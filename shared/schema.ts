@@ -142,14 +142,14 @@ export const scrapeSchedules = pgTable("scrape_schedules", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
-export const insertCountySchema = createInsertSchema(counties).omit({ id: true });
-export const insertPermitDatabaseSchema = createInsertSchema(permitDatabases).omit({ id: true });
-export const insertSearchQuerySchema = createInsertSchema(searchQueries).omit({ id: true, createdAt: true });
-export const insertSearchResultSchema = createInsertSchema(searchResults).omit({ id: true, createdAt: true });
-export const insertPropertyAppraiserSchema = createInsertSchema(propertyAppraisers).omit({ id: true });
-export const insertPropertyRecordSchema = createInsertSchema(propertyRecords).omit({ id: true, createdAt: true, fetchedAt: true });
-export const insertScrapeScheduleSchema = createInsertSchema(scrapeSchedules).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ createdAt: true });
+export const insertCountySchema = createInsertSchema(counties).omit({});
+export const insertPermitDatabaseSchema = createInsertSchema(permitDatabases).omit({});
+export const insertSearchQuerySchema = createInsertSchema(searchQueries).omit({ createdAt: true });
+export const insertSearchResultSchema = createInsertSchema(searchResults).omit({ createdAt: true });
+export const insertPropertyAppraiserSchema = createInsertSchema(propertyAppraisers).omit({});
+export const insertPropertyRecordSchema = createInsertSchema(propertyRecords).omit({ createdAt: true, fetchedAt: true });
+export const insertScrapeScheduleSchema = createInsertSchema(scrapeSchedules).omit({ createdAt: true });
 
 export const gmbListings = pgTable("gmb_listings", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -206,10 +206,10 @@ export const rankingGridResults = pgTable("ranking_grid_results", {
   checkedAt: timestamp("checked_at").notNull().defaultNow(),
 });
 
-export const insertGmbListingSchema = createInsertSchema(gmbListings).omit({ id: true, createdAt: true });
-export const insertGmbEditHistorySchema = createInsertSchema(gmbEditHistory).omit({ id: true, detectedAt: true });
-export const insertRankingGridScanSchema = createInsertSchema(rankingGridScans).omit({ id: true, createdAt: true });
-export const insertRankingGridResultSchema = createInsertSchema(rankingGridResults).omit({ id: true, checkedAt: true });
+export const insertGmbListingSchema = createInsertSchema(gmbListings).omit({ createdAt: true });
+export const insertGmbEditHistorySchema = createInsertSchema(gmbEditHistory).omit({ detectedAt: true });
+export const insertRankingGridScanSchema = createInsertSchema(rankingGridScans).omit({ createdAt: true });
+export const insertRankingGridResultSchema = createInsertSchema(rankingGridResults).omit({ checkedAt: true });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -270,8 +270,8 @@ export const competitorListings = pgTable("competitor_listings", {
   firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
 });
 
-export const insertCompetitorScanSchema = createInsertSchema(competitorScans).omit({ id: true, createdAt: true });
-export const insertCompetitorListingSchema = createInsertSchema(competitorListings).omit({ id: true, lastCheckedAt: true, firstSeenAt: true });
+export const insertCompetitorScanSchema = createInsertSchema(competitorScans).omit({ createdAt: true });
+export const insertCompetitorListingSchema = createInsertSchema(competitorListings).omit({ lastCheckedAt: true, firstSeenAt: true });
 
 export type CompetitorScan = typeof competitorScans.$inferSelect;
 export type InsertCompetitorScan = z.infer<typeof insertCompetitorScanSchema>;
@@ -290,7 +290,7 @@ export const subscriptions = pgTable("subscriptions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true, createdAt: true });
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ createdAt: true });
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 
@@ -379,13 +379,13 @@ export const locationAnalytics = pgTable("location_analytics", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertLocationAnalyticsSchema = createInsertSchema(locationAnalytics).omit({ id: true, createdAt: true });
+export const insertLocationAnalyticsSchema = createInsertSchema(locationAnalytics).omit({ createdAt: true });
 export type LocationAnalytics = typeof locationAnalytics.$inferSelect;
 export type InsertLocationAnalytics = z.infer<typeof insertLocationAnalyticsSchema>;
 
-export const insertBusinessLocationSchema = createInsertSchema(businessLocations).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertCitationCampaignSchema = createInsertSchema(citationCampaigns).omit({ id: true, createdAt: true });
-export const insertCitationSchema = createInsertSchema(citations).omit({ id: true, createdAt: true });
+export const insertBusinessLocationSchema = createInsertSchema(businessLocations).omit({ createdAt: true, updatedAt: true });
+export const insertCitationCampaignSchema = createInsertSchema(citationCampaigns).omit({ createdAt: true });
+export const insertCitationSchema = createInsertSchema(citations).omit({ createdAt: true });
 
 export type BusinessLocation = typeof businessLocations.$inferSelect;
 export type InsertBusinessLocation = z.infer<typeof insertBusinessLocationSchema>;
@@ -549,8 +549,8 @@ export const adSpyResults = pgTable("ad_spy_results", {
   seenAt: timestamp("seen_at").notNull().defaultNow(),
 });
 
-export const insertAdSpyKeywordSchema = createInsertSchema(adSpyKeywords).omit({ id: true, createdAt: true });
-export const insertAdSpyResultSchema = createInsertSchema(adSpyResults).omit({ id: true, seenAt: true });
+export const insertAdSpyKeywordSchema = createInsertSchema(adSpyKeywords).omit({ createdAt: true });
+export const insertAdSpyResultSchema = createInsertSchema(adSpyResults).omit({ seenAt: true });
 export type AdSpyKeyword = typeof adSpyKeywords.$inferSelect;
 export type InsertAdSpyKeyword = z.infer<typeof insertAdSpyKeywordSchema>;
 export type AdSpyResult = typeof adSpyResults.$inferSelect;
@@ -578,7 +578,7 @@ export const seoContracts = pgTable("seo_contracts", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
-export const insertSeoContractSchema = createInsertSchema(seoContracts).omit({ id: true, createdAt: true });
+export const insertSeoContractSchema = createInsertSchema(seoContracts).omit({ createdAt: true });
 export type SeoContract = typeof seoContracts.$inferSelect;
 export type InsertSeoContract = z.infer<typeof insertSeoContractSchema>;
 
@@ -636,7 +636,7 @@ export const reviewReminderSettings = pgTable("review_reminder_settings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertReminderSettingsSchema = createInsertSchema(reviewReminderSettings).omit({ id: true, updatedAt: true });
+export const insertReminderSettingsSchema = createInsertSchema(reviewReminderSettings).omit({ updatedAt: true });
 export type ReviewReminderSettings = typeof reviewReminderSettings.$inferSelect;
 export type InsertReminderSettings = z.infer<typeof insertReminderSettingsSchema>;
 
@@ -650,23 +650,23 @@ export const reviewTemplates = pgTable("review_templates", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertReviewTemplateSchema = createInsertSchema(reviewTemplates).omit({ id: true, createdAt: true });
+export const insertReviewTemplateSchema = createInsertSchema(reviewTemplates).omit({ createdAt: true });
 export type ReviewTemplate = typeof reviewTemplates.$inferSelect;
 export type InsertReviewTemplate = z.infer<typeof insertReviewTemplateSchema>;
 
-export const insertReviewRequestSchema = createInsertSchema(reviewRequests).omit({ id: true, createdAt: true });
+export const insertReviewRequestSchema = createInsertSchema(reviewRequests).omit({ createdAt: true });
 export type ReviewRequest = typeof reviewRequests.$inferSelect;
 export type InsertReviewRequest = z.infer<typeof insertReviewRequestSchema>;
 
-export const insertStateGuideSchema = createInsertSchema(stateGuides).omit({ id: true, createdAt: true });
-export const insertStateGuideStepSchema = createInsertSchema(stateGuideSteps).omit({ id: true });
-export const insertMasterClassModuleSchema = createInsertSchema(masterClassModules).omit({ id: true, createdAt: true });
-export const insertCoursePurchaseSchema = createInsertSchema(coursePurchases).omit({ id: true, purchasedAt: true });
-export const insertServicePurchaseSchema = createInsertSchema(servicePurchases).omit({ id: true, purchasedAt: true });
-export const insertTrackedDomainSchema = createInsertSchema(trackedDomains).omit({ id: true, createdAt: true });
-export const insertClickVisitSchema = createInsertSchema(clickVisits).omit({ id: true, visitedAt: true });
-export const insertBlockedIpSchema = createInsertSchema(blockedIps).omit({ id: true, blockedAt: true });
-export const insertVpnVisitSchema = createInsertSchema(vpnVisits).omit({ id: true, visitedAt: true });
+export const insertStateGuideSchema = createInsertSchema(stateGuides).omit({ createdAt: true });
+export const insertStateGuideStepSchema = createInsertSchema(stateGuideSteps).omit({});
+export const insertMasterClassModuleSchema = createInsertSchema(masterClassModules).omit({ createdAt: true });
+export const insertCoursePurchaseSchema = createInsertSchema(coursePurchases).omit({ purchasedAt: true });
+export const insertServicePurchaseSchema = createInsertSchema(servicePurchases).omit({ purchasedAt: true });
+export const insertTrackedDomainSchema = createInsertSchema(trackedDomains).omit({ createdAt: true });
+export const insertClickVisitSchema = createInsertSchema(clickVisits).omit({ visitedAt: true });
+export const insertBlockedIpSchema = createInsertSchema(blockedIps).omit({ blockedAt: true });
+export const insertVpnVisitSchema = createInsertSchema(vpnVisits).omit({ visitedAt: true });
 
 export const betaAccessCodes = pgTable("beta_access_codes", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -683,7 +683,7 @@ export const betaAccessCodes = pgTable("beta_access_codes", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertBetaAccessCodeSchema = createInsertSchema(betaAccessCodes).omit({ id: true, createdAt: true });
+export const insertBetaAccessCodeSchema = createInsertSchema(betaAccessCodes).omit({ createdAt: true });
 export type BetaAccessCode = typeof betaAccessCodes.$inferSelect;
 export type InsertBetaAccessCode = z.infer<typeof insertBetaAccessCodeSchema>;
 
@@ -707,7 +707,7 @@ export const googleProfileReviews = pgTable("google_profile_reviews", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertGoogleProfileReviewSchema = createInsertSchema(googleProfileReviews).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertGoogleProfileReviewSchema = createInsertSchema(googleProfileReviews).omit({ createdAt: true, updatedAt: true });
 export type GoogleProfileReview = typeof googleProfileReviews.$inferSelect;
 export type InsertGoogleProfileReview = z.infer<typeof insertGoogleProfileReviewSchema>;
 
@@ -740,7 +740,7 @@ export const mediaFolders = pgTable("media_folders", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertMediaFolderSchema = createInsertSchema(mediaFolders).omit({ id: true, createdAt: true });
+export const insertMediaFolderSchema = createInsertSchema(mediaFolders).omit({ createdAt: true });
 export type MediaFolder = typeof mediaFolders.$inferSelect;
 export type InsertMediaFolder = z.infer<typeof insertMediaFolderSchema>;
 
@@ -755,7 +755,7 @@ export const mediaPhotos = pgTable("media_photos", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertMediaPhotoSchema = createInsertSchema(mediaPhotos).omit({ id: true, createdAt: true });
+export const insertMediaPhotoSchema = createInsertSchema(mediaPhotos).omit({ createdAt: true });
 export type MediaPhoto = typeof mediaPhotos.$inferSelect;
 export type InsertMediaPhoto = z.infer<typeof insertMediaPhotoSchema>;
 
@@ -836,11 +836,11 @@ export const adminAuditLog = pgTable("admin_audit_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertLsaManagerConnectionSchema = createInsertSchema(lsaManagerConnection).omit({ id: true, connectedAt: true });
-export const insertLsaManagerAccountSchema = createInsertSchema(lsaManagerAccounts).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertLsaManagerInvitationSchema = createInsertSchema(lsaManagerInvitations).omit({ id: true, invitedAt: true });
-export const insertLsaManagerLeadSchema = createInsertSchema(lsaManagerLeads).omit({ id: true, createdAt: true });
-export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog).omit({ id: true, createdAt: true });
+export const insertLsaManagerConnectionSchema = createInsertSchema(lsaManagerConnection).omit({ connectedAt: true });
+export const insertLsaManagerAccountSchema = createInsertSchema(lsaManagerAccounts).omit({ createdAt: true, updatedAt: true });
+export const insertLsaManagerInvitationSchema = createInsertSchema(lsaManagerInvitations).omit({ invitedAt: true });
+export const insertLsaManagerLeadSchema = createInsertSchema(lsaManagerLeads).omit({ createdAt: true });
+export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog).omit({ createdAt: true });
 
 export type LsaManagerConnection = typeof lsaManagerConnection.$inferSelect;
 export type InsertLsaManagerConnection = z.infer<typeof insertLsaManagerConnectionSchema>;
