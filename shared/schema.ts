@@ -49,6 +49,9 @@ export const permitDatabases = pgTable("permit_databases", {
   searchableFields: text("searchable_fields").array(),
   isActive: boolean("is_active").notNull().default(true),
   lastScrapedAt: timestamp("last_scraped_at"),
+  // Link-verifier status: 'live' | 'dead' | 'unchecked' (see scripts/verify-links.ts).
+  linkStatus: text("link_status").default("unchecked"),
+  lastVerifiedAt: timestamp("last_verified_at"),
   notes: text("notes"),
 });
 
@@ -85,9 +88,11 @@ export const propertyAppraisers = pgTable("property_appraisers", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: text("name").notNull(),
   countyId: integer("county_id").notNull(),
-  portalUrl: text("portal_url").notNull(),
-  searchUrl: text("search_url").notNull(),
-  platform: text("platform").notNull(),
+  // Nullable: a real assessment office may have no online portal on record. We
+  // store null rather than fabricating a URL (see server/data/appraisers.json).
+  portalUrl: text("portal_url"),
+  searchUrl: text("search_url"),
+  platform: text("platform"),
   phone: text("phone"),
   address: text("address"),
   searchableFields: text("searchable_fields").array(),
@@ -95,6 +100,9 @@ export const propertyAppraisers = pgTable("property_appraisers", {
   ownerSearchPattern: text("owner_search_pattern"),
   parcelSearchPattern: text("parcel_search_pattern"),
   isActive: boolean("is_active").notNull().default(true),
+  // Link-verifier status: 'live' | 'dead' | 'unchecked' (see scripts/verify-links.ts).
+  linkStatus: text("link_status").default("unchecked"),
+  lastVerifiedAt: timestamp("last_verified_at"),
   notes: text("notes"),
 });
 

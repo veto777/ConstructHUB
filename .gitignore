@@ -14,3 +14,6 @@ uploads/
 .env.local
 .cache/
 .turbo/
+
+# NETR scraper checkpoint (scratch)
+server/data/.scrape-progress.json
