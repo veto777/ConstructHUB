@@ -5,6 +5,7 @@ import { seedExpandedStates } from "./seed-all-states";
 import { seedAllCounties } from "./seed-all-counties";
 import { seedAllCities } from "./seed-all-cities";
 import { seedAllAppraisers } from "./seed-all-appraisers";
+import { seedPermitPortals } from "./seed-permit-portals";
 import { seedReferenceData } from "./seed-reference-data";
 
 export async function seedDatabase() {
@@ -19,6 +20,7 @@ export async function seedDatabase() {
       await seedAllCities();
     }
     await seedAllAppraisers();
+    await seedPermitPortals();
     return;
   }
   if (existing.length > 0 && existing.length < 3000) {

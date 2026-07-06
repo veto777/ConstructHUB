@@ -1,0 +1,217 @@
+[
+  {
+    "jurisdiction": "Albuquerque, NM",
+    "url": "https://posse.cabq.gov/",
+    "platform": "Albuquerque POSSE"
+  },
+  {
+    "jurisdiction": "Anaheim, CA",
+    "url": "https://aca-prod.accela.com/ANAHEIM/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Atlanta, GA",
+    "url": "https://aca-prod.accela.com/ATLANTA_GA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Austin, TX",
+    "url": "https://abc.austintexas.gov/web/permit/public-search-other",
+    "platform": "Austin Build + Connect"
+  },
+  {
+    "jurisdiction": "Boise, ID",
+    "url": "https://aca-prod.accela.com/BOISE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Chandler, AZ",
+    "url": "https://aca-prod.accela.com/CHANDLER/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Chicago, IL",
+    "url": "https://webapps1.chicago.gov/buildingrecords/",
+    "platform": "Chicago Building Records"
+  },
+  {
+    "jurisdiction": "Cincinnati, OH",
+    "url": "https://aca-prod.accela.com/CINCINNATI/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Colorado Springs, CO",
+    "url": "https://aca-prod.accela.com/COSPRINGS/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Denver, CO",
+    "url": "https://aca-prod.accela.com/DENVER/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Detroit, MI",
+    "url": "https://aca-prod.accela.com/DETROIT/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Fort Lauderdale, FL",
+    "url": "https://aca-prod.accela.com/FTL/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Fort Worth, TX",
+    "url": "https://aca-prod.accela.com/CFW/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Fresno, CA",
+    "url": "https://aca-prod.accela.com/FRESNO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Honolulu, HI",
+    "url": "https://dppweb.honolulu.gov/",
+    "platform": "Honolulu DPP"
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "platform": "Houston Permitting Center"
+  },
+  {
+    "jurisdiction": "Jacksonville, FL",
+    "url": "https://buildinginspections.coj.net/",
+    "platform": "Jacksonville Building Inspection"
+  },
+  {
+    "jurisdiction": "Los Angeles, CA",
+    "url": "https://www.ladbsservices2.lacity.org/OnlineServices/",
+    "platform": "LADBS Online"
+  },
+  {
+    "jurisdiction": "Memphis, TN",
+    "url": "https://aca-prod.accela.com/SHELBYCO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Mesa, AZ",
+    "url": "https://aca-prod.accela.com/MESA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Milwaukee, WI",
+    "url": "https://www.milwaukee.gov/DNS/permits",
+    "platform": "Milwaukee DNS"
+  },
+  {
+    "jurisdiction": "Nashville, TN",
+    "url": "https://epermits.nashville.gov/",
+    "platform": "Nashville ePermits"
+  },
+  {
+    "jurisdiction": "New Orleans, LA",
+    "url": "https://onestopapp.nola.gov/",
+    "platform": "New Orleans One Stop"
+  },
+  {
+    "jurisdiction": "New York, NY",
+    "url": "https://a810-dobnow.nyc.gov/publish/Index.html",
+    "platform": "NYC DOB NOW"
+  },
+  {
+    "jurisdiction": "Oakland, CA",
+    "url": "https://aca-prod.accela.com/OAKLAND/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Oklahoma City, OK",
+    "url": "https://aca-prod.accela.com/OKC/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Omaha, NE",
+    "url": "https://aca-prod.accela.com/OMAHA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Philadelphia, PA",
+    "url": "https://eclipse.phila.gov/phillylmsprod/pub/lms/Login.aspx",
+    "platform": "Philadelphia Eclipse"
+  },
+  {
+    "jurisdiction": "Pittsburgh, PA",
+    "url": "https://pittsburghpa.gov/pli/",
+    "platform": "Pittsburgh PLI"
+  },
+  {
+    "jurisdiction": "Portland, OR",
+    "url": "https://www.portland.gov/permits",
+    "platform": "Portland Permitting"
+  },
+  {
+    "jurisdiction": "Raleigh, NC",
+    "url": "https://raleighnc.gov/permits",
+    "platform": "Raleigh Permits"
+  },
+  {
+    "jurisdiction": "Reno, NV",
+    "url": "https://aca-prod.accela.com/RENO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Sacramento, CA",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Saint Paul, MN",
+    "url": "https://www.stpaul.gov/departments/safety-inspections",
+    "platform": "St. Paul DSI"
+  },
+  {
+    "jurisdiction": "San Antonio, TX",
+    "url": "https://aca-prod.accela.com/COSA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "San Diego, CA",
+    "url": "https://aca-prod.accela.com/SANDIEGO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "San Francisco, CA",
+    "url": "https://dbiweb02.sfgov.org/dbipts/",
+    "platform": "SF DBI PTS"
+  },
+  {
+    "jurisdiction": "Santa Ana, CA",
+    "url": "https://aca-prod.accela.com/SANTAANA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Seattle, WA",
+    "url": "https://cosaccela.seattle.gov/portal/",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Stockton, CA",
+    "url": "https://aca-prod.accela.com/STOCKTON/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Tampa, FL",
+    "url": "https://aca-prod.accela.com/TAMPA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Tucson, AZ",
+    "url": "https://tdc-online.tucsonaz.gov/",
+    "platform": "Tucson TDC Online"
+  },
+  {
+    "jurisdiction": "Wichita, KS",
+    "url": "https://aca-prod.accela.com/WICHITA/Default.aspx",
+    "platform": "Accela"
+  }
+]
