@@ -435,6 +435,21 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
               Search
             </a>
           )}
+          {/* No official portal on record: offer an honest web search rather than a
+              fabricated link. Clearly labeled and styled as a "find", not a portal. */}
+          {!database.portalUrl && !database.searchUrl && (
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(`${database.jurisdiction} building permit search portal`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 italic text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`link-search-fallback-${database.id}`}
+              title="No official portal on record — search the web for this jurisdiction's permit portal"
+            >
+              <Search className="h-3 w-3" />
+              Find permit portal
+            </a>
+          )}
           {database.phone && (
             <span className="flex items-center gap-1">
               <Phone className="h-3 w-3" />
