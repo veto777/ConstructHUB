@@ -1,0 +1,574 @@
+
+
+**Version**: 1.0
+**Date**: February 25, 2026
+**Status**: In Development
+
+---
+
+## 1. Executive Summary
+
+BlackHat Beacon is a web-based platform that detects, analyzes, and reports black hat SEO techniques on websites. It provides transparent website ratings (A++ to F--), evidence-backed findings with blockchain verification, and community-driven public reporting. The platform operates on a freemium model and incorporates data privacy and legal compliance features including privacy policy analysis and consent management.
+
+---
+
+## 2. Product Vision
+
+### 2.1 Problem Statement
+Black hat SEO practices undermine search engine integrity, harm legitimate businesses, and can expose users to security risks. Website owners, SEO professionals, and regulators lack accessible tools to identify and document these practices with verifiable evidence.
+
+### 2.2 Solution
+BlackHat Beacon provides a multi-layered detection engine that combines rule-based pattern matching, AI-powered analysis, and web crawling to identify unethical SEO techniques. Results are stored with blockchain-verified evidence chains for auditability and legal defensibility.
+
+### 2.3 Target Users
+- **SEO Professionals** — Audit client and competitor websites for compliance
+- **Website Owners** — Verify their own sites are free of black hat techniques
+- **Digital Marketers** — Evaluate potential partners and vendors
+- **Regulators & Compliance Officers** — Investigate reports of deceptive practices
+- **General Public** — Check the trustworthiness of websites before engaging
+
+---
+
+## 3. Design Philosophy
+
+### 3.1 UI/UX Aesthetic
+The interface follows modern design principles inspired by SwiftUI and Jetpack Compose:
+- **Clean, card-based layouts** with consistent shadows and rounded corners
+- **Color-coded severity system** — Blue (Low), Yellow (Medium), Orange (High), Red (Critical)
+- **Rating gradient system** — Green (A), Cyan (B), Yellow (C), Orange (D), Red (F), Dark Red (F--)
+- **Inter font family** with clear typographic hierarchy
+- **Responsive design** with mobile-first breakpoints at 576px, 768px, 992px, 1200px
+- **Smooth micro-interactions** — card hover lifts, button transitions, progress animations
+
+### 3.2 Icon & Asset Strategy
+- Feather Icons and Font Awesome (v6.4.0) for iconography
+- SVG-first approach for vector graphics
+- Chart.js for data visualization (pie charts, bar charts)
+- Bootstrap 5 component framework
+
+---
+
+## 4. Feature Specification
+
+### 4.1 Public Features (No Login Required)
+
+#### 4.1.1 Homepage & Free Quick Scan
+- **Route**: `/`
+- Hero section with value proposition and call-to-action
+- Free URL scan form — no registration required
+- Quick scan results showing:
+  - Domain rating (A++ to F--)
+  - Count of detected techniques
+  - 3 visible issues (freemium gate)
+  - Blurred overlay for additional issues with signup prompt
+- Scan timestamp display
+
+#### 4.1.2 SEO Techniques Spectrum
+- **Route**: `/techniques`
+- Visual spectrum from White Hat → Gray Hat → Black Hat → Illegal
+- Rating scale mapping (A+ to F--)
+- Four categorized tiers with accordion-style detailed explanations:
+  - **White Hat (Ethical, A rating)**: Quality content, proper meta tags, legitimate link building
+  - **Gray Hat (Questionable, B-C rating)**: Aggressive optimization, borderline tactics
+  - **Black Hat (Unethical, D-F rating)**: Keyword stuffing, hidden text/links, cloaking, doorway pages, link farming, content scraping
+  - **Illegal (Harmful, F-- rating)**: Pharma hacking, website hacking, malware distribution, phishing schemes, identity theft, trademark infringement
+
+#### 4.1.3 Rule-Based Analysis
+- **Route**: `/rule-based-analysis`
+- Zero-cost analysis using pattern recognition (no API calls)
+- Detects: keyword density anomalies, content quality issues, link patterns, meta tag manipulation
+- Ethics spectrum meter visualization
+- Accessible without login
+
+#### 4.1.4 AI-Powered Detection
+- **Route**: `/ai-detection`
+- Advanced detection using AI models
+- Identifies sophisticated techniques missed by rule-based systems
+- Displays confidence levels and severity ratings
+- Available without login (enhanced for registered users)
+
+#### 4.1.5 Preview Pages
+- **Blockchain Evidence Preview** (`/blockchain/preview`): Demo of blockchain verification system
+- **Privacy Analysis Preview** (`/privacy/preview`): Demo of privacy compliance scanning
+- Both show limited data with login prompts for full access
+
+#### 4.1.6 Informational Pages
+- **About** (`/about`): Mission, technology highlights, team info
+- **Privacy Policy** (`/privacy`): GDPR/CCPA compliant disclosure
+- **Sitemap** (`/sitemap.xml`): XML sitemap for search engines
+- **Robots.txt** (`/robots.txt`): Crawler directives
+- **Status** (`/status`): JSON health check endpoint
+
+---
+
+### 4.2 Authenticated Features (Login Required)
+
+#### 4.2.1 Dashboard
+- **Route**: `/dashboard`
+- Statistics overview cards: Total scans, Completed, Failed, High-risk count
+- Scan results by rating (pie chart)
+- Issues by type (bar chart)
+- Recent scans list (10 most recent)
+- High-risk sites list (D rating or lower)
+
+#### 4.2.2 Full Website Scan
+- **Route**: `/scan`
+- URL input with validation
+- Crawler selection:
+  - Simple Crawler (recommended, reliable)
+  - Hybrid Crawler (combines Nutch, StormCrawler, Heritrix, Colly strategies)
+  - Enhanced Scrapy Crawler (advanced with JS support)
+  - Basic Crawler (legacy)
+  - Website Analysis (content-focused)
+- Configurable max pages (25–500)
+- Background async scanning with real-time progress (0–100%)
+- Detection categories: keyword stuffing, hidden text/links, cloaking, doorway pages, link schemes, meta manipulation, excessive redirects
+
+#### 4.2.3 Scan Report
+- **Route**: `/scan/<scan_id>`
+- Real-time progress tracking during scan
+- Scan metadata: domain, URL, rating, score, status, timestamps
+- Detected issues with:
+  - Issue type and severity (low/medium/high/critical)
+  - Confidence percentage (0–100%)
+  - Page location
+  - Detailed description
+- Evidence records with SHA-256 verification hashes
+- Export report as JSON
+- Delete scan option
+
+#### 4.2.4 Privacy Compliance Analysis
+- **Privacy Report** (`/scan/<scan_id>/privacy`):
+  - Privacy policy detection and quality score
+  - Cookie consent mechanism detection
+  - Tracking method identification (Google Analytics, Facebook Pixel, etc.)
+  - IP tracking and hidden tracking detection
+  - GDPR compliance score (0–100)
+  - CCPA compliance score (0–100)
+  - Risk level assessment
+  - Individual issues with recommendations and regulatory references
+
+- **Privacy Dashboard** (`/privacy/dashboard`):
+  - Total analyses count, high-risk count, compliant count
+  - Recent analyses with risk badges and score progress bars
+
+- **Consent Management** (`/privacy/consents`):
+  - Toggle switches for IP tracking, cookies, analytics consent
+  - Full audit log of consent changes with timestamps, IP, user agent
+
+#### 4.2.5 Blockchain Evidence Chain
+- **Route**: `/blockchain`
+- Statistics: total blocks, transactions, chain integrity, endorsements
+- Interactive block-by-block visualization with hash display
+- Evidence records table with filtering by issue type
+- Chain verification button
+- Full evidence chain export
+- Hyperledger Fabric-inspired architecture with endorsements and channels
+
+#### 4.2.6 Website Content Analysis
+- **Route**: `/website-analysis`
+- Deep content analysis with AI
+- Manual HTML content submission
+- Detailed SEO metrics and recommendations
+
+---
+
+### 4.3 API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `/api/scan-status/<scan_id>` | GET | Yes | Real-time scan progress (JSON) |
+| `/api/report/<scan_id>` | GET | Yes | Complete report data (JSON) |
+| `/website-analysis-api` | POST | Yes | Full AI-powered content analysis |
+| `/blockchain/verify` | POST | Yes | Verify blockchain integrity |
+| `/export/report/<scan_id>` | GET | Yes | Download report as JSON file |
+
+---
+
+## 5. Technical Architecture
+
+### 5.1 Technology Stack
+
+| Layer | Technology |
+|---|---|
+| **Web Framework** | Flask (Python) |
+| **Database** | PostgreSQL (production) / SQLite (development) |
+| **ORM** | SQLAlchemy with Flask-SQLAlchemy |
+| **Authentication** | Flask-Login with Werkzeug password hashing |
+| **Frontend** | Jinja2 templates, Bootstrap 5, Chart.js |
+| **AI/ML** | OpenAI GPT-3.5-turbo / GPT-4o (optional) |
+| **Web Crawling** | Requests, BeautifulSoup4, Selenium, Scrapy |
+| **Text Extraction** | Trafilatura |
+| **Evidence Integrity** | Custom blockchain with SHA-256 hashing |
+| **Server** | Gunicorn (WSGI) |
+
+### 5.2 Crawler Architecture
+
+The system uses a **Facade Pattern** with pluggable crawler strategies:
+
+```
+Crawler Facade (crawler_facade.py)
+├── Unified Crawler (unified_crawler.py) — Primary, strategy-based
+│   └── SimpleCrawlerStrategy — Default requests + BeautifulSoup
+├── Simple Crawler (simple_crawler.py) — Fallback
+├── Enhanced Crawler (enhanced_crawler.py) — Scrapy-based
+└── Hybrid Crawler (hybrid_crawler.py) — Multi-strategy combination
+```
+
+**Crawler Features**:
+- User-agent rotation (7 agents)
+- Random request delays (0.2–1.0s) for stealth
+- Error handling with metadata tracking
+- Progress tracking (0–100%)
+- Evidence collection with SHA-256 hashing
+
+### 5.3 Analysis Pipeline
+
+Detection operates across four layers, from fastest/cheapest to most sophisticated:
+
+```
+Layer 1: Rule-Based Detection (analyzer.py)
+    └─ Fast, zero API cost, pattern-matching
+       Detects: keyword density >5%, CSS hiding, suspicious anchors, link ratios
+
+Layer 2: AI Analyzer Fallback (ai_analyzer.py)
+    └─ Rule-based fallback when ML libraries unavailable
+       Word frequency analysis, CSS pattern detection
+
+Layer 3: SEO Content Analyzer (seo_content_analyzer.py)
+    └─ OpenAI GPT-3.5-turbo/GPT-4o powered
+       Full page content analysis, violation detection, rating assignment
+
+Layer 4: Advanced AI Detector (advanced_ai_detector.py)
+    └─ GPT-4o model, 16 detection types
+       Catches: AI-generated spam, structured data abuse, sneaky redirects, URL manipulation
+```
+
+### 5.4 Scan Execution Flow
+
+```
+User submits URL → Website record created → ScanJob created (status: queued)
+    → Background thread spawned → Crawler Facade selects crawler
+    → Pages crawled recursively → Each page analyzed through detection layers
+    → Evidence records created with verification hashes
+    → Rating calculated from weighted severity scores
+    → ScanReport stored → ScanJob marked completed
+```
+
+### 5.5 Rating System
+
+Ratings are calculated based on the number and severity of detected issues:
+
+| Rating | Meaning | Color |
+|---|---|---|
+| A++ / A+ / A / A- | Clean / Minimal issues | Green |
+| B+ / B / B- | Minor concerns | Cyan |
+| C+ / C / C- | Moderate issues | Yellow |
+| D+ / D / D- | Significant problems | Orange |
+| F+ / F / F- | Severe violations | Red |
+| F-- | Extreme / Illegal activity | Dark Red (special styling) |
+
+---
+
+## 6. Data Model
+
+### 6.1 Entity Relationship Diagram
+
+```
+User (1) ──── (N) ScanJob ──── (1) ScanReport ──── (N) Evidence
+  │                  │
+  │                  └──── (1) PrivacyAnalysis ──── (N) PrivacyIssue
+  │
+  ├──── (N) UserConsent
+  └──── (N) AuditLog
+
+Website (1) ──── (N) ScanJob
+
+BlackHatTechnique (reference table)
+```
+
+### 6.2 Core Tables
+
+| Table | Purpose | Key Fields |
+|---|---|---|
+| **user** | Authentication & profiles | username, email, password_hash, created_at |
+| **website** | Scanned domains | url, domain, first_scanned, last_scanned, latest_rating |
+| **scan_job** | Scan execution tracking | scan_id, user_id, website_id, status, rating, score, progress |
+| **scan_report** | Detailed scan results | scan_job_id, raw_data (JSON), summary, issues_count |
+| **evidence** | Individual findings | issue_type, location, description, confidence, severity, verification_hash |
+| **blackhat_technique** | Technique reference DB | name, description, severity, category, weight, ethical_score, legal_score, is_illegal |
+| **user_consent** | GDPR consent tracking | user_id, consent_type, consented, ip_address |
+| **audit_log** | Action audit trail | user_id, action_type, action_details, ip_address, user_agent |
+| **privacy_analysis** | Privacy scan results | has_privacy_policy, gdpr_compliance_score, ccpa_compliance_score, tracking_methods_detected |
+| **privacy_issue** | Privacy findings | issue_type, description, severity, recommendation, references |
+
+### 6.3 Blockchain Evidence Storage
+
+File-based immutable evidence chain (`blockchain_data/evidence_chain.json`):
+- Genesis block + sequential evidence blocks
+- Each block contains: index, timestamp, transactions (evidence), previous_hash, hash, nonce
+- Hyperledger Fabric-inspired endorsements from simulated nodes
+- SHA-256 chain integrity verification
+
+---
+
+## 7. Business Model (Freemium)
+
+### 7.1 Free Tier (No Registration)
+- Quick scan from homepage (limited per session)
+- View 3 of N detected issues per scan
+- Rule-based analysis (unlimited, no API cost)
+- AI detection page access
+- Techniques spectrum reference
+- Preview modes for blockchain and privacy features
+
+### 7.2 Registered Tier (Free with Login)
+- Full scan reports with all detected issues visible
+- Multiple crawler options (Simple, Hybrid, Enhanced)
+- Configurable scan depth (25–500 pages)
+- Dashboard with scan history and analytics
+- Privacy compliance analysis with GDPR/CCPA scores
+- Blockchain evidence storage and verification
+- Consent management with audit logging
+- Report export (JSON)
+- Scan management (view, delete)
+
+### 7.3 Future Premium Tier (Planned)
+- Scheduled/recurring scans
+- API access for programmatic scanning
+- White-label reports
+- Priority scanning queue
+- Advanced AI analysis with higher limits
+- Team accounts with shared dashboards
+
+---
+
+## 8. Security & Compliance
+
+### 8.1 Authentication
+- Flask-Login session management
+- Werkzeug password hashing (default algorithm)
+- Login-required decorators on protected routes
+
+### 8.2 Data Privacy
+- GDPR-compliant privacy policy
+- CCPA-compliant disclosures
+- Granular consent management (IP tracking, cookies, analytics)
+- Full audit logging of consent changes
+- User data access and deletion capabilities
+
+### 8.3 Evidence Integrity
+- SHA-256 verification hashes on all evidence records
+- Blockchain-style immutable evidence chain
+- Endorsement system for evidence validation
+- Chain integrity verification endpoint
+
+---
+
+## 9. SEO Techniques Detected
+
+### 9.1 Content Manipulation
+| Technique | Detection Method | Severity |
+|---|---|---|
+| Keyword Stuffing | Density analysis (>5% threshold), repetitive sequences | Medium–High |
+| Hidden Text/Links | CSS property detection (display:none, visibility:hidden, font-size:0) | High |
+| Thin/Duplicate Content | Content-to-code ratio analysis | Medium |
+| AI-Generated Spam | GPT-4o pattern analysis | High |
+
+### 9.2 Deceptive Redirects & Cloaking
+| Technique | Detection Method | Severity |
+|---|---|---|
+| Cloaking | User-agent differentiation, JavaScript-based content swaps | Critical |
+| Doorway Pages | Thin content + excessive links ratio | High |
+| Sneaky Redirects | Redirect chain analysis | High |
+
+### 9.3 Link Manipulation
+| Technique | Detection Method | Severity |
+|---|---|---|
+| Link Farming | External link density, domain repetition | High |
+| Link Schemes | Suspicious anchor text patterns, footer spam | High |
+| Paid Link Networks | Pattern-based detection | Medium–High |
+
+### 9.4 Technical Abuse
+| Technique | Detection Method | Severity |
+|---|---|---|
+| Meta Tag Manipulation | Over-optimization patterns | Medium |
+| Structured Data Spam | AI-powered detection | High |
+| URL Manipulation | Pattern analysis | Medium |
+
+### 9.5 Illegal Activities
+| Technique | Detection Method | Severity |
+|---|---|---|
+| Pharma Hacking | Content injection pattern detection | Critical |
+| Website Hacking | Unauthorized modification indicators | Critical |
+| Malware Distribution | Suspicious script and redirect detection | Critical |
+| Phishing Schemes | Deceptive form and URL analysis | Critical |
+| Identity Theft | Personal data harvesting detection | Critical |
+| Trademark Infringement | Brand name misuse patterns | Critical |
+
+---
+
+## 10. Page & Route Map
+
+### Public Routes
+| Route | Page | Description |
+|---|---|---|
+| `/` | Homepage | Hero + free quick scan |
+| `/about` | About | Mission and technology |
+| `/privacy` | Privacy Policy | Legal compliance |
+| `/techniques` | Techniques Spectrum | Full technique reference |
+| `/rule-based-analysis` | Rule-Based Analysis | Free pattern-based scanning |
+| `/ai-detection` | AI Detection | AI-powered scanning |
+| `/privacy/preview` | Privacy Preview | Demo privacy analysis |
+| `/blockchain/preview` | Blockchain Preview | Demo evidence chain |
+| `/website-analysis` | Website Analysis | Content analysis tool |
+| `/status` | Status | Health check (JSON) |
+| `/sitemap.xml` | Sitemap | XML sitemap |
+| `/robots.txt` | Robots | Crawler directives |
+
+### Authentication Routes
+| Route | Page | Description |
+|---|---|---|
+| `/register` | Registration | New account creation |
+| `/login` | Login | Email/password authentication |
+| `/logout` | Logout | Session termination |
+
+### Authenticated Routes
+| Route | Page | Description |
+|---|---|---|
+| `/dashboard` | Dashboard | Scan history and analytics |
+| `/scan` | New Scan | Configure and launch scans |
+| `/scan/<scan_id>` | Scan Report | View results and evidence |
+| `/scan/<scan_id>/privacy` | Privacy Report | Privacy compliance results |
+| `/privacy/dashboard` | Privacy Dashboard | Privacy analysis overview |
+| `/privacy/consents` | Consent Management | GDPR consent toggles |
+| `/blockchain` | Blockchain Evidence | Full evidence chain view |
+| `/delete-scan/<scan_id>` | Delete Scan | Remove scan data |
+| `/export/report/<scan_id>` | Export Report | Download JSON report |
+
+### API Routes
+| Route | Method | Description |
+|---|---|---|
+| `/api/scan-status/<scan_id>` | GET | Scan progress polling |
+| `/api/report/<scan_id>` | GET | Report data retrieval |
+| `/website-analysis-api` | POST | Content analysis |
+| `/blockchain/verify` | POST | Chain integrity check |
+
+---
+
+## 11. File Structure
+
+```
+blackhat-beacon/
+├── main.py                      # Application entry point
+├── app.py                       # Flask app factory, DB config
+├── routes.py                    # All route handlers
+├── models.py                    # SQLAlchemy data models (10 tables)
+│
+├── unified_crawler.py           # Primary crawler (strategy pattern)
+├── crawler_facade.py            # Crawler selection facade
+├── simple_crawler.py            # Basic requests-based crawler
+├── enhanced_crawler.py          # Scrapy-based crawler
+├── hybrid_crawler.py            # Multi-strategy crawler
+├── crawler.py                   # Legacy crawler (Selenium)
+│
+├── analyzer.py                  # Rule-based SEO analyzer
+├── ai_analyzer.py               # AI analyzer (ML fallback)
+├── seo_content_analyzer.py      # OpenAI content analysis
+├── advanced_ai_detector.py      # GPT-4o advanced detection
+├── detection.py                 # Core detection functions
+├── quick_scan.py                # Homepage quick scan module
+├── privacy_analyzer.py          # Privacy compliance analyzer
+│
+├── blockchain_evidence.py       # Blockchain evidence system
+├── blockchain_data/             # Evidence chain storage
+│   └── evidence_chain.json
+│
+├── templates/
+│   ├── layout.html              # Base template (nav, footer, scripts)
+│   ├── index.html               # Homepage
+│   ├── about.html               # About page
+│   ├── privacy.html             # Privacy policy
+│   ├── techniques.html          # SEO techniques spectrum
+│   ├── scan.html                # New scan form
+│   ├── report.html              # Scan report display
+│   ├── dashboard.html           # User dashboard
+│   ├── login.html               # Login form
+│   ├── register.html            # Registration form
+│   ├── rule_based_analysis.html # Rule-based analysis
+│   ├── ai_detection.html        # AI detection page
+│   ├── content_analyzer.html    # Website analysis
+│   ├── blockchain.html          # Blockchain evidence
+│   ├── privacy_report.html      # Privacy scan report
+│   ├── privacy_dashboard.html   # Privacy dashboard
+│   ├── privacy_public.html      # Privacy preview
+│   ├── manage_consents.html     # Consent management
+│   ├── 404.html                 # Not found error
+│   └── 500.html                 # Server error
+│
+├── static/
+│   └── css/
+│       └── styles.css           # Main stylesheet (1273 lines)
+│
+└── instance/
+    └── blackhat_beacon.db       # SQLite database (dev)
+```
+
+---
+
+## 12. Non-Functional Requirements
+
+### 12.1 Performance
+- Scan progress updates in real-time (0–100%)
+- Quick scan results within 10–30 seconds
+- Full scans support up to 500 pages
+- Request delays (0.2–1.0s) for responsible crawling
+
+### 12.2 Reliability
+- Automatic crawler fallback (enhanced → simple → unified)
+- Graceful error handling with metadata tracking
+- Database connection pooling with pre-ping health checks
+- Pool recycling every 300 seconds
+
+### 12.3 Scalability
+- Modular crawler architecture supports adding new strategies
+- Analysis pipeline layers can be enabled/disabled independently
+- Background thread scanning for non-blocking operation
+
+### 12.4 Cost Optimization
+- Rule-based analysis operates at zero API cost
+- AI features are optional and degrade gracefully
+- No paid API required for core functionality
+- OpenAI integration is supplementary, not mandatory
+
+---
+
+## 13. Future Roadmap
+
+| Priority | Feature | Description |
+|---|---|---|
+| High | Scheduled Scans | Recurring automated scans with change detection |
+| High | Community Reporting | Public submission and voting on reported sites |
+| Medium | API Access | RESTful API for third-party integrations |
+| Medium | White-Label Reports | Branded PDF report generation |
+| Medium | Team Accounts | Multi-user organizations with shared dashboards |
+| Low | Browser Extension | Quick-scan browser plugin for Chrome/Firefox |
+| Low | Competitive Analysis | Side-by-side website comparison reports |
+| Low | Historical Trends | Rating changes over time with trend visualization |
+
+---
+
+## 14. Success Metrics
+
+| Metric | Target |
+|---|---|
+| Free scans per month | 10,000+ |
+| Registration conversion rate | 15% of free scan users |
+| Scan completion rate | >95% |
+| Average scan accuracy | >85% confidence |
+| Page load time | <2 seconds |
+| Uptime | 99.5% |
+
+---
+
+*This document serves as the authoritative reference for the BlackHat Beacon product. All features described reflect the current implementation state with planned enhancements noted in the roadmap section.*

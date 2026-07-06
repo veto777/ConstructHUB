@@ -1,0 +1,167 @@
+[
+  {
+    "state_guide_id": 47,
+    "step_number": 1,
+    "title": "Form Your Business Entity with Secretary of State",
+    "description": "Register your LLC, Corporation, or other business entity with the Washington Secretary of State. This will issue you a UBI (Unified Business Identifier) number, which you will use for all state registrations. You can file online. LLC filing fee is $200.",
+    "url": "https://www.sos.wa.gov/corps/",
+    "url_label": "WA Secretary of State",
+    "category": "formation",
+    "is_required": true,
+    "tips": "An LLC is the most common choice for contractors. It provides liability protection and pass-through taxation. Keep your UBI number — you will need it for every other step."
+  },
+  {
+    "state_guide_id": 47,
+    "step_number": 2,
+    "title": "Register with Department of Revenue (DOR)",
+    "description": "Use your UBI number to register with the WA Department of Revenue for a business tax account. You will need to collect and remit retail sales tax on all construction services. You will also owe B&O (Business and Occupation) tax on gross receipts. Register at My DOR (online portal).",
+    "url": "https://dor.wa.gov/open-business/apply-business-license",
+    "url_label": "WA Department of Revenue",
+    "category": "tax",
+    "is_required": true,
+    "tips": "WA charges B&O tax on gross receipts AND retail sales tax on construction labor and materials — including painting and flooring. This is different from most states. File monthly or quarterly depending on revenue."
+  },
+  {
+    "state_guide_id": 47,
+    "step_number": 3,
+    "title": "Get Your Contractor License from Labor & Industries (L&I)",
+    "description": "Register as a contractor with L&I. This requires: (1) a surety bond ($12,000 for general contractor, $6,000 for specialty), (2) general liability insurance, (3) workers comp account with L&I (if you have employees or choose to cover yourself), and (4) passing a trade exam for some specialties. L&I can issue citations for conducting business without a license.",
+    "url": "https://lni.wa.gov/licensing-permits/contractors/",
+    "url_label": "WA Labor & Industries",
+    "category": "licensing",
+    "is_required": true,
+    "tips": "L&I is strict about unlicensed contracting — they actively investigate and issue citations with fines. Get your bond from a surety company, not your general insurance agent. Bond amounts: $12,000 GC, $6,000 specialty."
+  },
+  {
+    "state_guide_id": 47,
+    "step_number": 4,
+    "title": "Obtain a Surety Bond",
+    "description": "Purchase a contractor surety bond from a licensed surety company. General contractors need a $12,000 bond, specialty contractors need a $6,000 bond. The bond protects consumers if you fail to complete work or pay subcontractors. The cost is typically 1-15% of the bond amount based on your credit.",
+    "url": null,
+    "url_label": null,
+    "category": "licensing",
+    "is_required": true,
+    "tips": "Shop around for bond rates. Good credit can get you a rate as low as 1% of the bond amount ($120 for a $12,000 bond). Bad credit might mean 10-15% ($1,200-$1,800)."
+  },
+  {
+    "state_guide_id": 47,
+    "step_number": 5,
+    "title": "Get General Liability Insurance",
+    "description": "Obtain a general liability insurance policy. Minimum $250,000 in coverage is recommended, though many clients require $1M or more. This covers property damage and bodily injury claims related to your work.",
+    "url": null,
+    "url_label": null,
+    "category": "insurance",
+    "is_required": true,
+    "tips": "Shop multiple insurers. HINT: Look for contractors-specific insurance companies. Policy costs vary from $500-$5,000/year depending on your trade, revenue, and claims history."
+  },
+  {
+    "state_guide_id": 47,
+    "step_number": 6,
+    "title": "Open a Workers Compensation Account with L&I",
+    "description": "Washington uses a state-run workers comp system through L&I — you cannot purchase private workers comp insurance. If you have employees, you MUST have an L&I account. Sole owners can choose to cover themselves or opt out. L&I premiums are based on hours worked and risk classification.",
+    "url": "https://lni.wa.gov/insurance/",
+    "url_label": "L&I Insurance",
+    "category": "insurance",
+    "is_required": true,
+    "tips": "If you are a sole owner with no employees, you can choose not to cover yourself with L&I workers comp. However, if you get injured on the job, you will have no coverage. Consider opting in."
+  },
+  {
+    "state_guide_id": 47,
+    "step_number": 7,
+    "title": "Register with Employment Security Department (ESD)",
+    "description": "Register with ESD for unemployment insurance reporting. If you have employees, you must report wages and pay unemployment taxes quarterly. You can handle this directly or use a payroll service like Intuit Online Payroll, Gusto, or ADP to manage ESD, L&I, and DOR reporting automatically.",
+    "url": "https://esd.wa.gov/employer",
+    "url_label": "WA Employment Security",
+    "category": "payroll",
+    "is_required": true,
+    "tips": "Using a payroll service like Intuit Online Payroll saves significant time. They handle ESD quarterly reports, L&I premium payments, DOR tax withholding, and federal tax deposits all in one place."
+  },
+  {
+    "state_guide_id": 47,
+    "step_number": 8,
+    "title": "Set Up Payroll and Tax Reporting",
+    "description": "Set up a system to track employee hours, pay wages, withhold taxes, and file quarterly reports with ESD, L&I, and DOR. You can do this manually or use services like Intuit QuickBooks Payroll, Gusto, ADP, or similar platforms that integrate all your state reporting.",
+    "url": null,
+    "url_label": null,
+    "category": "payroll",
+    "is_required": false,
+    "tips": "Intuit Online Payroll and Gusto are popular choices for small contractors. They cost $30-$80/month + per employee fees but save hours of paperwork and reduce the risk of penalties for late or incorrect filings."
+  },
+  {
+    "state_guide_id": 9,
+    "step_number": 1,
+    "title": "Form Your Business Entity on Sunbiz.org",
+    "description": "Register your LLC, Corporation, or Fictitious Name (DBA) through Sunbiz.org, Florida's Division of Corporations portal. LLC filing fee is $125 + $25 registered agent fee. Florida is unique in offering Fictitious Name registration as an alternative to LLC formation. Fictitious Name registration is only $50.",
+    "url": "https://sunbiz.org/",
+    "url_label": "Sunbiz.org",
+    "category": "formation",
+    "is_required": true,
+    "tips": "Florida's Fictitious Name (DBA) registration is unique — it's cheaper but provides NO liability protection. An LLC costs more upfront but protects your personal assets. Strongly recommend LLC for contractors."
+  },
+  {
+    "state_guide_id": 9,
+    "step_number": 2,
+    "title": "Determine Your License Requirements",
+    "description": "Florida requires licensing for many (but not all) construction trades. Check if your trade requires a license through DBPR. Certified licenses are statewide. Registered licenses are county-specific. Some trades like basic painting, flooring installation, and minor handyman work do NOT require licensing in Florida.",
+    "url": "https://www.myfloridalicense.com/dbpr/pro/cilb/",
+    "url_label": "DBPR - Construction Industry Licensing Board",
+    "category": "licensing",
+    "is_required": true,
+    "tips": "Trades that DO require licensing: General Contractor, Building Contractor, Roofing, Plumbing, Electrical, HVAC, Pool/Spa, Solar, Underground Utility. Trades that generally do NOT: Painting, Flooring, Fencing, Pressure Washing, Minor Handyman."
+  },
+  {
+    "state_guide_id": 9,
+    "step_number": 3,
+    "title": "Apply for Your Contractor License (If Required)",
+    "description": "If your trade requires licensing, apply through DBPR. For a Certified General Contractor license, you need: (1) Application with $145-$245 fee, (2) Electronic fingerprints, (3) Credit report with FICO score (if below 660, must complete a financial responsibility course), (4) Pass the state exam. The exam covers business practices and trade knowledge.",
+    "url": "https://www.myfloridalicense.com/dbpr/pro/cilb/",
+    "url_label": "DBPR Application",
+    "category": "licensing",
+    "is_required": false,
+    "tips": "The GC exam is challenging — study thoroughly. PSI and Pearson VUE administer the exams. Many contractors use prep courses from providers like Builders Education or Contractors License School. Budget 2-4 weeks of study time."
+  },
+  {
+    "state_guide_id": 9,
+    "step_number": 4,
+    "title": "Get General Liability Insurance",
+    "description": "Obtain general liability insurance through a private insurance carrier. Florida requires insurance for licensed contractors. Minimum coverage varies by license type, but $300,000 or more is recommended. Florida's market has many contractors-focused insurers.",
+    "url": null,
+    "url_label": null,
+    "category": "insurance",
+    "is_required": true,
+    "tips": "Florida insurance rates can be higher than average due to hurricane risk. Shop multiple carriers. Consider adding wind/storm coverage. Many general liability policies start at $500-$2,000/year for new contractors."
+  },
+  {
+    "state_guide_id": 9,
+    "step_number": 5,
+    "title": "Set Up Workers Compensation",
+    "description": "Florida uses PRIVATE insurance for workers comp — there is no state-run fund. If you have employees, you must carry workers comp insurance. Sole owners in construction can apply for an exemption through the Department of Financial Services (DFS), but this means you have no coverage if injured.",
+    "url": "https://www.myfloridacfo.com/division/wc/",
+    "url_label": "FL Workers Compensation",
+    "category": "insurance",
+    "is_required": true,
+    "tips": "Construction employers with 1+ employees MUST carry workers comp in Florida. Officers of corporations are automatically included unless they opt out. LLC members and sole proprietors can apply for an exemption from DFS."
+  },
+  {
+    "state_guide_id": 9,
+    "step_number": 6,
+    "title": "Register with Florida Department of Revenue",
+    "description": "Register for a sales tax certificate with the FL Department of Revenue. In Florida, contractors do NOT pay sales tax on labor — only on materials. This is a significant advantage compared to states like Washington. You may also need to register for reemployment (unemployment) tax.",
+    "url": "https://floridarevenue.com/",
+    "url_label": "FL Department of Revenue",
+    "category": "tax",
+    "is_required": true,
+    "tips": "Major advantage in FL: No sales tax on labor! You only collect/pay sales tax on materials you sell to customers. No state income tax either. This makes Florida one of the most tax-friendly states for contractors."
+  },
+  {
+    "state_guide_id": 9,
+    "step_number": 7,
+    "title": "Set Up Payroll (If You Have Employees)",
+    "description": "Register for reemployment tax with the FL Department of Revenue. Set up payroll through a service like Intuit QuickBooks, Gusto, or ADP. No state income tax to withhold in Florida — only federal income tax, Social Security, and Medicare.",
+    "url": null,
+    "url_label": null,
+    "category": "payroll",
+    "is_required": false,
+    "tips": "Since Florida has no state income tax, payroll is simpler than most states. You only need to handle federal withholding, Social Security, Medicare, and FL reemployment tax. Payroll services typically cost $30-$80/month."
+  }
+]

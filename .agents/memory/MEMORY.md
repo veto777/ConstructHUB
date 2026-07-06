@@ -1,0 +1,4 @@
+- [LSA OAuth redirect URI](lsa-oauth-redirect-uri.md) — pin the Google LSA OAuth callback to one fixed canonical URI (not host-derived) so onboarding never needs per-account cloud changes.
+- [Competitor-intel visibility flag](competitor-intel-flag.md) — competitor-surveillance surfaces hidden behind one flag for GBP API review; re-enable only with honest wording (Google re-audits).
+- [Review-gating visibility flag](review-gating-flag.md) — Google Reviews feature hidden behind SHOW_GOOGLE_REVIEWS; sentiment gating violates Google policy, strip it before re-enabling.
+- [LSA schema bootstrap](lsa-schema-bootstrap.md) — all LSA tables (both systems) are created via ensureLsaSchema raw DDL at boot, NOT db:push; add new tables/columns there.

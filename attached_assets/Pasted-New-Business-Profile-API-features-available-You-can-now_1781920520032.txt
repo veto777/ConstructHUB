@@ -1,0 +1,57 @@
+New Business Profile API features available
+You can now create recurring posts through the LocalPosts API to keep your customers updated automatically. Additionally, you can access review media items and track your review reply status in the Reviews API to better manage customer feedback, and retrieve the location place ID in pending invitations through the Account Management API.
+Home
+Products
+Business Profile APIs
+Guides
+Was this helpful?
+
+Prerequisites
+
+
+
+Spark icon
+Page Summary
+To successfully create your first client application, you must complete the following prerequisites:
+
+Get a Google Account.
+Try out Business Profile.
+Create a project in the Google Cloud Console.
+Create an Organization account.
+Request access to the API.
+Get a Google Account
+You need a Google Account in order to create a project in the Google API Console. If you already have an account, you're all set.
+
+Try out Business Profile
+This API documentation assumes that you've used Business Profile before, and that you're familiar with web programming concepts and web data formats.
+
+If you haven't used Business Profile, try out the user interface before you start to code.
+
+Create a project in the Google API Console
+Before you can send requests to the Business Profile APIs, you need to use the Google API Console to create a project, and then request access to the Business Profile APIs for that project. To create a new project, go to the Google Cloud Console. Click Create project, enter a name, and click Create.
+
+Create an Organization account
+To create an Organization account, go to the GBP help center.
+
+Request access to the APIs
+In order to get access to GBP APIs, we require all applicants:
+
+Manage a Google Business Profile that is verified and active for 60+ days. This GBP can be the applicant's own office or headquarters or it could belong to one of the clients they manage.
+Have a website representing the business listed on the GBP.
+For a smooth and timely review of your application, we recommend that the Google Business Profile is fully complete and kept up-to-date with the current business information, including the business's official website.
+
+Once you have met the requirements stated earlier, you can request API access by following these steps:
+
+Go to the Google Cloud Console and select the project you plan to use with the Business Profile APIs.
+Find your Project Number in the Project info card on your project's Dashboard. You will need to provide this number in your application.
+When you are ready, submit your request using our GBP API contact form. Select 'Application for Basic API Access' from the drop-down menu and provide all requested information.
+Make sure that you are using an email address that is listed as an owner/manager on your business's GBP.
+A follow-up email will be sent to you after your request has been reviewed.
+Note on Checking Approval Status: You can also check if your project has been approved by viewing the quotas for the Business Profile APIs in the Google Cloud Console.
+
+If your quota is 0 QPM (Queries Per Minute), your project has not yet been approved.
+If your quota is set to 300 QPM, your project is approved.
+If your application is approved, see Basic setup to enable the Business Profile APIs for your project. If your application is rejected, make sure you have met the requirements stated earlier before re-applying.
+
+Was this helpful?
+

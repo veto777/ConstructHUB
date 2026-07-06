@@ -1,0 +1,105 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "Roboto",
+      "role": "body"
+    },
+    {
+      "family": "Inter",
+      "role": "heading"
+    }
+  ],
+  "colors": {
+    "primary": "#142134",
+    "accent": "#111E32",
+    "background": "#FCFCFC",
+    "textPrimary": "#111E32",
+    "link": "#111E32"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Roboto",
+      "heading": "Inter"
+    },
+    "fontStacks": {
+      "heading": [
+        "Inter",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "Roboto",
+        "sans-serif"
+      ],
+      "body": [
+        "Inter",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "Roboto",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Inter",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "Roboto",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "48px",
+      "h2": "20px",
+      "body": "10px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "6px"
+  },
+  "components": {},
+  "images": {
+    "logo": "https://b7f768e7-ecd5-42d1-a73c-da215a77d71d-00-1r5xol0kmyty.picard.replit.dev/chub-logo-trimmed.png",
+    "favicon": "https://b7f768e7-ecd5-42d1-a73c-da215a77d71d-00-1r5xol0kmyty.picard.replit.dev/favicon.png",
+    "ogImage": "/og-image.png",
+    "logoHref": "File saved at: attached_assets/logoHref.html",
+    "logoAlt": "CHUB"
+  },
+  "__llm_logo_reasoning": {
+    "selectedIndex": 1,
+    "reasoning": "Selected #1 because it is visible, medium-sized, located in the header, and links to the homepage, which aligns with the brand 'ConstructHUB'.",
+    "confidence": 0.95,
+    "source": "llm"
+  },
+  "personality": {
+    "tone": "professional",
+    "energy": "medium",
+    "targetAudience": "contractors and construction professionals"
+  },
+  "designSystem": {
+    "framework": "custom",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0,
+    "colors": 0.9,
+    "overall": 0.45
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": true,
+      "llmSucceeded": true,
+      "finalSource": "llm",
+      "rawLogoSelection": {
+        "selectedLogoIndex": 1,
+        "selectedLogoReasoning": "Selected #1 because it is visible, medium-sized, located in the header, and links to the homepage, which aligns with the brand 'ConstructHUB'.",
+        "confidence": 0.95
+      }
+    },
+    "buttonClassification": {
+      "llmCalled": false,
+      "llmSucceeded": false
+    }
+  }
+}

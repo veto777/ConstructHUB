@@ -1,0 +1,59 @@
+Diagnosing OAuth redirect URI mismatch (8 seconds)
+The sidebar grouping works now (your screenshot shows "Google LSA Leads" + "Google LSA Credits" under User Management). The new issue is the Google sign-in error: Error 400: redirect_uri_mismatch when clicking "Connect Google Ads". Let me inspect how the app builds the OAuth redirect URI.
+
+
+5 actions
+The sidebar grouping is working — your screenshot confirms it. The redirect_uri_mismatch (Error 400) is not a code bug — the app correctly builds the redirect URI from the request host. The error means that exact callback URL isn't registered in your Google Cloud Console OAuth client's "Authorized redirect URIs" list.
+
+The most useful thing I can do is surface the exact URI to register so there's no guesswork. Let me check the status endpoint to add it there.
+
+
+3 actions
+I'll add the exact redirect URI to the status response and surface it in the UI so the user can copy it directly. Let me find the Connect card in the leads page.
+
+
+Ran cd
+Let me read the Connect card region to add the redirect URI display.
+
+
+3 actions
+I'll add the exact redirect URI to the status response and show a copyable troubleshooting box in the Connect card. Let me check what's already imported (toast) in the leads page.
+
+
+Ran cd
+toast and Button are available. Now let me make the three edits: status route returns the URI, the interface gets the field, and the Connect card shows a copyable troubleshooting box.
+
+
+4 actions
+Let me fetch the exact redirect URI from the live status endpoint so I can tell you precisely what to register.
+
+
+2 actions
+The server needs a restart to pick up the route change (tsx doesn't auto-reload server files). Let me restart and verify with the real host header.
+
+
+Restarted Start application
+Now let me verify the redirect URI is returned correctly, simulating the real dev domain host.
+
+
+2 actions
+The redirect URI now returns correctly. Here's the situation:
+
+The sidebar works — your screenshot confirms "Google LSA Leads" and "Google LSA Credits" are grouped under User Management.
+
+The redirect_uri_mismatch is a Google setup issue, not an app bug. Google blocks the sign-in because the callback URL the app sends isn't on your OAuth client's approved list. You fix it in Google's console, not in the code.
+
+To fix it:
+
+Go to Google Cloud Console → APIs & Services → Credentials
+Open your OAuth 2.0 Client ID (the one whose ID is in GOOGLE_ADS_CLIENT_ID)
+Under Authorized redirect URIs, click Add URI and paste this exact value:
+https://fd7238c7-690f-4062-9445-2cc4b8aeaa76-00-29nmm0h2tqhu8.worf.replit.dev/api/admin/google-ads/oauth/callback
+
+Also add your live domain so it keeps working after you publish:
+https://alpineexteriorsfl.com/api/admin/google-ads/oauth/callback
+
+Save, wait ~1 minute for Google to propagate, then click Connect Google Ads again.
+To make this easier, I added a copy-paste helper right on the LSA Leads page: when you're not connected, a yellow box now shows the exact redirect URL with a Copy button — so you always have the precise value to register (it auto-updates to match whatever domain you're on).
+
+One heads-up: that dev URL (fd7238c7-…replit.dev) is tied to this workspace. Once you publish, the live site uses alpineexteriorsfl.com, which is why I included it above — register both and you won't hit this again.

@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Iv0NKHFmrkaW_KoFJBxt1"
+uri = "file://docs/google-login-prd.md"
+type = "text"
+title = "PRD: Sign in with Google for a New Site"
