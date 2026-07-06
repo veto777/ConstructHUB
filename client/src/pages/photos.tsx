@@ -445,7 +445,9 @@ export default function PhotosPage() {
     });
 
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
+      // Use createElement: the global Image constructor is shadowed by the
+      // lucide-react `Image` icon imported in this file.
+      const image = document.createElement("img");
       image.onload = () => resolve(image);
       image.onerror = () => reject(new Error("Failed to load image"));
       image.src = dataUrl;

@@ -21,10 +21,8 @@ async function getBrowser(): Promise<Browser> {
   }
   browserLaunchPromise = (async () => {
     try {
-      if (browserInstance) {
-        try { await browserInstance.close(); } catch {}
-        browserInstance = null;
-      }
+      // browserInstance is provably null here (getBrowser returns early or nulls
+      // it before this IIFE runs), so no stale instance to close.
       browserInstance = await chromium.launch({
         executablePath: CHROMIUM_PATH,
         headless: true,
@@ -1203,7 +1201,7 @@ function parseEnerGovResults(html: string): ScrapeResult[] {
     const cells = $el.find("td");
     if (cells.length >= 2) {
       const cellTexts: string[] = [];
-      cells.each((_j, cell) => cellTexts.push($(cell).text().trim()));
+      cells.each((_j, cell) => { cellTexts.push($(cell).text().trim()); });
 
       const permitNumber = cellTexts[0] || null;
       if (!permitNumber || permitNumber.toLowerCase().includes("no results")) return;
@@ -1539,7 +1537,7 @@ export async function scrapeAccela(
     await page.waitForTimeout(8000);
 
     const parseAccelaResults = async (): Promise<void> => {
-      const html = await page.content();
+      const html = await page!.content();
       const $ = cheerio.load(html);
 
       const headers: string[] = [];
@@ -1614,7 +1612,7 @@ export async function scrapeAccela(
       });
 
       if (allResults.length === 0) {
-        const rows = page.locator("table tr").filter({ hasText: /[A-Z]{2,}\d*[-\s]\d/ });
+        const rows = page!.locator("table tr").filter({ hasText: /[A-Z]{2,}\d*[-\s]\d/ });
         const count = await rows.count();
         for (let i = 0; i < Math.min(count, 100); i++) {
           const row = rows.nth(i);
@@ -1968,7 +1966,7 @@ export async function scrapeClick2Gov(
     }
 
     async function readVisibleTableRows(): Promise<ScrapeResult[]> {
-      const rowData = await page.evaluate(() => {
+      const rowData = await page!.evaluate(() => {
         const results: Array<{cells: string[], detailUrl: string | null}> = [];
         const tables = document.querySelectorAll("table");
         for (const table of tables) {
@@ -2063,14 +2061,14 @@ export async function scrapeClick2Gov(
             break;
           }
 
-          await page.waitForFunction(
-            (prev: string) => {
+          await page!.waitForFunction(
+            (prev: string | null) => {
               const el = document.querySelector(".dataTables_info");
-              return el && el.textContent !== prev;
+              return !!(el && el.textContent !== prev);
             },
             prevShowingText,
             { timeout: 15000 }
-          ).catch(() => page.waitForTimeout(3000));
+          ).catch(() => page!.waitForTimeout(3000));
 
           await page.waitForTimeout(1000);
 
