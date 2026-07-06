@@ -55,6 +55,18 @@ export function getBaseUrl(req: any): string {
 export async function setupAuth(app: Express) {
   const PgStore = connectPgSimple(session);
 
+  // SECURITY: never fall back to a hardcoded secret in production — a constant
+  // baked into source lets anyone forge signed session cookies. Fail fast so a
+  // misconfigured prod deploy refuses to boot rather than running insecure.
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SESSION_SECRET must be set in production");
+    }
+    console.warn("SESSION_SECRET is not set — using an insecure development-only secret.");
+  }
+  const resolvedSessionSecret = sessionSecret || "dev-only-insecure-session-secret";
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "session" (
       "sid" varchar NOT NULL COLLATE "default",
@@ -68,7 +80,7 @@ export async function setupAuth(app: Express) {
   app.use(
     session({
       store: new PgStore({ pool, createTableIfMissing: false }),
-      secret: process.env.SESSION_SECRET || "construction-hub-session-secret",
+      secret: resolvedSessionSecret,
       resave: false,
       saveUninitialized: false,
       cookie: {

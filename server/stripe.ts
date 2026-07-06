@@ -4,10 +4,25 @@ import { db } from "./db";
 import { subscriptions, users, masterClassModules, coursePurchases, servicePurchases } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
+import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS } from "./catalog";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-01-27.acacia" as any,
 });
+
+// current_period_end moved from the Subscription object to
+// items.data[].current_period_end in the Stripe 2025 (basil) API. Webhook
+// payloads render at the endpoint's configured version — not the client's
+// pinned version — so read the item field first and fall back to the legacy
+// top-level field. Returns null rather than an Invalid Date when neither exists.
+function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
+  const anySub = sub as any;
+  const epoch: number | undefined =
+    anySub.items?.data?.[0]?.current_period_end ?? anySub.current_period_end;
+  return typeof epoch === "number" && Number.isFinite(epoch)
+    ? new Date(epoch * 1000)
+    : null;
+}
 
 const PLANS = {
   standard: {
@@ -311,35 +326,54 @@ export function registerStripeRoutes(app: Express) {
         return res.status(400).json({ message: "Cart is empty" });
       }
 
-      const SEO_IDS = ["dfy_seo_first_page", "dfy_seo_growth", "dfy_seo_domination", "dfy_seo_ads"];
-      const hasSeoItems = items.some((item: any) => SEO_IDS.includes(item.id));
-      if (hasSeoItems) {
+      if (items.some((item: any) => SEO_CONTRACT_REQUIRED_IDS.has(item?.id))) {
         return res.status(400).json({ message: "SEO packages require a signed contract before payment. Please use the contract checkout flow." });
+      }
+
+      // SECURITY: resolve every price and name server-side from the catalog / DB.
+      // The client-supplied item.price and item.name are never trusted.
+      const resolved: { id: string; type: string; name: string; price: number; moduleId: number | null }[] = [];
+      for (const item of items) {
+        const type = String(item?.type ?? "");
+        if (type === "course_module") {
+          const moduleId = Number(item?.moduleId);
+          if (!Number.isInteger(moduleId)) {
+            return res.status(400).json({ message: "Invalid course module in cart" });
+          }
+          const [mod] = await db.select().from(masterClassModules).where(eq(masterClassModules.id, moduleId)).limit(1);
+          if (!mod) return res.status(400).json({ message: `Unknown course module: ${moduleId}` });
+          resolved.push({ id: String(item.id ?? `course_module_${moduleId}`), type, name: `Master Class — ${mod.title}`, price: mod.price, moduleId });
+        } else if (type === "course_bundle") {
+          resolved.push({ id: "course_bundle", type, name: COURSE_BUNDLE.name, price: COURSE_BUNDLE.priceCents, moduleId: null });
+        } else if (type === "dfy_service" || type === "dfy_bundle") {
+          const entry = DFY_CATALOG[String(item?.id ?? "")];
+          if (!entry) return res.status(400).json({ message: `Unknown service: ${item?.id}` });
+          resolved.push({ id: String(item.id), type, name: entry.name, price: entry.priceCents, moduleId: null });
+        } else {
+          return res.status(400).json({ message: `Unsupported cart item type: ${type}` });
+        }
       }
 
       const customerId = await getOrCreateCustomer(user.id, user.email);
 
-      const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item: any) => ({
+      const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = resolved.map((item) => ({
         price_data: {
           currency: "usd",
-          product_data: {
-            name: item.name,
-            ...(item.description ? { description: item.description } : {}),
-          },
+          product_data: { name: item.name },
           unit_amount: item.price,
         },
         quantity: 1,
       }));
 
-      const itemsMeta = items.map((item: any) => ({
+      const itemsMeta = resolved.map((item) => ({
         id: item.id,
         type: item.type,
         name: item.name,
         price: item.price,
-        moduleId: item.moduleId || null,
+        moduleId: item.moduleId,
       }));
 
-      const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
+      const totalAmount = resolved.reduce((sum, item) => sum + item.price, 0);
       const isHighTicket = totalAmount >= 500000;
 
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
@@ -374,14 +408,34 @@ export function registerStripeRoutes(app: Express) {
 
   app.post("/api/stripe/webhook", async (req: Request, res: Response) => {
     try {
-      const sig = req.headers["stripe-signature"] as string;
-      let event: Stripe.Event;
-
+      const sig = req.headers["stripe-signature"] as string | undefined;
       const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-      if (endpointSecret && sig) {
-        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-      } else {
-        event = req.body as Stripe.Event;
+
+      // Fail closed: never trust an unsigned/unverified body. A missing secret
+      // is a misconfiguration, not a reason to accept forged events.
+      if (!endpointSecret) {
+        console.error("STRIPE_WEBHOOK_SECRET is not set — rejecting webhook.");
+        return res.status(500).json({ message: "Webhook not configured" });
+      }
+      if (!sig) {
+        return res.status(400).json({ message: "Missing stripe-signature header" });
+      }
+
+      // constructEvent requires the raw request bytes; server/index.ts captures
+      // them as req.rawBody via the express.json verify hook. Using the parsed
+      // body here would make signature verification always throw.
+      const rawBody = (req as any).rawBody as Buffer | undefined;
+      if (!rawBody) {
+        console.error("req.rawBody missing — cannot verify Stripe signature.");
+        return res.status(500).json({ message: "Webhook body unavailable" });
+      }
+
+      let event: Stripe.Event;
+      try {
+        event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
+      } catch (verifyErr: any) {
+        console.error("Stripe signature verification failed:", verifyErr.message);
+        return res.status(400).json({ message: `Webhook signature verification failed` });
       }
 
       switch (event.type) {
@@ -440,7 +494,7 @@ export function registerStripeRoutes(app: Express) {
                 stripePriceId: stripeSubscription.items.data[0]?.price?.id || null,
                 plan,
                 status: "active",
-                currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+                currentPeriodEnd: subscriptionPeriodEnd(stripeSubscription),
               })
               .where(eq(subscriptions.userId, userId));
           }
@@ -461,7 +515,7 @@ export function registerStripeRoutes(app: Express) {
               .update(subscriptions)
               .set({
                 status: sub.status === "active" ? "active" : sub.status,
-                currentPeriodEnd: new Date(sub.current_period_end * 1000),
+                currentPeriodEnd: subscriptionPeriodEnd(sub),
               })
               .where(eq(subscriptions.id, existingSub.id));
           }

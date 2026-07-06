@@ -137,7 +137,7 @@ export default function ContractSignPage() {
         signatureData: `SIGNED:${signerName}:${new Date().toISOString()}:${navigator.userAgent}`,
         agreedToTerms: agreed,
         agreedToTermination: agreedTerms,
-        agreedToArbitration,
+        agreedToArbitration: agreedArbitration,
       });
       return res.json();
     },

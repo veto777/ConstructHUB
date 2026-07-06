@@ -21,11 +21,23 @@ import { db } from "./db";
 import { subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
-import { eq, and, desc, asc, gte, sql, count, countDistinct } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 
 const ADMIN_EMAILS = ["alpinesidingcompany@gmail.com", "support@constructhub.us"];
 function isAdmin(user: any): boolean {
   return user && ADMIN_EMAILS.includes(user.email?.toLowerCase());
+}
+
+// SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
+// deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
+// AND a non-production environment, so copying .env.example onto a deployed box
+// can never silently disable authentication. Leave DEV_AUTH_BYPASS_USER1 unset
+// everywhere except a developer's own machine.
+const DEV_AUTH_BYPASS =
+  process.env.DEV_AUTH_BYPASS_USER1 === "true" &&
+  process.env.NODE_ENV !== "production";
+if (DEV_AUTH_BYPASS) {
+  console.warn("⚠️  DEV_AUTH_BYPASS_USER1 is enabled — all requests authenticate as user 1. Never use this in production.");
 }
 
 const photoOpenai = new OpenAI({
@@ -104,7 +116,7 @@ export async function registerRoutes(
   function getDevUser(req: any, res: any): any {
     const user = req.user;
     if (user) return user;
-    if (process.env.NODE_ENV === "development") {
+    if (DEV_AUTH_BYPASS) {
       req.user = { id: 1 };
       return req.user;
     }
@@ -1692,7 +1704,11 @@ Rules:
   });
 
   // Ranking Grid Routes
-  app.get("/api/ranking-grid/scans", async (_req, res) => {
+  // NOTE: ranking_grid_scans has no user_id column yet, so these are scoped to
+  // authenticated users as a group rather than per-owner. Add a user_id column +
+  // per-user filtering to fully isolate one contractor's scans from another's.
+  app.get("/api/ranking-grid/scans", async (req, res) => {
+    if (!getDevUser(req, res)) return;
     try {
       const scans = await storage.getRankingGridScans();
       res.json(scans);
@@ -1702,6 +1718,7 @@ Rules:
   });
 
   app.get("/api/ranking-grid/scans/:id", async (req, res) => {
+    if (!getDevUser(req, res)) return;
     try {
       const scan = await storage.getRankingGridScanById(parseInt(req.params.id));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
@@ -1713,14 +1730,15 @@ Rules:
   });
 
   app.post("/api/ranking-grid/scans", async (req, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
     try {
       const { businessName, placeId, address, lat, lon, gridSize, gridDistance, keyword } = req.body;
       if (!businessName || !placeId || !lat || !lon || !keyword) {
         return res.status(400).json({ message: "businessName, placeId, lat, lon, and keyword are required" });
       }
 
-      const user = (req as any).user;
-      if (user) {
+      {
         const [sub] = await db
           .select()
           .from(subscriptions)
@@ -1758,6 +1776,7 @@ Rules:
   });
 
   app.delete("/api/ranking-grid/scans/:id", async (req, res) => {
+    if (!getDevUser(req, res)) return;
     try {
       await storage.deleteRankingGridScan(parseInt(req.params.id));
       res.json({ success: true });
@@ -1880,7 +1899,7 @@ Rules:
   async function requirePlatinum(req: any, res: any): Promise<boolean> {
     const user = req.user;
     if (!user) {
-      if (process.env.NODE_ENV === "development") {
+      if (DEV_AUTH_BYPASS) {
         req.user = { id: 1 };
         return true;
       }
@@ -1888,7 +1907,7 @@ Rules:
     }
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
     if (!sub || !["gold", "platinum"].includes(sub.plan) || (sub.status !== "active" && sub.status !== "trialing")) {
-      if (process.env.NODE_ENV === "development") return true;
+      if (DEV_AUTH_BYPASS) return true;
       res.status(403).json({ message: "Competitor Intelligence requires a Gold or Platinum membership. Upgrade your plan to access this feature." });
       return false;
     }
@@ -2455,7 +2474,7 @@ Rules:
   async function requirePremiumPlus(req: any, res: any): Promise<boolean> {
     const user = req.user;
     if (!user) {
-      if (process.env.NODE_ENV === "development") {
+      if (DEV_AUTH_BYPASS) {
         req.user = { id: 1 };
         return true;
       }
@@ -2463,7 +2482,7 @@ Rules:
     }
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
     if (!sub || !["premium", "gold", "platinum"].includes(sub.plan) || (sub.status !== "active" && sub.status !== "trialing")) {
-      if (process.env.NODE_ENV === "development") return true;
+      if (DEV_AUTH_BYPASS) return true;
       res.status(403).json({ message: "This feature requires a Premium, Gold, or Platinum plan. Upgrade to access it." });
       return false;
     }
@@ -5800,7 +5819,7 @@ Requirements:
       const scheduled = await db.select().from(reviewRequests)
         .where(and(
           eq(reviewRequests.status, "scheduled"),
-          gte(now, reviewRequests.scheduledFor!)
+          lte(reviewRequests.scheduledFor, now)
         ));
 
       for (const request of scheduled) {

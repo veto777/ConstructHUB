@@ -1,3 +1,30 @@
+// SSRF guard: only fetch URLs whose HOST is an allowlisted Google domain.
+// Uses real URL parsing + anchored host matching (not substring tests), so an
+// attacker host that merely contains "goo.gl/maps" — e.g.
+// http://169.254.169.254/latest/meta-data/goo.gl/maps — is rejected. IP-literal
+// hosts are refused outright as defense against direct metadata/internal access.
+export function isAllowedGoogleFetchTarget(urlStr: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(urlStr.trim());
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+
+  const host = u.hostname.toLowerCase();
+  // Reject bare IP literals (IPv4, IPv6, and [::]-bracketed forms).
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) return false;
+
+  // Google Maps shortlink hosts (exact apex or subdomain thereof).
+  const shortlinkApexes = ["goo.gl", "share.google", "g.page"];
+  if (shortlinkApexes.some((apex) => host === apex || host.endsWith("." + apex))) return true;
+
+  // google.<tld> maps/search pages, optionally prefixed www./maps.
+  // Anchored so google.com.evil.com and evilgoogle.com do NOT match.
+  return /^(www\.|maps\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(host);
+}
+
 export async function resolveGoogleShortUrl(url: string): Promise<{ resolvedUrl: string; extractedQuery: string | null; kgmid: string | null; htmlBody: string | null; ogTitle: string | null; hexCid: string | null; decimalCid: string | null }> {
   const trimmed = url.trim();
   let resolvedUrl = trimmed;
@@ -8,10 +35,7 @@ export async function resolveGoogleShortUrl(url: string): Promise<{ resolvedUrl:
   let hexCid: string | null = null;
   let decimalCid: string | null = null;
 
-  const isShortlink = /goo\.gl|maps\.app\.goo\.gl|share\.google|g\.page/i.test(trimmed);
-  const looksLikeMapsPage = /google\.\w+\/maps|maps\.google\.\w+/i.test(trimmed);
-
-  if (isShortlink || looksLikeMapsPage) {
+  if (isAllowedGoogleFetchTarget(trimmed)) {
     const ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
     try {
       const res = await fetch(trimmed, {
