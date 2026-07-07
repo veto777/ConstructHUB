@@ -17,3 +17,4 @@ uploads/
 
 # NETR scraper checkpoint (scratch)
 server/data/.scrape-progress.json
+scripts/_smoke-seed.ts
