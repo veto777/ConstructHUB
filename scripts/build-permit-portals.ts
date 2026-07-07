@@ -12,11 +12,25 @@
  *
  * Run:  npx tsx scripts/build-permit-portals.ts
  */
-import { writeFileSync } from "fs";
+import { writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 
 // jurisdiction key must match permit_databases.jurisdiction = "City, ST".
 interface Candidate { jurisdiction: string; url: string; platform: string; }
+
+// Optional merge source: candidates discovered by the expand-permit-portals
+// workflow (already WebFetch-confirmed by agents). They still pass through the
+// same deterministic liveness + permit-specificity gate below before shipping.
+function loadWorkflowCandidates(): Candidate[] {
+  const p = join(process.cwd(), "server", "data", "_permit-candidates.json");
+  if (!existsSync(p)) return [];
+  try {
+    const raw = JSON.parse(readFileSync(p, "utf8"));
+    const arr = Array.isArray(raw) ? raw : raw.candidates || [];
+    return arr.filter((c: any) => c && c.jurisdiction && c.url)
+      .map((c: any) => ({ jurisdiction: String(c.jurisdiction).trim(), url: String(c.url).trim(), platform: String(c.platform || "County Portal") }));
+  } catch { return []; }
+}
 
 const CANDIDATES: Candidate[] = [
   { jurisdiction: "New York, NY", url: "https://a810-dobnow.nyc.gov/publish/Index.html", platform: "NYC DOB NOW" },
@@ -93,8 +107,11 @@ const CANDIDATES: Candidate[] = [
   { jurisdiction: "Salt Lake City, UT", url: "https://aca-prod.accela.com/SLCUT/Default.aspx", platform: "Accela" },
 ];
 
-// A URL is accepted only if it looks permit-specific, not a generic homepage.
-const PERMIT_HINT = /permit|accela|energov|etrakit|epermit|dobnow|bisweb|dbi|pli|posse|inspection|building|dpp|dcra|dsi|dns|pdd|ladbs|onestop|compass|tdc-online|buildingrecords|eclipse|selfservice|dppweb/i;
+// A URL is accepted only if it looks permit-specific, not a bare homepage.
+// Broad: covers common permit platforms + permit/inspection/building paths.
+// (Workflow candidates are already WebFetch-confirmed by agents; this is the
+// deterministic second gate. A path like "/" with no hint is rejected.)
+const PERMIT_HINT = /permit|accela|energov|etrakit|epermit|eplan|dobnow|bisweb|\bdbi\b|\bpli\b|posse|inspection|building|develop|\bdpp\b|dcra|\bdsi\b|\bdns\b|\bpdd\b|ladbs|onestop|compass|tdc-online|buildingrecords|eclipse|selfservice|dppweb|citizenaccess|\baca[-.]|cityworks|mygov|viewpoint|smartgov|opengov|civicplus|projectdox|avolve|camino|clariti|epath|citizenserve|onlinepermit|land-?management|lms|\bpds\b|codeenforcement/i;
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
 const ALIVE = new Set([401, 403, 405, 406, 429, 999]);
 const CONCURRENCY = 8;
@@ -116,12 +133,21 @@ async function isLive(url: string): Promise<boolean> {
 }
 
 async function main() {
+  // Merge the hand-curated inline list with workflow-discovered candidates,
+  // dedupe by jurisdiction (inline list wins on conflict).
+  const merged: Candidate[] = [];
+  const byJur = new Set<string>();
+  for (const c of CANDIDATES) { if (!byJur.has(c.jurisdiction)) { byJur.add(c.jurisdiction); merged.push(c); } }
+  let fromWorkflow = 0;
+  for (const c of loadWorkflowCandidates()) { if (!byJur.has(c.jurisdiction)) { byJur.add(c.jurisdiction); merged.push(c); fromWorkflow++; } }
+  console.log(`Candidates: ${CANDIDATES.length} inline + ${fromWorkflow} new from workflow = ${merged.length} to verify.`);
+
   const verified: Candidate[] = [];
   const rejected: { c: Candidate; reason: string }[] = [];
   let idx = 0;
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
-    while (idx < CANDIDATES.length) {
-      const c = CANDIDATES[idx++];
+    while (idx < merged.length) {
+      const c = merged[idx++];
       if (!PERMIT_HINT.test(c.url)) { rejected.push({ c, reason: "not permit-specific" }); continue; }
       const live = await isLive(c.url);
       if (live) verified.push(c);
@@ -130,10 +156,11 @@ async function main() {
   }));
   verified.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction));
   writeFileSync(join(process.cwd(), "server", "data", "permit-portals.json"), JSON.stringify(verified, null, 2));
-  console.log(`\nVerified ${verified.length}/${CANDIDATES.length} permit portals -> server/data/permit-portals.json`);
+  console.log(`\nVerified ${verified.length}/${merged.length} permit portals -> server/data/permit-portals.json`);
   if (rejected.length) {
-    console.log(`Dropped ${rejected.length}:`);
-    for (const r of rejected) console.log(`  ✗ ${r.c.jurisdiction} (${r.reason}) ${r.c.url}`);
+    console.log(`Dropped ${rejected.length} (kept honest search-fallback):`);
+    for (const r of rejected.slice(0, 40)) console.log(`  ✗ ${r.c.jurisdiction} (${r.reason}) ${r.c.url}`);
+    if (rejected.length > 40) console.log(`  ... and ${rejected.length - 40} more`);
   }
 }
 

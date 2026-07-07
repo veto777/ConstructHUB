@@ -1,8 +1,63 @@
 [
   {
+    "jurisdiction": "Abilene, TX",
+    "url": "https://public.mygov.us/tx_abilene",
+    "platform": "MyGov"
+  },
+  {
+    "jurisdiction": "Ada County, ID",
+    "url": "https://apps.adacounty.id.gov/DevelopmentServices/dsClientPortal/",
+    "platform": "Ada County COBRA (Development Services Client Portal)"
+  },
+  {
+    "jurisdiction": "Adams County, CO",
+    "url": "https://aca-prod.accela.com/ADAMSCO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Akron, OH",
+    "url": "https://cityworks.summitoh.net/PublicAccess/template/login.aspx",
+    "platform": "Cityworks (Summit County Building Standards)"
+  },
+  {
+    "jurisdiction": "Alachua County, FL",
+    "url": "https://www.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=318",
+    "platform": "Citizenserve"
+  },
+  {
+    "jurisdiction": "Alameda County, CA",
+    "url": "https://acpermit.acgov.org/permit/portal/",
+    "platform": "MaintStar"
+  },
+  {
+    "jurisdiction": "Albany, NY",
+    "url": "https://albanyny-energovpub.tylerhost.net/Apps/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
     "jurisdiction": "Albuquerque, NM",
     "url": "https://posse.cabq.gov/",
     "platform": "Albuquerque POSSE"
+  },
+  {
+    "jurisdiction": "Alexandria, VA",
+    "url": "https://apexselfservice.alexandriava.gov/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov (APEX)"
+  },
+  {
+    "jurisdiction": "Allen, TX",
+    "url": "https://cityofallentx-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Allentown, PA",
+    "url": "https://energov.allentownpa.gov/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Amarillo, TX",
+    "url": "https://code.amarillo.gov/permit_list.php",
+    "platform": "City of Amarillo permit lookup (applications via MyGovernmentOnline)"
   },
   {
     "jurisdiction": "Anaheim, CA",
@@ -10,9 +65,29 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Anne Arundel County, MD",
+    "url": "https://aca-prod.accela.com/AACO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Arapahoe County, CO",
+    "url": "https://aca-prod.accela.com/ARAPAHOE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Arvada, CO",
+    "url": "https://permits.arvada.org/etrakit3/",
+    "platform": "eTRAKiT"
+  },
+  {
     "jurisdiction": "Atlanta, GA",
     "url": "https://aca-prod.accela.com/ATLANTA_GA/Default.aspx",
     "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Aurora, IL",
+    "url": "https://auro-trk.aspgov.com/etrakit/",
+    "platform": "eTRAKiT"
   },
   {
     "jurisdiction": "Austin, TX",
@@ -20,9 +95,109 @@
     "platform": "Austin Build + Connect"
   },
   {
+    "jurisdiction": "Baldwin County, AL",
+    "url": "https://www.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=363",
+    "platform": "Citizenserve"
+  },
+  {
+    "jurisdiction": "Baltimore County, MD",
+    "url": "https://cityworkspro.baltimorecountymd.gov/PLLPortal/",
+    "platform": "Cityworks PLL"
+  },
+  {
+    "jurisdiction": "Beaumont, TX",
+    "url": "https://cityworks.beaumonttexas.gov/OnlineApplications/",
+    "platform": "Cityworks Public Access"
+  },
+  {
+    "jurisdiction": "Bellevue, WA",
+    "url": "https://permitsearch.mybuildingpermit.com/",
+    "platform": "MyBuildingPermit"
+  },
+  {
+    "jurisdiction": "Bellingham, WA",
+    "url": "https://permits.cob.org/etrakit/Search/permit.aspx",
+    "platform": "eTRAKiT (CentralSquare)"
+  },
+  {
+    "jurisdiction": "Bentonville, AR",
+    "url": "https://bent.csqrcloud.com/community-etrakit/",
+    "platform": "eTRAKiT (CentralSquare)"
+  },
+  {
+    "jurisdiction": "Berkeley, CA",
+    "url": "https://aca-prod.accela.com/BERKELEY/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Bernalillo County, NM",
+    "url": "https://aca-prod.accela.com/BERNCO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Bexar County, TX",
+    "url": "https://countyofbexartx.portal.opengov.com/",
+    "platform": "OpenGov"
+  },
+  {
+    "jurisdiction": "Birmingham, AL",
+    "url": "https://aca-prod.accela.com/BIRMINGHAM/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Boca Raton, FL",
+    "url": "https://bocaratonfl-energovpub.tylerhost.net/Apps/SelfService#/home",
+    "platform": "Tyler EnerGov (Boca eHub)"
+  },
+  {
     "jurisdiction": "Boise, ID",
     "url": "https://aca-prod.accela.com/BOISE/Default.aspx",
     "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Boulder, CO",
+    "url": "https://energovcss.bouldercolorado.gov/EnerGov_Prod/SelfService/#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Brevard County, FL",
+    "url": "https://aca-prod.accela.com/brevard/Default.aspx",
+    "platform": "Accela (BASS)"
+  },
+  {
+    "jurisdiction": "Bridgeport, CT",
+    "url": "https://selfservice.bridgeportct.gov/energovprod/selfservice",
+    "platform": "Tyler EnerGov (Park City Portal)"
+  },
+  {
+    "jurisdiction": "Broward County, FL",
+    "url": "https://dpepp.broward.org/EPermitsAPP/",
+    "platform": "Broward ePermits OneStop (county-specific)"
+  },
+  {
+    "jurisdiction": "Brownsville, TX",
+    "url": "https://aca-prod.accela.com/brownsville/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Buffalo, NY",
+    "url": "https://epermits.buffalony.gov/",
+    "platform": "CIVICS"
+  },
+  {
+    "jurisdiction": "Cape Coral, FL",
+    "url": "https://energovweb.capecoral.gov/EnerGovProd/selfservice",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Carrollton, TX",
+    "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/Locator",
+    "platform": "CityView Portal (Harris/Granicus)"
+  },
+  {
+    "jurisdiction": "Cedar Rapids, IA",
+    "url": "https://cedarrapidsia-energovpub.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov"
   },
   {
     "jurisdiction": "Chandler, AZ",
@@ -30,9 +205,39 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Charleston County, SC",
+    "url": "https://eplweb.charlestoncounty.gov/energov_prod/selfservice",
+    "platform": "Tyler EnerGov (Citizen Access Portal)"
+  },
+  {
+    "jurisdiction": "Charleston, SC",
+    "url": "https://egcss.charleston-sc.gov/energov_prod/selfservice/",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Chattanooga, TN",
+    "url": "https://chattanoogatn.portal.opengov.com/",
+    "platform": "OpenGov"
+  },
+  {
+    "jurisdiction": "Chesapeake, VA",
+    "url": "https://aca-prod.accela.com/chesapeake/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Chesterfield County, VA",
+    "url": "https://aca-prod.accela.com/CHESTERFIELD/Default.aspx",
+    "platform": "Accela (ELM)"
+  },
+  {
     "jurisdiction": "Chicago, IL",
     "url": "https://webapps1.chicago.gov/buildingrecords/",
     "platform": "Chicago Building Records"
+  },
+  {
+    "jurisdiction": "Chula Vista, CA",
+    "url": "https://aca-prod.accela.com/CHULAVISTA/Default.aspx",
+    "platform": "Accela"
   },
   {
     "jurisdiction": "Cincinnati, OH",
@@ -40,9 +245,139 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Clackamas County, OR",
+    "url": "https://aca-prod.accela.com/CLACKAMAS/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Clark County, NV",
+    "url": "https://aca-prod.accela.com/clarkco/Cap/CapHome.aspx?module=Building&TabName=Building",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Clark County, WA",
+    "url": "https://permits.clark.wa.gov/pub/lms",
+    "platform": "LMS Online (Clark County custom)"
+  },
+  {
+    "jurisdiction": "Clarksville, TN",
+    "url": "https://clarksvilletn-energovweb.tylerhost.net/apps/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Clay County, FL",
+    "url": "https://public.claycountygov.com/permitsearch/",
+    "platform": "Clay County permit search (Tyler EPL)"
+  },
+  {
+    "jurisdiction": "Clayton County, GA",
+    "url": "https://claytoncountyga-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Clearwater, FL",
+    "url": "https://aca-prod.accela.com/CLEARWATER/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Clovis, CA",
+    "url": "https://css.cityofclovis.com/EnerGov_Prod/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Cobb County, GA",
+    "url": "https://cobbca.cobbcounty.gov/CitizenAccess/",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "College Station, TX",
+    "url": "https://cd.cstx.gov/eTRAKiT/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Collin County, TX",
+    "url": "https://collincountytx-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov (Citizen Self-Service)"
+  },
+  {
     "jurisdiction": "Colorado Springs, CO",
     "url": "https://aca-prod.accela.com/COSPRINGS/Default.aspx",
     "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Columbia, MO",
+    "url": "https://energov.como.gov/energov_prod/selfservice#/home",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Columbus, GA",
+    "url": "https://columbusga-energovpub.tylerhost.net/Apps/SelfService#/home",
+    "platform": "Tyler EnerGov (Civic Access / Citizens Self Service)"
+  },
+  {
+    "jurisdiction": "Concord, CA",
+    "url": "https://aca-prod.accela.com/CONCORD/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Concord, NC",
+    "url": "https://aca-prod.accela.com/CABARRUS/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Conroe, TX",
+    "url": "https://conroetx.portal.opengov.com/",
+    "platform": "OpenGov"
+  },
+  {
+    "jurisdiction": "Contra Costa County, CA",
+    "url": "https://aca-prod.accela.com/CCC/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Cook County, IL",
+    "url": "https://bzpermits.cookcountyil.gov/epermit/",
+    "platform": "Cook County ePermit (custom)"
+  },
+  {
+    "jurisdiction": "Coral Springs, FL",
+    "url": "https://etrakit.coralsprings.gov/etrakit/",
+    "platform": "eTRAKiT (CentralSquare)"
+  },
+  {
+    "jurisdiction": "Costa Mesa, CA",
+    "url": "https://permits.costamesaca.gov/energov_prod/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Davie, FL",
+    "url": "https://esuite.davie-fl.gov/eSuite.Permits/AdvancedSearchPage/AdvancedSearch.aspx",
+    "platform": "Tyler eSuite"
+  },
+  {
+    "jurisdiction": "Dayton, OH",
+    "url": "https://aca-prod.accela.com/DAYTON/Cap/CapHome.aspx?module=Building&TabName=Building",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "DeKalb County, GA",
+    "url": "https://epermits.dekalbcountyga.gov/",
+    "platform": "Infor CIVICS (Infor Public Sector)"
+  },
+  {
+    "jurisdiction": "Deltona, FL",
+    "url": "https://deltonafl-energovweb.tylerhost.net/apps/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Denton County, TX",
+    "url": "https://dentoncountytx-energovweb.tylerhost.net/apps/SelfService#/home",
+    "platform": "Tyler EnerGov (Civic Access)"
+  },
+  {
+    "jurisdiction": "Denton, TX",
+    "url": "https://dntn-trk.aspgov.com/eTRAKiT/",
+    "platform": "eTRAKiT (CentralSquare)"
   },
   {
     "jurisdiction": "Denver, CO",
@@ -50,8 +385,103 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Des Moines, IA",
+    "url": "https://css.dmgov.org/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov"
+  },
+  {
     "jurisdiction": "Detroit, MI",
     "url": "https://aca-prod.accela.com/DETROIT/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Douglas County, CO",
+    "url": "https://apps.douglas.co.us/building/services/",
+    "platform": "POSSE (county system)"
+  },
+  {
+    "jurisdiction": "Downey, CA",
+    "url": "https://aca-prod.accela.com/DOWNEY/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "DuPage County, IL",
+    "url": "https://aca-prod.accela.com/DUPAGE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Edinburg, TX",
+    "url": "https://development.cityofedinburg.com/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "El Paso County, CO",
+    "url": "https://www.pprbd.org/Search/Permit",
+    "platform": "Pikes Peak Regional Building Department (PPRBD)"
+  },
+  {
+    "jurisdiction": "El Paso, TX",
+    "url": "https://aca-prod.accela.com/ELPASO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Elk Grove, CA",
+    "url": "https://elgr-trk.aspgov.com/etrakit/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "platform": "City of Eugene custom (Planning and Development permit search)"
+  },
+  {
+    "jurisdiction": "Evansville, IN",
+    "url": "https://cityofevansvillein.munisselfservice.com/css/citizens/PermitsInspections/Default.aspx",
+    "platform": "Tyler Munis Citizen Self Service"
+  },
+  {
+    "jurisdiction": "Everett, WA",
+    "url": "https://onlinepermits.everettwa.gov/eTRAKiT/default.aspx",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Fairfax County, VA",
+    "url": "https://plus.fairfaxcounty.gov/CitizenAccess/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Fairfield, CA",
+    "url": "https://fairfieldca-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov (Civic Access / Fairfield BUILD)"
+  },
+  {
+    "jurisdiction": "Fargo, ND",
+    "url": "https://permits.fargond.gov/",
+    "platform": "City of Fargo Permitting & Licensing portal (city-specific)"
+  },
+  {
+    "jurisdiction": "Fayetteville, AR",
+    "url": "https://egov.fayetteville-ar.gov/energov_prod/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Federal Way, WA",
+    "url": "https://epermits.cityoffederalway.com/PublicPortal/FederalWayDev/public/public_query3.jsp",
+    "platform": "CSDC AMANDA (eNtraprise)"
+  },
+  {
+    "jurisdiction": "Fontana, CA",
+    "url": "https://aca-prod.accela.com/FONTANA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Forsyth County, GA",
+    "url": "https://css.forsythco.com/EnerGov_Prod/SelfService/",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Fort Collins, CO",
+    "url": "https://accela-aca.fcgov.com/CitizenAccess/Welcome.aspx",
     "platform": "Accela"
   },
   {
@@ -60,8 +490,23 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Fort Myers, FL",
+    "url": "https://cdservices.cityftmyers.com/energovprod/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Fort Wayne, IN",
+    "url": "https://aca-prod.accela.com/ACFW/Default.aspx",
+    "platform": "Accela"
+  },
+  {
     "jurisdiction": "Fort Worth, TX",
     "url": "https://aca-prod.accela.com/CFW/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Fremont, CA",
+    "url": "https://aca-prod.accela.com/COF/Default.aspx",
     "platform": "Accela"
   },
   {
@@ -70,9 +515,124 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Frisco, TX",
+    "url": "https://etrakit.friscotexas.gov/etrakit/",
+    "platform": "eTRAKiT (CentralSquare)"
+  },
+  {
+    "jurisdiction": "Fullerton, CA",
+    "url": "https://fullerton.getapermit.net/",
+    "platform": "getaPERMIT.net"
+  },
+  {
+    "jurisdiction": "Gainesville, FL",
+    "url": "https://www4.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=308",
+    "platform": "Citizenserve (PermitGNV)"
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ch.ggcity.org/permitsoft/start/index",
+    "platform": "Garden Grove PermitSoft (city-specific)"
+  },
+  {
+    "jurisdiction": "Gilbert, AZ",
+    "url": "https://onestopshop.gilbertaz.gov/",
+    "platform": "Tyler EnerGov (OneStop Shop)"
+  },
+  {
+    "jurisdiction": "Glendale, CA",
+    "url": "https://glendaleca-energovweb.tylerhost.net/apps/SelfService",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Goodyear, AZ",
+    "url": "https://aca-prod.accela.com/GOODYEAR/customization/common/home.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Grand Prairie, TX",
+    "url": "https://egov.gptx.org/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov (Customer Self Service)"
+  },
+  {
+    "jurisdiction": "Grand Rapids, MI",
+    "url": "https://aca-prod.accela.com/GRANDRAPIDS/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Greeley, CO",
+    "url": "https://trakit.greeleygov.com/etrakit/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Greenville County, SC",
+    "url": "https://grvlc-trk.aspgov.com/eTRAKiT/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Gresham, OR",
+    "url": "https://greshamor-energovweb.tylerhost.net/apps/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Guilford County, NC",
+    "url": "https://citizenaccess.guilfordcountync.gov/energov_prod/selfservice",
+    "platform": "Tyler EnerGov (Civic Access)"
+  },
+  {
+    "jurisdiction": "Gwinnett County, GA",
+    "url": "https://aca-prod.accela.com/GWINNETT/welcome.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Hamilton County, OH",
+    "url": "https://eztrak.cagis.org/CitizenAccess/",
+    "platform": "Accela (CAGIS ezTrak)"
+  },
+  {
+    "jurisdiction": "Harris County, TX",
+    "url": "https://epermits.harriscountytx.gov/PublicProjectStatus.aspx",
+    "platform": "Harris County ePermits (custom)"
+  },
+  {
+    "jurisdiction": "Hartford, CT",
+    "url": "https://aca-prod.accela.com/HARTFORD/Cap/CapHome.aspx?module=Building",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Hayward, CA",
+    "url": "https://haywardca-energovpub.tylerhost.net/Apps/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Henrico County, VA",
+    "url": "https://build.henrico.gov/henprod/pub/lms/Login.aspx",
+    "platform": "Build Henrico (county-specific)"
+  },
+  {
+    "jurisdiction": "High Point, NC",
+    "url": "https://aca-prod.accela.com/COHP/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Hillsborough County, FL",
+    "url": "https://aca-prod.accela.com/hcfl/Default.aspx",
+    "platform": "Accela (HillsGovHub)"
+  },
+  {
+    "jurisdiction": "Hollywood, FL",
+    "url": "https://aca-prod.accela.com/HOLLYWOOD/Default.aspx",
+    "platform": "Accela"
+  },
+  {
     "jurisdiction": "Honolulu, HI",
     "url": "https://dppweb.honolulu.gov/",
     "platform": "Honolulu DPP"
+  },
+  {
+    "jurisdiction": "Horry County, SC",
+    "url": "https://egweb.horrycounty.org/EnerGov_prod/selfservice",
+    "platform": "Tyler EnerGov"
   },
   {
     "jurisdiction": "Houston, TX",
@@ -80,9 +640,139 @@
     "platform": "Houston Permitting Center"
   },
   {
+    "jurisdiction": "Howard County, MD",
+    "url": "https://dilp.howardcountymd.gov/CitizenAccess/Welcome.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Huntington Beach, CA",
+    "url": "https://engage.huntingtonbeachca.gov/CitizenAccess/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Huntsville, AL",
+    "url": "https://eplanreview.huntsvilleal.gov/",
+    "platform": "City-specific (ePlans Review plan review portal)"
+  },
+  {
+    "jurisdiction": "Independence, MO",
+    "url": "https://apps.indepmo.org/apps/BuildingPermits",
+    "platform": "City of Independence Permits & Applications Center (city-specific)"
+  },
+  {
+    "jurisdiction": "Indianapolis, IN",
+    "url": "https://aca-prod.accela.com/INDY",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Irvine, CA",
+    "url": "https://permits.cityofirvine.org/",
+    "platform": "City-specific (Irvine Permits and Inspections)"
+  },
+  {
     "jurisdiction": "Jacksonville, FL",
     "url": "https://buildinginspections.coj.net/",
     "platform": "Jacksonville Building Inspection"
+  },
+  {
+    "jurisdiction": "Jefferson County, AL",
+    "url": "https://aca-prod.accela.com/jccal/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Jersey City, NJ",
+    "url": "https://jerseycitynj-energovpub.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Kansas City, KS",
+    "url": "https://aca-prod.accela.com/UG",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Kent, WA",
+    "url": "https://permitportal.kentwa.gov/",
+    "platform": "City of Kent Citizen Portal (city-specific)"
+  },
+  {
+    "jurisdiction": "Kern County, CA",
+    "url": "https://aca-prod.accela.com/KERNCO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "King County, WA",
+    "url": "https://aca-prod.accela.com/kingco/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Kirkland, WA",
+    "url": "https://permitsearch.mybuildingpermit.com/",
+    "platform": "MyBuildingPermit (eCityGov Alliance)"
+  },
+  {
+    "jurisdiction": "Kissimmee, FL",
+    "url": "https://cityofkissimmeefl-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Knox County, TN",
+    "url": "https://epw-permitsubmit.knoxcountytn.gov/",
+    "platform": "Knox County Permit Portal (county system)"
+  },
+  {
+    "jurisdiction": "Knoxville, TN",
+    "url": "https://aca-prod.accela.com/KNOXVILLE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Lake County, IL",
+    "url": "https://lakecountyil-energovpub.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Lakewood, CO",
+    "url": "https://lakw-trk.aspgov.com/eTRAKiT/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Lancaster, CA",
+    "url": "https://aca-prod.accela.com/LANCASTER/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Las Cruces, NM",
+    "url": "https://aca-prod.accela.com/LASCRUCES/",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "League City, TX",
+    "url": "https://tylerenergovweb.leaguecitytx.gov/energov_prod/selfservice#/home",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Lee County, FL",
+    "url": "https://aca-prod.accela.com/LEECO/Default.aspx",
+    "platform": "Accela (eConnect)"
+  },
+  {
+    "jurisdiction": "Lehi, UT",
+    "url": "https://lehibuilding.portal.iworq.net/portalhome/lehibuilding",
+    "platform": "iWorQ"
+  },
+  {
+    "jurisdiction": "Leon County, FL",
+    "url": "https://aca-prod.accela.com/LEONCO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Lincoln, NE",
+    "url": "https://aca-prod.accela.com/LINCOLN",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Little Rock, AR",
+    "url": "https://permitpayment.littlerock.gov/ips_PD/Views/Login.aspx",
+    "platform": "Infor DynamicPortal"
   },
   {
     "jurisdiction": "Los Angeles, CA",
@@ -90,9 +780,59 @@
     "platform": "LADBS Online"
   },
   {
+    "jurisdiction": "Loudoun County, VA",
+    "url": "https://loudouncountyvaeg.tylerhost.net/prod/selfservice#/home",
+    "platform": "Tyler EnerGov (LandMARC)"
+  },
+  {
+    "jurisdiction": "Lubbock, TX",
+    "url": "https://egovaccess.ci.lubbock.tx.us/EnerGov_Prod/selfservice/Lubbock_Prod",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Madison, WI",
+    "url": "https://elam.cityofmadison.com/CitizenAccess/",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Manatee County, FL",
+    "url": "https://aca-prod.accela.com/MANATEE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Maricopa County, AZ",
+    "url": "https://maricopacountyaz-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "McAllen, TX",
+    "url": "https://onlinepermits.mcallen.net/portal/Cap/CapHome.aspx?module=Building",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "McKinney, TX",
+    "url": "https://egov.mckinneytexas.org/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Mecklenburg County, NC",
+    "url": "https://aca-prod.accela.com/MECKLENBURG/Default.aspx",
+    "platform": "Accela"
+  },
+  {
     "jurisdiction": "Memphis, TN",
     "url": "https://aca-prod.accela.com/SHELBYCO/Default.aspx",
     "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Menifee, CA",
+    "url": "https://aca-prod.accela.com/MENIFEE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Meridian, ID",
+    "url": "https://aca-prod.accela.com/MERIDIAN/Default.aspx",
+    "platform": "Accela Citizen Access"
   },
   {
     "jurisdiction": "Mesa, AZ",
@@ -100,9 +840,79 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Mesquite, TX",
+    "url": "https://energov.cityofmesquite.com/selfservice",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Miami Beach, FL",
+    "url": "https://energovcss.miamibeachfl.gov/energovprod/selfservice",
+    "platform": "Tyler EnerGov (Civic Access)"
+  },
+  {
+    "jurisdiction": "Miami Gardens, FL",
+    "url": "https://miamigardensfl-energovpub.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Midland, TX",
+    "url": "https://comapps.midlandtexas.gov/energov/selfservice#/home",
+    "platform": "Tyler EnerGov (PermitMidland CSS)"
+  },
+  {
     "jurisdiction": "Milwaukee, WI",
     "url": "https://www.milwaukee.gov/DNS/permits",
     "platform": "Milwaukee DNS"
+  },
+  {
+    "jurisdiction": "Mobile, AL",
+    "url": "https://mobileal-energovpub.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Modesto, CA",
+    "url": "https://mode-trk.aspgov.com/eTRAKiT/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Monterey County, CA",
+    "url": "https://aca-prod.accela.com/monterey/default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Montgomery County, MD",
+    "url": "https://permittingservices.montgomerycountymd.gov/DPS/online/eSearch.aspx",
+    "platform": "DPS eServices (county-specific)"
+  },
+  {
+    "jurisdiction": "Moreno Valley, CA",
+    "url": "https://aca-prod.accela.com/MOVAL/Default.aspx",
+    "platform": "Accela (SimpliCITY)"
+  },
+  {
+    "jurisdiction": "Multnomah County, OR",
+    "url": "https://multnomahcountyor-energovweb.tylerhost.net/apps/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Murfreesboro, TN",
+    "url": "https://app06.cityworksonline.com/CLIENT_MurfreesboroTN-public/login",
+    "platform": "Cityworks"
+  },
+  {
+    "jurisdiction": "Murrieta, CA",
+    "url": "https://murrietaca-energovpub.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Nampa, ID",
+    "url": "https://nampaid-energovpub.tylerhost.net/Apps/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Naperville, IL",
+    "url": "https://napervilleil-energovweb.tylerhost.net/apps/SelfService",
+    "platform": "Tyler EnerGov (Civic Access)"
   },
   {
     "jurisdiction": "Nashville, TN",
@@ -120,9 +930,29 @@
     "platform": "NYC DOB NOW"
   },
   {
+    "jurisdiction": "Newark, NJ",
+    "url": "https://newarkcitynj.portal.fasttrackgov.com/Permits/Search.aspx?microapp=c",
+    "platform": "FastTrackGov (Mitchell Humphrey)"
+  },
+  {
+    "jurisdiction": "Newport News, VA",
+    "url": "https://cssprod.nnva.gov/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "North Las Vegas, NV",
+    "url": "https://eg.cityofnorthlasvegas.com/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov"
+  },
+  {
     "jurisdiction": "Oakland, CA",
     "url": "https://aca-prod.accela.com/OAKLAND/Default.aspx",
     "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Oceanside, CA",
+    "url": "https://etrakit.cityofoceanside.com/etrakit3/",
+    "platform": "eTRAKiT"
   },
   {
     "jurisdiction": "Oklahoma City, OK",
@@ -130,9 +960,49 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Olathe, KS",
+    "url": "https://energov.olatheks.gov/EnerGov_Prod/SelfService/",
+    "platform": "Tyler EnerGov (Customer Self Service)"
+  },
+  {
     "jurisdiction": "Omaha, NE",
     "url": "https://aca-prod.accela.com/OMAHA/Default.aspx",
     "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Ontario, CA",
+    "url": "https://aca-prod.accela.com/ONT/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "platform": "Palm Coast Connect (city-specific)"
+  },
+  {
+    "jurisdiction": "Palmdale, CA",
+    "url": "https://aca-prod.accela.com/PALMDALE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Pasadena, TX",
+    "url": "https://pasadenatx-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Pasco County, FL",
+    "url": "https://aca-prod.accela.com/PASCO/Default.aspx",
+    "platform": "Accela (PascoGateway)"
+  },
+  {
+    "jurisdiction": "Pearland, TX",
+    "url": "https://cityworks.pearlandtx.gov/publicportal",
+    "platform": "Cityworks PublicAccess (Trimble)"
+  },
+  {
+    "jurisdiction": "Pembroke Pines, FL",
+    "url": "https://pembrokepinesfl-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov"
   },
   {
     "jurisdiction": "Philadelphia, PA",
@@ -140,9 +1010,54 @@
     "platform": "Philadelphia Eclipse"
   },
   {
+    "jurisdiction": "Pima County, AZ",
+    "url": "https://aca-prod.accela.com/PIMA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Pinal County, AZ",
+    "url": "https://aca-prod.accela.com/PINAL",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Pinellas County, FL",
+    "url": "https://aca-prod.accela.com/pinellas/Default.aspx",
+    "platform": "Accela"
+  },
+  {
     "jurisdiction": "Pittsburgh, PA",
     "url": "https://pittsburghpa.gov/pli/",
     "platform": "Pittsburgh PLI"
+  },
+  {
+    "jurisdiction": "Placer County, CA",
+    "url": "https://aca-prod.accela.com/PLACERCO",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Plano, TX",
+    "url": "https://trakit.plano.gov/etrakit_prod/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Plantation, FL",
+    "url": "https://aca.plantation.org/CitizenAccess/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Polk County, FL",
+    "url": "https://aca-prod.accela.com/POLKCO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Pomona, CA",
+    "url": "https://connect.pomonaca.gov/energov_prod/selfservice",
+    "platform": "Tyler EnerGov (Citizen Self Service)"
+  },
+  {
+    "jurisdiction": "Portland, ME",
+    "url": "https://selfservice.portlandmaine.gov/EnerGov_Prod/SelfService",
+    "platform": "Tyler EnerGov"
   },
   {
     "jurisdiction": "Portland, OR",
@@ -150,13 +1065,83 @@
     "platform": "Portland Permitting"
   },
   {
+    "jurisdiction": "Prince William County, VA",
+    "url": "https://egcss.pwcgov.org/SelfService#/home",
+    "platform": "Tyler EnerGov (ePortal)"
+  },
+  {
+    "jurisdiction": "Providence, RI",
+    "url": "https://providenceri.portal.opengov.com/",
+    "platform": "OpenGov"
+  },
+  {
+    "jurisdiction": "Pueblo, CO",
+    "url": "https://www.prbd.com/e-gov/permitsearch1.php",
+    "platform": "Pueblo Regional Building Department e-gov (city-specific)"
+  },
+  {
+    "jurisdiction": "Queen Creek, AZ",
+    "url": "https://aca-prod.accela.com/QC/Cap/CapHome.aspx?module=Permits&TabName=Home",
+    "platform": "Accela"
+  },
+  {
     "jurisdiction": "Raleigh, NC",
     "url": "https://raleighnc.gov/permits",
     "platform": "Raleigh Permits"
   },
   {
+    "jurisdiction": "Rancho Cucamonga, CA",
+    "url": "https://aca-prod.accela.com/CITYOFRC/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Reading, PA",
+    "url": "https://readingpa-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
     "jurisdiction": "Reno, NV",
     "url": "https://aca-prod.accela.com/RENO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Renton, WA",
+    "url": "https://permitting.rentonwa.gov/",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Richland County, SC",
+    "url": "https://etrakit.rcgov.us/etrakit/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Riverside County, CA",
+    "url": "https://rivcoplus.org/energov_prod/selfservice",
+    "platform": "Tyler EnerGov (PLUS)"
+  },
+  {
+    "jurisdiction": "Rochester, MN",
+    "url": "https://aca-prod.accela.com/ROCHESTER/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Roseville, CA",
+    "url": "https://aca-prod.accela.com/COR/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Roswell, GA",
+    "url": "https://cityofroswellga-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Round Rock, TX",
+    "url": "https://permits.roundrocktexas.gov/portal",
+    "platform": "Round Rock Permit Portal (Timmons Group)"
+  },
+  {
+    "jurisdiction": "Sacramento County, CA",
+    "url": "https://aca-prod.accela.com/sacco/Default.aspx",
     "platform": "Accela"
   },
   {
@@ -170,8 +1155,33 @@
     "platform": "St. Paul DSI"
   },
   {
+    "jurisdiction": "Salinas, CA",
+    "url": "https://pc.ci.salinas.ca.us/eTRAKIT/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Salt Lake County, UT",
+    "url": "https://app03.cityworksonline.com/CLIENT_GreaterSaltLakeMSD-Public/login",
+    "platform": "Cityworks (Greater Salt Lake MSD)"
+  },
+  {
     "jurisdiction": "San Antonio, TX",
     "url": "https://aca-prod.accela.com/COSA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "San Bernardino County, CA",
+    "url": "https://ezpermits.sbcounty.gov/SBC/Default.aspx",
+    "platform": "Accela (EZ Online Permitting)"
+  },
+  {
+    "jurisdiction": "San Bernardino, CA",
+    "url": "https://aca-prod.accela.com/SANBERN/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "San Diego County, CA",
+    "url": "https://publicservices.sandiegocounty.gov/CitizenAccess/Default.aspx",
     "platform": "Accela"
   },
   {
@@ -180,9 +1190,14 @@
     "platform": "Accela"
   },
   {
-    "jurisdiction": "San Francisco, CA",
-    "url": "https://dbiweb02.sfgov.org/dbipts/",
-    "platform": "SF DBI PTS"
+    "jurisdiction": "San Mateo County, CA",
+    "url": "https://aca-prod.accela.com/smcgov/Welcome.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Sandy Springs, GA",
+    "url": "https://sandyspringsga.portal.opengov.com/",
+    "platform": "OpenGov"
   },
   {
     "jurisdiction": "Santa Ana, CA",
@@ -190,8 +1205,113 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Santa Clara County, CA",
+    "url": "https://aca-prod.accela.com/sccgov/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Santa Clara, CA",
+    "url": "https://aca-prod.accela.com/santaclara/default.aspx",
+    "platform": "Accela Citizen Access"
+  },
+  {
+    "jurisdiction": "Santa Clarita, CA",
+    "url": "https://aca-prod.accela.com/santaclarita/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Santa Fe, NM",
+    "url": "https://santafenm-energovpub.tylerhost.net/Apps/selfservice#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Santa Rosa, CA",
+    "url": "https://aca-prod.accela.com/SANTAROSA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Sarasota County, FL",
+    "url": "https://aca-prod.accela.com/SARASOTACO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Scranton, PA",
+    "url": "https://scrantonpa.portal.opengov.com/",
+    "platform": "OpenGov (ViewPoint Cloud)"
+  },
+  {
     "jurisdiction": "Seattle, WA",
     "url": "https://cosaccela.seattle.gov/portal/",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Shelby County, TN",
+    "url": "https://aca-prod.accela.com/SHELBYCO/Default.aspx",
+    "platform": "Accela (Develop901)"
+  },
+  {
+    "jurisdiction": "Simi Valley, CA",
+    "url": "https://selfservice.simivalley.org/EnerGovProd/SelfService#/home/",
+    "platform": "Tyler EnerGov (Customer Self Service)"
+  },
+  {
+    "jurisdiction": "Sioux Falls, SD",
+    "url": "https://css.siouxfalls.gov/energov_prod/selfservice/",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Solano County, CA",
+    "url": "https://aca-prod.accela.com/SOLANO/",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Sonoma County, CA",
+    "url": "https://aca-prod.accela.com/SONOMACO/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Sparks, NV",
+    "url": "https://aca-prod.accela.com/ONE/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Spokane, WA",
+    "url": "https://aca.spokanepermits.org/",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Springfield, MA",
+    "url": "https://springfieldma.portal.opengov.com/",
+    "platform": "OpenGov"
+  },
+  {
+    "jurisdiction": "St. George, UT",
+    "url": "https://www.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=399",
+    "platform": "Citizenserve"
+  },
+  {
+    "jurisdiction": "St. Johns County, FL",
+    "url": "https://webapp.sjcfl.us/watswebx/Permit/SearchPermit.aspx",
+    "platform": "WATS (county-specific)"
+  },
+  {
+    "jurisdiction": "St. Louis, MO",
+    "url": "https://www.stlcitypermits.com/",
+    "platform": "City-specific (STL City Permits, by WBlue LLC)"
+  },
+  {
+    "jurisdiction": "St. Lucie County, FL",
+    "url": "https://stluciecountyfl-energovpub.tylerhost.net/Apps/SelfService",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Stamford, CT",
+    "url": "https://stamfordct.portal.opengov.com/",
+    "platform": "OpenGov (ViewPoint Cloud)"
+  },
+  {
+    "jurisdiction": "Stanislaus County, CA",
+    "url": "https://aca-prod.accela.com/STANCO/Default.aspx",
     "platform": "Accela"
   },
   {
@@ -200,8 +1320,53 @@
     "platform": "Accela"
   },
   {
+    "jurisdiction": "Sugar Land, TX",
+    "url": "https://energovweb.sugarlandtx.gov/EnerGov_prod/SelfService#/home",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Sunrise, FL",
+    "url": "https://energov.sunrisefl.gov/EnerGov_Prod/selfservice/SunriseFL%20Prod",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Tacoma, WA",
+    "url": "https://aca-prod.accela.com/tacoma/Default.aspx",
+    "platform": "Accela"
+  },
+  {
     "jurisdiction": "Tampa, FL",
     "url": "https://aca-prod.accela.com/TAMPA/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Temecula, CA",
+    "url": "https://css.temeculaca.gov/EnerGov_Prod/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Tempe, AZ",
+    "url": "https://epermits.tempe.gov/CitizenAccess/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Thousand Oaks, CA",
+    "url": "https://thousandoaksca-energovpub.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Toledo, OH",
+    "url": "https://applyforpermits.toledo.oh.gov/portal",
+    "platform": "Toledo Application Portal (city-specific)"
+  },
+  {
+    "jurisdiction": "Topeka, KS",
+    "url": "https://cityworks.topeka.org/publicaccess",
+    "platform": "Cityworks PublicAccess (Trimble)"
+  },
+  {
+    "jurisdiction": "Torrance, CA",
+    "url": "https://aca-prod.accela.com/TORRANCE/Cap/CapHome.aspx?module=Building&TabName=Home",
     "platform": "Accela"
   },
   {
@@ -210,8 +1375,93 @@
     "platform": "Tucson TDC Online"
   },
   {
+    "jurisdiction": "Tuscaloosa, AL",
+    "url": "https://www.tuscaloosa.com/buildingpermit",
+    "platform": "BluePrince (city apply page with Cognito Forms applications)"
+  },
+  {
+    "jurisdiction": "Tyler, TX",
+    "url": "https://trakit.cityoftyler.net/etrakit/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Ventura County, CA",
+    "url": "https://vcca.venturacounty.gov/citizenaccess/Welcome.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Victorville, CA",
+    "url": "https://cityofvictorvilleca-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Visalia, CA",
+    "url": "https://cd.visalia.city/CitizenAccess/Cap/CapHome.aspx?IsToShowInspection=yes&module=Building",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Volusia County, FL",
+    "url": "https://connectlivepermits.org/citizenportal",
+    "platform": "Connect Live (county-specific)"
+  },
+  {
+    "jurisdiction": "Waco, TX",
+    "url": "https://selfservice.wacotx.gov/EnerGov/SelfService/",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Wake County, NC",
+    "url": "https://wakecountync-energovpub.tylerhost.net/apps/SelfService",
+    "platform": "Tyler EnerGov"
+  },
+  {
+    "jurisdiction": "Washington County, OR",
+    "url": "https://permits.washingtoncountyor.gov/CitizenAccess/Welcome.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Washoe County, NV",
+    "url": "https://aca-prod.accela.com/ONE/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Weld County, CO",
+    "url": "https://aca-prod.accela.com/WELD/Default.aspx",
+    "platform": "Accela"
+  },
+  {
+    "jurisdiction": "West Jordan, UT",
+    "url": "https://permit.westjordan.utah.gov/CityworksPortal-LIVE/login",
+    "platform": "Cityworks"
+  },
+  {
+    "jurisdiction": "West Palm Beach, FL",
+    "url": "https://westpalmbeachfl-energovpub.tylerhost.net/apps/selfservice/WestPalmBeachFLProd#/home",
+    "platform": "Tyler EnerGov (Civic Access)"
+  },
+  {
+    "jurisdiction": "Westminster, CO",
+    "url": "https://develop.cityofwestminster.us/etrakit/",
+    "platform": "eTRAKiT"
+  },
+  {
+    "jurisdiction": "Wichita Falls, TX",
+    "url": "https://public.mygov.us/wichitafalls_tx",
+    "platform": "MyGov"
+  },
+  {
     "jurisdiction": "Wichita, KS",
     "url": "https://aca-prod.accela.com/WICHITA/Default.aspx",
     "platform": "Accela"
+  },
+  {
+    "jurisdiction": "Wilmington, DE",
+    "url": "https://cityofwilmingtondecitizens.munisselfservice.com/citizens/PermitsInspections/Default.aspx",
+    "platform": "Tyler Munis Self Service"
+  },
+  {
+    "jurisdiction": "Wilmington, NC",
+    "url": "https://newhanovercountync-energovpub.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov (New Hanover County COAST; county issues building permits within the city)"
   }
 ]

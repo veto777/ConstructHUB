@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { permitDatabases } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -19,9 +19,10 @@ export async function seedPermitPortals() {
     return;
   }
 
-  let updated = 0;
+  let updated = 0, unmatched = 0;
   for (const p of portals) {
-    // permit_databases.jurisdiction for a city row is exactly "City, ST".
+    // permit_databases.jurisdiction is "City, ST" for cities and "Name County, ST"
+    // for counties — the string alone identifies the row, so match on it directly.
     const res = await db
       .update(permitDatabases)
       .set({
@@ -32,13 +33,11 @@ export async function seedPermitPortals() {
         linkStatus: "live", // verified live at build time; re-checked by verify-links.ts
         lastVerifiedAt: new Date(),
       })
-      .where(and(
-        eq(permitDatabases.jurisdiction, p.jurisdiction),
-        eq(permitDatabases.jurisdictionType, "city"),
-      ))
+      .where(eq(permitDatabases.jurisdiction, p.jurisdiction))
       .returning({ id: permitDatabases.id });
     if (res.length) updated += res.length;
-    else console.warn(`  permit-portal: no matching city row for "${p.jurisdiction}"`);
+    else { unmatched++; console.warn(`  permit-portal: no matching row for "${p.jurisdiction}"`); }
   }
+  if (unmatched) console.log(`  (${unmatched} portals had no matching permit row — jurisdiction naming mismatch)`);
   console.log(`Permit portals: applied ${updated} verified real portals to major jurisdictions.`);
 }
