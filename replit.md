@@ -1,3 +1,8 @@
+> **SUPERSEDED (2026-07-07):** This is the inherited Replit architecture doc and has drifted.
+> For current operating rules see `CLAUDE.md`; for project state + deployment see `HANDOFF.md`.
+> Notably: the government data described here was fabricated and has been replaced with real,
+> verified data; the app is being self-hosted (not Replit).
+
 # Construction Hub
 
 ## Overview
