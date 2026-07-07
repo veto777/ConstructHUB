@@ -22,3 +22,4 @@ scripts/_smoke-seed.ts
 # permit-portal workflow scratch
 server/data/_permit-candidates.json
 scripts/_*.ts
+scripts/_verify-round2.ts
