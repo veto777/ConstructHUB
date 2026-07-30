@@ -11,6 +11,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes, randomInt } from "crypto";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
 import { resolveGoogleUrl } from "./google-url-resolver";
+import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 
 function generateAccountId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -44,12 +45,11 @@ declare global {
 }
 
 export function getBaseUrl(req: any): string {
-  if (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT) {
-    return "https://constructhub.us";
-  }
-  const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  return `${proto}://${host}`;
+  // Host-aware (allowlisted) so links generated on constructhub.app or on the
+  // portal subdomain point back at the domain the user is actually using.
+  // Unknown hosts fall back to the primary domain — a spoofed Host header must
+  // never end up inside an outgoing email or an OAuth callback.
+  return siteBaseUrl(req);
 }
 
 export async function setupAuth(app: Express) {
@@ -160,7 +160,7 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/auth/google", (req, res, next) => {
-    const callbackURL = `${getBaseUrl(req)}/api/auth/google/callback`;
+    const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
     const gbp = req.query.gbp === "1";
     const scopes = ["profile", "email"];
     if (gbp) {
@@ -177,7 +177,7 @@ export async function setupAuth(app: Express) {
   app.get(
     "/api/auth/google/callback",
     (req, res, next) => {
-      const callbackURL = `${getBaseUrl(req)}/api/auth/google/callback`;
+      const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
       passport.authenticate("google", { failureRedirect: "/auth?error=google-failed", callbackURL } as any)(req, res, next);
     },
     async (req, res) => {

@@ -124,6 +124,16 @@ export async function registerRoutes(
     return null;
   }
 
+  // CRM tenancy layer (orgs, crews, roles, invitations).
+  try {
+    const { ensureCrmSchema } = await import("./crm/schema-ensure");
+    await ensureCrmSchema();
+    const { registerCrmRoutes } = await import("./crm/routes");
+    registerCrmRoutes(app, getDevUser);
+  } catch (e: any) {
+    console.error("Failed to initialize CRM module:", e?.message || e);
+  }
+
   // Google Local Services Ads (multi-tenant LSA lead system).
   try {
     const { ensureLsaSchema } = await import("./lsa/schema-ensure");

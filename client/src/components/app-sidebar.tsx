@@ -5,6 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Zap, Star,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
+  Users2,
 } from "lucide-react";
 import permitsLogo from "@assets/Permits_1772157993497.png";
 import spyLogo from "@assets/Spy_logo_1772157993496.png";
@@ -156,6 +157,7 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, logo: spyLogo, landingUrl: "/competitors-landing" }] : []),
   { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/master-class-landing" },
+  { title: "Team & Company", url: "/crm/team", icon: Users2, badge: "new" },
 ];
 
 const pricingGroup: NavGroup = {

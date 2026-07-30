@@ -1,7 +1,9 @@
 # ConstructHUB — operating rules for Claude
 
 Construction-permit data aggregator + GMB/Google-Ads toolset. Express 5 + React/Vite/shadcn +
-Drizzle (Postgres). Imported from Replit 2026-07-06; being moved to self-hosting on your own servers.
+Drizzle (Postgres). Imported from Replit 2026-07-06; **LIVE at https://constructhub.us since
+2026-07-10** (self-hosted on vb7 — see Deploy below). GBP/GMB API access: twice rejected by Google,
+reapply on/after **2026-09-08** (details in `HANDOFF.md` → "GBP API access timeline").
 
 ## 🚫 HARD RULE — never fabricate data
 This project shipped from Replit with **~100% fabricated government data** (guessed `.gov` URLs,
@@ -40,6 +42,7 @@ or "Name County, ST"). Counties/cities from `seed-all-counties.ts` / `seed-all-c
 
 ## Commands
 `npm run dev` (tsx server) · `npm run build` · `npm start` (dist) · `npm run check` (tsc, must be 0) ·
+`npm test` (vitest — CRM server unit + money-path integration tests; integration tests need the dev server) ·
 `npm run db:push` (drizzle — but prefer `apply-schema-migration.ts`, see above).
 
 ## Security (from the code review — keep these intact)
@@ -48,5 +51,8 @@ Stripe webhook verifies the raw body + fails closed; cart prices resolved server
 (not `NODE_ENV`); SSRF-safe Google URL resolver (host allowlist). Don't regress these.
 
 ## Deploy
-Self-hosted (NOT Replit). Needs its own Postgres. See `HANDOFF.md` for the full state + deploy steps.
-`replit.md` is the inherited architecture doc — historical reference, superseded by this file + HANDOFF.
+**LIVE at https://constructhub.us since 2026-07-10** — vb7 `~/ConstructHUB` :8110 (systemd --user
+`constructhub.service`), local Postgres 16, own Cloudflare tunnel `d8436ec8…` (`constructhub-tunnel.service`).
+Update flow: build on tower → `rsync -azc dist/` to vb7 → restart the service (full runbook + owner-pending
+items in `HANDOFF.md`). `replit.md` is the inherited architecture doc — historical reference, superseded
+by this file + HANDOFF.

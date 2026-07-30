@@ -24,7 +24,9 @@ function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
     : null;
 }
 
-const PLANS = {
+// Exported so the CRM tenancy layer can enforce seat limits server-side
+// (limits.users) without duplicating the plan table.
+export const PLANS = {
   standard: {
     name: "Standard",
     price: 1500,

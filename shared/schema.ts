@@ -971,3 +971,973 @@ export const LSA_DISPUTE_REASONS = [
   "SPAM",
 ] as const;
 export type LsaDisputeReason = (typeof LSA_DISPUTE_REASONS)[number];
+
+// ── CRM: organizations, membership, roles & invitations ─────────────────────
+// The tenancy layer for the ConstructHUB CRM. Everything CRM-side is scoped by
+// org_id, NOT user_id: a construction company has crews, and the office staff,
+// field techs and owner must all see the same jobs. (The rest of ConstructHUB
+// predates this and stays user_id-scoped; the two models coexist deliberately —
+// see server/crm/tenancy.ts for the get-or-create bridge.)
+//
+// Convention note: matches the existing codebase — varchar uuid PKs, no foreign
+// keys, no drizzle relations(); joins are written explicitly in query code.
+
+// A construction company. Also carries the company profile that appears on
+// estimates, invoices and contracts (modelled on what a contractor actually
+// needs on a printed document: license number, legal entity, terms, warranty).
+export const crmOrgs = pgTable("crm_orgs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  legalEntityName: text("legal_entity_name"),
+  ownerUserId: integer("owner_user_id").notNull(),
+  // Contact / branding
+  email: text("email"),
+  phone: text("phone"),
+  website: text("website"),
+  logoUrl: text("logo_url"),
+  // Address
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  country: text("country").default("US"),
+  timezone: text("timezone").default("America/Los_Angeles"),
+  // Trade/compliance. licenseState matters because deposit caps are per-state
+  // (see analysis/hcp-crawl — CA/NV/MD/MA/PA/NY cap contractor deposits).
+  licenseNumber: text("license_number"),
+  licenseState: text("license_state"),
+  industry: text("industry").default("Construction & Remodeling"),
+  description: text("description"),
+  // Document defaults
+  invoiceFooter: text("invoice_footer"),
+  estimateFooter: text("estimate_footer"),
+  termsAndConditions: text("terms_and_conditions"),
+  warrantyText: text("warranty_text"),
+  // Money defaults (integer cents / basis points — never floats in billing)
+  defaultDepositBps: integer("default_deposit_bps").default(0),
+  currency: text("currency").default("usd"),
+  // Set when the owner finishes (or dismisses) the setup checklist, so the
+  // portal stops routing them back into onboarding.
+  onboardingDismissedAt: timestamp("onboarding_dismissed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Membership of a user in an org, with role + per-seat overrides. A user may
+// belong to several orgs (a bookkeeper serving multiple contractors); the
+// active one is held in the session.
+export const crmMembers = pgTable("crm_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  userId: integer("user_id"),          // null while an invitation is pending
+  email: text("email").notNull(),      // stable identity before the user exists
+  role: text("role").notNull().default("field"),
+  status: text("status").notNull().default("active"), // active | invited | disabled
+  // Display / dispatch
+  displayName: text("display_name"),
+  title: text("title"),
+  phone: text("phone"),
+  avatarUrl: text("avatar_url"),
+  calendarColor: text("calendar_color"),
+  // Job costing: what this person costs us per hour, in cents. Kept on the
+  // membership (not the user) because the same person can cost different
+  // amounts to different orgs.
+  hourlyCostCents: integer("hourly_cost_cents"),
+  // Sparse overrides on top of the role defaults; see CRM_PERMISSIONS.
+  permissions: jsonb("permissions"),
+  lastActiveAt: timestamp("last_active_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Pending invitations. Token is single-use; accepting binds the row in
+// crm_members to the accepting user's id.
+export const crmInvitations = pgTable("crm_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("field"),
+  permissions: jsonb("permissions"),
+  token: text("token").notNull().unique(),
+  invitedByUserId: integer("invited_by_user_id"),
+  expiresAt: timestamp("expires_at"),
+  acceptedAt: timestamp("accepted_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmOrgSchema = createInsertSchema(crmOrgs).omit({ id: true, createdAt: true, updatedAt: true });
+export type CrmOrg = typeof crmOrgs.$inferSelect;
+export type InsertCrmOrg = z.infer<typeof insertCrmOrgSchema>;
+
+export const insertCrmMemberSchema = createInsertSchema(crmMembers).omit({ id: true, createdAt: true, updatedAt: true });
+export type CrmMember = typeof crmMembers.$inferSelect;
+export type InsertCrmMember = z.infer<typeof insertCrmMemberSchema>;
+
+export const insertCrmInvitationSchema = createInsertSchema(crmInvitations).omit({ id: true, createdAt: true });
+export type CrmInvitation = typeof crmInvitations.$inferSelect;
+export type InsertCrmInvitation = z.infer<typeof insertCrmInvitationSchema>;
+
+// ── Roles & permissions ─────────────────────────────────────────────────────
+// Housecall Pro ships three fixed roles and no custom fields; we ship five
+// construction-shaped roles PLUS per-seat overrides, because a lead carpenter
+// who can approve change orders but not see company reporting is a real and
+// common case that fixed roles cannot express.
+
+export const CRM_ROLES = ["owner", "admin", "office", "field", "subcontractor"] as const;
+export type CrmRole = (typeof CRM_ROLES)[number];
+
+export const CRM_PERMISSIONS = [
+  "viewAllJobs",        // false ⇒ only jobs this member is assigned to
+  "manageJobs",
+  "manageCustomers",
+  "manageEstimates",
+  "manageInvoices",
+  "takePayment",
+  "seePrices",          // field crews are often deliberately price-blind
+  "seeCosts",           // cost/margin is stricter than price
+  "approveChangeOrders",
+  "managePriceBook",
+  "manageTeam",
+  "manageSettings",
+  "seeReporting",
+  "manageIntegrations",
+] as const;
+export type CrmPermission = (typeof CRM_PERMISSIONS)[number];
+export type CrmPermissionSet = Partial<Record<CrmPermission, boolean>>;
+
+const ALL: CrmPermissionSet = Object.fromEntries(CRM_PERMISSIONS.map((p) => [p, true]));
+
+// Defaults per role. A membership's `permissions` jsonb overrides these keys.
+export const CRM_ROLE_DEFAULTS: Record<CrmRole, CrmPermissionSet> = {
+  owner: { ...ALL },
+  admin: { ...ALL, manageIntegrations: false },
+  office: {
+    viewAllJobs: true, manageJobs: true, manageCustomers: true, manageEstimates: true,
+    manageInvoices: true, takePayment: true, seePrices: true, seeCosts: false,
+    approveChangeOrders: false, managePriceBook: false, manageTeam: false,
+    manageSettings: false, seeReporting: true, manageIntegrations: false,
+  },
+  field: {
+    viewAllJobs: false, manageJobs: false, manageCustomers: false, manageEstimates: false,
+    manageInvoices: false, takePayment: false, seePrices: false, seeCosts: false,
+    approveChangeOrders: false, managePriceBook: false, manageTeam: false,
+    manageSettings: false, seeReporting: false, manageIntegrations: false,
+  },
+  // Deliberately its own role rather than "a customer with a flag" — modelling
+  // subs as customers is exactly the mistake Housecall Pro makes.
+  subcontractor: {
+    viewAllJobs: false, manageJobs: false, manageCustomers: false, manageEstimates: false,
+    manageInvoices: false, takePayment: false, seePrices: false, seeCosts: false,
+    approveChangeOrders: false, managePriceBook: false, manageTeam: false,
+    manageSettings: false, seeReporting: false, manageIntegrations: false,
+  },
+};
+
+/** Effective permissions for a membership: role defaults + sparse overrides. */
+export function crmEffectivePermissions(
+  role: string | null | undefined,
+  overrides?: unknown,
+): Record<CrmPermission, boolean> {
+  const base = CRM_ROLE_DEFAULTS[(role as CrmRole)] ?? CRM_ROLE_DEFAULTS.field;
+  const out = {} as Record<CrmPermission, boolean>;
+  for (const p of CRM_PERMISSIONS) out[p] = base[p] === true;
+  if (overrides && typeof overrides === "object") {
+    for (const [k, v] of Object.entries(overrides as Record<string, unknown>)) {
+      if ((CRM_PERMISSIONS as readonly string[]).includes(k) && typeof v === "boolean") {
+        out[k as CrmPermission] = v;
+      }
+    }
+  }
+  return out;
+}
+
+// ── CRM: customers, projects, jobs, estimates, client portal ────────────────
+// Everything here is org-scoped (crm_orgs), never user-scoped.
+//
+// Object model (analysis/HYBRID-SPEC.md §1): a LEAD IS NOT A JOB (Leap conflates
+// them), and a Project sits between Customer and Job so phases/budget have a
+// home — Leap admits on camera that their users fake phases with naming
+// conventions because they only allow one trade per job.
+
+// ── Canonical status enums. ONE vocabulary per entity, used for storage,
+// filtering and display. Housecall Pro ships two (`in progress` in responses,
+// `in_progress` in filters) and that produces filters which silently miss rows.
+export const CRM_LEAD_STATUSES = ["new", "contacted", "qualified", "won", "lost"] as const;
+export const CRM_PROJECT_STATUSES = [
+  "lead", "estimating", "proposal_sent", "approved", "scheduled",
+  "in_progress", "waiting_on_trades", "punch_list", "complete", "invoiced", "paid", "cancelled",
+] as const;
+export const CRM_JOB_STATUSES = [
+  "unscheduled", "scheduled", "in_progress", "complete", "cancelled",
+] as const;
+export const CRM_ESTIMATE_STATUSES = [
+  "draft", "sent", "viewed", "approved", "declined", "expired", "cancelled",
+] as const;
+export const CRM_INVOICE_STATUSES = [
+  "draft", "sent", "partial", "paid", "void", "uncollectible",
+] as const;
+export const CRM_LINE_ITEM_KINDS = ["labor", "material", "equipment", "subcontractor", "fee", "discount"] as const;
+
+export type CrmProjectStatus = (typeof CRM_PROJECT_STATUSES)[number];
+export type CrmEstimateStatus = (typeof CRM_ESTIMATE_STATUSES)[number];
+
+// Human labels + board grouping. "waiting_on_trades" and "punch_list" are real
+// construction states every Leap customer invents by hand; we ship them.
+export const CRM_PROJECT_STAGE_META: Record<string, { label: string; group: string }> = {
+  lead:               { label: "Lead",              group: "Prospect" },
+  estimating:         { label: "Estimating",        group: "Sales" },
+  proposal_sent:      { label: "Proposal Sent",     group: "Sales" },
+  approved:           { label: "Approved",          group: "Sales" },
+  scheduled:          { label: "Scheduled",         group: "Production" },
+  in_progress:        { label: "In Progress",       group: "Production" },
+  waiting_on_trades:  { label: "Waiting on Trades", group: "Production" },
+  punch_list:         { label: "Punch List",        group: "Production" },
+  complete:           { label: "Complete",          group: "Production" },
+  invoiced:           { label: "Invoiced",          group: "Billing" },
+  paid:               { label: "Paid",              group: "Billing" },
+  cancelled:          { label: "Cancelled",         group: "Closed" },
+};
+
+export const crmCustomers = pgTable("crm_customers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  displayName: text("display_name").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  companyName: text("company_name"),
+  email: text("email"),
+  phone: text("phone"),
+  altPhone: text("alt_phone"),
+  // Service address
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  // Billing address, when different
+  billingSameAsService: boolean("billing_same_as_service").notNull().default(true),
+  billingLine1: text("billing_line1"),
+  billingCity: text("billing_city"),
+  billingState: text("billing_state"),
+  billingPostalCode: text("billing_postal_code"),
+  leadSourceId: varchar("lead_source_id"),
+  ownerMemberId: varchar("owner_member_id"),
+  notes: text("notes"),
+  tags: text("tags").array(),
+  // First-class custom fields on EVERY entity. HCP's own docs say "Housecall Pro
+  // is not set up to allow for custom fields" — that is the opening.
+  customFields: jsonb("custom_fields"),
+  // The client portal is created with the customer, not later. Token is the
+  // unguessable key in the estimate email link.
+  portalToken: text("portal_token").notNull(),
+  portalLastSeenAt: timestamp("portal_last_seen_at"),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const crmProjects = pgTable("crm_projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  number: text("number"),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("lead"),
+  // Site address, when it differs from the customer record
+  addressLine1: text("address_line1"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  trades: text("trades").array(),
+  projectManagerMemberId: varchar("project_manager_member_id"),
+  salesMemberId: varchar("sales_member_id"),
+  // Money in integer cents, always.
+  contractValueCents: integer("contract_value_cents"),
+  budgetCents: integer("budget_cents"),
+  startDate: timestamp("start_date"),
+  targetEndDate: timestamp("target_end_date"),
+  completedAt: timestamp("completed_at"),
+  // Our moat: the verified permit portal + parcel record for this address.
+  permitPortalId: integer("permit_portal_id"),
+  permitNumber: text("permit_number"),
+  parcelNumber: text("parcel_number"),
+  customFields: jsonb("custom_fields"),
+  stageChangedAt: timestamp("stage_changed_at").defaultNow(),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// A per-trade scope of work inside a project (roof, siding, gutters).
+export const crmJobs = pgTable("crm_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  name: text("name").notNull(),
+  trade: text("trade"),
+  description: text("description"),
+  status: text("status").notNull().default("unscheduled"),
+  assignedMemberIds: text("assigned_member_ids").array(),
+  scheduledStart: timestamp("scheduled_start"),
+  scheduledEnd: timestamp("scheduled_end"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  customFields: jsonb("custom_fields"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const crmEstimates = pgTable("crm_estimates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  projectId: varchar("project_id"),
+  number: text("number"),
+  title: text("title").notNull().default("Estimate"),
+  status: text("status").notNull().default("draft"),
+  introText: text("intro_text"),
+  termsText: text("terms_text"),
+  // Totals, integer cents. Recomputed server-side from line items — never trust
+  // a client-supplied total.
+  subtotalCents: integer("subtotal_cents").notNull().default(0),
+  discountCents: integer("discount_cents").notNull().default(0),
+  taxRateBps: integer("tax_rate_bps").notNull().default(0),
+  taxCents: integer("tax_cents").notNull().default(0),
+  totalCents: integer("total_cents").notNull().default(0),
+  depositCents: integer("deposit_cents"),
+  // Send + open tracking. viewedAt is the "you can see it was opened" feature.
+  publicToken: text("public_token").notNull(),
+  sentAt: timestamp("sent_at"),
+  sentToEmail: text("sent_to_email"),
+  firstViewedAt: timestamp("first_viewed_at"),
+  lastViewedAt: timestamp("last_viewed_at"),
+  viewCount: integer("view_count").notNull().default(0),
+  approvedAt: timestamp("approved_at"),
+  declinedAt: timestamp("declined_at"),
+  declineReason: text("decline_reason"),
+  signatureName: text("signature_name"),
+  signatureIp: text("signature_ip"),
+  expiresAt: timestamp("expires_at"),
+  createdByMemberId: varchar("created_by_member_id"),
+  customFields: jsonb("custom_fields"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const crmEstimateItems = pgTable("crm_estimate_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  estimateId: varchar("estimate_id").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  kind: text("kind").notNull().default("labor"),
+  name: text("name").notNull(),
+  description: text("description"),
+  quantityMilli: integer("quantity_milli").notNull().default(1000), // 1.000 = 1000
+  unit: text("unit"),
+  unitPriceCents: integer("unit_price_cents").notNull().default(0),
+  // Cost is privileged: stripped from responses unless the caller has seeCosts.
+  unitCostCents: integer("unit_cost_cents"),
+  taxable: boolean("taxable").notNull().default(true),
+  // Hidden line items still affect the total but are not shown to the homeowner.
+  hiddenFromClient: boolean("hidden_from_client").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Append-only audit of what the client did. Powers "opened at 2:14pm" and the
+// approve/decline notification.
+export const crmEstimateEvents = pgTable("crm_estimate_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  estimateId: varchar("estimate_id").notNull(),
+  type: text("type").notNull(), // created|sent|viewed|approved|declined|reminded
+  actor: text("actor"),         // member id, "client", or "system"
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmLeadSources = pgTable("crm_lead_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmCustomerSchema = createInsertSchema(crmCustomers).omit({ id: true, createdAt: true, updatedAt: true });
+export type CrmCustomer = typeof crmCustomers.$inferSelect;
+export const insertCrmProjectSchema = createInsertSchema(crmProjects).omit({ id: true, createdAt: true, updatedAt: true });
+export type CrmProject = typeof crmProjects.$inferSelect;
+export const insertCrmJobSchema = createInsertSchema(crmJobs).omit({ id: true, createdAt: true, updatedAt: true });
+export type CrmJob = typeof crmJobs.$inferSelect;
+export const insertCrmEstimateSchema = createInsertSchema(crmEstimates).omit({ id: true, createdAt: true, updatedAt: true });
+export type CrmEstimate = typeof crmEstimates.$inferSelect;
+export type CrmEstimateItem = typeof crmEstimateItems.$inferSelect;
+
+// ── CRM: connected payment accounts + payments ───────────────────────────────
+// The contractor connects THEIR OWN Stripe/Square account. We never take
+// custody: Stripe Connect *Standard* with direct charges, so the contractor is
+// merchant of record and dispute/negative-balance liability stays with Stripe
+// rather than with us. (Express/Custom shift losses onto the platform — the
+// common belief that "Express means Stripe takes the risk" is backwards.)
+//
+// ACH is the point: a $25,000 deposit costs ~$5 on ACH vs ~$725 on card.
+
+export const CRM_PAYMENT_PROVIDERS = ["stripe", "square"] as const;
+export const CRM_PAYMENT_STATUSES = [
+  "pending", "processing", "succeeded", "failed", "canceled", "refunded",
+] as const;
+
+export const crmPaymentAccounts = pgTable("crm_payment_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  provider: text("provider").notNull(),
+  // Stripe: acct_…  Square: merchant id
+  externalAccountId: text("external_account_id").notNull(),
+  livemode: boolean("livemode").notNull().default(false),
+  // Capability flags as reported by the provider, so the UI can say honestly
+  // whether ACH is actually turned on for this merchant.
+  chargesEnabled: boolean("charges_enabled").notNull().default(false),
+  achEnabled: boolean("ach_enabled").notNull().default(false),
+  cardEnabled: boolean("card_enabled").notNull().default(false),
+  accountEmail: text("account_email"),
+  businessName: text("business_name"),
+  country: text("country"),
+  defaultCurrency: text("default_currency"),
+  // Square OAuth issues refresh tokens; Stripe Standard does not need one.
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  connectedByMemberId: varchar("connected_by_member_id"),
+  lastCheckedAt: timestamp("last_checked_at"),
+  lastError: text("last_error"),
+  disconnectedAt: timestamp("disconnected_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const crmPayments = pgTable("crm_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  estimateId: varchar("estimate_id"),
+  invoiceId: varchar("invoice_id"),
+  projectId: varchar("project_id"),
+  provider: text("provider").notNull(),
+  // Stripe Checkout Session / PaymentIntent id
+  externalId: text("external_id"),
+  purpose: text("purpose").notNull().default("deposit"), // deposit | progress | final
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").notNull().default("usd"),
+  method: text("method"),                                 // ach | card
+  status: text("status").notNull().default("pending"),
+  // Cents we charged as a platform fee. Zero by default — we are not skimming
+  // the contractor's deposit.
+  applicationFeeCents: integer("application_fee_cents").notNull().default(0),
+  failureReason: text("failure_reason"),
+  // Free-text memo on manually recorded (offline) payments — "check #1042".
+  note: text("note"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CrmPaymentAccount = typeof crmPaymentAccounts.$inferSelect;
+export type CrmPayment = typeof crmPayments.$inferSelect;
+
+// ── CRM: invoices, costing, scheduling, field ops, API ───────────────────────
+// The half neither Housecall Pro nor Leap ships. Verified against Leap's own
+// bundle: cost code / budget / actual cost / retainage / punch list / daily log
+// / allowance all return ZERO hits. This is the open ground.
+
+export const CRM_CHANGE_ORDER_STATUSES = ["draft", "sent", "approved", "declined", "void"] as const;
+export const CRM_APPOINTMENT_STATUSES = ["scheduled", "on_my_way", "started", "complete", "canceled"] as const;
+export const CRM_PUNCH_STATUSES = ["open", "in_progress", "done", "wont_fix"] as const;
+export const CRM_SELECTION_STATUSES = ["pending", "chosen", "ordered", "installed"] as const;
+export const CRM_COMMITMENT_TYPES = ["purchase_order", "subcontract", "labor"] as const;
+
+// ── Invoices (many per project = progress billing) ──────────────────────────
+export const crmInvoices = pgTable("crm_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  projectId: varchar("project_id"),
+  estimateId: varchar("estimate_id"),
+  number: text("number"),
+  title: text("title").notNull().default("Invoice"),
+  status: text("status").notNull().default("draft"),
+  subtotalCents: integer("subtotal_cents").notNull().default(0),
+  discountCents: integer("discount_cents").notNull().default(0),
+  taxRateBps: integer("tax_rate_bps").notNull().default(0),
+  taxCents: integer("tax_cents").notNull().default(0),
+  totalCents: integer("total_cents").notNull().default(0),
+  paidCents: integer("paid_cents").notNull().default(0),
+  // Retainage withheld on this invoice — absent from both competitors.
+  retainageBps: integer("retainage_bps").notNull().default(0),
+  retainageCents: integer("retainage_cents").notNull().default(0),
+  dueAt: timestamp("due_at"),
+  publicToken: text("public_token").notNull(),
+  sentAt: timestamp("sent_at"),
+  sentToEmail: text("sent_to_email"),
+  firstViewedAt: timestamp("first_viewed_at"),
+  viewCount: integer("view_count").notNull().default(0),
+  paidAt: timestamp("paid_at"),
+  voidedAt: timestamp("voided_at"),
+  notes: text("notes"),
+  customFields: jsonb("custom_fields"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const crmInvoiceItems = pgTable("crm_invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  invoiceId: varchar("invoice_id").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  kind: text("kind").notNull().default("labor"),
+  name: text("name").notNull(),
+  description: text("description"),
+  quantityMilli: integer("quantity_milli").notNull().default(1000),
+  unit: text("unit"),
+  unitPriceCents: integer("unit_price_cents").notNull().default(0),
+  costCodeId: varchar("cost_code_id"),
+  taxable: boolean("taxable").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── Cost codes + the budget ledger ─────────────────────────────────────────
+export const crmCostCodes = pgTable("crm_cost_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  code: text("code").notNull(),          // "06-100"
+  name: text("name").notNull(),          // "Rough Carpentry"
+  division: text("division"),            // CSI division grouping
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Optional phase layer. Leap admits its users fake phases with custom work
+// types because it only allows one trade per job; we make it native.
+export const crmPhases = pgTable("crm_phases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/** One budget line per project × cost code. Budget vs Committed vs Actual. */
+export const crmBudgetLines = pgTable("crm_budget_lines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  phaseId: varchar("phase_id"),
+  costCodeId: varchar("cost_code_id").notNull(),
+  budgetCents: integer("budget_cents").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** A PO or subcontract: money promised but not yet spent. */
+export const crmCommitments = pgTable("crm_commitments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  costCodeId: varchar("cost_code_id"),
+  type: text("type").notNull().default("purchase_order"),
+  number: text("number"),
+  vendorName: text("vendor_name"),
+  supplier: text("supplier"),             // abc_supply | srs | qxo | other
+  description: text("description"),
+  amountCents: integer("amount_cents").notNull().default(0),
+  status: text("status").notNull().default("open"),
+  // Set when a supplier order is placed through an integration — this is what
+  // closes the procurement→job-cost loop that neither competitor documents.
+  externalOrderId: text("external_order_id"),
+  orderedAt: timestamp("ordered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** Actual cost: a vendor bill or posted labor. */
+export const crmCostEntries = pgTable("crm_cost_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  costCodeId: varchar("cost_code_id"),
+  commitmentId: varchar("commitment_id"),
+  source: text("source").notNull().default("vendor_bill"), // vendor_bill|labor|expense
+  vendorName: text("vendor_name"),
+  memberId: varchar("member_id"),
+  description: text("description"),
+  amountCents: integer("amount_cents").notNull().default(0),
+  hoursMilli: integer("hours_milli"),
+  incurredOn: timestamp("incurred_on").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── Scheduling: appointments carry their own crew (HCP's model) ─────────────
+export const crmAppointments = pgTable("crm_appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id"),
+  jobId: varchar("job_id"),
+  customerId: varchar("customer_id"),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  crewNotes: text("crew_notes"),
+  status: text("status").notNull().default("scheduled"),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  allDay: boolean("all_day").notNull().default(false),
+  arrivalWindowMinutes: integer("arrival_window_minutes"),
+  // Per-visit crew — a three-visit job assigns different people per visit.
+  dispatchedMemberIds: text("dispatched_member_ids").array(),
+  onMyWayAt: timestamp("on_my_way_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── Change orders — the #1 missing feature for remodelers ───────────────────
+export const crmChangeOrders = pgTable("crm_change_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  number: text("number"),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("draft"),
+  amountCents: integer("amount_cents").notNull().default(0),
+  costCents: integer("cost_cents"),
+  scheduleImpactDays: integer("schedule_impact_days").notNull().default(0),
+  costCodeId: varchar("cost_code_id"),
+  publicToken: text("public_token").notNull(),
+  sentAt: timestamp("sent_at"),
+  firstViewedAt: timestamp("first_viewed_at"),
+  approvedAt: timestamp("approved_at"),
+  declinedAt: timestamp("declined_at"),
+  signatureName: text("signature_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── Field ops: punch list, daily logs, selections & allowances ──────────────
+export const crmPunchItems = pgTable("crm_punch_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  location: text("location"),
+  status: text("status").notNull().default("open"),
+  assignedMemberId: varchar("assigned_member_id"),
+  dueAt: timestamp("due_at"),
+  completedAt: timestamp("completed_at"),
+  photoUrls: text("photo_urls").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const crmDailyLogs = pgTable("crm_daily_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  logDate: timestamp("log_date").notNull(),
+  authorMemberId: varchar("author_member_id"),
+  weather: text("weather"),
+  tempF: integer("temp_f"),
+  crewCount: integer("crew_count"),
+  hoursMilli: integer("hours_milli"),
+  workCompleted: text("work_completed"),
+  delays: text("delays"),
+  visitors: text("visitors"),
+  safetyNotes: text("safety_notes"),
+  photoUrls: text("photo_urls").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmSelections = pgTable("crm_selections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  category: text("category"),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("pending"),
+  // Allowance vs actual: the overage is billable to the homeowner.
+  allowanceCents: integer("allowance_cents").notNull().default(0),
+  chosenOptionName: text("chosen_option_name"),
+  actualCents: integer("actual_cents"),
+  dueAt: timestamp("due_at"),
+  decidedAt: timestamp("decided_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── Estimate options (good / better / best) ─────────────────────────────────
+export const crmEstimateOptions = pgTable("crm_estimate_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  estimateId: varchar("estimate_id").notNull(),
+  name: text("name").notNull(),            // Good / Better / Best
+  tier: integer("tier").notNull().default(1),
+  description: text("description"),
+  recommended: boolean("recommended").notNull().default(false),
+  // Leap leaked pricing by showing tier totals; we default to hiding them.
+  showTotal: boolean("show_total").notNull().default(true),
+  subtotalCents: integer("subtotal_cents").notNull().default(0),
+  totalCents: integer("total_cents").notNull().default(0),
+  selectedAt: timestamp("selected_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── Public API keys + webhooks (Leap has neither) ───────────────────────────
+export const crmApiKeys = pgTable("crm_api_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  // Only a SHA-256 hash is stored; the plaintext is shown once at creation.
+  keyHash: text("key_hash").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  scopes: text("scopes").array(),
+  createdByMemberId: varchar("created_by_member_id"),
+  lastUsedAt: timestamp("last_used_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmWebhooks = pgTable("crm_webhooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  events: text("events").array(),
+  active: boolean("active").notNull().default(true),
+  lastStatus: integer("last_status"),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  failureCount: integer("failure_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const CRM_WEBHOOK_EVENTS = [
+  "customer.created", "customer.updated",
+  "project.created", "project.stage_changed",
+  "estimate.sent", "estimate.viewed", "estimate.approved", "estimate.declined",
+  "invoice.sent", "invoice.viewed", "invoice.paid",
+  "changeorder.approved", "changeorder.declined",
+  "appointment.scheduled", "appointment.completed",
+  "payment.succeeded", "payment.failed",
+] as const;
+
+export type CrmInvoice = typeof crmInvoices.$inferSelect;
+export type CrmCostCode = typeof crmCostCodes.$inferSelect;
+export type CrmBudgetLine = typeof crmBudgetLines.$inferSelect;
+export type CrmAppointment = typeof crmAppointments.$inferSelect;
+export type CrmChangeOrder = typeof crmChangeOrders.$inferSelect;
+
+// ── CRM: price book ─────────────────────────────────────────────────────────
+// Hybrid of both competitors (see analysis/PRICE-BOOK-RESEARCH.md):
+//  - Housecall Pro's spine: every material and labor rate carries COST and
+//    PRICE, so margin is computed rather than guessed, and an assembly is
+//    materials × qty + labor × hours.
+//  - Leap's formula engine: a qty formula string with [SYMBOL] placeholders.
+//  - Leap's accessories and packages (good/better/best).
+//  - Ours, which neither has: an explicit wasteFactorBps field, so nobody has
+//    to bury "* 1.10" in a formula string and later wonder why.
+
+export const CRM_PB_PRICING_MODES = ["flat", "computed", "formula", "percentage"] as const;
+export const CRM_PB_UNITS = [
+  "ea", "sq", "sf", "lf", "cy", "hr", "day", "gal", "lb", "ton", "roll", "bundle", "sheet", "job",
+] as const;
+
+/** Formula symbols the evaluator understands, plus per-item custom placeholders. */
+export const CRM_PB_SYMBOLS = [
+  "QTY", "SQUARES", "LF", "SF", "EA", "PITCH", "STORIES", "WASTE", "COST", "PRICE", "HOURS",
+] as const;
+
+export const crmPbCategories = pgTable("crm_pb_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  parentId: varchar("parent_id"),           // nested to any depth, HCP's model
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmPbLaborRates = pgTable("crm_pb_labor_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  hourlyCostCents: integer("hourly_cost_cents").notNull().default(0),
+  hourlyPriceCents: integer("hourly_price_cents").notNull().default(0),
+  isDefault: boolean("is_default").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmPbMaterials = pgTable("crm_pb_materials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  categoryId: varchar("category_id"),
+  name: text("name").notNull(),
+  sku: text("sku"),
+  description: text("description"),
+  unit: text("unit").notNull().default("ea"),
+  costCents: integer("cost_cents").notNull().default(0),
+  priceCents: integer("price_cents").notNull().default(0),
+  // 1000 = 10% waste, applied to QUANTITY when an assembly expands. Neither
+  // competitor has a dedicated field for this.
+  wasteFactorBps: integer("waste_factor_bps").notNull().default(0),
+  taxable: boolean("taxable").notNull().default(true),
+  supplier: text("supplier"),               // abc_supply | srs | qxo | other
+  supplierSku: text("supplier_sku"),
+  imageUrl: text("image_url"),
+  active: boolean("active").notNull().default(true),
+  costUpdatedAt: timestamp("cost_updated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** The assembly. One line on an estimate that expands into many. */
+export const crmPbItems = pgTable("crm_pb_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  categoryId: varchar("category_id"),
+  code: text("code"),
+  name: text("name").notNull(),
+  description: text("description"),
+  unit: text("unit").notNull().default("ea"),
+  pricingMode: text("pricing_mode").notNull().default("computed"),
+  // flat mode
+  flatPriceCents: integer("flat_price_cents"),
+  flatCostCents: integer("flat_cost_cents"),
+  // percentage mode (Leap's isPercentage) — e.g. a 15% overhead line
+  percentBps: integer("percent_bps"),
+  // formula mode: "[SQUARES] * 1.1 + 2" with named placeholders
+  qtyFormula: text("qty_formula"),
+  placeholders: jsonb("placeholders"),      // [{symbol,label,defaultValue}]
+  // markup applied to computed COST to reach price when priceCents are absent
+  markupBps: integer("markup_bps").notNull().default(0),
+  minChargeCents: integer("min_charge_cents"),
+  taxable: boolean("taxable").notNull().default(true),
+  costCodeId: varchar("cost_code_id"),      // ties the sale straight to the budget
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** Assembly contents: a material with a quantity, or labor with hours. */
+export const crmPbItemParts = pgTable("crm_pb_item_parts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  itemId: varchar("item_id").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  materialId: varchar("material_id"),
+  laborRateId: varchar("labor_rate_id"),
+  // per ONE unit of the parent assembly. 1000 = 1.000
+  quantityMilli: integer("quantity_milli").notNull().default(1000),
+  hoursMilli: integer("hours_milli"),
+  // Optional per-part formula, overrides quantityMilli when present
+  qtyFormula: text("qty_formula"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/** Optional add-ons offered with a parent item (Leap's accessories). */
+export const crmPbItemAccessories = pgTable("crm_pb_item_accessories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  itemId: varchar("item_id").notNull(),
+  accessoryItemId: varchar("accessory_item_id").notNull(),
+  defaultIncluded: boolean("default_included").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** A bundle of items → becomes a good/better/best estimate option. */
+export const crmPbPackages = pgTable("crm_pb_packages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  tier: integer("tier").notNull().default(1),
+  description: text("description"),
+  categoryId: varchar("category_id"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmPbPackageItems = pgTable("crm_pb_package_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  packageId: varchar("package_id").notNull(),
+  itemId: varchar("item_id").notNull(),
+  quantityMilli: integer("quantity_milli").notNull().default(1000),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export type CrmPbItem = typeof crmPbItems.$inferSelect;
+export type CrmPbMaterial = typeof crmPbMaterials.$inferSelect;
+
+// ── CRM: measurements ───────────────────────────────────────────────────────
+// Provider-neutral by design. HOVER and EagleView are explicitly NOT planned
+// (owner decision 2026-07-29); the CladAI measurement project becomes the
+// provider once it ships.
+//
+// ⚠️ TOWER BOUNDARY: CladAI is a SEPARATE project and is SHARED with outside
+// devs, while ConstructHUB is private. When this is wired it MUST go over
+// CladAI's public HTTPS API using a credential issued to ConstructHUB — never
+// by reading its local files, never by sharing its database, never by
+// importing its code. See analysis/CRM-BRAIN.md §7b before implementing.
+
+export const CRM_MEASUREMENT_PROVIDERS = ["manual", "cladai", "other"] as const;
+export const CRM_MEASUREMENT_STATUSES = ["draft", "requested", "processing", "ready", "failed"] as const;
+
+export const crmMeasurements = pgTable("crm_measurements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id"),
+  customerId: varchar("customer_id"),
+  provider: text("provider").notNull().default("manual"),
+  status: text("status").notNull().default("draft"),
+  // The provider's own job/report id, so a later callback can find this row.
+  externalId: text("external_id"),
+  addressLine1: text("address_line1"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  // Derived values, normalised into the units estimating actually uses. These
+  // become the [SQUARES]/[LF]/[SF] symbols an assembly formula consumes.
+  squaresMilli: integer("squares_milli"),        // roof squares, 1000 = 1.000
+  roofAreaSfMilli: integer("roof_area_sf_milli"),
+  wallAreaSfMilli: integer("wall_area_sf_milli"),
+  ridgeLfMilli: integer("ridge_lf_milli"),
+  hipLfMilli: integer("hip_lf_milli"),
+  valleyLfMilli: integer("valley_lf_milli"),
+  eaveLfMilli: integer("eave_lf_milli"),
+  rakeLfMilli: integer("rake_lf_milli"),
+  perimeterLfMilli: integer("perimeter_lf_milli"),
+  predominantPitch: text("predominant_pitch"),   // "6/12"
+  stories: integer("stories"),
+  facetCount: integer("facet_count"),
+  wasteSuggestionBps: integer("waste_suggestion_bps"),
+  // Whatever the provider returned, kept verbatim for audit and re-derivation.
+  rawPayload: jsonb("raw_payload"),
+  reportUrl: text("report_url"),
+  requestedByMemberId: varchar("requested_by_member_id"),
+  requestedAt: timestamp("requested_at"),
+  completedAt: timestamp("completed_at"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CrmMeasurement = typeof crmMeasurements.$inferSelect;

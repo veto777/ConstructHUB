@@ -38,6 +38,19 @@ import PermitsLandingPage from "@/pages/permits-landing";
 import CompetitorsLandingPage from "@/pages/competitors-landing";
 import MasterClassLandingPage from "@/pages/master-class-landing";
 import SettingsPage from "@/pages/settings";
+import CrmTeamPage from "@/pages/crm-team";
+import CrmJoinPage from "@/pages/crm-join";
+import CrmHomePage from "@/pages/crm-home";
+import CrmClientsPage from "@/pages/crm-clients";
+import CrmClientPage from "@/pages/crm-client";
+import CrmPaymentsPage from "@/pages/crm-payments";
+import CrmPipelinePage from "@/pages/crm-pipeline";
+import CrmPriceBookPage from "@/pages/crm-pricebook";
+import CrmProjectPage from "@/pages/crm-project";
+import PublicEstimatePage from "@/pages/public-estimate";
+import PublicPortalPage from "@/pages/public-portal";
+import PublicInvoicePage from "@/pages/public-invoice";
+import { isPortal } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
 import VpnShieldPage from "@/pages/vpn-shield";
 import IndividualPricingPage from "@/pages/individual-pricing";
@@ -59,6 +72,8 @@ function DashboardRouter() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/search" component={SearchPage} />
+      <Route path="/crm/team" component={CrmTeamPage} />
+      <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/databases" component={DatabasesPage} />
       <Route path="/property" component={PropertyPage} />
       <Route path="/schedules" component={SchedulesPage} />
@@ -94,6 +109,10 @@ function DashboardRouter() {
       <Route path="/lsa-account-manager" component={LsaAccountManagerPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/e/:token" component={PublicEstimatePage} />
+      <Route path="/i/:token" component={PublicInvoicePage} />
+      <Route path="/portal/:token" component={PublicPortalPage} />
+      <Route path="/crm/join" component={CrmJoinPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -139,6 +158,43 @@ const sidebarStyle = {
   "--sidebar-width-icon": "3rem",
 };
 
+/** The portal (portal.constructhub.*) is the CRM only — no marketing routes. */
+function PortalRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={CrmHomePage} />
+      <Route path="/crm" component={CrmHomePage} />
+      <Route path="/crm/home" component={CrmHomePage} />
+      <Route path="/crm/clients" component={CrmClientsPage} />
+      <Route path="/crm/clients/:id" component={CrmClientPage} />
+      <Route path="/crm/pipeline" component={CrmPipelinePage} />
+      <Route path="/crm/pricebook" component={CrmPriceBookPage} />
+      <Route path="/crm/projects/:id" component={CrmProjectPage} />
+      <Route path="/crm/payments" component={CrmPaymentsPage} />
+      <Route path="/crm/team" component={CrmTeamPage} />
+      <Route path="/crm/join" component={CrmJoinPage} />
+      <Route path="/e/:token" component={PublicEstimatePage} />
+      <Route path="/portal/:token" component={PublicPortalPage} />
+      {/* Unknown portal route -> home, which always offers the next action. */}
+      <Route component={CrmHomePage} />
+    </Switch>
+  );
+}
+
+/** Signed-out portal visitors get the login screen, not the marketing landing page. */
+function PortalPublicRouter() {
+  return (
+    <Switch>
+      {/* Client-facing links are token-authorised and must never demand a login. */}
+      <Route path="/e/:token" component={PublicEstimatePage} />
+      <Route path="/portal/:token" component={PublicPortalPage} />
+      <Route path="/crm/join" component={CrmJoinPage} />
+      <Route path="/auth" component={AuthPage} />
+      <Route component={AuthPage} />
+    </Switch>
+  );
+}
+
 function AppContent() {
   const { data: user, isLoading } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -159,12 +215,73 @@ function AppContent() {
 
   const showSiteChat = location === "/" || location === "/landing";
 
+  const portal = isPortal();
+
   if (!user && !isDev) {
+    // On the portal, an anonymous visitor gets the sign-in screen. Never the
+    // marketing site — the two are deliberately separate products.
+    if (portal) return <PortalPublicRouter />;
     return (
       <>
         <PublicRouter />
         {showSiteChat && <SiteAssistantChat />}
       </>
+    );
+  }
+
+  // The portal has its own minimal shell: no marketing landing pages, no cart,
+  // no ads chat — just the CRM.
+  if (portal) {
+    return (
+      <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          <div className="flex flex-col flex-1 min-w-0">
+            <header className="flex items-center justify-between gap-3 px-4 h-12 border-b border-border/40 bg-background sticky top-0 z-50">
+              <div className="flex items-center gap-4 min-w-0">
+                <Link href="/" data-testid="link-portal-home">
+                  <span className="font-semibold whitespace-nowrap cursor-pointer">ConstructHUB Portal</span>
+                </Link>
+                <nav className="flex items-center gap-1 text-sm">
+                  <Link href="/" data-testid="link-portal-nav-home">
+                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location === "/" ? "bg-accent font-medium" : "text-muted-foreground"}`}>
+                      Home
+                    </span>
+                  </Link>
+                  <Link href="/crm/clients" data-testid="link-portal-nav-clients">
+                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/clients") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
+                      Clients
+                    </span>
+                  </Link>
+                  <Link href="/crm/pipeline" data-testid="link-portal-nav-pipeline">
+                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
+                      Pipeline
+                    </span>
+                  </Link>
+                  <Link href="/crm/pricebook" data-testid="link-portal-nav-pricebook">
+                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/pricebook") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
+                      Price book
+                    </span>
+                  </Link>
+                  <Link href="/crm/payments" data-testid="link-portal-nav-payments">
+                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/payments") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
+                      Payments
+                    </span>
+                  </Link>
+                  <Link href="/crm/team" data-testid="link-portal-nav-team">
+                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/team") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
+                      Team &amp; Company
+                    </span>
+                  </Link>
+                </nav>
+              </div>
+              <ThemeToggle />
+            </header>
+            <main className="flex-1 overflow-auto">
+              <PortalRouter />
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
     );
   }
 
@@ -196,6 +313,11 @@ function AppContent() {
   if (location.startsWith("/contract/sign/")) {
     return <ContractSignPage />;
   }
+
+  // Client-facing pages render full-bleed on any host — no app chrome.
+  if (location.startsWith("/e/")) return <PublicEstimatePage />;
+  if (location.startsWith("/i/")) return <PublicInvoicePage />;
+  if (location.startsWith("/portal/")) return <PublicPortalPage />;
 
   return (
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
