@@ -174,6 +174,7 @@ function PortalRouter() {
       <Route path="/crm/team" component={CrmTeamPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
+      <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       {/* Unknown portal route -> home, which always offers the next action. */}
       <Route component={CrmHomePage} />
@@ -187,6 +188,7 @@ function PortalPublicRouter() {
     <Switch>
       {/* Client-facing links are token-authorised and must never demand a login. */}
       <Route path="/e/:token" component={PublicEstimatePage} />
+      <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/auth" component={AuthPage} />

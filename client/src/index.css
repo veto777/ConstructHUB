@@ -244,10 +244,6 @@
     -webkit-backdrop-filter: saturate(180%) blur(20px);
   }
 
-  .animate-in {
-    animation: fadeSlideIn 0.5s ease-out both;
-  }
-
   .animate-in-delay-1 {
     animation: fadeSlideIn 0.5s ease-out 0.08s both;
   }
@@ -351,6 +347,20 @@
   .stagger-item {
     animation: fadeSlideIn 0.5s ease-out both;
   }
+}
+
+/*
+ * Marketing entrance animation. Deliberately OUTSIDE @layer utilities: inside
+ * the layer Tailwind generates data-[state=…] variants of `.animate-in` that
+ * override tailwindcss-animate's own `animate-in` utility on shadcn overlays
+ * (dialog, select, toast…). fadeSlideIn fills with `transform: translateY(0)`,
+ * which permanently overrode the dialog's translate(-50%,-50%) centering and
+ * pinned every dialog's top-left corner to the middle of the viewport.
+ * Unlayered, this rule still wins for the marketing divs that use the bare
+ * `animate-in` class, and never matches the shadcn variant classes.
+ */
+.animate-in {
+  animation: fadeSlideIn 0.5s ease-out both;
 }
 
 @keyframes fadeSlideIn {

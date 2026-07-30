@@ -93,9 +93,9 @@ export default function CrmProjectPage() {
 
       <div>
         <h1 className="text-3xl font-bold">{project.name}</h1>
-        <p className="text-muted-foreground mt-1">
+        <div className="text-muted-foreground mt-1 text-sm">
           {project.number} · <Badge variant="secondary">{project.stageLabel}</Badge> · {project.stageGroup}
-        </p>
+        </div>
       </div>
 
       {seeCosts && t && (

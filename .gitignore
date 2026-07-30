@@ -30,3 +30,7 @@ scripts/_verify-round2.ts
 # live CF DNS token + DNS rollback snapshots — never commit
 secrets/
 tunnel/dns-rollback/
+
+# playwright
+test-results/
+playwright-report/
