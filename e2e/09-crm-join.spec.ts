@@ -24,7 +24,7 @@ test.describe("/crm/join", () => {
     try {
       await gotoCrm(page, `/crm/join?token=${token}`);
       await expect(page.getByText(email, { exact: true })).toBeVisible();
-      await expect(page.getByText(/invited you to ConstructHUB/)).toBeVisible();
+      await expect(page.getByText(/invited you to ConstructHub CRM/)).toBeVisible();
       await page.getByTestId("button-accept-invite").click();
       await expect(page.getByText("Could not accept", { exact: true })).toBeVisible();
     } finally {

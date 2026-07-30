@@ -68,7 +68,7 @@ export default function CrmJoinPage() {
             <UserPlus className="h-5 w-5" /> Join the team
           </CardTitle>
           <CardDescription>
-            {data?.orgName ? `${data.orgName} invited you to ConstructHUB.` : "Checking your invitation…"}
+            {data?.orgName ? `${data.orgName} invited you to ConstructHub CRM.` : "Checking your invitation…"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

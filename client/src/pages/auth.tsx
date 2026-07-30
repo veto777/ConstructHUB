@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff, Building2 } from "lucide-react";
 import { CHLogo } from "@/components/ch-logo";
+import { isPortal } from "@/lib/site";
 
 type AuthMode = "login" | "signup" | "forgot-password" | "reset-password";
 
@@ -168,10 +169,18 @@ export default function AuthPage() {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <CHLogo height={50} />
+            {isPortal()
+              ? <Building2 className="h-12 w-12 text-primary" />
+              : <CHLogo height={50} />}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-auth-title">Construct<span className="font-extrabold">HUB</span></h1>
-          <p className="text-sm text-muted-foreground">Nationwide Contractor Services</p>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-auth-title">
+            {isPortal()
+              ? <>ConstructHub <span className="font-extrabold text-primary">CRM</span></>
+              : <>Construct<span className="font-extrabold">HUB</span></>}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {isPortal() ? "Projects, clients & payments for contractors" : "Nationwide Contractor Services"}
+          </p>
         </div>
 
         <Card className="p-6 space-y-5" style={{ boxShadow: "var(--shadow-sm)" }}>

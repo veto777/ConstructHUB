@@ -1,4 +1,5 @@
 import { Switch, Route, useLocation, Link } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -50,7 +51,7 @@ import CrmProjectPage from "@/pages/crm-project";
 import PublicEstimatePage from "@/pages/public-estimate";
 import PublicPortalPage from "@/pages/public-portal";
 import PublicInvoicePage from "@/pages/public-invoice";
-import { isPortal } from "@/lib/site";
+import { isPortal, CRM_NAME } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
 import VpnShieldPage from "@/pages/vpn-shield";
 import IndividualPricingPage from "@/pages/individual-pricing";
@@ -72,8 +73,6 @@ function DashboardRouter() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/search" component={SearchPage} />
-      <Route path="/crm/team" component={CrmTeamPage} />
-      <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/databases" component={DatabasesPage} />
       <Route path="/property" component={PropertyPage} />
       <Route path="/schedules" component={SchedulesPage} />
@@ -112,7 +111,6 @@ function DashboardRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
-      <Route path="/crm/join" component={CrmJoinPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -203,6 +201,13 @@ function AppContent() {
   });
   const [location] = useLocation();
 
+  const portal = isPortal();
+
+  // The CRM is its own product — its own tab title, never the marketing one.
+  useEffect(() => {
+    if (portal) document.title = CRM_NAME;
+  }, [portal]);
+
 
   if (isLoading) {
     return (
@@ -216,8 +221,6 @@ function AppContent() {
   const showAdsChat = location.startsWith("/google-ads") || location.startsWith("/google-ad-fraud");
 
   const showSiteChat = location === "/" || location === "/landing";
-
-  const portal = isPortal();
 
   if (!user && !isDev) {
     // On the portal, an anonymous visitor gets the sign-in screen. Never the
@@ -241,7 +244,7 @@ function AppContent() {
             <header className="flex items-center justify-between gap-3 px-4 h-12 border-b border-border/40 bg-background sticky top-0 z-50">
               <div className="flex items-center gap-4 min-w-0">
                 <Link href="/" data-testid="link-portal-home">
-                  <span className="font-semibold whitespace-nowrap cursor-pointer">ConstructHUB Portal</span>
+                  <span className="font-semibold whitespace-nowrap cursor-pointer" data-testid="text-crm-brand">ConstructHub <span className="font-extrabold text-primary">CRM</span></span>
                 </Link>
                 <nav className="flex items-center gap-1 text-sm">
                   <Link href="/" data-testid="link-portal-nav-home">

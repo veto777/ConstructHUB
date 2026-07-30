@@ -491,9 +491,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     try {
       await sendWithFallback({
         to: email,
-        subject: `You've been invited to join ${ctx.org.name} on ConstructHUB`,
+        subject: `You've been invited to join ${ctx.org.name} on ConstructHub CRM`,
         html: `
-          <p>${ctx.org.name} has invited you to join their team on ConstructHUB.</p>
+          <p>${ctx.org.name} has invited you to join their team on ConstructHub CRM.</p>
           <p><a href="${link}">Accept the invitation</a></p>
           <p>This link expires in 14 days. If you weren't expecting it, you can ignore this email.</p>
         `,

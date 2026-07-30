@@ -316,7 +316,7 @@ export function registerCrmIntegrationRoutes(app: Express): void {
   /** Machine-readable description of the API — the thing Leap never published. */
   app.get("/api/v1", (_req, res) => {
     res.json({
-      name: "ConstructHUB Public API",
+      name: "ConstructHub CRM Public API",
       version: "v1",
       auth: "Authorization: Bearer chk_… (create keys in Portal → Payments/Integrations)",
       pagination: "?limit=50&offset=0 — one envelope on every collection",

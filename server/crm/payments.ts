@@ -91,7 +91,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         custody: "Payments go directly into your own Stripe account. We never hold your money.",
         achFee: "ACH: 0.8% capped at $5.00 per payment (Stripe's rate — we add nothing).",
         cardFee: "Card: 2.9% + 30¢ (Stripe's rate — we add nothing).",
-        platformFee: "ConstructHUB takes $0 of your payments.",
+        platformFee: "ConstructHub CRM takes $0 of your payments.",
         holds: "Stripe may review or hold funds under their risk policy. No platform can override that, and we will never claim otherwise.",
       },
     });
