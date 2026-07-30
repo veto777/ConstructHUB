@@ -40,6 +40,16 @@ if (DEV_AUTH_BYPASS) {
   console.warn("⚠️  DEV_AUTH_BYPASS_USER1 is enabled — all requests authenticate as user 1. Never use this in production.");
 }
 
+// PUBLIC DEMO mode (demo.constructhub.us): every request is the demo owner.
+// Distinct from the dev bypass — it is ALLOWED in production, but only when
+// explicitly opted in, and only ever on the isolated demo instance with its
+// own throwaway database (seeded fake data, no real users, no Stripe Connect).
+// Never set this on the real deployment.
+const DEMO_AUTOLOGIN = process.env.CRM_DEMO_AUTOLOGIN === "true";
+if (DEMO_AUTOLOGIN) {
+  console.warn("⚠️  CRM_DEMO_AUTOLOGIN is enabled — public demo instance, all requests authenticate as user 1.");
+}
+
 const photoOpenai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -116,7 +126,7 @@ export async function registerRoutes(
   function getDevUser(req: any, res: any): any {
     const user = req.user;
     if (user) return user;
-    if (DEV_AUTH_BYPASS) {
+    if (DEV_AUTH_BYPASS || DEMO_AUTOLOGIN) {
       req.user = { id: 1 };
       return req.user;
     }
