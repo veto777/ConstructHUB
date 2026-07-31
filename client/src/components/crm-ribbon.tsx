@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  type LucideIcon,
+  ShieldCheck, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -24,6 +24,8 @@ const MORE_LINKS: {
   title: string; url: string; icon: LucideIcon; testid: string;
   /** Permission required to see this item; undefined = everyone. */
   perm?: string;
+  /** Platform admins only (ConstructHUB staff — see /api/crm/me). */
+  platformAdmin?: boolean;
   active: (l: string) => boolean;
 }[] = [
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
@@ -38,6 +40,10 @@ const MORE_LINKS: {
   { title: "Settings", url: "/crm/settings", icon: Settings, testid: "ribbon-more-settings",
     perm: "manageSettings",
     active: (l) => l.startsWith("/crm/settings") },
+  // ConstructHUB staff only, like the sidebar.
+  { title: "Platform Admin", url: "/crm/admin", icon: ShieldCheck, testid: "ribbon-more-admin",
+    platformAdmin: true,
+    active: (l) => l.startsWith("/crm/admin") },
 ];
 
 function RibbonTab({
@@ -121,7 +127,10 @@ export function CrmRibbon() {
             <SheetDescription className="sr-only">The rest of your workspace.</SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-1">
-            {MORE_LINKS.filter((l) => !l.perm || me?.permissions?.[l.perm] === true).map((l) => (
+            {MORE_LINKS.filter((l) =>
+              (!l.perm || me?.permissions?.[l.perm] === true) &&
+              (!l.platformAdmin || me?.isPlatformAdmin === true),
+            ).map((l) => (
               <Link key={l.url} href={l.url} data-testid={l.testid} onClick={() => setMoreOpen(false)}
                 className={cn(
                   "flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium transition-colors",

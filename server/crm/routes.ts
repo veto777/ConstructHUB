@@ -30,6 +30,8 @@ import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pric
 import { registerCrmClientAuthRoutes } from "./client-auth";
 import { registerCrmScheduleRoutes } from "./schedule";
 import { registerCrmDivisionRoutes, getDivision } from "./divisions";
+import { registerCrmAdminRoutes } from "./admin";
+import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 
@@ -143,6 +145,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmScheduleRoutes(app, getDevUser);
   // Divisions: WA HQ + FL style operating arms of one company.
   registerCrmDivisionRoutes(app, getDevUser);
+  // Platform admin (email-list gated, never org membership) + beta invites.
+  registerCrmAdminRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -167,6 +171,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       user: account
         ? { id: account.id, email: account.email, displayName: account.displayName, avatarUrl: account.avatarUrl }
         : { id: user.id },
+      // Platform (ConstructHUB staff) admin — gates the /crm/admin console.
+      // Distinct from the org "admin" ROLE, which is scoped to one org.
+      isPlatformAdmin: isPlatformAdminEmail(account?.email),
       org: ctx.org,
       member: presentMember(ctx.member, ctx.permissions.seeCosts),
       permissions: ctx.permissions,

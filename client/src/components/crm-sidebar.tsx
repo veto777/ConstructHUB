@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  HardHat, Settings, LogOut, type LucideIcon,
+  HardHat, Settings, LogOut, ShieldCheck, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -29,6 +29,8 @@ const NAV: {
   title: string; url: string; icon: LucideIcon; testid: string;
   /** Permission required to see this item; undefined = everyone. */
   perm?: string;
+  /** Platform admins only (ConstructHUB staff — see /api/crm/me). */
+  platformAdmin?: boolean;
   active: (l: string) => boolean;
 }[] = [
   { title: "Home", url: "/", icon: LayoutDashboard, testid: "link-portal-nav-home",
@@ -47,6 +49,10 @@ const NAV: {
   { title: "Settings", url: "/crm/settings", icon: Settings, testid: "link-nav-settings",
     perm: "manageSettings",
     active: (l: string) => l.startsWith("/crm/settings") },
+  // Gated: ConstructHUB staff only — cross-account monitoring, never org-scoped.
+  { title: "Platform Admin", url: "/crm/admin", icon: ShieldCheck, testid: "link-portal-nav-admin",
+    platformAdmin: true,
+    active: (l: string) => l.startsWith("/crm/admin") },
 ];
 
 export function CrmSidebar() {
@@ -99,7 +105,10 @@ export function CrmSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="px-2 gap-1">
-              {NAV.filter((item) => !item.perm || me?.permissions?.[item.perm] === true).map((item) => (
+              {NAV.filter((item) =>
+                (!item.perm || me?.permissions?.[item.perm] === true) &&
+                (!item.platformAdmin || me?.isPlatformAdmin === true),
+              ).map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild

@@ -53,6 +53,7 @@ import CrmPipelinePage from "@/pages/crm-pipeline";
 import CrmPriceBookPage from "@/pages/crm-pricebook";
 import CrmProjectPage from "@/pages/crm-project";
 import CrmSettingsPage from "@/pages/crm-settings";
+import CrmAdminPage from "@/pages/crm-admin";
 import PublicEstimatePage from "@/pages/public-estimate";
 import PublicPortalPage from "@/pages/public-portal";
 import PublicInvoicePage from "@/pages/public-invoice";
@@ -179,6 +180,7 @@ function PortalRouter() {
       <Route path="/crm/payments" component={CrmPaymentsPage} />
       <Route path="/crm/team" component={CrmTeamPage} />
       <Route path="/crm/settings" component={CrmSettingsPage} />
+      <Route path="/crm/admin" component={CrmAdminPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
@@ -290,6 +292,7 @@ function AppContent() {
       location.startsWith("/crm/payments") ? "Payments" :
       location.startsWith("/crm/team") ? "Team & Company" :
       location.startsWith("/crm/settings") ? "Settings" :
+      location.startsWith("/crm/admin") ? "Platform Admin" :
       location.startsWith("/crm/join") ? "Join the team" : "Home";
     return (
       <SidebarProvider style={sidebarStyle as React.CSSProperties}>

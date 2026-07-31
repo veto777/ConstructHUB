@@ -22,6 +22,7 @@ const EXPECTED_4XX: RegExp[] = [
   /\/api\/crm\/invitations\/accept/, // accept while signed in as a different email → 403 by design
   /\/api\/public\/(estimates|invoices|portal)\/not-a-real-token/, // deliberate bogus-token probes
   /\/api\/client\/documents/, // 401 IS the signed-out state on the client portal
+  /\/api\/admin\//, // 403 IS the designed state for a non-admin on /crm/admin
 ];
 
 /** Designed 503s: online payment without a Stripe account is a friendly

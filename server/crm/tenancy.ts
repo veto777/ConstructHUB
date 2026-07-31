@@ -152,6 +152,35 @@ export function requirePermission(res: any, ctx: OrgContext, perm: CrmPermission
  * returns the numbers so the UI can say exactly what is needed.
  */
 export async function getSeatUsage(org: typeof crmOrgs.$inferSelect) {
+  const [{ used }] = await db
+    .select({ used: sql<number>`count(*)::int` })
+    .from(crmMembers)
+    .where(
+      and(
+        eq(crmMembers.orgId, org.id),
+        sql`${crmMembers.status} in ('active','invited')`,
+      ),
+    );
+
+  // Beta accounts (owner signed up through a platform beta invite) get
+  // unlimited seats for the duration of the beta — every gate below, and both
+  // 402 sites in routes.ts, key off this result, so they never paywall one.
+  const [owner] = await db
+    .select({ betaAt: users.betaAt })
+    .from(users)
+    .where(eq(users.id, org.ownerUserId))
+    .limit(1);
+  if (owner?.betaAt) {
+    return {
+      plan: "beta",
+      planName: "Beta",
+      limit: -1,                               // -1 means unlimited
+      used,
+      remaining: -1,
+      canAddSeat: true,
+    };
+  }
+
   const [sub] = await db
     .select()
     .from(subscriptions)
@@ -163,16 +192,6 @@ export async function getSeatUsage(org: typeof crmOrgs.$inferSelect) {
   const plan = active ? PLANS[planKey] : undefined;
   // Unknown/free/inactive plans get a single seat (the owner).
   const limit = (plan?.limits as { users?: number } | undefined)?.users ?? 1;
-
-  const [{ used }] = await db
-    .select({ used: sql<number>`count(*)::int` })
-    .from(crmMembers)
-    .where(
-      and(
-        eq(crmMembers.orgId, org.id),
-        sql`${crmMembers.status} in ('active','invited')`,
-      ),
-    );
 
   return {
     plan: planKey,

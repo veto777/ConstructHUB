@@ -187,6 +187,13 @@ export function registerStripeRoutes(app: Express) {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
+      // Beta accounts get the CRM free for the duration of the beta — never
+      // send one to a card form.
+      const { isBetaUser } = await import("./crm/beta");
+      if (await isBetaUser(user.id)) {
+        return res.status(400).json({ message: "Your account is included in the beta — no payment needed." });
+      }
+
       const { plan } = req.body;
       if (!plan || !PLANS[plan as keyof typeof PLANS]) {
         return res.status(400).json({ message: "Invalid plan" });

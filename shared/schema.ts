@@ -24,6 +24,9 @@ export const users = pgTable("users", {
   googleAccessToken: text("google_access_token"),
   googleRefreshToken: text("google_refresh_token"),
   googleTokenExpiry: timestamp("google_token_expiry"),
+  // Set when the account was created through a CRM beta invite. Beta accounts
+  // get unlimited CRM seats and are never billed (see server/crm/tenancy.ts).
+  betaAt: timestamp("beta_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1087,6 +1090,22 @@ export type InsertCrmMember = z.infer<typeof insertCrmMemberSchema>;
 export const insertCrmInvitationSchema = createInsertSchema(crmInvitations).omit({ id: true, createdAt: true });
 export type CrmInvitation = typeof crmInvitations.$inferSelect;
 export type InsertCrmInvitation = z.infer<typeof insertCrmInvitationSchema>;
+
+// Platform beta invites (admin-issued, NOT org-scoped): one email, one
+// single-use token. Raw tokens never hit the database — only their SHA-256,
+// same convention as the client portal's magic links. Accepting one stamps
+// users.beta_at, which unlocks unlimited CRM seats (server/crm/tenancy.ts).
+export const crmBetaInvites = pgTable("crm_beta_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  invitedByUserId: integer("invited_by_user_id"),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CrmBetaInvite = typeof crmBetaInvites.$inferSelect;
 
 // ── Divisions: one company, several operating arms ─────────────────────────
 // The owner runs two divisions of one company (e.g. WA headquarters + FL).

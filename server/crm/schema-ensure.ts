@@ -527,9 +527,27 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS crm_client_sessions_hash_uniq ON crm_client_sessions (token_hash);
   `);
 
+  // ── Platform beta invites + the beta flag on users ───────────────────────
+  // users predates the CRM ensure layer, so its additive column lives here
+  // with the rest of the IF NOT EXISTS boot DDL.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_at timestamp;
+
+    CREATE TABLE IF NOT EXISTS crm_beta_invites (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      email text NOT NULL,
+      token_hash text NOT NULL,
+      invited_by_user_id integer,
+      expires_at timestamp NOT NULL,
+      accepted_at timestamp,
+      created_at timestamp DEFAULT now()
+    );
+  `);
+
   // Constraints are added separately: they are not IF NOT EXISTS in older
   // Postgres, so each is guarded and allowed to fail benignly if present.
   const guarded = [
+    `CREATE UNIQUE INDEX IF NOT EXISTS crm_beta_invites_hash_uniq ON crm_beta_invites (token_hash)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS crm_members_org_email_uniq ON crm_members (org_id, lower(email))`,
     `CREATE UNIQUE INDEX IF NOT EXISTS crm_invitations_token_uniq ON crm_invitations (token)`,
     // One pending invite per email per org; accepted/revoked rows are excluded

@@ -27,6 +27,8 @@ declare module "express-session" {
   interface SessionData {
     passport: { user: number };
     pending2FAUserId?: number;
+    /** CRM beta invite token, carried through the Google OAuth round-trip. */
+    betaToken?: string;
   }
 }
 
@@ -102,13 +104,18 @@ export async function setupAuth(app: Express) {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         callbackURL: "/api/auth/google/callback",
         proxy: true,
+        passReqToCallback: true,
       },
-      async (accessToken, refreshToken, profile, done) => {
+      async (req: any, accessToken, refreshToken, profile, done) => {
         try {
           const googleId = profile.id;
           const email = profile.emails?.[0]?.value || "";
           const displayName = profile.displayName || null;
           const avatarUrl = profile.photos?.[0]?.value || null;
+
+          // A beta invite rides the OAuth round-trip in the session; only a
+          // brand-new account redeems it (below), never an existing login.
+          const betaToken = req.session?.betaToken;
 
           const tokenData: any = { emailVerified: true };
           if (accessToken) tokenData.googleAccessToken = accessToken;
@@ -117,6 +124,7 @@ export async function setupAuth(app: Express) {
 
           const existingByGoogle = await db.select().from(users).where(eq(users.googleId, googleId));
           if (existingByGoogle.length > 0) {
+            if (req.session) delete req.session.betaToken;
             await db
               .update(users)
               .set({ email, displayName, avatarUrl, ...tokenData })
@@ -126,6 +134,7 @@ export async function setupAuth(app: Express) {
 
           const existingByEmail = await db.select().from(users).where(eq(users.email, email));
           if (existingByEmail.length > 0) {
+            if (req.session) delete req.session.betaToken;
             await db
               .update(users)
               .set({ googleId, displayName, avatarUrl, ...tokenData })
@@ -133,9 +142,13 @@ export async function setupAuth(app: Express) {
             return done(null, { ...existingByEmail[0], googleId, displayName, avatarUrl });
           }
 
+          if (req.session) delete req.session.betaToken;
+          const { consumeBetaInvite } = await import("./crm/beta");
+          const betaAt = await consumeBetaInvite(betaToken, email);
+
           const [newUser] = await db
             .insert(users)
-            .values({ googleId, email, displayName, avatarUrl, accountId: generateAccountId(), ...tokenData })
+            .values({ googleId, email, displayName, avatarUrl, accountId: generateAccountId(), betaAt, ...tokenData })
             .returning();
 
           done(null, newUser);
@@ -162,6 +175,10 @@ export async function setupAuth(app: Express) {
   app.get("/api/auth/google", (req, res, next) => {
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
     const gbp = req.query.gbp === "1";
+    // A CRM beta invite survives the OAuth round-trip in the session.
+    if (typeof req.query.beta === "string" && req.query.beta) {
+      req.session.betaToken = req.query.beta;
+    }
     const scopes = ["profile", "email"];
     if (gbp) {
       scopes.push("https://www.googleapis.com/auth/business.manage");
@@ -199,7 +216,7 @@ export async function setupAuth(app: Express) {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, displayName } = req.body;
+      const { email, password, displayName, beta } = req.body;
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
@@ -216,6 +233,11 @@ export async function setupAuth(app: Express) {
       const verificationToken = randomBytes(32).toString("hex");
       const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+      // CRM beta invite (single-use, 30-day expiry, email-bound). An invalid
+      // or spent token never blocks the signup — it just doesn't flag.
+      const { consumeBetaInvite } = await import("./crm/beta");
+      const betaAt = await consumeBetaInvite(typeof beta === "string" ? beta : null, email.toLowerCase().trim());
+
       const [newUser] = await db
         .insert(users)
         .values({
@@ -226,6 +248,7 @@ export async function setupAuth(app: Express) {
           verificationToken,
           verificationExpiry,
           accountId: generateAccountId(),
+          betaAt,
         })
         .returning();
 

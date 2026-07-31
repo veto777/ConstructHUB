@@ -29,11 +29,14 @@ export default function AuthPage() {
   const errorParam = params.get("error");
   const modeParam = params.get("mode");
   const tokenParam = params.get("token");
+  // CRM beta invite: /auth?beta=<token> starts in signup mode and the token
+  // rides along through email/password signup or the Google OAuth round-trip.
+  const betaParam = params.get("beta");
 
   const initialMode: AuthMode =
     modeParam === "reset-password" && tokenParam ? "reset-password" :
     modeParam === "forgot-password" ? "forgot-password" :
-    modeParam === "signup" ? "signup" : "login";
+    modeParam === "signup" || betaParam ? "signup" : "login";
 
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState("");
@@ -76,6 +79,7 @@ export default function AuthPage() {
         email: email.trim(),
         password,
         displayName: displayName.trim() || undefined,
+        beta: betaParam || undefined,
       });
       const data = await res.json();
       setMessage(data.message);
@@ -290,7 +294,13 @@ export default function AuthPage() {
                 <p className="text-sm text-muted-foreground">Get started with Construction HUB</p>
               </div>
 
-              <a href="/api/auth/google" data-testid="link-google-signup">
+              {betaParam && (
+                <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-sm text-foreground" data-testid="banner-beta-invite">
+                  You're invited to the ConstructHub CRM beta — unlimited access during beta.
+                </div>
+              )}
+
+              <a href={betaParam ? `/api/auth/google?beta=${encodeURIComponent(betaParam)}` : "/api/auth/google"} data-testid="link-google-signup">
                 <Button variant="outline" className="w-full gap-2" type="button">
                   <svg className="h-4 w-4" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />

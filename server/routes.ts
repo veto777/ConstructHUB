@@ -22,11 +22,7 @@ import { subscriptions, competitorScans, competitorListings, businessLocations, 
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
-
-const ADMIN_EMAILS = ["alpinesidingcompany@gmail.com", "support@constructhub.us"];
-function isAdmin(user: any): boolean {
-  return user && ADMIN_EMAILS.includes(user.email?.toLowerCase());
-}
+import { isPlatformAdmin as isAdmin } from "./admin";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
