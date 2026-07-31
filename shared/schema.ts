@@ -1020,6 +1020,10 @@ export const crmOrgs = pgTable("crm_orgs", {
   // Set when the owner finishes (or dismisses) the setup checklist, so the
   // portal stops routing them back into onboarding.
   onboardingDismissedAt: timestamp("onboarding_dismissed_at"),
+  // Org-level custom fields — every other crm_* entity already has this;
+  // used e.g. by the HCP importer to preserve team + lead-source reference
+  // data without fabricating user accounts.
+  customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

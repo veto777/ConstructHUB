@@ -449,6 +449,7 @@ export async function ensureCrmSchema(): Promise<void> {
   // Additive columns for installs created before the column existed.
   await pool.query(`
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS onboarding_dismissed_at timestamp;
+    ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS invoice_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
   `);
