@@ -14,6 +14,7 @@ import {
   crmCustomers, crmProjects, crmEstimates, crmEstimateItems, crmEstimateOptions, crmOrgs, crmMembers,
   crmEstimateEvents,
   CRM_PROJECT_STAGE_META,
+  crmNotificationEnabled,
 } from "@shared/schema";
 import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
@@ -362,6 +363,11 @@ async function notifyOwner(
   event: "opened" | "approved" | "declined",
   reason?: string,
 ) {
+  // The org can silence each notification type in Settings (default: on).
+  const pref =
+    event === "opened" ? "estimateViewed" : event === "approved" ? "estimateApproved" : "estimateDeclined";
+  if (!crmNotificationEnabled(org.customFields, pref)) return;
+
   const recipients = new Set<string>();
   if (org.email) recipients.add(org.email);
   const members = await db.select().from(crmMembers)

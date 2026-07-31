@@ -134,6 +134,10 @@ export async function sweepPage(
       if (seen.has(key)) continue;
       seen.add(key);
       info = { testid, text, href };
+      // Logout is verified curated in 14-crm-settings — clicking it mid-sweep
+      // destroys the shared dev session (and the org pin with it), breaking
+      // every later iteration.
+      if (testid === "button-logout") { target = -1; continue; }
       if (opts.skip?.(info)) { target = -1; continue; }
       target = i;
       break;

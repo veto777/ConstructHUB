@@ -15,6 +15,7 @@ import { db } from "../db";
 import {
   crmPayments, crmInvoices, crmEstimates, crmProjects, crmCustomers, crmOrgs,
   crmApiKeys, crmWebhooks, crmMembers, crmEstimateEvents,
+  crmNotificationEnabled,
 } from "@shared/schema";
 import { and, eq, desc, sql, isNull } from "drizzle-orm";
 import { sendWithFallback } from "../email";
@@ -402,6 +403,8 @@ async function applySettlement(
 /** Tell the contractor money landed. */
 async function notifyPaid(pay: typeof crmPayments.$inferSelect) {
   const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, pay.orgId)).limit(1);
+  // The org can silence this notification in Settings (default: on).
+  if (!crmNotificationEnabled(org?.customFields, "invoicePaid")) return;
   const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, pay.customerId)).limit(1);
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, pay.orgId), eq(crmMembers.status, "active")));

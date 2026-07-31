@@ -1157,6 +1157,27 @@ export function crmEffectivePermissions(
   return out;
 }
 
+// ── Notification preferences ────────────────────────────────────────────────
+// Per-org on/off switches for the transactional emails the CRM sends to the
+// contractor (client-facing sends are never gated — the client asked for that
+// mail by receiving an estimate). Stored in crm_orgs.custom_fields->
+// 'notificationPrefs'; absent key means ON, so existing orgs keep today's
+// behaviour until they explicitly turn one off.
+export const CRM_NOTIFICATION_PREFS = [
+  "estimateViewed",    // client opened an estimate for the first time
+  "estimateApproved",  // client approved an estimate
+  "estimateDeclined",  // client declined an estimate
+  "invoicePaid",       // an online payment landed
+] as const;
+export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
+
+/** Default ON; only an explicit `false` silences a notification. */
+export function crmNotificationEnabled(customFields: unknown, pref: CrmNotificationPref): boolean {
+  const prefs = (customFields as Record<string, unknown> | null | undefined)?.notificationPrefs;
+  if (!prefs || typeof prefs !== "object") return true;
+  return (prefs as Record<string, unknown>)[pref] !== false;
+}
+
 // ── CRM: customers, projects, jobs, estimates, client portal ────────────────
 // Everything here is org-scoped (crm_orgs), never user-scoped.
 //

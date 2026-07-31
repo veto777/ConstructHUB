@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  HardHat,
+  HardHat, Settings, LogOut, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -17,14 +17,20 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 /**
  * The CRM's own sidebar — slimmer and quieter than the marketing app's, but
  * the same shadcn idiom: wordmark up top, icon+label nav with an active pill,
  * theme toggle and user chip pinned to the bottom.
  */
-const NAV = [
+const NAV: {
+  title: string; url: string; icon: LucideIcon; testid: string;
+  /** Permission required to see this item; undefined = everyone. */
+  perm?: string;
+  active: (l: string) => boolean;
+}[] = [
   { title: "Home", url: "/", icon: LayoutDashboard, testid: "link-portal-nav-home",
     active: (l: string) => l === "/" || l === "/crm" || l === "/crm/home" },
   { title: "Clients", url: "/crm/clients", icon: Users, testid: "link-portal-nav-clients",
@@ -37,6 +43,10 @@ const NAV = [
     active: (l: string) => l.startsWith("/crm/payments") },
   { title: "Team & Company", url: "/crm/team", icon: Building2, testid: "link-portal-nav-team",
     active: (l: string) => l.startsWith("/crm/team") },
+  // Gated: only members with manageSettings see (or can reach) Settings.
+  { title: "Settings", url: "/crm/settings", icon: Settings, testid: "link-nav-settings",
+    perm: "manageSettings",
+    active: (l: string) => l.startsWith("/crm/settings") },
 ];
 
 export function CrmSidebar() {
@@ -49,6 +59,16 @@ export function CrmSidebar() {
 
   const displayName = me?.member?.displayName || user?.displayName || user?.email || "";
   const orgName = me?.org?.name;
+
+  // Sign out, drop every cached query (they hold org-scoped data), and land on
+  // the login screen. A full navigation so no portal state survives.
+  const logout = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/auth/logout", {}),
+    onSettled: () => {
+      queryClient.clear();
+      window.location.href = "/auth";
+    },
+  });
 
   return (
     <Sidebar collapsible="icon">
@@ -79,7 +99,7 @@ export function CrmSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="px-2 gap-1">
-              {NAV.map((item) => (
+              {NAV.filter((item) => !item.perm || me?.permissions?.[item.perm] === true).map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
@@ -122,6 +142,17 @@ export function CrmSidebar() {
           </div>
           <div className="flex items-center gap-0.5 shrink-0 group-data-[collapsible=icon]:flex-col">
             <ThemeToggle className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent" />
+            <button
+              type="button"
+              onClick={() => logout.mutate()}
+              disabled={logout.isPending}
+              title="Sign out"
+              aria-label="Sign out"
+              data-testid="button-logout"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors disabled:opacity-50"
+            >
+              <LogOut className="h-3.5 w-3.5" strokeWidth={1.9} />
+            </button>
           </div>
         </div>
       </SidebarFooter>

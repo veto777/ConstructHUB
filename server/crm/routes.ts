@@ -17,6 +17,7 @@ import {
   CRM_ROLES,
   CRM_PERMISSIONS,
   CRM_ROLE_DEFAULTS,
+  CRM_NOTIFICATION_PREFS,
 } from "@shared/schema";
 import { and, eq, desc, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage } from "./tenancy";
@@ -61,6 +62,14 @@ const orgPatchSchema = z.object({
   termsAndConditions: z.string().max(20000).nullable().optional(),
   warrantyText: z.string().max(5000).nullable().optional(),
   defaultDepositBps: z.number().int().min(0).max(10000).nullable().optional(),
+  // Merged INTO custom_fields (never a wholesale replace — the HCP importer
+  // stores reference data there too). Unknown keys are rejected.
+  notificationPrefs: z
+    .record(z.boolean())
+    .refine((o) => Object.keys(o).every((k) => (CRM_NOTIFICATION_PREFS as readonly string[]).includes(k)), {
+      message: "Unknown notification preference key",
+    })
+    .optional(),
 });
 
 const profilePatchSchema = z.object({
@@ -302,9 +311,26 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const parsed = orgPatchSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid company profile", issues: parsed.error.issues });
 
+    // notificationPrefs is a virtual field: it merges into custom_fields so the
+    // rest of that jsonb (e.g. HCP import reference data) is never clobbered.
+    const { notificationPrefs, ...profile } = parsed.data;
     const [row] = await db
       .update(crmOrgs)
-      .set({ ...parsed.data, updatedAt: new Date() })
+      .set({
+        ...profile,
+        ...(notificationPrefs
+          ? {
+              customFields: {
+                ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
+                notificationPrefs: {
+                  ...(((ctx.org.customFields as any)?.notificationPrefs as Record<string, boolean> | undefined) ?? {}),
+                  ...notificationPrefs,
+                },
+              },
+            }
+          : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(crmOrgs.id, ctx.org.id))
       .returning();
     res.json(row);

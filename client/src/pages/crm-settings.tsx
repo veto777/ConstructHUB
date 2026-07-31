@@ -1,0 +1,683 @@
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Settings, Building2, FileText, Bell, CreditCard, KeyRound, Webhook,
+  Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark,
+} from "lucide-react";
+import {
+  CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
+} from "@/components/crm-ui";
+
+/**
+ * Org settings — company profile, document defaults, notification switches,
+ * payments status, API keys & webhooks. Gated on manageSettings; the
+ * integrations section additionally needs manageIntegrations (the API
+ * enforces both — the UI just avoids asking for what it can't have).
+ */
+
+// What the system emails the contractor about today, honestly. Client-facing
+// sends (the estimate/invoice itself) are never gated by these switches.
+const NOTIFICATIONS = [
+  { key: "estimateViewed", label: "Estimate viewed", description: "A client opened an estimate for the first time." },
+  { key: "estimateApproved", label: "Estimate approved", description: "A client approved and signed an estimate." },
+  { key: "estimateDeclined", label: "Estimate declined", description: "A client declined an estimate." },
+  { key: "invoicePaid", label: "Payment received", description: "An online payment landed in your Stripe account." },
+] as const;
+
+type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
+
+const emptyToNull = (s: string) => (s.trim() === "" ? null : s.trim());
+
+export default function CrmSettingsPage() {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+
+  const { data: me, isLoading: meLoading } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const allowed = me?.permissions?.manageSettings === true;
+  const canIntegrations = me?.permissions?.manageIntegrations === true;
+
+  useEffect(() => {
+    if (me && !allowed) navigate("/");
+  }, [me, allowed, navigate]);
+
+  const { data: org, isLoading: orgLoading, isError: orgError } = useQuery<any>({
+    queryKey: ["/api/crm/org"],
+    enabled: allowed,
+  });
+  const { data: payStatus } = useQuery<any>({
+    queryKey: ["/api/crm/payments/status"],
+    enabled: allowed,
+  });
+  const { data: apiKeys } = useQuery<any[]>({
+    queryKey: ["/api/crm/api-keys"],
+    enabled: allowed && canIntegrations,
+  });
+  const { data: webhookData } = useQuery<{ webhooks: any[]; events: string[] }>({
+    queryKey: ["/api/crm/webhooks"],
+    enabled: allowed && canIntegrations,
+  });
+  const { data: leadSources } = useQuery<any[]>({
+    queryKey: ["/api/crm/lead-sources"],
+    enabled: allowed,
+  });
+
+  // ── Company profile ───────────────────────────────────────────────────────
+  const [company, setCompany] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!org) return;
+    const s = (v: any) => v ?? "";
+    setCompany({
+      name: s(org.name), legalEntityName: s(org.legalEntityName),
+      email: s(org.email), phone: s(org.phone), website: s(org.website),
+      logoUrl: s(org.logoUrl),
+      addressLine1: s(org.addressLine1), addressLine2: s(org.addressLine2),
+      city: s(org.city), state: s(org.state), postalCode: s(org.postalCode),
+      licenseNumber: s(org.licenseNumber), licenseState: s(org.licenseState),
+      industry: s(org.industry), description: s(org.description),
+    });
+  }, [org?.id]);
+
+  const setC = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setCompany((c) => ({ ...c, [k]: e.target.value }));
+
+  const saveCompany = useMutation({
+    mutationFn: async () => (await apiRequest("PATCH", "/api/crm/org", {
+      name: company.name || undefined,
+      legalEntityName: emptyToNull(company.legalEntityName ?? ""),
+      email: emptyToNull(company.email ?? ""),
+      phone: emptyToNull(company.phone ?? ""),
+      website: emptyToNull(company.website ?? ""),
+      logoUrl: emptyToNull(company.logoUrl ?? ""),
+      addressLine1: emptyToNull(company.addressLine1 ?? ""),
+      addressLine2: emptyToNull(company.addressLine2 ?? ""),
+      city: emptyToNull(company.city ?? ""),
+      state: emptyToNull(company.state ?? ""),
+      postalCode: emptyToNull(company.postalCode ?? ""),
+      licenseNumber: emptyToNull(company.licenseNumber ?? ""),
+      licenseState: emptyToNull(company.licenseState ?? ""),
+      industry: emptyToNull(company.industry ?? ""),
+      description: emptyToNull(company.description ?? ""),
+    })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      toast({ title: "Company profile saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save company profile", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── Estimate & invoice defaults ───────────────────────────────────────────
+  const [defaults, setDefaults] = useState({
+    estimateFooter: "", invoiceFooter: "", termsAndConditions: "",
+    warrantyText: "", depositPct: "",
+  });
+  useEffect(() => {
+    if (!org) return;
+    setDefaults({
+      estimateFooter: org.estimateFooter ?? "",
+      invoiceFooter: org.invoiceFooter ?? "",
+      termsAndConditions: org.termsAndConditions ?? "",
+      warrantyText: org.warrantyText ?? "",
+      depositPct: org.defaultDepositBps ? String(org.defaultDepositBps / 100) : "",
+    });
+  }, [org?.id]);
+
+  const saveDefaults = useMutation({
+    mutationFn: async () => {
+      const pct = parseFloat(defaults.depositPct);
+      return (await apiRequest("PATCH", "/api/crm/org", {
+        estimateFooter: emptyToNull(defaults.estimateFooter),
+        invoiceFooter: emptyToNull(defaults.invoiceFooter),
+        termsAndConditions: emptyToNull(defaults.termsAndConditions),
+        warrantyText: emptyToNull(defaults.warrantyText),
+        defaultDepositBps: defaults.depositPct.trim() === "" || Number.isNaN(pct)
+          ? null
+          : Math.round(Math.min(100, Math.max(0, pct)) * 100),
+      })).json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Defaults saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save defaults", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  const notifPrefs: Record<string, boolean> =
+    (org?.customFields as any)?.notificationPrefs ?? {};
+  const notifOn = (k: NotifKey) => notifPrefs[k] !== false;
+
+  const saveNotif = useMutation({
+    mutationFn: async (patch: Record<string, boolean>) =>
+      (await apiRequest("PATCH", "/api/crm/org", { notificationPrefs: patch })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Notification preferences saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save notifications", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── API keys ──────────────────────────────────────────────────────────────
+  const [keyName, setKeyName] = useState("");
+  const [freshKey, setFreshKey] = useState<{ name: string; key: string } | null>(null);
+
+  const createKey = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/api-keys", { name: keyName.trim() || "API key" })).json(),
+    onSuccess: (r: any) => {
+      setFreshKey({ name: r.name, key: r.key });
+      setKeyName("");
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/api-keys"] });
+      toast({ title: "API key created" });
+    },
+    onError: (e: any) => toast({ title: "Could not create key", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const revokeKey = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/crm/api-keys/${id}`, undefined)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/api-keys"] });
+      toast({ title: "API key revoked" });
+    },
+    onError: (e: any) => toast({ title: "Could not revoke key", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── Webhooks ──────────────────────────────────────────────────────────────
+  const [hookUrl, setHookUrl] = useState("");
+  const [hookEvents, setHookEvents] = useState<Record<string, boolean>>({});
+  const [freshSecret, setFreshSecret] = useState<string | null>(null);
+
+  const createHook = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/webhooks", {
+      url: hookUrl.trim(),
+      events: Object.entries(hookEvents).filter(([, v]) => v).map(([k]) => k),
+    })).json(),
+    onSuccess: (r: any) => {
+      setFreshSecret(r.secret ?? null);
+      setHookUrl("");
+      setHookEvents({});
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/webhooks"] });
+      toast({ title: "Webhook added" });
+    },
+    onError: (e: any) => toast({ title: "Could not add webhook", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const deleteHook = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/crm/webhooks/${id}`, undefined)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/webhooks"] });
+      toast({ title: "Webhook deleted" });
+    },
+    onError: (e: any) => toast({ title: "Could not delete webhook", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  if (meLoading || (allowed && orgLoading)) {
+    return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+  if (!allowed) return null; // redirect effect above fires; nothing to render
+  if (orgError || !org) {
+    return <ErrorCard title="Couldn't load settings" description="Check your connection and refresh the page." />;
+  }
+
+  const acct = payStatus?.account;
+  const hookEventChoices = webhookData?.events ?? [];
+  const chosenEvents = Object.values(hookEvents).filter(Boolean).length;
+
+  return (
+    <CrmPage className="max-w-4xl">
+      <CrmPageHeader
+        icon={Settings}
+        title="Settings"
+        subtitle="Company profile, document defaults, notifications and integrations."
+      />
+
+      {/* ── Company profile ─────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <SectionTitle
+            icon={Building2}
+            title="Company profile"
+            description="Appears on estimates, invoices and the client portal."
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="company-name">Company name</Label>
+              <Input id="company-name" data-testid="input-company-name"
+                value={company.name ?? ""} onChange={setC("name")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-legal">Legal entity</Label>
+              <Input id="company-legal" data-testid="input-company-legal" placeholder="e.g. Alpine Exteriors LLC"
+                value={company.legalEntityName ?? ""} onChange={setC("legalEntityName")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-email">Email</Label>
+              <Input id="company-email" type="email" data-testid="input-company-email"
+                value={company.email ?? ""} onChange={setC("email")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-phone">Phone</Label>
+              <Input id="company-phone" data-testid="input-company-phone"
+                value={company.phone ?? ""} onChange={setC("phone")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-website">Website</Label>
+              <Input id="company-website" data-testid="input-company-website" placeholder="https://…"
+                value={company.website ?? ""} onChange={setC("website")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-logo">Logo URL</Label>
+              <Input id="company-logo" data-testid="input-company-logo" placeholder="https://…"
+                value={company.logoUrl ?? ""} onChange={setC("logoUrl")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-address1">Address</Label>
+              <Input id="company-address1" data-testid="input-company-address1"
+                value={company.addressLine1 ?? ""} onChange={setC("addressLine1")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-address2">Address line 2</Label>
+              <Input id="company-address2" data-testid="input-company-address2"
+                value={company.addressLine2 ?? ""} onChange={setC("addressLine2")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-city">City</Label>
+              <Input id="company-city" data-testid="input-company-city"
+                value={company.city ?? ""} onChange={setC("city")} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="company-state">State</Label>
+                <Input id="company-state" data-testid="input-company-state"
+                  value={company.state ?? ""} onChange={setC("state")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="company-postal">ZIP</Label>
+                <Input id="company-postal" data-testid="input-company-postal"
+                  value={company.postalCode ?? ""} onChange={setC("postalCode")} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-license-number">License #</Label>
+              <Input id="company-license-number" data-testid="input-company-license-number"
+                value={company.licenseNumber ?? ""} onChange={setC("licenseNumber")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company-license-state">License state</Label>
+              <Input id="company-license-state" data-testid="input-company-license-state" placeholder="e.g. FL"
+                value={company.licenseState ?? ""} onChange={setC("licenseState")} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="company-industry">Industry</Label>
+              <Input id="company-industry" data-testid="input-company-industry"
+                value={company.industry ?? ""} onChange={setC("industry")} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="company-description">Description</Label>
+              <Textarea id="company-description" rows={3} data-testid="textarea-company-description"
+                value={company.description ?? ""} onChange={setC("description")} />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => saveCompany.mutate()} disabled={saveCompany.isPending || !company.name?.trim()}
+              data-testid="button-save-company">
+              {saveCompany.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save company profile
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Estimate & invoice defaults ─────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <SectionTitle
+            icon={FileText}
+            title="Estimate & invoice defaults"
+            description="Pre-filled on every new document; editable per document."
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="estimate-footer">Estimate footer</Label>
+              <Textarea id="estimate-footer" rows={3} data-testid="textarea-estimate-footer"
+                value={defaults.estimateFooter}
+                onChange={(e) => setDefaults((d) => ({ ...d, estimateFooter: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="invoice-footer">Invoice footer</Label>
+              <Textarea id="invoice-footer" rows={3} data-testid="textarea-invoice-footer"
+                value={defaults.invoiceFooter}
+                onChange={(e) => setDefaults((d) => ({ ...d, invoiceFooter: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="terms">Terms &amp; conditions</Label>
+              <Textarea id="terms" rows={3} data-testid="textarea-terms"
+                value={defaults.termsAndConditions}
+                onChange={(e) => setDefaults((d) => ({ ...d, termsAndConditions: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="warranty">Warranty text</Label>
+              <Textarea id="warranty" rows={3} data-testid="textarea-warranty"
+                value={defaults.warrantyText}
+                onChange={(e) => setDefaults((d) => ({ ...d, warrantyText: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="default-deposit">Default deposit (%)</Label>
+              <Input id="default-deposit" type="number" min={0} max={100} step="0.5"
+                data-testid="input-default-deposit" placeholder="e.g. 10"
+                value={defaults.depositPct}
+                onChange={(e) => setDefaults((d) => ({ ...d, depositPct: e.target.value }))} />
+              <p className="text-xs text-muted-foreground">
+                Note: some states cap contractor deposits (CA, NV, MD, MA, PA, NY).
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => saveDefaults.mutate()} disabled={saveDefaults.isPending}
+              data-testid="button-save-defaults">
+              {saveDefaults.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save defaults
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Notifications ───────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <SectionTitle
+            icon={Bell}
+            title="Notifications"
+            description="Emails the system sends to you. Emails to your clients (the estimate or invoice itself) always send."
+          />
+        </CardHeader>
+        <CardContent className="divide-y">
+          {NOTIFICATIONS.map((n) => (
+            <div key={n.key} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+              <div>
+                <div className="text-sm font-medium">{n.label}</div>
+                <div className="text-xs text-muted-foreground">{n.description}</div>
+              </div>
+              <Switch
+                checked={notifOn(n.key)}
+                onCheckedChange={(v) => saveNotif.mutate({ [n.key]: v })}
+                disabled={saveNotif.isPending}
+                data-testid={`switch-notif-${n.key}`}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* ── Payments ────────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <SectionTitle
+            icon={CreditCard}
+            title="Payments"
+            description="Your own Stripe account, via Stripe Connect."
+            actions={
+              <Link href="/crm/payments" data-testid="link-payments"
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                Open payments <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            }
+          />
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-3" data-testid="card-payments-status">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Landmark className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">
+                {acct ? (acct.businessName || acct.accountEmail || acct.externalAccountId) : "No account connected"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {acct
+                  ? "Payments go directly to your Stripe account — we never hold your money."
+                  : "Connect Stripe on the Payments page to take card and ACH payments."}
+              </div>
+            </div>
+            {payStatus && (
+              <StatusPill tone={acct?.chargesEnabled ? "success" : "neutral"} data-testid="pill-payments-status">
+                {acct ? (acct.chargesEnabled ? "Connected" : "Connected · charges off") : "Not connected"}
+              </StatusPill>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Integrations: API keys + webhooks ───────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <SectionTitle
+            icon={KeyRound}
+            title="API keys"
+            description="Read-only access to your data from your own tools, via /api/v1."
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!canIntegrations ? (
+            <p className="text-sm text-muted-foreground">
+              You don't have the manageIntegrations permission — ask an admin.
+            </p>
+          ) : (
+            <>
+              {freshKey && (
+                <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2"
+                  data-testid="text-new-api-key">
+                  <div className="text-sm font-medium">
+                    {freshKey.name} — copy this key now. It is never shown again.
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 rounded bg-muted px-2 py-1.5 text-xs font-mono break-all">
+                      {freshKey.key}
+                    </code>
+                    <Button size="sm" variant="outline" data-testid="button-copy-api-key"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(freshKey.key).catch(() => {});
+                        toast({ title: "Copied" });
+                      }}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input placeholder="Key name (e.g. Zapier, reporting script)"
+                  data-testid="input-api-key-name"
+                  value={keyName} onChange={(e) => setKeyName(e.target.value)} />
+                <Button onClick={() => createKey.mutate()} disabled={createKey.isPending}
+                  data-testid="button-create-api-key" className="shrink-0">
+                  {createKey.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create key
+                </Button>
+              </div>
+              {!apiKeys?.length ? (
+                <EmptyState compact icon={KeyRound} title="No API keys yet"
+                  description="Create one to read your customers, projects, estimates and invoices from your own tools." />
+              ) : (
+                <div className="space-y-2">
+                  {apiKeys.map((k) => (
+                    <div key={k.id} className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                      data-testid={`row-api-key-${k.id}`}>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{k.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {k.keyPrefix}… · created {new Date(k.createdAt).toLocaleDateString()}
+                          {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ""}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => revokeKey.mutate(k.id)}
+                        disabled={revokeKey.isPending} data-testid={`button-revoke-api-key-${k.id}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <SectionTitle
+            icon={Webhook}
+            title="Webhooks"
+            description="POST signed events to your own endpoint when things happen in the CRM."
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!canIntegrations ? (
+            <p className="text-sm text-muted-foreground">
+              You don't have the manageIntegrations permission — ask an admin.
+            </p>
+          ) : (
+            <>
+              {freshSecret && (
+                <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-1"
+                  data-testid="text-new-webhook-secret">
+                  <div className="text-sm font-medium">Copy this signing secret now. It is never shown again.</div>
+                  <code className="block rounded bg-muted px-2 py-1.5 text-xs font-mono break-all">{freshSecret}</code>
+                </div>
+              )}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="webhook-url">Endpoint URL</Label>
+                  <Input id="webhook-url" placeholder="https://example.com/webhooks/constructhub"
+                    data-testid="input-webhook-url"
+                    value={hookUrl} onChange={(e) => setHookUrl(e.target.value)} />
+                </div>
+                {hookEventChoices.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                    {hookEventChoices.map((ev) => (
+                      <label key={ev} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Checkbox
+                          checked={hookEvents[ev] === true}
+                          onCheckedChange={(v) => setHookEvents((h) => ({ ...h, [ev]: v === true }))}
+                          data-testid={`checkbox-webhook-event-${ev}`}
+                        />
+                        {ev}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  <Button onClick={() => createHook.mutate()}
+                    disabled={createHook.isPending || !hookUrl.trim() || chosenEvents === 0}
+                    data-testid="button-create-webhook">
+                    {createHook.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Add webhook
+                  </Button>
+                </div>
+              </div>
+              {!webhookData?.webhooks?.length ? (
+                <EmptyState compact icon={Webhook} title="No webhooks yet"
+                  description="Add an endpoint and pick the events it should receive. Payloads are HMAC-signed." />
+              ) : (
+                <div className="space-y-2">
+                  {webhookData.webhooks.map((w) => (
+                    <div key={w.id} className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                      data-testid={`row-webhook-${w.id}`}>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate font-mono">{w.url}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {(w.events ?? []).join(", ")}
+                          {w.failureCount > 0 ? ` · ${w.failureCount} failures` : ""}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <StatusPill tone={w.active ? "success" : "danger"}>
+                          {w.active ? "active" : "disabled"}
+                        </StatusPill>
+                        <Button size="sm" variant="ghost" onClick={() => deleteHook.mutate(w.id)}
+                          disabled={deleteHook.isPending} data-testid={`button-delete-webhook-${w.id}`}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Shortcuts ───────────────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Users className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">Team &amp; permissions</div>
+              <div className="text-xs text-muted-foreground">Members, roles, invitations and per-person overrides.</div>
+            </div>
+            <Link href="/crm/team" data-testid="link-team"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline shrink-0">
+              Open <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <BookOpen className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">Price book</div>
+              <div className="text-xs text-muted-foreground">Materials, labor rates, assemblies and packages.</div>
+            </div>
+            <Link href="/crm/pricebook" data-testid="link-pricebook"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline shrink-0">
+              Open <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Lead sources (read-only) ────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <SectionTitle
+            icon={Tag}
+            title="Lead sources"
+            description="Where your clients come from. Set per client on the client's page."
+          />
+        </CardHeader>
+        <CardContent>
+          {!leadSources?.length ? (
+            <EmptyState compact icon={Tag} title="No lead sources yet"
+              description="Sources appear here as they're added to clients." />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {leadSources.map((s) => (
+                <StatusPill key={s.id} tone="neutral" data-testid={`row-lead-source-${s.id}`}>
+                  {s.name}
+                </StatusPill>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </CrmPage>
+  );
+}
