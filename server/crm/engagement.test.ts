@@ -9,11 +9,31 @@
  * Override the target with CRM_TEST_BASE_URL.
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { createHash, randomBytes } from "crypto";
+import pg from "pg";
 
 // portal.ts pulls in entities → ../stripe, which throws without a key at
 // module scope. A dummy value is enough for import (no queries are run here).
 process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_module_import";
 process.env.DATABASE_URL ||= "postgres://localhost:5432/unused_no_queries_run";
+
+// The public respond/engagement routes are email-gated: they need a
+// crm_client session covering the document's customer. Mint it directly —
+// same shape as a redeemed magic link. NOTE: DATABASE_URL is deliberately
+// poisoned above (import shim), so the pool uses the dev DSN explicitly.
+const pool = new pg.Pool({
+  connectionString: "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
+});
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+async function clientCookie(customerId: string): Promise<string> {
+  const raw = randomBytes(32).toString("hex");
+  await pool.query(
+    `insert into crm_client_sessions (token_hash, customer_ids, expires_at, last_seen_at)
+     values ($1, $2::jsonb, now() + interval '30 days', now())`,
+    [sha256(raw), JSON.stringify([customerId])],
+  );
+  return `crm_client=${raw}`;
+}
 
 let engagementIncrement: any, estimateExpiryOnSend: any, redactIpPrefix: any, ESTIMATE_EXPIRY_DAYS: number;
 
@@ -136,10 +156,11 @@ describe("expiry + engagement against the dev server", () => {
     }, cookie);
     expect(bad.status).toBe(400);
 
-    // Approve via the public link, then extend must be refused.
+    // Approve via the public link (as the verified client), then extend must
+    // be refused.
     const approve = await api(`/api/public/estimates/${token}/respond`, {
       method: "POST", body: JSON.stringify({ decision: "approve", signatureName: "Vitest Signer" }),
-    });
+    }, await clientCookie(est.customerId));
     expect(approve.status).toBe(200);
     const late = await api(`/api/crm/estimates/${est.id}/extend`, {
       method: "POST", body: JSON.stringify({ days: 7 }),
@@ -152,9 +173,12 @@ describe("expiry + engagement against the dev server", () => {
     const send = await api(`/api/crm/estimates/${est.id}/send`, { method: "POST", body: "{}" }, cookie);
     const token = send.body.link.split("/e/")[1];
 
+    // The engagement session opens as the verified client — anonymous
+    // browsers get a silent no-op from the gated start route.
+    const client = await clientCookie(est.customerId);
     const start = await api("/api/public/engagement/start", {
       method: "POST", body: JSON.stringify({ docType: "estimate", token }),
-    });
+    }, client);
     expect(start.status).toBe(200);
     const sessionId = start.body.sessionId;
     expect(sessionId).toBeTruthy();

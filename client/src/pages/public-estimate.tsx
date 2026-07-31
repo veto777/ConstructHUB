@@ -12,6 +12,7 @@ import { CheckCircle2, XCircle, Loader2, AlertTriangle, Phone, Mail, Globe, Shie
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
 import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
+import { DocGateChallenge } from "@/components/doc-gate";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -87,7 +88,8 @@ function PayCard({ token, company, estimate }: { token: string; company: any; es
   );
 }
 
-/** The homeowner's estimate page. No login — authorised by the link itself. */
+/** The homeowner's estimate page. Authorised by the link PLUS a verified
+ *  client session — anonymous browsers get the email-verification challenge. */
 export default function PublicEstimatePage() {
   const [, params] = useRoute("/e/:token");
   const token = params?.token;
@@ -98,14 +100,19 @@ export default function PublicEstimatePage() {
   const [showDecline, setShowDecline] = useState(false);
   const [done, setDone] = useState<"approved" | "declined" | null>(null);
 
+  // A contractor preview grant rides in the page URL — forward it to the API.
+  const previewGrant = new URLSearchParams(window.location.search).get("preview");
+  const docUrl = `/api/public/estimates/${token}${previewGrant ? `?preview=${encodeURIComponent(previewGrant)}` : ""}`;
+
   const { data, isLoading, error } = useQuery<any>({
-    queryKey: [`/api/public/estimates/${token}`],
+    queryKey: [docUrl],
     enabled: !!token,
     retry: false,
   });
 
-  // Engagement heartbeat — starts only once the document has loaded.
-  useEngagementTracker("estimate", token, !!data);
+  // Engagement heartbeat — starts only once the document has loaded, and
+  // never for a contractor preview (that's not client behaviour).
+  useEngagementTracker("estimate", token, !!data && !data?.preview);
 
   const respond = useMutation({
     mutationFn: async (decision: "approve" | "decline") => {
@@ -130,9 +137,19 @@ export default function PublicEstimatePage() {
   }
 
   if (error) {
+    const msg = String((error as Error).message ?? "");
+    // 401 requiresVerification = the email gate. The document stays sealed
+    // until the visitor proves they own the inbox it was sent to.
+    if (msg.startsWith("401:")) {
+      try {
+        const j = JSON.parse(msg.slice(msg.indexOf(":") + 1));
+        if (j?.requiresVerification) {
+          return <DocGateChallenge docType="estimate" token={token!} />;
+        }
+      } catch { /* fall through to the generic error card */ }
+    }
     // 410 = expired. The server sends only org contact details with it (never
     // document content), so this page is all an expired visitor can reach.
-    const msg = String((error as Error).message ?? "");
     let expiredInfo: any = null;
     if (msg.startsWith("410:")) {
       try { expiredInfo = JSON.parse(msg.slice(msg.indexOf(":") + 1)); } catch { /* fall through */ }
@@ -166,7 +183,7 @@ export default function PublicEstimatePage() {
     );
   }
 
-  const { estimate: e, items, company, customer, options } = data;
+  const { estimate: e, items, company, customer, options, preview } = data;
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
 
@@ -174,6 +191,14 @@ export default function PublicEstimatePage() {
     <main className="min-h-screen bg-muted/40 py-10 px-4">
       <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
+        {preview && (
+          <Card className="border-amber-500/50 bg-amber-500/5" data-testid="preview-banner">
+            <CardContent className="p-4 text-sm text-center">
+              <span className="font-medium">Contractor preview</span> — this is what your client
+              sees after verifying their email. Approving and paying are disabled here.
+            </CardContent>
+          </Card>
+        )}
         {/* Letterhead — the company the client hired, not us. */}
         <div className="text-center space-y-1.5 pb-2">
           {company.logoUrl && (
@@ -336,7 +361,7 @@ export default function PublicEstimatePage() {
           </CardContent>
         </Card>
 
-        {!settled && !expired && (
+        {!settled && !expired && !preview && (
           <Card className="shadow-md border-primary/30">
             <CardHeader>
               <CardTitle className="text-lg">Ready to go ahead?</CardTitle>
@@ -387,7 +412,7 @@ export default function PublicEstimatePage() {
         )}
 
         <p className="text-center text-xs text-muted-foreground/70 pb-4">
-          Secure link — only people with this URL can view this estimate.
+          Private document — it opens only after verifying the email address it was sent to.
         </p>
       </div>
     </main>

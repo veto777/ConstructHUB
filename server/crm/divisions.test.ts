@@ -16,6 +16,7 @@
  * it in a finally block. Local throwaway dev DB only.
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { createHash, randomBytes } from "crypto";
 import pg from "pg";
 
 process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_module_import";
@@ -209,9 +210,18 @@ describe("division list scoping (dev server)", () => {
       const fl = await mkDocSet(flId, "fl");
 
       // Branding: the FL estimate's public page must carry the FL division,
-      // the WA one the WA division — never crossed.
-      const flToken = (await pool.query(`select public_token from crm_estimates where id = $1`, [fl.estimateId])).rows[0].public_token;
-      const pub = await api(`/api/public/estimates/${flToken}`);
+      // the WA one the WA division — never crossed. (The public route is
+      // email-gated: open it with a client session for the doc's customer.)
+      const flRow = (await pool.query(
+        `select public_token, customer_id from crm_estimates where id = $1`, [fl.estimateId])).rows[0];
+      const flToken = flRow.public_token;
+      const raw = randomBytes(32).toString("hex");
+      await pool.query(
+        `insert into crm_client_sessions (token_hash, customer_ids, expires_at, last_seen_at)
+         values ($1, $2::jsonb, now() + interval '30 days', now())`,
+        [createHash("sha256").update(raw).digest("hex"), JSON.stringify([flRow.customer_id])],
+      );
+      const pub = await api(`/api/public/estimates/${flToken}`, {}, `crm_client=${raw}`);
       expect(pub.status).toBe(200);
       expect(pub.body.company.divisionCode).toContain("VTF");
       expect(pub.body.company.state).toBe("FL");

@@ -1,4 +1,5 @@
 import pg from "pg";
+import { createHash, randomBytes } from "crypto";
 
 /**
  * Direct dev-DB access for test setup/teardown that shouldn't fight product
@@ -13,6 +14,23 @@ const pool = new pg.Pool({
 export async function q<T = any>(text: string, params: any[] = []): Promise<T[]> {
   const r = await pool.query(text, params);
   return r.rows as T[];
+}
+
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+/**
+ * Insert a client session row exactly as a redeemed magic link would;
+ * returns the RAW crm_client cookie token. The public document pages are
+ * email-gated — specs that browse them as "the client" need this.
+ */
+export async function makeClientSession(customerIds: string[]): Promise<string> {
+  const raw = randomBytes(32).toString("hex");
+  await q(
+    `insert into crm_client_sessions (token_hash, customer_ids, expires_at, last_seen_at)
+     values ($1, $2::jsonb, now() + interval '30 days', now())`,
+    [sha256(raw), JSON.stringify(customerIds)],
+  );
+  return raw;
 }
 
 export const ASPIRE_ORG = "b839980a-ad26-44d4-9e83-df427bd60fe8";

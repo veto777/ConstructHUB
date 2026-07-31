@@ -21,6 +21,7 @@ const EXPECTED_4XX: RegExp[] = [
   /\/api\/crm\/invitations\/lookup\//, // join page with a bogus/expired token
   /\/api\/crm\/invitations\/accept/, // accept while signed in as a different email → 403 by design
   /\/api\/public\/(estimates|invoices|portal)\/not-a-real-token/, // deliberate bogus-token probes
+  /\/api\/public\/(estimates|invoices)\/[^/]+$/, // 401 requiresVerification IS the email gate doing its job
   /\/api\/client\/documents/, // 401 IS the signed-out state on the client portal
   /\/api\/admin\//, // 403 IS the designed state for a non-admin on /crm/admin
 ];
@@ -74,6 +75,20 @@ export function watchPage(page: Page): PageGuards {
 export async function gotoCrm(page: Page, path: string) {
   await page.goto(path);
   await page.waitForLoadState("networkidle");
+}
+
+/**
+ * Hand the browser a crm_client session (same shape as a redeemed magic
+ * link). The public estimate/invoice pages are email-gated: specs exercise
+ * them as the verified client, not anonymously — anonymous is the challenge
+ * flow, curated in 20-link-gating.
+ */
+export async function grantClientSession(page: Page, customerIds: string[]) {
+  const { makeClientSession } = await import("./db");
+  const raw = await makeClientSession(customerIds);
+  await page.context().addCookies([
+    { name: "crm_client", value: raw, url: "http://127.0.0.1:8119" },
+  ]);
 }
 
 export const ORGS = {

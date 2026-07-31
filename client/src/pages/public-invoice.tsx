@@ -7,12 +7,14 @@ import { Loader2, AlertTriangle, CheckCircle2, Phone, Mail, Landmark, ShieldChec
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
 import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
+import { DocGateChallenge } from "@/components/doc-gate";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const qty = (m: number) => (m / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
 
-/** Public invoice — token-authorised, no login. Mirrors the estimate page. */
+/** Public invoice — authorised by the link PLUS a verified client session,
+ *  like the estimate page. Anonymous browsers get the email challenge. */
 export default function PublicInvoicePage() {
   const [, params] = useRoute("/i/:token");
   const token = params?.token;
@@ -38,6 +40,16 @@ export default function PublicInvoicePage() {
   if (isLoading) return <div className="flex justify-center p-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   if (error) {
+    const msg = String((error as Error).message ?? "");
+    // 401 requiresVerification = the email gate.
+    if (msg.startsWith("401:")) {
+      try {
+        const j = JSON.parse(msg.slice(msg.indexOf(":") + 1));
+        if (j?.requiresVerification) {
+          return <DocGateChallenge docType="invoice" token={token!} />;
+        }
+      } catch { /* fall through to the generic error card */ }
+    }
     return (
       <div className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
         <ErrorCard title="This link isn't valid" description={String((error as Error).message)} />
@@ -198,7 +210,7 @@ export default function PublicInvoicePage() {
         )}
 
         <p className="text-center text-xs text-muted-foreground/70 pb-4">
-          Secure link — only people with this URL can view this invoice.
+          Private document — it opens only after verifying the email address it was sent to.
         </p>
       </div>
     </main>

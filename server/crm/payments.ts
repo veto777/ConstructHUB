@@ -24,6 +24,7 @@ import {
 } from "@shared/schema";
 import { and, eq, isNull, desc, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { requireDocSession } from "./portal";
 import { getBaseUrl } from "../auth";
 
 type GetUser = (req: any, res: any) => any;
@@ -251,6 +252,8 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const t = String(req.params.token || "");
     const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
     if (!inv) return res.status(404).json({ message: "This invoice link is no longer valid." });
+    // Email gate, same as the document read: paying requires the verified session.
+    if (!(await requireDocSession(req, res, inv.customerId))) return;
     if (inv.voidedAt) return res.status(410).json({ message: "This invoice has been voided." });
     // Retainage is withheld until closeout, so it is not payable now.
     const amount = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
@@ -308,6 +311,8 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const t = String(req.params.token || "");
     const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
     if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    // Email gate, same as the document read: paying requires the verified session.
+    if (!(await requireDocSession(req, res, est.customerId))) return;
     if (!est.approvedAt) return res.status(409).json({ message: "Approve the estimate first." });
 
     const amount = est.depositCents && est.depositCents > 0 ? est.depositCents : est.totalCents;

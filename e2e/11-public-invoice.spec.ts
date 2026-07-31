@@ -1,12 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { q } from "./db";
-import { gotoCrm, makeEstimate, ORGS, sweepPage, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, makeEstimate, ORGS, sweepPage, switchOrg, watchPage } from "./helpers";
 
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.aspire));
 
-/** Create an invoice from a freshly approved throwaway estimate. */
+/** Create an invoice from a freshly approved throwaway estimate. The public
+ *  approve is email-gated, so the browser gets a client session first —
+ *  page.request shares the context's cookies. */
 async function makeInvoice(page: any): Promise<{ invoiceId: string; token: string }> {
-  const { estimateId, token: estToken } = await makeEstimate(page);
+  const { customerId, estimateId, token: estToken } = await makeEstimate(page);
+  await grantClientSession(page, [customerId]);
   const respond = await page.request.post(`/api/public/estimates/${estToken}/respond`, {
     data: { decision: "approve", signatureName: "Mary Homeowner" },
   });
@@ -38,9 +41,10 @@ test.describe("/i/:token (public invoice)", () => {
 
   test("curated: paid invoice shows the paid state", async ({ page }) => {
     const guards = watchPage(page);
-    const paid = await q<{ public_token: string }>(
-      `select public_token from crm_invoices where status = 'paid' and public_token is not null limit 1`);
+    const paid = await q<{ public_token: string; customer_id: string }>(
+      `select public_token, customer_id from crm_invoices where status = 'paid' and public_token is not null limit 1`);
     expect(paid.length).toBeGreaterThan(0);
+    await grantClientSession(page, [paid[0].customer_id]);
     await gotoCrm(page, `/i/${paid[0].public_token}`);
     await expect(page.getByText(/Paid — thank you!/)).toBeVisible();
     guards.assertClean("public invoice paid");

@@ -304,6 +304,15 @@ export default function CrmClientPage() {
     onError: (e: any) => toast({ title: "Could not send", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  // Contractor preview: the public page is email-gated now, so the CRM opens
+  // a short-lived read-only preview link instead of the raw client URL.
+  const preview = useMutation({
+    mutationFn: async (estimateId: string) =>
+      (await apiRequest("POST", `/api/crm/estimates/${estimateId}/preview-link`, {})).json(),
+    onSuccess: (r: any) => { if (r.url) window.open(r.url, "_blank", "noopener"); },
+    onError: (e: any) => toast({ title: "Could not open preview", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   if (isLoading) {
     return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
@@ -479,6 +488,14 @@ export default function CrmClientPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {canEstimate && (
+                    <Button size="sm" variant="ghost"
+                      onClick={() => preview.mutate(e.id)} disabled={preview.isPending}
+                      data-testid={`button-preview-${e.id}`}>
+                      {preview.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
+                      Preview
+                    </Button>
+                  )}
                   {canEstimate && !e.approvedAt && !e.declinedAt && (
                     <Button size="sm" variant="ghost"
                       onClick={() => setOptsFor(e)}

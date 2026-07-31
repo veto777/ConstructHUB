@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { q } from "./db";
-import { gotoCrm, ORGS, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, ORGS, switchOrg, watchPage } from "./helpers";
 
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.alpine));
 
@@ -27,6 +27,10 @@ test("pipeline: client → estimate → approve → invoice → payment → void
   await page.locator('[data-testid^="client-"]').first().click();
   await expect(page.locator("h1")).toContainText(clientName);
   const customerId = page.url().split("/crm/clients/")[1];
+
+  // The public approve steps below are email-gated: this browser plays the
+  // client, so it carries a verified session for the new customer.
+  await grantClientSession(page, [customerId]);
 
   // ── Estimate with a line item ─────────────────────────────────────────────
   await page.getByTestId("button-new-estimate").click();

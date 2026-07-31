@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { gotoCrm, ORGS, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, ORGS, switchOrg, watchPage } from "./helpers";
 import { q, ASPIRE_ORG } from "./db";
 
 /**
@@ -104,6 +104,7 @@ test.describe("divisions", () => {
       `select public_token from crm_estimates where id = $1`, [estimate.id],
     );
 
+    await grantClientSession(page, [customer.id]); // the public page is email-gated
     await gotoCrm(page, `/e/${token}`);
     await expect(page.locator("h1")).toContainText(`E2E Gulf Coast ${stamp}`);
     const addr = page.getByTestId("text-company-address");

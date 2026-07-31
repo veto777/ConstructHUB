@@ -2,22 +2,30 @@
  * Send an estimate, track that it was opened, and let the client approve or
  * decline from their own portal.
  *
- * The two public routes here take NO session — they authorise on an unguessable
- * 48-hex token in the URL, exactly like the existing /review/:token flow. They
- * are deliberately narrow: read one estimate, or approve/decline one estimate.
- * Costs and internal-only line items are never serialised to them.
+ * The public document routes are EMAIL-GATED (Jobber-style): the 48-hex token
+ * in the URL identifies the document but no longer authorises it. The browser
+ * must also hold a client session (crm_client cookie) whose customerIds
+ * include the document's customer — minted by verifying the email address the
+ * document was sent to (POST /api/public/verify-access, same magic-link
+ * machinery as the client portal). A forwarded bare link is therefore useless
+ * to anyone without access to the recipient's inbox. The routes stay
+ * deliberately narrow: read one document, or approve/decline/pay one
+ * document. Costs and internal-only line items are never serialised to them.
  */
 import type { Express } from "express";
 import { z } from "zod";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmEstimates, crmEstimateItems, crmEstimateOptions, crmOrgs, crmMembers,
   crmEstimateEvents, crmEngagementSessions,
   CRM_PROJECT_STAGE_META,
   crmNotificationEnabled,
+  crmClientTokens,
 } from "@shared/schema";
 import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { logEvent, presentEstimate } from "./entities";
@@ -26,6 +34,8 @@ import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision } from
 import { crmInvoices, crmInvoiceItems, crmPayments } from "@shared/schema";
 
 type GetUser = (req: any, res: any) => any;
+
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -80,6 +90,54 @@ export function redactIpPrefix(ip: string | null | undefined): string | null {
   }
   if (ip.includes(":")) return `${ip.split(":").slice(0, 3).join(":")}::/48`;
   return null;
+}
+
+// ── The email gate ──────────────────────────────────────────────────────────
+
+/**
+ * A public document serves only to a browser holding a client session whose
+ * customerIds include the document's customer. Everyone else gets
+ * 401 { requiresVerification: true } and the page renders the email-
+ * verification challenge. Used by every public document route here and by the
+ * public pay routes in payments.ts.
+ */
+export async function requireDocSession(req: any, res: any, customerId: string): Promise<boolean> {
+  const ids = await resolveClientCustomerIds(req);
+  if (ids.includes(customerId)) return true;
+  res.status(401).json({
+    message: "This document is private. Verify the email address it was sent to.",
+    requiresVerification: true,
+  });
+  return false;
+}
+
+// ── Contractor preview ──────────────────────────────────────────────────────
+// Org members preview the client page WITHOUT a client session. The bypass is
+// an HMAC-signed 15-minute grant bound to ONE estimate id (SESSION_SECRET
+// keyed, stateless) and is READ-ONLY: respond/pay/engagement still require the
+// client session, and preview opens never touch view tracking.
+const PREVIEW_TTL_MS = 15 * 60 * 1000;
+const previewSecret = () => process.env.SESSION_SECRET || "";
+
+function mintPreviewGrant(estimateId: string): string {
+  const exp = Date.now() + PREVIEW_TTL_MS;
+  const sig = createHmac("sha256", previewSecret())
+    .update(`estimate-preview:${estimateId}:${exp}`).digest("hex").slice(0, 32);
+  return `${exp}.${sig}`;
+}
+
+function previewGrantValid(estimateId: string, grant: string): boolean {
+  const secret = previewSecret();
+  if (!secret) return false;
+  const m = /^(\d{10,16})\.([0-9a-f]{32})$/.exec(grant);
+  if (!m) return false;
+  const exp = Number(m[1]);
+  if (!Number.isFinite(exp) || exp < Date.now()) return false;
+  const expected = createHmac("sha256", secret)
+    .update(`estimate-preview:${estimateId}:${exp}`).digest("hex").slice(0, 32);
+  const a = Buffer.from(m[2]);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /** What the homeowner is allowed to see. Hidden items and all costs are dropped. */
@@ -172,6 +230,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         <p style="font-size:13px;color:#666">
           Or paste this into your browser:<br><span style="word-break:break-all">${link}</span>
         </p>
+        <p style="font-size:13px;color:#666">
+          Only you can open this link — it verifies ${esc(to)}. If it's forwarded to
+          anyone else, they can't get in without access to your inbox.
+        </p>
         <p style="font-size:13px;color:#666">This estimate expires on ${expiresAt.toDateString()}.</p>
         <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
         <p style="font-size:13px;color:#666">
@@ -216,7 +278,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
   });
 
   // ── Public: the client's estimate page ────────────────────────────────────
-  // Token-authorised, no session. Viewing records first/last open + a count.
+  // Email-gated: the URL token identifies the estimate; a client session (or a
+  // contractor preview grant) authorises it. Viewing records first/last open +
+  // a count — never for previews.
 
   app.get("/api/public/estimates/:token", async (req: any, res) => {
     const t = String(req.params.token || "");
@@ -230,6 +294,12 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (!org || !cust) return res.status(404).json({ message: "Not found" });
     const division = await resolveEstimateDivision(est);
     const branding = companyBranding(org, division);
+
+    // THE GATE — ahead of everything, expiry included. A contractor preview
+    // grant bypasses it (read-only, untracked); everyone else needs a client
+    // session covering this estimate's customer.
+    const preview = previewGrantValid(est.id, String(req.query?.preview || ""));
+    if (!preview && !(await requireDocSession(req, res, est.customerId))) return;
 
     // Expired and never answered: 410 BEFORE any document content is loaded.
     // The body carries only what the contact page needs — org name + public
@@ -253,9 +323,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
 
     // Open tracking — the "you can see it was opened" feature. Only counted
     // once the estimate has actually been sent, so internal preview clicks
-    // don't create a false "client viewed it".
+    // don't create a false "client viewed it" — and a preview-grant open is
+    // the contractor by definition, so it skips this entirely.
     let current = est;
-    if (est.sentAt && !est.approvedAt && !est.declinedAt) {
+    if (!preview && est.sentAt && !est.approvedAt && !est.declinedAt) {
       // Dedupe: count at most one view per IP per window. lastViewedAt still
       // moves on every open (a visit really happened); viewCount and the
       // events trail only move when this looks like a genuinely new view.
@@ -289,8 +360,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         }
       }
     }
-    await db.update(crmCustomers).set({ portalLastSeenAt: new Date() })
-      .where(eq(crmCustomers.id, cust.id)).catch(() => {});
+    if (!preview) {
+      await db.update(crmCustomers).set({ portalLastSeenAt: new Date() })
+        .where(eq(crmCustomers.id, cust.id)).catch(() => {});
+    }
 
     // Server-side paid flag — the client must never infer "paid" from the
     // ?paid=1 redirect parameter alone.
@@ -300,6 +373,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const view = publicEstimateView(current, items, org, cust, division);
     res.json({
       ...view,
+      preview: preview || undefined, // read-only: the page hides approve/pay
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
       options: options.map((o) => ({
         id: o.id, name: o.name, tier: o.tier, description: o.description,
@@ -310,7 +384,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     });
   });
 
-  /** Client approves or declines. */
+  /** Client approves or declines. Gated like the read: approving IS signing,
+   *  so a forwarded link alone must never be enough — and a preview grant
+   *  deliberately does NOT work here (read-only). */
   app.post("/api/public/estimates/:token/respond", async (req: any, res) => {
     const t = String(req.params.token || "");
     const parsed = z.object({
@@ -322,6 +398,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
 
     const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
     if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    if (!(await requireDocSession(req, res, est.customerId))) return;
     if (est.approvedAt || est.declinedAt) {
       return res.status(409).json({ message: "This estimate has already been responded to." });
     }
@@ -365,6 +442,127 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     res.json({ ok: true, status: row.status });
   });
 
+  // ── Email verification challenge ──────────────────────────────────────────
+  // The gate's other half. ALWAYS 200 { sent: true } — matching or not,
+  // mailing or not, must be indistinguishable (the same anti-enumeration rule
+  // as the client portal's request-link). Rate buckets key on the IP, the
+  // document token, and the REQUESTED address — all known to the requester
+  // either way, so a 429 can't oracle the match. Only a match against the
+  // customer's email (or the address the document was actually sent to)
+  // mints a magic link, scoped to JUST that customer, landing back on the
+  // document itself.
+  // Per-IP is the loosest bucket (real households/offices NAT behind one
+  // address) — the per-token and per-email buckets are the actual guards.
+  const VA_IP_LIMIT = 60;
+  const VA_TOKEN_LIMIT = 10;
+  const VA_EMAIL_LIMIT = 5;
+
+  app.post("/api/public/verify-access", async (req: any, res) => {
+    const parsed = z.object({
+      docType: z.enum(["estimate", "invoice"]),
+      token: z.string().min(24).max(120),
+      email: z.string().email().max(320),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Enter a valid email address" });
+    const { docType, token: t } = parsed.data;
+    const email = parsed.data.email.trim().toLowerCase();
+
+    if (!rateAllow(`va-ip:${clientIp(req)}`, VA_IP_LIMIT)
+      || !rateAllow(`va-tok:${t}`, VA_TOKEN_LIMIT)
+      || !rateAllow(`va-em:${email}`, VA_EMAIL_LIMIT)) {
+      return res.status(429).json({ message: "Too many requests. Please try again later." });
+    }
+
+    let cust: typeof crmCustomers.$inferSelect | undefined;
+    let org: typeof crmOrgs.$inferSelect | undefined;
+    let sentTo: string | null = null;
+    let docLabel = "a document";
+    let nextPath = "";
+    if (docType === "estimate") {
+      const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
+      if (est) {
+        [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
+        [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
+        sentTo = est.sentToEmail;
+        docLabel = est.number ? `estimate ${est.number}` : "an estimate";
+        nextPath = `/e/${t}`;
+      }
+    } else {
+      const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
+      if (inv) {
+        [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
+        [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
+        sentTo = inv.sentToEmail;
+        docLabel = inv.number ? `invoice ${inv.number}` : "an invoice";
+        nextPath = `/i/${t}`;
+      }
+    }
+
+    // Case-insensitive match against the customer record OR the send-time
+    // override address (the email that actually received the quote).
+    const matches = Boolean(cust && org) && (
+      (cust!.email ?? "").toLowerCase() === email || (sentTo ?? "").toLowerCase() === email
+    );
+
+    if (matches) {
+      const raw = randomBytes(32).toString("hex");
+      await db.insert(crmClientTokens).values({
+        tokenHash: sha256(raw),
+        customerIds: [cust!.id],
+        email,
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      });
+      const link = `${getBaseUrl(req)}/api/client/auth/verify?token=${raw}&next=${encodeURIComponent(nextPath)}`;
+      try {
+        await sendWithFallback({
+          to: email,
+          subject: `${org!.name} shared a document with you — open it securely`,
+          html: `
+            <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px">
+              <p style="font-size:16px">Hi ${esc(cust!.displayName)},</p>
+              <p style="font-size:16px"><strong>${esc(org!.name)}</strong> shared ${esc(docLabel)} with you.
+                 Use the secure link below to open it — it confirms this email address and takes you
+                 straight to the document.</p>
+              <p style="margin:28px 0">
+                <a href="${link}" style="background:#4f46e5;color:#fff;padding:13px 24px;border-radius:6px;
+                   text-decoration:none;font-weight:600;font-size:16px;display:inline-block">Open your document securely</a>
+              </p>
+              <p style="font-size:13px;color:#666">This link expires in 30 minutes and can only be used once.
+                 If you weren't expecting it, you can ignore this email.</p>
+            </div>`,
+        } as any);
+      } catch (e: any) {
+        // The response must not change when mail fails — same { sent: true }
+        // either way, so SMTP behaviour is never an enumeration oracle.
+        console.error("[crm] verify-access email failed:", String(e?.message || e).slice(0, 300));
+      }
+    }
+
+    res.json({ sent: true });
+  });
+
+  /** Contractor preview: mint a 15-minute read-only grant for the client
+   *  page. The CRM opens THIS instead of the raw public URL, which is gated
+   *  behind the client's email now. Preview opens never count as views or
+   *  engagement, and the grant cannot approve, decline or pay. */
+  app.post("/api/crm/estimates/:id/preview-link", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageEstimates")) return;
+    if (!previewSecret()) return res.status(503).json({ message: "Preview is not configured on this server." });
+
+    const [est] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+
+    res.json({
+      url: `${getBaseUrl(req)}/e/${est.publicToken}?preview=${mintPreviewGrant(est.id)}`,
+      expiresAt: new Date(Date.now() + PREVIEW_TTL_MS),
+    });
+  });
+
   // ── Engagement tracking: how long the client actually spent ───────────────
   // Token-authorised like the document pages themselves. A session opens on
   // page load and heartbeats every 15s while the tab is visible; duration is
@@ -381,17 +579,22 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
 
     // Only track live documents — an unsent draft opened as an internal
     // preview is the contractor, not client behaviour. Mirrors the conditions
-    // under which view tracking counts.
+    // under which view tracking counts. The document gate applies too: a
+    // browser that couldn't open the document (no client session covering its
+    // customer) gets a silent no-op, not a tracking row.
+    const ids = await resolveClientCustomerIds(req);
     let orgId: string, docId: string;
     if (docType === "estimate") {
       const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
       if (!est) return res.status(404).json({ message: "Not found" });
       if (!est.sentAt || est.approvedAt || est.declinedAt) return res.json({ sessionId: null });
+      if (!ids.includes(est.customerId)) return res.json({ sessionId: null });
       orgId = est.orgId; docId = est.id;
     } else {
       const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
       if (!inv) return res.status(404).json({ message: "Not found" });
       if (!inv.sentAt || inv.paidAt || inv.voidedAt) return res.json({ sessionId: null });
+      if (!ids.includes(inv.customerId)) return res.json({ sessionId: null });
       orgId = inv.orgId; docId = inv.id;
     }
 
@@ -630,6 +833,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
             </p>
             <p style="font-size:13px;color:#666">Or paste this in your browser:<br>
               <span style="word-break:break-all">${link}</span></p>
+            <p style="font-size:13px;color:#666">Only you can open this link — it verifies ${esc(to)}.
+              If it's forwarded to anyone else, they can't get in without access to your inbox.</p>
             <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
             <p style="font-size:13px;color:#666">
               ${esc(branding.name)}${branding.phone ? ` &middot; ${esc(branding.phone)}` : ""}
@@ -653,12 +858,15 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     res.json({ invoice: row, link, emailed, emailError });
   });
 
-  /** Public invoice, token-authorised. Records opens like the estimate page. */
+  /** Public invoice — email-gated like the estimate. Records opens. */
   app.get("/api/public/invoices/:token", async (req: any, res) => {
     const t = String(req.params.token || "");
     if (t.length < 24) return res.status(404).json({ message: "Not found" });
     const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
     if (!inv) return res.status(404).json({ message: "This invoice link is no longer valid." });
+
+    // THE GATE — ahead of everything, the voided state included.
+    if (!(await requireDocSession(req, res, inv.customerId))) return;
     if (inv.voidedAt) return res.status(410).json({ message: "This invoice has been voided." });
 
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);

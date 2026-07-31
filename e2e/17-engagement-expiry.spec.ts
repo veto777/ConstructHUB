@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { gotoCrm, makeEstimate, ORGS, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, makeEstimate, ORGS, switchOrg, watchPage } from "./helpers";
 import { q } from "./db";
 
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.aspire));
@@ -12,6 +12,9 @@ test.describe("engagement + expiry + print lockdown", () => {
     // Engagement only tracks live (sent) documents.
     const send = await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
     expect(send.ok()).toBeTruthy();
+
+    // The page is email-gated: open it as the verified client.
+    await grantClientSession(page, [customerId]);
 
     // Loading the public page opens an engagement session on its own.
     const startPromise = page.waitForResponse((r) => r.url().includes("/api/public/engagement/start"));
@@ -48,9 +51,11 @@ test.describe("engagement + expiry + print lockdown", () => {
   });
 
   test("expired estimate shows the contact page; extend makes it viewable again", async ({ page }) => {
-    const { estimateId, token } = await makeEstimate(page);
+    const { customerId, estimateId, token } = await makeEstimate(page);
     const send = await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
     expect(send.ok()).toBeTruthy();
+    // The 410 page sits behind the email gate too — browse as the client.
+    await grantClientSession(page, [customerId]);
 
     // Push expiry into the past — the document must 410 with no content leak.
     // (No watchPage here: the 410 is the designed behaviour under test.)
@@ -72,7 +77,8 @@ test.describe("engagement + expiry + print lockdown", () => {
 
   test("print media hides the document and shows only the lockdown notice", async ({ page }) => {
     const guards = watchPage(page);
-    const { token } = await makeEstimate(page);
+    const { customerId, token } = await makeEstimate(page);
+    await grantClientSession(page, [customerId]);
     await gotoCrm(page, `/e/${token}`);
     await expect(page.getByTestId("input-signature")).toBeVisible();
 

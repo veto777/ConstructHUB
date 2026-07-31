@@ -12,8 +12,29 @@
  *   3. Options can be deleted on an editable estimate.
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { createHash, randomBytes } from "crypto";
+import pg from "pg";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
+
+// The public respond route is email-gated: approving needs a crm_client
+// session covering the estimate's customer (minted here directly, same shape
+// as a redeemed magic link).
+const pool = new pg.Pool({
+  connectionString:
+    process.env.DATABASE_URL ??
+    "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
+});
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+async function clientCookie(customerId: string): Promise<string> {
+  const raw = randomBytes(32).toString("hex");
+  await pool.query(
+    `insert into crm_client_sessions (token_hash, customer_ids, expires_at, last_seen_at)
+     values ($1, $2::jsonb, now() + interval '30 days', now())`,
+    [sha256(raw), JSON.stringify([customerId])],
+  );
+  return `crm_client=${raw}`;
+}
 
 async function api(path: string, opts: RequestInit = {}, cookie?: string) {
   const res = await fetch(`${BASE}${path}`, {
@@ -159,12 +180,12 @@ describe("estimate option guards", () => {
     const delAgain = await api(`/api/crm/estimates/${est.body.id}/options/${opt.body.id}`, { method: "DELETE" }, cookie);
     expect(delAgain.status).toBe(404);
 
-    // Approve it through the public token.
+    // Approve it through the public token (as the verified client).
     const send = await api(`/api/crm/estimates/${est.body.id}/send`, { method: "POST", body: "{}" }, cookie);
     const token = send.body.link.split("/e/")[1];
     const approve = await api(`/api/public/estimates/${token}/respond`, {
       method: "POST", body: JSON.stringify({ decision: "approve", signatureName: "Vitest Signer" }),
-    });
+    }, await clientCookie(customerId));
     expect(approve.status).toBe(200);
 
     // Now the tier loop is closed: 409 on both write paths.

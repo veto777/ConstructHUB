@@ -66,7 +66,7 @@ const IP_LIMIT = 30;
 const EMAIL_LIMIT = 5;
 const buckets = new Map<string, number[]>();
 
-function allow(key: string, limit: number): boolean {
+export function allow(key: string, limit: number): boolean {
   const now = Date.now();
   const hits = (buckets.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
   if (hits.length >= limit) {
@@ -87,32 +87,40 @@ function setSessionCookie(res: any, token: string, maxAgeMs: number) {
 }
 
 /**
- * The client-portal gate. Resolves the `crm_client` cookie to the session's
- * customer ids (and slides the expiry), or answers 401. No contractor session
- * is involved anywhere in this module.
+ * Resolve the `crm_client` cookie to the session's customer ids WITHOUT
+ * answering 401 — for routes that branch on the session (the public document
+ * gate) rather than requiring it. Same sliding expiry as requireClient.
  */
-export async function requireClient(req: any, res: any): Promise<{ customerIds: string[] } | null> {
+export async function resolveClientCustomerIds(req: any): Promise<string[]> {
   const token = parseCookies(req)[COOKIE_NAME];
-  if (!token || token.length < 32) {
-    res.status(401).json({ message: "Sign in required" });
-    return null;
-  }
+  if (!token || token.length < 32) return [];
   const [sess] = await db
     .select()
     .from(crmClientSessions)
     .where(eq(crmClientSessions.tokenHash, sha256(token)))
     .limit(1);
-  if (!sess || sess.expiresAt.getTime() < Date.now()) {
-    res.status(401).json({ message: "Sign in required" });
-    return null;
-  }
+  if (!sess || sess.expiresAt.getTime() < Date.now()) return [];
   // Sliding expiry: every use pushes the session 30 days out.
   await db
     .update(crmClientSessions)
     .set({ lastSeenAt: new Date(), expiresAt: new Date(Date.now() + SESSION_TTL_MS) })
     .where(eq(crmClientSessions.id, sess.id))
     .catch(() => {});
-  return { customerIds: Array.isArray(sess.customerIds) ? sess.customerIds : [] };
+  return Array.isArray(sess.customerIds) ? sess.customerIds : [];
+}
+
+/**
+ * The client-portal gate. Resolves the `crm_client` cookie to the session's
+ * customer ids (and slides the expiry), or answers 401. No contractor session
+ * is involved anywhere in this module.
+ */
+export async function requireClient(req: any, res: any): Promise<{ customerIds: string[] } | null> {
+  const customerIds = await resolveClientCustomerIds(req);
+  if (!customerIds.length) {
+    res.status(401).json({ message: "Sign in required" });
+    return null;
+  }
+  return { customerIds };
 }
 
 export function registerCrmClientAuthRoutes(app: Express): void {
@@ -174,10 +182,13 @@ export function registerCrmClientAuthRoutes(app: Express): void {
   });
 
   // ── Redeem a magic link ───────────────────────────────────────────────────
-  // Success: single-use check, mint session, set cookie, 302 to /.
-  // Failure (bogus / used / expired): 302 to /?auth=invalid — the SPA renders
-  // the explanation there. `client=1` is forwarded so dev (where the client
-  // face is query-forced) survives the redirect; harmless on real hosts.
+  // Success: single-use check, mint session, set cookie, 302 to / — or to an
+  // allowlisted document path (`next=/e/:token` / `/i/:token`), which is how a
+  // document-gate verification link returns the client to the page they were
+  // trying to open. Failure (bogus / used / expired): 302 to /?auth=invalid —
+  // the SPA renders the explanation there. `client=1` is forwarded so dev
+  // (where the client face is query-forced) survives the redirect; harmless
+  // on real hosts.
   app.get("/api/client/auth/verify", async (req: any, res) => {
     const dev = req.query?.client === "1" ? "&client=1" : "";
     const devOnly = req.query?.client === "1" ? "?client=1" : "";
@@ -185,6 +196,10 @@ export function registerCrmClientAuthRoutes(app: Express): void {
 
     const token = String(req.query?.token || "");
     if (token.length < 32) return invalid();
+
+    // Open-redirect guard: next is honoured only for public document paths.
+    const next = String(req.query?.next || "");
+    const safeNext = /^\/[ei]\/[0-9a-fA-F]{24,120}$/.test(next) ? next : "";
 
     // Atomic single-use: only one concurrent verify can flip used_at.
     const [row] = await db
@@ -209,7 +224,7 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     });
 
     setSessionCookie(res, sessionToken, SESSION_TTL_MS);
-    res.redirect(302, `/${devOnly}`);
+    res.redirect(302, safeNext || `/${devOnly}`);
   });
 
   // ── Sign out ──────────────────────────────────────────────────────────────

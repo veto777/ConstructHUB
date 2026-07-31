@@ -10,8 +10,29 @@
  * from the original curl verification.
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { createHash, randomBytes } from "crypto";
+import pg from "pg";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
+
+// The public document routes are email-gated now: they serve only to a
+// browser holding a crm_client session covering the document's customer.
+// Tests mint that session directly (same shape as a redeemed magic link).
+const pool = new pg.Pool({
+  connectionString:
+    process.env.DATABASE_URL ??
+    "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
+});
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+async function clientCookie(customerId: string): Promise<string> {
+  const raw = randomBytes(32).toString("hex");
+  await pool.query(
+    `insert into crm_client_sessions (token_hash, customer_ids, expires_at, last_seen_at)
+     values ($1, $2::jsonb, now() + interval '30 days', now())`,
+    [sha256(raw), JSON.stringify([customerId])],
+  );
+  return `crm_client=${raw}`;
+}
 
 async function api(path: string, opts: RequestInit = {}, cookie?: string) {
   const res = await fetch(`${BASE}${path}`, {
@@ -90,13 +111,15 @@ describe("money pipeline", () => {
     expect(send.body.estimate.status).toBe("sent");
     const token = send.body.link.split("/e/")[1];
 
-    // 5. Public view: first open flips sent → viewed and counts ONE view;
-    //    a refresh from the same IP inside the window must not inflate it.
-    const v1 = await api(`/api/public/estimates/${token}`);
+    // 5. Public view (as the verified client — the route is email-gated):
+    //    first open flips sent → viewed and counts ONE view; a refresh from
+    //    the same IP inside the window must not inflate it.
+    const client = await clientCookie(cust.body.id);
+    const v1 = await api(`/api/public/estimates/${token}`, {}, client);
     expect(v1.status).toBe(200);
     expect(v1.body.estimate.status).toBe("viewed");
     expect(v1.body.estimate.totalCents).toBe(937856);
-    const v2 = await api(`/api/public/estimates/${token}`);
+    const v2 = await api(`/api/public/estimates/${token}`, {}, client);
     expect(v2.status).toBe(200);
     const detail = await api(`/api/crm/estimates/${est.body.id}`, {}, cookie);
     expect(detail.body.estimate.viewCount).toBe(1);
@@ -106,13 +129,13 @@ describe("money pipeline", () => {
     // 6. Guards: approve without a name → 400.
     const noName = await api(`/api/public/estimates/${token}/respond`, {
       method: "POST", body: JSON.stringify({ decision: "approve" }),
-    });
+    }, client);
     expect(noName.status).toBe(400);
 
     // 7. Approve with a typed name → project advances and takes the total.
     const approve = await api(`/api/public/estimates/${token}/respond`, {
       method: "POST", body: JSON.stringify({ decision: "approve", signatureName: "Vitest Signer" }),
-    });
+    }, client);
     expect(approve.status).toBe(200);
     const projAfter = await api(`/api/crm/projects?customerId=${cust.body.id}`, {}, cookie);
     const mine = projAfter.body.projects.find((p: any) => p.id === proj.body.id);
@@ -122,7 +145,7 @@ describe("money pipeline", () => {
     // 8. Double approve → 409.
     const again = await api(`/api/public/estimates/${token}/respond`, {
       method: "POST", body: JSON.stringify({ decision: "approve", signatureName: "Vitest Signer" }),
-    });
+    }, client);
     expect(again.status).toBe(409);
 
     // 9. Progress invoice: 50% draw with 10% retainage.

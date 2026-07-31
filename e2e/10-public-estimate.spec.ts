@@ -1,12 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { gotoCrm, makeEstimate, ORGS, sweepPage, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, makeEstimate, ORGS, sweepPage, switchOrg, watchPage } from "./helpers";
 
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.aspire));
 
+// The public pages are email-gated: every browse below happens with a client
+// session for the estimate's customer (the anonymous challenge flow is
+// curated in 20-link-gating.spec.ts).
 test.describe("/e/:token (public estimate)", () => {
   test("curated: full approve flow on a throwaway estimate", async ({ page }) => {
     const guards = watchPage(page);
-    const { token } = await makeEstimate(page);
+    const { customerId, token } = await makeEstimate(page);
+    await grantClientSession(page, [customerId]);
 
     await gotoCrm(page, `/e/${token}`);
     // Company header, line items and total render.
@@ -31,7 +35,8 @@ test.describe("/e/:token (public estimate)", () => {
 
   test("curated: decline flow with a reason", async ({ page }) => {
     const guards = watchPage(page);
-    const { token } = await makeEstimate(page);
+    const { customerId, token } = await makeEstimate(page);
+    await grantClientSession(page, [customerId]);
 
     await gotoCrm(page, `/e/${token}`);
     await page.getByTestId("button-show-decline").click();
@@ -50,7 +55,8 @@ test.describe("/e/:token (public estimate)", () => {
   });
 
   test("sweep: every button and link", async ({ page }) => {
-    const { token } = await makeEstimate(page);
+    const { customerId, token } = await makeEstimate(page);
+    await grantClientSession(page, [customerId]);
     const { clicked, labels } = await sweepPage(page, `/e/${token}`, {
       ready: '[data-testid="input-signature"]',
     });
