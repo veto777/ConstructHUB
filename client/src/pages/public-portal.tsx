@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Hammer, Phone, Mail, ArrowRight, Receipt, ShieldCheck } from "lucide-react";
 import { StatusPill, EmptyState, ErrorCard, statusTone } from "@/components/crm-ui";
+import { PrintLockdown } from "@/components/print-lockdown";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -41,6 +42,7 @@ export default function PublicPortalPage() {
 
   return (
     <main className="min-h-screen bg-muted/40 py-10 px-4">
+      <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
         <div className="text-center space-y-1.5 pb-2">
           {company.logoUrl && <img src={company.logoUrl} alt={company.name} className="h-14 mx-auto object-contain" />}

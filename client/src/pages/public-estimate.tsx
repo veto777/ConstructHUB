@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, XCircle, Loader2, AlertTriangle, Phone, Mail, Globe, ShieldCheck } from "lucide-react";
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
+import { useEngagementTracker } from "@/components/engagement-tracker";
+import { PrintLockdown } from "@/components/print-lockdown";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -102,6 +104,9 @@ export default function PublicEstimatePage() {
     retry: false,
   });
 
+  // Engagement heartbeat — starts only once the document has loaded.
+  useEngagementTracker("estimate", token, !!data);
+
   const respond = useMutation({
     mutationFn: async (decision: "approve" | "decline") => {
       const r = await fetch(`/api/public/estimates/${token}/respond`, {
@@ -125,6 +130,35 @@ export default function PublicEstimatePage() {
   }
 
   if (error) {
+    // 410 = expired. The server sends only org contact details with it (never
+    // document content), so this page is all an expired visitor can reach.
+    const msg = String((error as Error).message ?? "");
+    let expiredInfo: any = null;
+    if (msg.startsWith("410:")) {
+      try { expiredInfo = JSON.parse(msg.slice(msg.indexOf(":") + 1)); } catch { /* fall through */ }
+    }
+    if (expiredInfo?.expired) {
+      const co = expiredInfo.company ?? {};
+      return (
+        <main className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
+          <PrintLockdown />
+          <Card className="max-w-md w-full shadow-md" data-testid="expired-notice">
+            <CardContent className="p-8 text-center space-y-4">
+              <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto" />
+              <h1 className="text-xl font-semibold">
+                This estimate expired{expiredInfo.expiredAt ? ` on ${new Date(expiredInfo.expiredAt).toLocaleDateString()}` : ""}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Contact {co.name ?? "us"}
+                {co.email ? <> at <a className="text-primary underline" href={`mailto:${co.email}`}>{co.email}</a></> : ""}
+                {co.phone ? <> or <a className="text-primary underline" href={`tel:${co.phone}`}>{co.phone}</a></> : ""}
+                {" "}for a fresh one.
+              </p>
+            </CardContent>
+          </Card>
+        </main>
+      );
+    }
     return (
       <div className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
         <ErrorCard title="This link isn't valid" description={String((error as Error).message)} />
@@ -138,6 +172,7 @@ export default function PublicEstimatePage() {
 
   return (
     <main className="min-h-screen bg-muted/40 py-10 px-4">
+      <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
         {/* Letterhead — the company the client hired, not us. */}
         <div className="text-center space-y-1.5 pb-2">

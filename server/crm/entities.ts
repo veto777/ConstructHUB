@@ -388,7 +388,6 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       termsText: z.string().max(20000).nullable().optional(),
       taxRateBps: z.number().int().min(0).max(3000).default(0),
       depositCents: z.number().int().min(0).nullable().optional(),
-      expiresInDays: z.number().int().min(1).max(365).default(30),
       items: z.array(itemSchema).max(300).default([]),
     });
     const parsed = schema.safeParse(req.body);
@@ -408,7 +407,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
       taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,
       publicToken: token(), createdByMemberId: ctx.member.id,
-      expiresAt: new Date(Date.now() + d.expiresInDays * 86400000),
+      // No expiry on a draft — the 7-day clock starts when it is SENT
+      // (portal.ts), so a draft never burns its validity window unsent.
     } as any).returning();
 
     if (d.items.length) {

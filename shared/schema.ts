@@ -1414,6 +1414,27 @@ export const crmEstimateEvents = pgTable("crm_estimate_events", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+/**
+ * Client engagement sessions on the public estimate/invoice pages — the
+ * "did they spend 1 minute or 40" signal. One row per page visit: the page
+ * POSTs /start on load, then heartbeats every 15s while visible. Duration is
+ * accumulated server-side, capped per ping gap (see portal.ts), so a tab left
+ * open overnight does not read as 8 hours of attention. No cookies, no PII
+ * beyond the IP/UA the estimate events trail already records.
+ */
+export const crmEngagementSessions = pgTable("crm_engagement_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  docType: text("doc_type").notNull(), // estimate | invoice
+  docId: varchar("doc_id").notNull(),
+  startedAt: timestamp("started_at").defaultNow(),
+  lastPingAt: timestamp("last_ping_at").defaultNow(),
+  durationSecs: integer("duration_secs").notNull().default(0),
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const crmLeadSources = pgTable("crm_lead_sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull(),

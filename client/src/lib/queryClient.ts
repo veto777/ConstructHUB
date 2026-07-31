@@ -31,6 +31,10 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      // Never let the browser cache API responses: 404/410 are cacheable by
+      // default (RFC 9111), so a stale "expired" would survive the fix — e.g.
+      // an extended estimate kept showing the expired page.
+      cache: "no-store",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

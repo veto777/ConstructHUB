@@ -24,6 +24,7 @@ import {
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
 } from "@/components/crm-ui";
+import { EstimateEngagement } from "@/components/crm-engagement";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -527,6 +528,9 @@ export default function CrmClientPage() {
                   </span>
                 )}
               </div>
+
+              {/* Engagement (visits/time) + expiry + Extend — self-contained. */}
+              <EstimateEngagement estimate={e} canManage={canEstimate} onChanged={refresh} />
             </div>
           ))}
         </CardContent>

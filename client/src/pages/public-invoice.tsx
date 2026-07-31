@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, AlertTriangle, CheckCircle2, Phone, Mail, Landmark, ShieldCheck } from "lucide-react";
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
+import { useEngagementTracker } from "@/components/engagement-tracker";
+import { PrintLockdown } from "@/components/print-lockdown";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -18,6 +20,9 @@ export default function PublicInvoicePage() {
   const { data, isLoading, error } = useQuery<any>({
     queryKey: [`/api/public/invoices/${token}`], enabled: !!token, retry: false,
   });
+
+  // Engagement heartbeat — starts only once the document has loaded.
+  useEngagementTracker("invoice", token, !!data);
 
   const pay = useMutation({
     mutationFn: async () => {
@@ -49,6 +54,7 @@ export default function PublicInvoicePage() {
 
   return (
     <main className="min-h-screen bg-muted/40 py-10 px-4">
+      <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
         <div className="text-center space-y-1.5 pb-2">
           {company.logoUrl && <img src={company.logoUrl} alt={company.name} className="h-14 mx-auto object-contain" />}

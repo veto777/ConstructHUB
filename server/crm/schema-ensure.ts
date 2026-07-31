@@ -454,6 +454,25 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
   `);
 
+  // ── Client engagement sessions (public estimate/invoice dwell time) ──────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_engagement_sessions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      doc_type text NOT NULL,
+      doc_id varchar NOT NULL,
+      started_at timestamp DEFAULT now(),
+      last_ping_at timestamp DEFAULT now(),
+      duration_secs integer NOT NULL DEFAULT 0,
+      ip text,
+      user_agent text,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_engagement_doc_idx ON crm_engagement_sessions (doc_type, doc_id);
+    CREATE INDEX IF NOT EXISTS crm_engagement_org_idx ON crm_engagement_sessions (org_id);
+  `);
+
   // ── Homeowner client portal: magic-link tokens + sessions ────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS crm_client_tokens (

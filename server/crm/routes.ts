@@ -28,6 +28,7 @@ import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
 import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmClientAuthRoutes } from "./client-auth";
+import { registerCrmScheduleRoutes } from "./schedule";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 
@@ -134,6 +135,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmMeasurementRoutes(app, getDevUser);
   // The homeowner client portal takes no contractor session at all.
   registerCrmClientAuthRoutes(app);
+  // Read-only schedule + activity feeds for the mobile ribbon.
+  registerCrmScheduleRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 

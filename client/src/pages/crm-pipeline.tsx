@@ -81,11 +81,11 @@ export default function CrmPipelinePage() {
               <span className={`h-2 w-2 rounded-full ${color.dot}`} />
               <h2 className={`text-xs font-semibold uppercase tracking-widest ${color.text}`}>{String(group)}</h2>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-3">
+            <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-proximity">
               {groupStages.map((s) => {
                 const inStage = projects.filter((p) => p.status === s.key);
                 return (
-                  <div key={s.key} className="min-w-[260px] w-[260px] shrink-0"
+                  <div key={s.key} className="min-w-[260px] w-[260px] shrink-0 snap-start"
                     onDragOver={(e) => canMove && e.preventDefault()}
                     onDrop={(e) => {
                       if (!canMove) return;

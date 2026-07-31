@@ -12,7 +12,7 @@ import { z } from "zod";
 import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmEstimates, crmEstimateItems, crmEstimateOptions, crmOrgs, crmMembers,
-  crmEstimateEvents,
+  crmEstimateEvents, crmEngagementSessions,
   CRM_PROJECT_STAGE_META,
   crmNotificationEnabled,
 } from "@shared/schema";
@@ -42,6 +42,44 @@ const clientIp = (req: any) =>
  * events audit trail). First-view tracking is unaffected.
  */
 const VIEW_DEDUPE_MIN = 30;
+
+// ── Engagement + expiry: pure helpers (unit-tested in engagement.test.ts) ───
+
+/**
+ * Sent estimates expire. Default: 7 days from the moment it is sent — long
+ * enough to decide, short enough that pricing doesn't go stale. Stamped at
+ * send time (not at create), so a draft sitting in the pipeline doesn't burn
+ * its validity window before the client ever sees it.
+ */
+export const ESTIMATE_EXPIRY_DAYS = 7;
+export function estimateExpiryOnSend(sentAt: Date, days: number = ESTIMATE_EXPIRY_DAYS): Date {
+  return new Date(sentAt.getTime() + days * 86_400_000);
+}
+
+/**
+ * A heartbeat says "I was still here N seconds after the last one". Gaps are
+ * capped: the page pings every 15s while visible, so anything beyond 60s
+ * means the tab was hidden/backgrounded/asleep — not reading time. Counting
+ * the full gap would turn an open-in-background tab into fake engagement.
+ */
+export const ENGAGEMENT_PING_CAP_SECS = 60;
+export function engagementIncrement(lastPingAt: Date | null | undefined, now: Date): number {
+  if (!lastPingAt) return 0;
+  const gapSecs = Math.floor((now.getTime() - lastPingAt.getTime()) / 1000);
+  if (gapSecs <= 0) return 0; // duplicate/out-of-order ping — never subtract
+  return Math.min(gapSecs, ENGAGEMENT_PING_CAP_SECS);
+}
+
+/** CRM-side reads redact client IPs to the /24 (v4) or /48 (v6) prefix. */
+export function redactIpPrefix(ip: string | null | undefined): string | null {
+  if (!ip) return null;
+  if (ip.includes(".")) {
+    const parts = ip.split(".");
+    return parts.length === 4 ? `${parts[0]}.${parts[1]}.${parts[2]}.0/24` : null;
+  }
+  if (ip.includes(":")) return `${ip.split(":").slice(0, 3).join(":")}::/48`;
+  return null;
+}
 
 /** What the homeowner is allowed to see. Hidden items and all costs are dropped. */
 function publicEstimateView(
@@ -107,6 +145,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const base = getBaseUrl(req);
     const link = `${base}/e/${est.publicToken}`;
     const from = ctx.member.displayName || ctx.org.name;
+    // Sending starts the expiry clock (default 7 days). Computed once here so
+    // the email and the row agree.
+    const sentAt = new Date();
+    const expiresAt = estimateExpiryOnSend(sentAt);
 
     // The email says who it's from and carries the estimate link.
     const html = `
@@ -127,7 +169,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         <p style="font-size:13px;color:#666">
           Or paste this into your browser:<br><span style="word-break:break-all">${link}</span>
         </p>
-        ${est.expiresAt ? `<p style="font-size:13px;color:#666">This estimate expires on ${est.expiresAt.toDateString()}.</p>` : ""}
+        <p style="font-size:13px;color:#666">This estimate expires on ${expiresAt.toDateString()}.</p>
         <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
         <p style="font-size:13px;color:#666">
           ${esc(ctx.org.name)}${ctx.org.phone ? ` &middot; ${esc(ctx.org.phone)}` : ""}
@@ -154,7 +196,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // work is not lost. `emailed:false` tells the UI to offer the link instead.
     const [row] = await db.update(crmEstimates).set({
       status: est.status === "draft" ? "sent" : est.status,
-      sentAt: new Date(), sentToEmail: to, updatedAt: new Date(),
+      sentAt, expiresAt, sentToEmail: to, updatedAt: new Date(),
     }).where(eq(crmEstimates.id, est.id)).returning();
 
     await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, { to, emailed, emailError });
@@ -182,6 +224,19 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
     if (!org || !cust) return res.status(404).json({ message: "Not found" });
+
+    // Expired and never answered: 410 BEFORE any document content is loaded.
+    // The body carries only what the contact page needs — org name + public
+    // contact details — never line items or totals. Approved/declined
+    // estimates stay viewable (they're settled, and approval unlocks payment).
+    if (est.expiresAt && est.expiresAt.getTime() < Date.now() && !est.approvedAt && !est.declinedAt) {
+      return res.status(410).json({
+        message: "This estimate has expired.",
+        expired: true,
+        expiredAt: est.expiresAt,
+        company: { name: org.name, email: org.email, phone: org.phone },
+      });
+    }
 
     const items = await db.select().from(crmEstimateItems)
       .where(eq(crmEstimateItems.estimateId, est.id)).orderBy(asc(crmEstimateItems.sortOrder));
@@ -302,6 +357,126 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }
 
     res.json({ ok: true, status: row.status });
+  });
+
+  // ── Engagement tracking: how long the client actually spent ───────────────
+  // Token-authorised like the document pages themselves. A session opens on
+  // page load and heartbeats every 15s while the tab is visible; duration is
+  // accumulated here (never client-reported) with each gap capped, so an
+  // idle background tab cannot inflate "time spent".
+
+  app.post("/api/public/engagement/start", async (req: any, res) => {
+    const parsed = z.object({
+      docType: z.enum(["estimate", "invoice"]),
+      token: z.string().min(24).max(120),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid engagement start" });
+    const { docType, token: t } = parsed.data;
+
+    // Only track live documents — an unsent draft opened as an internal
+    // preview is the contractor, not client behaviour. Mirrors the conditions
+    // under which view tracking counts.
+    let orgId: string, docId: string;
+    if (docType === "estimate") {
+      const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
+      if (!est) return res.status(404).json({ message: "Not found" });
+      if (!est.sentAt || est.approvedAt || est.declinedAt) return res.json({ sessionId: null });
+      orgId = est.orgId; docId = est.id;
+    } else {
+      const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
+      if (!inv) return res.status(404).json({ message: "Not found" });
+      if (!inv.sentAt || inv.paidAt || inv.voidedAt) return res.json({ sessionId: null });
+      orgId = inv.orgId; docId = inv.id;
+    }
+
+    // Timestamps are written from JS, not DB defaults: node-pg and the DB's
+    // timezone setting disagree on `timestamp without tz` columns, and mixing
+    // the two write paths skews the first ping's gap by hours.
+    const now = new Date();
+    const [row] = await db.insert(crmEngagementSessions).values({
+      orgId, docType, docId,
+      startedAt: now, lastPingAt: now,
+      ip: clientIp(req) || null,
+      userAgent: String(req.headers["user-agent"] || "").slice(0, 300) || null,
+    } as any).returning();
+    res.json({ sessionId: row.id });
+  });
+
+  app.post("/api/public/engagement/ping", async (req: any, res) => {
+    const parsed = z.object({ sessionId: z.string().min(8).max(64) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid ping" });
+
+    const [sess] = await db.select().from(crmEngagementSessions)
+      .where(eq(crmEngagementSessions.id, parsed.data.sessionId)).limit(1);
+    if (!sess) return res.status(404).json({ message: "Not found" });
+
+    const now = new Date();
+    const inc = engagementIncrement(sess.lastPingAt, now);
+    const [row] = await db.update(crmEngagementSessions).set({
+      lastPingAt: now,
+      durationSecs: (sess.durationSecs ?? 0) + inc,
+    }).where(eq(crmEngagementSessions.id, sess.id)).returning();
+    res.json({ ok: true, durationSecs: row?.durationSecs ?? sess.durationSecs });
+  });
+
+  /** Contractor-side read: per-estimate engagement summary. Org-scoped; IPs
+   *  are redacted to their /24 before leaving the server. */
+  app.get("/api/crm/estimates/:id/engagement", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+
+    const [est] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+
+    const sessions = await db.select().from(crmEngagementSessions)
+      .where(and(
+        eq(crmEngagementSessions.orgId, ctx.org.id),
+        eq(crmEngagementSessions.docType, "estimate"),
+        eq(crmEngagementSessions.docId, est.id),
+      ))
+      .orderBy(desc(crmEngagementSessions.startedAt)).limit(100);
+
+    res.json({
+      visits: sessions.length,
+      totalSecs: sessions.reduce((s, x) => s + (x.durationSecs ?? 0), 0),
+      lastVisitAt: sessions[0]?.startedAt ?? null,
+      sessions: sessions.map((s) => ({
+        startedAt: s.startedAt,
+        durationSecs: s.durationSecs,
+        ip: redactIpPrefix(s.ip),
+        userAgent: s.userAgent,
+      })),
+    });
+  });
+
+  /** Push the expiry date out — e.g. the client asked for the weekend to
+   *  decide. Only while the estimate is still unanswered. */
+  app.post("/api/crm/estimates/:id/extend", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageEstimates")) return;
+
+    const parsed = z.object({
+      days: z.number().int().min(1).max(365).default(ESTIMATE_EXPIRY_DAYS),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid extend request", issues: parsed.error.issues });
+
+    const [est] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+    if (est.approvedAt) return res.status(409).json({ message: "This estimate has been approved — expiry no longer applies." });
+    if (est.declinedAt) return res.status(409).json({ message: "This estimate has been declined." });
+
+    const expiresAt = estimateExpiryOnSend(new Date(), parsed.data.days);
+    const [row] = await db.update(crmEstimates).set({ expiresAt, updatedAt: new Date() })
+      .where(eq(crmEstimates.id, est.id)).returning();
+    await logEvent(ctx.org.id, est.id, "extended", ctx.member.id, req, { days: parsed.data.days, expiresAt });
+    res.json({ estimate: presentEstimate(row, ctx) });
   });
 
   /** The client's own portal: everything of theirs, by their customer token. */

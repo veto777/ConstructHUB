@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
+import { CrmRibbon } from "@/components/crm-ribbon";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CartProvider } from "@/contexts/cart-context";
@@ -43,6 +44,8 @@ import SettingsPage from "@/pages/settings";
 import CrmTeamPage from "@/pages/crm-team";
 import CrmJoinPage from "@/pages/crm-join";
 import CrmHomePage from "@/pages/crm-home";
+import CrmSchedulePage from "@/pages/crm-schedule";
+import CrmInboxPage from "@/pages/crm-inbox";
 import CrmClientsPage from "@/pages/crm-clients";
 import CrmClientPage from "@/pages/crm-client";
 import CrmPaymentsPage from "@/pages/crm-payments";
@@ -168,6 +171,8 @@ function PortalRouter() {
       <Route path="/crm/home" component={CrmHomePage} />
       <Route path="/crm/clients" component={CrmClientsPage} />
       <Route path="/crm/clients/:id" component={CrmClientPage} />
+      <Route path="/crm/schedule" component={CrmSchedulePage} />
+      <Route path="/crm/inbox" component={CrmInboxPage} />
       <Route path="/crm/pipeline" component={CrmPipelinePage} />
       <Route path="/crm/pricebook" component={CrmPriceBookPage} />
       <Route path="/crm/projects/:id" component={CrmProjectPage} />
@@ -278,6 +283,8 @@ function AppContent() {
     if (location.startsWith("/portal/")) return <PublicPortalPage />;
     const section =
       location.startsWith("/crm/clients") ? "Clients" :
+      location.startsWith("/crm/schedule") ? "Schedule" :
+      location.startsWith("/crm/inbox") ? "Inbox" :
       location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
       location.startsWith("/crm/pricebook") ? "Price book" :
       location.startsWith("/crm/payments") ? "Payments" :
@@ -293,10 +300,12 @@ function AppContent() {
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <span className="text-sm text-muted-foreground" data-testid="text-crm-section">{section}</span>
             </header>
-            <main className="flex-1 overflow-auto">
+            {/* Bottom padding keeps content clear of the mobile ribbon; desktop is unchanged. */}
+            <main className="flex-1 overflow-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
               <PortalRouter />
             </main>
           </div>
+          <CrmRibbon />
         </div>
       </SidebarProvider>
     );

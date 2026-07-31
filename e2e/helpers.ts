@@ -93,7 +93,9 @@ export async function switchOrg(page: Page, orgId: string) {
 const SWEEP_SELECTOR =
   'main button:visible:enabled, main a:visible, header button:visible:enabled, header a:visible' +
   // The CRM's nav moved from the top bar into the shadcn sidebar — sweep it too.
-  ', [data-slot="sidebar"] a:visible, [data-slot="sidebar"] button:visible:enabled';
+  ', [data-slot="sidebar"] a:visible, [data-slot="sidebar"] button:visible:enabled' +
+  // …and on phones the nav is the bottom ribbon.
+  ', [data-testid="crm-ribbon"] a:visible, [data-testid="crm-ribbon"] button:visible:enabled';
 
 /**
  * Guarded every-button sweep: click each visible, enabled button and link on

@@ -58,7 +58,7 @@ export function CrmPageHeader({
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>}
     </div>
   );
 }
@@ -306,11 +306,24 @@ export const crmTable = {
   wrapper: "overflow-x-auto rounded-lg border bg-card",
   table: "w-full text-sm",
   thead: "bg-muted/50",
-  th: "px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap",
-  thRight: "px-4 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap",
-  td: "px-4 py-3 align-middle",
-  tdRight: "px-4 py-3 align-middle text-right tabular-nums",
+  // Cells loosen up at sm so dense tables still read on a phone without
+  // changing anything on desktop.
+  th: "px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap",
+  thRight: "px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap",
+  td: "px-3 py-2.5 sm:px-4 sm:py-3 align-middle",
+  tdRight: "px-3 py-2.5 sm:px-4 sm:py-3 align-middle text-right tabular-nums",
   tr: "border-t transition-colors hover:bg-muted/40",
+};
+
+/**
+ * Responsive table→cards pattern: below sm each row renders as a stacked card
+ * (header hidden, cells unboxed), at sm and up it's the same table as ever.
+ * Pair with `hidden sm:table-cell` on columns that can wait for a bigger screen.
+ */
+export const crmTableCards = {
+  thead: "hidden sm:table-header-group",
+  tr: "flex flex-col gap-1.5 px-3.5 py-3 sm:table-row",
+  td: "block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle",
 };
 
 /* ── Section heading inside a card stack ────────────────────────────────── */

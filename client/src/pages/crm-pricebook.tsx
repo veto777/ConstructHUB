@@ -130,7 +130,7 @@ export default function CrmPriceBookPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-muted/60 p-1">
+        <TabsList className="bg-muted/60 p-1 flex-wrap h-auto max-w-full justify-start sm:h-10 sm:flex-nowrap">
           <TabsTrigger value="items"><Package className="h-4 w-4 mr-1" /> Assemblies</TabsTrigger>
           <TabsTrigger value="materials"><Wrench className="h-4 w-4 mr-1" /> Materials</TabsTrigger>
           <TabsTrigger value="labor"><Percent className="h-4 w-4 mr-1" /> Labor</TabsTrigger>

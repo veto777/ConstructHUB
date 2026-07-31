@@ -12,7 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight } from "lucide-react";
-import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable } from "@/components/crm-ui";
+import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
 
 interface Client {
   id: string;
@@ -174,21 +174,21 @@ export default function CrmClientsPage() {
       ) : (
         <div className={crmTable.wrapper}>
           <table className={crmTable.table}>
-            <thead className={crmTable.thead}>
+            <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
               <tr>
                 <th className={crmTable.th}>Client</th>
                 <th className={crmTable.th}>Contact</th>
-                <th className={crmTable.th}>Address</th>
-                <th className={crmTable.th}>Added</th>
+                <th className={`${crmTable.th} hidden sm:table-cell`}>Address</th>
+                <th className={`${crmTable.th} hidden sm:table-cell`}>Added</th>
                 <th className="w-10" />
               </tr>
             </thead>
             <tbody>
               {clients.map((c) => (
-                <tr key={c.id} className={`${crmTable.tr} cursor-pointer`}
+                <tr key={c.id} className={`${crmTable.tr} ${crmTableCards.tr} cursor-pointer`}
                   onClick={() => navigate(`/crm/clients/${c.id}`)}
                   data-testid={`client-${c.id}`}>
-                  <td className={crmTable.td}>
+                  <td className={crmTableCards.td}>
                     <div className="flex items-center gap-3 min-w-0">
                       <InitialAvatar name={c.displayName} />
                       <div className="min-w-0">
@@ -201,7 +201,7 @@ export default function CrmClientsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className={crmTable.td}>
+                  <td className={crmTableCards.td}>
                     <div className="space-y-0.5 text-sm">
                       {c.email && (
                         <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -216,7 +216,7 @@ export default function CrmClientsPage() {
                       {!c.email && !c.phone && <span className="text-muted-foreground">—</span>}
                     </div>
                   </td>
-                  <td className={crmTable.td}>
+                  <td className={`${crmTable.td} hidden sm:table-cell`}>
                     {(c.addressLine1 || c.city) ? (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <MapPin className="h-3 w-3 shrink-0" />
@@ -224,10 +224,10 @@ export default function CrmClientsPage() {
                       </div>
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className={`${crmTable.td} text-sm text-muted-foreground whitespace-nowrap`}>
+                  <td className={`${crmTable.td} hidden sm:table-cell text-sm text-muted-foreground whitespace-nowrap`}>
                     {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
                   </td>
-                  <td className={`${crmTable.td} pr-3`}>
+                  <td className="hidden sm:table-cell sm:px-4 sm:py-3 sm:pr-3 align-middle">
                     <Link href={`/crm/clients/${c.id}`}>
                       <ChevronRight className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                     </Link>
