@@ -53,7 +53,8 @@ import CrmSettingsPage from "@/pages/crm-settings";
 import PublicEstimatePage from "@/pages/public-estimate";
 import PublicPortalPage from "@/pages/public-portal";
 import PublicInvoicePage from "@/pages/public-invoice";
-import { isPortal, CRM_NAME } from "@/lib/site";
+import ClientPortalPage from "@/pages/client-portal";
+import { isPortal, isClientPortal, CRM_NAME } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
 import VpnShieldPage from "@/pages/vpn-shield";
 import IndividualPricingPage from "@/pages/individual-pricing";
@@ -198,6 +199,24 @@ function PortalPublicRouter() {
   );
 }
 
+/**
+ * The homeowner client portal (client.constructhub.*) is its own product face:
+ * no marketing routes, no CRM chrome, no platform login. Token-authorised
+ * document pages render here too — they are the approve/pay surfaces the
+ * dashboard links out to.
+ */
+function ClientRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={ClientPortalPage} />
+      <Route path="/e/:token" component={PublicEstimatePage} />
+      <Route path="/i/:token" component={PublicInvoicePage} />
+      <Route path="/portal/:token" component={PublicPortalPage} />
+      <Route component={ClientPortalPage} />
+    </Switch>
+  );
+}
+
 function AppContent() {
   const { data: user, isLoading } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -205,11 +224,23 @@ function AppContent() {
   const [location] = useLocation();
 
   const portal = isPortal();
+  const clientPortal = isClientPortal();
 
   // The CRM is its own product — its own tab title, never the marketing one.
   useEffect(() => {
-    if (portal) document.title = CRM_NAME;
-  }, [portal]);
+    if (clientPortal) document.title = "Client Portal";
+    else if (portal) document.title = CRM_NAME;
+  }, [portal, clientPortal]);
+
+  // The client portal never touches the platform session: a homeowner has no
+  // ConstructHUB account. Handle it before the /api/auth/me gate entirely.
+  // Client-facing token pages stay full-bleed on this host too.
+  if (clientPortal) {
+    if (location.startsWith("/e/")) return <PublicEstimatePage />;
+    if (location.startsWith("/i/")) return <PublicInvoicePage />;
+    if (location.startsWith("/portal/")) return <PublicPortalPage />;
+    return <ClientRouter />;
+  }
 
 
   if (isLoading) {

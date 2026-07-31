@@ -19,15 +19,21 @@ test.describe("/crm/settings", () => {
     await page.getByTestId("button-save-defaults").click();
     await expect(page.getByText("Defaults saved", { exact: true })).toBeVisible();
 
-    // Notifications: turn one off, prove it survives a reload, turn it back on.
+    // Notifications: flip one, prove it survives a reload, restore the ORIGINAL
+    // state (the sweep clicks these switches too — never assume an initial value,
+    // or the next suite run starts dirty).
     const viewedSwitch = page.getByTestId("switch-notif-estimateViewed");
-    await expect(viewedSwitch).toHaveAttribute("aria-checked", "true");
+    const original = await viewedSwitch.getAttribute("aria-checked");
     await viewedSwitch.click();
     await expect(page.getByText("Notification preferences saved", { exact: true })).toBeVisible();
     await gotoCrm(page, "/crm/settings");
-    await expect(page.getByTestId("switch-notif-estimateViewed")).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByTestId("switch-notif-estimateViewed")).toHaveAttribute(
+      "aria-checked",
+      original === "true" ? "false" : "true",
+    );
     await page.getByTestId("switch-notif-estimateViewed").click();
     await expect(page.getByText("Notification preferences saved", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("switch-notif-estimateViewed")).toHaveAttribute("aria-checked", original!);
 
     // API keys: create (key shown once), then revoke.
     const keyName = `E2E key ${Date.now().toString(36)}`;

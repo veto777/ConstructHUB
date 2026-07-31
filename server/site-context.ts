@@ -34,11 +34,17 @@ export const PORTAL_PREFIX = (process.env.PORTAL_PREFIX || "portal").toLowerCase
 
 export const PORTAL_HOSTS: string[] = SITE_DOMAINS.map((d) => `${PORTAL_PREFIX}.${d}`);
 
+/** Subdomain that serves the homeowner client portal (magic-link sign-in). */
+export const CLIENT_PREFIX = (process.env.CLIENT_PREFIX || "client").toLowerCase();
+
+export const CLIENT_HOSTS: string[] = SITE_DOMAINS.map((d) => `${CLIENT_PREFIX}.${d}`);
+
 /** Every hostname we will echo back in an absolute URL. */
 const ALLOWED_HOSTS = new Set<string>([
   ...SITE_DOMAINS,
   ...SITE_DOMAINS.map((d) => `www.${d}`),
   ...PORTAL_HOSTS,
+  ...CLIENT_HOSTS,
 ]);
 
 export function normalizeHost(raw: unknown): string {
@@ -52,6 +58,21 @@ export function requestHost(req: any): string {
 
 export function isPortalHost(host: string): boolean {
   return PORTAL_HOSTS.includes(normalizeHost(host));
+}
+
+export function isClientHost(host: string): boolean {
+  return CLIENT_HOSTS.includes(normalizeHost(host));
+}
+
+/**
+ * Origin the magic-link email points at. Always the client host of the
+ * caller's own domain in production; the request origin in dev.
+ */
+export function clientPortalBaseUrl(req: any): string {
+  if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT) {
+    return siteBaseUrl(req);
+  }
+  return `https://${CLIENT_PREFIX}.${siteDomainOf(requestHost(req))}`;
 }
 
 export function isKnownHost(host: string): boolean {

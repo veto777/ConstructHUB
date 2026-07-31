@@ -27,6 +27,7 @@ import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
 import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
+import { registerCrmClientAuthRoutes } from "./client-auth";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 
@@ -131,6 +132,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmIntegrationRoutes(app);
   registerCrmPriceBookRoutes(app, getDevUser);
   registerCrmMeasurementRoutes(app, getDevUser);
+  // The homeowner client portal takes no contractor session at all.
+  registerCrmClientAuthRoutes(app);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 

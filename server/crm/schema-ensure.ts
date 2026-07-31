@@ -454,6 +454,31 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
   `);
 
+  // ── Homeowner client portal: magic-link tokens + sessions ────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_client_tokens (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      token_hash text NOT NULL,
+      customer_ids jsonb NOT NULL,
+      email text NOT NULL,
+      expires_at timestamp NOT NULL,
+      used_at timestamp,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_client_sessions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      token_hash text NOT NULL,
+      customer_ids jsonb NOT NULL,
+      expires_at timestamp NOT NULL,
+      created_at timestamp DEFAULT now(),
+      last_seen_at timestamp
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_client_tokens_hash_uniq ON crm_client_tokens (token_hash);
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_client_sessions_hash_uniq ON crm_client_sessions (token_hash);
+  `);
+
   // Constraints are added separately: they are not IF NOT EXISTS in older
   // Postgres, so each is guarded and allowed to fail benignly if present.
   const guarded = [

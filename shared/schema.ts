@@ -1083,6 +1083,35 @@ export const insertCrmInvitationSchema = createInsertSchema(crmInvitations).omit
 export type CrmInvitation = typeof crmInvitations.$inferSelect;
 export type InsertCrmInvitation = z.infer<typeof insertCrmInvitationSchema>;
 
+// ── Homeowner client portal (client.constructhub.*) ─────────────────────────
+// Magic-link sign-in for the contractor's end customers. Raw tokens never hit
+// the database — only their SHA-256. A token is single-use and trades for a
+// 30-day sliding session. customerIds snapshots EVERY crm_customers row
+// (across orgs) matching the email, so one sign-in shows all of a homeowner's
+// contractors.
+
+export const crmClientTokens = pgTable("crm_client_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenHash: text("token_hash").notNull().unique(),
+  customerIds: jsonb("customer_ids").$type<string[]>().notNull(),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmClientSessions = pgTable("crm_client_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenHash: text("token_hash").notNull().unique(),
+  customerIds: jsonb("customer_ids").$type<string[]>().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastSeenAt: timestamp("last_seen_at"),
+});
+
+export type CrmClientToken = typeof crmClientTokens.$inferSelect;
+export type CrmClientSession = typeof crmClientSessions.$inferSelect;
+
 // ── Roles & permissions ─────────────────────────────────────────────────────
 // Housecall Pro ships three fixed roles and no custom fields; we ship five
 // construction-shaped roles PLUS per-seat overrides, because a lead carpenter

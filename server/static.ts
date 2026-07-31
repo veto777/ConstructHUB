@@ -5,6 +5,7 @@ import {
   PRIMARY_DOMAIN,
   SITE_DOMAINS,
   isPortalHost,
+  isClientHost,
   requestHost,
 } from "./site-context";
 
@@ -65,7 +66,7 @@ export function serveStatic(app: Express) {
   // keeps a single hostname rather than two.
   app.use((req, res, next) => {
     const host = requestHost(req);
-    if (isPortalHost(host)) return next();
+    if (isPortalHost(host) || isClientHost(host)) return next();
 
     const wwwOf = SITE_DOMAINS.find((d) => host === `www.${d}`);
     if (wwwOf) {
@@ -75,8 +76,8 @@ export function serveStatic(app: Express) {
   });
 
   app.get("/robots.txt", (req, res) => {
-    // The CRM must never be crawled.
-    if (isPortalHost(requestHost(req))) {
+    // The CRM and the client portal must never be crawled.
+    if (isPortalHost(requestHost(req)) || isClientHost(requestHost(req))) {
       return res.type("text/plain").send(`User-agent: *\nDisallow: /\n`);
     }
     res
@@ -85,7 +86,7 @@ export function serveStatic(app: Express) {
   });
 
   app.get("/sitemap.xml", (req, res) => {
-    if (isPortalHost(requestHost(req))) return res.status(404).type("text/plain").send("Not found");
+    if (isPortalHost(requestHost(req)) || isClientHost(requestHost(req))) return res.status(404).type("text/plain").send("Not found");
     res.type("application/xml").send(sitemapXml);
   });
 
@@ -97,7 +98,7 @@ export function serveStatic(app: Express) {
   app.use("/{*path}", (req, res) => {
     // originalUrl, not req.path — inside app.use() req.path is stripped to the
     // mount remainder and always reads "/".
-    if (isPortalHost(requestHost(req))) {
+    if (isPortalHost(requestHost(req)) || isClientHost(requestHost(req))) {
       const html = indexHtml.replace(
         /<\/title>/i,
         `</title>\n    <meta name="robots" content="noindex, nofollow" />`,

@@ -31,6 +31,27 @@ export function isPortal(): boolean {
   return CRM_HOST_PREFIXES.some((p) => host.startsWith(p)) || forcedPortal();
 }
 
+/**
+ * The homeowner client portal (client.constructhub.*) — magic-link sign-in,
+ * estimates/invoices/contracts in one place. A separate product face from both
+ * marketing and the CRM. Kept in lockstep with server/site-context.ts
+ * (CLIENT_PREFIX env).
+ *
+ * Local dev: ?client=1 or VITE_FORCE_CLIENT=true renders it on localhost
+ * (takes precedence over the portal force flags).
+ */
+export function isClientPortal(): boolean {
+  if (typeof window === "undefined") return false;
+  if (import.meta.env?.VITE_FORCE_CLIENT === "true") return true;
+  const host = window.location.hostname.toLowerCase();
+  if (host.startsWith("client.")) return true;
+  try {
+    return new URLSearchParams(window.location.search).get("client") === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** The CRM origin for the domain currently being browsed. */
 export function portalUrl(path = "/"): string {
   if (typeof window === "undefined") return path;

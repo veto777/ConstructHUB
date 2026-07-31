@@ -21,6 +21,7 @@ const EXPECTED_4XX: RegExp[] = [
   /\/api\/crm\/invitations\/lookup\//, // join page with a bogus/expired token
   /\/api\/crm\/invitations\/accept/, // accept while signed in as a different email → 403 by design
   /\/api\/public\/(estimates|invoices|portal)\/not-a-real-token/, // deliberate bogus-token probes
+  /\/api\/client\/documents/, // 401 IS the signed-out state on the client portal
 ];
 
 /** Designed 503s: online payment without a Stripe account is a friendly
@@ -136,8 +137,9 @@ export async function sweepPage(
       info = { testid, text, href };
       // Logout is verified curated in 14-crm-settings — clicking it mid-sweep
       // destroys the shared dev session (and the org pin with it), breaking
-      // every later iteration.
-      if (testid === "button-logout") { target = -1; continue; }
+      // every later iteration. The client portal's own sign-out (curated in
+      // 15-client-portal) gets the same treatment.
+      if (testid === "button-logout" || testid === "button-client-logout") { target = -1; continue; }
       if (opts.skip?.(info)) { target = -1; continue; }
       target = i;
       break;
