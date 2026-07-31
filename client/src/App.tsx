@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { CrmSidebar } from "@/components/crm-sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CartProvider } from "@/contexts/cart-context";
@@ -234,52 +235,29 @@ function AppContent() {
     );
   }
 
-  // The portal has its own minimal shell: no marketing landing pages, no cart,
-  // no ads chat — just the CRM.
+  // The portal has its own app frame: a branded sidebar, a slim top bar with
+  // just the collapse trigger and the current section — no marketing chrome.
   if (portal) {
+    // Client-facing documents render full-bleed even on the portal host — the
+    // homeowner gets a clean page, not the contractor's app frame.
+    if (location.startsWith("/e/")) return <PublicEstimatePage />;
+    if (location.startsWith("/i/")) return <PublicInvoicePage />;
+    if (location.startsWith("/portal/")) return <PublicPortalPage />;
+    const section =
+      location.startsWith("/crm/clients") ? "Clients" :
+      location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
+      location.startsWith("/crm/pricebook") ? "Price book" :
+      location.startsWith("/crm/payments") ? "Payments" :
+      location.startsWith("/crm/team") ? "Team & Company" :
+      location.startsWith("/crm/join") ? "Join the team" : "Home";
     return (
       <SidebarProvider style={sidebarStyle as React.CSSProperties}>
         <div className="flex h-screen w-full">
+          <CrmSidebar />
           <div className="flex flex-col flex-1 min-w-0">
-            <header className="flex items-center justify-between gap-3 px-4 h-12 border-b border-border/40 bg-background sticky top-0 z-50">
-              <div className="flex items-center gap-4 min-w-0">
-                <Link href="/" data-testid="link-portal-home">
-                  <span className="font-semibold whitespace-nowrap cursor-pointer" data-testid="text-crm-brand">ConstructHub <span className="font-extrabold text-primary">CRM</span></span>
-                </Link>
-                <nav className="flex items-center gap-1 text-sm">
-                  <Link href="/" data-testid="link-portal-nav-home">
-                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location === "/" ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-                      Home
-                    </span>
-                  </Link>
-                  <Link href="/crm/clients" data-testid="link-portal-nav-clients">
-                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/clients") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-                      Clients
-                    </span>
-                  </Link>
-                  <Link href="/crm/pipeline" data-testid="link-portal-nav-pipeline">
-                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-                      Pipeline
-                    </span>
-                  </Link>
-                  <Link href="/crm/pricebook" data-testid="link-portal-nav-pricebook">
-                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/pricebook") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-                      Price book
-                    </span>
-                  </Link>
-                  <Link href="/crm/payments" data-testid="link-portal-nav-payments">
-                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/payments") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-                      Payments
-                    </span>
-                  </Link>
-                  <Link href="/crm/team" data-testid="link-portal-nav-team">
-                    <span className={`px-2 py-1 rounded-md cursor-pointer hover:bg-accent ${location.startsWith("/crm/team") ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-                      Team &amp; Company
-                    </span>
-                  </Link>
-                </nav>
-              </div>
-              <ThemeToggle />
+            <header className="flex items-center gap-3 px-4 h-12 border-b border-border/40 bg-background/80 backdrop-blur sticky top-0 z-50">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <span className="text-sm text-muted-foreground" data-testid="text-crm-section">{section}</span>
             </header>
             <main className="flex-1 overflow-auto">
               <PortalRouter />

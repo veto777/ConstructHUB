@@ -46,6 +46,8 @@ test.describe("/portal/:token (client portal)", () => {
       ready: 'a:has-text("E2E throwaway estimate")',
     });
     console.log(`public portal sweep clicked ${clicked}: ${labels.join(" | ")}`);
-    expect(clicked).toBeGreaterThanOrEqual(10);
+    // Full-bleed client page: no app chrome — the estimate-to-review link,
+    // its Review button, and the estimates-list link are the controls.
+    expect(clicked).toBeGreaterThanOrEqual(3);
   });
 });

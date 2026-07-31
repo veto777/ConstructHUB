@@ -59,6 +59,7 @@ test.describe("/i/:token (public invoice)", () => {
       ready: '[data-testid="button-pay-invoice"]',
     });
     console.log(`public invoice sweep clicked ${clicked}: ${labels.join(" | ")}`);
-    expect(clicked).toBeGreaterThanOrEqual(9);
+    // Full-bleed client page: no app chrome — the Pay button is the one control.
+    expect(clicked).toBeGreaterThanOrEqual(1);
   });
 });

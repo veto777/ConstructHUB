@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useLocation, Link } from "wouter";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ArrowRight, AlertTriangle } from "lucide-react";
+import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight } from "lucide-react";
+import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable } from "@/components/crm-ui";
 
 interface Client {
   id: string;
@@ -35,6 +35,7 @@ const EMPTY = {
 
 export default function CrmClientsPage() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
@@ -72,17 +73,12 @@ export default function CrmClientsPage() {
   });
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Users className="h-7 w-7" /> Clients
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Every client gets their own portal the moment you create them.
-          </p>
-        </div>
-        {canManage && (
+    <CrmPage>
+      <CrmPageHeader
+        icon={Users}
+        title="Clients"
+        subtitle="Every client gets their own portal the moment you create them."
+        actions={canManage ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-new-client"><Plus className="h-4 w-4 mr-2" /> New client</Button>
@@ -147,64 +143,101 @@ export default function CrmClientsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
-      </div>
+        ) : undefined}
+      />
 
-      <div className="relative">
+      <div className="relative max-w-md">
         <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Search name, email, phone or address"
+        <Input className="pl-9 bg-card" placeholder="Search name, email, phone or address"
           value={q} onChange={(e) => setQ(e.target.value)} data-testid="input-search-clients" />
       </div>
 
       {isLoading ? (
         <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : isError ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" /> Couldn't load clients
-            </CardTitle>
-            <CardDescription>Check your connection and refresh the page.</CardDescription>
-          </CardHeader>
-        </Card>
+        <ErrorCard title="Couldn't load clients" description="Check your connection and refresh the page." />
       ) : !clients?.length ? (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">No clients yet</CardTitle>
-            <CardDescription>
-              {canManage ? "Create your first client to get started." : "Nobody has added a client yet."}
-            </CardDescription>
-          </CardHeader>
+          <EmptyState
+            icon={Users}
+            title="No clients yet"
+            description={canManage
+              ? "Create your first client — their portal is generated automatically."
+              : "Nobody has added a client yet."}
+            action={canManage ? (
+              <Button onClick={() => setOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" /> New client
+              </Button>
+            ) : undefined}
+          />
         </Card>
       ) : (
-        <div className="space-y-2">
-          {clients.map((c) => (
-            <Link key={c.id} href={`/crm/clients/${c.id}`}>
-              <Card className="hover:bg-accent transition-colors cursor-pointer" data-testid={`client-${c.id}`}>
-                <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate flex items-center gap-2">
-                      {c.displayName}
-                      {c.companyName && <Badge variant="outline">{c.companyName}</Badge>}
+        <div className={crmTable.wrapper}>
+          <table className={crmTable.table}>
+            <thead className={crmTable.thead}>
+              <tr>
+                <th className={crmTable.th}>Client</th>
+                <th className={crmTable.th}>Contact</th>
+                <th className={crmTable.th}>Address</th>
+                <th className={crmTable.th}>Added</th>
+                <th className="w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((c) => (
+                <tr key={c.id} className={`${crmTable.tr} cursor-pointer`}
+                  onClick={() => navigate(`/crm/clients/${c.id}`)}
+                  data-testid={`client-${c.id}`}>
+                  <td className={crmTable.td}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <InitialAvatar name={c.displayName} />
+                      <div className="min-w-0">
+                        <Link href={`/crm/clients/${c.id}`}>
+                          <span className="font-medium truncate text-primary hover:underline cursor-pointer block">{c.displayName}</span>
+                        </Link>
+                        {c.companyName && (
+                          <div className="text-xs text-muted-foreground truncate">{c.companyName}</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                      {c.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{c.email}</span>}
-                      {c.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</span>}
-                      {(c.addressLine1 || c.city) && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}
-                        </span>
+                  </td>
+                  <td className={crmTable.td}>
+                    <div className="space-y-0.5 text-sm">
+                      {c.email && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Mail className="h-3 w-3 shrink-0" /><span className="truncate">{c.email}</span>
+                        </div>
                       )}
+                      {c.phone && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Phone className="h-3 w-3 shrink-0" />{c.phone}
+                        </div>
+                      )}
+                      {!c.email && !c.phone && <span className="text-muted-foreground">—</span>}
                     </div>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </td>
+                  <td className={crmTable.td}>
+                    {(c.addressLine1 || c.city) ? (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}</span>
+                      </div>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className={`${crmTable.td} text-sm text-muted-foreground whitespace-nowrap`}>
+                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
+                  </td>
+                  <td className={`${crmTable.td} pr-3`}>
+                    <Link href={`/crm/clients/${c.id}`}>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </div>
+    </CrmPage>
   );
 }

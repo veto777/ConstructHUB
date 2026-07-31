@@ -1,13 +1,15 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   CreditCard, Landmark, Loader2, CheckCircle2, AlertTriangle, RefreshCw, Unplug, ShieldCheck,
 } from "lucide-react";
+import {
+  CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle, statusTone,
+} from "@/components/crm-ui";
 
 export default function CrmPaymentsPage() {
   const { toast } = useToast();
@@ -42,16 +44,10 @@ export default function CrmPaymentsPage() {
 
   if (isError || !data) {
     return (
-      <div className="p-6 max-w-lg mx-auto mt-10">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" /> Couldn't load payment settings
-            </CardTitle>
-            <CardDescription>Check your connection and refresh the page.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <ErrorCard
+        title="Couldn't load payment settings"
+        description="Check your connection and refresh the page."
+      />
     );
   }
 
@@ -59,83 +55,88 @@ export default function CrmPaymentsPage() {
   const params = new URLSearchParams(window.location.search);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Landmark className="h-7 w-7" /> Payments
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Connect your own Stripe account. Money goes straight to you — we never hold it.
-        </p>
-      </div>
+    <CrmPage className="max-w-3xl">
+      <CrmPageHeader
+        icon={Landmark}
+        title="Payments"
+        subtitle="Connect your own Stripe account. Money goes straight to you — we never hold it."
+      />
 
       {params.get("connected") === "1" && (
-        <Card className="border-green-600">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" /> Stripe connected
-            </CardTitle>
-            {params.get("ach") === "off" && (
-              <CardDescription>
-                ACH isn't active on your Stripe account yet. Enable ACH Direct Debit in Stripe,
-                then hit Refresh below — it's the difference between $5 and $725 on a $25,000 deposit.
-              </CardDescription>
-            )}
-          </CardHeader>
+        <Card className="border-emerald-500/50 bg-emerald-500/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-medium">Stripe connected</div>
+              {params.get("ach") === "off" && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  ACH isn't active on your Stripe account yet. Enable ACH Direct Debit in Stripe,
+                  then hit Refresh below — it's the difference between $5 and $725 on a $25,000 deposit.
+                </p>
+              )}
+            </div>
+          </CardContent>
         </Card>
       )}
       {params.get("error") && (
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" /> Connection failed
-            </CardTitle>
-            <CardDescription>{params.get("error")}</CardDescription>
-          </CardHeader>
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <div className="font-medium">Connection failed</div>
+              <p className="text-sm text-muted-foreground mt-1">{params.get("error")}</p>
+            </div>
+          </CardContent>
         </Card>
       )}
 
       {!data.configured && (
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" /> Not configured on this server
-            </CardTitle>
-            <CardDescription>
-              Missing environment {data.missing.length === 1 ? "variable" : "variables"}:{" "}
-              <code>{data.missing.join(", ")}</code>. Add {data.missing.length === 1 ? "it" : "them"} to
-              the server <code>.env</code> and restart. <code>STRIPE_CONNECT_CLIENT_ID</code> comes from
-              Stripe → Settings → Connect → Onboarding options.
-            </CardDescription>
-          </CardHeader>
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <div className="font-medium">Not configured on this server</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Missing environment {data.missing.length === 1 ? "variable" : "variables"}:{" "}
+                <code>{data.missing.join(", ")}</code>. Add {data.missing.length === 1 ? "it" : "them"} to
+                the server <code>.env</code> and restart. <code>STRIPE_CONNECT_CLIENT_ID</code> comes from
+                Stripe → Settings → Connect → Onboarding options.
+              </p>
+            </div>
+          </CardContent>
         </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Your payment account</CardTitle>
-          <CardDescription>
-            {acct ? "Connected via Stripe Connect (Standard)." : "No account connected yet."}
-          </CardDescription>
+          <SectionTitle
+            title="Your payment account"
+            description={acct ? "Connected via Stripe Connect (Standard)." : "No account connected yet."}
+          />
         </CardHeader>
         <CardContent className="space-y-4">
           {acct ? (
             <>
-              <div className="text-sm space-y-1">
-                <div className="font-medium">{acct.businessName || acct.accountEmail || acct.externalAccountId}</div>
-                <div className="text-muted-foreground text-xs font-mono">{acct.externalAccountId}</div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Landmark className="h-5 w-5" strokeWidth={1.8} />
+                </div>
+                <div>
+                  <div className="font-medium">{acct.businessName || acct.accountEmail || acct.externalAccountId}</div>
+                  <div className="text-muted-foreground text-xs font-mono">{acct.externalAccountId}</div>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge variant={acct.chargesEnabled ? "default" : "destructive"}>
+                <StatusPill tone={acct.chargesEnabled ? "success" : "danger"}>
                   {acct.chargesEnabled ? "Charges enabled" : "Charges disabled"}
-                </Badge>
-                <Badge variant={acct.achEnabled ? "default" : "secondary"}>
-                  <Landmark className="h-3 w-3 mr-1" /> ACH {acct.achEnabled ? "on" : "off"}
-                </Badge>
-                <Badge variant={acct.cardEnabled ? "default" : "secondary"}>
-                  <CreditCard className="h-3 w-3 mr-1" /> Card {acct.cardEnabled ? "on" : "off"}
-                </Badge>
-                {!acct.livemode && <Badge variant="outline">test mode</Badge>}
+                </StatusPill>
+                <StatusPill tone={acct.achEnabled ? "success" : "neutral"}>
+                  ACH {acct.achEnabled ? "on" : "off"}
+                </StatusPill>
+                <StatusPill tone={acct.cardEnabled ? "success" : "neutral"}>
+                  Card {acct.cardEnabled ? "on" : "off"}
+                </StatusPill>
+                {!acct.livemode && <StatusPill tone="warning">test mode</StatusPill>}
               </div>
               {!acct.achEnabled && (
                 <p className="text-sm text-muted-foreground">
@@ -159,11 +160,16 @@ export default function CrmPaymentsPage() {
               )}
             </>
           ) : canManage ? (
-            <Button onClick={() => connect.mutate()} disabled={connect.isPending || !data.configured}
-              data-testid="button-connect-stripe">
-              {connect.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Connect Stripe
-            </Button>
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-sm text-muted-foreground">
+                Take card and ACH payments on your estimates and invoices.
+              </p>
+              <Button onClick={() => connect.mutate()} disabled={connect.isPending || !data.configured}
+                data-testid="button-connect-stripe">
+                {connect.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Connect Stripe
+              </Button>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">Ask an admin to connect a payment account.</p>
           )}
@@ -172,8 +178,10 @@ export default function CrmPaymentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Recent payments</CardTitle>
-          <CardDescription>Online (Stripe) and manually recorded (check, cash, bank transfer).</CardDescription>
+          <SectionTitle
+            title="Recent payments"
+            description="Online (Stripe) and manually recorded (check, cash, bank transfer)."
+          />
         </CardHeader>
         <CardContent className="space-y-2">
           {!canSeePrices ? (
@@ -182,16 +190,19 @@ export default function CrmPaymentsPage() {
             <p className="text-sm text-destructive flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" /> Couldn't load payments — refresh to try again.
             </p>
-          ) : !payments?.length && (
-            <p className="text-sm text-muted-foreground">
-              Nothing yet. Payments appear here when a client pays online or you record one from a client's page.
-            </p>
-          )}
+          ) : !payments?.length ? (
+            <EmptyState
+              compact
+              icon={CreditCard}
+              title="No payments yet"
+              description="Nothing yet. Payments appear here when a client pays online or you record one from a client's page."
+            />
+          ) : null}
           {payments?.slice(0, 50).map((p: any) => (
-            <div key={p.id} className="border rounded-md p-3 flex flex-wrap items-center justify-between gap-2"
+            <div key={p.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2"
               data-testid={`payment-${p.id}`}>
               <div>
-                <div className="font-medium">
+                <div className="font-medium tabular-nums">
                   ${((p.amountCents ?? 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   <span className="text-muted-foreground font-normal text-sm">
                     {" "}· {p.method ?? p.provider} · {p.purpose}
@@ -202,9 +213,7 @@ export default function CrmPaymentsPage() {
                   {p.note ? ` · ${p.note}` : ""}
                 </div>
               </div>
-              <Badge variant={p.status === "succeeded" ? "default" : p.status === "pending" ? "outline" : "destructive"}>
-                {p.status}
-              </Badge>
+              <StatusPill tone={statusTone(p.status)}>{p.status}</StatusPill>
             </div>
           ))}
         </CardContent>
@@ -212,9 +221,7 @@ export default function CrmPaymentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5" /> What we promise, in writing
-          </CardTitle>
+          <SectionTitle icon={ShieldCheck} title="What we promise, in writing" />
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {Object.entries(data.disclosure as Record<string, string>).map(([k, v]) => (
@@ -229,6 +236,6 @@ export default function CrmPaymentsPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </CrmPage>
   );
 }

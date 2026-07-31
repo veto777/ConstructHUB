@@ -55,6 +55,9 @@ test.describe("/e/:token (public estimate)", () => {
       ready: '[data-testid="input-signature"]',
     });
     console.log(`public estimate sweep clicked ${clicked}: ${labels.join(" | ")}`);
-    expect(clicked).toBeGreaterThanOrEqual(2);
+    // Full-bleed client page: no app chrome, so only the page's own controls
+    // (Decline toggle) are swept. The estimate's approve button is disabled
+    // until a signature is typed, which the sweep doesn't do.
+    expect(clicked).toBeGreaterThanOrEqual(1);
   });
 });

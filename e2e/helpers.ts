@@ -90,7 +90,9 @@ export async function switchOrg(page: Page, orgId: string) {
 }
 
 const SWEEP_SELECTOR =
-  'main button:visible:enabled, main a:visible, header button:visible:enabled, header a:visible';
+  'main button:visible:enabled, main a:visible, header button:visible:enabled, header a:visible' +
+  // The CRM's nav moved from the top bar into the shadcn sidebar — sweep it too.
+  ', [data-slot="sidebar"] a:visible, [data-slot="sidebar"] button:visible:enabled';
 
 /**
  * Guarded every-button sweep: click each visible, enabled button and link on

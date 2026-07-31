@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +18,9 @@ import {
   Users, Building2, UserCircle, ShieldCheck, Mail, Loader2, Trash2,
   Copy, AlertTriangle, Plus, Check, ArrowRight,
 } from "lucide-react";
+import {
+  CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, roleTone,
+} from "@/components/crm-ui";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type PermissionMap = Record<string, boolean>;
@@ -268,16 +270,10 @@ export default function CrmTeamPage() {
 
   if (isError || !me) {
     return (
-      <div className="p-6 max-w-lg mx-auto mt-10">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" /> Couldn't load your workspace
-            </CardTitle>
-            <CardDescription>Check your connection and refresh the page.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <ErrorCard
+        title="Couldn't load your workspace"
+        description="Check your connection and refresh the page."
+      />
     );
   }
 
@@ -285,18 +281,15 @@ export default function CrmTeamPage() {
   const members = teamData?.members ?? [];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Users className="h-7 w-7" /> Team &amp; Company
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Your profile, your company details, and who can do what.
-        </p>
-      </div>
+    <CrmPage>
+      <CrmPageHeader
+        icon={Users}
+        title="Team & Company"
+        subtitle="Your profile, your company details, and who can do what."
+      />
 
       {onboarding?.nextStep && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 p-3"
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3"
              data-testid="banner-next-step">
           <div className="text-sm">
             <span className="font-medium">Next: </span>
@@ -345,10 +338,10 @@ export default function CrmTeamPage() {
         <TabsContent value="profile" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>My profile</CardTitle>
-              <CardDescription>
-                How you appear to your crew and on the schedule. Signed in as {me.user.email}.
-              </CardDescription>
+              <SectionTitle
+                title="My profile"
+                description={`How you appear to your crew and on the schedule. Signed in as ${me.user.email}.`}
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -370,7 +363,7 @@ export default function CrmTeamPage() {
                 <div>
                   <Label>Role</Label>
                   <div className="mt-2">
-                    <Badge variant="secondary" data-testid="badge-my-role">{me.member.role}</Badge>
+                    <StatusPill tone={roleTone(me.member.role)} data-testid="badge-my-role">{me.member.role}</StatusPill>
                   </div>
                 </div>
               </div>
@@ -385,14 +378,14 @@ export default function CrmTeamPage() {
         <TabsContent value="company" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Company profile</CardTitle>
-              <CardDescription>
-                These details appear on your estimates, invoices and contracts.
-              </CardDescription>
+              <SectionTitle
+                title="Company profile"
+                description="These details appear on your estimates, invoices and contracts."
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               {!me.permissions.manageSettings && (
-                <div className="flex items-start gap-2 text-sm text-muted-foreground border rounded-md p-3">
+                <div className="flex items-start gap-2 text-sm text-muted-foreground rounded-lg border bg-muted/30 p-3">
                   <AlertTriangle className="h-4 w-4 mt-0.5" />
                   You can view these details but not change them.
                 </div>
@@ -474,26 +467,26 @@ export default function CrmTeamPage() {
         {/* ── Team ───────────────────────────────────────────────────────── */}
         <TabsContent value="team" className="mt-4 space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Seats</span>
-                <Badge variant={seats.canAddSeat ? "secondary" : "destructive"} data-testid="badge-seats">
-                  {seats.used} of {seats.limit < 0 ? "unlimited" : seats.limit} used
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Your {seats.planName} plan includes{" "}
-                {seats.limit < 0 ? "unlimited seats" : `${seats.limit} seat${seats.limit === 1 ? "" : "s"}`}.
-                Deactivated members don't use a seat.
-              </CardDescription>
-            </CardHeader>
+            <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
+              <SectionTitle
+                title="Seats"
+                description={`Your ${seats.planName} plan includes ${
+                  seats.limit < 0 ? "unlimited seats" : `${seats.limit} seat${seats.limit === 1 ? "" : "s"}`
+                }. Deactivated members don't use a seat.`}
+              />
+              <StatusPill tone={seats.canAddSeat ? "success" : "danger"} data-testid="badge-seats">
+                {seats.used} of {seats.limit < 0 ? "unlimited" : seats.limit} used
+              </StatusPill>
+            </CardContent>
           </Card>
 
           {canManageTeam && (
             <Card>
               <CardHeader>
-                <CardTitle>Invite someone</CardTitle>
-                <CardDescription>They'll get an email with a link that expires in 14 days.</CardDescription>
+                <SectionTitle
+                  title="Invite someone"
+                  description="They'll get an email with a link that expires in 14 days."
+                />
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -538,15 +531,15 @@ export default function CrmTeamPage() {
 
           {canManageTeam && invites && invites.length > 0 && (
             <Card>
-              <CardHeader><CardTitle>Pending invitations</CardTitle></CardHeader>
+              <CardHeader><SectionTitle title="Pending invitations" /></CardHeader>
               <CardContent className="space-y-2">
                 {invites.map((inv) => (
-                  <div key={inv.id} className="flex items-center justify-between border rounded-md p-3"
+                  <div key={inv.id} className="flex items-center justify-between rounded-lg border px-4 py-3"
                     data-testid={`invite-${inv.id}`}>
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="truncate">{inv.email}</span>
-                      <Badge variant="outline">{inv.role}</Badge>
+                      <span className="truncate text-sm">{inv.email}</span>
+                      <StatusPill tone={roleTone(inv.role)}>{inv.role}</StatusPill>
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => revoke.mutate(inv.id)}
                       data-testid={`button-revoke-${inv.id}`}>
@@ -560,23 +553,26 @@ export default function CrmTeamPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Team members</CardTitle>
-              <CardDescription>
-                Roles set the defaults. Toggle any individual permission to override them for one person.
-              </CardDescription>
+              <SectionTitle
+                title="Team members"
+                description="Roles set the defaults. Toggle any individual permission to override them for one person."
+              />
             </CardHeader>
             <CardContent className="space-y-3">
               {members.map((m) => {
                 const isOwner = m.role === "owner";
                 return (
-                  <div key={m.id} className="border rounded-md p-4 space-y-3" data-testid={`member-${m.id}`}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{m.displayName || m.email}</div>
-                        <div className="text-sm text-muted-foreground truncate">{m.email}</div>
+                  <div key={m.id} className="rounded-lg border p-4 space-y-3" data-testid={`member-${m.id}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <InitialAvatar name={m.displayName || m.email} />
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{m.displayName || m.email}</div>
+                          <div className="text-sm text-muted-foreground truncate">{m.email}</div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {m.status !== "active" && <Badge variant="outline">{m.status}</Badge>}
+                        {m.status !== "active" && <StatusPill tone="neutral">{m.status}</StatusPill>}
                         {canManageTeam && !isOwner ? (
                           <Select value={m.role}
                             onValueChange={(role) => updateMember.mutate({ id: m.id, patch: { role } })}>
@@ -590,7 +586,7 @@ export default function CrmTeamPage() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Badge variant="secondary">{m.role}</Badge>
+                          <StatusPill tone={roleTone(m.role)}>{m.role}</StatusPill>
                         )}
                         {canManageTeam && !isOwner && m.status === "active" && (
                           <Button size="sm" variant="ghost" onClick={() => removeMember.mutate(m.id)}
@@ -642,12 +638,12 @@ export default function CrmTeamPage() {
                 );
               })}
               {members.length === 0 && (
-                <p className="text-sm text-muted-foreground">No team members yet.</p>
+                <EmptyState compact icon={Users} title="No team members yet" description="Invite your crew above — they'll get an email with a link." />
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </CrmPage>
   );
 }

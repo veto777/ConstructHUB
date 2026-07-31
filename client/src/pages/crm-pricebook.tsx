@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   BookOpen, Plus, Loader2, Package, Wrench, Calculator, Percent, Sparkles, AlertTriangle,
 } from "lucide-react";
+import { CrmPage, CrmPageHeader, EmptyState, SectionTitle, crmTable } from "@/components/crm-ui";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -115,24 +116,21 @@ export default function CrmPriceBookPage() {
   });
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><BookOpen className="h-7 w-7" /> Price book</h1>
-          <p className="text-muted-foreground mt-1">
-            Build assemblies once, then estimate by quantity. Waste factors are a real field, not a formula trick.
-          </p>
-        </div>
-        {canManage && !itemsLoading && !items?.length && (
+    <CrmPage>
+      <CrmPageHeader
+        icon={BookOpen}
+        title="Price book"
+        subtitle="Build assemblies once, then estimate by quantity. Waste factors are a real field, not a formula trick."
+        actions={canManage && !itemsLoading && !items?.length ? (
           <Button variant="outline" onClick={() => seed.mutate()} disabled={seed.isPending} data-testid="button-seed-pb">
             {seed.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
             Add starter roofing set
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="bg-muted/60 p-1">
           <TabsTrigger value="items"><Package className="h-4 w-4 mr-1" /> Assemblies</TabsTrigger>
           <TabsTrigger value="materials"><Wrench className="h-4 w-4 mr-1" /> Materials</TabsTrigger>
           <TabsTrigger value="labor"><Percent className="h-4 w-4 mr-1" /> Labor</TabsTrigger>
@@ -140,18 +138,28 @@ export default function CrmPriceBookPage() {
         </TabsList>
 
         <TabsContent value="items" className="mt-4 space-y-3">
-          {itemsState && (
+          {itemsState && !items?.length && !itemsLoading && !itemsError ? (
+            <Card>
+              <EmptyState
+                icon={Package}
+                title="No assemblies yet"
+                description={canManage
+                  ? "Add the starter set above, or build one from materials."
+                  : "Assemblies bundle materials and labor into one priced unit."}
+              />
+            </Card>
+          ) : itemsState ? (
             <Card><CardContent className="py-2">{itemsState}</CardContent></Card>
-          )}
+          ) : null}
           {items?.map((i) => (
             <Card key={i.id} data-testid={`pb-item-${i.id}`}>
               <CardContent className="p-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="font-medium">{i.name}</div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground flex items-center gap-1.5">
                       {i.code ? `${i.code} · ` : ""}per {i.unit}
-                      {" · "}<Badge variant="outline" className="text-[10px]">{i.pricingMode}</Badge>
+                      <Badge variant="outline" className="text-[10px] font-normal">{i.pricingMode}</Badge>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -171,28 +179,28 @@ export default function CrmPriceBookPage() {
                   </div>
                 )}
                 {prev?.id === i.id && preview && (
-                  <div className="border rounded-md mt-2 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50"><tr>
-                        <th className="text-left p-2">Expands to</th><th className="text-right p-2">Qty</th>
-                        <th className="text-right p-2">Price</th><th className="text-right p-2">Line</th>
+                  <div className={`${crmTable.wrapper} mt-2`}>
+                    <table className={crmTable.table}>
+                      <thead className={crmTable.thead}><tr>
+                        <th className={crmTable.th}>Expands to</th><th className={crmTable.thRight}>Qty</th>
+                        <th className={crmTable.thRight}>Price</th><th className={crmTable.thRight}>Line</th>
                       </tr></thead>
                       <tbody>
                         {preview.lines?.map((l: any, n: number) => (
                           <tr key={n} className="border-t">
-                            <td className="p-2">{l.name}</td>
-                            <td className="p-2 text-right">{(l.quantityMilli / 1000).toFixed(2)} {l.unit}</td>
-                            <td className="p-2 text-right">{money(l.unitPriceCents)}</td>
-                            <td className="p-2 text-right">{money(Math.round(l.unitPriceCents * l.quantityMilli / 1000))}</td>
+                            <td className={crmTable.td}>{l.name}</td>
+                            <td className={crmTable.tdRight}>{(l.quantityMilli / 1000).toFixed(2)} {l.unit}</td>
+                            <td className={crmTable.tdRight}>{money(l.unitPriceCents)}</td>
+                            <td className={crmTable.tdRight}>{money(Math.round(l.unitPriceCents * l.quantityMilli / 1000))}</td>
                           </tr>
                         ))}
                         <tr className="border-t font-medium bg-muted/30">
-                          <td className="p-2" colSpan={3}>Total</td>
-                          <td className="p-2 text-right">{money(preview.totalPriceCents)}</td>
+                          <td className={crmTable.td} colSpan={3}>Total</td>
+                          <td className={crmTable.tdRight}>{money(preview.totalPriceCents)}</td>
                         </tr>
                         {seeCosts && preview.marginBps != null && (
                           <tr className="border-t text-xs text-muted-foreground">
-                            <td className="p-2" colSpan={4}>
+                            <td className={crmTable.td} colSpan={4}>
                               cost {money(preview.totalCostCents)} · margin {(preview.marginBps / 100).toFixed(1)}%
                             </td>
                           </tr>
@@ -200,7 +208,7 @@ export default function CrmPriceBookPage() {
                       </tbody>
                     </table>
                     {preview.warnings?.length > 0 && (
-                      <div className="p-2 text-xs text-destructive flex items-start gap-1">
+                      <div className="p-2 text-xs text-destructive flex items-start gap-1 border-t">
                         <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                         <span>{preview.warnings.join(" ")}</span>
                       </div>
@@ -214,11 +222,13 @@ export default function CrmPriceBookPage() {
 
         <TabsContent value="materials" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-lg">Materials</CardTitle>
-              <CardDescription>Waste % is applied to quantity when an assembly expands.</CardDescription></CardHeader>
-            <CardContent className="space-y-3">
+            <CardHeader>
+              <SectionTitle title="Materials"
+                description="Waste % is applied to quantity when an assembly expands." />
+            </CardHeader>
+            <CardContent className="space-y-4">
               {canManage && (
-                <div className="grid gap-2 sm:grid-cols-12 items-end border rounded-md p-2">
+                <div className="grid gap-2 sm:grid-cols-12 items-end rounded-lg border bg-muted/30 p-3">
                   <div className="sm:col-span-4"><Label className="text-xs">Name</Label>
                     <Input value={mat.name} onChange={(e) => setMat({ ...mat, name: e.target.value })}
                       placeholder="Architectural shingles" data-testid="input-mat-name" /></div>
@@ -239,47 +249,54 @@ export default function CrmPriceBookPage() {
                   </div>
                 </div>
               )}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50"><tr>
-                    <th className="text-left p-2">Material</th><th className="text-left p-2">Unit</th>
-                    {seeCosts && <th className="text-right p-2">Cost</th>}
-                    <th className="text-right p-2">Price</th><th className="text-right p-2">Waste</th>
-                    {seeCosts && <th className="text-right p-2">Margin</th>}
-                  </tr></thead>
-                  <tbody>
-                    {materials?.map((m) => {
-                      const margin = seeCosts && m.priceCents > 0
-                        ? ((m.priceCents - m.costCents) / m.priceCents * 100).toFixed(0) + "%" : "—";
-                      return (
-                        <tr key={m.id} className="border-t" data-testid={`pb-mat-${m.id}`}>
-                          <td className="p-2">
-                            <div className="font-medium">{m.name}</div>
-                            {m.sku && <div className="text-xs text-muted-foreground">{m.sku}</div>}
-                          </td>
-                          <td className="p-2">{m.unit}</td>
-                          {seeCosts && <td className="p-2 text-right">{money(m.costCents)}</td>}
-                          <td className="p-2 text-right">{money(m.priceCents)}</td>
-                          <td className="p-2 text-right">{(m.wasteFactorBps / 100).toFixed(0)}%</td>
-                          {seeCosts && <td className="p-2 text-right">{margin}</td>}
-                        </tr>
-                      );
-                    })}
-                    {matsState && <tr><td className="p-1" colSpan={6}>{matsState}</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+              {!materials?.length && !matsLoading && !matsError ? (
+                <EmptyState compact icon={Wrench} title="No materials yet"
+                  description="Materials carry a cost, a price and a waste factor." />
+              ) : (
+                <div className={crmTable.wrapper}>
+                  <table className={crmTable.table}>
+                    <thead className={crmTable.thead}><tr>
+                      <th className={crmTable.th}>Material</th><th className={crmTable.th}>Unit</th>
+                      {seeCosts && <th className={crmTable.thRight}>Cost</th>}
+                      <th className={crmTable.thRight}>Price</th><th className={crmTable.thRight}>Waste</th>
+                      {seeCosts && <th className={crmTable.thRight}>Margin</th>}
+                    </tr></thead>
+                    <tbody>
+                      {materials?.map((m) => {
+                        const margin = seeCosts && m.priceCents > 0
+                          ? ((m.priceCents - m.costCents) / m.priceCents * 100).toFixed(0) + "%" : "—";
+                        return (
+                          <tr key={m.id} className={crmTable.tr} data-testid={`pb-mat-${m.id}`}>
+                            <td className={crmTable.td}>
+                              <div className="font-medium">{m.name}</div>
+                              {m.sku && <div className="text-xs text-muted-foreground">{m.sku}</div>}
+                            </td>
+                            <td className={crmTable.td}>{m.unit}</td>
+                            {seeCosts && <td className={crmTable.tdRight}>{money(m.costCents)}</td>}
+                            <td className={`${crmTable.tdRight} font-medium`}>{money(m.priceCents)}</td>
+                            <td className={crmTable.tdRight}>{(m.wasteFactorBps / 100).toFixed(0)}%</td>
+                            {seeCosts && <td className={crmTable.tdRight}>{margin}</td>}
+                          </tr>
+                        );
+                      })}
+                      {matsState && <tr><td className="p-1" colSpan={6}>{matsState}</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="labor" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-lg">Labor rates</CardTitle>
-              <CardDescription>Cost is what you pay; price is what you charge.</CardDescription></CardHeader>
+            <CardHeader>
+              <SectionTitle title="Labor rates"
+                description="Cost is what you pay; price is what you charge." />
+            </CardHeader>
             <CardContent className="space-y-3">
               {canManage && (
-                <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
                   <div className="flex-1 min-w-[160px]"><Label className="text-xs">Name</Label>
                     <Input value={lab.name} onChange={(e) => setLab({ ...lab, name: e.target.value })}
                       placeholder="Roofing crew" data-testid="input-lab-name" /></div>
@@ -292,12 +309,15 @@ export default function CrmPriceBookPage() {
                 </div>
               )}
               {laborState}
+              {!labor?.length && !laborLoading && !laborError && (
+                <EmptyState compact icon={Percent} title="No labor rates yet" />
+              )}
               {labor?.map((l) => (
-                <div key={l.id} className="border rounded-md p-3 flex items-center justify-between gap-2">
+                <div key={l.id} className="rounded-lg border px-4 py-3 flex items-center justify-between gap-2">
                   <div className="font-medium flex items-center gap-2">
                     {l.name}{l.isDefault && <Badge variant="secondary" className="text-[10px]">default</Badge>}
                   </div>
-                  <div className="text-sm">
+                  <div className="text-sm tabular-nums">
                     {seeCosts && <span className="text-muted-foreground mr-3">cost {money(l.hourlyCostCents)}/hr</span>}
                     <span className="font-medium">{money(l.hourlyPriceCents)}/hr</span>
                   </div>
@@ -310,8 +330,7 @@ export default function CrmPriceBookPage() {
         <TabsContent value="formula" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Formula tester</CardTitle>
-              <CardDescription>{meta?.formulaHelp}</CardDescription>
+              <SectionTitle title="Formula tester" description={meta?.formulaHelp} />
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
@@ -331,7 +350,7 @@ export default function CrmPriceBookPage() {
                 </Button>
               </div>
               {fres && (
-                <div className={`text-sm font-mono ${fres.startsWith("✕") ? "text-destructive" : ""}`}
+                <div className={`text-sm font-mono rounded-lg border bg-muted/30 px-3 py-2 ${fres.startsWith("✕") ? "text-destructive" : ""}`}
                   data-testid="text-formula-result">{fres}</div>
               )}
               <Separator />
@@ -346,6 +365,6 @@ export default function CrmPriceBookPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </CrmPage>
   );
 }

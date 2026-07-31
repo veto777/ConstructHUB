@@ -1,16 +1,29 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, KanbanSquare, AlertTriangle } from "lucide-react";
+import { Loader2, KanbanSquare, ArrowRight } from "lucide-react";
+import { CrmPage, CrmPageHeader, EmptyState, ErrorCard } from "@/components/crm-ui";
+import { Button } from "@/components/ui/button";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "" : `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+
+/** One accent per swimlane, falling back by position for custom groups. */
+const GROUP_COLORS = [
+  { dot: "bg-blue-500", text: "text-blue-600 dark:text-blue-400" },
+  { dot: "bg-violet-500", text: "text-violet-600 dark:text-violet-400" },
+  { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+  { dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" },
+];
+const GROUP_BY_NAME: Record<string, number> = { prospect: 0, sales: 1, production: 2, billing: 3 };
+const groupColor = (group: string, idx: number) =>
+  GROUP_COLORS[GROUP_BY_NAME[group.toLowerCase()] ?? idx % GROUP_COLORS.length];
 
 /**
  * Pipeline board. Grouped into parallel swimlanes (Prospect / Sales /
@@ -40,16 +53,10 @@ export default function CrmPipelinePage() {
 
   if (isError || !data) {
     return (
-      <div className="p-6 max-w-lg mx-auto mt-10">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" /> Couldn't load the pipeline
-            </CardTitle>
-            <CardDescription>Check your connection and refresh the page.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <ErrorCard
+        title="Couldn't load the pipeline"
+        description="Check your connection and refresh the page."
+      />
     );
   }
 
@@ -58,26 +65,27 @@ export default function CrmPipelinePage() {
   const groups = [...new Set(stages.map((s) => s.group))];
 
   return (
-    <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <KanbanSquare className="h-7 w-7" /> Pipeline
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {projects.length} project{projects.length === 1 ? "" : "s"} · drag a card to move it, or use the stage menu.
-        </p>
-      </div>
+    <CrmPage wide>
+      <CrmPageHeader
+        icon={KanbanSquare}
+        title="Pipeline"
+        subtitle={`${projects.length} project${projects.length === 1 ? "" : "s"} · drag a card to move it, or use the stage menu.`}
+      />
 
-      {groups.map((group) => {
+      {groups.map((group, gi) => {
+        const color = groupColor(String(group), gi);
         const groupStages = stages.filter((s) => s.group === group);
         return (
-          <div key={group} className="space-y-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group}</h2>
-            <div className="flex gap-3 overflow-x-auto pb-2">
+          <div key={String(group)} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${color.dot}`} />
+              <h2 className={`text-xs font-semibold uppercase tracking-widest ${color.text}`}>{String(group)}</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-3">
               {groupStages.map((s) => {
                 const inStage = projects.filter((p) => p.status === s.key);
                 return (
-                  <div key={s.key} className="min-w-[240px] w-[240px] shrink-0"
+                  <div key={s.key} className="min-w-[260px] w-[260px] shrink-0"
                     onDragOver={(e) => canMove && e.preventDefault()}
                     onDrop={(e) => {
                       if (!canMove) return;
@@ -85,54 +93,58 @@ export default function CrmPipelinePage() {
                       if (id) move.mutate({ id, status: s.key });
                     }}
                     data-testid={`stage-col-${s.key}`}>
-                    <div className="flex items-center justify-between px-1 pb-1">
+                    <div className="flex items-center justify-between px-1.5 pb-2">
                       <span className="text-sm font-medium">{s.label}</span>
-                      <Badge variant="secondary">{inStage.length}</Badge>
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
+                        {inStage.length}
+                      </span>
                     </div>
-                    <div className="space-y-2 min-h-[60px] rounded-md bg-muted/40 p-2">
+                    <div className="space-y-2 min-h-[80px] rounded-xl border border-border/50 bg-muted/40 p-2">
                       {inStage.map((p) => (
-                        <Card key={p.id}
+                        <div key={p.id}
                           draggable={canMove}
                           onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
-                          className="cursor-pointer hover:ring-1 hover:ring-primary"
+                          className="rounded-lg border bg-card p-3 space-y-1.5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-primary/40"
                           data-testid={`card-project-${p.id}`}>
-                          <CardContent className="p-3 space-y-1">
-                            <Link href={`/crm/projects/${p.id}`}>
-                              <div className="font-medium text-sm leading-tight hover:underline">
-                                {p.name}
-                              </div>
-                            </Link>
-                            <div className="text-xs text-muted-foreground">{p.number}</div>
+                          <Link href={`/crm/projects/${p.id}`}>
+                            <div className="font-medium text-sm leading-snug hover:underline">
+                              {p.name}
+                            </div>
+                          </Link>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">{p.number}</span>
                             {canSeePrices && p.contractValueCents != null && (
-                              <div className="text-xs font-medium">{money(p.contractValueCents)}</div>
+                              <span className="text-sm font-semibold tabular-nums">{money(p.contractValueCents)}</span>
                             )}
-                            {p.trades?.length ? (
-                              <div className="flex flex-wrap gap-1 pt-1">
-                                {p.trades.slice(0, 3).map((t: string) => (
-                                  <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
-                                ))}
-                              </div>
-                            ) : null}
-                            {canMove && (
-                              <div className="pt-1" onClick={(e) => e.stopPropagation()}>
-                                <Select value={p.status}
-                                  onValueChange={(status) => status !== p.status && move.mutate({ id: p.id, status })}>
-                                  <SelectTrigger className="h-7 text-xs" data-testid={`select-stage-${p.id}`}>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {stages.map((st) => (
-                                      <SelectItem key={st.key} value={st.key}>{st.label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
+                          </div>
+                          {p.trades?.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {p.trades.slice(0, 3).map((t: string) => (
+                                <Badge key={t} variant="outline" className="text-[10px] font-normal">{t}</Badge>
+                              ))}
+                            </div>
+                          ) : null}
+                          {canMove && (
+                            <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                              <Select value={p.status}
+                                onValueChange={(status) => status !== p.status && move.mutate({ id: p.id, status })}>
+                                <SelectTrigger className="h-7 text-xs bg-muted/40 border-transparent" data-testid={`select-stage-${p.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {stages.map((st) => (
+                                    <SelectItem key={st.key} value={st.key}>{st.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
                       ))}
                       {!inStage.length && (
-                        <div className="text-xs text-muted-foreground text-center py-3">—</div>
+                        <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-lg">
+                          Drop a project here
+                        </div>
                       )}
                     </div>
                   </div>
@@ -144,12 +156,19 @@ export default function CrmPipelinePage() {
       })}
 
       {!projects.length && (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            No projects yet. Create one from a client's page.
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border bg-card">
+          <EmptyState
+            icon={KanbanSquare}
+            title="No projects yet"
+            description="Projects are the jobs on your board — create one from a client's page."
+            action={
+              <Link href="/crm/clients">
+                <Button>Go to clients <ArrowRight className="h-4 w-4 ml-1" /></Button>
+              </Link>
+            }
+          />
+        </div>
       )}
-    </div>
+    </CrmPage>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,8 +19,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, CheckCircle2, XCircle, Copy,
-  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, AlertTriangle,
+  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin,
 } from "lucide-react";
+import {
+  CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
+} from "@/components/crm-ui";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -36,11 +39,6 @@ interface Item {
 const BLANK: Item = {
   kind: "labor", name: "", description: "", quantityMilli: 1000,
   unit: "", unitPriceCents: 0, taxable: true, hiddenFromClient: false,
-};
-
-const STATUS_STYLE: Record<string, string> = {
-  draft: "secondary", sent: "outline", viewed: "default",
-  approved: "default", declined: "destructive", expired: "secondary",
 };
 
 /**
@@ -311,24 +309,14 @@ export default function CrmClientPage() {
 
   if (isError || !data) {
     return (
-      <div className="p-6 max-w-lg mx-auto mt-10">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              {isError ? "Couldn't load this client" : "Client not found"}
-            </CardTitle>
-            <CardDescription>
-              {isError ? "Check your connection and refresh the page." : "This client may have been removed."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/crm/clients">
-              <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> All clients</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <ErrorCard
+        title={isError ? "Couldn't load this client" : "Client not found"}
+        description={isError ? "Check your connection and refresh the page." : "This client may have been removed."}
+      >
+        <Link href="/crm/clients">
+          <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> All clients</Button>
+        </Link>
+      </ErrorCard>
     );
   }
 
@@ -336,38 +324,54 @@ export default function CrmClientPage() {
   const estimates = data.estimates ?? [];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-5">
+    <CrmPage>
       <Link href="/crm/clients">
-        <Button variant="ghost" size="sm" data-testid="link-back-clients">
+        <Button variant="ghost" size="sm" className="-ml-2" data-testid="link-back-clients">
           <ArrowLeft className="h-4 w-4 mr-1" /> All clients
         </Button>
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold">{c.displayName}</h1>
-          <p className="text-muted-foreground mt-1">
-            {[c.email, c.phone, [c.addressLine1, c.city, c.state].filter(Boolean).join(", ")]
-              .filter(Boolean).join("  ·  ")}
-          </p>
-        </div>
-        {data.portalPath && (
-          <Button variant="outline" size="sm" data-testid="button-copy-portal"
-            onClick={() => {
-              navigator.clipboard?.writeText(window.location.origin + data.portalPath);
-              toast({ title: "Client portal link copied" });
-            }}>
-            <Copy className="h-4 w-4 mr-2" /> Copy portal link
-          </Button>
-        )}
-      </div>
+      {/* Identity card: who this is and how to reach them. */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-4 min-w-0">
+              <InitialAvatar name={c.displayName} className="h-14 w-14 text-lg" />
+              <div className="min-w-0">
+                <h1 className="text-2xl font-semibold tracking-tight">{c.displayName}</h1>
+                {c.companyName && <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>}
+                <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
+                  {c.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{c.email}</span>}
+                  {c.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{c.phone}</span>}
+                  {(c.addressLine1 || c.city) && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {data.portalPath && (
+              <Button variant="outline" size="sm" data-testid="button-copy-portal"
+                onClick={() => {
+                  navigator.clipboard?.writeText(window.location.origin + data.portalPath);
+                  toast({ title: "Client portal link copied" });
+                }}>
+                <Copy className="h-4 w-4 mr-2" /> Copy portal link
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2"><FileText className="h-5 w-5" /> Estimates</CardTitle>
-            <CardDescription>You'll see exactly when the client opens one.</CardDescription>
-          </div>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <SectionTitle
+            icon={FileText}
+            title="Estimates"
+            description="You'll see exactly when the client opens one."
+          />
           {canEstimate && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
@@ -453,16 +457,25 @@ export default function CrmClientPage() {
           )}
         </CardHeader>
         <CardContent className="space-y-2">
-          {!estimates.length && <p className="text-sm text-muted-foreground">No estimates yet.</p>}
+          {!estimates.length && (
+            <EmptyState
+              compact
+              icon={FileText}
+              title="No estimates yet"
+              description="Build one from a template or from scratch — the client approves it online."
+            />
+          )}
           {estimates.map((e: any) => (
-            <div key={e.id} className="border rounded-md p-3 space-y-2" data-testid={`estimate-${e.id}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <div key={e.id} className="rounded-lg border p-4 space-y-2.5 hover:border-border/80 transition-colors" data-testid={`estimate-${e.id}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-medium flex items-center gap-2">
+                  <div className="font-medium flex items-center gap-2.5">
                     {e.number} · {e.title}
-                    <Badge variant={(STATUS_STYLE[e.status] ?? "secondary") as any}>{e.status}</Badge>
+                    <StatusPill tone={statusTone(e.status)}>{e.status}</StatusPill>
                   </div>
-                  {canSeePrices && <div className="text-sm text-muted-foreground">{money(e.totalCents)}</div>}
+                  {canSeePrices && (
+                    <div className="text-sm text-muted-foreground mt-0.5 tabular-nums">{money(e.totalCents)}</div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {canEstimate && !e.approvedAt && !e.declinedAt && (
@@ -503,7 +516,7 @@ export default function CrmClientPage() {
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Not opened yet</span>
                 ) : null}
                 {e.approvedAt && (
-                  <span className="flex items-center gap-1 text-green-600 font-medium">
+                  <span className="flex items-center gap-1 text-emerald-600 font-medium">
                     <CheckCircle2 className="h-3 w-3" /> Approved {when(e.approvedAt)}
                     {e.signatureName && ` by ${e.signatureName}`}
                   </span>
@@ -522,29 +535,39 @@ export default function CrmClientPage() {
       {canSeePrices && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2"><Receipt className="h-5 w-5" /> Invoices</CardTitle>
-            <CardDescription>Send the link, take the payment online, or record a check.</CardDescription>
+            <SectionTitle
+              icon={Receipt}
+              title="Invoices"
+              description="Send the link, take the payment online, or record a check."
+            />
           </CardHeader>
           <CardContent className="space-y-2">
             {invoicesError ? (
               <p className="text-sm text-destructive flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" /> Couldn't load invoices — refresh to try again.
+                Couldn't load invoices — refresh to try again.
               </p>
             ) : !invoices?.length && (
-              <p className="text-sm text-muted-foreground">No invoices yet — approve an estimate, then convert it.</p>
+              <EmptyState
+                compact
+                icon={Receipt}
+                title="No invoices yet"
+                description="Approve an estimate, then convert it — the client pays online."
+              />
             )}
             {invoices?.map((inv: any) => {
               const due = Math.max(0, (inv.totalCents ?? 0) - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
               const open = !inv.voidedAt && !inv.paidAt && due > 0;
               return (
-                <div key={inv.id} className="border rounded-md p-3 space-y-2" data-testid={`invoice-${inv.id}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                <div key={inv.id} className="rounded-lg border p-4 space-y-2" data-testid={`invoice-${inv.id}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-medium flex items-center gap-2">
+                      <div className="font-medium flex items-center gap-2.5">
                         {inv.number} · {inv.title}
-                        <Badge variant={inv.paidAt ? "default" : inv.voidedAt ? "destructive" : "outline"}>{inv.status}</Badge>
+                        <StatusPill tone={inv.paidAt ? "success" : inv.voidedAt ? "danger" : statusTone(inv.status)}>
+                          {inv.status}
+                        </StatusPill>
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground mt-0.5 tabular-nums">
                         {money(inv.totalCents)}{inv.paidCents > 0 && !inv.paidAt ? ` · ${money(inv.paidCents)} paid` : ""}
                         {open ? ` · ${money(due)} due` : ""}
                       </div>
@@ -591,11 +614,11 @@ export default function CrmClientPage() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <div>
-            <CardTitle className="text-lg">Projects</CardTitle>
-            <CardDescription>Approving an estimate moves its project to Approved automatically.</CardDescription>
-          </div>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <SectionTitle
+            title="Projects"
+            description="Approving an estimate moves its project to Approved automatically."
+          />
           {canManageJobs && (
             <Dialog open={projOpen} onOpenChange={setProjOpen}>
               <DialogTrigger asChild>
@@ -621,17 +644,24 @@ export default function CrmClientPage() {
           )}
         </CardHeader>
         <CardContent className="space-y-2">
-          {!data.projects?.length && <p className="text-sm text-muted-foreground">No projects yet.</p>}
+          {!data.projects?.length && (
+            <EmptyState
+              compact
+              icon={FileText}
+              title="No projects yet"
+              description="A project tracks the job from approval to final invoice."
+            />
+          )}
           {data.projects?.map((p: any) => (
             <Link key={p.id} href={`/crm/projects/${p.id}`}>
-              <div className="border rounded-md p-3 flex items-center justify-between gap-2 hover:bg-accent transition-colors cursor-pointer"
+              <div className="rounded-lg border px-4 py-3 flex items-center justify-between gap-3 hover:bg-accent transition-colors cursor-pointer"
                 data-testid={`project-${p.id}`}>
-                <div>
-                  <div className="font-medium">{p.number} · {p.name}</div>
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{p.number} · {p.name}</div>
                   <div className="text-sm text-muted-foreground">{p.stageLabel} · {p.stageGroup}</div>
                 </div>
                 {canSeePrices && p.contractValueCents != null && (
-                  <div className="font-medium">{money(p.contractValueCents)}</div>
+                  <div className="font-medium tabular-nums shrink-0">{money(p.contractValueCents)}</div>
                 )}
               </div>
             </Link>
@@ -684,6 +714,6 @@ export default function CrmClientPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </CrmPage>
   );
 }
