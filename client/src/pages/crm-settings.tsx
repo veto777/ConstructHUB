@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings, Building2, FileText, Bell, CreditCard, KeyRound, Webhook,
-  Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark,
+  Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
@@ -70,6 +70,73 @@ export default function CrmSettingsPage() {
     queryKey: ["/api/crm/lead-sources"],
     enabled: allowed,
   });
+  const { data: divisions } = useQuery<any[]>({
+    queryKey: ["/api/crm/divisions"],
+    enabled: allowed,
+  });
+
+  // ── Divisions ─────────────────────────────────────────────────────────────
+  const emptyDivision = {
+    name: "", code: "", email: "", phone: "",
+    addressLine1: "", addressLine2: "", city: "", state: "", postalCode: "",
+    licenseNumber: "", licenseState: "", isHeadquarters: false,
+  };
+  const [divForm, setDivForm] = useState(emptyDivision);
+  const [editingDivisionId, setEditingDivisionId] = useState<string | null>(null);
+  const setD = (k: keyof typeof emptyDivision) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setDivForm((d) => ({ ...d, [k]: e.target.value }));
+
+  const saveDivision = useMutation({
+    mutationFn: async () => {
+      const body = {
+        name: divForm.name.trim(),
+        code: divForm.code.trim(),
+        email: emptyToNull(divForm.email),
+        phone: emptyToNull(divForm.phone),
+        addressLine1: emptyToNull(divForm.addressLine1),
+        addressLine2: emptyToNull(divForm.addressLine2),
+        city: emptyToNull(divForm.city),
+        state: emptyToNull(divForm.state),
+        postalCode: emptyToNull(divForm.postalCode),
+        licenseNumber: emptyToNull(divForm.licenseNumber),
+        licenseState: emptyToNull(divForm.licenseState),
+        isHeadquarters: divForm.isHeadquarters,
+      };
+      const r = editingDivisionId
+        ? await apiRequest("PATCH", `/api/crm/divisions/${editingDivisionId}`, body)
+        : await apiRequest("POST", "/api/crm/divisions", body);
+      return r.json();
+    },
+    onSuccess: () => {
+      setDivForm(emptyDivision);
+      setEditingDivisionId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/divisions"] });
+      toast({ title: editingDivisionId ? "Division updated" : "Division created" });
+    },
+    onError: (e: any) => toast({ title: "Could not save division", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const setHq = useMutation({
+    mutationFn: async (id: string) =>
+      (await apiRequest("PATCH", `/api/crm/divisions/${id}`, { isHeadquarters: true })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/divisions"] });
+      toast({ title: "Headquarters updated" });
+    },
+    onError: (e: any) => toast({ title: "Could not update", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const startEditDivision = (d: any) => {
+    const s = (v: any) => v ?? "";
+    setDivForm({
+      name: s(d.name), code: s(d.code), email: s(d.email), phone: s(d.phone),
+      addressLine1: s(d.addressLine1), addressLine2: s(d.addressLine2),
+      city: s(d.city), state: s(d.state), postalCode: s(d.postalCode),
+      licenseNumber: s(d.licenseNumber), licenseState: s(d.licenseState),
+      isHeadquarters: d.isHeadquarters === true,
+    });
+    setEditingDivisionId(d.id);
+  };
 
   // ── Company profile ───────────────────────────────────────────────────────
   const [company, setCompany] = useState<Record<string, string>>({});
@@ -335,6 +402,133 @@ export default function CrmSettingsPage() {
               {saveCompany.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save company profile
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Divisions ─────────────────────────────────────────────────── */}
+      <Card data-testid="card-divisions">
+        <CardHeader>
+          <SectionTitle
+            icon={MapPin}
+            title="Divisions"
+            description="Operating arms of your company (e.g. a WA headquarters and a FL division). A project's division sets the name, address and license that print on its estimates and invoices — and admins can be scoped to one."
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {divisions && divisions.length > 0 && (
+            <div className="space-y-2">
+              {divisions.map((d) => (
+                <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                  data-testid={`row-division-${d.id}`}>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate flex items-center gap-2">
+                      {d.name}
+                      <StatusPill tone="neutral">{d.code}</StatusPill>
+                      {d.isHeadquarters && <StatusPill tone="info" data-testid={`pill-hq-${d.id}`}>HQ</StatusPill>}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {[d.addressLine1, d.city, d.state].filter(Boolean).join(", ") || "No address — falls back to the company's"}
+                      {d.licenseNumber ? ` · License ${d.licenseNumber}${d.licenseState ? ` (${d.licenseState})` : ""}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!d.isHeadquarters && (
+                      <Button size="sm" variant="outline" onClick={() => setHq.mutate(d.id)}
+                        disabled={setHq.isPending} data-testid={`button-set-hq-${d.id}`}>
+                        Set as HQ
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => startEditDivision(d)}
+                      data-testid={`button-edit-division-${d.id}`}>
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="text-sm font-medium">{editingDivisionId ? "Edit division" : "Add a division"}</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="div-name">Name</Label>
+                <Input id="div-name" placeholder="e.g. Alpine Exteriors — Florida"
+                  data-testid="input-division-name" value={divForm.name} onChange={setD("name")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-code">Code</Label>
+                <Input id="div-code" placeholder="e.g. FL" data-testid="input-division-code"
+                  value={divForm.code} onChange={setD("code")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-address1">Address</Label>
+                <Input id="div-address1" data-testid="input-division-address1"
+                  value={divForm.addressLine1} onChange={setD("addressLine1")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-city">City</Label>
+                <Input id="div-city" data-testid="input-division-city"
+                  value={divForm.city} onChange={setD("city")} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="div-state">State</Label>
+                  <Input id="div-state" data-testid="input-division-state"
+                    value={divForm.state} onChange={setD("state")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="div-postal">ZIP</Label>
+                  <Input id="div-postal" data-testid="input-division-postal"
+                    value={divForm.postalCode} onChange={setD("postalCode")} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="div-license">License #</Label>
+                  <Input id="div-license" data-testid="input-division-license-number"
+                    value={divForm.licenseNumber} onChange={setD("licenseNumber")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="div-license-state">License state</Label>
+                  <Input id="div-license-state" data-testid="input-division-license-state"
+                    value={divForm.licenseState} onChange={setD("licenseState")} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-email">Email (optional)</Label>
+                <Input id="div-email" type="email" data-testid="input-division-email"
+                  value={divForm.email} onChange={setD("email")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-phone">Phone (optional)</Label>
+                <Input id="div-phone" data-testid="input-division-phone"
+                  value={divForm.phone} onChange={setD("phone")} />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                checked={divForm.isHeadquarters}
+                onCheckedChange={(v) => setDivForm((d) => ({ ...d, isHeadquarters: v === true }))}
+                data-testid="checkbox-division-hq"
+              />
+              This is the headquarters
+            </label>
+            <div className="flex justify-end gap-2">
+              {editingDivisionId && (
+                <Button variant="ghost" onClick={() => { setDivForm(emptyDivision); setEditingDivisionId(null); }}
+                  data-testid="button-cancel-division-edit">
+                  Cancel
+                </Button>
+              )}
+              <Button onClick={() => saveDivision.mutate()}
+                disabled={saveDivision.isPending || !divForm.name.trim() || !divForm.code.trim()}
+                data-testid="button-save-division">
+                {saveDivision.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {editingDivisionId ? "Save division" : "Add division"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

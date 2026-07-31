@@ -22,6 +22,7 @@ import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { logEvent, presentEstimate } from "./entities";
 import { emitCrmEvent } from "./integrations";
+import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments } from "@shared/schema";
 
 type GetUser = (req: any, res: any) => any;
@@ -87,6 +88,7 @@ function publicEstimateView(
   items: (typeof crmEstimateItems.$inferSelect)[],
   org: typeof crmOrgs.$inferSelect,
   cust: typeof crmCustomers.$inferSelect,
+  division: Awaited<ReturnType<typeof resolveEstimateDivision>> = null,
 ) {
   return {
     estimate: {
@@ -107,11 +109,10 @@ function publicEstimateView(
         lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
       })),
     company: {
-      name: org.name, legalEntityName: org.legalEntityName, phone: org.phone,
-      email: org.email, website: org.website, logoUrl: org.logoUrl,
-      licenseNumber: org.licenseNumber, licenseState: org.licenseState,
+      // The DIVISION's letterhead when the work belongs to one — a Florida
+      // estimate never goes out under the WA HQ address.
+      ...companyBranding(org, division),
       warrantyText: org.warrantyText,
-      addressLine1: org.addressLine1, city: org.city, state: org.state, postalCode: org.postalCode,
     },
     customer: { displayName: cust.displayName, email: cust.email },
   };
@@ -149,13 +150,15 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // the email and the row agree.
     const sentAt = new Date();
     const expiresAt = estimateExpiryOnSend(sentAt);
+    // The letterhead is the division's when the work belongs to one.
+    const branding = companyBranding(ctx.org, await resolveEstimateDivision(est));
 
     // The email says who it's from and carries the estimate link.
     const html = `
       <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px">
         <p style="font-size:16px">Hi ${esc(cust.displayName)},</p>
         <p style="font-size:16px">
-          ${esc(from)} at <strong>${esc(ctx.org.name)}</strong> has sent you an estimate
+          ${esc(from)} at <strong>${esc(branding.name)}</strong> has sent you an estimate
           ${est.number ? `(${esc(est.number)})` : ""} for your review.
         </p>
         ${parsed.data.message ? `<p style="font-size:16px;white-space:pre-wrap">${esc(parsed.data.message)}</p>` : ""}
@@ -172,8 +175,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         <p style="font-size:13px;color:#666">This estimate expires on ${expiresAt.toDateString()}.</p>
         <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
         <p style="font-size:13px;color:#666">
-          ${esc(ctx.org.name)}${ctx.org.phone ? ` &middot; ${esc(ctx.org.phone)}` : ""}
-          ${ctx.org.licenseNumber ? `<br>License ${esc(ctx.org.licenseNumber)}${ctx.org.licenseState ? ` (${esc(ctx.org.licenseState)})` : ""}` : ""}
+          ${esc(branding.name)}${branding.phone ? ` &middot; ${esc(branding.phone)}` : ""}
+          ${branding.addressLine1 ? `<br>${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `, ${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}` : ""}
+          ${branding.licenseNumber ? `<br>License ${esc(branding.licenseNumber)}${branding.licenseState ? ` (${esc(branding.licenseState)})` : ""}` : ""}
         </p>
       </div>`;
 
@@ -182,9 +186,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     try {
       await sendWithFallback({
         to,
-        subject: `Estimate from ${ctx.org.name}${est.number ? ` — ${est.number}` : ""}`,
+        subject: `Estimate from ${branding.name}${est.number ? ` — ${est.number}` : ""}`,
         html,
-        replyTo: ctx.org.email || undefined,
+        replyTo: branding.email || undefined,
       } as any);
       emailed = true;
     } catch (e: any) {
@@ -224,6 +228,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
     if (!org || !cust) return res.status(404).json({ message: "Not found" });
+    const division = await resolveEstimateDivision(est);
+    const branding = companyBranding(org, division);
 
     // Expired and never answered: 410 BEFORE any document content is loaded.
     // The body carries only what the contact page needs — org name + public
@@ -234,7 +240,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         message: "This estimate has expired.",
         expired: true,
         expiredAt: est.expiresAt,
-        company: { name: org.name, email: org.email, phone: org.phone },
+        company: { name: branding.name, email: branding.email, phone: branding.phone },
       });
     }
 
@@ -291,7 +297,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const settledPayments = await db.select({ id: crmPayments.id }).from(crmPayments)
       .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
 
-    const view = publicEstimateView(current, items, org, cust);
+    const view = publicEstimateView(current, items, org, cust, division);
     res.json({
       ...view,
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
@@ -603,16 +609,17 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const link = `${getBaseUrl(req)}/i/${inv.publicToken}`;
     const from = ctx.member.displayName || ctx.org.name;
     const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
+    const branding = companyBranding(ctx.org, await resolveInvoiceDivision(inv));
 
     let emailed = false, emailError: string | null = null;
     try {
       await sendWithFallback({
         to,
-        subject: `Invoice from ${ctx.org.name}${inv.number ? ` — ${inv.number}` : ""}`,
+        subject: `Invoice from ${branding.name}${inv.number ? ` — ${inv.number}` : ""}`,
         html: `
           <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px">
             <p style="font-size:16px">Hi ${esc(cust.displayName)},</p>
-            <p style="font-size:16px">${esc(from)} at <strong>${esc(ctx.org.name)}</strong> has sent you
+            <p style="font-size:16px">${esc(from)} at <strong>${esc(branding.name)}</strong> has sent you
               invoice ${esc(inv.number ?? "")}.</p>
             ${parsed.data.message ? `<p style="font-size:16px;white-space:pre-wrap">${esc(parsed.data.message)}</p>` : ""}
             <p style="font-size:22px;margin:18px 0"><strong>${money(due)}</strong> due</p>
@@ -623,8 +630,14 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
             </p>
             <p style="font-size:13px;color:#666">Or paste this in your browser:<br>
               <span style="word-break:break-all">${link}</span></p>
+            <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
+            <p style="font-size:13px;color:#666">
+              ${esc(branding.name)}${branding.phone ? ` &middot; ${esc(branding.phone)}` : ""}
+              ${branding.addressLine1 ? `<br>${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `, ${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}` : ""}
+              ${branding.licenseNumber ? `<br>License ${esc(branding.licenseNumber)}${branding.licenseState ? ` (${esc(branding.licenseState)})` : ""}` : ""}
+            </p>
           </div>`,
-        replyTo: ctx.org.email || undefined,
+        replyTo: branding.email || undefined,
       } as any);
       emailed = true;
     } catch (e: any) {
@@ -651,6 +664,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
     if (!org || !cust) return res.status(404).json({ message: "Not found" });
+    const division = await resolveInvoiceDivision(inv);
     const items = await db.select().from(crmInvoiceItems)
       .where(eq(crmInvoiceItems.invoiceId, inv.id)).orderBy(asc(crmInvoiceItems.sortOrder));
 
@@ -678,10 +692,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         quantityMilli: i.quantityMilli, unitPriceCents: i.unitPriceCents,
         lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
       })),
-      company: {
-        name: org.name, phone: org.phone, email: org.email, website: org.website,
-        logoUrl: org.logoUrl, licenseNumber: org.licenseNumber, licenseState: org.licenseState,
-      },
+      company: companyBranding(org, division),
       customer: { displayName: cust.displayName },
     });
   });

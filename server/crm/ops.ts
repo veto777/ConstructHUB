@@ -25,6 +25,7 @@ import {
 } from "@shared/schema";
 import { and, eq, gte, lte, desc, asc, sql, ilike, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { getBaseUrl } from "../auth";
 
@@ -92,8 +93,15 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const where = [eq(crmInvoices.orgId, ctx.org.id)];
     if (req.query.projectId) where.push(eq(crmInvoices.projectId, String(req.query.projectId)));
     if (req.query.customerId) where.push(eq(crmInvoices.customerId, String(req.query.customerId)));
-    const rows = await db.select().from(crmInvoices).where(and(...where))
+    let rows = await db.select().from(crmInvoices).where(and(...where))
       .orderBy(desc(crmInvoices.createdAt)).limit(500);
+    // Division scoping — same resolution order as estimates (project →
+    // estimate's project → customer's latest project).
+    const divScope = divisionScopeOf(ctx.member);
+    if (divScope) {
+      const maps = await divisionMapsForOrg(ctx.org.id);
+      rows = rows.filter((i) => divisionVisible(divScope, docDivisionFromMaps(maps, i)));
+    }
     res.json(rows);
   });
 

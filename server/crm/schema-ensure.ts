@@ -74,6 +74,30 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_invitations_org_idx ON crm_invitations (org_id);
   `);
 
+  // ── Divisions: one company, several operating arms (WA HQ + FL) ──────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_divisions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      name text NOT NULL,
+      code text NOT NULL,
+      email text,
+      phone text,
+      address_line1 text,
+      address_line2 text,
+      city text,
+      state text,
+      postal_code text,
+      license_number text,
+      license_state text,
+      is_headquarters boolean NOT NULL DEFAULT false,
+      created_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_divisions_org_idx ON crm_divisions (org_id);
+  `);
+
   // ── Entities: customers, projects, jobs, estimates ──────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS crm_customers (
@@ -452,6 +476,11 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS invoice_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
+    ALTER TABLE crm_projects ADD COLUMN IF NOT EXISTS division_id varchar;
+    ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS division_id varchar;
+    ALTER TABLE crm_invitations ADD COLUMN IF NOT EXISTS division_id varchar;
+    CREATE INDEX IF NOT EXISTS crm_members_division_idx ON crm_members (division_id);
+    CREATE INDEX IF NOT EXISTS crm_projects_division_idx ON crm_projects (division_id);
   `);
 
   // ── Client engagement sessions (public estimate/invoice dwell time) ──────
@@ -508,6 +537,9 @@ export async function ensureCrmSchema(): Promise<void> {
     `CREATE UNIQUE INDEX IF NOT EXISTS crm_invitations_pending_uniq
        ON crm_invitations (org_id, lower(email))
        WHERE accepted_at IS NULL AND revoked_at IS NULL`,
+    // Division codes are per-org unique ("WA" means one thing inside one org).
+    `CREATE UNIQUE INDEX IF NOT EXISTS crm_divisions_org_code_uniq
+       ON crm_divisions (org_id, lower(code))`,
   ];
   for (const stmt of guarded) {
     try {

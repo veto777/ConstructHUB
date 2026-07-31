@@ -380,6 +380,40 @@ async function main() {
     projectManagerMemberId: marco.id,
   });
 
+  // ── Divisions: the owner's reality — WA headquarters + a Florida arm ──────
+  async function ensureDivision(d: {
+    code: string; name: string; isHeadquarters?: boolean;
+    email?: string; phone?: string;
+    addressLine1: string; city: string; state: string; postalCode: string;
+    licenseNumber?: string; licenseState?: string;
+  }) {
+    const [row] = await db.select().from(s.crmDivisions)
+      .where(and(eq(s.crmDivisions.orgId, orgId), eq(s.crmDivisions.code, d.code))).limit(1);
+    if (row) return row;
+    return (await db.insert(s.crmDivisions).values({
+      orgId, code: d.code, name: d.name, isHeadquarters: d.isHeadquarters ?? false,
+      email: d.email ?? null, phone: d.phone ?? null,
+      addressLine1: d.addressLine1, city: d.city, state: d.state, postalCode: d.postalCode,
+      licenseNumber: d.licenseNumber ?? null, licenseState: d.licenseState ?? null,
+    } as any).returning())[0];
+  }
+  await ensureDivision({
+    code: "WA", name: "Aspire Interiors — Washington", isHeadquarters: true,
+    email: "hq@aspireinteriors.co", phone: "(360) 555-0142",
+    addressLine1: "2211 Meridian St", city: "Bellingham", state: "WA", postalCode: "98225",
+    licenseNumber: "ASPIRII881JD", licenseState: "WA",
+  });
+  const flDivision = await ensureDivision({
+    code: "FL", name: "Aspire Interiors — Florida",
+    email: "fl@aspireinteriors.co", phone: "(941) 555-0107",
+    addressLine1: "1847 Main Street", city: "Sarasota", state: "FL", postalCode: "34236",
+    licenseNumber: "CBC1264418", licenseState: "FL",
+  });
+  // One project explicitly runs under the Florida division — its estimates and
+  // invoices carry the FL address, never the WA HQ's.
+  await db.update(s.crmProjects).set({ divisionId: flDivision.id, updatedAt: new Date() })
+    .where(eq(s.crmProjects.id, projNguyen.id));
+
   // ── Estimates (one approved, one open) ────────────────────────────────────
   async function ensureEstimate(e: {
     number: string; customerId: string; projectId?: string; title: string;

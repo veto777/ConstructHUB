@@ -20,6 +20,9 @@ import {
 } from "@shared/schema";
 import { and, eq, desc, asc, ilike, or, sql, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import {
+  divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, getDivision,
+} from "./divisions";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -139,6 +142,7 @@ const projectSchema = z.object({
   trades: z.array(z.string().max(60)).max(20).nullable().optional(),
   projectManagerMemberId: z.string().max(64).nullable().optional(),
   salesMemberId: z.string().max(64).nullable().optional(),
+  divisionId: z.string().max(64).nullable().optional(),
   contractValueCents: z.number().int().min(0).nullable().optional(),
   budgetCents: z.number().int().min(0).nullable().optional(),
   permitNumber: z.string().max(80).nullable().optional(),
@@ -283,6 +287,12 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (req.query.customerId) where.push(eq(crmProjects.customerId, String(req.query.customerId)));
     // A field tech without viewAllJobs sees only projects they're PM on.
     if (!ctx.permissions.viewAllJobs) where.push(eq(crmProjects.projectManagerMemberId, ctx.member.id));
+    // A division-scoped member sees only their division's projects (plus the
+    // unassigned commons) — mirrors the viewAllJobs idiom above.
+    const divScope = divisionScopeOf(ctx.member);
+    if (divScope) {
+      where.push(or(eq(crmProjects.divisionId, divScope), isNull(crmProjects.divisionId)) as any);
+    }
 
     const rows = await db.select().from(crmProjects).where(and(...where))
       .orderBy(desc(crmProjects.createdAt)).limit(500);
@@ -301,6 +311,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const [cust] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, parsed.data.customerId))).limit(1);
     if (!cust) return res.status(400).json({ message: "Customer not found in this organization" });
+    if (parsed.data.divisionId) {
+      const div = await getDivision(ctx.org.id, parsed.data.divisionId);
+      if (!div) return res.status(400).json({ message: "Division not found in this organization" });
+    }
 
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmProjects)
       .where(eq(crmProjects.orgId, ctx.org.id));
@@ -319,6 +333,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (parsed.data.budgetCents !== undefined && !ctx.permissions.seeCosts) {
       return res.status(403).json({ message: "Requires permission: seeCosts" });
     }
+    if (parsed.data.divisionId) {
+      const div = await getDivision(ctx.org.id, parsed.data.divisionId);
+      if (!div) return res.status(400).json({ message: "Division not found in this organization" });
+    }
     const patch: any = { ...parsed.data, updatedAt: new Date() };
     if (parsed.data.status) patch.stageChangedAt = new Date();
     const [row] = await db.update(crmProjects).set(patch)
@@ -335,9 +353,15 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const where = [eq(crmJobs.orgId, ctx.org.id)];
     if (req.query.projectId) where.push(eq(crmJobs.projectId, String(req.query.projectId)));
     const rows = await db.select().from(crmJobs).where(and(...where)).orderBy(asc(crmJobs.createdAt)).limit(500);
-    const visible = ctx.permissions.viewAllJobs
+    let visible = ctx.permissions.viewAllJobs
       ? rows
       : rows.filter((j) => (j.assignedMemberIds || []).includes(ctx.member.id));
+    // Division scoping follows the job's project.
+    const divScope = divisionScopeOf(ctx.member);
+    if (divScope) {
+      const maps = await divisionMapsForOrg(ctx.org.id);
+      visible = visible.filter((j) => divisionVisible(divScope, maps.byProject.get(j.projectId) ?? null));
+    }
     res.json({ jobs: visible, statuses: CRM_JOB_STATUSES });
   });
 
@@ -372,8 +396,15 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const where = [eq(crmEstimates.orgId, ctx.org.id)];
     if (req.query.customerId) where.push(eq(crmEstimates.customerId, String(req.query.customerId)));
     if (req.query.status) where.push(eq(crmEstimates.status, String(req.query.status)));
-    const rows = await db.select().from(crmEstimates).where(and(...where))
+    let rows = await db.select().from(crmEstimates).where(and(...where))
       .orderBy(desc(crmEstimates.createdAt)).limit(500);
+    // Division scoping: the estimate's project's division, else its customer's
+    // latest project's, else unassigned (visible to everyone).
+    const divScope = divisionScopeOf(ctx.member);
+    if (divScope) {
+      const maps = await divisionMapsForOrg(ctx.org.id);
+      rows = rows.filter((e) => divisionVisible(divScope, docDivisionFromMaps(maps, e)));
+    }
     res.json(rows.map((e) => presentEstimate(e, ctx)));
   });
 

@@ -29,6 +29,7 @@ import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmClientAuthRoutes } from "./client-auth";
 import { registerCrmScheduleRoutes } from "./schedule";
+import { registerCrmDivisionRoutes, getDivision } from "./divisions";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 
@@ -90,6 +91,7 @@ const memberPatchSchema = z.object({
   phone: z.string().max(40).nullable().optional(),
   calendarColor: z.string().max(20).nullable().optional(),
   hourlyCostCents: z.number().int().min(0).max(100_000_00).nullable().optional(),
+  divisionId: z.string().max(64).nullable().optional(),
   permissions: permissionsSchema.nullable().optional(),
 });
 
@@ -98,6 +100,7 @@ const inviteSchema = z.object({
   role: roleSchema.default("field"),
   permissions: permissionsSchema.optional(),
   displayName: z.string().max(120).optional(),
+  divisionId: z.string().max(64).nullable().optional(),
 });
 
 /** Strip anything the caller isn't allowed to see (cost rates are privileged). */
@@ -113,6 +116,7 @@ function presentMember(m: typeof crmMembers.$inferSelect, canSeeCosts: boolean) 
     phone: m.phone,
     avatarUrl: m.avatarUrl,
     calendarColor: m.calendarColor,
+    divisionId: m.divisionId,
     hourlyCostCents: canSeeCosts ? m.hourlyCostCents : undefined,
     permissions: m.permissions ?? null,
     effectivePermissions: crmEffectivePermissions(m.role, m.permissions),
@@ -137,6 +141,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmClientAuthRoutes(app);
   // Read-only schedule + activity feeds for the mobile ribbon.
   registerCrmScheduleRoutes(app, getDevUser);
+  // Divisions: WA HQ + FL style operating arms of one company.
+  registerCrmDivisionRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -398,6 +404,11 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         return res.status(402).json({ message: "Seat limit reached", seats });
       }
     }
+    // A division scope must point at one of the org's own divisions.
+    if (parsed.data.divisionId) {
+      const div = await getDivision(ctx.org.id, parsed.data.divisionId);
+      if (!div) return res.status(400).json({ message: "Division not found in this organization" });
+    }
 
     const [row] = await db
       .update(crmMembers)
@@ -460,10 +471,14 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
     const parsed = inviteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid invitation", issues: parsed.error.issues });
-    const { email, role, permissions, displayName } = parsed.data;
+    const { email, role, permissions, displayName, divisionId } = parsed.data;
 
     if (role === "owner" && ctx.member.role !== "owner") {
       return res.status(403).json({ message: "Only an owner can invite another owner" });
+    }
+    if (divisionId) {
+      const div = await getDivision(ctx.org.id, divisionId);
+      if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
 
     const seats = await getSeatUsage(ctx.org);
@@ -494,6 +509,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         email: lower,
         role,
         permissions: permissions ?? null,
+        divisionId: divisionId ?? null,
         token,
         invitedByUserId: user.id,
         expiresAt,
@@ -504,7 +520,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (existing.length) {
       await db
         .update(crmMembers)
-        .set({ status: "invited", role, permissions: permissions ?? null, displayName: displayName ?? null, updatedAt: new Date() })
+        .set({ status: "invited", role, permissions: permissions ?? null, displayName: displayName ?? null, divisionId: divisionId ?? null, updatedAt: new Date() })
         .where(eq(crmMembers.id, existing[0].id));
     } else {
       await db.insert(crmMembers).values({
@@ -514,6 +530,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         role,
         status: "invited",
         displayName: displayName ?? null,
+        divisionId: divisionId ?? null,
         permissions: permissions ?? null,
       });
     }
@@ -638,6 +655,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         role: invite.role,
         status: "active",
         permissions: invite.permissions ?? null,
+        divisionId: invite.divisionId ?? null,
         displayName: account?.displayName ?? null,
         avatarUrl: account?.avatarUrl ?? null,
       });

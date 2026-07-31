@@ -35,10 +35,18 @@ interface Member {
   title: string | null;
   phone: string | null;
   calendarColor: string | null;
+  divisionId: string | null;
   hourlyCostCents?: number | null;
   permissions: PermissionMap | null;
   effectivePermissions: PermissionMap;
   lastActiveAt: string | null;
+}
+
+interface Division {
+  id: string;
+  name: string;
+  code: string;
+  isHeadquarters: boolean;
 }
 
 interface Seats {
@@ -88,6 +96,7 @@ interface Invitation {
   id: string;
   email: string;
   role: string;
+  divisionId: string | null;
   expiresAt: string | null;
   createdAt: string | null;
 }
@@ -168,6 +177,9 @@ export default function CrmTeamPage() {
     queryKey: ["/api/crm/invitations"],
     enabled: canManageTeam,
   });
+  const { data: divisions } = useQuery<Division[]>({ queryKey: ["/api/crm/divisions"] });
+  const divisionLabel = (id: string | null | undefined) =>
+    id ? divisions?.find((d) => d.id === id)?.code ?? null : null;
 
   // ── Profile ────────────────────────────────────────────────────────────────
   const [profile, setProfile] = useState({ displayName: "", title: "", phone: "" });
@@ -214,11 +226,16 @@ export default function CrmTeamPage() {
   // ── Team ───────────────────────────────────────────────────────────────────
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("field");
+  const [inviteDivision, setInviteDivision] = useState("all");
   const [lastLink, setLastLink] = useState<string | null>(null);
 
   const invite = useMutation({
     mutationFn: async () =>
-      (await apiRequest("POST", "/api/crm/invitations", { email: inviteEmail, role: inviteRole })).json(),
+      (await apiRequest("POST", "/api/crm/invitations", {
+        email: inviteEmail,
+        role: inviteRole,
+        divisionId: inviteDivision === "all" ? null : inviteDivision,
+      })).json(),
     onSuccess: (data: any) => {
       setInviteEmail("");
       setLastLink(data.link ?? null);
@@ -503,6 +520,19 @@ export default function CrmTeamPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {divisions && divisions.length > 0 && (
+                    <Select value={inviteDivision} onValueChange={setInviteDivision}>
+                      <SelectTrigger className="sm:w-48" data-testid="select-invite-division">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All divisions</SelectItem>
+                        {divisions.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>{d.name} ({d.code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Button onClick={() => invite.mutate()}
                     disabled={!inviteEmail || invite.isPending || !seats.canAddSeat}
                     data-testid="button-send-invite">
@@ -540,6 +570,9 @@ export default function CrmTeamPage() {
                       <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="truncate text-sm">{inv.email}</span>
                       <StatusPill tone={roleTone(inv.role)}>{inv.role}</StatusPill>
+                      {divisionLabel(inv.divisionId) && (
+                        <StatusPill tone="neutral">{divisionLabel(inv.divisionId)}</StatusPill>
+                      )}
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => revoke.mutate(inv.id)}
                       data-testid={`button-revoke-${inv.id}`}>
@@ -587,6 +620,24 @@ export default function CrmTeamPage() {
                           </Select>
                         ) : (
                           <StatusPill tone={roleTone(m.role)}>{m.role}</StatusPill>
+                        )}
+                        {divisions && divisions.length > 0 && (
+                          canManageTeam && !isOwner ? (
+                            <Select value={m.divisionId ?? "all"}
+                              onValueChange={(v) => updateMember.mutate({ id: m.id, patch: { divisionId: v === "all" ? null : v } })}>
+                              <SelectTrigger className="w-44" data-testid={`select-division-${m.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All divisions</SelectItem>
+                                {divisions.map((d) => (
+                                  <SelectItem key={d.id} value={d.id}>{d.name} ({d.code})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            divisionLabel(m.divisionId) && <StatusPill tone="neutral">{divisionLabel(m.divisionId)}</StatusPill>
+                          )
                         )}
                         {canManageTeam && !isOwner && m.status === "active" && (
                           <Button size="sm" variant="ghost" onClick={() => removeMember.mutate(m.id)}

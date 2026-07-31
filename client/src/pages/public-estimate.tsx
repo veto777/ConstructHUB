@@ -180,6 +180,14 @@ export default function PublicEstimatePage() {
             <img src={company.logoUrl} alt={company.name} className="h-14 mx-auto object-contain" />
           )}
           <h1 className="text-2xl font-semibold tracking-tight">{company.name}</h1>
+          {(company.addressLine1 || company.city) && (
+            <div className="text-sm text-muted-foreground" data-testid="text-company-address">
+              {[
+                [company.addressLine1, company.addressLine2].filter(Boolean).join(", "),
+                [company.city, [company.state, company.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+              ].filter(Boolean).join(" · ")}
+            </div>
+          )}
           <div className="text-sm text-muted-foreground flex flex-wrap justify-center gap-x-4 gap-y-1">
             {company.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{company.phone}</span>}
             {company.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{company.email}</span>}

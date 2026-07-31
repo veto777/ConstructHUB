@@ -1048,6 +1048,9 @@ export const crmMembers = pgTable("crm_members", {
   // membership (not the user) because the same person can cost different
   // amounts to different orgs.
   hourlyCostCents: integer("hourly_cost_cents"),
+  // Division scoping: null = all divisions. A member pinned to a division (and
+  // not the owner) sees only that division's work in list endpoints.
+  divisionId: varchar("division_id"),
   // Sparse overrides on top of the role defaults; see CRM_PERMISSIONS.
   permissions: jsonb("permissions"),
   lastActiveAt: timestamp("last_active_at"),
@@ -1063,6 +1066,8 @@ export const crmInvitations = pgTable("crm_invitations", {
   email: text("email").notNull(),
   role: text("role").notNull().default("field"),
   permissions: jsonb("permissions"),
+  // Pre-assign the division the invitee will be scoped to on accept.
+  divisionId: varchar("division_id"),
   token: text("token").notNull().unique(),
   invitedByUserId: integer("invited_by_user_id"),
   expiresAt: timestamp("expires_at"),
@@ -1082,6 +1087,38 @@ export type InsertCrmMember = z.infer<typeof insertCrmMemberSchema>;
 export const insertCrmInvitationSchema = createInsertSchema(crmInvitations).omit({ id: true, createdAt: true });
 export type CrmInvitation = typeof crmInvitations.$inferSelect;
 export type InsertCrmInvitation = z.infer<typeof insertCrmInvitationSchema>;
+
+// ── Divisions: one company, several operating arms ─────────────────────────
+// The owner runs two divisions of one company (e.g. WA headquarters + FL).
+// A division carries its own branding — address, license, contact — because an
+// estimate for Florida work must never go out with the WA HQ address on it.
+// Projects are assigned to a division; estimates/invoices resolve their
+// branding through their project, falling back to the org when none is set.
+export const crmDivisions = pgTable("crm_divisions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),          // short tag: "WA", "FL"
+  // Contact — nullable, falls back to the org's when absent.
+  email: text("email"),
+  phone: text("phone"),
+  // Branding address — what prints on estimates and invoices.
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  // Per-state licensing (a FL license is not the WA one).
+  licenseNumber: text("license_number"),
+  licenseState: text("license_state"),
+  isHeadquarters: boolean("is_headquarters").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCrmDivisionSchema = createInsertSchema(crmDivisions).omit({ id: true, createdAt: true, updatedAt: true });
+export type CrmDivision = typeof crmDivisions.$inferSelect;
+export type InsertCrmDivision = z.infer<typeof insertCrmDivisionSchema>;
 
 // ── Homeowner client portal (client.constructhub.*) ─────────────────────────
 // Magic-link sign-in for the contractor's end customers. Raw tokens never hit
@@ -1308,6 +1345,9 @@ export const crmProjects = pgTable("crm_projects", {
   trades: text("trades").array(),
   projectManagerMemberId: varchar("project_manager_member_id"),
   salesMemberId: varchar("sales_member_id"),
+  // Which division of the company this job belongs to. Drives the branding on
+  // its estimates/invoices and division-scoped list visibility.
+  divisionId: varchar("division_id"),
   // Money in integer cents, always.
   contractValueCents: integer("contract_value_cents"),
   budgetCents: integer("budget_cents"),
