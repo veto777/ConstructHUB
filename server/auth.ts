@@ -437,6 +437,16 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/auth/me", async (req, res) => {
+    // Demo/dev autologin: the SPA boots off this endpoint, so it must honor the
+    // same flags as getDevUser (routes.ts) or the demo instance shows a login
+    // wall while every API call actually works. Demo = isolated throwaway DB.
+    const demoOrBypass =
+      process.env.CRM_DEMO_AUTOLOGIN === "true" ||
+      (process.env.DEV_AUTH_BYPASS_USER1 === "true" && process.env.NODE_ENV !== "production");
+    if ((!req.isAuthenticated() || !req.user) && demoOrBypass) {
+      req.user = { id: 1 } as any;
+      (req as any).isAuthenticated = () => true;
+    }
     if (req.isAuthenticated() && req.user) {
       try {
         const [fresh] = await db.select().from(users).where(eq(users.id, req.user.id));
