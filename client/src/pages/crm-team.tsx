@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Users, Building2, UserCircle, ShieldCheck, Mail, Loader2, Trash2,
-  Copy, AlertTriangle, Plus, Check, ArrowRight,
+  Copy, AlertTriangle, Plus, Check, ArrowRight, RefreshCw, KeyRound,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, roleTone,
@@ -259,6 +259,21 @@ export default function CrmTeamPage() {
     },
   });
 
+  const resendInvite = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("POST", `/api/crm/invitations/${id}/resend`, {})).json(),
+    onSuccess: (data: any) => {
+      // Delivery failed — surface the fresh link for manual copy, same as the
+      // create flow does.
+      if (!data.emailed) setLastLink(data.link ?? null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invitations"] });
+      toast({
+        title: "Invitation resent",
+        description: data.emailed ? undefined : "Email delivery failed — copy the link below instead.",
+      });
+    },
+    onError: (e: any) => toast({ title: "Could not resend", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   const updateMember = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) =>
       (await apiRequest("PATCH", `/api/crm/members/${id}`, patch)).json(),
@@ -269,10 +284,29 @@ export default function CrmTeamPage() {
     onError: (e: any) => toast({ title: "Could not update", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  const sendPasswordReset = useMutation({
+    mutationFn: async (id: string) =>
+      (await apiRequest("POST", `/api/crm/members/${id}/send-password-reset`, {})).json(),
+    onSuccess: (data: any) => {
+      if (data.emailed) {
+        toast({ title: "Password reset email sent" });
+      } else {
+        toast({
+          title: "Couldn't send the reset email",
+          description: "Email delivery failed — ask them to use \"Forgot password\" on the sign-in page instead.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (e: any) => toast({ title: "Could not send reset email", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   const removeMember = useMutation({
     mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/crm/members/${id}`, undefined)).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/members"] });
+      // Removing an invited member also revokes their pending invitation.
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invitations"] });
       toast({ title: "Team member deactivated" });
     },
     onError: (e: any) => toast({ title: "Could not remove", description: String(e.message ?? e), variant: "destructive" }),
@@ -575,10 +609,18 @@ export default function CrmTeamPage() {
                         <StatusPill tone="neutral">{divisionLabel(inv.divisionId)}</StatusPill>
                       )}
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => revoke.mutate(inv.id)}
-                      data-testid={`button-revoke-${inv.id}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" title="Resend invitation"
+                        onClick={() => resendInvite.mutate(inv.id)} disabled={resendInvite.isPending}
+                        data-testid={`button-resend-invite-${inv.id}`}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" title="Revoke invitation"
+                        onClick={() => revoke.mutate(inv.id)}
+                        data-testid={`button-revoke-${inv.id}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>
@@ -641,11 +683,20 @@ export default function CrmTeamPage() {
                             divisionLabel(m.divisionId) && <StatusPill tone="neutral">{divisionLabel(m.divisionId)}</StatusPill>
                           )
                         )}
-                        {canManageTeam && !isOwner && m.status === "active" && (
-                          <Button size="sm" variant="ghost" onClick={() => removeMember.mutate(m.id)}
-                            data-testid={`button-remove-${m.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        {canManageTeam && !isOwner && (
+                          <>
+                            <Button size="sm" variant="ghost" title="Send password reset email"
+                              onClick={() => sendPasswordReset.mutate(m.id)} disabled={sendPasswordReset.isPending}
+                              data-testid={`button-reset-password-${m.id}`}>
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost"
+                              title={m.status === "invited" ? "Revoke invite and remove" : "Remove from team"}
+                              onClick={() => removeMember.mutate(m.id)}
+                              data-testid={`button-remove-${m.id}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
