@@ -27,7 +27,7 @@ import type { Express } from "express";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import { crmAppointments, crmCustomers, crmOrgs, crmProjects } from "@shared/schema";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { getBaseUrl } from "../auth";
 import { oauthBaseUrl } from "../site-context";
@@ -149,6 +149,31 @@ async function saveGoogleConnection(orgId: string, gc: GoogleConnection | null):
     .where(eq(crmOrgs.id, orgId));
 }
 
+// Per-member connections: each team member may hook up their OWN Google
+// account and get only the appointments assigned to them. Stored beside the
+// org-level connection (customFields.googleCalendarMembers[memberId]) — the
+// org-level "company calendar" stays the owner/admin's optional, separate
+// choice and receives everything.
+function memberConnectionOf(org: typeof crmOrgs.$inferSelect, memberId: string): GoogleConnection | null {
+  const cf = (org.customFields ?? {}) as Record<string, any>;
+  const gc = cf.googleCalendarMembers?.[memberId];
+  return gc && typeof gc.refreshToken === "string" && gc.refreshToken ? (gc as GoogleConnection) : null;
+}
+
+async function saveMemberConnection(orgId: string, memberId: string, gc: GoogleConnection | null): Promise<void> {
+  const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
+  const cf = { ...((org?.customFields ?? {}) as Record<string, any>) };
+  const members = { ...((cf.googleCalendarMembers as Record<string, any>) ?? {}) };
+  if (gc) members[memberId] = gc;
+  else delete members[memberId];
+  if (Object.keys(members).length) cf.googleCalendarMembers = members;
+  else delete cf.googleCalendarMembers;
+  await db
+    .update(crmOrgs)
+    .set({ customFields: cf, updatedAt: new Date() })
+    .where(eq(crmOrgs.id, orgId));
+}
+
 async function googleTokenRequest(params: Record<string, string>): Promise<any> {
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -228,7 +253,15 @@ const toGcalEvent = (e: ICalEvent, orgId: string, timeZone: string) => ({
 
 // ── Appointments → feed events ───────────────────────────────────────────────
 
-async function orgFeedEvents(orgId: string): Promise<ICalEvent[]> {
+/** All the org's appointments — or, with `memberId`, only the ones dispatched
+ *  to that member (their own schedule, for their own Google calendar). */
+async function orgFeedEvents(orgId: string, memberId?: string): Promise<ICalEvent[]> {
+  const where = memberId
+    ? and(
+        eq(crmAppointments.orgId, orgId),
+        sql`${crmAppointments.dispatchedMemberIds} @> ARRAY[${memberId}]::text[]`,
+      )
+    : eq(crmAppointments.orgId, orgId);
   const rows = await db
     .select({
       appointment: crmAppointments,
@@ -243,7 +276,7 @@ async function orgFeedEvents(orgId: string): Promise<ICalEvent[]> {
     .from(crmAppointments)
     .leftJoin(crmProjects, eq(crmProjects.id, crmAppointments.projectId))
     .leftJoin(crmCustomers, eq(crmCustomers.id, crmAppointments.customerId))
-    .where(eq(crmAppointments.orgId, orgId))
+    .where(where)
     .orderBy(asc(crmAppointments.startsAt))
     .limit(1000);
 
@@ -326,18 +359,24 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     if (!ctx) return;
 
     const gc = googleConnectionOf(ctx.org);
+    const mine = memberConnectionOf(ctx.org, ctx.member.id);
+    const present = (c: GoogleConnection | null) =>
+      c
+        ? {
+            connectedAt: c.connectedAt,
+            calendarId: c.calendarId ?? null,
+            lastSyncAt: c.lastSyncAt ?? null,
+            lastSyncError: c.lastSyncError ?? null,
+          }
+        : null;
     res.json({
       configured: googleCalendarConfigured(),
       missing: googleCalendarMissing(),
       scope: CALENDAR_EVENTS_SCOPE,
-      connection: gc
-        ? {
-            connectedAt: gc.connectedAt,
-            calendarId: gc.calendarId ?? null,
-            lastSyncAt: gc.lastSyncAt ?? null,
-            lastSyncError: gc.lastSyncError ?? null,
-          }
-        : null,
+      // The org-wide "company calendar" (owner/admin's optional choice)…
+      connection: present(gc),
+      // …and this member's own connection — their appointments, their account.
+      myConnection: present(mine),
     });
   });
 
@@ -346,7 +385,10 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    if (!requirePermission(res, ctx, "manageSettings")) return;
+    // scope=me → the member's own calendar (any member may connect their own);
+    // otherwise the org-wide company calendar (owner/admin only).
+    const scope = req.query?.scope === "me" ? "me" : "org";
+    if (scope === "org" && !requirePermission(res, ctx, "manageSettings")) return;
     if (!googleCalendarConfigured()) {
       return res.status(503).json({
         message: "Google Calendar sync isn't configured on this server yet.",
@@ -354,7 +396,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
       });
     }
 
-    // CSRF: bind the OAuth round-trip to this session + org.
+    // CSRF: bind the OAuth round-trip to this session + org (+ member scope).
     const state = createHash("sha256")
       .update(`${ctx.org.id}:${Date.now()}:${Math.random()}`)
       .digest("hex")
@@ -362,6 +404,8 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     if (req.session) {
       req.session.googleCalendarState = state;
       req.session.googleCalendarOrgId = ctx.org.id;
+      req.session.googleCalendarScope = scope;
+      req.session.googleCalendarMemberId = scope === "me" ? ctx.member.id : null;
     }
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID!,
@@ -376,7 +420,11 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
   });
 
   app.get("/api/crm/calendar/google/callback", async (req: any, res) => {
-    const back = (q: string) => res.redirect(`/crm/settings?calendar=${q}`);
+    // A member-scope connect returns to the Team page (every member can reach
+    // it); an org-scope connect returns to Settings as before.
+    const scope = req.session?.googleCalendarScope === "me" ? "me" : "org";
+    const back = (q: string) =>
+      res.redirect(scope === "me" ? `/crm/team?calendar=${q}` : `/crm/settings?calendar=${q}`);
     const user = getDevUser(req, res);
     if (!user) return;
     if (!googleCalendarConfigured()) return back("error=not_configured");
@@ -388,12 +436,17 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
       return back("error=state_mismatch");
     }
     const orgId = req.session.googleCalendarOrgId;
+    const memberId = req.session.googleCalendarMemberId ?? null;
     delete req.session.googleCalendarState;
     delete req.session.googleCalendarOrgId;
+    delete req.session.googleCalendarScope;
+    delete req.session.googleCalendarMemberId;
 
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (ctx.org.id !== orgId) return back("error=org_mismatch");
+    // The member slot being written must be the member who started the flow.
+    if (scope === "me" && ctx.member.id !== memberId) return back("error=member_mismatch");
 
     try {
       const tok = await googleTokenRequest({
@@ -406,7 +459,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
       if (!tok.refresh_token) {
         return back("error=no_refresh_token");
       }
-      await saveGoogleConnection(ctx.org.id, {
+      const gc: GoogleConnection = {
         refreshToken: tok.refresh_token,
         accessToken: tok.access_token ?? null,
         accessTokenExpiresAt: tok.expires_in
@@ -414,7 +467,9 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
           : null,
         connectedAt: new Date().toISOString(),
         connectedByMemberId: ctx.member.id,
-      });
+      };
+      if (scope === "me") await saveMemberConnection(ctx.org.id, ctx.member.id, gc);
+      else await saveGoogleConnection(ctx.org.id, gc);
       return back("connected=1");
     } catch (e: any) {
       console.error("[crm] google calendar connect failed:", e?.message || e);
@@ -434,15 +489,20 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    if (!requirePermission(res, ctx, "manageSettings")) return;
+    // scope=me → the member's own calendar with only their appointments (any
+    // member); otherwise the org-wide company calendar (owner/admin only).
+    const scope = req.query?.scope === "me" ? "me" : "org";
+    if (scope === "org" && !requirePermission(res, ctx, "manageSettings")) return;
     if (!googleCalendarConfigured()) {
       return res.status(503).json({
         message: "Google Calendar sync isn't configured on this server yet.",
         missing: googleCalendarMissing(),
       });
     }
-    let gc = googleConnectionOf(ctx.org);
+    let gc = scope === "me" ? memberConnectionOf(ctx.org, ctx.member.id) : googleConnectionOf(ctx.org);
     if (!gc) return res.status(409).json({ message: "Google Calendar is not connected yet." });
+    const saveGc = (g: GoogleConnection) =>
+      scope === "me" ? saveMemberConnection(ctx.org.id, ctx.member.id, g) : saveGoogleConnection(ctx.org.id, g);
 
     try {
       const refreshed = await googleAccessToken(gc);
@@ -470,7 +530,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
       } while (pageToken);
 
       const timeZone = ctx.org.timezone || "UTC";
-      const events = await orgFeedEvents(ctx.org.id);
+      const events = await orgFeedEvents(ctx.org.id, scope === "me" ? ctx.member.id : undefined);
       const live = events.filter((e) => e.status !== "canceled");
       const liveIds = new Set(live.map((e) => e.id));
 
@@ -505,14 +565,14 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
 
       gc.lastSyncAt = new Date().toISOString();
       gc.lastSyncError = null;
-      await saveGoogleConnection(ctx.org.id, gc);
+      await saveGc(gc);
       res.json({ ok: true, calendarId, upserted, deleted, total: live.length });
     } catch (e: any) {
       const message = String(e?.message || e).slice(0, 300);
       console.error("[crm] google calendar sync failed:", message);
       gc.lastSyncAt = new Date().toISOString();
       gc.lastSyncError = message;
-      await saveGoogleConnection(ctx.org.id, gc);
+      await saveGc(gc);
       res.status(502).json({ message });
     }
   });
@@ -522,8 +582,11 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    if (!requirePermission(res, ctx, "manageSettings")) return;
-    const gc = googleConnectionOf(ctx.org);
+    // Members may always disconnect their own; the company calendar needs
+    // manageSettings, as before.
+    const scope = req.query?.scope === "me" ? "me" : "org";
+    if (scope === "org" && !requirePermission(res, ctx, "manageSettings")) return;
+    const gc = scope === "me" ? memberConnectionOf(ctx.org, ctx.member.id) : googleConnectionOf(ctx.org);
     if (!gc) return res.status(404).json({ message: "Google Calendar is not connected" });
 
     // Best-effort revoke at Google; the local connection is dropped regardless
@@ -533,7 +596,8 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
         method: "POST",
       }).catch((e: any) => console.error("[crm] google revoke:", e?.message || e));
     }
-    await saveGoogleConnection(ctx.org.id, null);
+    if (scope === "me") await saveMemberConnection(ctx.org.id, ctx.member.id, null);
+    else await saveGoogleConnection(ctx.org.id, null);
     res.json({ ok: true });
   });
 }

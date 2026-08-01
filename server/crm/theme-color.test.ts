@@ -191,8 +191,10 @@ describe("org theme over the API (dev server)", () => {
       // Valid id → 200, merged into custom_fields. Assertions land on THIS
       // PATCH's own .returning() row — immune to other suites concurrently
       // writing the same column (they hold their own snapshots).
+      // themeBase pinned explicitly: the dev org's base is whatever was last
+      // clicked in the UI, and this assertion must not depend on that.
       const good = await api("/api/crm/org", {
-        method: "PATCH", body: JSON.stringify({ themeColor: "green" }),
+        method: "PATCH", body: JSON.stringify({ themeColor: "green", themeBase: "black" }),
       }, cookie);
       expect(good.status).toBe(200);
       expect((good.body.customFields as any)?.themeColor).toBe("green");

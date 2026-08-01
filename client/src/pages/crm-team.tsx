@@ -17,6 +17,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Users, Building2, UserCircle, ShieldCheck, Mail, Loader2, Trash2,
   Copy, AlertTriangle, Plus, Check, ArrowRight, RefreshCw, KeyRound,
+  CalendarDays, Unplug,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, roleTone,
@@ -130,6 +131,109 @@ const PERM_LABEL: Record<string, string> = {
 function humanMoney(cents?: number | null) {
   if (cents === null || cents === undefined) return "";
   return (cents / 100).toFixed(2);
+}
+
+/**
+ * Every member's own Google Calendar hookup — THEIR appointments in THEIR
+ * Google account. Independent of the company-wide calendar the owner/admin
+ * may (optionally) connect in Settings: if the company one exists it carries
+ * everything; either way each member handles their own scheduling here.
+ */
+function MyGoogleCalendarCard() {
+  const { toast } = useToast();
+  const { data: status } = useQuery<any>({ queryKey: ["/api/crm/calendar/google/status"] });
+  const mine = status?.myConnection ?? null;
+
+  // The OAuth round-trip lands back on /crm/team?calendar=connected|error=….
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const cal = q.get("calendar");
+    if (!cal) return;
+    if (cal === "connected" || q.get("connected")) {
+      toast({ title: "Google Calendar connected", description: "Your appointments will sync to your own calendar." });
+    } else {
+      toast({ title: "Google Calendar connection failed", description: q.get("error") ?? cal, variant: "destructive" });
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("calendar");
+    url.searchParams.delete("error");
+    window.history.replaceState({}, "", url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const connect = useMutation({
+    mutationFn: async () => (await apiRequest("GET", "/api/crm/calendar/google/connect?scope=me")).json(),
+    onSuccess: (r: any) => { if (r.url) window.location.href = r.url; },
+    onError: (e: any) => toast({ title: "Couldn't start Google connect", description: String(e.message ?? e), variant: "destructive" }),
+  });
+  const syncNow = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/calendar/google/sync?scope=me", {})).json(),
+    onSuccess: (r: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
+      toast({ title: "Calendar synced", description: `${r.upserted ?? 0} updated · ${r.deleted ?? 0} removed.` });
+    },
+    onError: (e: any) => toast({ title: "Sync failed", description: String(e.message ?? e), variant: "destructive" }),
+  });
+  const disconnect = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/calendar/google/disconnect?scope=me", {})).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
+      toast({ title: "Google Calendar disconnected" });
+    },
+    onError: (e: any) => toast({ title: "Couldn't disconnect", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  if (status && !status.configured) return null; // server has no Google OAuth app set up
+
+  return (
+    <Card className="mt-4" data-testid="card-my-google-calendar">
+      <CardHeader>
+        <SectionTitle
+          icon={CalendarDays}
+          title="My Google Calendar"
+          description="Your appointments, synced to your own Google account. The company calendar (if your admin connects one in Settings) is separate and carries everyone's."
+        />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {mine ? (
+          <>
+            <div className="text-sm text-muted-foreground" data-testid="text-my-gcal-status">
+              Connected{mine.connectedAt ? ` since ${new Date(mine.connectedAt).toLocaleDateString()}` : ""}
+              {mine.lastSyncAt ? ` · last synced ${new Date(mine.lastSyncAt).toLocaleString()}` : " · not synced yet"}
+            </div>
+            {mine.lastSyncError && (
+              <p className="text-sm text-destructive" data-testid="text-my-gcal-error">
+                Last sync failed: {mine.lastSyncError}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}
+                data-testid="button-my-gcal-sync">
+                {syncNow.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                Sync now
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}
+                data-testid="button-my-gcal-disconnect">
+                {disconnect.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Unplug className="h-3.5 w-3.5 mr-1.5" />}
+                Disconnect
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="sm" onClick={() => connect.mutate()} disabled={connect.isPending}
+              data-testid="button-my-gcal-connect">
+              {connect.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+              Connect my Google Calendar
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Only appointments assigned to you are synced — into a dedicated calendar in your account.
+            </span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function CrmTeamPage() {
@@ -424,6 +528,8 @@ export default function CrmTeamPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <MyGoogleCalendarCard />
         </TabsContent>
 
         {/* ── Company ────────────────────────────────────────────────────── */}
