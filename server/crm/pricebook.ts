@@ -16,11 +16,13 @@ import {
   crmEstimateOptions,
   CRM_PB_PRICING_MODES, CRM_PB_UNITS, CRM_PB_SYMBOLS,
   crmMeasurements, CRM_MEASUREMENT_PROVIDERS,
+  crmOrgs,
 } from "@shared/schema";
 import { and, eq, asc, desc, ilike, or, sql } from "drizzle-orm";
-import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { requireOrg, requireOwnerRole, requirePermission, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
 import { evalFormula, validateFormula, formulaSymbols, FormulaError } from "./formula";
+import { priceFloorLockOf } from "./price-floor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -152,6 +154,33 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (perm && !requirePermission(res, ctx, perm)) return null;
     return ctx;
   }
+
+  // ── Price-floor lock (org setting, owner only) ────────────────────────────
+  // Lives in custom_fields->'priceFloorLock' — merged, never a wholesale
+  // replace, like notificationPrefs on PATCH /api/crm/org (routes.ts, which
+  // this lane does not touch). Enforcement is in entities.ts/discounts.ts;
+  // the owner's price chart and discounts stay editable regardless.
+  app.put("/api/crm/org/price-floor-lock", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (!requireOwnerRole(res, ctx)) return;
+    const p = z.object({
+      enabled: z.boolean(),
+      floorBps: z.number().int().min(0).max(10_000).nullable().optional(),
+    }).safeParse(req.body);
+    if (!p.success) return res.status(400).json({ message: "Invalid price-floor lock", issues: p.error.issues });
+
+    const base = { ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}) };
+    base.priceFloorLock = {
+      enabled: p.data.enabled,
+      ...(p.data.floorBps != null ? { floorBps: p.data.floorBps } : {}),
+    };
+    const [row] = await db.update(crmOrgs)
+      .set({ customFields: base, updatedAt: new Date() })
+      .where(eq(crmOrgs.id, ctx.org.id))
+      .returning();
+    res.json({ ...row, priceFloorLock: priceFloorLockOf(row?.customFields) });
+  });
 
   // ── Reference data ────────────────────────────────────────────────────────
 
