@@ -29,12 +29,13 @@ import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl } from "../site-context";
-import { logEvent, presentEstimate } from "./entities";
+import { logEvent, presentEstimate, recalcEstimate } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
+import { recordActivity } from "./activity";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
-import { recomputeApprovalTotals } from "./discounts";
+import { recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
 import { storeGeneratedPdf } from "./attachments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
@@ -435,12 +436,35 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         id: o.id, code: o.code, label: o.label,
         percentBps: o.percentBps, conditions: o.conditions,
       })),
-      options: options.map((o) => ({
-        id: o.id, name: o.name, tier: o.tier, description: o.description,
-        recommended: o.recommended,
-        totalCents: o.showTotal ? o.totalCents : undefined,
-        selectedAt: o.selectedAt,
-      })),
+      options: options.map((o) => {
+        // An option carrying its own line items is a client-selectable scope;
+        // subtotal/taxable are recomputed here so the page's live total can
+        // never drift from what select-options would generate.
+        const scopeItems = Array.isArray(o.items) ? (o.items as any[]) : [];
+        let subtotal = 0, taxable = 0;
+        for (const i of scopeItems) {
+          const line = Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 1000)) / 1000);
+          subtotal += line;
+          if (i.taxable !== false) taxable += line;
+        }
+        return {
+          id: o.id, name: o.name, tier: o.tier, description: o.description,
+          recommended: o.recommended,
+          totalCents: o.showTotal ? o.totalCents : undefined,
+          selectedAt: o.selectedAt,
+          selectable: scopeItems.length > 0,
+          subtotalCents: scopeItems.length ? subtotal : undefined,
+          taxableCents: scopeItems.length ? taxable : undefined,
+        };
+      }),
+      // A selection-generated estimate pre-ticks the discounts the client
+      // already chose on the source document (matched by code against THIS
+      // estimate's own offer rows — ids are per-estimate).
+      preselectedDiscounts: (() => {
+        const codes = (est.customFields as any)?.preselectedDiscountCodes;
+        if (!Array.isArray(codes) || !codes.length) return undefined;
+        return discountOffers.filter((o) => codes.includes(o.code)).map((o) => o.id);
+      })(),
     });
   });
 
@@ -527,6 +551,175 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }
 
     res.json({ ok: true, status: row.status });
+  });
+
+  /**
+   * Client-selectable scopes ("good/better/best", mix-and-match): the client
+   * ticks options on the public page; this regenerates the estimate with ONLY
+   * the chosen scopes' items, so the normal approve flow signs exactly what
+   * they picked. The original is never deleted — it's the contractor's
+   * record — and re-selecting supersedes the previous generated estimate
+   * (cancelled with a pointer to its replacement), never a zombie duplicate.
+   * Gated like the read: the client's session must cover the customer.
+   */
+  app.post("/api/public/estimates/:token/select-options", async (req: any, res) => {
+    const t = String(req.params.token || "");
+    const parsed = z.object({
+      optionIds: z.array(z.string().max(64)).min(1).max(20),
+      selectedDiscounts: z.array(z.string().max(64)).max(20).optional(),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid selection", issues: parsed.error.issues });
+
+    const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
+    if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    if (!(await requireDocSession(req, res, est.customerId))) return;
+    if (est.approvedAt || est.declinedAt) {
+      return res.status(409).json({ message: "This estimate has already been responded to." });
+    }
+    if (est.expiresAt && est.expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({ message: "This estimate has expired. Please contact us for an updated quote." });
+    }
+
+    const options = await db.select().from(crmEstimateOptions)
+      .where(eq(crmEstimateOptions.estimateId, est.id)).orderBy(asc(crmEstimateOptions.tier));
+    const byId = new Map(options.map((o) => [o.id, o]));
+    const chosen: typeof options = [];
+    for (const id of [...new Set(parsed.data.optionIds)]) {
+      const o = byId.get(id);
+      if (!o) return res.status(400).json({ message: "One of those options doesn't belong to this estimate." });
+      if (!Array.isArray(o.items) || !(o.items as any[]).length) {
+        return res.status(400).json({ message: `"${o.name}" has no priced scope to select.` });
+      }
+      chosen.push(o);
+    }
+
+    // Discount ids are validated against the ORIGINAL's own enabled offers —
+    // ids only, percentages are never taken from the client.
+    const selections = await resolveSelectedOffers(est.orgId, est.id, parsed.data.selectedDiscounts ?? []);
+
+    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEstimates)
+      .where(eq(crmEstimates.orgId, est.orgId));
+
+    const [newEst] = await db.insert(crmEstimates).values({
+      orgId: est.orgId, customerId: est.customerId, projectId: est.projectId,
+      number: `E-${1000 + n + 1}`,
+      title: `${est.title} — your selections`.slice(0, 200),
+      introText: est.introText, termsText: est.termsText,
+      taxRateBps: est.taxRateBps,
+      publicToken: randomBytes(24).toString("hex"),
+      status: "sent", sentAt: new Date(), sentToEmail: est.sentToEmail,
+      // Picking scopes doesn't extend the deal — the new document inherits
+      // the original's expiry.
+      expiresAt: est.expiresAt,
+      createdByMemberId: est.createdByMemberId,
+      customFields: {
+        selectedFromEstimateId: est.id,
+        selectedFromNumber: est.number ?? null,
+        selectedOptionNames: chosen.map((o) => o.name),
+        preselectedDiscountCodes: selections.map((s) => s.code),
+      },
+    } as any).returning();
+
+    const scopeItems = chosen.flatMap((o) => o.items as any[]);
+    await db.insert(crmEstimateItems).values(
+      scopeItems.map((i, idx) => ({
+        orgId: est.orgId, estimateId: newEst.id,
+        kind: typeof i.kind === "string" ? i.kind : "labor",
+        name: String(i.name ?? "Item").slice(0, 300),
+        description: i.description ?? null,
+        quantityMilli: i.quantityMilli ?? 1000,
+        unit: i.unit ?? null,
+        unitPriceCents: i.unitPriceCents ?? 0,
+        unitCostCents: i.unitCostCents ?? null,
+        taxable: i.taxable !== false,
+        hiddenFromClient: false,
+        sortOrder: idx,
+      })) as any,
+    );
+
+    // The offers travel with the deal so the client can adjust ticks before
+    // approving the regenerated document (pre-ticked by code in the payload).
+    const offers = await db.select().from(crmEstimateDiscounts)
+      .where(and(
+        eq(crmEstimateDiscounts.orgId, est.orgId),
+        eq(crmEstimateDiscounts.estimateId, est.id),
+        eq(crmEstimateDiscounts.enabled, true),
+      ))
+      .orderBy(asc(crmEstimateDiscounts.sortOrder), asc(crmEstimateDiscounts.createdAt));
+    if (offers.length) {
+      await db.insert(crmEstimateDiscounts).values(
+        offers.map((o, idx) => ({
+          orgId: est.orgId, estimateId: newEst.id,
+          code: o.code, label: o.label, percentBps: o.percentBps,
+          conditions: o.conditions, enabled: true, sortOrder: idx,
+        })) as any,
+      );
+    }
+
+    const fresh = await recalcEstimate(est.orgId, newEst.id);
+    const newNumber = fresh?.number ?? newEst.number;
+    await logEvent(est.orgId, newEst.id, "created", "client", req, {
+      from: est.number ?? est.id, options: chosen.map((o) => o.name),
+    });
+
+    // Re-selection supersedes the previous generated estimate — cancelled
+    // with a pointer to its replacement, never a zombie duplicate.
+    const prior = await db.select().from(crmEstimates)
+      .where(and(
+        eq(crmEstimates.orgId, est.orgId),
+        sql`${crmEstimates.customFields}->>'selectedFromEstimateId' = ${est.id}`,
+        sql`${crmEstimates.id} <> ${newEst.id}`,
+        isNull(crmEstimates.approvedAt), isNull(crmEstimates.declinedAt),
+      ));
+    for (const p of prior) {
+      if (p.status === "cancelled") continue;
+      await db.update(crmEstimates).set({
+        status: "cancelled", updatedAt: new Date(),
+        customFields: {
+          ...((p.customFields as Record<string, unknown> | null) ?? {}),
+          supersededAt: new Date().toISOString(),
+          supersededByEstimateId: newEst.id,
+          supersededByNumber: newNumber,
+        },
+      }).where(eq(crmEstimates.id, p.id));
+      await logEvent(est.orgId, p.id, "cancelled", "client", req, { supersededBy: newNumber });
+    }
+
+    // The contractor sees the selection on the ORIGINAL's trail (event +
+    // audit row) and on the document itself.
+    await db.update(crmEstimates).set({
+      customFields: {
+        ...((est.customFields as Record<string, unknown> | null) ?? {}),
+        clientSelection: {
+          at: new Date().toISOString(),
+          optionNames: chosen.map((o) => o.name),
+          newEstimateId: newEst.id,
+          newEstimateNumber: newNumber,
+        },
+      },
+      updatedAt: new Date(),
+    }).where(eq(crmEstimates.id, est.id));
+    await logEvent(est.orgId, est.id, "options_selected", "client", req, {
+      options: chosen.map((o) => o.name), newEstimateNumber: newNumber,
+      totalCents: fresh?.totalCents ?? 0,
+    });
+    recordActivity({
+      orgId: est.orgId, actorLabel: "client",
+      action: "estimate_options_selected",
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: {
+        options: chosen.map((o) => o.name), newEstimateNumber: newNumber,
+        totalCents: fresh?.totalCents ?? 0,
+      },
+    });
+
+    res.json({
+      ok: true,
+      token: newEst.publicToken,
+      estimateId: newEst.id,
+      number: newNumber,
+      totalCents: fresh?.totalCents ?? 0,
+    });
   });
 
   // ── Email verification challenge ──────────────────────────────────────────
