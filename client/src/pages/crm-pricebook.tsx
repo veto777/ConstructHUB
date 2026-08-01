@@ -7,10 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   BookOpen, Plus, Loader2, Package, Wrench, Calculator, Percent, Sparkles, AlertTriangle,
+  Pencil, Trash2,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, SectionTitle, crmTable } from "@/components/crm-ui";
 
@@ -46,7 +54,7 @@ export default function CrmPriceBookPage() {
   };
 
   const itemsState = listState(itemsLoading, itemsError, items,
-    `No assemblies yet.${canManage ? " Add the starter set above, or build one from materials." : ""}`);
+    `No SKUs yet.${canManage ? " Add one below, or seed the starter set above." : ""}`);
   const matsState = listState(matsLoading, matsError, materials, "No materials yet.");
   const laborState = listState(laborLoading, laborError, labor, "No labor rates yet.");
 
@@ -85,6 +93,51 @@ export default function CrmPriceBookPage() {
     onSuccess: () => { invalidate(); setLab({ name: "", cost: "", price: "" }); toast({ title: "Labor rate added" }); },
   });
 
+  // ── price chart SKU: add / edit / delete ──
+  const emptyItemForm = {
+    name: "", code: "", unit: "ea", pricingMode: "computed",
+    flatPrice: "", flatCost: "", description: "",
+  };
+  // dlg.id null → creating; otherwise editing that item.
+  const [dlg, setDlg] = useState<{ id: string | null; form: typeof emptyItemForm } | null>(null);
+  const openEdit = (i: any) => setDlg({
+    id: i.id,
+    form: {
+      name: i.name ?? "", code: i.code ?? "", unit: i.unit ?? "ea",
+      pricingMode: i.pricingMode ?? "computed",
+      flatPrice: i.flatPriceCents != null ? (i.flatPriceCents / 100).toString() : "",
+      flatCost: i.flatCostCents != null ? (i.flatCostCents / 100).toString() : "",
+      description: i.description ?? "",
+    },
+  });
+  const saveItem = useMutation({
+    mutationFn: async () => {
+      if (!dlg) throw new Error("No item");
+      const body: any = {
+        name: dlg.form.name, code: dlg.form.code || null,
+        unit: dlg.form.unit, pricingMode: dlg.form.pricingMode,
+        description: dlg.form.description || null,
+      };
+      if (dlg.form.pricingMode === "flat") {
+        body.flatPriceCents = Math.round((parseFloat(dlg.form.flatPrice) || 0) * 100);
+        body.flatCostCents = Math.round((parseFloat(dlg.form.flatCost) || 0) * 100);
+      }
+      const r = await apiRequest(dlg.id ? "PATCH" : "POST",
+        dlg.id ? `/api/crm/pricebook/items/${dlg.id}` : "/api/crm/pricebook/items", body);
+      return r.json();
+    },
+    onSuccess: () => {
+      invalidate(); setDlg(null);
+      toast({ title: dlg?.id ? "SKU updated" : "SKU added" });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: String(e.message ?? e), variant: "destructive" }),
+  });
+  const delItem = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/crm/pricebook/items/${id}`)).json(),
+    onSuccess: () => { invalidate(); toast({ title: "SKU deleted" }); },
+    onError: (e: any) => toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   // ── formula tester ──
   const [f, setF] = useState({ formula: "ceil([SQUARES] * (1 + [WASTE]/100))", squares: "32", waste: "10" });
   const [fres, setFres] = useState<string | null>(null);
@@ -120,7 +173,7 @@ export default function CrmPriceBookPage() {
       <CrmPageHeader
         icon={BookOpen}
         title="Price book"
-        subtitle="Build assemblies once, then estimate by quantity. Waste factors are a real field, not a formula trick."
+        subtitle="Price each SKU once, then estimate by quantity. Waste factors are a real field, not a formula trick."
         actions={canManage && !itemsLoading && !items?.length ? (
           <Button variant="outline" onClick={() => seed.mutate()} disabled={seed.isPending} data-testid="button-seed-pb">
             {seed.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
@@ -131,21 +184,29 @@ export default function CrmPriceBookPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-muted/60 p-1 flex-wrap h-auto max-w-full justify-start sm:h-10 sm:flex-nowrap">
-          <TabsTrigger value="items"><Package className="h-4 w-4 mr-1" /> Assemblies</TabsTrigger>
+          <TabsTrigger value="items"><Package className="h-4 w-4 mr-1" /> Price Chart</TabsTrigger>
           <TabsTrigger value="materials"><Wrench className="h-4 w-4 mr-1" /> Materials</TabsTrigger>
           <TabsTrigger value="labor"><Percent className="h-4 w-4 mr-1" /> Labor</TabsTrigger>
           <TabsTrigger value="formula"><Calculator className="h-4 w-4 mr-1" /> Formulas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items" className="mt-4 space-y-3">
+          {canManage && (
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" onClick={() => setDlg({ id: null, form: { ...emptyItemForm } })}
+                data-testid="button-add-item">
+                <Plus className="h-4 w-4 mr-1" /> Add SKU
+              </Button>
+            </div>
+          )}
           {itemsState && !items?.length && !itemsLoading && !itemsError ? (
             <Card>
               <EmptyState
                 icon={Package}
-                title="No assemblies yet"
+                title="No SKUs yet"
                 description={canManage
-                  ? "Add the starter set above, or build one from materials."
-                  : "Assemblies bundle materials and labor into one priced unit."}
+                  ? "Add your first SKU above, or seed the starter roofing set."
+                  : "Each SKU bundles materials and labor into one priced unit."}
               />
             </Card>
           ) : itemsState ? (
@@ -171,6 +232,24 @@ export default function CrmPriceBookPage() {
                       data-testid={`button-preview-${i.id}`}>
                       Preview
                     </Button>
+                    {canManage && (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(i)}
+                          data-testid={`button-edit-item-${i.id}`}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost"
+                          onClick={() => {
+                            if (window.confirm(`Delete "${i.name}"? It stays on estimates that already use it.`)) {
+                              delItem.mutate(i.id);
+                            }
+                          }}
+                          disabled={delItem.isPending}
+                          data-testid={`button-delete-item-${i.id}`}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
                 {i.formulaSymbols?.length > 0 && (
@@ -224,7 +303,7 @@ export default function CrmPriceBookPage() {
           <Card>
             <CardHeader>
               <SectionTitle title="Materials"
-                description="Waste % is applied to quantity when an assembly expands." />
+                description="Waste % is applied to quantity when a SKU expands." />
             </CardHeader>
             <CardContent className="space-y-4">
               {canManage && (
@@ -365,6 +444,88 @@ export default function CrmPriceBookPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!dlg} onOpenChange={(open) => { if (!open) setDlg(null); }}>
+        <DialogContent data-testid="dialog-item">
+          <DialogHeader>
+            <DialogTitle>{dlg?.id ? "Edit SKU" : "Add SKU"}</DialogTitle>
+          </DialogHeader>
+          {dlg && (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Name</Label>
+                  <Input value={dlg.form.name}
+                    onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, name: e.target.value } })}
+                    placeholder="Re-roof, architectural" data-testid="input-item-name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Code</Label>
+                  <Input value={dlg.form.code}
+                    onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, code: e.target.value } })}
+                    placeholder="RR-ARCH-1L" data-testid="input-item-code" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Unit</Label>
+                  <Select value={dlg.form.unit}
+                    onValueChange={(v) => setDlg({ ...dlg, form: { ...dlg.form, unit: v } })}>
+                    <SelectTrigger data-testid="select-item-unit"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(meta?.units ?? ["ea", "sq", "sf", "lf", "hr", "job"]).map((u: string) => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Pricing mode</Label>
+                  <Select value={dlg.form.pricingMode}
+                    onValueChange={(v) => setDlg({ ...dlg, form: { ...dlg.form, pricingMode: v } })}>
+                    <SelectTrigger data-testid="select-item-pricing"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(meta?.pricingModes ?? ["flat", "computed", "formula", "percentage"]).map((m: string) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {dlg.form.pricingMode === "flat" && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Price $</Label>
+                      <Input type="number" value={dlg.form.flatPrice}
+                        onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, flatPrice: e.target.value } })}
+                        data-testid="input-item-flat-price" />
+                    </div>
+                    {seeCosts && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Cost $</Label>
+                        <Input type="number" value={dlg.form.flatCost}
+                          onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, flatCost: e.target.value } })}
+                          data-testid="input-item-flat-cost" />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Description</Label>
+                <Textarea rows={2} value={dlg.form.description}
+                  onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, description: e.target.value } })}
+                  data-testid="input-item-description" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDlg(null)} data-testid="button-cancel-item">Cancel</Button>
+            <Button disabled={!dlg?.form.name || saveItem.isPending} onClick={() => saveItem.mutate()}
+              data-testid="button-save-item">
+              {saveItem.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {dlg?.id ? "Save changes" : "Add SKU"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CrmPage>
   );
 }

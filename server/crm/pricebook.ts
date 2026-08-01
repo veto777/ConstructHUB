@@ -377,6 +377,51 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     });
   });
 
+  app.patch("/api/crm/pricebook/items/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "managePriceBook");
+    if (!ctx) return;
+    const p = itemSchema.partial().safeParse(req.body);
+    if (!p.success) return res.status(400).json({ message: "Invalid item", issues: p.error.issues });
+    // Validate the formula before it can poison an estimate.
+    if (p.data.qtyFormula) {
+      const v = validateFormula(p.data.qtyFormula);
+      if (!v.ok) return res.status(400).json({ message: `Formula error: ${v.error}` });
+    }
+    const { parts, ...patch } = p.data;
+    const [row] = await db.update(crmPbItems).set({ ...patch, updatedAt: new Date() } as any)
+      .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, req.params.id))).returning();
+    if (!row) return res.status(404).json({ message: "Item not found" });
+    // Parts are replaced wholesale when supplied — a partial merge of "the
+    // shingles line" against "the underlayment line" would be guesswork.
+    if (parts) {
+      const bad = parts.find((x) => x.qtyFormula && !validateFormula(x.qtyFormula).ok);
+      if (bad) return res.status(400).json({ message: `Part formula error in "${bad.qtyFormula}"` });
+      await db.delete(crmPbItemParts)
+        .where(and(eq(crmPbItemParts.orgId, ctx.org.id), eq(crmPbItemParts.itemId, row.id)));
+      if (parts.length) {
+        await db.insert(crmPbItemParts).values(parts.map((x, i) => ({
+          ...x, orgId: ctx.org.id, itemId: row.id, sortOrder: i,
+        })) as any);
+      }
+    }
+    res.json(row);
+  });
+
+  /**
+   * Soft delete. Estimate lines are value copies, but packages and accessories
+   * reference the item by id and expandItem doesn't filter on active — so the
+   * row stays and just leaves the active list, same rule as materials.
+   */
+  app.delete("/api/crm/pricebook/items/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "managePriceBook");
+    if (!ctx) return;
+    const [row] = await db.update(crmPbItems).set({ active: false, updatedAt: new Date() })
+      .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, req.params.id),
+        eq(crmPbItems.active, true))).returning({ id: crmPbItems.id });
+    if (!row) return res.status(404).json({ message: "Item not found" });
+    res.json({ ok: true });
+  });
+
   /**
    * Accessories — optional add-ons offered with a parent item (Leap's
    * accessories). The table existed and was read by GET items/:id but had no
