@@ -8,7 +8,7 @@ single shared server on `127.0.0.1:8119` / `constructhub_dev`.
 
 | piece    | env var       | default            | lane aN                     |
 | -------- | ------------- | ------------------ | --------------------------- |
-| port     | `E2E_PORT`    | `8119`             | `8130 + N` (a1 → 8131, …)   |
+| port     | `E2E_PORT`    | `8119`             | `8119 + N*10` (a1 → 8129, …) |
 | database | `E2E_DB`      | `constructhub_dev` | `constructhub_dev_aN`       |
 | workers  | `E2E_WORKERS` | `4`                | same                        |
 | worktree | —             | main checkout      | `../ConstructHUB-aN`        |
@@ -24,7 +24,7 @@ setup/teardown SQL, so tests and server always land on the same database.
 ```bash
 npm run e2e:worktree -- a1          # worktree + branch lane/a1 + DB clone + port
 cd ../ConstructHUB-a1
-E2E_PORT=8131 E2E_DB=constructhub_dev_a1 npm run test:e2e
+E2E_PORT=8129 E2E_DB=constructhub_dev_a1 npm run test:e2e
 ```
 
 Pieces are also usable on their own:
@@ -46,6 +46,34 @@ an empty DB would trigger the full US-counties seed on server boot.
 
 Housekeeping: lane DBs and worktrees are throwaway, but they cost disk
 (~520 MB source + 34 MB DB each) — tear lanes down when the agent finishes.
+
+## Unit tests on a lane
+
+`npm test` (vitest) splits in two: pure unit tests, and `server/crm/*.test.ts`
+suites that talk to a running dev server over HTTP **and** run their own SQL.
+Point both knobs at the lane or the test-side writes land in the wrong DB:
+
+```bash
+DATABASE_URL=postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev_a1 \
+CRM_TEST_DATABASE_URL=postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev_a1 \
+CRM_TEST_BASE_URL=http://127.0.0.1:8129 \
+npm test
+```
+
+`DATABASE_URL` covers the test files that run their own SQL;
+`CRM_TEST_DATABASE_URL` covers `engagement.test.ts`, which poisons
+`DATABASE_URL` as an import shim and so reads the override instead.
+
+(The lane server for this is any dev server booted with the lane's
+`DATABASE_URL`/`PORT` — e.g. the one `npm run test:e2e`'s webServer starts,
+or a manual `PORT=8129 DATABASE_URL=… npx tsx --env-file=.env server/index.ts`.)
+
+Known re-run hazard, not lane-specific: `/api/client/auth/request-link` is
+rate-limited to 30 requests/IP per 15 minutes in-memory per server. Hammering
+repeated full suite runs at the same server exhausts it and client-auth /
+link-gating tests fail with 429/401 until the window slides. Separate lanes
+(separate server processes) sidestep this entirely.
+
 
 ## Why `workers` is 4 but four spec files are `@serial`
 
@@ -70,6 +98,23 @@ asserts absolute counts of shared rows, tag its describe `{ tag: "@serial" }`.
 A green run does not prove a new spec is parallel-safe — check what shared
 rows it reads/writes.
 
+Evidence (2026-08-01): the parallel phase passed 76/76 at 4 workers four
+times — twice on lane a1 and twice on lane a2, with the two lanes running
+full suites **simultaneously** (own ports, own DBs, own vite dev servers).
+After the vite-crash fix below, both full suites (76 parallel + 14 serial,
+90 tests each) finished green in the same overlapping window.
+
+## Dev-server crash found by the lanes (fixed)
+
+The first simultaneous two-lane run killed both lane servers mid-sweep with
+no stack trace: `server/vite.ts`'s custom vite logger called
+`process.exit(1)` on any dev-time vite error (e.g. an outdated-optimize-dep
+reload), and `process.exit` discarded the pending pipe write, so the message
+never surfaced. The logger now logs and keeps serving. Dev-only code path;
+production builds don't run vite. If a lane server ever dies silently again,
+suspect the same pattern — reproduce with the suite's own `webServer`, not
+a hand-started one, and grep the runner log for the last `[WebServer]` line.
+
 ## Swarm briefs that fit the 30-minute cap
 
 Split work so one brief ≈ 15 minutes. A brief that dies at 29 minutes resumes
@@ -88,7 +133,8 @@ Template:
 
 ```
 Lane: aN (run `npm run e2e:worktree -- aN` in /home/veto/ConstructHUB, then
-work in /home/veto/ConstructHUB-aN with E2E_PORT=813N E2E_DB=constructhub_dev_aN).
+work in /home/veto/ConstructHUB-aN with E2E_PORT=$((8119+N*10))
+E2E_DB=constructhub_dev_aN — the worktree script prints the exact values).
 
 Task: <one feature or fix, smallest viable slice>.
 Verify: npm run check && npx playwright test e2e/<relevant spec>.spec.ts

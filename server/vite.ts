@@ -21,8 +21,11 @@ export async function setupVite(server: Server, app: Express) {
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
+        // Log and keep serving. The old behaviour (process.exit(1)) turned
+        // any dev-time vite error — e.g. an outdated-optimize-dep reload —
+        // into a full server crash, which killed e2e runs mid-suite and
+        // swallowed the message (process.exit drops pending pipe writes).
         viteLogger.error(msg, options);
-        process.exit(1);
       },
     },
     server: serverOptions,

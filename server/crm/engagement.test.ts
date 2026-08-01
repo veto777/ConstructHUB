@@ -20,9 +20,12 @@ process.env.DATABASE_URL ||= "postgres://localhost:5432/unused_no_queries_run";
 // The public respond/engagement routes are email-gated: they need a
 // crm_client session covering the document's customer. Mint it directly —
 // same shape as a redeemed magic link. NOTE: DATABASE_URL is deliberately
-// poisoned above (import shim), so the pool uses the dev DSN explicitly.
+// poisoned above (import shim), so the pool can't read it — lane runs point
+// CRM_TEST_DATABASE_URL at their own DB instead (default: the shared dev DB).
 const pool = new pg.Pool({
-  connectionString: "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
+  connectionString:
+    process.env.CRM_TEST_DATABASE_URL ??
+    "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
 });
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 async function clientCookie(customerId: string): Promise<string> {
