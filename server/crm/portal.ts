@@ -33,6 +33,9 @@ import { emitCrmEvent } from "./integrations";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { recomputeApprovalTotals } from "./discounts";
+import { storeGeneratedPdf } from "./attachments";
+import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
+import type { CrmNotificationPref } from "@shared/schema";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -169,7 +172,7 @@ function publicEstimateView(
       taxCents: est.taxCents, totalCents: est.totalCents, depositCents: est.depositCents,
       taxableBaseCents,
       approvedTotalCents: est.approvedTotalCents, selectedDiscounts: est.selectedDiscounts,
-      expiresAt: est.expiresAt, sentAt: est.sentAt,
+      expiresAt: est.expiresAt, sentAt: est.sentAt, createdAt: est.createdAt,
       approvedAt: est.approvedAt, declinedAt: est.declinedAt,
       signatureName: est.signatureName,
     },
@@ -187,7 +190,14 @@ function publicEstimateView(
       ...companyBranding(org, division),
       warrantyText: org.warrantyText,
     },
-    customer: { displayName: cust.displayName, email: cust.email },
+    customer: {
+      displayName: cust.displayName, email: cust.email, phone: cust.phone,
+      // The client's own address — the 'Prepared for' block on the document
+      // letterhead. Never anyone else's: this route is session-gated to this
+      // exact customer.
+      addressLine1: cust.addressLine1, addressLine2: cust.addressLine2,
+      city: cust.city, state: cust.state, postalCode: cust.postalCode,
+    },
   };
 }
 
@@ -488,6 +498,11 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       // The PM's "job awarded" heads-up — separate from the owner's copy,
       // gated by its own notificationPref (jobApproved, default ON).
       if (approve) notifyJobApproved(req, est, row, cust, org).catch(() => {});
+      // Approval mints the signed contract: PDF built, stored (kind='contract'),
+      // emailed to client AND admin, listed in the client portal. Fire-and-
+      // forget — a generation/delivery failure must NEVER break the approval.
+      if (approve) void deliverSignedContract(req, row, cust, org).catch((e: any) =>
+        console.error("[crm] contract delivery failed:", String(e?.message || e).slice(0, 300)));
     }
 
     res.json({ ok: true, status: row.status });
@@ -918,6 +933,99 @@ async function notifyJobApproved(
   } as any).catch((e: any) => console.error("[crm] job-approved notify failed:", e?.message || e));
 }
 
+// ── Signed-contract delivery ────────────────────────────────────────────────
+
+/**
+ * Approval mints the contract: build the PDF, store it as a kind='contract'
+ * attachment (reachable through the same gated download routes as every other
+ * file), and email it to the client AND the company admin. The CLIENT copy
+ * always sends — they asked for it by signing; the admin copy honors the
+ * org's 'contractSigned' notificationPref (default ON). NOTE: the pref key is
+ * not yet in the shared CRM_NOTIFICATION_PREFS list because shared/schema.ts
+ * belongs to a parallel workstream — crmNotificationEnabled treats an absent
+ * key as ON either way, and the cast keeps tsc honest about that.
+ *
+ * Runs fire-and-forget from the approve route — nothing here may break the
+ * approval; the caller logs and swallows every failure.
+ */
+async function deliverSignedContract(
+  req: any,
+  est: typeof crmEstimates.$inferSelect, // the APPROVED row
+  cust: typeof crmCustomers.$inferSelect,
+  org: typeof crmOrgs.$inferSelect,
+) {
+  const [items, options, division, members] = await Promise.all([
+    db.select().from(crmEstimateItems)
+      .where(eq(crmEstimateItems.estimateId, est.id)).orderBy(asc(crmEstimateItems.sortOrder)),
+    db.select().from(crmEstimateOptions)
+      .where(eq(crmEstimateOptions.estimateId, est.id)).orderBy(asc(crmEstimateOptions.tier)),
+    resolveEstimateDivision(est),
+    db.select().from(crmMembers)
+      .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active"))),
+  ]);
+  const branding = companyBranding(org, division);
+
+  const pdf = await buildContractPdf({
+    branding,
+    orgName: org.name,
+    customer: cust,
+    estimate: est,
+    items: items
+      .filter((i) => !i.hiddenFromClient) // internal-only lines never leave the building
+      .map((i) => ({
+        name: i.name, description: i.description, quantityMilli: i.quantityMilli,
+        unit: i.unit, unitPriceCents: i.unitPriceCents,
+        lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
+      })),
+    options: options.map((o) => ({
+      name: o.name, description: o.description, recommended: o.recommended,
+      totalCents: o.showTotal ? o.totalCents : null,
+    })),
+    terms: org.termsAndConditions,
+  });
+  const fileName = contractFileName(est.number);
+  const att = await storeGeneratedPdf({
+    orgId: org.id, kind: "contract", refId: est.id, fileName, buffer: pdf,
+  });
+
+  const total = est.approvedTotalCents ?? est.totalCents;
+  const adminTo = contractAdminRecipients({
+    prefEnabled: crmNotificationEnabled(org.customFields, "contractSigned" as CrmNotificationPref),
+    members, orgEmail: org.email,
+  });
+  const clientTo = cust.email ? [cust.email] : [];
+
+  // Record the attempt BEFORE sending — the events trail is the durable proof
+  // of who the contract went to; SMTP delivery itself is best-effort.
+  await logEvent(org.id, est.id, "contract_emailed", "system", req, {
+    attachmentId: att.id, fileName, totalCents: total,
+    clientTo, adminTo, adminSkipped: adminTo.length === 0,
+  });
+
+  const subject = `${branding.name} — your signed contract ${est.number ?? ""}`.trim();
+  const html = (forAdmin: boolean) => `
+    <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
+      <p style="font-size:16px">${forAdmin ? `<strong>${esc(cust.displayName)}</strong> signed` : "Thank you — you signed"}
+        estimate <strong>${esc(est.number ?? "")}</strong> for <strong>${money(total)}</strong>.</p>
+      <p style="font-size:14px;color:#444">The signed contract is attached as a PDF${forAdmin ? "" : " — keep it for your records"}.
+        Signed as: ${esc(est.signatureName)}.</p>
+      <p style="font-size:13px;color:#666">${esc(branding.name)}${branding.phone ? ` &middot; ${esc(branding.phone)}` : ""}${branding.website ? ` &middot; ${esc(branding.website)}` : ""}</p>
+    </div>`;
+  const mail = {
+    subject,
+    attachments: [{ filename: fileName, content: pdf, contentType: "application/pdf" }],
+  };
+
+  if (clientTo.length) {
+    await sendWithFallback({ ...mail, to: clientTo.join(","), html: html(false), replyTo: branding.email || undefined } as any)
+      .catch((e: any) => console.error("[crm] contract email (client) failed:", String(e?.message || e).slice(0, 300)));
+  }
+  if (adminTo.length) {
+    await sendWithFallback({ ...mail, to: adminTo.join(","), html: html(true) } as any)
+      .catch((e: any) => console.error("[crm] contract email (admin) failed:", String(e?.message || e).slice(0, 300)));
+  }
+}
+
 // ── Invoices: send, public view with open tracking, and pay ─────────────────
 // Mirrors the estimate flow deliberately: same token pattern, same tracking,
 // same "email failed but the link still works" behaviour.
@@ -1029,6 +1137,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         taxCents: inv.taxCents, totalCents: inv.totalCents,
         retainageCents: inv.retainageCents, paidCents: inv.paidCents,
         dueCents: due, dueAt: inv.dueAt, paidAt: inv.paidAt, notes: inv.notes,
+        createdAt: inv.createdAt,
       },
       items: items.map((i) => ({
         id: i.id, name: i.name, description: i.description, unit: i.unit,
@@ -1036,7 +1145,11 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
       })),
       company: companyBranding(org, division),
-      customer: { displayName: cust.displayName },
+      customer: {
+        displayName: cust.displayName, email: cust.email, phone: cust.phone,
+        addressLine1: cust.addressLine1, addressLine2: cust.addressLine2,
+        city: cust.city, state: cust.state, postalCode: cust.postalCode,
+      },
     });
   });
 }

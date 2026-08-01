@@ -20,14 +20,15 @@ import {
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
   crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers,
-  crmNotificationEnabled,
+  crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES, CRM_APPOINTMENT_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
 } from "@shared/schema";
 import { and, eq, gte, lte, desc, asc, sql, ilike, isNull } from "drizzle-orm";
-import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
+import { autoSendPaymentReceipt } from "./receipts";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 
@@ -39,6 +40,24 @@ const METHOD_LABELS: Record<string, string> = {
   cash: "cash", check: "check", wire: "wire transfer", credit_card: "credit card",
   ach: "bank transfer (ACH)", card: "card", other: "another method",
 };
+
+/**
+ * Why an invoice may NOT be hard-deleted, or null when it can. A paid invoice
+ * — or one with ANY payment row recorded against it — is a money trail and is
+ * never deletable (voiding is the audit-preserving path for unpaid ones).
+ */
+export function invoiceDeleteRefusal(
+  inv: { status: string; paidCents: number | null; paidAt: Date | null },
+  paymentCount: number,
+): string | null {
+  if (inv.status === "paid" || (inv.paidCents ?? 0) > 0 || inv.paidAt) {
+    return "This invoice has been paid — paid money trails are never deletable.";
+  }
+  if (paymentCount > 0) {
+    return "Payments have been recorded against this invoice; it cannot be deleted.";
+  }
+  return null;
+}
 
 /** Tell the org owner money landed on an invoice (manual entry). Best-effort:
  *  email must never fail the request that recorded the payment. */
@@ -262,6 +281,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     // Tell the owner money landed (honors the paymentReceived notification pref).
     notifyPaymentRecorded(ctx.org, inv, parsed.data.amountCents, parsed.data.method)
       .catch((e: any) => console.error("[crm] payment-recorded email failed:", e?.message || e));
+    // And email the client their receipt-to-date (honors paymentReceipt).
+    autoSendPaymentReceipt(ctx.org.id, inv.id)
+      .catch((e: any) => console.error("[crm] auto-receipt failed:", e?.message || e));
     res.status(201).json({ payment: pay, invoice: row });
   });
 
@@ -280,6 +302,45 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       voidedAt: new Date(), status: "void", updatedAt: new Date(),
     }).where(eq(crmInvoices.id, inv.id)).returning();
     res.json(row);
+  });
+
+  /**
+   * Hard-delete an invoice — OWNER only (requireOwnerRole, never a permission
+   * flag), for cleaning up test documents. An invoice with ANY recorded
+   * payment, or one already paid, is a money trail: 409, never deletable.
+   * Line items and engagement sessions go with it in one transaction, and a
+   * deletion note lands on the client's activity.
+   */
+  app.delete("/api/crm/invoices/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (!requireOwnerRole(res, ctx)) return;
+    const [inv] = await db.select().from(crmInvoices)
+      .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
+    if (!inv) return res.status(404).json({ message: "Invoice not found" });
+
+    const [{ n: paymentCount }] = await db.select({ n: sql<number>`count(*)::int` })
+      .from(crmPayments)
+      .where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.invoiceId, inv.id)));
+    const refusal = invoiceDeleteRefusal(inv, paymentCount);
+    if (refusal) return res.status(409).json({ message: refusal });
+
+    await db.transaction(async (tx) => {
+      await tx.delete(crmInvoiceItems)
+        .where(and(eq(crmInvoiceItems.orgId, ctx.org.id), eq(crmInvoiceItems.invoiceId, inv.id)));
+      await tx.delete(crmEngagementSessions)
+        .where(and(eq(crmEngagementSessions.orgId, ctx.org.id),
+          eq(crmEngagementSessions.docType, "invoice"), eq(crmEngagementSessions.docId, inv.id)));
+      await tx.delete(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id)));
+    });
+
+    console.log(`[crm] owner ${ctx.member.id} deleted invoice ${inv.number ?? inv.id} (${inv.id}) in org ${ctx.org.id}`);
+    await db.insert(crmCustomerNotes).values({
+      orgId: ctx.org.id, customerId: inv.customerId, authorMemberId: ctx.member.id,
+      body: `Invoice ${inv.number ?? inv.id} ("${inv.title}") was permanently deleted by the account owner.`,
+    }).catch(() => {});
+    res.json({ ok: true, deleted: inv.id });
   });
 
   // ══ COST CODES + BUDGET LEDGER ════════════════════════════════════════════

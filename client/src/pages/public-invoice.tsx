@@ -3,7 +3,7 @@ import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle, CheckCircle2, Phone, Mail, Landmark, ShieldCheck } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, Phone, Mail, Globe, Landmark, ShieldCheck } from "lucide-react";
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
 import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
@@ -12,6 +12,7 @@ import { DocGateChallenge } from "@/components/doc-gate";
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const qty = (m: number) => (m / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
+const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
 
 /** Public invoice — authorised by the link PLUS a verified client session,
  *  like the estimate page. Anonymous browsers get the email challenge. */
@@ -78,29 +79,6 @@ export default function PublicInvoicePage() {
     <main className="min-h-screen bg-muted/40 py-10 px-4">
       <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
-        <div className="text-center space-y-1.5 pb-2">
-          {company.logoUrl && <img src={company.logoUrl} alt={company.name} className="h-14 mx-auto object-contain" />}
-          <h1 className="text-2xl font-semibold tracking-tight">{company.name}</h1>
-          {(company.addressLine1 || company.city) && (
-            <div className="text-sm text-muted-foreground" data-testid="text-company-address">
-              {[
-                [company.addressLine1, company.addressLine2].filter(Boolean).join(", "),
-                [company.city, [company.state, company.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
-              ].filter(Boolean).join(" · ")}
-            </div>
-          )}
-          <div className="text-sm text-muted-foreground flex flex-wrap justify-center gap-x-4">
-            {company.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{company.phone}</span>}
-            {company.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{company.email}</span>}
-          </div>
-          {company.licenseNumber && (
-            <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <ShieldCheck className="h-3 w-3" />
-              License {company.licenseNumber}{company.licenseState ? ` (${company.licenseState})` : ""}
-            </div>
-          )}
-        </div>
-
         {settled && (
           <Card className="border-emerald-500/50 bg-emerald-500/5">
             <CardContent className="p-5 flex items-start gap-3">
@@ -128,19 +106,72 @@ export default function PublicInvoicePage() {
           </Card>
         )}
 
-        <Card className="shadow-md">
-          <CardHeader className="border-b bg-muted/30 rounded-t-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-xl">{inv.title}</CardTitle>
-                <CardDescription className="mt-1">{inv.number} · for {customer.displayName}</CardDescription>
+        {/* The document itself — same letterhead layout as the estimate:
+            company left, document facts right, 'Prepared for', footer band. */}
+        <Card className="shadow-md overflow-hidden" data-testid="invoice-document">
+          <div className="border-b p-6 sm:p-8 space-y-6">
+            <div className="flex flex-wrap justify-between gap-x-8 gap-y-6">
+              <div className="space-y-1.5 min-w-0">
+                {company.logoUrl && <img src={company.logoUrl} alt={company.name} className="h-12 object-contain mb-1" />}
+                <h1 className="text-xl font-semibold tracking-tight">{company.name}</h1>
+                {(company.addressLine1 || company.city) && (
+                  <div className="text-sm text-muted-foreground" data-testid="text-company-address">
+                    {[
+                      [company.addressLine1, company.addressLine2].filter(Boolean).join(", "),
+                      [company.city, [company.state, company.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  {company.phone && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" />{company.phone}</div>}
+                  {company.email && <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" />{company.email}</div>}
+                  {company.website && <div className="flex items-center gap-1.5"><Globe className="h-3 w-3" />{company.website}</div>}
+                </div>
+                {company.licenseNumber && (
+                  <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-3 w-3" />
+                    License {company.licenseNumber}{company.licenseState ? ` (${company.licenseState})` : ""}
+                  </div>
+                )}
               </div>
-              <StatusPill tone={settled ? "success" : statusTone(inv.status)}>
-                {settled ? "paid" : inv.status}
-              </StatusPill>
+              <div className="sm:text-right space-y-1.5 shrink-0">
+                <div className="text-3xl font-bold tracking-tight text-primary" data-testid="doc-wordmark">INVOICE</div>
+                {inv.number && <div className="font-medium">{inv.number}</div>}
+                <div className="text-xs text-muted-foreground space-y-0.5">
+                  {inv.createdAt && <div>Created {day(inv.createdAt)}</div>}
+                  {inv.dueAt && <div>Due {day(inv.dueAt)}</div>}
+                </div>
+                <div>
+                  <StatusPill tone={settled ? "success" : statusTone(inv.status)}>
+                    {settled ? "paid" : inv.status}
+                  </StatusPill>
+                </div>
+                <div className="pt-1">
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Amount due</div>
+                  <div className="text-2xl font-bold tabular-nums" data-testid="doc-total">{money(inv.dueCents)}</div>
+                </div>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
+            <div className="rounded-lg border bg-muted/30 p-4" data-testid="prepared-for">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Prepared for</div>
+              <div className="font-medium mt-1">{customer.displayName}</div>
+              {(customer.addressLine1 || customer.city) && (
+                <div className="text-sm text-muted-foreground">
+                  {[
+                    [customer.addressLine1, customer.addressLine2].filter(Boolean).join(", "),
+                    [customer.city, [customer.state, customer.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+                  ].filter(Boolean).join(" · ")}
+                </div>
+              )}
+              {(customer.email || customer.phone) && (
+                <div className="text-sm text-muted-foreground">
+                  {[customer.email, customer.phone].filter(Boolean).join(" · ")}
+                </div>
+              )}
+            </div>
+          </div>
+          <CardContent className="p-6 sm:p-8 space-y-6">
+            <CardTitle className="text-xl">{inv.title}</CardTitle>
             <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50"><tr>
@@ -201,6 +232,16 @@ export default function PublicInvoicePage() {
 
             {inv.notes && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{inv.notes}</p>}
           </CardContent>
+          {/* Footer band — company name · license # · website. */}
+          <div className="border-t bg-muted/30 px-6 py-3.5 text-center text-xs text-muted-foreground" data-testid="document-footer">
+            {[
+              company.name,
+              company.licenseNumber
+                ? `License #${company.licenseNumber}${company.licenseState ? ` (${company.licenseState})` : ""}`
+                : null,
+              company.website,
+            ].filter(Boolean).join(" · ")}
+          </div>
         </Card>
 
         {!settled && !processing && inv.dueCents > 0 && (

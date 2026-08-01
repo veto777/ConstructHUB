@@ -129,8 +129,17 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
 - [ ] **2026-09-08: reapply for GBP API access** (see "GBP API access timeline" above — cloud reminder armed).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").
 - [ ] Rotate secrets (Stripe, Google, SMTP, R2 — provider dashboards; SESSION_SECRET + DB pw already fresh).
-- [ ] `STRIPE_WEBHOOK_SECRET` — owner creates the webhook endpoint (constructhub.us/api/stripe/webhook)
-      in the Stripe dashboard, pastes secret into vb7 `.env`, restart. Webhooks fail closed until then.
+- [x] `STRIPE_WEBHOOK_SECRET` — **DONE 2026-08-01.** Endpoint `we_1Tzdpj4e8DdHYZEhJ2zSi20W` created
+      via the Stripe API (no dashboard needed — the API returns the secret at creation), events:
+      `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`.
+      Secret in tower + vb7 `.env`; service restarted; unsigned POST → 400; endpoint `enabled`.
+- [x] CRM **Stripe Connect webhook** — **DONE 2026-08-01.** Endpoint `we_1TzeAd4e8DdHYZEhJOrdMGU8`
+      (`connect=true`) → `/api/crm/stripe/connect-webhook`, all 7 events `server/crm/integrations.ts`
+      handles. `STRIPE_CONNECT_WEBHOOK_SECRET` on tower + vb7; verified 400 on unsigned POST.
+- [ ] CRM Stripe Connect **client id** — owner: Stripe Dashboard → Settings → Connect →
+      Platform settings → copy the `ca_…` client ID into `STRIPE_CONNECT_CLIENT_ID` on vb7 `.env` +
+      restart. Until then contractors can't OAuth-connect their own Stripe accounts (the CRM
+      payments settings page reports exactly this as "missing"). Everything else is ready.
 - [ ] Real OpenAI key — `AI_INTEGRATIONS_OPENAI_API_KEY` is a boot-safe dummy; AI consultant/assistant
       endpoints error until a real key is set (Replit's modelfarm proxy no longer exists).
 - [ ] **Export real user data from Replit** — see the "Replit user-data export" section above for the

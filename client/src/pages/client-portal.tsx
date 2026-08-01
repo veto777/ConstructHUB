@@ -148,6 +148,16 @@ function Dashboard({ data }: { data: any }) {
     accounts = [], pamphlets = [], photos = [], financing = [],
   } = data;
 
+  // Signed-contract PDFs, minted server-side at approval and keyed by
+  // estimate id — each signed contract gets a download link when its PDF exists.
+  const { data: contractPdfs } = useQuery<any>({
+    queryKey: ["/api/client/contracts"],
+    retry: false,
+  });
+  const pdfByEstimate = new Map<string, any>(
+    (contractPdfs?.contracts ?? []).map((p: any) => [p.estimateId, p]),
+  );
+
   const now = Date.now();
   const awaitingEstimates = estimates.filter(
     (e: any) => !e.approvedAt && !e.declinedAt && (!e.expiresAt || new Date(e.expiresAt).getTime() > now),
@@ -338,6 +348,7 @@ function Dashboard({ data }: { data: any }) {
                     <th className={crmTable.th}>Signed by</th>
                     <th className={crmTable.th}>Signed on</th>
                     <th className={crmTable.thRight}>Value</th>
+                    <th className={crmTable.thRight}>Contract PDF</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -354,6 +365,15 @@ function Dashboard({ data }: { data: any }) {
                       <td className={crmTable.td}>{c.signedName ?? "—"}</td>
                       <td className={crmTable.td}>{day(c.signedAt) ?? "—"}</td>
                       <td className={crmTable.tdRight}>{money(c.totalCents)}</td>
+                      <td className={crmTable.tdRight}>
+                        {pdfByEstimate.get(c.id) && (
+                          <a href={pdfByEstimate.get(c.id).downloadUrl}
+                            className="font-medium text-primary hover:underline"
+                            data-testid={`client-contract-download-${c.id}`}>
+                            Download
+                          </a>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

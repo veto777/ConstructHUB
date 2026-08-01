@@ -20,6 +20,7 @@ import { EstimateAttachments } from "@/components/client-uploads";
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const qty = (m: number) => (m / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
+const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
 
 /** Deposit payment, shown only after approval. ACH is highlighted because it is
  *  dramatically cheaper on a large deposit and the client should know. */
@@ -228,7 +229,7 @@ export default function PublicEstimatePage() {
     setSelectedDiscounts((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
 
   return (
-    <main className="min-h-screen bg-muted/40 py-10 px-4">
+    <main className="min-h-screen bg-muted/40 py-6 px-3 sm:py-10 sm:px-4">
       <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
         {preview && (
@@ -239,32 +240,6 @@ export default function PublicEstimatePage() {
             </CardContent>
           </Card>
         )}
-        {/* Letterhead — the company the client hired, not us. */}
-        <div className="text-center space-y-1.5 pb-2">
-          {company.logoUrl && (
-            <img src={company.logoUrl} alt={company.name} className="h-14 mx-auto object-contain" />
-          )}
-          <h1 className="text-2xl font-semibold tracking-tight">{company.name}</h1>
-          {(company.addressLine1 || company.city) && (
-            <div className="text-sm text-muted-foreground" data-testid="text-company-address">
-              {[
-                [company.addressLine1, company.addressLine2].filter(Boolean).join(", "),
-                [company.city, [company.state, company.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
-              ].filter(Boolean).join(" · ")}
-            </div>
-          )}
-          <div className="text-sm text-muted-foreground flex flex-wrap justify-center gap-x-4 gap-y-1">
-            {company.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{company.phone}</span>}
-            {company.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{company.email}</span>}
-            {company.website && <span className="flex items-center gap-1"><Globe className="h-3 w-3" />{company.website}</span>}
-          </div>
-          {company.licenseNumber && (
-            <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <ShieldCheck className="h-3 w-3" />
-              License {company.licenseNumber}{company.licenseState ? ` (${company.licenseState})` : ""}
-            </div>
-          )}
-        </div>
 
         {settled === "approved" && (
           <PayCard token={token!} company={company} estimate={e} />
@@ -317,27 +292,88 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
-        {/* The document itself */}
-        <Card className="shadow-md">
-          <CardHeader className="border-b bg-muted/30 rounded-t-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-xl">{e.title}</CardTitle>
-                <CardDescription className="mt-1">
-                  {e.number} · prepared for {customer.displayName}
-                </CardDescription>
+        {/* The document itself — a real letterhead: company on the left,
+            document facts on the right, 'Prepared for' below, footer band
+            at the bottom. */}
+        <Card className="shadow-md overflow-hidden" data-testid="estimate-document">
+          <div className="border-b p-4 sm:p-8 space-y-6">
+            <div className="flex flex-wrap justify-between gap-x-8 gap-y-6">
+              {/* Letterhead — the company the client hired, not us. */}
+              <div className="space-y-1.5 min-w-0">
+                {company.logoUrl && (
+                  <img src={company.logoUrl} alt={company.name} className="h-12 object-contain mb-1" />
+                )}
+                <h1 className="text-xl font-semibold tracking-tight">{company.name}</h1>
+                {(company.addressLine1 || company.city) && (
+                  <div className="text-sm text-muted-foreground" data-testid="text-company-address">
+                    {[
+                      [company.addressLine1, company.addressLine2].filter(Boolean).join(", "),
+                      [company.city, [company.state, company.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  {company.phone && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" />{company.phone}</div>}
+                  {company.email && <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" />{company.email}</div>}
+                  {company.website && <div className="flex items-center gap-1.5"><Globe className="h-3 w-3" />{company.website}</div>}
+                </div>
+                {company.licenseNumber && (
+                  <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-3 w-3" />
+                    License {company.licenseNumber}{company.licenseState ? ` (${company.licenseState})` : ""}
+                  </div>
+                )}
               </div>
-              <StatusPill tone={settled === "approved" ? "success" : settled ? "danger" : statusTone(e.status)}>
-                {settled ?? e.status}
-              </StatusPill>
+              {/* Document facts. The big number mirrors the totals block
+                  below — label and amount stay separate elements so the
+                  totals block's exact "Total $X" row remains unique. */}
+              <div className="sm:text-right space-y-1.5 shrink-0">
+                <div className="text-3xl font-bold tracking-tight text-primary" data-testid="doc-wordmark">ESTIMATE</div>
+                {e.number && <div className="font-medium">{e.number}</div>}
+                <div className="text-xs text-muted-foreground space-y-0.5">
+                  {e.createdAt && <div>Created {day(e.createdAt)}</div>}
+                  {e.expiresAt && <div>Valid until {day(e.expiresAt)}</div>}
+                </div>
+                <div>
+                  <StatusPill tone={settled === "approved" ? "success" : settled ? "danger" : statusTone(e.status)}>
+                    {settled ?? e.status}
+                  </StatusPill>
+                </div>
+                <div className="pt-1">
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</div>
+                  <div className="text-2xl font-bold tabular-nums" data-testid="doc-total">{money(shownTotalCents)}</div>
+                </div>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
+            {/* Prepared for — the client's own details. */}
+            <div className="rounded-lg border bg-muted/30 p-4" data-testid="prepared-for">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Prepared for</div>
+              <div className="font-medium mt-1">{customer.displayName}</div>
+              {(customer.addressLine1 || customer.city) && (
+                <div className="text-sm text-muted-foreground">
+                  {[
+                    [customer.addressLine1, customer.addressLine2].filter(Boolean).join(", "),
+                    [customer.city, [customer.state, customer.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+                  ].filter(Boolean).join(" · ")}
+                </div>
+              )}
+              {(customer.email || customer.phone) && (
+                <div className="text-sm text-muted-foreground">
+                  {[customer.email, customer.phone].filter(Boolean).join(" · ")}
+                </div>
+              )}
+            </div>
+          </div>
+          <CardContent className="p-4 sm:p-8 space-y-6">
+            <CardTitle className="text-xl">{e.title}</CardTitle>
             {e.introText && <p className="whitespace-pre-wrap text-sm leading-relaxed">{e.introText}</p>}
 
+            {/* Line items. Below sm each row stacks: name, "qty × price",
+                then the line total — no sideways scrolling on a phone. The
+                qty column folds into the price line; desktop is unchanged. */}
             <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
+              <table className="block sm:table w-full text-sm">
+                <thead className="hidden sm:table-header-group bg-muted/50">
                   <tr>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Item</th>
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground w-24">Qty</th>
@@ -345,16 +381,22 @@ export default function PublicEstimatePage() {
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground w-28">Total</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="block sm:table-row-group">
                   {items.map((i: any) => (
-                    <tr key={i.id} className="border-t">
-                      <td className="px-4 py-3">
+                    <tr key={i.id} className="block sm:table-row border-t px-4 py-3 sm:p-0">
+                      <td className="block sm:table-cell sm:px-4 sm:py-3">
                         <div className="font-medium">{i.name}</div>
                         {i.description && <div className="text-muted-foreground text-xs mt-0.5">{i.description}</div>}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{money(i.unitPriceCents)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">{money(i.lineTotalCents)}</td>
+                      <td className="hidden sm:table-cell px-4 py-3 text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
+                      <td className="block sm:table-cell mt-1 sm:mt-0 sm:px-4 sm:py-3 sm:text-right tabular-nums">
+                        <span className="text-muted-foreground sm:hidden">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""} × </span>
+                        {money(i.unitPriceCents)}
+                      </td>
+                      <td className="flex items-baseline justify-between sm:table-cell sm:px-4 sm:py-3 sm:text-right tabular-nums font-medium">
+                        <span className="text-xs font-normal text-muted-foreground sm:hidden">Total</span>
+                        {money(i.lineTotalCents)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -411,6 +453,17 @@ export default function PublicEstimatePage() {
               </>
             )}
           </CardContent>
+          {/* Footer band — company name · license # · website. The "#" form
+              keeps the header's "License X (ST)" string unique for tests. */}
+          <div className="border-t bg-muted/30 px-6 py-3.5 text-center text-xs text-muted-foreground" data-testid="document-footer">
+            {[
+              company.name,
+              company.licenseNumber
+                ? `License #${company.licenseNumber}${company.licenseState ? ` (${company.licenseState})` : ""}`
+                : null,
+              company.website,
+            ].filter(Boolean).join(" · ")}
+          </div>
         </Card>
 
         {/* Files the contractor pinned to this estimate (same email gate). */}
@@ -428,10 +481,10 @@ export default function PublicEstimatePage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {offers.map((o: any) => (
-                <label key={o.id} className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                <label key={o.id} className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer hover:bg-accent/50 active:bg-accent transition-colors"
                   data-testid={`discount-offer-${o.code}`}>
                   <Checkbox
-                    className="mt-0.5"
+                    className="mt-0.5 h-5 w-5"
                     checked={selectedDiscounts.includes(o.id)}
                     onCheckedChange={(c) => toggleDiscount(o.id, c === true)}
                     data-testid={`check-discount-${o.code}`}
@@ -471,23 +524,26 @@ export default function PublicEstimatePage() {
 
         {!settled && !expired && !preview && (
           <Card className="shadow-md border-primary/30">
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg">Ready to go ahead?</CardTitle>
               <CardDescription>Type your name to approve. This is your signature.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
               <div>
                 <Label htmlFor="sig">Your full name</Label>
                 <Input id="sig" value={name} onChange={(ev) => setName(ev.target.value)}
-                  placeholder={customer.displayName} data-testid="input-signature" />
+                  placeholder={customer.displayName} data-testid="input-signature"
+                  className="h-12 text-base" />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button disabled={name.trim().length < 2 || respond.isPending}
+                  className="w-full sm:w-auto h-12 sm:h-10"
                   onClick={() => respond.mutate("approve")} data-testid="button-approve">
                   {respond.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                   Approve this estimate
                 </Button>
-                <Button variant="outline" onClick={() => setShowDecline(!showDecline)} data-testid="button-show-decline">
+                <Button variant="outline" className="w-full sm:w-auto h-12 sm:h-10"
+                  onClick={() => setShowDecline(!showDecline)} data-testid="button-show-decline">
                   Decline
                 </Button>
               </div>

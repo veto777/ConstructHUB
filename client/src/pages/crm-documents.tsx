@@ -1,14 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  FileText, ReceiptText, Loader2, Search, type LucideIcon,
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import {
+  FileText, ReceiptText, Loader2, Search, Trash2, type LucideIcon,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable,
 } from "@/components/crm-ui";
+import { InvoiceReceiptButton } from "@/components/crm-receipt";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
 /**
@@ -108,11 +116,33 @@ function rangeDates(range: RangeKey, from: string, to: string): { from: string; 
 const selectCls =
   "h-9 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function CrmDocumentsPage({ kind }: { kind: "estimates" | "invoices" }) {
+export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoices"; actions?: React.ReactNode }) {
   const cfg = CONFIG[kind];
   const [, setLocation] = useLocation();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const allowed = !cfg.needsPrices || me?.permissions?.seePrices === true;
+  const canReceipt = cfg.hasDueColumn === true && me?.permissions?.manageInvoices === true;
+  const { toast } = useToast();
+
+  // Hard delete is OWNER-only (the server enforces it; the button simply
+  // doesn't render for anyone else). One shared confirm dialog names the
+  // exact document and the consequence before anything is deleted.
+  const isOwner = me?.member?.role === "owner";
+  const [delFor, setDelFor] = useState<DocRow | null>(null);
+  const del = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `${cfg.endpoint}/${id}`)).json(),
+    onSuccess: () => {
+      setDelFor(null);
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0]).startsWith(cfg.endpoint),
+      });
+      toast({ title: `${kind === "estimates" ? "Estimate" : "Invoice"} deleted` });
+    },
+    onError: (e: any) => {
+      setDelFor(null);
+      toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" });
+    },
+  });
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [range, setRange] = useState<RangeKey>("any");
@@ -182,7 +212,7 @@ export function CrmDocumentsPage({ kind }: { kind: "estimates" | "invoices" }) {
 
   return (
     <CrmPage wide>
-      <CrmPageHeader icon={cfg.icon} title={cfg.title} subtitle={cfg.subtitle} />
+      <CrmPageHeader icon={cfg.icon} title={cfg.title} subtitle={cfg.subtitle} actions={actions} />
 
       <Card>
         <CardContent className="p-4 sm:p-5 space-y-4">
@@ -343,6 +373,8 @@ export function CrmDocumentsPage({ kind }: { kind: "estimates" | "invoices" }) {
                 {cfg.hasDueColumn && (
                   <th className={cn(crmTable.th, "hidden sm:table-cell")}>Due</th>
                 )}
+                {cfg.hasDueColumn && <th className={crmTable.th}></th>}
+                {isOwner && <th className={crmTable.thRight} aria-label="Actions" />}
               </tr>
             </thead>
             <tbody>
@@ -383,12 +415,61 @@ export function CrmDocumentsPage({ kind }: { kind: "estimates" | "invoices" }) {
                       {day(r.dueAt)}
                     </td>
                   )}
+                  {cfg.hasDueColumn && (
+                    <td className={cn(crmTable.td, "text-right")} onClick={(e) => e.stopPropagation()}>
+                      {canReceipt && (r.paidCents ?? 0) > 0 && (
+                        <InvoiceReceiptButton invoiceId={r.id} invoiceNumber={r.number} />
+                      )}
+                    </td>
+                  )}
+                  {isOwner && (
+                    <td className={crmTable.tdRight}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid={`button-delete-doc-${r.id}`}
+                        aria-label={`Delete ${r.number ?? "document"}`}
+                        onClick={(e) => { e.stopPropagation(); setDelFor(r); }}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* Owner-only hard delete: names the exact document and what goes with it. */}
+      <AlertDialog open={!!delFor} onOpenChange={(o) => { if (!o) setDelFor(null); }}>
+        <AlertDialogContent data-testid="dialog-delete-doc">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {kind === "estimates" ? "estimate" : "invoice"} {delFor?.number ?? ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes {delFor?.number ?? "this document"}
+              {delFor?.title ? ` ("${delFor.title}")` : ""}
+              {delFor?.customerName ? ` for ${delFor.customerName}` : ""}
+              {kind === "estimates"
+                ? ", with all of its line items, options, discounts and history"
+                : ", with all of its line items"}
+              . This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-doc">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-delete-doc"
+              onClick={() => { if (delFor) del.mutate(delFor.id); }}
+            >
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CrmPage>
   );
 }

@@ -282,6 +282,24 @@ function displayName(g: Group): string {
   return g.variants[0] ?? g.normalized;
 }
 
+/**
+ * Full representative scope text for a group: the most common raw variant in
+ * full (never truncated), then every alternate writing in full, then mining
+ * provenance. This is what lands in crm_pb_items.description /
+ * crm_pb_materials.description — keep it in sync with the description
+ * patch-samples.ts rebuilds from skus-review.json.
+ */
+function scopeDescription(g: Group): string {
+  const full = g.variants[0] ?? g.normalized;
+  const alts = g.variants.slice(1);
+  return (
+    full +
+    (alts.length ? ` Also written as: ${alts.join(" | ")}.` : "") +
+    ` Mined from ${g.uses} HCP estimate option${g.uses === 1 ? "" : "s"} (scope names — HCP exported no line items).` +
+    (g.lastUsed ? ` Last used ${g.lastUsed.slice(0, 10)}.` : "")
+  );
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   const groups = mine();
@@ -357,10 +375,10 @@ async function main() {
       },
       source: "hcp_estimate_scopes",
     });
-    const description =
-      `Mined from ${g.uses} HCP estimate option${g.uses === 1 ? "" : "s"} (scope names — HCP exported no line items).` +
-      (g.lastUsed ? ` Last used ${g.lastUsed.slice(0, 10)}.` : "") +
-      (g.variants.length > 1 ? ` Variants: ${g.variants.slice(1).join(" | ").slice(0, 300)}` : "");
+    // Lead with the FULL representative scope text (the group's most common
+    // variant, untruncated) so the assembly carries real scope wording, then
+    // any alternate writings in full, then provenance.
+    const description = scopeDescription(g);
     try {
       // No unique constraint exists on (org_id, code/sku) — idempotency is a
       // SELECT on the normalized-name key, then INSERT or no-op UPDATE.

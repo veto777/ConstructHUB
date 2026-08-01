@@ -19,6 +19,7 @@ import {
 } from "@shared/schema";
 import { and, eq, desc, sql, isNull } from "drizzle-orm";
 import { sendWithFallback } from "../email";
+import { autoSendPaymentReceipt } from "./receipts";
 
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const CONNECT_WEBHOOK_SECRET = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
@@ -390,6 +391,9 @@ async function applySettlement(
         updatedAt: new Date(),
       }).where(eq(crmInvoices.id, inv.id));
       if (paid >= due) await emitCrmEvent(pay.orgId, "invoice.paid", { invoiceId: inv.id, paidCents: paid });
+      // Email the client their receipt-to-date (honors paymentReceipt).
+      autoSendPaymentReceipt(pay.orgId, inv.id)
+        .catch((e: any) => console.error("[crm] auto-receipt failed:", e?.message || e));
     }
   }
 

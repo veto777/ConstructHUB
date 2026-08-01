@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  ShieldCheck, FileText, ReceiptText, type LucideIcon,
+  ShieldCheck, FileText, FilePlus2, ReceiptText, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -31,7 +31,10 @@ const MORE_LINKS: {
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "ribbon-more-estimates",
-    active: (l) => l.startsWith("/crm/estimates") },
+    active: (l) => l.startsWith("/crm/estimates") && l !== "/crm/estimates/new" },
+  // The one-tap fast path — the action a field user wants from the driveway.
+  { title: "New estimate", url: "/crm/estimates/new", icon: FilePlus2, testid: "ribbon-more-new-estimate",
+    active: (l) => l === "/crm/estimates/new" },
   // Gated like the API: invoices are money, seePrices only.
   { title: "Invoices", url: "/crm/invoices", icon: ReceiptText, testid: "ribbon-more-invoices",
     perm: "seePrices",

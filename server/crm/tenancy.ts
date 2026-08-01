@@ -144,6 +144,17 @@ export function requirePermission(res: any, ctx: OrgContext, perm: CrmPermission
 }
 
 /**
+ * Guard a route on the OWNER role itself. Hard deletes (test-document cleanup)
+ * are owner-only — never a permission flag, so no admin/pm seat override can
+ * ever grant them. Responds 403 and returns false for every other role.
+ */
+export function requireOwnerRole(res: any, ctx: OrgContext): boolean {
+  if (ctx.member.role === "owner") return true;
+  res.status(403).json({ message: "Only the account owner can delete records." });
+  return false;
+}
+
+/**
  * Seat limit for an org, derived from the OWNER's subscription plan.
  *
  * Housecall Pro's seat cliff (extra logins are MAX-only, so hiring a 6th person

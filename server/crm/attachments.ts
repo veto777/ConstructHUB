@@ -12,6 +12,10 @@
  *   - photo: job photos the HOMEOWNER uploads from the portal (refId =
  *     customer id, max 20 per customer). Contractors see them on the client
  *     detail page.
+ * A fourth kind is SYSTEM-GENERATED, never uploaded:
+ *   - contract: the signed-contract PDF minted when an estimate is approved
+ *     (refId = estimate id, server/crm/contract-pdf.ts). Clients download it
+ *     from the portal contracts section; contractors via the CRM file route.
  *
  * Client comments (crm_client_comments) are notes a homeowner sends from the
  * portal; the division's admin members (org owner as fallback) get an email,
@@ -113,6 +117,34 @@ async function storeFile(
     sizeBytes: file.size,
     storagePath,
   };
+}
+
+/**
+ * Persist a SERVER-GENERATED PDF (the signed contract) through the same
+ * storage as uploads — same directory, same containment rule, same gated
+ * reads. kind is 'contract', refId the estimate id; the row is the record.
+ */
+export async function storeGeneratedPdf(args: {
+  orgId: string;
+  kind: string;
+  refId: string | null;
+  fileName: string;
+  buffer: Buffer;
+}): Promise<typeof crmAttachments.$inferSelect> {
+  const storagePath = `${args.orgId}/${randomUUID()}.pdf`;
+  const abs = path.join(STORAGE_DIR, storagePath);
+  await fs.promises.mkdir(path.dirname(abs), { recursive: true });
+  await fs.promises.writeFile(abs, args.buffer);
+  const [row] = await db.insert(crmAttachments).values({
+    orgId: args.orgId,
+    kind: args.kind,
+    refId: args.refId,
+    fileName: safeName(args.fileName),
+    mime: "application/pdf",
+    sizeBytes: args.buffer.length,
+    storagePath,
+  }).returning();
+  return row;
 }
 
 function streamAttachment(res: any, att: typeof crmAttachments.$inferSelect, inline: boolean) {
@@ -370,7 +402,10 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     let allowed = false;
     if (att.kind === "photo") {
       allowed = !!att.refId && client.customerIds.includes(att.refId);
-    } else if (att.kind === "estimate") {
+    } else if (att.kind === "estimate" || att.kind === "contract") {
+      // estimate files and the signed-contract PDF both key off the estimate
+      // (refId = estimate id) — allowed when the estimate belongs to one of
+      // the session's customers.
       const [est] = await db
         .select({ customerId: crmEstimates.customerId })
         .from(crmEstimates)
@@ -388,6 +423,39 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     }
     if (!allowed) return res.status(404).json({ message: "File not found" });
     streamAttachment(res, att, req.query.inline === "1");
+  });
+
+  /** The client's signed-contract PDFs, keyed by estimate id so the portal's
+   *  contracts section can attach a download link to each signed contract.
+   *  Session-scoped exactly like the documents payload. */
+  app.get("/api/client/contracts", async (req: any, res) => {
+    const client = await requireClient(req, res);
+    if (!client) return;
+    if (!client.customerIds.length) return res.json({ contracts: [] });
+
+    const estimates = await db
+      .select({ id: crmEstimates.id })
+      .from(crmEstimates)
+      .where(inArray(crmEstimates.customerId, client.customerIds));
+    const estimateIds = estimates.map((e) => e.id);
+    if (!estimateIds.length) return res.json({ contracts: [] });
+
+    const rows = await db
+      .select()
+      .from(crmAttachments)
+      .where(and(eq(crmAttachments.kind, "contract"), inArray(crmAttachments.refId, estimateIds)))
+      .orderBy(desc(crmAttachments.createdAt));
+    res.json({
+      contracts: rows.map((a) => ({
+        id: a.id,
+        estimateId: a.refId,
+        fileName: a.fileName,
+        mime: a.mime,
+        sizeBytes: a.sizeBytes,
+        createdAt: a.createdAt,
+        downloadUrl: `/api/client/attachments/${a.id}/download`,
+      })),
+    });
   });
 
   app.post("/api/client/comments", async (req: any, res) => {

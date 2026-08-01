@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,11 @@ import { Separator } from "@/components/ui/separator";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -28,6 +33,7 @@ import { EstimateEngagement } from "@/components/crm-engagement";
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "@/components/client-uploads";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
+import { InvoiceReceiptButton } from "@/components/crm-receipt";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -166,6 +172,7 @@ export default function CrmClientPage() {
   const [, params] = useRoute("/crm/clients/:id");
   const id = params?.id;
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canEstimate = me?.permissions?.manageEstimates === true;
@@ -174,6 +181,9 @@ export default function CrmClientPage() {
   const canTakePayment = me?.permissions?.takePayment === true;
   const canManageJobs = me?.permissions?.manageJobs === true;
   const canManageCustomers = me?.permissions?.manageCustomers === true;
+  // Hard delete is OWNER-only — the server gates on the role itself, so the
+  // button simply doesn't render for admin/pm/office seats.
+  const isOwner = me?.member?.role === "owner";
 
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: [`/api/crm/customers/${id}`],
@@ -254,6 +264,22 @@ export default function CrmClientPage() {
       (await apiRequest("POST", `/api/crm/invoices/${invoiceId}/void`, {})).json(),
     onSuccess: () => { refresh(); toast({ title: "Invoice voided" }); },
     onError: (e: any) => toast({ title: "Could not void", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── Owner-only hard delete (test-record cleanup) ──────────────────────────
+  const [delOpen, setDelOpen] = useState(false);
+  const deleteClient = useMutation({
+    mutationFn: async (force: boolean) =>
+      (await apiRequest("DELETE", `/api/crm/customers/${id}${force ? "?force=1" : ""}`)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      toast({ title: "Client deleted" });
+      setLocation("/crm/clients");
+    },
+    onError: (e: any) => {
+      setDelOpen(false);
+      toast({ title: "Could not delete client", description: String(e.message ?? e), variant: "destructive" });
+    },
   });
 
   // ── Estimate builder ──────────────────────────────────────────────────────
@@ -377,6 +403,43 @@ export default function CrmClientPage() {
                   <Copy className="h-4 w-4 mr-2" /> Copy portal link
                 </Button>
               )}
+              {isOwner && (() => {
+                const estN = (data.estimates ?? []).length;
+                const projN = (data.projects ?? []).length;
+                const invN = (invoices ?? []).length;
+                const hasDocs = estN + projN + invN > 0;
+                return (
+                  <AlertDialog open={delOpen} onOpenChange={setDelOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm" data-testid="button-delete-client"
+                        className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent data-testid="dialog-delete-client">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {c.displayName}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {hasDocs
+                            ? `This permanently deletes ${c.displayName} AND their entire tree: ` +
+                              `${estN} estimate(s), ${invN} invoice(s) and ${projN} project(s), ` +
+                              `with all line items, payments and history. This cannot be undone.`
+                            : `This permanently deletes ${c.displayName}. This cannot be undone.`}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid="button-cancel-delete-client">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          data-testid="button-confirm-delete-client"
+                          onClick={() => deleteClient.mutate(hasDocs)}
+                        >
+                          Delete permanently
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                );
+              })()}
             </div>
           </div>
         </CardContent>
@@ -629,6 +692,9 @@ export default function CrmClientPage() {
                           onClick={() => { setPayFor(inv); setPayAmount((due / 100).toFixed(2)); }}>
                           <Landmark className="h-4 w-4 mr-2" /> Record payment
                         </Button>
+                      )}
+                      {canInvoice && !inv.voidedAt && (inv.paidCents ?? 0) > 0 && (
+                        <InvoiceReceiptButton invoiceId={inv.id} invoiceNumber={inv.number} />
                       )}
                       {canInvoice && !inv.voidedAt && !(inv.paidCents > 0) && (
                         <Button size="sm" variant="ghost" data-testid={`button-void-invoice-${inv.id}`}

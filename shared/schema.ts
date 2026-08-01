@@ -1339,6 +1339,7 @@ export const CRM_NOTIFICATION_PREFS = [
   "estimateDeclined",  // client declined an estimate
   "invoicePaid",       // an online payment landed
   "paymentReceived",   // a manual/offline payment was recorded on an invoice
+  "paymentReceipt",    // the client gets a receipt-to-date email after any payment
   "jobApproved",       // PM notice: an estimate was approved (job awarded)
   "clientComments",    // a homeowner sent a note from the client portal
   "financeClick",      // a homeowner tapped a financing link in the client portal

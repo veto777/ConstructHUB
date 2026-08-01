@@ -16,12 +16,15 @@ import { z } from "zod";
 import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmJobs, crmEstimates, crmEstimateItems,
-  crmEstimateEvents, crmLeadSources, crmInvoices,
+  crmEstimateEvents, crmLeadSources, crmInvoices, crmInvoiceItems,
+  crmEstimateOptions, crmEstimateDiscounts, crmEngagementSessions,
+  crmPayments, crmCustomerNotes, crmClientComments, crmFinanceClicks,
+  crmAttachments,
   CRM_PROJECT_STATUSES, CRM_JOB_STATUSES, CRM_LINE_ITEM_KINDS,
   CRM_PROJECT_STAGE_META, CRM_ESTIMATE_STATUSES, CRM_INVOICE_STATUSES,
 } from "@shared/schema";
 import { and, eq, desc, asc, ilike, or, sql, isNull, inArray, gte, lte } from "drizzle-orm";
-import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import {
   divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, getDivision,
 } from "./divisions";
@@ -170,6 +173,53 @@ async function logEvent(orgId: string, estimateId: string, type: string, actor: 
     ip: req ? String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim() : null,
     userAgent: req ? String(req.headers["user-agent"] || "").slice(0, 300) : null,
     meta: meta ?? null,
+  }).catch(() => {});
+}
+
+// ── Owner-only hard deletes (test-document cleanup) ─────────────────────────
+
+/**
+ * Why an estimate may NOT be deleted, or null when it can. An approved
+ * estimate is a signed contract — it is never deletable. Every other state
+ * (draft/sent/viewed/declined/expired/cancelled) is fair game.
+ */
+export function estimateDeleteRefusal(e: { status: string; approvedAt: Date | null }): string | null {
+  if (e.approvedAt || e.status === "approved") {
+    return "This estimate has been approved and signed — it is a contract and cannot be deleted.";
+  }
+  return null;
+}
+
+/** Delete one estimate's child rows inside a transaction. */
+async function deleteEstimateChildren(tx: any, orgId: string, estimateIds: string[]) {
+  if (!estimateIds.length) return;
+  await tx.delete(crmEstimateOptions)
+    .where(and(eq(crmEstimateOptions.orgId, orgId), inArray(crmEstimateOptions.estimateId, estimateIds)));
+  await tx.delete(crmEstimateDiscounts)
+    .where(and(eq(crmEstimateDiscounts.orgId, orgId), inArray(crmEstimateDiscounts.estimateId, estimateIds)));
+  await tx.delete(crmEstimateItems)
+    .where(and(eq(crmEstimateItems.orgId, orgId), inArray(crmEstimateItems.estimateId, estimateIds)));
+  await tx.delete(crmEstimateEvents)
+    .where(and(eq(crmEstimateEvents.orgId, orgId), inArray(crmEstimateEvents.estimateId, estimateIds)));
+  await tx.delete(crmEngagementSessions)
+    .where(and(eq(crmEngagementSessions.orgId, orgId), eq(crmEngagementSessions.docType, "estimate"),
+      inArray(crmEngagementSessions.docId, estimateIds)));
+}
+
+/** Delete one invoice's child rows inside a transaction. */
+async function deleteInvoiceChildren(tx: any, orgId: string, invoiceIds: string[]) {
+  if (!invoiceIds.length) return;
+  await tx.delete(crmInvoiceItems)
+    .where(and(eq(crmInvoiceItems.orgId, orgId), inArray(crmInvoiceItems.invoiceId, invoiceIds)));
+  await tx.delete(crmEngagementSessions)
+    .where(and(eq(crmEngagementSessions.orgId, orgId), eq(crmEngagementSessions.docType, "invoice"),
+      inArray(crmEngagementSessions.docId, invoiceIds)));
+}
+
+/** A deletion note on the client's activity (Client 360 notes surface). */
+async function logDeletionNote(orgId: string, customerId: string, memberId: string, body: string) {
+  await db.insert(crmCustomerNotes).values({
+    orgId, customerId, authorMemberId: memberId, body,
   }).catch(() => {});
 }
 
@@ -339,6 +389,86 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .returning();
     if (!row) return res.status(404).json({ message: "Customer not found" });
     res.json({ ...row, portalToken: undefined });
+  });
+
+  /**
+   * Hard-delete a client — OWNER only (requireOwnerRole, never a permission
+   * flag), for cleaning up test records. A client with ANY estimates, invoices
+   * or projects is refused with 409 unless ?force=1 is passed, which deletes
+   * the whole tree transactionally (documents, line items, payments, jobs,
+   * notes, comments — everything under the client).
+   */
+  app.delete("/api/crm/customers/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (!requireOwnerRole(res, ctx)) return;
+    const orgId = ctx.org.id;
+    const [c] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, orgId), eq(crmCustomers.id, req.params.id))).limit(1);
+    if (!c) return res.status(404).json({ message: "Customer not found" });
+
+    const countOf = async (t: any, col: any) => {
+      const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(t)
+        .where(and(eq(t.orgId, orgId), eq(col, c.id)));
+      return n;
+    };
+    const estimates = await countOf(crmEstimates, crmEstimates.customerId);
+    const invoices = await countOf(crmInvoices, crmInvoices.customerId);
+    const projects = await countOf(crmProjects, crmProjects.customerId);
+    const force = req.query.force === "1";
+    if ((estimates || invoices || projects) && !force) {
+      return res.status(409).json({
+        message: `This client has ${estimates} estimate(s), ${invoices} invoice(s) and ${projects} project(s). ` +
+          "Deleting removes the entire tree — call DELETE again with ?force=1 to confirm.",
+        estimates, invoices, projects,
+      });
+    }
+
+    await db.transaction(async (tx) => {
+      const estIds = (await tx.select({ id: crmEstimates.id }).from(crmEstimates)
+        .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.customerId, c.id)))).map((r: any) => r.id);
+      const invIds = (await tx.select({ id: crmInvoices.id }).from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, orgId), eq(crmInvoices.customerId, c.id)))).map((r: any) => r.id);
+      const projIds = (await tx.select({ id: crmProjects.id }).from(crmProjects)
+        .where(and(eq(crmProjects.orgId, orgId), eq(crmProjects.customerId, c.id)))).map((r: any) => r.id);
+
+      await deleteEstimateChildren(tx, orgId, estIds);
+      await deleteInvoiceChildren(tx, orgId, invIds);
+      await tx.delete(crmPayments)
+        .where(and(eq(crmPayments.orgId, orgId), eq(crmPayments.customerId, c.id)));
+      if (estIds.length) {
+        await tx.delete(crmAttachments)
+          .where(and(eq(crmAttachments.orgId, orgId), inArray(crmAttachments.refId, estIds)));
+      }
+      if (invIds.length) {
+        await tx.delete(crmInvoices)
+          .where(and(eq(crmInvoices.orgId, orgId), inArray(crmInvoices.id, invIds)));
+      }
+      if (estIds.length) {
+        await tx.delete(crmEstimates)
+          .where(and(eq(crmEstimates.orgId, orgId), inArray(crmEstimates.id, estIds)));
+      }
+      if (projIds.length) {
+        await tx.delete(crmJobs)
+          .where(and(eq(crmJobs.orgId, orgId), inArray(crmJobs.projectId, projIds)));
+        await tx.delete(crmProjects)
+          .where(and(eq(crmProjects.orgId, orgId), inArray(crmProjects.id, projIds)));
+      }
+      await tx.delete(crmCustomerNotes)
+        .where(and(eq(crmCustomerNotes.orgId, orgId), eq(crmCustomerNotes.customerId, c.id)));
+      await tx.delete(crmClientComments)
+        .where(and(eq(crmClientComments.orgId, orgId), eq(crmClientComments.customerId, c.id)));
+      await tx.delete(crmFinanceClicks)
+        .where(and(eq(crmFinanceClicks.orgId, orgId), eq(crmFinanceClicks.customerId, c.id)));
+      await tx.delete(crmAttachments)
+        .where(and(eq(crmAttachments.orgId, orgId), eq(crmAttachments.refId, c.id)));
+      await tx.delete(crmCustomers)
+        .where(and(eq(crmCustomers.orgId, orgId), eq(crmCustomers.id, c.id)));
+    });
+
+    console.log(`[crm] owner ${ctx.member.id} deleted customer ${c.id} (${c.displayName}) in org ${orgId}` +
+      (force ? ` — force tree: ${estimates} estimates, ${invoices} invoices, ${projects} projects` : ""));
+    res.json({ ok: true, deleted: c.id, force });
   });
 
   // ── Projects ──────────────────────────────────────────────────────────────
@@ -715,6 +845,35 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     }
     const fresh = await recalcEstimate(ctx.org.id, e.id);
     res.json(presentEstimate(fresh ?? e, ctx));
+  });
+
+  /**
+   * Hard-delete an estimate — OWNER only, for cleaning up test documents.
+   * An approved estimate is a signed contract: 409, never deletable. Every
+   * other status (draft/sent/viewed/declined/expired/cancelled) deletes with
+   * its children (options, discounts, items, events, engagement) in one
+   * transaction, and leaves a deletion note on the client's activity.
+   */
+  app.delete("/api/crm/estimates/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (!requireOwnerRole(res, ctx)) return;
+    const [e] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!e) return res.status(404).json({ message: "Estimate not found" });
+    const refusal = estimateDeleteRefusal(e);
+    if (refusal) return res.status(409).json({ message: refusal });
+
+    await db.transaction(async (tx) => {
+      await deleteEstimateChildren(tx, ctx.org.id, [e.id]);
+      await tx.delete(crmEstimates)
+        .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, e.id)));
+    });
+
+    console.log(`[crm] owner ${ctx.member.id} deleted estimate ${e.number ?? e.id} (${e.id}) in org ${ctx.org.id}`);
+    await logDeletionNote(ctx.org.id, e.customerId, ctx.member.id,
+      `Estimate ${e.number ?? e.id} ("${e.title}") was permanently deleted by the account owner.`);
+    res.json({ ok: true, deleted: e.id });
   });
 
   app.get("/api/crm/lead-sources", async (req: any, res) => {

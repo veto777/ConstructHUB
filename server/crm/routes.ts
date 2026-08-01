@@ -38,6 +38,7 @@ import { registerCrmMigrateRoutes } from "./migrate";
 import { registerCrmDiscountRoutes } from "./discounts";
 import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
+import { registerCrmReceiptRoutes } from "./receipts";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
@@ -172,6 +173,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmDiscountRoutes(app, getDevUser);
   // Client portal v2: pamphlet/estimate/photo attachments + homeowner comments.
   registerCrmAttachmentRoutes(app, getDevUser);
+  // Receipts-to-date: preview + one-click send; auto-emailed after payments.
+  registerCrmReceiptRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
