@@ -53,6 +53,21 @@ const lineNumbers = (l: CartLine) => ({
   unitPriceCents: priceToCents(l.priceText),
 });
 
+/**
+ * apiRequest throws "422: {"message":"…"}" — pull the server's own sentence
+ * out so a rejection (e.g. the price-floor lock) reads like a sentence in the
+ * toast, not like a stack trace.
+ */
+const serverMessage = (e: any): string => {
+  const raw = String(e?.message ?? e);
+  const body = raw.replace(/^\d{3}:\s*/, "");
+  try {
+    const j = JSON.parse(body);
+    if (j && typeof j.message === "string") return j.message;
+  } catch { /* not JSON — show it as-is */ }
+  return raw;
+};
+
 interface DoneState {
   sent: boolean;
   emailed: boolean;
@@ -224,7 +239,7 @@ export default function CrmEstimateNewPage() {
         });
       }
     } catch (e: any) {
-      toast({ title: "Could not create the estimate", description: String(e.message ?? e), variant: "destructive" });
+      toast({ title: "Could not create the estimate", description: serverMessage(e), variant: "destructive" });
     } finally {
       setSending(false);
     }

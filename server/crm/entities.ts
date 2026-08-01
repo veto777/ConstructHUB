@@ -28,6 +28,7 @@ import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from
 import {
   divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, getDivision,
 } from "./divisions";
+import { priceFloorViolation } from "./price-floor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -780,6 +781,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, d.customerId))).limit(1);
     if (!cust) return res.status(400).json({ message: "Customer not found in this organization" });
 
+    // Price-floor lock: non-owners may price above the floor, never below.
+    const floorMsg = await priceFloorViolation(ctx, d.items);
+    if (floorMsg) return res.status(422).json({ message: floorMsg });
+
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEstimates)
       .where(eq(crmEstimates.orgId, ctx.org.id));
 
@@ -835,6 +840,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
     if (!e) return res.status(404).json({ message: "Estimate not found" });
     if (e.approvedAt) return res.status(409).json({ message: "This estimate has been approved and can no longer be edited." });
+
+    // Price-floor lock: non-owners may price above the floor, never below.
+    const floorMsg = await priceFloorViolation(ctx, parsed.data.items);
+    if (floorMsg) return res.status(422).json({ message: floorMsg });
 
     await db.delete(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, e.id)));
