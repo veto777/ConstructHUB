@@ -305,7 +305,7 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
       `/api/crm/integrations/hover/oauth/callback?code=stub-auth-code&state=${encodeURIComponent(state)}`,
     );
     expect(cb.status).toBe(302);
-    expect(cb.location).toBe("/crm/settings?hover=connected");
+    expect(cb.location).toBe("/crm/integrations?hover=connected");
 
     // Token exchange carried the app credentials + OUR redirect_uri.
     const exchange = stub.tokenRequests.find((t) => t.grant_type === "authorization_code");

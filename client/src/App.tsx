@@ -56,6 +56,7 @@ import CrmPipelinePage from "@/pages/crm-pipeline";
 import CrmPriceBookPage from "@/pages/crm-pricebook";
 import CrmProjectPage from "@/pages/crm-project";
 import CrmSettingsPage from "@/pages/crm-settings";
+import CrmIntegrationsPage from "@/pages/crm-integrations";
 import CrmReportsPage from "@/pages/crm-reports";
 import CrmMigratePage from "@/pages/crm-migrate";
 import CrmAdminPage from "@/pages/crm-admin";
@@ -190,6 +191,7 @@ function PortalRouter() {
       <Route path="/crm/payments" component={CrmPaymentsPage} />
       <Route path="/crm/team" component={CrmTeamPage} />
       <Route path="/crm/settings" component={CrmSettingsPage} />
+      <Route path="/crm/integrations" component={CrmIntegrationsPage} />
       <Route path="/crm/reports" component={CrmReportsPage} />
       <Route path="/crm/migrate" component={CrmMigratePage} />
       <Route path="/crm/admin" component={CrmAdminPage} />
@@ -319,6 +321,7 @@ function AppContent() {
       location.startsWith("/crm/payments") ? "Payments" :
       location.startsWith("/crm/team") ? "Team & Company" :
       location.startsWith("/crm/settings") ? "Settings" :
+      location.startsWith("/crm/integrations") ? "Integrations" :
       location.startsWith("/crm/reports") ? "Reports" :
       location.startsWith("/crm/admin") ? "Platform Admin" :
       location.startsWith("/crm/join") ? "Join the team" : "Home";

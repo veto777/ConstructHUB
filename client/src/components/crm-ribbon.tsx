@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  ShieldCheck, FileText, FilePlus2, ReceiptText, type LucideIcon,
+  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -45,6 +45,10 @@ const MORE_LINKS: {
     active: (l) => l.startsWith("/crm/payments") },
   { title: "Team & Company", url: "/crm/team", icon: Building2, testid: "ribbon-more-team",
     active: (l) => l.startsWith("/crm/team") },
+  // Gated like the sidebar, next to Settings where it grew from.
+  { title: "Integrations", url: "/crm/integrations", icon: Blocks, testid: "ribbon-more-integrations",
+    perm: "manageSettings",
+    active: (l) => l.startsWith("/crm/integrations") },
   // Gated like the sidebar: only members with manageSettings see Settings.
   { title: "Settings", url: "/crm/settings", icon: Settings, testid: "ribbon-more-settings",
     perm: "manageSettings",

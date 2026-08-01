@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  Settings, LogOut, ShieldCheck, FileText, ReceiptText, type LucideIcon,
+  Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { CHLogo } from "@/components/ch-logo";
@@ -53,6 +53,10 @@ const NAV: {
     active: (l: string) => l.startsWith("/crm/payments") },
   { title: "Team & Company", url: "/crm/team", icon: Building2, testid: "link-portal-nav-team",
     active: (l: string) => l.startsWith("/crm/team") },
+  // Gated like Settings: the integrations hub grew out of the settings page.
+  { title: "Integrations", url: "/crm/integrations", icon: Blocks, testid: "link-nav-integrations",
+    perm: "manageSettings",
+    active: (l: string) => l.startsWith("/crm/integrations") },
   // Gated: only members with manageSettings see (or can reach) Settings.
   { title: "Settings", url: "/crm/settings", icon: Settings, testid: "link-nav-settings",
     perm: "manageSettings",
