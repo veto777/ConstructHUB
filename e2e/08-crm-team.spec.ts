@@ -30,7 +30,8 @@ test.describe("/crm/team", () => {
     await page.getByTestId("button-save-org").click();
     await expect(page.getByText("Company profile saved", { exact: true })).toBeVisible();
 
-    // Team: invite, then revoke the invitation.
+    // Team: invite, resend, reset-password, revoke — then a second invite to
+    // cover the trash-button revoke path.
     await gotoCrm(page, "/crm/team?tab=team");
     await openTab(page, "tab-team");
     const inviteBtn = page.getByTestId("button-send-invite");
@@ -44,12 +45,45 @@ test.describe("/crm/team", () => {
         page.getByText("Invitation sent", { exact: true })
           .or(page.getByText("Invitation created", { exact: true })),
       ).toBeVisible();
-      // Pending invitation appears; revoke it.
+
+      // Pending invitation appears; resend it (SMTP failure is fine — the API
+      // answers 200 with emailed:false either way).
       const inviteRow = page.locator('[data-testid^="invite-"]', { hasText: email });
       await expect(inviteRow).toBeVisible();
-      await inviteRow.locator("button").click();
-      await expect(page.getByText("Invitation revoked", { exact: true })).toBeVisible();
+      const inviteId = (await inviteRow.getAttribute("data-testid"))!.replace("invite-", "");
+      await page.getByTestId(`button-resend-invite-${inviteId}`).click();
+      await expect(page.getByText("Invitation resent", { exact: true })).toBeVisible();
+
+      // The invited member has a placeholder row; fire the password reset.
+      const invitedMemberRow = page.locator('[data-testid^="member-"]', { hasText: email });
+      await expect(invitedMemberRow).toBeVisible();
+      const invitedMemberId = (await invitedMemberRow.getAttribute("data-testid"))!.replace("member-", "");
+      await page.getByTestId(`button-reset-password-${invitedMemberId}`).click();
+      await expect(
+        page.getByText("Password reset email sent", { exact: true })
+          .or(page.getByText("Couldn't send the reset email", { exact: true })),
+      ).toBeVisible();
+
+      // Revoke access from the member row — this also kills the pending invite.
+      await page.getByTestId(`button-remove-${invitedMemberId}`).click();
+      await expect(page.getByText("Team member deactivated", { exact: true })).toBeVisible();
       await expect(inviteRow).toHaveCount(0);
+
+      // Second invite (the seat was released above) to cover trash-button revoke.
+      const email2 = `e2e-invite2-${Date.now().toString(36)}@example.com`;
+      await page.getByTestId("input-invite-email").fill(email2);
+      await page.getByTestId("select-invite-role").click();
+      await page.getByRole("option", { name: "field" }).click();
+      await inviteBtn.click();
+      await expect(
+        page.getByText("Invitation sent", { exact: true })
+          .or(page.getByText("Invitation created", { exact: true })),
+      ).toBeVisible();
+      const inviteRow2 = page.locator('[data-testid^="invite-"]', { hasText: email2 });
+      await expect(inviteRow2).toBeVisible();
+      await inviteRow2.getByTestId(/^button-revoke-/).click();
+      await expect(page.getByText("Invitation revoked", { exact: true })).toBeVisible();
+      await expect(inviteRow2).toHaveCount(0);
     } else {
       await expect(page.getByTestId("text-seat-limit")).toBeVisible();
     }
