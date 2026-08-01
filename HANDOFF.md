@@ -136,23 +136,24 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
 ## Open items
 - [ ] **2026-09-08: reapply for GBP API access** (see "GBP API access timeline" above — cloud reminder armed).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").
-- [ ] Rotate secrets (Stripe, Google, SMTP, R2 — provider dashboards; SESSION_SECRET + DB pw already fresh).
-- [x] `STRIPE_WEBHOOK_SECRET` — **DONE 2026-08-01.** Endpoint `we_1Tzdpj4e8DdHYZEhJ2zSi20W` created
-      via the Stripe API (no dashboard needed — the API returns the secret at creation), events:
-      `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`.
-      Secret in tower + vb7 `.env`; service restarted; unsigned POST → 400; endpoint `enabled`.
-- [x] CRM **Stripe Connect webhook** — **DONE 2026-08-01.** Endpoint `we_1TzeAd4e8DdHYZEhJOrdMGU8`
-      (`connect=true`) → `/api/crm/stripe/connect-webhook`, all 7 events `server/crm/integrations.ts`
-      handles. `STRIPE_CONNECT_WEBHOOK_SECRET` on tower + vb7; verified 400 on unsigned POST.
+- [ ] Rotate secrets (Google, SMTP, R2 — provider dashboards; SESSION_SECRET + DB pw already fresh).
+      **Stripe: superseded by the cross-wire item below — the leaked key was GGG's, rotate it on the
+      GGG side.**
+- [ ] **🚨 2026-08-01 STRIPE CROSS-WIRE FOUND:** the `.env` Stripe keys (from
+      `Construct_hub_secrets.txt` / Replit) belonged to **GGG's Stripe account**
+      (godgritglorypodcast@gmail.com), not ConstructHUB — discovered when the Connect OAuth callback
+      failed ("Authorization code provided does not belong to you"). GGG's account verified clean
+      (0 constructhub charges/subs ever); the two webhook endpoints created there earlier that day
+      were deleted. ConstructHUB's real account: **acct_1TzcYU9yWcdekSaP**; its publishable key is
+      installed tower+vb7. **Remaining:** owner pastes a fresh `sk_live_…` from that account
+      (Developers → API keys → Create secret key) → recreate BOTH webhook endpoints + both
+      `*_WEBHOOK_SECRET`s under it → restart + re-verify. **Also: rotate GGG's Stripe key (it sat in
+      Replit git history) — task belongs to the GGG project.**
 - [x] CRM Stripe Connect **client id** — **DONE 2026-08-01.** Platform profile completed (Platform /
       direct charges / Stripe-hosted onboarding / Stripe carries risk), OAuth enabled,
-      `STRIPE_CONNECT_CLIENT_ID` (`ca_Uzc1…Rsgf`) on tower + vb7, service restarted.
-- [ ] CRM Connect **OAuth redirect URIs** — owner: Stripe Dashboard → Settings → Connect →
-      Onboarding options → OAuth → Add URI (dashboard-only, no API):
-      `https://portal.constructhub.us/api/crm/payments/connect/stripe/callback`,
-      `https://portal.constructionhub.app/api/crm/payments/connect/stripe/callback`,
-      `https://constructhub.us/api/crm/payments/connect/stripe/callback`.
-      Stripe rejects the OAuth flow until these exist.
+      `STRIPE_CONNECT_CLIENT_ID` (`ca_Uzc1…Rsgf`, correct acct) on tower + vb7.
+- [x] CRM Connect **OAuth redirect URIs** — **DONE 2026-08-01** (owner added all 3 callback URIs in
+      the dashboard; portal.constructhub.us is Default).
 - [ ] Stripe account banner "**Action required** — provide info to keep payouts enabled" — owner,
       Stripe dashboard → View task (business/identity verification).
 - [ ] Real OpenAI key — `AI_INTEGRATIONS_OPENAI_API_KEY` is a boot-safe dummy; AI consultant/assistant
