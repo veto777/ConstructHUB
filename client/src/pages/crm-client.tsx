@@ -20,11 +20,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, CheckCircle2, XCircle, Copy,
-  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin,
+  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, Pencil,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
@@ -88,7 +88,7 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
       setName(""); setDescription(""); setTotal(""); setRecommended(false); setShowTotal(false);
       toast({ title: "Option added", description: "It appears on the client's estimate page." });
     },
-    onError: (e: any) => toast({ title: "Could not add option", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not add option", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   return (
@@ -212,7 +212,7 @@ export default function CrmClientPage() {
       refresh();
       toast({ title: "Project created" });
     },
-    onError: (e: any) => toast({ title: "Could not create project", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not create project", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Estimate options (good / better / best) ───────────────────────────────
@@ -223,7 +223,7 @@ export default function CrmClientPage() {
     mutationFn: async (estimateId: string) =>
       (await apiRequest("POST", `/api/crm/estimates/${estimateId}/invoice`, {})).json(),
     onSuccess: () => { refresh(); toast({ title: "Invoice created from the approved estimate" }); },
-    onError: (e: any) => toast({ title: "Could not convert", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not convert", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const sendInvoice = useMutation({
@@ -238,7 +238,7 @@ export default function CrmClientPage() {
         toast({ title: "Email failed — payment link copied", description: "Send it to your client directly.", variant: "destructive" });
       }
     },
-    onError: (e: any) => toast({ title: "Could not send", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const [payFor, setPayFor] = useState<any | null>(null);
@@ -257,14 +257,14 @@ export default function CrmClientPage() {
       refresh();
       toast({ title: "Payment recorded" });
     },
-    onError: (e: any) => toast({ title: "Could not record payment", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not record payment", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const voidInvoice = useMutation({
     mutationFn: async (invoiceId: string) =>
       (await apiRequest("POST", `/api/crm/invoices/${invoiceId}/void`, {})).json(),
     onSuccess: () => { refresh(); toast({ title: "Invoice voided" }); },
-    onError: (e: any) => toast({ title: "Could not void", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not void", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Owner-only hard delete (test-record cleanup) ──────────────────────────
@@ -279,8 +279,43 @@ export default function CrmClientPage() {
     },
     onError: (e: any) => {
       setDelOpen(false);
-      toast({ title: "Could not delete client", description: String(e.message ?? e), variant: "destructive" });
+      toast({ title: "Could not delete client", description: apiErrorMessage(e), variant: "destructive" });
     },
+  });
+
+  // ── Edit client — the send flow tells the contractor "add an email first";
+  // without this dialog there was no UI anywhere to do that. ─────────────────
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    displayName: "", email: "", phone: "",
+    addressLine1: "", city: "", state: "", postalCode: "",
+  });
+  const openEdit = () => {
+    const c = data?.customer ?? {};
+    setEditForm({
+      displayName: c.displayName ?? "", email: c.email ?? "", phone: c.phone ?? "",
+      addressLine1: c.addressLine1 ?? "", city: c.city ?? "", state: c.state ?? "",
+      postalCode: c.postalCode ?? "",
+    });
+    setEditOpen(true);
+  };
+  const updateClient = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("PATCH", `/api/crm/customers/${id}`, {
+        displayName: editForm.displayName.trim(),
+        email: editForm.email.trim() || null,
+        phone: editForm.phone.trim() || null,
+        addressLine1: editForm.addressLine1.trim() || null,
+        city: editForm.city.trim() || null,
+        state: editForm.state.trim() || null,
+        postalCode: editForm.postalCode.trim() || null,
+      })).json(),
+    onSuccess: () => {
+      setEditOpen(false);
+      refresh();
+      toast({ title: "Client updated" });
+    },
+    onError: (e: any) => toast({ title: "Could not update client", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Estimate builder ──────────────────────────────────────────────────────
@@ -313,7 +348,7 @@ export default function CrmClientPage() {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
       toast({ title: "Estimate created" });
     },
-    onError: (e: any) => toast({ title: "Could not create estimate", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not create estimate", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const send = useMutation({
@@ -332,7 +367,7 @@ export default function CrmClientPage() {
         });
       }
     },
-    onError: (e: any) => toast({ title: "Could not send", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // Contractor preview: the public page is email-gated now, so the CRM opens
@@ -341,7 +376,7 @@ export default function CrmClientPage() {
     mutationFn: async (estimateId: string) =>
       (await apiRequest("POST", `/api/crm/estimates/${estimateId}/preview-link`, {})).json(),
     onSuccess: (r: any) => { if (r.url) window.open(r.url, "_blank", "noopener"); },
-    onError: (e: any) => toast({ title: "Could not open preview", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not open preview", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -395,6 +430,67 @@ export default function CrmClientPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {canManageCustomers && <ViewAsClientButton customerId={id!} />}
+              {canManageCustomers && (
+                <>
+                  <Button variant="outline" size="sm" data-testid="button-edit-client" onClick={openEdit}>
+                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                  </Button>
+                  <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                    <DialogContent className="max-w-md" data-testid="dialog-edit-client">
+                      <DialogHeader><DialogTitle>Edit {c.displayName}</DialogTitle></DialogHeader>
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="edit-name">Name</Label>
+                          <Input id="edit-name" value={editForm.displayName} data-testid="input-edit-name"
+                            onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} />
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <Label htmlFor="edit-email">Email</Label>
+                            <Input id="edit-email" type="email" value={editForm.email} data-testid="input-edit-email"
+                              placeholder="Needed to send estimates"
+                              onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit-phone">Phone</Label>
+                            <Input id="edit-phone" type="tel" value={editForm.phone} data-testid="input-edit-phone"
+                              onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-address">Address</Label>
+                          <Input id="edit-address" value={editForm.addressLine1} data-testid="input-edit-address"
+                            onChange={(e) => setEditForm({ ...editForm, addressLine1: e.target.value })} />
+                        </div>
+                        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+                          <div className="col-span-2 sm:col-span-1">
+                            <Label htmlFor="edit-city">City</Label>
+                            <Input id="edit-city" value={editForm.city}
+                              onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit-state">State</Label>
+                            <Input id="edit-state" value={editForm.state}
+                              onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit-zip">ZIP</Label>
+                            <Input id="edit-zip" value={editForm.postalCode}
+                              onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })} />
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={() => updateClient.mutate()}
+                          disabled={!editForm.displayName.trim() || updateClient.isPending}
+                          data-testid="button-save-client">
+                          {updateClient.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save changes
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
               {data.portalPath && (
                 <Button variant="outline" size="sm" data-testid="button-copy-portal"
                   onClick={() => {
@@ -543,7 +639,14 @@ export default function CrmClientPage() {
               compact
               icon={FileText}
               title="No estimates yet"
-              description="Build one from a template or from scratch — the client approves it online."
+              description="Add lines right here, or tap them in from your price book in the full builder — the client approves it online."
+              action={canEstimate ? (
+                <Link href="/crm/estimates/new">
+                  <Button variant="outline" size="sm" data-testid="link-full-builder">
+                    Open the full builder
+                  </Button>
+                </Link>
+              ) : undefined}
             />
           )}
           {estimates.map((e: any) => (
