@@ -144,6 +144,8 @@ test.describe("client portal v2 — photos + comments", () => {
     try {
       await grantClientSession(page, [customerId]);
       await gotoCrm(page, "/?client=1");
+      // Photos live behind the sidebar's Photos view.
+      await page.getByTestId("portal-nav-photos").click();
       await expect(page.getByTestId("section-photo-share")).toBeVisible({ timeout: 15_000 });
 
       await page.getByTestId("input-client-photo").setInputFiles({
@@ -174,6 +176,8 @@ test.describe("client portal v2 — photos + comments", () => {
     try {
       await grantClientSession(page, [customerId]);
       await gotoCrm(page, "/?client=1");
+      // Comments live behind the sidebar's Messages view.
+      await page.getByTestId("portal-nav-messages").click();
       await expect(page.getByTestId("section-comment-box")).toBeVisible({ timeout: 15_000 });
 
       await page.getByTestId("input-client-comment").fill("Can we move the start date to next Friday?");

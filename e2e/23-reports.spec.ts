@@ -73,6 +73,8 @@ test.describe("/crm/reports", () => {
     expect(rows.length).toBe(1);
     await grantClientSession(page, [rows[0].id]);
     await gotoCrm(page, "/?client=1");
+    // Measurement reports live behind their own sidebar view in the portal.
+    await page.getByTestId("portal-nav-reports").click();
     const reports = page.getByTestId("section-reports");
     await expect(reports).toBeVisible({ timeout: 15_000 });
     await expect(reports).toContainText("hover report");

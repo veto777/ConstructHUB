@@ -65,8 +65,9 @@ test.describe("signed contract PDF", () => {
     expect(att, "signed-contract attachment row").toBeTruthy();
     expect(att!.mime).toBe("application/pdf");
 
-    // ── The client portal: contracts section + working download. ─────────
+    // ── The client portal: contracts view + working download. ────────────
     await gotoCrm(page, "/?client=1");
+    await page.getByTestId("portal-nav-contracts").click();
     const contracts = page.getByTestId("section-contracts");
     await expect(contracts).toContainText("E2E throwaway estimate");
     await expect(contracts).toContainText("Mary Homeowner");

@@ -195,6 +195,8 @@ test.describe("client 360 — view as client", () => {
         await expect(popup.getByTestId("text-org-name")).toBeVisible();
 
         // A comment post refuses with a clear toast — and writes nothing.
+        // Comments live behind the sidebar's Messages view.
+        await popup.getByTestId("portal-nav-messages").click();
         await popup.getByTestId("input-client-comment").fill("Preview must not post this");
         await popup.getByTestId("button-send-comment").click();
         await expect(popup.getByText(/read-only — sign in as the client/i)).toBeVisible({ timeout: 10_000 });
