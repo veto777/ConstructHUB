@@ -197,8 +197,11 @@ export async function trySend(useBackup: boolean, mailOptions: any, replyToSelf:
 // test run sends real email from the production address — which happened
 // 2026-08-01 (beta-invite e2e → real send → bounce in the shared inbox).
 // Set EMAIL_ALLOW_REAL=1 to deliberately send real mail from dev.
+// EMAIL_FORCE_SINK=1 forces the sink even under NODE_ENV=production — for
+// prod-parity smoke servers on the tower that must never touch real SMTP.
 const OUTBOX_PATH = path.join(process.cwd(), "tmp", "email-outbox.jsonl");
 function realSendAllowed(): boolean {
+  if (process.env.EMAIL_FORCE_SINK === "1") return false;
   return process.env.NODE_ENV === "production" || process.env.EMAIL_ALLOW_REAL === "1";
 }
 function sinkToOutbox(mailOptions: any): { accepted: string[]; rejected: string[]; response: string } {
