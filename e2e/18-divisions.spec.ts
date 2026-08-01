@@ -109,7 +109,9 @@ test.describe("divisions", { tag: "@serial" }, () => {
 
     await grantClientSession(page, [customer.id]); // the public page is email-gated
     await gotoCrm(page, `/e/${token}`);
-    await expect(page.locator("h1")).toContainText(`E2E Gulf Coast ${stamp}`);
+    // The letterhead shows the project title as its own heading (the page has
+    // two h1s — the other is "Estimate for <client>"), so match it by name.
+    await expect(page.getByRole("heading", { name: `E2E Gulf Coast ${stamp}` })).toBeVisible();
     const addr = page.getByTestId("text-company-address");
     await expect(addr).toBeVisible();
     await expect(addr).toContainText("9 E2E Blvd");
