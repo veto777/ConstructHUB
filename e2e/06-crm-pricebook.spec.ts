@@ -35,8 +35,8 @@ test.describe("/crm/pricebook", () => {
     await page.getByTestId("button-test-formula").click();
     await expect(page.getByTestId("text-formula-result")).toContainText("= 36");
 
-    // Assemblies: preview expands one into priced lines.
-    await openTab(page, "Assemblies");
+    // Price Chart: preview expands one SKU into priced lines.
+    await openTab(page, "Price Chart");
     const previewBtn = page.locator('[data-testid^="button-preview-"]').first();
     if (await previewBtn.isVisible().catch(() => false)) {
       const itemId = (await previewBtn.getAttribute("data-testid"))!.replace("button-preview-", "");
@@ -45,14 +45,35 @@ test.describe("/crm/pricebook", () => {
       await expect(page.getByTestId(`pb-item-${itemId}`).locator("table")).toBeVisible();
     }
 
+    // Price Chart: add a SKU, edit it, delete it — the full lifecycle.
+    await page.getByTestId("button-add-item").click();
+    await page.getByTestId("input-item-name").fill(`E2E SKU ${stamp}`);
+    await page.getByTestId("button-save-item").click();
+    await expect(page.getByText("SKU added", { exact: true })).toBeVisible();
+    const row = page.locator('[data-testid^="pb-item-"]', { hasText: `E2E SKU ${stamp}` });
+    await expect(row).toBeVisible();
+    const skuId = (await row.getAttribute("data-testid"))!.replace("pb-item-", "");
+
+    await page.getByTestId(`button-edit-item-${skuId}`).click();
+    await page.getByTestId("input-item-name").fill(`E2E SKU ${stamp} v2`);
+    await page.getByTestId("button-save-item").click();
+    await expect(page.getByText("SKU updated", { exact: true })).toBeVisible();
+    await expect(page.getByTestId(`pb-item-${skuId}`)).toContainText(`E2E SKU ${stamp} v2`);
+
+    await page.getByTestId(`button-delete-item-${skuId}`).click(); // confirm auto-accepted
+    await expect(page.getByText("SKU deleted", { exact: true })).toBeVisible();
+    await expect(page.getByTestId(`pb-item-${skuId}`)).toHaveCount(0);
+
     guards.assertClean("pricebook curated");
   });
 
-  for (const tab of ["Assemblies", "Materials", "Labor", "Formulas"]) {
+  for (const tab of ["Price Chart", "Materials", "Labor", "Formulas"]) {
     test(`sweep: every button and link (${tab} tab)`, async ({ page }) => {
       const { clicked } = await sweepPage(page, "/crm/pricebook", {
         ready: 'h1:has-text("Price book")',
         beforeEach: async (p) => openTab(p, tab),
+        // Delete is curated above — a sweep would empty the whole price chart.
+        skip: ({ testid }) => testid.startsWith("button-delete-item-"),
       });
       console.log(`pricebook ${tab} sweep clicked ${clicked}`);
       expect(clicked).toBeGreaterThanOrEqual(10);
