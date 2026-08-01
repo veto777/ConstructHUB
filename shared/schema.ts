@@ -1343,6 +1343,11 @@ export const CRM_NOTIFICATION_PREFS = [
   "jobApproved",       // PM notice: an estimate was approved (job awarded)
   "clientComments",    // a homeowner sent a note from the client portal
   "financeClick",      // a homeowner tapped a financing link in the client portal
+  // Owner-level "runs a tight ship" coverage (server/crm/owner-notify.ts).
+  "estimateSent",        // a team member sent a bid to a client
+  "memberLogin",         // a team member signed in
+  "memberAccountChange", // a team member changed their own profile or password
+  "leadReceived",        // a lead came in through the website lead form
 ] as const;
 export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 

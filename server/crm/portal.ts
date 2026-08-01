@@ -30,6 +30,7 @@ import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl } from "../site-context";
 import { logEvent, presentEstimate } from "./entities";
+import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
@@ -296,6 +297,21 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }).where(eq(crmEstimates.id, est.id)).returning();
 
     await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, { to, emailed, emailError });
+
+    // Owner's "bid sent" notice — fires even when the client copy failed to
+    // send (the estimate is marked sent either way; the link is live).
+    await notifyOrgOwners({
+      org: ctx.org,
+      pref: "estimateSent",
+      excludeEmails: [ctx.member.email],
+      subject: `📤 Bid sent to ${cust.displayName}${est.number ? ` — ${est.number}` : ""}`,
+      bodyHtml:
+        `<p><strong>${esc(ctx.member.displayName || from)}</strong> sent estimate ` +
+        `<strong>${esc(est.number ?? "")}</strong> for <strong>${money(est.totalCents)}</strong> ` +
+        `to <strong>${esc(cust.displayName)}</strong>.</p>`,
+      link: `${portalBaseUrl(req)}/crm/estimates`,
+      linkLabel: "Open estimates",
+    });
 
     if (est.projectId) {
       await db.update(crmProjects)

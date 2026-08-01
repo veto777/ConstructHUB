@@ -14,12 +14,6 @@
  * The public POST is deliberately boring from the outside: honeypot hits and
  * rate-limited requests get the exact same 201 { ok: true } as a real lead —
  * the response can never be an oracle for whether a submission "worked".
- *
- * NOTE on the notification pref: 'leadReceived' is intentionally NOT added to
- * the shared CRM_NOTIFICATION_PREFS list — shared/schema.ts belongs to a
- * parallel workstream (same situation portal.ts documents for
- * 'contractSigned'). crmNotificationEnabled treats an absent key as ON either
- * way, and the cast keeps tsc honest about that.
  */
 import type { Express } from "express";
 import { randomBytes, timingSafeEqual } from "crypto";
@@ -31,7 +25,6 @@ import {
   crmCustomers,
   crmLeadSources,
   crmNotificationEnabled,
-  type CrmNotificationPref,
 } from "@shared/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
@@ -130,7 +123,7 @@ async function notifyLeadReceived(
   owner: typeof crmMembers.$inferSelect | null,
   lead: { name: string; email?: string | null; phone?: string | null; message?: string | null },
 ) {
-  if (!crmNotificationEnabled(org.customFields, "leadReceived" as CrmNotificationPref)) return;
+  if (!crmNotificationEnabled(org.customFields, "leadReceived")) return;
 
   const recipients = new Set<string>();
   if (owner?.email) recipients.add(owner.email);

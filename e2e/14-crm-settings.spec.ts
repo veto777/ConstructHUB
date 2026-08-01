@@ -35,6 +35,33 @@ test.describe("/crm/settings", () => {
     await expect(page.getByText("Notification preferences saved", { exact: true })).toBeVisible();
     await expect(page.getByTestId("switch-notif-estimateViewed")).toHaveAttribute("aria-checked", original!);
 
+    // Owner-level switches (bid sent / member signs in / account changes /
+    // website lead): same dance as estimateViewed — render, toggle, persist
+    // across a reload, then restore the ORIGINAL states so the next suite
+    // run (and the parallel sweep below) never starts dirty.
+    const ownerKeys = ["estimateSent", "memberLogin", "memberAccountChange", "leadReceived"];
+    const ownerOriginals: Record<string, string | null> = {};
+    for (const key of ownerKeys) {
+      const sw = page.getByTestId(`switch-notif-${key}`);
+      await expect(sw).toBeVisible();
+      ownerOriginals[key] = await sw.getAttribute("aria-checked");
+      await sw.click();
+      await expect(page.getByText("Notification preferences saved", { exact: true }).first()).toBeVisible();
+    }
+    await gotoCrm(page, "/crm/settings");
+    for (const key of ownerKeys) {
+      await expect(page.getByTestId(`switch-notif-${key}`)).toHaveAttribute(
+        "aria-checked",
+        ownerOriginals[key] === "true" ? "false" : "true",
+      );
+    }
+    for (const key of ownerKeys) {
+      const sw = page.getByTestId(`switch-notif-${key}`);
+      await sw.click();
+      await expect(page.getByText("Notification preferences saved", { exact: true }).first()).toBeVisible();
+      await expect(sw).toHaveAttribute("aria-checked", ownerOriginals[key]!);
+    }
+
     // The integrations sections moved out — the pointer card stands in their place.
     await expect(page.getByTestId("card-integrations-moved")).toBeVisible();
     await page.getByTestId("link-integrations").click();

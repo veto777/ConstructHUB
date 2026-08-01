@@ -36,6 +36,10 @@ const NOTIFICATIONS = [
   { key: "estimateDeclined", label: "Estimate declined", description: "A client declined an estimate." },
   { key: "invoicePaid", label: "Payment received", description: "An online payment landed in your Stripe account." },
   { key: "paymentReceived", label: "Manual payment recorded", description: "A cash, check, wire or card payment was recorded on an invoice." },
+  { key: "estimateSent", label: "Bid sent to client", description: "A team member sent an estimate to a client." },
+  { key: "memberLogin", label: "Team member signs in", description: "Someone on your team signed in (at most one email per person per hour)." },
+  { key: "memberAccountChange", label: "Team member changes their account", description: "A team member changed their own profile details or password." },
+  { key: "leadReceived", label: "Website lead received", description: "A lead came in through your website lead form." },
 ] as const;
 
 type NotifKey = (typeof NOTIFICATIONS)[number]["key"];

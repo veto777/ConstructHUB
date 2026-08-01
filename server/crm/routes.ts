@@ -42,6 +42,7 @@ import { registerCrmDiscountRoutes } from "./discounts";
 import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmReceiptRoutes } from "./receipts";
+import { notifyMemberAccountChange } from "./owner-notify";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
@@ -268,6 +269,16 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(crmMembers.id, ctx.member.id))
       .returning();
+
+    // Owner's "account changed" notice — field names only.
+    const changed = (["displayName", "title", "phone", "avatarUrl"] as const)
+      .filter((k) => parsed.data[k] !== undefined);
+    if (changed.length) {
+      await notifyMemberAccountChange(
+        { id: user.id, email: ctx.member.email, displayName: ctx.member.displayName },
+        [...changed],
+      );
+    }
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 
@@ -507,6 +518,20 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(crmMembers.id, target.id))
       .returning();
+
+    // Owner's "account changed" notice when a member edits their OWN profile
+    // through the team route — field names only. An admin editing someone
+    // else's seat is the owner's own action, not the member's.
+    if (target.id === ctx.member.id) {
+      const changed = (["displayName", "title", "phone"] as const)
+        .filter((k) => parsed.data[k] !== undefined);
+      if (changed.length) {
+        await notifyMemberAccountChange(
+          { id: user.id, email: ctx.member.email, displayName: ctx.member.displayName },
+          [...changed],
+        );
+      }
+    }
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 
