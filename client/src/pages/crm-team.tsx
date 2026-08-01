@@ -104,16 +104,16 @@ interface Invitation {
 const ROLE_BLURB: Record<string, string> = {
   owner: "Full control, holds the subscription. Cannot be removed or demoted.",
   admin: "Everything except integrations. For a co-owner or general manager.",
-  pm: "Runs jobs, estimates and customers across the whole book. Sees prices, never costs.",
-  office: "Scheduling, customers, estimates, invoices and payments. No costs or margins.",
+  pm: "Runs jobs, estimates and clients across the whole book. Sees prices, never costs.",
+  office: "Scheduling, clients, estimates, invoices and payments. No costs or margins.",
   field: "Sees only their own assigned jobs. Price-blind by default.",
-  subcontractor: "Outside crew. Sees only assigned work — never customers or pricing.",
+  subcontractor: "Outside crew. Sees only assigned work — never clients or pricing.",
 };
 
 const PERM_LABEL: Record<string, string> = {
   viewAllJobs: "See all jobs (not just their own)",
   manageJobs: "Create and edit jobs",
-  manageCustomers: "Manage customers",
+  manageCustomers: "Manage clients",
   manageEstimates: "Create and send estimates",
   manageInvoices: "Create and send invoices",
   takePayment: "Take payments",

@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { LucideIcon } from "lucide-react";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -71,22 +72,34 @@ export function MetricCard({
   value,
   context,
   testid,
+  href,
+  valueClassName,
 }: {
   icon?: LucideIcon;
   label: string;
   value: React.ReactNode;
   context?: React.ReactNode;
   testid?: string;
+  /** Metrics that stand for a page link there — a number nobody can click is a dead end. */
+  href?: string;
+  /** Long values (money) can drop a size so they fit the card instead of clipping. */
+  valueClassName?: string;
 }) {
-  return (
-    <Card data-testid={testid} className="overflow-hidden">
+  const card = (
+    <Card data-testid={testid} className="overflow-hidden h-full">
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {label}
             </div>
-            <div className="mt-1.5 text-3xl font-semibold tracking-tight tabular-nums leading-none">
+            <div
+              className={cn(
+                "mt-1.5 text-3xl font-semibold tracking-tight tabular-nums leading-none truncate",
+                valueClassName,
+              )}
+              title={typeof value === "string" || typeof value === "number" ? String(value) : undefined}
+            >
               {value}
             </div>
             {context && <div className="mt-2 text-xs text-muted-foreground">{context}</div>}
@@ -99,6 +112,13 @@ export function MetricCard({
         </div>
       </CardContent>
     </Card>
+  );
+  return href ? (
+    <Link href={href} className="block h-full rounded-xl transition-shadow hover:shadow-md">
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }
 

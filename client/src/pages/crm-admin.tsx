@@ -186,18 +186,27 @@ export default function CrmAdminPage() {
 
       {/* ── Overview ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="section-overview">
-        <MetricCard icon={Users} label="Users" value={overview?.users ?? "—"} testid="metric-users"
-          context={overview ? `${overview.betaUsers} beta` : undefined} />
-        <MetricCard icon={Building2} label="Orgs" value={overview?.orgs ?? "—"} testid="metric-orgs" />
-        <MetricCard icon={UserCircle} label="Customers" value={overview?.customers ?? "—"} testid="metric-customers" />
-        <MetricCard icon={FileText} label="Estimates" value={overview?.estimates ?? "—"} testid="metric-estimates" />
-        <MetricCard icon={Receipt} label="Invoices" value={overview?.invoices ?? "—"} testid="metric-invoices" />
+        {/* Users/orgs have no dedicated page — the destination is the section below. */}
+        <a href="#card-users" className="block h-full rounded-xl transition-shadow hover:shadow-md">
+          <MetricCard icon={Users} label="Users" value={overview?.users ?? "—"} testid="metric-users"
+            context={overview ? `${overview.betaUsers} beta` : undefined} />
+        </a>
+        <a href="#card-orgs" className="block h-full rounded-xl transition-shadow hover:shadow-md">
+          <MetricCard icon={Building2} label="Orgs" value={overview?.orgs ?? "—"} testid="metric-orgs" />
+        </a>
+        <MetricCard icon={UserCircle} label="Clients" value={overview?.customers ?? "—"} testid="metric-customers"
+          href="/crm/clients" />
+        <MetricCard icon={FileText} label="Estimates" value={overview?.estimates ?? "—"} testid="metric-estimates"
+          href="/crm/estimates" />
+        <MetricCard icon={Receipt} label="Invoices" value={overview?.invoices ?? "—"} testid="metric-invoices"
+          href="/crm/invoices" />
         <MetricCard icon={CreditCard} label="Payments" value={overview ? money(overview.payments.succeededCents) : "—"}
-          testid="metric-payments" context={overview ? `${overview.payments.count} charges` : undefined} />
+          testid="metric-payments" href="/crm/payments" valueClassName="text-2xl"
+          context={overview ? `${overview.payments.count} charges` : undefined} />
       </div>
 
       {/* ── Users ────────────────────────────────────────────────────────── */}
-      <Card data-testid="card-users">
+      <Card data-testid="card-users" id="card-users" className="scroll-mt-6">
         <CardContent className="p-4 sm:p-5 space-y-4">
           <SectionTitle
             icon={Users}
@@ -265,7 +274,7 @@ export default function CrmAdminPage() {
       </Card>
 
       {/* ── Orgs ─────────────────────────────────────────────────────────── */}
-      <Card data-testid="card-orgs">
+      <Card data-testid="card-orgs" id="card-orgs" className="scroll-mt-6">
         <CardContent className="p-4 sm:p-5 space-y-4">
           <SectionTitle icon={Building2} title="Organizations" description={`${orgs?.length ?? 0} orgs — click one for detail`} />
           <div className={crmTable.wrapper}>
@@ -276,7 +285,7 @@ export default function CrmAdminPage() {
                   <th className={crmTable.th}>Owner</th>
                   <th className={crmTable.th}>Plan</th>
                   <th className={crmTable.thRight}>Members</th>
-                  <th className={crmTable.thRight}>Customers</th>
+                  <th className={crmTable.thRight}>Clients</th>
                   <th className={crmTable.thRight}>Projects</th>
                   <th className={crmTable.thRight}>Estimates</th>
                   <th className={crmTable.thRight}>Invoices</th>
