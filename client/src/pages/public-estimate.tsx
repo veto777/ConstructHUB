@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { queryClient } from "@/lib/queryClient";
@@ -146,6 +146,10 @@ export default function PublicEstimatePage() {
   // copy opened on another device falls back to the email gate below.
   const firstOpenPass = new URLSearchParams(window.location.search).get("k");
   const [passState, setPassState] = useState<"idle" | "trying" | "failed">("idle");
+  // One attempt per page load, guarded by a ref: state changes re-run the
+  // effect, and a cleanup-style cancellation here once left a successful
+  // redemption ignored (spinner forever until a manual reload).
+  const passAttempted = useRef(false);
   const needsGate = (() => {
     const msg = String((error as Error | null)?.message ?? "");
     if (!msg.startsWith("401:")) return false;
@@ -153,9 +157,9 @@ export default function PublicEstimatePage() {
     catch { return false; }
   })();
   useEffect(() => {
-    if (!needsGate || !firstOpenPass || passState !== "idle") return;
+    if (!needsGate || !firstOpenPass || passAttempted.current) return;
+    passAttempted.current = true;
     setPassState("trying");
-    let cancelled = false;
     (async () => {
       try {
         const r = await fetch("/api/client/auth/redeem", {
@@ -163,24 +167,21 @@ export default function PublicEstimatePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: firstOpenPass }),
         });
-        if (cancelled) return;
         if (r.ok) {
-          // The pass is spent — drop it from the URL so what gets saved or
-          // shared is the bare link, then load the document on the session.
+          // The pass is spent and the session cookie is set — navigate to the
+          // bare URL (no ?k) for a clean load on the session. A full
+          // navigation, deliberately: no client-state juggling can strand it.
           const url = new URL(window.location.href);
           url.searchParams.delete("k");
-          window.history.replaceState({}, "", url.toString());
-          setPassState("idle");
-          queryClient.invalidateQueries({ queryKey: [docUrl] });
+          window.location.replace(url.toString());
         } else {
           setPassState("failed");
         }
       } catch {
-        if (!cancelled) setPassState("failed");
+        setPassState("failed");
       }
     })();
-    return () => { cancelled = true; };
-  }, [needsGate, firstOpenPass, passState, docUrl]);
+  }, [needsGate, firstOpenPass]);
 
   // Engagement heartbeat — starts only once the document has loaded, and
   // never for a contractor preview (that's not client behaviour).
