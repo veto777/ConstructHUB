@@ -82,6 +82,14 @@ interface BetaInvite {
 
 const money = (cents: number) =>
   `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+/** Six-up metric cards are ~200px wide — platform revenue needs compact
+ *  notation ("$1.7M") or it clips; the exact total lives on /crm/payments. */
+const moneyCompact = (cents: number) =>
+  Math.abs(cents) >= 100_000_00
+    ? new Intl.NumberFormat("en-US", {
+        style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1,
+      }).format(cents / 100)
+    : money(cents);
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
 
 function PlanPill({ plan, beta }: { plan: { plan: string; status: string }; beta?: boolean }) {
@@ -200,7 +208,7 @@ export default function CrmAdminPage() {
           href="/crm/estimates" />
         <MetricCard icon={Receipt} label="Invoices" value={overview?.invoices ?? "—"} testid="metric-invoices"
           href="/crm/invoices" />
-        <MetricCard icon={CreditCard} label="Payments" value={overview ? money(overview.payments.succeededCents) : "—"}
+        <MetricCard icon={CreditCard} label="Payments" value={overview ? moneyCompact(overview.payments.succeededCents) : "—"}
           testid="metric-payments" href="/crm/payments" valueClassName="text-2xl"
           context={overview ? `${overview.payments.count} charges` : undefined} />
       </div>
