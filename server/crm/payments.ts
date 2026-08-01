@@ -76,15 +76,40 @@ export type OrgPaymentSettings = {
   surchargeBps: number | null;
   /** ON = the client pays the card fee; OFF = the contractor absorbs it. */
   passFeeToClient: boolean;
+  /** Which rails the org offers its clients. The org decides, not the payer. */
+  railMode: "both" | "ach_only" | "card_only";
+  /** With railMode "both": at/above this amount card is withheld (ACH only). */
+  achOnlyOverCents: number | null;
 };
 
 export function paymentSettingsOf(org: { customFields: unknown } | null | undefined): OrgPaymentSettings {
   const p = (org?.customFields as Record<string, any> | null | undefined)?.payments ?? {};
   const bps = Number(p.surchargeBps);
+  const over = Number(p.achOnlyOverCents);
   return {
     surchargeBps: Number.isFinite(bps) && bps > 0 ? Math.min(1000, Math.round(bps)) : null,
     passFeeToClient: p.passFeeToClient === true,
+    railMode: p.railMode === "ach_only" || p.railMode === "card_only" ? p.railMode : "both",
+    achOnlyOverCents: Number.isFinite(over) && over > 0 ? Math.round(over) : null,
   };
+}
+
+/** The rails a client may actually use for this amount: org policy ∩ account
+ *  capability. Policy can only narrow what the account supports; when it
+ *  filters everything out the payment page falls back to "contact us" —
+ *  never to a rail the org excluded. */
+export function allowedRails(
+  org: { customFields: unknown } | null | undefined,
+  acct: { chargesEnabled: boolean; achEnabled: boolean; cardEnabled: boolean } | null | undefined,
+  amountCents: number,
+): { ach: boolean; card: boolean } {
+  const s = paymentSettingsOf(org);
+  const ach = Boolean(acct?.chargesEnabled && acct.achEnabled) && s.railMode !== "card_only";
+  let card = Boolean(acct?.chargesEnabled && acct.cardEnabled) && s.railMode !== "ach_only";
+  // The threshold only bites when ACH is genuinely available — a large invoice
+  // must never become unpayable because the account lacks the ACH capability.
+  if (card && ach && s.achOnlyOverCents != null && amountCents >= s.achOnlyOverCents) card = false;
+  return { ach, card };
 }
 
 /** The fee a client pays on top of `amountCents` when paying by card. 0 when off. */
@@ -327,6 +352,9 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       payments: z.object({
         surchargeBps: z.number().int().min(0).max(1000).nullable(),
         passFeeToClient: z.boolean(),
+        railMode: z.enum(["both", "ach_only", "card_only"]).optional(),
+        // Cents; $1M cap keeps typos ($1e12) from silently disabling card forever.
+        achOnlyOverCents: z.number().int().min(0).max(100_000_000).nullable().optional(),
       }).optional(),
       financingLinks: financingLinksSchema.optional(),
     }).safeParse(req.body ?? {});
@@ -338,6 +366,9 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         surchargeBps: parsed.data.payments.surchargeBps && parsed.data.payments.surchargeBps > 0
           ? parsed.data.payments.surchargeBps : null,
         passFeeToClient: parsed.data.payments.passFeeToClient,
+        railMode: parsed.data.payments.railMode ?? "both",
+        achOnlyOverCents: parsed.data.payments.achOnlyOverCents && parsed.data.payments.achOnlyOverCents > 0
+          ? parsed.data.payments.achOnlyOverCents : null,
       };
     }
     if (parsed.data.financingLinks) {
@@ -418,12 +449,13 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const acct = await activeAccount(inv.orgId);
     const dueCents = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
     const settings = paymentSettingsOf(org);
+    const rails = allowedRails(org, acct, dueCents);
     const fee = cardFeeCents(org, dueCents);
     res.json({
       dueCents,
-      cardAvailable: Boolean(acct?.chargesEnabled && acct.cardEnabled),
-      achAvailable: Boolean(acct?.chargesEnabled && acct.achEnabled),
-      cardFee: settings.passFeeToClient && settings.surchargeBps
+      cardAvailable: rails.card,
+      achAvailable: rails.ach,
+      cardFee: rails.card && settings.passFeeToClient && settings.surchargeBps
         ? { bps: settings.surchargeBps, feeCents: fee, totalCents: dueCents + fee }
         : null,
       financing: getPrimaryFinancing(org),
@@ -468,26 +500,30 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
 
-    // The client may pick their rail up front (the invoice page offers
-    // separate card/ACH buttons when a card surcharge applies). An explicit
-    // choice pins the session to that one method so an ACH payer is never
-    // charged the card fee.
+    // The org's rail policy decides what is offered (ACH-only, card-only, or
+    // an amount threshold above which card is withheld) — the payer only picks
+    // among what the policy allows. An explicit choice pins the session to
+    // that one method so an ACH payer is never charged the card fee.
+    const rails = allowedRails(org, acct, amount);
+    if (!rails.ach && !rails.card) {
+      return res.status(503).json({ message: "Online payment isn't available for this invoice. Please contact us to arrange payment." });
+    }
     const requested = z.enum(["card", "ach"]).safeParse(req.body?.method);
     const choice = requested.success ? requested.data : undefined;
-    if (choice === "ach" && !acct.achEnabled) {
+    if (choice === "ach" && !rails.ach) {
       return res.status(400).json({ message: "Bank transfer (ACH) isn't available for this invoice — please pay by card." });
     }
-    if (choice === "card" && !acct.cardEnabled) {
-      return res.status(400).json({ message: "Card payment isn't available for this invoice." });
+    if (choice === "card" && !rails.card) {
+      return res.status(400).json({ message: "Card payment isn't available for this invoice — please pay by bank transfer (ACH)." });
     }
 
     const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
     if (choice === "card") methods.push("card");
     else if (choice === "ach") methods.push("us_bank_account");
     else {
-      if (acct.achEnabled) methods.push("us_bank_account");
-      if (acct.cardEnabled) methods.push("card");
-      if (!methods.length) methods.push("card");
+      // ACH listed first so it is the default choice when both are offered.
+      if (rails.ach) methods.push("us_bank_account");
+      if (rails.card) methods.push("card");
     }
 
     // CC fee passthrough: a clearly-labelled surcharge line on CARD checkout
@@ -527,7 +563,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         orgId: inv.orgId, customerId: inv.customerId, invoiceId: inv.id,
         projectId: inv.projectId ?? null, provider: "stripe", externalId: session.id,
         purpose: "progress", amountCents: amount, currency: acct.defaultCurrency || "usd",
-        method: choice === "card" ? "card" : choice === "ach" ? "ach" : (acct.achEnabled ? "ach" : "card"),
+        method: choice === "card" ? "card" : choice === "ach" ? "ach" : (rails.ach ? "ach" : "card"),
         status: "pending", applicationFeeCents: 0,
         note: fee > 0 ? `Card processing fee $${(fee / 100).toFixed(2)} paid by the client on top.` : null,
       } as any);
@@ -571,11 +607,15 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
 
     // ACH listed first so it is the default choice — it is 100× cheaper on a
-    // large deposit and is the whole reason this exists.
+    // large deposit and is the whole reason this exists. The org's rail policy
+    // (ACH-only / threshold) applies here exactly as on invoices.
+    const rails = allowedRails(org, acct, amount);
+    if (!rails.ach && !rails.card) {
+      return res.status(503).json({ message: "Online payment isn't available for this estimate. Please contact us to arrange payment." });
+    }
     const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
-    if (acct.achEnabled) methods.push("us_bank_account");
-    if (acct.cardEnabled) methods.push("card");
-    if (!methods.length) methods.push("card");
+    if (rails.ach) methods.push("us_bank_account");
+    if (rails.card) methods.push("card");
 
     const base = getBaseUrl(req);
     try {
@@ -605,7 +645,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         projectId: est.projectId ?? null, provider: "stripe",
         externalId: session.id, purpose: est.depositCents ? "deposit" : "final",
         amountCents: amount, currency: acct.defaultCurrency || "usd",
-        method: acct.achEnabled ? "ach" : "card", status: "pending",
+        method: rails.ach ? "ach" : "card", status: "pending",
         applicationFeeCents: 0,
       } as any);
 
