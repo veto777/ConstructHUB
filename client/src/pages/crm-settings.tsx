@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings, Building2, FileText, Bell, CreditCard, KeyRound, Webhook,
-  Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin,
+  Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud,
+  CalendarDays, RefreshCw, Unplug, Ruler,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
@@ -72,6 +73,14 @@ export default function CrmSettingsPage() {
   });
   const { data: divisions } = useQuery<any[]>({
     queryKey: ["/api/crm/divisions"],
+    enabled: allowed,
+  });
+  const { data: calFeed } = useQuery<{ url: string }>({
+    queryKey: ["/api/crm/calendar/feed-url"],
+    enabled: allowed,
+  });
+  const { data: gcalStatus } = useQuery<any>({
+    queryKey: ["/api/crm/calendar/google/status"],
     enabled: allowed,
   });
 
@@ -287,6 +296,43 @@ export default function CrmSettingsPage() {
     onError: (e: any) => toast({ title: "Could not delete webhook", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  // ── Calendar sync ─────────────────────────────────────────────────────────
+  const rotateFeed = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/calendar/rotate-feed-token", {})).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/feed-url"] });
+      toast({ title: "New feed URL generated", description: "Old calendar subscriptions will stop updating." });
+    },
+    onError: (e: any) => toast({ title: "Could not regenerate", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const googleConnect = useMutation({
+    mutationFn: async () => (await apiRequest("GET", "/api/crm/calendar/google/connect", undefined)).json(),
+    onSuccess: (r: any) => { if (r.url) window.location.href = r.url; },
+    onError: (e: any) => toast({ title: "Can't start Google connect", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const googleSync = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/calendar/google/sync", {})).json(),
+    onSuccess: (r: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
+      toast({ title: "Synced to Google Calendar", description: `${r.total ?? 0} appointments pushed (${r.upserted ?? 0} written, ${r.deleted ?? 0} removed).` });
+    },
+    onError: (e: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
+      toast({ title: "Sync failed", description: String(e.message ?? e), variant: "destructive" });
+    },
+  });
+
+  const googleDisconnect = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/calendar/google/disconnect", {})).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
+      toast({ title: "Google Calendar disconnected" });
+    },
+    onError: (e: any) => toast({ title: "Could not disconnect", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   if (meLoading || (allowed && orgLoading)) {
     return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
@@ -298,6 +344,8 @@ export default function CrmSettingsPage() {
   const acct = payStatus?.account;
   const hookEventChoices = webhookData?.events ?? [];
   const chosenEvents = Object.values(hookEvents).filter(Boolean).length;
+  const gcal = gcalStatus?.connection ?? null;
+  const calendarParam = new URLSearchParams(window.location.search).get("calendar");
 
   return (
     <CrmPage className="max-w-4xl">
@@ -422,10 +470,11 @@ export default function CrmSettingsPage() {
                 <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
                   data-testid={`row-division-${d.id}`}>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate flex items-center gap-2">
-                      {d.name}
-                      <StatusPill tone="neutral">{d.code}</StatusPill>
-                      {d.isHeadquarters && <StatusPill tone="info" data-testid={`pill-hq-${d.id}`}>HQ</StatusPill>}
+                    <div className="text-sm font-medium flex items-center gap-2 min-w-0">
+                      {/* The name truncates; the pills never get pushed off-screen. */}
+                      <span className="truncate">{d.name}</span>
+                      <StatusPill tone="neutral" className="shrink-0">{d.code}</StatusPill>
+                      {d.isHeadquarters && <StatusPill tone="info" className="shrink-0" data-testid={`pill-hq-${d.id}`}>HQ</StatusPill>}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {[d.addressLine1, d.city, d.state].filter(Boolean).join(", ") || "No address — falls back to the company's"}
@@ -655,6 +704,119 @@ export default function CrmSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Calendar sync ───────────────────────────────────────────────── */}
+      <Card data-testid="card-calendar">
+        <CardHeader>
+          <SectionTitle
+            icon={CalendarDays}
+            title="Calendar"
+            description="Your schedule in the calendar app you already use — subscribe anywhere, or push to Google Calendar."
+          />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {calendarParam === "connected=1" && (
+            <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm"
+              data-testid="text-google-calendar-connected">
+              Google Calendar connected. Hit "Sync now" to push your schedule.
+            </p>
+          )}
+          {calendarParam?.startsWith("error=") && (
+            <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm"
+              data-testid="text-google-calendar-error">
+              Google Calendar connection failed: {decodeURIComponent(calendarParam.slice(6))}
+            </p>
+          )}
+
+          {/* Universal iCal feed */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Subscribe from any calendar app</div>
+            <p className="text-xs text-muted-foreground">
+              Works with Apple Calendar, Outlook, Google Calendar and anything else that reads an iCal feed.
+              Calendar apps can't log in, so <strong>the token in this URL is the password</strong> — anyone
+              with the link can read the schedule. Regenerate it to cut off every old copy.
+            </p>
+            <div className="flex gap-2">
+              <Input readOnly value={calFeed?.url ?? ""} data-testid="input-calendar-feed-url"
+                onFocus={(e) => e.target.select()} />
+              <Button size="sm" variant="outline" className="shrink-0" data-testid="button-copy-calendar-feed"
+                onClick={() => {
+                  if (calFeed?.url) navigator.clipboard?.writeText(calFeed.url).catch(() => {});
+                  toast({ title: "Copied" });
+                }}>
+                <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
+              </Button>
+              <Button size="sm" variant="outline" className="shrink-0" data-testid="button-regenerate-calendar-feed"
+                onClick={() => rotateFeed.mutate()} disabled={rotateFeed.isPending}>
+                {rotateFeed.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                Regenerate
+              </Button>
+            </div>
+          </div>
+
+          {/* Google Calendar push */}
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-medium">Google Calendar (push sync)</div>
+                <p className="text-xs text-muted-foreground">
+                  Writes your appointments into a dedicated "ConstructHub CRM" calendar in your Google account.
+                </p>
+              </div>
+              {gcalStatus && (
+                <StatusPill tone={gcal ? "success" : "neutral"} data-testid="pill-google-calendar-status">
+                  {gcal ? "Connected" : "Not connected"}
+                </StatusPill>
+              )}
+            </div>
+
+            {gcalStatus && !gcalStatus.configured && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3"
+                data-testid="text-google-calendar-not-configured">
+                <div className="text-sm font-medium">Not configured on this server</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Missing environment {(gcalStatus.missing ?? []).length === 1 ? "variable" : "variables"}:{" "}
+                  <code>{(gcalStatus.missing ?? []).join(", ")}</code>. Add {(gcalStatus.missing ?? []).length === 1 ? "it" : "them"} to
+                  the server <code>.env</code> and restart — the same Google OAuth client the sign-in flow uses,
+                  with the <code>calendar.events</code> scope authorized.
+                </p>
+              </div>
+            )}
+
+            {gcal ? (
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground">
+                  Connected {new Date(gcal.connectedAt).toLocaleDateString()}
+                  {gcal.lastSyncAt ? ` · last synced ${new Date(gcal.lastSyncAt).toLocaleString()}` : " · not synced yet"}
+                </div>
+                {gcal.lastSyncError && (
+                  <p className="text-xs text-destructive" data-testid="text-google-calendar-sync-error">
+                    Last sync failed: {gcal.lastSyncError}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => googleSync.mutate()}
+                    disabled={googleSync.isPending} data-testid="button-sync-google-calendar">
+                    {googleSync.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                    Sync now
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => googleDisconnect.mutate()}
+                    disabled={googleDisconnect.isPending} data-testid="button-disconnect-google-calendar">
+                    <Unplug className="h-3.5 w-3.5 mr-1.5" /> Disconnect
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button size="sm" onClick={() => googleConnect.mutate()}
+                disabled={googleConnect.isPending || gcalStatus?.configured === false}
+                data-testid="button-connect-google-calendar">
+                {googleConnect.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                Connect Google Calendar
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ── Integrations: API keys + webhooks ───────────────────────────── */}
       <Card>
         <CardHeader>
@@ -841,6 +1003,36 @@ export default function CrmSettingsPage() {
               <div className="text-xs text-muted-foreground">Materials, labor rates, assemblies and packages.</div>
             </div>
             <Link href="/crm/pricebook" data-testid="link-pricebook"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline shrink-0">
+              Open <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <UploadCloud className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">Import your data</div>
+              <div className="text-xs text-muted-foreground">Clients, estimates and invoices from Jobber, QuickBooks, Leap or Excel.</div>
+            </div>
+            <Link href="/crm/migrate" data-testid="link-migrate"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline shrink-0">
+              Open <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Ruler className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">Measurement reports</div>
+              <div className="text-xs text-muted-foreground">Import HOVER or CladAI reports — the client is created automatically.</div>
+            </div>
+            <Link href="/crm/reports" data-testid="link-reports"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline shrink-0">
               Open <ArrowRight className="h-3.5 w-3.5" />
             </Link>

@@ -1169,12 +1169,12 @@ export type CrmClientToken = typeof crmClientTokens.$inferSelect;
 export type CrmClientSession = typeof crmClientSessions.$inferSelect;
 
 // ── Roles & permissions ─────────────────────────────────────────────────────
-// Housecall Pro ships three fixed roles and no custom fields; we ship five
+// Housecall Pro ships three fixed roles and no custom fields; we ship six
 // construction-shaped roles PLUS per-seat overrides, because a lead carpenter
 // who can approve change orders but not see company reporting is a real and
 // common case that fixed roles cannot express.
 
-export const CRM_ROLES = ["owner", "admin", "office", "field", "subcontractor"] as const;
+export const CRM_ROLES = ["owner", "admin", "pm", "office", "field", "subcontractor"] as const;
 export type CrmRole = (typeof CRM_ROLES)[number];
 
 export const CRM_PERMISSIONS = [
@@ -1202,6 +1202,16 @@ const ALL: CrmPermissionSet = Object.fromEntries(CRM_PERMISSIONS.map((p) => [p, 
 export const CRM_ROLE_DEFAULTS: Record<CrmRole, CrmPermissionSet> = {
   owner: { ...ALL },
   admin: { ...ALL, manageIntegrations: false },
+  // Project manager: office-like reach across the whole book of work (all
+  // jobs, estimates and customers — they coordinate the work), but cost-blind:
+  // sees scopes and their prices, never costs or margins. The back office
+  // (team/settings/integrations) stays off.
+  pm: {
+    viewAllJobs: true, manageJobs: true, manageCustomers: true, manageEstimates: true,
+    manageInvoices: true, takePayment: true, seePrices: true, seeCosts: false,
+    approveChangeOrders: false, managePriceBook: false, manageTeam: false,
+    manageSettings: false, seeReporting: true, manageIntegrations: false,
+  },
   office: {
     viewAllJobs: true, manageJobs: true, manageCustomers: true, manageEstimates: true,
     manageInvoices: true, takePayment: true, seePrices: true, seeCosts: false,

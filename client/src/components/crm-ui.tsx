@@ -104,7 +104,7 @@ export function MetricCard({
 
 /* ── Status pill — semantic colour, one shape everywhere ───────────────── */
 
-export type PillTone = "success" | "warning" | "danger" | "info" | "violet" | "neutral";
+export type PillTone = "success" | "warning" | "danger" | "info" | "violet" | "teal" | "neutral";
 
 const PILL_TONE: Record<PillTone, string> = {
   success:
@@ -113,6 +113,7 @@ const PILL_TONE: Record<PillTone, string> = {
   danger: "bg-red-500/10 text-red-700 border-red-500/25 dark:text-red-400",
   info: "bg-blue-500/10 text-blue-700 border-blue-500/25 dark:text-blue-400",
   violet: "bg-violet-500/10 text-violet-700 border-violet-500/25 dark:text-violet-400",
+  teal: "bg-teal-500/10 text-teal-700 border-teal-500/25 dark:text-teal-400",
   neutral: "bg-muted text-muted-foreground border-border",
 };
 
@@ -181,6 +182,8 @@ export function roleTone(role?: string | null): PillTone {
       return "violet";
     case "admin":
       return "info";
+    case "pm":
+      return "teal";
     case "office":
       return "success";
     case "field":

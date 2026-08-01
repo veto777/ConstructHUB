@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff, Building2 } from "lucide-react";
+import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { CHLogo } from "@/components/ch-logo";
+import { CrmLogo } from "@/components/crm-logo";
 import { isPortal } from "@/lib/site";
 
 type AuthMode = "login" | "signup" | "forgot-password" | "reset-password";
@@ -174,7 +175,7 @@ export default function AuthPage() {
         <div className="text-center space-y-2">
           <div className="flex justify-center">
             {isPortal()
-              ? <Building2 className="h-12 w-12 text-primary" />
+              ? <CrmLogo height={40} />
               : <CHLogo height={50} />}
           </div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-auth-title">

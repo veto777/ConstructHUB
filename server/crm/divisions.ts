@@ -10,10 +10,11 @@
  *      work. Resolution order (first hit wins): the document's project's
  *      division → the customer's most recent project with a division → the
  *      org. Division fields that are null fall back to the org per field.
- *   3. Division list-scoping. A member pinned to a division (divisionId set)
- *      who is not the owner sees only their division's rows in list endpoints.
- *      Rows with no division are unassigned and stay visible to everyone —
- *      pre-division data must not vanish when an admin gets scoped.
+ *   3. Division list-scoping — STRICT. A member pinned to a division
+ *      (divisionId set) who is not the owner sees ONLY their division's rows
+ *      in list endpoints. Unassigned (null division) rows are visible only to
+ *      owners and division-less members — the owner keeps Braxton out of WA
+ *      and Mike/Andrey out of FL, with nothing leaking through the commons.
  */
 import type { Express } from "express";
 import { z } from "zod";
@@ -89,12 +90,13 @@ export function divisionScopeOf(member: { role: string; divisionId: string | nul
 
 /**
  * Is a row with this division visible to a member scoped to `scope`?
- * Unassigned (null) rows are shared — scoping hides OTHER divisions' work,
- * never the commons.
+ * STRICT: a scoped member sees only their own division's rows — unassigned
+ * (null) rows are NOT shared with them; only the unscoped (owners and
+ * division-less members) see the commons.
  */
 export function divisionVisible(scope: string | null, rowDivisionId: string | null | undefined): boolean {
   if (!scope) return true;
-  return !rowDivisionId || rowDivisionId === scope;
+  return rowDivisionId === scope;
 }
 
 // ── DB-side resolution helpers ──────────────────────────────────────────────

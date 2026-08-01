@@ -6,10 +6,11 @@
  *      DIVISION's name/address/license, with per-field fallback to the org.
  *      The original bug was Florida estimates going out under the WA HQ
  *      address — the merged letterhead must never mix them.
- *   2. List scoping (against the running dev server): a member pinned to a
- *      division who is not the owner never sees another division's projects,
- *      estimates, jobs or invoices in list endpoints. Owners and
- *      division-less members see everything; unassigned rows are commons.
+ *   2. List scoping (against the running dev server) — STRICT: a member
+ *      pinned to a division who is not the owner sees ONLY their division's
+ *      projects, estimates, jobs or invoices in list endpoints — never
+ *      another division's, never unassigned rows. Owners and division-less
+ *      members see everything, including the unassigned commons.
  *
  * The server-side part uses the same trick as e2e: it temporarily re-roles
  * the dev-bypass user's membership via SQL, exercises the API, and restores
@@ -123,11 +124,16 @@ describe("divisionScopeOf / divisionVisible", () => {
     expect(divisionScopeOf({ role: "admin", divisionId: null })).toBeNull();
     expect(divisionScopeOf({ role: "field", divisionId: "d-fl" })).toBe("d-fl");
   });
-  it("a scoped member sees their division and the unassigned commons — never another division", () => {
+  it("a scoped member sees ONLY their division — never another division, never the unassigned commons", () => {
     expect(divisionVisible("d-wa", "d-wa")).toBe(true);
-    expect(divisionVisible("d-wa", null)).toBe(true);
+    expect(divisionVisible("d-wa", null)).toBe(false); // STRICT: commons are not shared
+    expect(divisionVisible("d-wa", undefined)).toBe(false);
     expect(divisionVisible("d-wa", "d-fl")).toBe(false);
-    expect(divisionVisible(null, "d-fl")).toBe(true); // unscoped sees all
+  });
+  it("unscoped members (owners, division-less) see everything, including unassigned rows", () => {
+    expect(divisionVisible(null, "d-fl")).toBe(true);
+    expect(divisionVisible(null, null)).toBe(true);
+    expect(divisionVisible(null, undefined)).toBe(true);
   });
   it("docDivisionFromMaps resolves project → estimate → customer", () => {
     const maps = {
@@ -156,7 +162,7 @@ async function api(path: string, opts: RequestInit = {}, cookie?: string) {
 }
 
 describe("division list scoping (dev server)", () => {
-  it("a WA-scoped admin never sees FL projects/estimates/jobs/invoices; owner does", async () => {
+  it("a WA-scoped admin sees ONLY WA work — FL and unassigned rows vanish; the owner sees all", async () => {
     const pool = new pg.Pool({ connectionString: DATABASE_URL });
     const run = Date.now().toString(36);
     let cookie: string | undefined;
@@ -179,12 +185,13 @@ describe("division list scoping (dev server)", () => {
       const waId = await mkDiv(`VTW${run}`.slice(0, 20), "WA");
       const flId = await mkDiv(`VTF${run}`.slice(0, 20), "FL");
 
-      const mkDocSet = async (divisionId: string, tag: string) => {
+      const mkDocSet = async (divisionId: string | null, tag: string) => {
         const cust = await api("/api/crm/customers", {
           method: "POST", body: JSON.stringify({ displayName: `Vitest ${tag} ${run}`, email: `vitest.${tag}.${run}@example.com` }),
         }, cookie);
         const proj = await api("/api/crm/projects", {
-          method: "POST", body: JSON.stringify({ customerId: cust.body.id, name: `Vitest ${tag} proj ${run}`, divisionId }),
+          method: "POST",
+          body: JSON.stringify({ customerId: cust.body.id, name: `Vitest ${tag} proj ${run}`, ...(divisionId ? { divisionId } : {}) }),
         }, cookie);
         expect(proj.status).toBe(201);
         const est = await api("/api/crm/estimates", {
@@ -208,6 +215,7 @@ describe("division list scoping (dev server)", () => {
       };
       const wa = await mkDocSet(waId, "wa");
       const fl = await mkDocSet(flId, "fl");
+      const unassigned = await mkDocSet(null, "unassigned");
 
       // Branding: the FL estimate's public page must carry the FL division,
       // the WA one the WA division — never crossed. (The public route is
@@ -226,6 +234,13 @@ describe("division list scoping (dev server)", () => {
       expect(pub.body.company.divisionCode).toContain("VTF");
       expect(pub.body.company.state).toBe("FL");
 
+      // As the owner, every set is visible — including the unassigned commons.
+      const ownerProjects = await api("/api/crm/projects", {}, cookie);
+      const ownerProjIds = ownerProjects.body.projects.map((p: any) => p.id);
+      expect(ownerProjIds).toContain(wa.projectId);
+      expect(ownerProjIds).toContain(fl.projectId);
+      expect(ownerProjIds).toContain(unassigned.projectId);
+
       // Flip the dev user's membership to a WA-scoped admin.
       await pool.query(
         `update crm_members set role = 'admin', division_id = $1 where org_id = $2 and user_id = 1`,
@@ -236,21 +251,25 @@ describe("division list scoping (dev server)", () => {
       const projIds = projects.body.projects.map((p: any) => p.id);
       expect(projIds).toContain(wa.projectId);
       expect(projIds).not.toContain(fl.projectId);
+      expect(projIds).not.toContain(unassigned.projectId); // STRICT: commons are not shared
 
       const estimates = await api("/api/crm/estimates", {}, cookie);
       const estIds = estimates.body.map((e: any) => e.id);
       expect(estIds).toContain(wa.estimateId);
       expect(estIds).not.toContain(fl.estimateId);
+      expect(estIds).not.toContain(unassigned.estimateId);
 
       const jobs = await api("/api/crm/jobs", {}, cookie);
       const jobIds = jobs.body.jobs.map((j: any) => j.id);
       expect(jobIds).toContain(wa.jobId);
       expect(jobIds).not.toContain(fl.jobId);
+      expect(jobIds).not.toContain(unassigned.jobId);
 
       const invoices = await api("/api/crm/invoices", {}, cookie);
       const invIds = invoices.body.map((i: any) => i.id);
       expect(invIds).toContain(wa.invoiceId);
       expect(invIds).not.toContain(fl.invoiceId);
+      expect(invIds).not.toContain(unassigned.invoiceId);
     } finally {
       // ALWAYS restore the dev user's owner membership — every other suite
       // depends on it.

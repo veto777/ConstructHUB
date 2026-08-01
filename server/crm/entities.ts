@@ -287,11 +287,11 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (req.query.customerId) where.push(eq(crmProjects.customerId, String(req.query.customerId)));
     // A field tech without viewAllJobs sees only projects they're PM on.
     if (!ctx.permissions.viewAllJobs) where.push(eq(crmProjects.projectManagerMemberId, ctx.member.id));
-    // A division-scoped member sees only their division's projects (plus the
-    // unassigned commons) — mirrors the viewAllJobs idiom above.
+    // A division-scoped member sees ONLY their division's projects — the
+    // unassigned commons stay with owners and division-less members (STRICT).
     const divScope = divisionScopeOf(ctx.member);
     if (divScope) {
-      where.push(or(eq(crmProjects.divisionId, divScope), isNull(crmProjects.divisionId)) as any);
+      where.push(eq(crmProjects.divisionId, divScope));
     }
 
     const rows = await db.select().from(crmProjects).where(and(...where))
@@ -399,7 +399,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     let rows = await db.select().from(crmEstimates).where(and(...where))
       .orderBy(desc(crmEstimates.createdAt)).limit(500);
     // Division scoping: the estimate's project's division, else its customer's
-    // latest project's, else unassigned (visible to everyone).
+    // latest project's, else unassigned — which a scoped member never sees (STRICT).
     const divScope = divisionScopeOf(ctx.member);
     if (divScope) {
       const maps = await divisionMapsForOrg(ctx.org.id);

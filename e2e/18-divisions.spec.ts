@@ -119,20 +119,21 @@ test.describe("divisions", () => {
     guards.assertClean("division estimate branding");
   });
 
-  test("a WA-scoped admin never sees FL work in list endpoints; the owner does", async ({ page }) => {
+  test("a WA-scoped admin sees ONLY WA work — FL and unassigned rows vanish; the owner sees all", async ({ page }) => {
     const stamp = Date.now().toString(36);
     const codeMap = await divisionsByCode(page);
     const waId = codeMap.get("WA")!;
     const flId = codeMap.get("FL")!;
 
-    // One throwaway project per division.
-    const mk = async (divisionId: string, tag: string) => {
+    // One throwaway project per division, plus one with NO division (the
+    // unassigned commons — under STRICT scoping a scoped member loses these).
+    const mk = async (divisionId: string | null, tag: string) => {
       const cust = await page.request.post("/api/crm/customers", {
         data: { displayName: `E2E scope ${tag} ${stamp}`, email: `e2e-scope-${tag}-${stamp}@example.com` },
       });
       const customer = await cust.json();
       const proj = await page.request.post("/api/crm/projects", {
-        data: { customerId: customer.id, name: `E2E scope ${tag} ${stamp}`, divisionId },
+        data: { customerId: customer.id, name: `E2E scope ${tag} ${stamp}`, ...(divisionId ? { divisionId } : {}) },
       });
       const project = await proj.json();
       const est = await page.request.post("/api/crm/estimates", {
@@ -145,12 +146,14 @@ test.describe("divisions", () => {
     };
     const wa = await mk(waId, "wa");
     const fl = await mk(flId, "fl");
+    const unassigned = await mk(null, "unassigned");
 
-    // As the owner, both are visible.
+    // As the owner, all three are visible.
     const before = await page.request.get("/api/crm/projects");
     const beforeIds = (await before.json()).projects.map((p: any) => p.id);
     expect(beforeIds).toContain(wa.projectId);
     expect(beforeIds).toContain(fl.projectId);
+    expect(beforeIds).toContain(unassigned.projectId);
 
     // Flip the dev user's Aspire membership to a WA-scoped admin, exercise the
     // lists, and ALWAYS restore the owner seat.
@@ -161,11 +164,13 @@ test.describe("divisions", () => {
       const projIds = (await projects.json()).projects.map((p: any) => p.id);
       expect(projIds).toContain(wa.projectId);
       expect(projIds).not.toContain(fl.projectId);
+      expect(projIds).not.toContain(unassigned.projectId); // STRICT: commons are not shared
 
       const estimates = await page.request.get("/api/crm/estimates");
       const estIds = (await estimates.json()).map((e: any) => e.id);
       expect(estIds).toContain(wa.estimateId);
       expect(estIds).not.toContain(fl.estimateId);
+      expect(estIds).not.toContain(unassigned.estimateId);
     } finally {
       await q(`update crm_members set role = 'owner', division_id = null where org_id = $1 and user_id = 1`, [ASPIRE_ORG]);
     }
@@ -174,6 +179,7 @@ test.describe("divisions", () => {
     const after = await page.request.get("/api/crm/projects");
     const afterIds = (await after.json()).projects.map((p: any) => p.id);
     expect(afterIds).toContain(fl.projectId);
+    expect(afterIds).toContain(unassigned.projectId);
   });
 
   test("team page: a member's division select persists", async ({ page }) => {

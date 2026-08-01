@@ -27,10 +27,13 @@ import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
 import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
+import { registerCrmReportRoutes } from "./reports";
 import { registerCrmClientAuthRoutes } from "./client-auth";
 import { registerCrmScheduleRoutes } from "./schedule";
+import { registerCrmCalendarRoutes } from "./calendar";
 import { registerCrmDivisionRoutes, getDivision } from "./divisions";
 import { registerCrmAdminRoutes } from "./admin";
+import { registerCrmMigrateRoutes } from "./migrate";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
@@ -139,14 +142,20 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmIntegrationRoutes(app);
   registerCrmPriceBookRoutes(app, getDevUser);
   registerCrmMeasurementRoutes(app, getDevUser);
+  // Measurement report imports (HOVER upload/paste + provider webhook).
+  registerCrmReportRoutes(app, getDevUser);
   // The homeowner client portal takes no contractor session at all.
   registerCrmClientAuthRoutes(app);
   // Read-only schedule + activity feeds for the mobile ribbon.
   registerCrmScheduleRoutes(app, getDevUser);
+  // Calendar sync: tokenized iCal feed + Google Calendar push.
+  registerCrmCalendarRoutes(app, getDevUser);
   // Divisions: WA HQ + FL style operating arms of one company.
   registerCrmDivisionRoutes(app, getDevUser);
   // Platform admin (email-list gated, never org membership) + beta invites.
   registerCrmAdminRoutes(app, getDevUser);
+  // Self-serve CSV/TSV migration center (Jobber/Leap/QuickBooks/Excel).
+  registerCrmMigrateRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -404,6 +413,11 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (parsed.data.role === "owner" && ctx.member.role !== "owner") {
       return res.status(403).json({ message: "Only an owner can grant the owner role" });
     }
+    // The pm role sees the whole book of work — only owner/admin hand it out,
+    // never a delegate who merely holds manageTeam via an override.
+    if (parsed.data.role === "pm" && ctx.member.role !== "owner" && ctx.member.role !== "admin") {
+      return res.status(403).json({ message: "Only an owner or admin can grant the pm role" });
+    }
     // Re-activating a seat has to respect the plan limit.
     if (parsed.data.status === "active" && target.status !== "active") {
       const seats = await getSeatUsage(ctx.org);
@@ -482,6 +496,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
     if (role === "owner" && ctx.member.role !== "owner") {
       return res.status(403).json({ message: "Only an owner can invite another owner" });
+    }
+    if (role === "pm" && ctx.member.role !== "owner" && ctx.member.role !== "admin") {
+      return res.status(403).json({ message: "Only an owner or admin can invite a pm" });
     }
     if (divisionId) {
       const div = await getDivision(ctx.org.id, divisionId);

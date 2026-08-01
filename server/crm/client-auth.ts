@@ -23,6 +23,7 @@ import {
   crmOrgs,
   crmEstimates,
   crmInvoices,
+  crmMeasurements,
   crmClientTokens,
   crmClientSessions,
 } from "@shared/schema";
@@ -249,7 +250,7 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     const client = await requireClient(req, res);
     if (!client) return;
     if (!client.customerIds.length) {
-      return res.json({ customer: null, orgs: [], estimates: [], invoices: [], contracts: [] });
+      return res.json({ customer: null, orgs: [], estimates: [], invoices: [], contracts: [], reports: [] });
     }
 
     const customers = await db
@@ -278,6 +279,20 @@ export function registerCrmClientAuthRoutes(app: Express): void {
         ),
       )
       .orderBy(desc(crmInvoices.createdAt));
+
+    // Measurement reports the contractor imported for this customer (HOVER
+    // uploads and provider webhooks alike) — ready ones only, drafts are
+    // internal until confirmed.
+    const measurements = await db
+      .select()
+      .from(crmMeasurements)
+      .where(
+        and(
+          inArray(crmMeasurements.customerId, client.customerIds),
+          eq(crmMeasurements.status, "ready"),
+        ),
+      )
+      .orderBy(desc(crmMeasurements.createdAt));
 
     const primary = customers[0];
     res.json({
@@ -310,6 +325,21 @@ export function registerCrmClientAuthRoutes(app: Express): void {
           orgName: orgName.get(e.orgId) ?? null,
           link: `/e/${e.publicToken}`,
         })),
+      reports: measurements.map((r) => {
+        const raw = (r.rawPayload ?? {}) as any;
+        const hasSource = typeof raw.sourceText === "string" && raw.sourceText.length > 0;
+        return {
+          id: r.id, provider: r.provider,
+          date: r.completedAt ?? r.createdAt,
+          addressLine1: r.addressLine1, city: r.city, state: r.state, postalCode: r.postalCode,
+          squares: r.squaresMilli === null ? null : r.squaresMilli / 1000,
+          roofAreaSf: r.roofAreaSfMilli === null ? null : r.roofAreaSfMilli / 1000,
+          pitch: r.predominantPitch, facetCount: r.facetCount,
+          wastePercent: r.wasteSuggestionBps === null ? null : r.wasteSuggestionBps / 100,
+          orgName: orgName.get(r.orgId) ?? null,
+          downloadUrl: hasSource ? `/api/client/reports/${r.id}/download` : null,
+        };
+      }),
     });
   });
 }

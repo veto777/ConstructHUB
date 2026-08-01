@@ -83,6 +83,29 @@ describe("owner role — sees everything", () => {
   });
 });
 
+describe("pm role — coordinates the work, cost-blind", () => {
+  it("defaults: office-like reach, seePrices on, seeCosts and back office off", () => {
+    const p = crmEffectivePermissions("pm", null);
+    expect(p.viewAllJobs).toBe(true);
+    expect(p.manageJobs).toBe(true);
+    expect(p.manageEstimates).toBe(true);
+    expect(p.manageCustomers).toBe(true);
+    expect(p.seePrices).toBe(true);
+    expect(p.seeCosts).toBe(false);
+    expect(p.manageTeam).toBe(false);
+    expect(p.manageSettings).toBe(false);
+    expect(p.manageIntegrations).toBe(false);
+  });
+  it("redaction: the pm sees the scope's price, never its cost", () => {
+    const out = presentEstimateItem(item, ctx("pm"));
+    expect(out.unitPriceCents).toBe(400000);
+    expect(out.unitCostCents).toBeUndefined();
+    // …and the document totals survive — only costs are stripped.
+    const est = presentEstimate(estimate, ctx("pm"));
+    expect(est.totalCents).toBe(937856);
+  });
+});
+
 describe("per-seat overrides", () => {
   it("a field tech granted seePrices sees price but still not cost", () => {
     const custom = { org: { id: "o" }, member: { id: "m" },

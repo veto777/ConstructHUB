@@ -171,7 +171,7 @@ export default function CrmHomePage() {
       )}
 
       {/* The numbers row */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard
           icon={Users}
           label="Clients"
@@ -201,7 +201,7 @@ export default function CrmHomePage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Needs attention */}
         <Card>
           <CardHeader className="pb-3">
@@ -282,7 +282,7 @@ export default function CrmHomePage() {
       </div>
 
       {/* Shortcuts */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Link href="/crm/clients">
           <Card className="hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full" data-testid="card-clients">
             <CardContent className="p-5">

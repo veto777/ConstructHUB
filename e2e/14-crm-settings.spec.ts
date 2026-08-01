@@ -77,6 +77,9 @@ test.describe("/crm/settings", () => {
   test("sweep: every button and link", async ({ page }) => {
     const { clicked } = await sweepPage(page, "/crm/settings", {
       ready: 'h1:has-text("Settings")',
+      // Connect Google Calendar redirects off-site to the OAuth consent screen
+      // (Google creds ARE set in dev), same reason 07 skips Connect Stripe.
+      skip: ({ testid }) => testid === "button-connect-google-calendar",
     });
     console.log(`settings sweep clicked ${clicked}`);
     expect(clicked).toBeGreaterThanOrEqual(10);

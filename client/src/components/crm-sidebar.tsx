@@ -1,8 +1,10 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  HardHat, Settings, LogOut, ShieldCheck, type LucideIcon,
+  Settings, LogOut, ShieldCheck, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { CHLogo } from "@/components/ch-logo";
+import { CrmLogo } from "@/components/crm-logo";
 import {
   Sidebar,
   SidebarContent,
@@ -79,20 +81,17 @@ export function CrmSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-4 pt-5 pb-4">
-        <Link href="/" className="flex items-center gap-2.5 cursor-pointer" data-testid="link-portal-home">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <HardHat className="h-4 w-4" strokeWidth={2} />
-          </div>
+        <Link href="/" className="flex items-center gap-2.5 cursor-pointer min-w-0" data-testid="link-portal-home">
+          {/* Full brand lockup (mark + CRM badge); collapses to the bare mark. */}
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-[15px] leading-tight whitespace-nowrap" data-testid="text-crm-brand">
-              ConstructHub <span className="text-sidebar-primary font-bold">CRM</span>
-            </span>
+            <CrmLogo height={26} testid="text-crm-brand" />
             {orgName && (
-              <span className="text-[11px] text-sidebar-foreground/50 truncate leading-tight mt-0.5">
+              <span className="text-[11px] text-sidebar-foreground/50 truncate leading-tight mt-1">
                 {orgName}
               </span>
             )}
           </div>
+          <CHLogo height={22} className="hidden group-data-[collapsible=icon]:inline-flex" />
         </Link>
       </SidebarHeader>
 

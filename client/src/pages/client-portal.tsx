@@ -4,11 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Loader2, FileText, Receipt, ShieldCheck, Mail, ArrowRight, LogOut, Inbox,
+  Loader2, FileText, Receipt, ShieldCheck, Mail, ArrowRight, LogOut, Inbox, Ruler,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
+import { CrmLogo } from "@/components/crm-logo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const money = (c?: number | null) =>
@@ -75,6 +76,9 @@ function RequestLink() {
     <main className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
       <div className="w-full max-w-md space-y-4">
         <div className="text-center space-y-1 pb-2">
+          <div className="flex justify-center pb-3">
+            <CrmLogo height={34} testid="client-portal-brand" />
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight">Your documents, in one place</h1>
           <p className="text-sm text-muted-foreground">
             Estimates, invoices and signed contracts from your contractor.
@@ -137,7 +141,7 @@ function RequestLink() {
 /* ── Signed in: the dashboard ────────────────────────────────────────────── */
 
 function Dashboard({ data }: { data: any }) {
-  const { customer, orgs = [], estimates = [], invoices = [], contracts = [] } = data;
+  const { customer, orgs = [], estimates = [], invoices = [], contracts = [], reports = [] } = data;
 
   const now = Date.now();
   const awaitingEstimates = estimates.filter(
@@ -338,9 +342,62 @@ function Dashboard({ data }: { data: any }) {
           )}
         </section>
 
-        <p className="text-center text-xs text-muted-foreground/70 pb-4">
-          Signed in by secure email link · your documents only
-        </p>
+        {/* Measurement reports */}
+        <section className="space-y-3" data-testid="section-reports">
+          <SectionTitle icon={Ruler} title="Measurement reports" />
+          {!reports.length ? (
+            <Card><EmptyState compact icon={Ruler} title="No measurement reports yet"
+              description="Roof or property measurement reports your contractor files for you appear here." /></Card>
+          ) : (
+            <div className={crmTable.wrapper}>
+              <table className={crmTable.table}>
+                <thead className={crmTable.thead}>
+                  <tr>
+                    <th className={crmTable.th}>Report</th>
+                    <th className={crmTable.th}>Date</th>
+                    <th className={crmTable.thRight}>Roof size</th>
+                    <th className={crmTable.thRight}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.map((r: any) => (
+                    <tr key={r.id} className={crmTable.tr} data-testid={`client-report-${r.id}`}>
+                      <td className={crmTable.td}>
+                        <span className="font-medium capitalize">{r.provider} report</span>
+                        <div className="text-xs text-muted-foreground">
+                          {[r.addressLine1, r.city, r.state].filter(Boolean).join(", ") || "—"}
+                          {orgs.length > 1 && r.orgName ? ` · ${r.orgName}` : ""}
+                        </div>
+                      </td>
+                      <td className={crmTable.td}>{day(r.date) ?? "—"}</td>
+                      <td className={crmTable.tdRight}>
+                        {r.squares !== null && r.squares !== undefined
+                          ? `${r.squares.toLocaleString("en-US", { maximumFractionDigits: 2 })} sq`
+                          : "—"}
+                        {r.pitch ? <span className="text-xs text-muted-foreground"> · {r.pitch}</span> : null}
+                      </td>
+                      <td className={crmTable.tdRight}>
+                        {r.downloadUrl && (
+                          <a href={r.downloadUrl} className="font-medium text-primary hover:underline" data-testid={`client-report-download-${r.id}`}>
+                            Download
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <div className="flex flex-col items-center gap-2.5 pb-4">
+          {/* The CRM powers this portal; the header above stays the contractor's. */}
+          <CrmLogo height={20} className="opacity-60" />
+          <p className="text-center text-xs text-muted-foreground/70">
+            Signed in by secure email link · your documents only
+          </p>
+        </div>
       </CrmPage>
     </main>
   );

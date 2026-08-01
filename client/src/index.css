@@ -150,9 +150,72 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/*
+ * ── ConstructHub CRM brand theme ───────────────────────────────────────────
+ * The CRM is its own product face (portal.constructhub.* / demo.* / the
+ * homeowner client portal), so it gets its own identity: ConstructHUB's
+ * marketing orange #F97316 as the primary action colour, with a purple/blue
+ * as the secondary accent. Scoped behind the `crm-theme` class — toggled on
+ * <html> by App.tsx only on CRM hosts — so the marketing site's palette is
+ * untouched. It lives on <html> (not the shell div) because Radix dialogs,
+ * sheets and menus portal out to <body> and would otherwise escape the scope.
+ */
+.crm-theme {
+  --primary: 25 95% 53%; /* #F97316 — the marketing orange */
+  --primary-foreground: 0 0% 100%;
+  --ring: 25 95% 53%;
+  --sidebar-primary: 25 95% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-ring: 25 95% 53%;
+  /* Secondary accent: purple/blue, used for the CRM badge and highlights. */
+  --crm-accent: 250 84% 60%;
+  --crm-accent-foreground: 0 0% 100%;
+  --chart-1: 25 95% 53%;
+  --chart-2: 215 50% 40%;
+  --chart-3: 32 95% 44%;
+  --chart-4: 250 84% 60%;
+  --chart-5: 142 71% 45%;
+
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+}
+
+.dark.crm-theme {
+  --primary: 27 96% 61%; /* orange-400 — keeps contrast on dark surfaces */
+  --primary-foreground: 24 80% 10%;
+  --ring: 27 96% 61%;
+  --sidebar-primary: 27 96% 61%;
+  --sidebar-primary-foreground: 24 80% 10%;
+  --sidebar-ring: 27 96% 61%;
+  --crm-accent: 252 90% 72%;
+  --crm-accent-foreground: 250 60% 12%;
+  --chart-1: 27 96% 61%;
+  --chart-4: 252 90% 72%;
+
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+}
+
 @layer base {
   * {
     @apply border-border;
+  }
+
+  /*
+   * Global horizontal-overflow guard. Pages are genuinely fixed to fit 100vw
+   * (tables scroll inside their own wrappers, the kanban keeps its own
+   * horizontal region); this clip is the last line of defence so a stray
+   * wide element can never make the whole page pan side to side on a phone.
+   * `clip` (not `hidden`) does not create a scroll container, so position:sticky
+   * keeps working.
+   */
+  html,
+  body {
+    overflow-x: clip;
   }
 
   body {

@@ -104,6 +104,7 @@ interface Invitation {
 const ROLE_BLURB: Record<string, string> = {
   owner: "Full control, holds the subscription. Cannot be removed or demoted.",
   admin: "Everything except integrations. For a co-owner or general manager.",
+  pm: "Runs jobs, estimates and customers across the whole book. Sees prices, never costs.",
   office: "Scheduling, customers, estimates, invoices and payments. No costs or margins.",
   field: "Sees only their own assigned jobs. Price-blind by default.",
   subcontractor: "Outside crew. Sees only assigned work — never customers or pricing.",
@@ -604,12 +605,13 @@ export default function CrmTeamPage() {
                           <div className="text-sm text-muted-foreground truncate">{m.email}</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
                         {m.status !== "active" && <StatusPill tone="neutral">{m.status}</StatusPill>}
                         {canManageTeam && !isOwner ? (
                           <Select value={m.role}
                             onValueChange={(role) => updateMember.mutate({ id: m.id, patch: { role } })}>
-                            <SelectTrigger className="w-40" data-testid={`select-role-${m.id}`}>
+                            {/* Full-width rows on a phone; fixed inline widths at sm+. */}
+                            <SelectTrigger className="w-full sm:w-40" data-testid={`select-role-${m.id}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -625,7 +627,7 @@ export default function CrmTeamPage() {
                           canManageTeam && !isOwner ? (
                             <Select value={m.divisionId ?? "all"}
                               onValueChange={(v) => updateMember.mutate({ id: m.id, patch: { divisionId: v === "all" ? null : v } })}>
-                              <SelectTrigger className="w-44" data-testid={`select-division-${m.id}`}>
+                              <SelectTrigger className="w-full sm:w-44" data-testid={`select-division-${m.id}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>

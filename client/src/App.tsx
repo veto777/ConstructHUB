@@ -53,6 +53,8 @@ import CrmPipelinePage from "@/pages/crm-pipeline";
 import CrmPriceBookPage from "@/pages/crm-pricebook";
 import CrmProjectPage from "@/pages/crm-project";
 import CrmSettingsPage from "@/pages/crm-settings";
+import CrmReportsPage from "@/pages/crm-reports";
+import CrmMigratePage from "@/pages/crm-migrate";
 import CrmAdminPage from "@/pages/crm-admin";
 import PublicEstimatePage from "@/pages/public-estimate";
 import PublicPortalPage from "@/pages/public-portal";
@@ -180,6 +182,8 @@ function PortalRouter() {
       <Route path="/crm/payments" component={CrmPaymentsPage} />
       <Route path="/crm/team" component={CrmTeamPage} />
       <Route path="/crm/settings" component={CrmSettingsPage} />
+      <Route path="/crm/reports" component={CrmReportsPage} />
+      <Route path="/crm/migrate" component={CrmMigratePage} />
       <Route path="/crm/admin" component={CrmAdminPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
@@ -239,6 +243,16 @@ function AppContent() {
     else if (portal) document.title = CRM_NAME;
   }, [portal, clientPortal]);
 
+  // …and its own brand theme (orange primary, purple/blue accent — see
+  // `.crm-theme` in index.css). Set on <html>, not the shell div, because
+  // Radix dialogs/sheets/menus portal out to <body> and would escape a
+  // shell-scoped class. The marketing site never gets it.
+  useEffect(() => {
+    const on = portal || clientPortal;
+    document.documentElement.classList.toggle("crm-theme", on);
+    return () => document.documentElement.classList.remove("crm-theme");
+  }, [portal, clientPortal]);
+
   // The client portal never touches the platform session: a homeowner has no
   // ConstructHUB account. Handle it before the /api/auth/me gate entirely.
   // Client-facing token pages stay full-bleed on this host too.
@@ -292,6 +306,7 @@ function AppContent() {
       location.startsWith("/crm/payments") ? "Payments" :
       location.startsWith("/crm/team") ? "Team & Company" :
       location.startsWith("/crm/settings") ? "Settings" :
+      location.startsWith("/crm/reports") ? "Reports" :
       location.startsWith("/crm/admin") ? "Platform Admin" :
       location.startsWith("/crm/join") ? "Join the team" : "Home";
     return (
