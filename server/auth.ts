@@ -13,7 +13,7 @@ import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
 import { resolveGoogleUrl } from "./google-url-resolver";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 
-function generateAccountId(): string {
+export function generateAccountId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const len = 4 + randomInt(4);
   let id = "";
