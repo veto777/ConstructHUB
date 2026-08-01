@@ -1973,6 +1973,12 @@ export const crmEstimateOptions = pgTable("crm_estimate_options", {
   showTotal: boolean("show_total").notNull().default(true),
   subtotalCents: integer("subtotal_cents").notNull().default(0),
   totalCents: integer("total_cents").notNull().default(0),
+  // The scope itself: line items in the same shape as crm_estimate_items
+  // (kind/name/description/quantityMilli/unit/unitPriceCents/unitCostCents/
+  // taxable). An option WITH items is a client-selectable scope on the public
+  // page (checkbox → regenerated estimate); a legacy option without items
+  // stays a display-only tier card.
+  items: jsonb("items"),
   selectedAt: timestamp("selected_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

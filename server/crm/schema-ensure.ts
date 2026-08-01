@@ -355,6 +355,7 @@ export async function ensureCrmSchema(): Promise<void> {
       description text, recommended boolean NOT NULL DEFAULT false,
       show_total boolean NOT NULL DEFAULT true,
       subtotal_cents integer NOT NULL DEFAULT 0, total_cents integer NOT NULL DEFAULT 0,
+      items jsonb,
       selected_at timestamp, created_at timestamp DEFAULT now());
 
     CREATE TABLE IF NOT EXISTS crm_api_keys (
@@ -495,6 +496,9 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS selected_discounts jsonb;
     ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_pb_materials ADD COLUMN IF NOT EXISTS custom_fields jsonb;
+    -- Client-selectable scopes: an option carrying its own line items is a
+    -- checkbox on the public estimate page (server/crm/portal.ts select-options).
+    ALTER TABLE crm_estimate_options ADD COLUMN IF NOT EXISTS items jsonb;
 
     CREATE TABLE IF NOT EXISTS crm_estimate_discounts (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -23,6 +23,7 @@ import {
   crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES, CRM_APPOINTMENT_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
+  CRM_LINE_ITEM_KINDS,
 } from "@shared/schema";
 import { and, eq, gte, lte, desc, asc, sql, ilike, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
@@ -1072,6 +1073,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       ...o,
       subtotalCents: ctx.permissions.seePrices ? o.subtotalCents : undefined,
       totalCents: ctx.permissions.seePrices ? o.totalCents : undefined,
+      // Costs stay privileged inside option scopes too (the pm is cost-blind).
+      items: Array.isArray(o.items)
+        ? (o.items as any[]).map((i) => ({ ...i, unitCostCents: ctx.permissions.seeCosts ? i.unitCostCents : undefined }))
+        : o.items,
     })));
   });
 
@@ -1102,11 +1107,39 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       recommended: z.boolean().default(false),
       // Default false: Leap leaked pricing by showing tier totals up front.
       showTotal: z.boolean().default(false),
+      // The scope itself. When items are given they make the option
+      // client-selectable on the public page, and the totals are COMPUTED
+      // from them (never taken from the body) at the estimate's own tax rate.
+      items: z.array(z.object({
+        kind: z.enum(CRM_LINE_ITEM_KINDS as unknown as [string, ...string[]]).default("labor"),
+        name: z.string().min(1).max(300),
+        description: z.string().max(4000).nullable().optional(),
+        quantityMilli: z.number().int().min(0).max(100_000_000).default(1000),
+        unit: z.string().max(20).nullable().optional(),
+        unitPriceCents: z.number().int().min(0).max(1_000_000_00).default(0),
+        unitCostCents: z.number().int().min(0).max(1_000_000_00).nullable().optional(),
+        taxable: z.boolean().default(true),
+      })).max(100).optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid option", issues: parsed.error.issues });
+    const items = parsed.data.items?.length ? parsed.data.items : null;
+    let subtotal = parsed.data.totalCents, total = parsed.data.totalCents;
+    if (items) {
+      let taxable = 0;
+      subtotal = 0;
+      for (const i of items) {
+        const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
+        subtotal += line;
+        if (i.taxable) taxable += line;
+      }
+      total = subtotal + Math.round((taxable * (est.taxRateBps || 0)) / 10000);
+    }
     const [row] = await db.insert(crmEstimateOptions).values({
-      ...parsed.data, orgId: ctx.org.id, estimateId: est.id,
-      subtotalCents: parsed.data.totalCents,
+      name: parsed.data.name, tier: parsed.data.tier,
+      description: parsed.data.description ?? null,
+      recommended: parsed.data.recommended, showTotal: parsed.data.showTotal,
+      orgId: ctx.org.id, estimateId: est.id,
+      subtotalCents: subtotal, totalCents: total, items,
     } as any).returning();
     res.status(201).json(row);
   });

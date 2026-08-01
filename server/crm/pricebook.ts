@@ -692,6 +692,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
 
     let subtotal = 0, taxable = 0;
     const warnings: string[] = [];
+    const scopeLines: ExpandedLine[] = [];
     for (const pi of pkgItems) {
       let r;
       try {
@@ -704,6 +705,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         const line = Math.round((l.unitPriceCents * l.quantityMilli) / 1000);
         subtotal += line;
         if (l.taxable) taxable += line;
+        scopeLines.push(l);
       }
     }
     const tax = Math.round((taxable * (est.taxRateBps || 0)) / 10000);
@@ -711,6 +713,14 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       orgId: ctx.org.id, estimateId: est.id, name: pkg.name, tier: pkg.tier,
       description: pkg.description ?? null, recommended: p.data.recommended,
       showTotal: p.data.showTotal, subtotalCents: subtotal, totalCents: subtotal + tax,
+      // The expanded scope rides on the option so the client can select it on
+      // the public page (portal.ts select-options regenerates the estimate).
+      items: scopeLines.map((l) => ({
+        kind: l.kind, name: l.name, description: l.description,
+        quantityMilli: l.quantityMilli, unit: l.unit,
+        unitPriceCents: l.unitPriceCents, unitCostCents: l.unitCostCents,
+        taxable: l.taxable,
+      })),
     } as any).returning();
     res.status(201).json({ option: row, warnings });
   });
