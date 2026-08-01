@@ -1,18 +1,21 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, Loader2, AlertTriangle, Phone, Mail, Globe, ShieldCheck } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, AlertTriangle, Phone, Mail, Globe, ShieldCheck, BadgePercent } from "lucide-react";
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
 import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
 import { DocGateChallenge } from "@/components/doc-gate";
+import { EstimateAttachments } from "@/components/client-uploads";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -99,6 +102,9 @@ export default function PublicEstimatePage() {
   const [reason, setReason] = useState("");
   const [showDecline, setShowDecline] = useState(false);
   const [done, setDone] = useState<"approved" | "declined" | null>(null);
+  // Optional discount offers the client has ticked (ids). Preview only —
+  // the server re-computes the real approved total on submit.
+  const [selectedDiscounts, setSelectedDiscounts] = useState<string[]>([]);
 
   // A contractor preview grant rides in the page URL — forward it to the API.
   const previewGrant = new URLSearchParams(window.location.search).get("preview");
@@ -114,6 +120,14 @@ export default function PublicEstimatePage() {
   // never for a contractor preview (that's not client behaviour).
   useEngagementTracker("estimate", token, !!data && !data?.preview);
 
+  // The org's primary financing link. Gated like the document itself; skipped
+  // in contractor preview (no client session exists there).
+  const { data: payInfo } = useQuery<any>({
+    queryKey: [`/api/public/estimates/${token}/pay-info`],
+    enabled: !!data && !data?.preview,
+    retry: false,
+  });
+
   const respond = useMutation({
     mutationFn: async (decision: "approve" | "decline") => {
       const r = await fetch(`/api/public/estimates/${token}/respond`, {
@@ -123,12 +137,18 @@ export default function PublicEstimatePage() {
           decision,
           signatureName: decision === "approve" ? name : undefined,
           reason: decision === "decline" ? reason : undefined,
+          selectedDiscounts: decision === "approve" && selectedDiscounts.length ? selectedDiscounts : undefined,
         }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Something went wrong");
       return r.json();
     },
-    onSuccess: (_r, decision) => setDone(decision === "approve" ? "approved" : "declined"),
+    onSuccess: (_r, decision) => {
+      setDone(decision === "approve" ? "approved" : "declined");
+      // Refetch: an approval may carry selected optional discounts, and the
+      // signed page shows the server-recomputed approved total.
+      queryClient.invalidateQueries({ queryKey: [docUrl] });
+    },
     onError: (e: any) => toast({ title: "Could not submit", description: String(e.message ?? e), variant: "destructive" }),
   });
 
@@ -183,9 +203,29 @@ export default function PublicEstimatePage() {
     );
   }
 
-  const { estimate: e, items, company, customer, options, preview } = data;
+  const { estimate: e, items, company, customer, options, preview, discountOffers } = data;
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
+
+  // Optional discounts — LIVE preview, mirroring the server's approve-time
+  // math (server/crm/discounts.ts): the combined concession is capped at the
+  // taxable base and tax is charged on the reduced base. The server
+  // re-computes on approve; this is only what the client sees before signing.
+  const offers: any[] = discountOffers ?? [];
+  const selBps = Math.min(10_000,
+    offers.filter((o) => selectedDiscounts.includes(o.id)).reduce((s, o) => s + (o.percentBps ?? 0), 0));
+  const previewing = selBps > 0 && !settled;
+  const optDiscountCents = Math.round(((e.taxableBaseCents ?? 0) * selBps) / 10_000);
+  const shownTaxCents = previewing
+    ? Math.round(((e.taxableBaseCents ?? 0) - optDiscountCents) * (e.taxRateBps ?? 0) / 10_000)
+    : e.taxCents;
+  const shownTotalCents = previewing
+    ? Math.max(0, (e.subtotalCents ?? 0) - (e.discountCents ?? 0) - optDiscountCents + shownTaxCents)
+    : (settled === "approved" ? (e.approvedTotalCents ?? e.totalCents) : e.totalCents);
+  const appliedDiscounts: any[] = settled === "approved" && Array.isArray(e.selectedDiscounts) ? e.selectedDiscounts : [];
+
+  const toggleDiscount = (id: string, on: boolean) =>
+    setSelectedDiscounts((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
 
   return (
     <main className="min-h-screen bg-muted/40 py-10 px-4">
@@ -333,14 +373,26 @@ export default function PublicEstimatePage() {
                     <span className="font-medium tabular-nums">−{money(e.discountCents)}</span>
                   </div>
                 )}
-                {e.taxCents > 0 && (
+                {previewing && (
+                  <div className="flex justify-between" data-testid="row-optional-discount">
+                    <span className="text-muted-foreground">Optional discounts</span>
+                    <span className="font-medium tabular-nums">−{money(optDiscountCents)}</span>
+                  </div>
+                )}
+                {appliedDiscounts.length > 0 && (
+                  <div className="flex justify-between" data-testid="row-applied-discounts">
+                    <span className="text-muted-foreground">Optional discounts</span>
+                    <span className="font-medium text-right">{appliedDiscounts.map((d) => d.label).join(", ")}</span>
+                  </div>
+                )}
+                {shownTaxCents > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tax</span>
-                    <span className="font-medium tabular-nums">{money(e.taxCents)}</span>
+                    <span className="font-medium tabular-nums">{money(shownTaxCents)}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t pt-2 text-lg font-bold">
-                  Total <span className="tabular-nums">{money(e.totalCents)}</span>
+                  Total <span className="tabular-nums">{money(shownTotalCents)}</span>
                 </div>
                 {e.depositCents ? (
                   <div className="flex justify-between text-muted-foreground">
@@ -360,6 +412,62 @@ export default function PublicEstimatePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Files the contractor pinned to this estimate (same email gate). */}
+        {!preview && <EstimateAttachments token={token!} />}
+
+        {offers.length > 0 && !settled && !expired && (
+          <Card className="shadow-md" data-testid="discounts-section">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BadgePercent className="h-5 w-5 text-primary" /> Optional discounts
+              </CardTitle>
+              <CardDescription>
+                Tick any you qualify for — the total updates as you go, and is confirmed when you approve.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {offers.map((o: any) => (
+                <label key={o.id} className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                  data-testid={`discount-offer-${o.code}`}>
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={selectedDiscounts.includes(o.id)}
+                    onCheckedChange={(c) => toggleDiscount(o.id, c === true)}
+                    data-testid={`check-discount-${o.code}`}
+                  />
+                  <span className="min-w-0">
+                    <span className="font-medium text-sm">
+                      {o.label} <span className="text-primary">−{(o.percentBps / 100).toLocaleString("en-US")}%</span>
+                    </span>
+                    {o.conditions && (
+                      <span className="block text-xs text-muted-foreground mt-0.5">{o.conditions}</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+              {previewing && (
+                <p className="text-xs text-muted-foreground" data-testid="text-discount-note">
+                  Your new total: <strong className="text-foreground">{money(shownTotalCents)}</strong> —
+                  verified against the offer conditions when the job is scheduled.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {payInfo?.financing && (
+          <Card className="shadow-sm">
+            <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">Prefer to spread payments out?</div>
+              <a href={payInfo.financing.url} target="_blank" rel="noreferrer" data-testid="link-financing"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+                Finance this project →
+                <span className="font-normal text-muted-foreground">{payInfo.financing.label}</span>
+              </a>
+            </CardContent>
+          </Card>
+        )}
 
         {!settled && !expired && !preview && (
           <Card className="shadow-md border-primary/30">

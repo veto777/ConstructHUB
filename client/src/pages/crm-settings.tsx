@@ -33,6 +33,7 @@ const NOTIFICATIONS = [
   { key: "estimateApproved", label: "Estimate approved", description: "A client approved and signed an estimate." },
   { key: "estimateDeclined", label: "Estimate declined", description: "A client declined an estimate." },
   { key: "invoicePaid", label: "Payment received", description: "An online payment landed in your Stripe account." },
+  { key: "paymentReceived", label: "Manual payment recorded", description: "A cash, check, wire or card payment was recorded on an invoice." },
 ] as const;
 
 type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
@@ -86,22 +87,45 @@ export default function CrmSettingsPage() {
 
   // ── Divisions ─────────────────────────────────────────────────────────────
   const emptyDivision = {
-    name: "", code: "", email: "", phone: "",
+    name: "", code: "", email: "", phone: "", website: "",
     addressLine1: "", addressLine2: "", city: "", state: "", postalCode: "",
     licenseNumber: "", licenseState: "", isHeadquarters: false,
+    // Sales tax (custom_fields->taxRates): division default + per-city overrides.
+    taxDefaultPct: "", taxCities: "",
   };
   const [divForm, setDivForm] = useState(emptyDivision);
   const [editingDivisionId, setEditingDivisionId] = useState<string | null>(null);
   const setD = (k: keyof typeof emptyDivision) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setDivForm((d) => ({ ...d, [k]: e.target.value }));
 
+  // "Seattle: 10.1%" per line → { Seattle: 1010 } (basis points, capped at 30%).
+  const parseCityRates = (s: string) => {
+    const out: Record<string, number> = {};
+    for (const line of s.split(/\n+/)) {
+      const m = /^\s*([^:]+?)\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*%?\s*$/.exec(line);
+      if (m) out[m[1]] = Math.round(Math.min(30, Math.max(0, parseFloat(m[2]))) * 100);
+    }
+    return out;
+  };
+  const serializeCityRates = (cities?: Record<string, number> | null) =>
+    cities ? Object.entries(cities).map(([k, v]) => `${k}: ${v / 100}%`).join("\n") : "";
+
   const saveDivision = useMutation({
     mutationFn: async () => {
+      const taxDefault = parseFloat(divForm.taxDefaultPct);
+      const taxRates = {
+        default: divForm.taxDefaultPct.trim() === "" || Number.isNaN(taxDefault)
+          ? null
+          : Math.round(Math.min(30, Math.max(0, taxDefault)) * 100),
+        cities: parseCityRates(divForm.taxCities),
+      };
+      const hasTax = taxRates.default != null || Object.keys(taxRates.cities).length > 0;
       const body = {
         name: divForm.name.trim(),
         code: divForm.code.trim(),
         email: emptyToNull(divForm.email),
         phone: emptyToNull(divForm.phone),
+        website: emptyToNull(divForm.website),
         addressLine1: emptyToNull(divForm.addressLine1),
         addressLine2: emptyToNull(divForm.addressLine2),
         city: emptyToNull(divForm.city),
@@ -111,10 +135,15 @@ export default function CrmSettingsPage() {
         licenseState: emptyToNull(divForm.licenseState),
         isHeadquarters: divForm.isHeadquarters,
       };
-      const r = editingDivisionId
-        ? await apiRequest("PATCH", `/api/crm/divisions/${editingDivisionId}`, body)
-        : await apiRequest("POST", "/api/crm/divisions", body);
-      return r.json();
+      if (editingDivisionId) {
+        // taxRates is PATCH-only on the API (merged into custom_fields).
+        return (await apiRequest("PATCH", `/api/crm/divisions/${editingDivisionId}`, { ...body, taxRates })).json();
+      }
+      const created = await (await apiRequest("POST", "/api/crm/divisions", body)).json();
+      if (hasTax && created?.id) {
+        await apiRequest("PATCH", `/api/crm/divisions/${created.id}`, { taxRates });
+      }
+      return created;
     },
     onSuccess: () => {
       setDivForm(emptyDivision);
@@ -137,12 +166,15 @@ export default function CrmSettingsPage() {
 
   const startEditDivision = (d: any) => {
     const s = (v: any) => v ?? "";
+    const taxRates = (d.customFields as any)?.taxRates;
     setDivForm({
-      name: s(d.name), code: s(d.code), email: s(d.email), phone: s(d.phone),
+      name: s(d.name), code: s(d.code), email: s(d.email), phone: s(d.phone), website: s(d.website),
       addressLine1: s(d.addressLine1), addressLine2: s(d.addressLine2),
       city: s(d.city), state: s(d.state), postalCode: s(d.postalCode),
       licenseNumber: s(d.licenseNumber), licenseState: s(d.licenseState),
       isHeadquarters: d.isHeadquarters === true,
+      taxDefaultPct: taxRates?.default != null ? String(taxRates.default / 100) : "",
+      taxCities: serializeCityRates(taxRates?.cities),
     });
     setEditingDivisionId(d.id);
   };
@@ -192,10 +224,30 @@ export default function CrmSettingsPage() {
     onError: (e: any) => toast({ title: "Could not save company profile", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  // ── Company logo upload (PNG/JPG ≤ 2MB → org.logoUrl, shown on documents) ──
+  const uploadLogo = useMutation({
+    mutationFn: async (file: File) => {
+      if (file.size > 2 * 1024 * 1024) throw new Error("Logo is too large — 2MB maximum.");
+      const fd = new FormData();
+      fd.append("logo", file);
+      const r = await fetch("/api/crm/org/logo", { method: "POST", body: fd, credentials: "include" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || "Upload failed");
+      return j;
+    },
+    onSuccess: (j: any) => {
+      setCompany((c) => ({ ...c, logoUrl: j.logoUrl }));
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      toast({ title: "Logo uploaded" });
+    },
+    onError: (e: any) => toast({ title: "Could not upload logo", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   // ── Estimate & invoice defaults ───────────────────────────────────────────
   const [defaults, setDefaults] = useState({
     estimateFooter: "", invoiceFooter: "", termsAndConditions: "",
-    warrantyText: "", depositPct: "",
+    warrantyText: "", depositPct: "", taxPct: "",
   });
   useEffect(() => {
     if (!org) return;
@@ -205,12 +257,14 @@ export default function CrmSettingsPage() {
       termsAndConditions: org.termsAndConditions ?? "",
       warrantyText: org.warrantyText ?? "",
       depositPct: org.defaultDepositBps ? String(org.defaultDepositBps / 100) : "",
+      taxPct: org.defaultTaxRateBps ? String(org.defaultTaxRateBps / 100) : "",
     });
   }, [org?.id]);
 
   const saveDefaults = useMutation({
     mutationFn: async () => {
       const pct = parseFloat(defaults.depositPct);
+      const taxPctNum = parseFloat(defaults.taxPct);
       return (await apiRequest("PATCH", "/api/crm/org", {
         estimateFooter: emptyToNull(defaults.estimateFooter),
         invoiceFooter: emptyToNull(defaults.invoiceFooter),
@@ -219,6 +273,9 @@ export default function CrmSettingsPage() {
         defaultDepositBps: defaults.depositPct.trim() === "" || Number.isNaN(pct)
           ? null
           : Math.round(Math.min(100, Math.max(0, pct)) * 100),
+        defaultTaxRateBps: defaults.taxPct.trim() === "" || Number.isNaN(taxPctNum)
+          ? null
+          : Math.round(Math.min(30, Math.max(0, taxPctNum)) * 100),
       })).json();
     },
     onSuccess: () => {
@@ -242,6 +299,50 @@ export default function CrmSettingsPage() {
     },
     onError: (e: any) => toast({ title: "Could not save notifications", description: String(e.message ?? e), variant: "destructive" }),
   });
+
+  // ── Payments: card fee passthrough + financing links ──────────────────────
+  const { data: paySettings } = useQuery<any>({
+    queryKey: ["/api/crm/payments/settings"],
+    enabled: allowed,
+  });
+  const [feeForm, setFeeForm] = useState({ passFeeToClient: false, surchargePct: "" });
+  const [finLinks, setFinLinks] = useState<{ label: string; url: string; primary?: boolean }[]>([]);
+  const [newLink, setNewLink] = useState({ label: "", url: "" });
+  useEffect(() => {
+    if (!paySettings) return;
+    setFeeForm({
+      passFeeToClient: paySettings.payments?.passFeeToClient === true,
+      surchargePct: paySettings.payments?.surchargeBps ? String(paySettings.payments.surchargeBps / 100) : "",
+    });
+    setFinLinks(paySettings.financingLinks ?? []);
+  }, [paySettings]);
+
+  const savePaySettings = useMutation({
+    mutationFn: async (body: any) => (await apiRequest("PUT", "/api/crm/payments/settings", body)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/payments/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Payment settings saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save payment settings", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const saveFee = () => {
+    const pct = parseFloat(feeForm.surchargePct);
+    savePaySettings.mutate({
+      payments: {
+        passFeeToClient: feeForm.passFeeToClient,
+        surchargeBps: feeForm.surchargePct.trim() === "" || Number.isNaN(pct)
+          ? null
+          : Math.round(Math.min(10, Math.max(0, pct)) * 100),
+      },
+    });
+  };
+
+  const saveLinks = (links: typeof finLinks) => {
+    setFinLinks(links);
+    savePaySettings.mutate({ financingLinks: links });
+  };
 
   // ── API keys ──────────────────────────────────────────────────────────────
   const [keyName, setKeyName] = useState("");
@@ -397,6 +498,26 @@ export default function CrmSettingsPage() {
                 value={company.logoUrl ?? ""} onChange={setC("logoUrl")} />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="company-logo-file">Upload logo</Label>
+              <div className="flex items-center gap-3">
+                {company.logoUrl && (
+                  <img src={company.logoUrl} alt="Company logo" data-testid="img-company-logo"
+                    className="h-9 w-9 rounded border object-contain bg-white" />
+                )}
+                <Input id="company-logo-file" type="file" accept="image/png,image/jpeg"
+                  data-testid="input-company-logo-file" disabled={uploadLogo.isPending}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadLogo.mutate(f);
+                    e.target.value = "";
+                  }} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                PNG or JPG, 2MB max. Shows on estimates, invoices and the portal.
+                {uploadLogo.isPending ? " Uploading…" : ""}
+              </p>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="company-address1">Address</Label>
               <Input id="company-address1" data-testid="input-company-address1"
                 value={company.addressLine1 ?? ""} onChange={setC("addressLine1")} />
@@ -479,6 +600,7 @@ export default function CrmSettingsPage() {
                     <div className="text-xs text-muted-foreground">
                       {[d.addressLine1, d.city, d.state].filter(Boolean).join(", ") || "No address — falls back to the company's"}
                       {d.licenseNumber ? ` · License ${d.licenseNumber}${d.licenseState ? ` (${d.licenseState})` : ""}` : ""}
+                      {d.website ? ` · ${d.website}` : ""}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -555,7 +677,29 @@ export default function CrmSettingsPage() {
                 <Input id="div-phone" data-testid="input-division-phone"
                   value={divForm.phone} onChange={setD("phone")} />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-website">Website (optional)</Label>
+                <Input id="div-website" data-testid="input-division-website" placeholder="https://…"
+                  value={divForm.website} onChange={setD("website")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-tax-default">Sales tax — division default (%)</Label>
+                <Input id="div-tax-default" type="number" min={0} max={30} step="0.1"
+                  data-testid="input-division-tax-default" placeholder="e.g. 7.0"
+                  value={divForm.taxDefaultPct} onChange={setD("taxDefaultPct")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="div-tax-cities">City tax overrides (one per line)</Label>
+                <Textarea id="div-tax-cities" rows={2} data-testid="textarea-division-tax-cities"
+                  placeholder={"Seattle: 10.1%\nTacoma: 9.4%"}
+                  value={divForm.taxCities}
+                  onChange={(e) => setDivForm((d) => ({ ...d, taxCities: e.target.value }))} />
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Sales tax resolves city override → division default → company default (Estimate &amp;
+              invoice defaults). Rates are managed here in Settings → Divisions — verify with your accountant.
+            </p>
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <Checkbox
                 checked={divForm.isHeadquarters}
@@ -625,6 +769,17 @@ export default function CrmSettingsPage() {
                 onChange={(e) => setDefaults((d) => ({ ...d, depositPct: e.target.value }))} />
               <p className="text-xs text-muted-foreground">
                 Note: some states cap contractor deposits (CA, NV, MD, MA, PA, NY).
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="default-tax">Default sales tax (%)</Label>
+              <Input id="default-tax" type="number" min={0} max={30} step="0.1"
+                data-testid="input-default-tax" placeholder="e.g. 8.8"
+                value={defaults.taxPct}
+                onChange={(e) => setDefaults((d) => ({ ...d, taxPct: e.target.value }))} />
+              <p className="text-xs text-muted-foreground">
+                Fallback when no city or division rate matches — rates are managed in
+                Settings → Divisions — verify with your accountant.
               </p>
             </div>
           </div>
@@ -699,6 +854,116 @@ export default function CrmSettingsPage() {
               <StatusPill tone={acct?.chargesEnabled ? "success" : "neutral"} data-testid="pill-payments-status">
                 {acct ? (acct.chargesEnabled ? "Connected" : "Connected · charges off") : "Not connected"}
               </StatusPill>
+            )}
+          </div>
+
+          {/* Card processing fee passthrough — ACH always stays fee-free. */}
+          <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-card-fee">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium">Pass the card processing fee to the client</div>
+                <p className="text-xs text-muted-foreground">
+                  Card checkouts add a clearly-labelled "Card processing fee" line. Bank transfer (ACH) is always fee-free.
+                </p>
+              </div>
+              <Switch
+                checked={feeForm.passFeeToClient}
+                onCheckedChange={(v) => setFeeForm((f) => ({ ...f, passFeeToClient: v }))}
+                data-testid="switch-pass-fee"
+              />
+            </div>
+            {feeForm.passFeeToClient && (
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="surcharge-pct">Card surcharge (%)</Label>
+                  <Input id="surcharge-pct" type="number" min={0} max={10} step="0.1" className="w-32"
+                    placeholder="e.g. 3" data-testid="input-surcharge-pct"
+                    value={feeForm.surchargePct}
+                    onChange={(e) => setFeeForm((f) => ({ ...f, surchargePct: e.target.value }))} />
+                </div>
+                <Button size="sm" onClick={saveFee} disabled={savePaySettings.isPending}
+                  data-testid="button-save-card-fee">
+                  {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save fee setting
+                </Button>
+              </div>
+            )}
+            {!feeForm.passFeeToClient && (
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={saveFee} disabled={savePaySettings.isPending}
+                  data-testid="button-save-card-fee-off">
+                  {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save fee setting
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Financing links — the primary one shows on estimates & invoices. */}
+          <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-financing">
+            <div>
+              <div className="text-sm font-medium">Financing links</div>
+              <p className="text-xs text-muted-foreground">
+                Up to 10 lender or partner links. The primary one appears as "Finance this project →"
+                on your estimates, invoices and the client portal.
+              </p>
+            </div>
+            {finLinks.length > 0 && (
+              <div className="space-y-2">
+                {finLinks.map((l, i) => (
+                  <div key={`${l.label}-${i}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
+                    data-testid={`row-financing-${i}`}>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        <span className="truncate">{l.label}</span>
+                        {l.primary && <StatusPill tone="info" className="shrink-0" data-testid={`pill-primary-financing-${i}`}>Primary</StatusPill>}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">{l.url}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!l.primary && (
+                        <Button size="sm" variant="outline"
+                          onClick={() => saveLinks(finLinks.map((x, j) => ({ ...x, primary: j === i })))}
+                          disabled={savePaySettings.isPending} data-testid={`button-primary-financing-${i}`}>
+                          Set primary
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost"
+                        onClick={() => {
+                          const next = finLinks.filter((_, j) => j !== i);
+                          // Never leave the list without a primary.
+                          if (next.length && !next.some((x) => x.primary)) next[0] = { ...next[0], primary: true };
+                          saveLinks(next);
+                        }}
+                        disabled={savePaySettings.isPending} data-testid={`button-remove-financing-${i}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {finLinks.length < 10 && (
+              <div className="flex flex-wrap gap-2">
+                <Input placeholder="Label (e.g. GreenSky financing)" className="sm:w-56"
+                  data-testid="input-financing-label"
+                  value={newLink.label} onChange={(e) => setNewLink((n) => ({ ...n, label: e.target.value }))} />
+                <Input placeholder="https://…" className="flex-1 min-w-48"
+                  data-testid="input-financing-url"
+                  value={newLink.url} onChange={(e) => setNewLink((n) => ({ ...n, url: e.target.value }))} />
+                <Button size="sm" variant="outline" className="shrink-0"
+                  disabled={savePaySettings.isPending || !newLink.label.trim() || !/^https?:\/\//i.test(newLink.url.trim())}
+                  data-testid="button-add-financing"
+                  onClick={() => {
+                    const next = [...finLinks, {
+                      label: newLink.label.trim(), url: newLink.url.trim(), primary: finLinks.length === 0,
+                    }];
+                    setNewLink({ label: "", url: "" });
+                    saveLinks(next);
+                  }}>
+                  Add link
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>

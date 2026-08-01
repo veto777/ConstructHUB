@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  Settings, LogOut, ShieldCheck, type LucideIcon,
+  Settings, LogOut, ShieldCheck, FileText, ReceiptText, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { CHLogo } from "@/components/ch-logo";
@@ -41,6 +41,12 @@ const NAV: {
     active: (l: string) => l.startsWith("/crm/clients") },
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "link-portal-nav-pipeline",
     active: (l: string) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
+  { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "link-portal-nav-estimates",
+    active: (l: string) => l.startsWith("/crm/estimates") },
+  // Invoices carry money — hidden from members without seePrices, like the API.
+  { title: "Invoices", url: "/crm/invoices", icon: ReceiptText, testid: "link-portal-nav-invoices",
+    perm: "seePrices",
+    active: (l: string) => l.startsWith("/crm/invoices") },
   { title: "Price book", url: "/crm/pricebook", icon: BookOpen, testid: "link-portal-nav-pricebook",
     active: (l: string) => l.startsWith("/crm/pricebook") },
   { title: "Payments", url: "/crm/payments", icon: CreditCard, testid: "link-portal-nav-payments",
@@ -86,8 +92,14 @@ export function CrmSidebar() {
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <CrmLogo height={26} testid="text-crm-brand" />
             {orgName && (
-              <span className="text-[11px] text-sidebar-foreground/50 truncate leading-tight mt-1">
-                {orgName}
+              <span className="flex items-center gap-1.5 mt-1 min-w-0">
+                {me?.org?.logoUrl && (
+                  <img src={me.org.logoUrl} alt="" data-testid="img-sidebar-org-logo"
+                    className="h-4 w-4 rounded-sm object-contain bg-white shrink-0" />
+                )}
+                <span className="text-[11px] text-sidebar-foreground/50 truncate leading-tight">
+                  {orgName}
+                </span>
               </span>
             )}
           </div>

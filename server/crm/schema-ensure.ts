@@ -83,6 +83,7 @@ export async function ensureCrmSchema(): Promise<void> {
       code text NOT NULL,
       email text,
       phone text,
+      website text,
       address_line1 text,
       address_line2 text,
       city text,
@@ -483,6 +484,32 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_projects_division_idx ON crm_projects (division_id);
   `);
 
+  // ── Optional discounts + sales tax by city ───────────────────────────────
+  // Org fallback rate, per-division override bag (custom_fields->taxRates),
+  // the approval-time totals, and the offers table itself.
+  await pool.query(`
+    ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS default_tax_rate_bps integer;
+    ALTER TABLE crm_divisions ADD COLUMN IF NOT EXISTS custom_fields jsonb;
+    ALTER TABLE crm_divisions ADD COLUMN IF NOT EXISTS website text;
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS approved_total_cents integer;
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS selected_discounts jsonb;
+
+    CREATE TABLE IF NOT EXISTS crm_estimate_discounts (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      estimate_id varchar NOT NULL,
+      code text NOT NULL,
+      label text NOT NULL,
+      percent_bps integer NOT NULL,
+      conditions text,
+      enabled boolean NOT NULL DEFAULT true,
+      sort_order integer NOT NULL DEFAULT 0,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_estimate_discounts_est_idx ON crm_estimate_discounts (estimate_id);
+  `);
+
   // ── Client engagement sessions (public estimate/invoice dwell time) ──────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS crm_engagement_sessions (
@@ -542,6 +569,35 @@ export async function ensureCrmSchema(): Promise<void> {
       accepted_at timestamp,
       created_at timestamp DEFAULT now()
     );
+  `);
+
+  // ── Client portal v2: attachments + homeowner comments ───────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_attachments (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      kind text NOT NULL,
+      ref_id varchar,
+      file_name text NOT NULL,
+      mime text NOT NULL,
+      size_bytes integer NOT NULL,
+      storage_path text NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_client_comments (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      customer_id varchar NOT NULL,
+      body text NOT NULL,
+      created_at timestamp DEFAULT now(),
+      read_at timestamp
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_attachments_org_idx ON crm_attachments (org_id);
+    CREATE INDEX IF NOT EXISTS crm_attachments_ref_idx ON crm_attachments (kind, ref_id);
+    CREATE INDEX IF NOT EXISTS crm_client_comments_customer_idx ON crm_client_comments (customer_id);
+    CREATE INDEX IF NOT EXISTS crm_client_comments_org_idx ON crm_client_comments (org_id);
   `);
 
   // Constraints are added separately: they are not IF NOT EXISTS in older

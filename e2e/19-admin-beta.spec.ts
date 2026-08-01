@@ -13,7 +13,10 @@ import { q } from "./db";
 
 const DEV_EMAIL = "dev@constructhub.local";
 
-test.describe("platform admin console", () => {
+// @serial: temporarily points user 1's email at a non-admin address (admin
+// status is email-derived) — must not overlap specs that assume the dev
+// bypass user is an admin.
+test.describe("platform admin console", { tag: "@serial" }, () => {
   test("renders overview, users, orgs and the org detail drawer", async ({ page }) => {
     const guards = watchPage(page);
     await gotoCrm(page, "/crm/admin");
@@ -72,7 +75,7 @@ test.describe("platform admin console", () => {
   });
 });
 
-test.describe("beta invites", () => {
+test.describe("beta invites", { tag: "@serial" }, () => {
   test("create in the UI, accept at signup, unlimited seats", async ({ page }) => {
     const guards = watchPage(page);
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

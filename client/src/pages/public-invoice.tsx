@@ -23,12 +23,22 @@ export default function PublicInvoicePage() {
     queryKey: [`/api/public/invoices/${token}`], enabled: !!token, retry: false,
   });
 
+  // Fee + financing info, fetched only once the document itself loaded (which
+  // means the email gate already passed — this endpoint is gated the same way).
+  const { data: payInfo } = useQuery<any>({
+    queryKey: [`/api/public/invoices/${token}/pay-info`], enabled: !!data, retry: false,
+  });
+
   // Engagement heartbeat — starts only once the document has loaded.
   useEngagementTracker("invoice", token, !!data);
 
   const pay = useMutation({
-    mutationFn: async () => {
-      const r = await fetch(`/api/public/invoices/${token}/pay`, { method: "POST" });
+    mutationFn: async (method?: "card" | "ach") => {
+      const r = await fetch(`/api/public/invoices/${token}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(method ? { method } : {}),
+      });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.message || "Could not start payment");
       return j;
@@ -201,10 +211,59 @@ export default function PublicInvoicePage() {
                 Paid directly to {company.name}. Bank transfer (ACH) is the cheapest option.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate()} disabled={pay.isPending} data-testid="button-pay-invoice">
-                {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Pay {money(inv.dueCents)}
-              </Button>
+            <CardContent className="space-y-3">
+              {payInfo?.cardFee && (payInfo.achAvailable || payInfo.cardAvailable) ? (
+                <>
+                  {/* The fee is stated BEFORE the client chooses a rail. */}
+                  <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1" data-testid="text-card-fee-notice">
+                    {payInfo.achAvailable && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Bank transfer (ACH)</span>
+                        <span className="font-medium tabular-nums">{money(payInfo.dueCents)} — no fee</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">
+                        Card (includes {money(payInfo.cardFee.feeCents)} card processing fee, {(payInfo.cardFee.bps / 100).toFixed(2)}%)
+                      </span>
+                      <span className="font-medium tabular-nums">{money(payInfo.cardFee.totalCents)}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {payInfo.achAvailable && (
+                      <Button size="lg" variant="outline" onClick={() => pay.mutate("ach")} disabled={pay.isPending}
+                        data-testid="button-pay-invoice-ach">
+                        {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Pay {money(payInfo.dueCents)} by bank
+                      </Button>
+                    )}
+                    {payInfo.cardAvailable && (
+                      <Button size="lg" onClick={() => pay.mutate("card")} disabled={pay.isPending}
+                        data-testid="button-pay-invoice-card">
+                        {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Pay {money(payInfo.cardFee.totalCents)} by card
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate(undefined)} disabled={pay.isPending} data-testid="button-pay-invoice">
+                  {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Pay {money(inv.dueCents)}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {payInfo?.financing && (
+          <Card className="shadow-sm">
+            <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">Prefer to spread payments out?</div>
+              <a href={payInfo.financing.url} target="_blank" rel="noreferrer" data-testid="link-financing"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+                Finance this project →
+                <span className="font-normal text-muted-foreground">{payInfo.financing.label}</span>
+              </a>
             </CardContent>
           </Card>
         )}

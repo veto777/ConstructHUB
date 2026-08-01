@@ -34,6 +34,9 @@ import { registerCrmCalendarRoutes } from "./calendar";
 import { registerCrmDivisionRoutes, getDivision } from "./divisions";
 import { registerCrmAdminRoutes } from "./admin";
 import { registerCrmMigrateRoutes } from "./migrate";
+import { registerCrmDiscountRoutes } from "./discounts";
+import { registerCrmTaxHooks } from "./tax";
+import { registerCrmAttachmentRoutes } from "./attachments";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
@@ -70,6 +73,8 @@ const orgPatchSchema = z.object({
   termsAndConditions: z.string().max(20000).nullable().optional(),
   warrantyText: z.string().max(5000).nullable().optional(),
   defaultDepositBps: z.number().int().min(0).max(10000).nullable().optional(),
+  // Org-wide fallback sales-tax rate (basis points) — see server/crm/tax.ts.
+  defaultTaxRateBps: z.number().int().min(0).max(3000).nullable().optional(),
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.
   notificationPrefs: z
@@ -133,6 +138,9 @@ function presentMember(m: typeof crmMembers.$inferSelect, canSeeCosts: boolean) 
 export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   // Entities (customers/projects/jobs/estimates) and the client portal live in
   // their own files to keep this one about identity.
+  // Tax hooks MUST precede the entity routes: they fill in taxRateBps on
+  // estimate creation only when the caller left it unset (server/crm/tax.ts).
+  registerCrmTaxHooks(app, getDevUser);
   registerCrmEntityRoutes(app, getDevUser);
   registerCrmPortalRoutes(app, getDevUser);
   registerCrmInvoicePortalRoutes(app, getDevUser);
@@ -156,6 +164,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmAdminRoutes(app, getDevUser);
   // Self-serve CSV/TSV migration center (Jobber/Leap/QuickBooks/Excel).
   registerCrmMigrateRoutes(app, getDevUser);
+  // Optional client-selected discount offers on estimates.
+  registerCrmDiscountRoutes(app, getDevUser);
+  // Client portal v2: pamphlet/estimate/photo attachments + homeowner comments.
+  registerCrmAttachmentRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 

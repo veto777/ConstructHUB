@@ -10,7 +10,11 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "npm run test:e2e:parallel && npm run test:e2e:serial",
+    "test:e2e:parallel": "playwright test --grep-invert @serial",
+    "test:e2e:serial": "E2E_WORKERS=1 playwright test --grep @serial",
+    "e2e:lane": "tsx script/e2e-lane.ts",
+    "e2e:worktree": "bash script/e2e-worktree.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.999.0",

@@ -56,7 +56,7 @@ export type CompanyBranding = {
 export function companyBranding(
   org: Pick<CrmOrg, "name" | "legalEntityName" | "email" | "phone" | "website" | "logoUrl" |
     "addressLine1" | "addressLine2" | "city" | "state" | "postalCode" | "licenseNumber" | "licenseState">,
-  division: Pick<CrmDivision, "name" | "code" | "email" | "phone" |
+  division: Pick<CrmDivision, "name" | "code" | "email" | "phone" | "website" |
     "addressLine1" | "addressLine2" | "city" | "state" | "postalCode" | "licenseNumber" | "licenseState"> | null,
 ): CompanyBranding {
   const d = division ?? null;
@@ -66,7 +66,7 @@ export function companyBranding(
     legalEntityName: org.legalEntityName,
     email: d?.email ?? org.email,
     phone: d?.phone ?? org.phone,
-    website: org.website,
+    website: d?.website ?? org.website,
     logoUrl: org.logoUrl,
     addressLine1: dHasAddress ? d!.addressLine1 : org.addressLine1,
     addressLine2: dHasAddress ? d!.addressLine2 : org.addressLine2,
@@ -205,6 +205,7 @@ const divisionSchema = z.object({
   code: z.string().min(1).max(20),
   email: z.string().email().nullable().optional(),
   phone: z.string().max(40).nullable().optional(),
+  website: z.string().max(300).nullable().optional(),
   addressLine1: z.string().max(200).nullable().optional(),
   addressLine2: z.string().max(200).nullable().optional(),
   city: z.string().max(120).nullable().optional(),
@@ -213,6 +214,13 @@ const divisionSchema = z.object({
   licenseNumber: z.string().max(80).nullable().optional(),
   licenseState: z.string().max(10).nullable().optional(),
   isHeadquarters: z.boolean().optional(),
+  // Sales-tax override map, stored at custom_fields->taxRates:
+  // { default: bps, cities: { CityName: bps } }. Resolved by server/crm/tax.ts.
+  // Accepted on PATCH (merged, never a wholesale custom_fields replace).
+  taxRates: z.object({
+    default: z.number().int().min(0).max(3000).nullable().optional(),
+    cities: z.record(z.number().int().min(0).max(3000)).optional(),
+  }).nullable().optional(),
 });
 
 export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): void {
@@ -253,8 +261,10 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
     // The first division of an org is the headquarters by default.
     const isFirst = !(await db.select({ id: crmDivisions.id }).from(crmDivisions)
       .where(eq(crmDivisions.orgId, ctx.org.id)).limit(1)).length;
+    // taxRates is PATCH-only (stored in custom_fields, not a column).
+    const { taxRates: _taxRates, ...createData } = parsed.data;
     const [row] = await db.insert(crmDivisions).values({
-      ...parsed.data,
+      ...createData,
       isHeadquarters: parsed.data.isHeadquarters ?? isFirst,
       orgId: ctx.org.id,
     }).returning();
@@ -282,8 +292,17 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
       await db.update(crmDivisions).set({ isHeadquarters: false, updatedAt: new Date() })
         .where(eq(crmDivisions.orgId, ctx.org.id));
     }
+    // taxRates merges INTO custom_fields (never a wholesale replace) — the
+    // same rule as the org's notificationPrefs.
+    const { taxRates, ...patch } = parsed.data;
     const [row] = await db.update(crmDivisions)
-      .set({ ...parsed.data, updatedAt: new Date() })
+      .set({
+        ...patch,
+        ...(taxRates !== undefined
+          ? { customFields: { ...((existing.customFields as Record<string, unknown> | null) ?? {}), taxRates } }
+          : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(crmDivisions.id, existing.id))
       .returning();
     res.json(row);

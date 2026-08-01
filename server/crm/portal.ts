@@ -30,8 +30,9 @@ import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { logEvent, presentEstimate } from "./entities";
 import { emitCrmEvent } from "./integrations";
-import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision } from "./divisions";
-import { crmInvoices, crmInvoiceItems, crmPayments } from "@shared/schema";
+import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
+import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
+import { recomputeApprovalTotals } from "./discounts";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -148,12 +149,26 @@ function publicEstimateView(
   cust: typeof crmCustomers.$inferSelect,
   division: Awaited<ReturnType<typeof resolveEstimateDivision>> = null,
 ) {
+  // The taxable base the displayed tax was computed on. Hidden items still
+  // count (they affect the total); only the item ROWS are dropped below.
+  // Exposed so the client page can preview optional discounts live with the
+  // same math the server applies on approve (server/crm/discounts.ts).
+  let taxable = 0, lineDiscount = 0;
+  for (const i of items) {
+    const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
+    if (i.kind === "discount") { lineDiscount += Math.abs(line); continue; }
+    if (i.taxable) taxable += line;
+  }
+  const taxableBaseCents = Math.max(0, taxable - lineDiscount);
   return {
     estimate: {
       id: est.id, number: est.number, title: est.title, status: est.status,
       introText: est.introText, termsText: est.termsText,
       subtotalCents: est.subtotalCents, discountCents: est.discountCents,
+      taxRateBps: est.taxRateBps,
       taxCents: est.taxCents, totalCents: est.totalCents, depositCents: est.depositCents,
+      taxableBaseCents,
+      approvedTotalCents: est.approvedTotalCents, selectedDiscounts: est.selectedDiscounts,
       expiresAt: est.expiresAt, sentAt: est.sentAt,
       approvedAt: est.approvedAt, declinedAt: est.declinedAt,
       signatureName: est.signatureName,
@@ -371,10 +386,24 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
 
     const view = publicEstimateView(current, items, org, cust, division);
+    // Optional discount offers the client may tick (enabled ones only). The
+    // client page previews with them; the approve route re-computes from the
+    // server's own rows, so these are presentation, never input.
+    const discountOffers = await db.select().from(crmEstimateDiscounts)
+      .where(and(
+        eq(crmEstimateDiscounts.orgId, est.orgId),
+        eq(crmEstimateDiscounts.estimateId, est.id),
+        eq(crmEstimateDiscounts.enabled, true),
+      ))
+      .orderBy(asc(crmEstimateDiscounts.sortOrder), asc(crmEstimateDiscounts.createdAt));
     res.json({
       ...view,
       preview: preview || undefined, // read-only: the page hides approve/pay
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
+      discountOffers: discountOffers.map((o) => ({
+        id: o.id, code: o.code, label: o.label,
+        percentBps: o.percentBps, conditions: o.conditions,
+      })),
       options: options.map((o) => ({
         id: o.id, name: o.name, tier: o.tier, description: o.description,
         recommended: o.recommended,
@@ -393,6 +422,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       decision: z.enum(["approve", "decline"]),
       signatureName: z.string().min(2).max(120).optional(),
       reason: z.string().max(2000).optional(),
+      // Optional discount offer ids the client ticked. Ids only — percentages
+      // and totals are re-derived from the server's own rows below.
+      selectedDiscounts: z.array(z.string().max(64)).max(20).optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid response", issues: parsed.error.issues });
 
@@ -410,6 +442,15 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }
 
     const approve = parsed.data.decision === "approve";
+
+    // Optional client-selected discounts: the total is RE-COMPUTED here from
+    // the line items and the server's own enabled offers — the client's
+    // preview total is never trusted (integer cents; the math is documented
+    // in server/crm/discounts.ts). Declines never touch the numbers.
+    const approval = approve
+      ? await recomputeApprovalTotals(est.orgId, est.id, est.taxRateBps ?? 0, parsed.data.selectedDiscounts ?? [])
+      : null;
+
     const [row] = await db.update(crmEstimates).set({
       status: approve ? "approved" : "declined",
       approvedAt: approve ? new Date() : null,
@@ -417,18 +458,25 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       declineReason: approve ? null : (parsed.data.reason ?? null),
       signatureName: approve ? parsed.data.signatureName ?? null : null,
       signatureIp: approve ? clientIp(req) : null,
+      ...(approval
+        ? { approvedTotalCents: approval.totals.totalCents, selectedDiscounts: approval.selections }
+        : {}),
       updatedAt: new Date(),
     }).where(eq(crmEstimates.id, est.id)).returning();
 
     await logEvent(est.orgId, est.id, approve ? "approved" : "declined", "client", req, {
       signatureName: parsed.data.signatureName, reason: parsed.data.reason,
+      ...(approval && approval.selections.length
+        ? { selectedDiscounts: approval.selections.map((s) => s.code), approvedTotalCents: approval.totals.totalCents }
+        : {}),
     });
 
-    // Approving advances the project — Leap's "Job Awarded" gate.
+    // Approving advances the project — Leap's "Job Awarded" gate. The contract
+    // value is the APPROVED total (after any selected optional discounts).
     if (est.projectId) {
       await db.update(crmProjects).set({
         status: approve ? "approved" : "estimating",
-        contractValueCents: approve ? est.totalCents : undefined,
+        contractValueCents: approve ? (approval?.totals.totalCents ?? est.totalCents) : undefined,
         stageChangedAt: new Date(), updatedAt: new Date(),
       } as any).where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId))).catch(() => {});
     }
@@ -437,6 +485,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
     if (org && cust) {
       notifyOwner(est.orgId, row, cust, org, approve ? "approved" : "declined", parsed.data.reason).catch(() => {});
+      // The PM's "job awarded" heads-up — separate from the owner's copy,
+      // gated by its own notificationPref (jobApproved, default ON).
+      if (approve) notifyJobApproved(req, est, row, cust, org).catch(() => {});
     }
 
     res.json({ ok: true, status: row.status });
@@ -769,7 +820,7 @@ async function notifyOwner(
 
   const body =
     event === "approved"
-      ? `<p><strong>${esc(cust.displayName)}</strong> approved estimate ${esc(est.number ?? "")} for <strong>${money(est.totalCents)}</strong>.</p>
+      ? `<p><strong>${esc(cust.displayName)}</strong> approved estimate ${esc(est.number ?? "")} for <strong>${money(est.approvedTotalCents ?? est.totalCents)}</strong>.</p>
          <p>Signed as: ${esc(est.signatureName)}</p>`
       : event === "declined"
       ? `<p><strong>${esc(cust.displayName)}</strong> declined estimate ${esc(est.number ?? "")}.</p>
@@ -781,6 +832,90 @@ async function notifyOwner(
     subject,
     html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
   } as any).catch((e: any) => console.error("[crm] owner notify failed:", e?.message || e));
+}
+
+// ── PM auto-email on approval ───────────────────────────────────────────────
+
+/**
+ * Who gets the "job awarded" email (pure — unit-tested in discounts.test.ts).
+ * TO: the admin member(s) of the project's division; when the project has no
+ * division (or it has no admins), the org owner(s). CC: the estimate's
+ * creator — the estimator who wrote the quote — unless they're already a TO.
+ */
+export function jobApprovedRecipients(args: {
+  members: { id: string; email: string | null; role: string; status: string; divisionId: string | null }[];
+  divisionId: string | null;
+  creatorMemberId: string | null;
+}): { to: string[]; cc: string[] } {
+  const active = args.members.filter((m) => m.status === "active" && m.email);
+  let to: string[] = [];
+  if (args.divisionId) {
+    to = active
+      .filter((m) => m.role === "admin" && m.divisionId === args.divisionId)
+      .map((m) => m.email!);
+  }
+  if (!to.length) {
+    to = active.filter((m) => m.role === "owner").map((m) => m.email!);
+  }
+  to = [...new Set(to)];
+  const creator = active.find((m) => m.id === args.creatorMemberId);
+  const cc = creator?.email && !to.includes(creator.email) ? [creator.email] : [];
+  return { to, cc };
+}
+
+/**
+ * Email the PM on file when the client signs: division admins of the
+ * project's division (fallback: org owner), CC the estimator. Gated by the
+ * org's jobApproved notificationPref (default ON). Content: customer,
+ * estimate #, total, division, and a link to the project.
+ */
+async function notifyJobApproved(
+  req: any,
+  est: typeof crmEstimates.$inferSelect,
+  row: typeof crmEstimates.$inferSelect,
+  cust: typeof crmCustomers.$inferSelect,
+  org: typeof crmOrgs.$inferSelect,
+) {
+  if (!crmNotificationEnabled(org.customFields, "jobApproved")) return;
+
+  let divisionId: string | null = null;
+  let divisionName: string | null = null;
+  if (est.projectId) {
+    const [p] = await db.select({ divisionId: crmProjects.divisionId }).from(crmProjects)
+      .where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId))).limit(1);
+    divisionId = p?.divisionId ?? null;
+    const div = await getDivision(est.orgId, divisionId);
+    divisionName = div?.name ?? null;
+  }
+
+  const members = await db.select().from(crmMembers)
+    .where(eq(crmMembers.orgId, est.orgId));
+  const { to, cc } = jobApprovedRecipients({
+    members, divisionId, creatorMemberId: est.createdByMemberId,
+  });
+  const toList = to.length ? to : cc;
+  const ccList = to.length ? cc : [];
+  if (!toList.length) return;
+
+  const total = row.approvedTotalCents ?? row.totalCents;
+  const projectLink = est.projectId ? `${getBaseUrl(req)}/crm/projects/${est.projectId}` : null;
+  await sendWithFallback({
+    to: toList.join(","),
+    ...(ccList.length ? { cc: ccList.join(",") } : {}),
+    subject: `Job approved — ${cust.displayName} signed estimate ${est.number ?? ""}`.trim(),
+    html: `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
+        <p style="font-size:16px"><strong>${esc(cust.displayName)}</strong> approved estimate
+          <strong>${esc(est.number ?? "")}</strong> for
+          <strong>${money(total)}</strong>${divisionName ? ` (${esc(divisionName)})` : ""}.</p>
+        <p style="font-size:14px;color:#444">Signed as: ${esc(row.signatureName)}. The job is awarded —
+          scheduling can begin.</p>
+        ${projectLink ? `<p style="margin:20px 0">
+          <a href="${projectLink}" style="background:#4f46e5;color:#fff;padding:11px 20px;border-radius:6px;
+             text-decoration:none;font-weight:600;font-size:14px;display:inline-block">Open the project</a>
+        </p>` : ""}
+      </div>`,
+  } as any).catch((e: any) => console.error("[crm] job-approved notify failed:", e?.message || e));
 }
 
 // ── Invoices: send, public view with open tracking, and pay ─────────────────

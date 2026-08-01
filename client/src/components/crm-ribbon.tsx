@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  ShieldCheck, type LucideIcon,
+  ShieldCheck, FileText, ReceiptText, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -30,6 +30,12 @@ const MORE_LINKS: {
 }[] = [
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
+  { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "ribbon-more-estimates",
+    active: (l) => l.startsWith("/crm/estimates") },
+  // Gated like the API: invoices are money, seePrices only.
+  { title: "Invoices", url: "/crm/invoices", icon: ReceiptText, testid: "ribbon-more-invoices",
+    perm: "seePrices",
+    active: (l) => l.startsWith("/crm/invoices") },
   { title: "Price book", url: "/crm/pricebook", icon: BookOpen, testid: "ribbon-more-pricebook",
     active: (l) => l.startsWith("/crm/pricebook") },
   { title: "Payments", url: "/crm/payments", icon: CreditCard, testid: "ribbon-more-payments",

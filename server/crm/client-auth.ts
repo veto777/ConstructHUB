@@ -24,6 +24,7 @@ import {
   crmEstimates,
   crmInvoices,
   crmMeasurements,
+  crmAttachments,
   crmClientTokens,
   crmClientSessions,
 } from "@shared/schema";
@@ -250,7 +251,10 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     const client = await requireClient(req, res);
     if (!client) return;
     if (!client.customerIds.length) {
-      return res.json({ customer: null, orgs: [], estimates: [], invoices: [], contracts: [], reports: [] });
+      return res.json({
+        customer: null, orgs: [], accounts: [], estimates: [], invoices: [],
+        contracts: [], reports: [], pamphlets: [], photos: [],
+      });
     }
 
     const customers = await db
@@ -294,18 +298,60 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       )
       .orderBy(desc(crmMeasurements.createdAt));
 
+    // Client-portal v2 file exchange: org pamphlets ("From <company>"), files
+    // pinned to the client's estimates, and the photos the client uploaded.
+    // All session-scoped — pamphlets only for orgs the client belongs to,
+    // estimate/photo attachments only for their own customer ids.
+    const estimateIds = estimates.map((e) => e.id);
+    const [pamphletRows, estimateAttRows, photoRows] = await Promise.all([
+      orgIds.length
+        ? db.select().from(crmAttachments)
+            .where(and(eq(crmAttachments.kind, "pamphlet"), inArray(crmAttachments.orgId, orgIds)))
+            .orderBy(desc(crmAttachments.createdAt))
+        : Promise.resolve([]),
+      estimateIds.length
+        ? db.select().from(crmAttachments)
+            .where(and(eq(crmAttachments.kind, "estimate"), inArray(crmAttachments.refId, estimateIds)))
+            .orderBy(desc(crmAttachments.createdAt))
+        : Promise.resolve([]),
+      db.select().from(crmAttachments)
+        .where(and(eq(crmAttachments.kind, "photo"), inArray(crmAttachments.refId, client.customerIds)))
+        .orderBy(desc(crmAttachments.createdAt)),
+    ]);
+    const attsByEstimate = new Map<string, typeof estimateAttRows>();
+    for (const a of estimateAttRows) {
+      if (!a.refId) continue;
+      const list = attsByEstimate.get(a.refId) ?? [];
+      list.push(a);
+      attsByEstimate.set(a.refId, list);
+    }
+    const clientFile = (a: (typeof pamphletRows)[number]) => ({
+      id: a.id, fileName: a.fileName, mime: a.mime, sizeBytes: a.sizeBytes,
+      createdAt: a.createdAt,
+      downloadUrl: `/api/client/attachments/${a.id}/download`,
+    });
+
     const primary = customers[0];
     res.json({
       customer: primary
         ? { displayName: primary.displayName, email: primary.email }
         : null,
       orgs: orgs.map((o) => ({ id: o.id, name: o.name, logoUrl: o.logoUrl })),
+      // Every customer row this session covers — upload/comment targets.
+      accounts: customers.map((c) => ({
+        id: c.id, displayName: c.displayName, orgName: orgName.get(c.orgId) ?? null,
+      })),
+      pamphlets: pamphletRows.map((a) => ({
+        ...clientFile(a), orgName: orgName.get(a.orgId) ?? null,
+      })),
+      photos: photoRows.map((a) => ({ ...clientFile(a), customerId: a.refId })),
       estimates: estimates.map((e) => ({
         id: e.id, number: e.number, title: e.title, status: e.status,
         totalCents: e.totalCents, sentAt: e.sentAt, expiresAt: e.expiresAt,
         approvedAt: e.approvedAt, declinedAt: e.declinedAt,
         orgName: orgName.get(e.orgId) ?? null,
         link: `/e/${e.publicToken}`,
+        attachments: (attsByEstimate.get(e.id) ?? []).map(clientFile),
       })),
       invoices: invoices.map((i) => ({
         id: i.id, number: i.number, title: i.title, status: i.status,

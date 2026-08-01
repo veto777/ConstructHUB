@@ -16,7 +16,9 @@ import { q, ASPIRE_ORG } from "./db";
  */
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.aspire));
 
-test.describe("pm role", () => {
+// @serial: re-roles the dev-bypass user to pm and back — every other suite
+// depends on that owner seat, so this file must never run concurrently.
+test.describe("pm role", { tag: "@serial" }, () => {
   test("pm is selectable in the invite form and member role selects", async ({ page }) => {
     const guards = watchPage(page);
     await gotoCrm(page, "/crm/team?tab=team");

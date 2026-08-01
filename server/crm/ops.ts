@@ -19,7 +19,8 @@ import {
   crmCommitments, crmCostEntries, crmAppointments, crmChangeOrders,
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
-  crmEstimateItems, crmPayments, permitDatabases, propertyAppraisers,
+  crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers,
+  crmNotificationEnabled,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES, CRM_APPOINTMENT_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
 } from "@shared/schema";
@@ -27,10 +28,47 @@ import { and, eq, gte, lte, desc, asc, sql, ilike, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
+import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 
 type GetUser = (req: any, res: any) => any;
 const tok = () => randomBytes(24).toString("hex");
+
+/** Human label for a payment method, used in the "payment received" email. */
+const METHOD_LABELS: Record<string, string> = {
+  cash: "cash", check: "check", wire: "wire transfer", credit_card: "credit card",
+  ach: "bank transfer (ACH)", card: "card", other: "another method",
+};
+
+/** Tell the org owner money landed on an invoice (manual entry). Best-effort:
+ *  email must never fail the request that recorded the payment. */
+async function notifyPaymentRecorded(
+  org: typeof crmOrgs.$inferSelect,
+  inv: typeof crmInvoices.$inferSelect,
+  amountCents: number,
+  method: string,
+) {
+  // The org can silence this notification in Settings (default: on).
+  if (!crmNotificationEnabled(org.customFields, "paymentReceived")) return;
+  const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
+  const owners = await db.select().from(crmMembers)
+    .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active"), eq(crmMembers.role, "owner")));
+  const to = new Set<string>();
+  if (org.email) to.add(org.email);
+  for (const m of owners) if (m.email) to.add(m.email);
+  if (!to.size) return;
+  const amount = `$${(amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  const via = METHOD_LABELS[method] ?? method;
+  const who = cust?.displayName ?? "a client";
+  const doc = inv.number ?? "an invoice";
+  await sendWithFallback({
+    to: [...to].join(","),
+    subject: `Payment received — ${amount} via ${via} from ${who} for invoice ${inv.number ?? ""}`.trim(),
+    html: `<p><strong>${amount}</strong> received via <strong>${via}</strong> from ${who}` +
+          ` for invoice <strong>${doc}</strong>${inv.title ? ` (${inv.title})` : ""}.</p>` +
+          `<p>Recorded manually in ConstructHub CRM.</p>`,
+  } as any);
+}
 
 export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   async function ctxFor(req: any, res: any, perm?: any): Promise<OrgContext | null> {
@@ -177,7 +215,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (!ctx) return;
     const parsed = z.object({
       amountCents: z.number().int().min(1).max(10_000_000_00),
-      method: z.enum(["cash", "check", "ach", "card", "other"]).default("other"),
+      // cash/check/wire/credit_card are the manual rails; ach/card/other are
+      // kept so older clients and imports still validate.
+      method: z.enum(["cash", "check", "wire", "credit_card", "ach", "card", "other"]),
       note: z.string().max(2000).nullable().optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid payment", issues: parsed.error.issues });
@@ -219,6 +259,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       paymentId: pay.id, amountCents: pay.amountCents, method: pay.method,
       invoiceId: inv.id, projectId: inv.projectId,
     });
+    // Tell the owner money landed (honors the paymentReceived notification pref).
+    notifyPaymentRecorded(ctx.org, inv, parsed.data.amountCents, parsed.data.method)
+      .catch((e: any) => console.error("[crm] payment-recorded email failed:", e?.message || e));
     res.status(201).json({ payment: pay, invoice: row });
   });
 

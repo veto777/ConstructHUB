@@ -4,11 +4,22 @@ import { createHash, randomBytes } from "crypto";
 /**
  * Direct dev-DB access for test setup/teardown that shouldn't fight product
  * constraints (seat limits, email delivery). Throwaway local database only.
+ *
+ * Lane isolation: E2E_DB picks the database name (default constructhub_dev)
+ * so each agent runs against its own constructhub_dev_* clone. The name must
+ * start with constructhub_dev — the live database is never an e2e target.
  */
+const e2eDb = process.env.E2E_DB ?? "constructhub_dev";
+if (!e2eDb.startsWith("constructhub_dev")) {
+  throw new Error(
+    `E2E_DB must start with "constructhub_dev" (got "${e2eDb}") — refusing to touch the live database`,
+  );
+}
+
 const pool = new pg.Pool({
   connectionString:
     process.env.DATABASE_URL ??
-    "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
+    `postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/${e2eDb}`,
 });
 
 export async function q<T = any>(text: string, params: any[] = []): Promise<T[]> {

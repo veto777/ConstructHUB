@@ -9,6 +9,7 @@ import {
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
+import { PortalPamphlets, PortalPhotoShare, PortalCommentBox } from "@/components/client-uploads";
 import { CrmLogo } from "@/components/crm-logo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -141,7 +142,10 @@ function RequestLink() {
 /* ── Signed in: the dashboard ────────────────────────────────────────────── */
 
 function Dashboard({ data }: { data: any }) {
-  const { customer, orgs = [], estimates = [], invoices = [], contracts = [], reports = [] } = data;
+  const {
+    customer, orgs = [], estimates = [], invoices = [], contracts = [], reports = [],
+    accounts = [], pamphlets = [], photos = [],
+  } = data;
 
   const now = Date.now();
   const awaitingEstimates = estimates.filter(
@@ -241,6 +245,16 @@ function Dashboard({ data }: { data: any }) {
                         </a>
                         {orgs.length > 1 && e.orgName && (
                           <div className="text-xs text-muted-foreground">{e.orgName}</div>
+                        )}
+                        {e.attachments?.length > 0 && (
+                          <div className="text-xs mt-0.5 flex flex-wrap gap-x-3">
+                            {e.attachments.map((a: any) => (
+                              <a key={a.id} href={a.downloadUrl} className="text-primary hover:underline"
+                                data-testid={`client-estimate-attachment-${a.id}`}>
+                                {a.fileName}
+                              </a>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td className={crmTable.td}>
@@ -390,6 +404,15 @@ function Dashboard({ data }: { data: any }) {
             </div>
           )}
         </section>
+
+        {/* From <company> — org pamphlets (brochures, warranties) */}
+        <PortalPamphlets pamphlets={pamphlets} />
+
+        {/* Share photos with your contractor */}
+        <PortalPhotoShare accounts={accounts} photos={photos} />
+
+        {/* Questions? Send a note to your contractor */}
+        <PortalCommentBox accounts={accounts} />
 
         <div className="flex flex-col items-center gap-2.5 pb-4">
           {/* The CRM powers this portal; the header above stays the contractor's. */}

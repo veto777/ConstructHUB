@@ -1,5 +1,7 @@
 /**
- * CRM entities — customers, projects, jobs, estimates.
+ * CRM entities — customers, projects, jobs, estimates, plus the org-wide
+ * Documents Center lists (filtered estimates/invoices for /crm/estimates and
+ * /crm/invoices; see parseDocQuery).
  *
  * Two rules hold everywhere in this file:
  *   1. Every query is scoped by the caller's active org. Never trust an org id
@@ -14,11 +16,11 @@ import { z } from "zod";
 import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmJobs, crmEstimates, crmEstimateItems,
-  crmEstimateEvents, crmLeadSources,
+  crmEstimateEvents, crmLeadSources, crmInvoices,
   CRM_PROJECT_STATUSES, CRM_JOB_STATUSES, CRM_LINE_ITEM_KINDS,
-  CRM_PROJECT_STAGE_META,
+  CRM_PROJECT_STAGE_META, CRM_ESTIMATE_STATUSES, CRM_INVOICE_STATUSES,
 } from "@shared/schema";
-import { and, eq, desc, asc, ilike, or, sql, isNull } from "drizzle-orm";
+import { and, eq, desc, asc, ilike, or, sql, isNull, inArray, gte, lte } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import {
   divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, getDivision,
@@ -27,6 +29,68 @@ import {
 type GetUser = (req: any, res: any) => any;
 
 const token = () => randomBytes(24).toString("hex");
+
+// ── Documents Center list params ────────────────────────────────────────────
+// The org-wide Documents Center (/crm/estimates, /crm/invoices) needs real
+// filtering — the #1 complaint about HCP. Document mode is strictly opt-in:
+// passing any of these params switches a list endpoint from its legacy
+// bare-array shape to { rows, total, filtered }. No params at all = exactly
+// yesterday's behaviour, so every existing caller and test is untouched.
+
+interface DocQuery {
+  statuses: string[];
+  dateField: "created" | "sent";
+  from: Date | null;
+  to: Date | null;
+  q: string;
+  sort: "newest" | "oldest" | "largest";
+}
+
+/**
+ * Parse the document-mode params, or return null when the request is a legacy
+ * call. `statusTriggers` is true for endpoints that never had a status param
+ * (invoices) — there, even a single status value means document mode; on
+ * estimates a lone ?status=x stays legacy and only a comma list opts in.
+ */
+function parseDocQuery(
+  query: Record<string, any>,
+  allowedStatuses: readonly string[],
+  derivedStatuses: string[] = [],
+  statusTriggers = false,
+): DocQuery | null {
+  const has = (k: string) => query[k] !== undefined && String(query[k]).trim() !== "";
+  const rawStatus = String(query.status || "").trim();
+  const docMode =
+    has("from") || has("to") || has("q") || has("sort") || has("dateField") ||
+    rawStatus.includes(",") || (statusTriggers && rawStatus !== "");
+  if (!docMode) return null;
+
+  const statuses = rawStatus
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => allowedStatuses.includes(s) || derivedStatuses.includes(s));
+
+  const parseDate = (v: any, endOfDay: boolean): Date | null => {
+    const s = String(v || "").trim();
+    if (!s) return null;
+    // A bare date means the whole day, not midnight-to-midnight misses.
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(s)
+      ? `${s}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`
+      : s;
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const sortRaw = String(query.sort || "newest");
+  return {
+    statuses,
+    dateField: query.dateField === "sent" ? "sent" : "created",
+    from: parseDate(query.from, false),
+    to: parseDate(query.to, true),
+    q: String(query.q || "").trim().slice(0, 200),
+    sort: sortRaw === "oldest" || sortRaw === "largest" ? sortRaw : "newest",
+  };
+}
 
 // ── Presenters: the permission boundary ─────────────────────────────────────
 
@@ -393,19 +457,176 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
   app.get("/api/crm/estimates", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
-    const where = [eq(crmEstimates.orgId, ctx.org.id)];
+    const dq = parseDocQuery(req.query, CRM_ESTIMATE_STATUSES);
+    if (!dq) {
+      // Legacy shape: bare array, single-value status filter, 500-row cap.
+      const where = [eq(crmEstimates.orgId, ctx.org.id)];
+      if (req.query.customerId) where.push(eq(crmEstimates.customerId, String(req.query.customerId)));
+      if (req.query.status) where.push(eq(crmEstimates.status, String(req.query.status)));
+      let rows = await db.select().from(crmEstimates).where(and(...where))
+        .orderBy(desc(crmEstimates.createdAt)).limit(500);
+      // Division scoping: the estimate's project's division, else its customer's
+      // latest project's, else unassigned — which a scoped member never sees (STRICT).
+      const divScope = divisionScopeOf(ctx.member);
+      if (divScope) {
+        const maps = await divisionMapsForOrg(ctx.org.id);
+        rows = rows.filter((e) => divisionVisible(divScope, docDivisionFromMaps(maps, e)));
+      }
+      return res.json(rows.map((e) => presentEstimate(e, ctx)));
+    }
+
+    // ── Documents Center mode: SQL-level status list / date range / search /
+    // sort, customer name joined in, and count summary for "23 of 451".
+    const dateCol = dq.dateField === "sent" ? crmEstimates.sentAt : crmEstimates.createdAt;
+    const where: any[] = [eq(crmEstimates.orgId, ctx.org.id)];
     if (req.query.customerId) where.push(eq(crmEstimates.customerId, String(req.query.customerId)));
-    if (req.query.status) where.push(eq(crmEstimates.status, String(req.query.status)));
-    let rows = await db.select().from(crmEstimates).where(and(...where))
-      .orderBy(desc(crmEstimates.createdAt)).limit(500);
-    // Division scoping: the estimate's project's division, else its customer's
-    // latest project's, else unassigned — which a scoped member never sees (STRICT).
+    if (dq.statuses.length) where.push(inArray(crmEstimates.status, dq.statuses));
+    if (dq.from) where.push(gte(dateCol, dq.from));
+    if (dq.to) where.push(lte(dateCol, dq.to));
+    if (dq.q) {
+      where.push(or(
+        ilike(crmEstimates.number, `%${dq.q}%`),
+        ilike(crmEstimates.title, `%${dq.q}%`),
+        ilike(crmCustomers.displayName, `%${dq.q}%`),
+      ) as any);
+    }
+    const order = dq.sort === "oldest" ? asc(crmEstimates.createdAt)
+      : dq.sort === "largest" ? desc(crmEstimates.totalCents)
+      : desc(crmEstimates.createdAt);
+    const joinCust = and(
+      eq(crmCustomers.id, crmEstimates.customerId),
+      eq(crmCustomers.orgId, ctx.org.id),
+    );
+
     const divScope = divisionScopeOf(ctx.member);
+    let rows: { doc: typeof crmEstimates.$inferSelect; customerName: string | null }[];
+    let filtered: number;
+    let total: number;
+    if (divScope) {
+      // Division scoping resolves through project/customer maps, so it stays a
+      // JS filter — counts are computed after it, never from raw SQL totals.
+      const maps = await divisionMapsForOrg(ctx.org.id);
+      const all = await db.select({ doc: crmEstimates, customerName: crmCustomers.displayName })
+        .from(crmEstimates).leftJoin(crmCustomers, joinCust)
+        .where(and(...where)).orderBy(order);
+      const visible = all.filter((r) => divisionVisible(divScope, docDivisionFromMaps(maps, r.doc)));
+      filtered = visible.length;
+      rows = visible.slice(0, 500);
+      const everyDoc = await db.select({
+        projectId: crmEstimates.projectId, customerId: crmEstimates.customerId,
+      }).from(crmEstimates).where(eq(crmEstimates.orgId, ctx.org.id));
+      total = everyDoc.filter((d) => divisionVisible(divScope, docDivisionFromMaps(maps, d))).length;
+    } else {
+      rows = await db.select({ doc: crmEstimates, customerName: crmCustomers.displayName })
+        .from(crmEstimates).leftJoin(crmCustomers, joinCust)
+        .where(and(...where)).orderBy(order).limit(500);
+      const [{ n: f }] = await db.select({ n: sql<number>`count(*)::int` })
+        .from(crmEstimates).leftJoin(crmCustomers, joinCust).where(and(...where));
+      filtered = f;
+      const [{ n: t }] = await db.select({ n: sql<number>`count(*)::int` })
+        .from(crmEstimates).where(eq(crmEstimates.orgId, ctx.org.id));
+      total = t;
+    }
+    res.json({
+      rows: rows.map((r) => ({ ...presentEstimate(r.doc, ctx), customerName: r.customerName ?? null })),
+      total,
+      filtered,
+    });
+  });
+
+  // routes.ts registers entity routes before ops routes, so this handler is
+  // the one Express serves for GET /api/crm/invoices. The legacy branch
+  // reproduces the original ops.ts behaviour exactly (bare array, 403 without
+  // seePrices, project/customer filters, division scoping); document params
+  // unlock the Documents Center filters. Do not "fix" the duplication in
+  // ops.ts — that file belongs to the construction-side module.
+  app.get("/api/crm/invoices", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (!ctx.permissions.seePrices) return res.status(403).json({ message: "Requires permission: seePrices" });
+    const dq = parseDocQuery(req.query, CRM_INVOICE_STATUSES, ["overdue"], true);
+    if (!dq) {
+      const where = [eq(crmInvoices.orgId, ctx.org.id)];
+      if (req.query.projectId) where.push(eq(crmInvoices.projectId, String(req.query.projectId)));
+      if (req.query.customerId) where.push(eq(crmInvoices.customerId, String(req.query.customerId)));
+      let rows = await db.select().from(crmInvoices).where(and(...where))
+        .orderBy(desc(crmInvoices.createdAt)).limit(500);
+      const divScope = divisionScopeOf(ctx.member);
+      if (divScope) {
+        const maps = await divisionMapsForOrg(ctx.org.id);
+        rows = rows.filter((i) => divisionVisible(divScope, docDivisionFromMaps(maps, i)));
+      }
+      return res.json(rows);
+    }
+
+    // ── Documents Center mode. "overdue" is derived, never stored: an open
+    // (sent/partial) invoice past its due date with a balance still due.
+    const overdueSql = sql`(${crmInvoices.status} in ('sent','partial') and ${crmInvoices.dueAt} is not null and ${crmInvoices.dueAt} < now() and ${crmInvoices.paidCents} < ${crmInvoices.totalCents})`;
+    const dateCol = dq.dateField === "sent" ? crmInvoices.sentAt : crmInvoices.createdAt;
+    const where: any[] = [eq(crmInvoices.orgId, ctx.org.id)];
+    if (req.query.projectId) where.push(eq(crmInvoices.projectId, String(req.query.projectId)));
+    if (req.query.customerId) where.push(eq(crmInvoices.customerId, String(req.query.customerId)));
+    if (dq.statuses.length) {
+      const plain = dq.statuses.filter((s) => s !== "overdue");
+      const conds: any[] = [];
+      if (plain.length) conds.push(inArray(crmInvoices.status, plain));
+      if (dq.statuses.includes("overdue")) conds.push(overdueSql);
+      where.push(conds.length === 1 ? conds[0] : (or(...conds) as any));
+    }
+    if (dq.from) where.push(gte(dateCol, dq.from));
+    if (dq.to) where.push(lte(dateCol, dq.to));
+    if (dq.q) {
+      where.push(or(
+        ilike(crmInvoices.number, `%${dq.q}%`),
+        ilike(crmInvoices.title, `%${dq.q}%`),
+        ilike(crmCustomers.displayName, `%${dq.q}%`),
+      ) as any);
+    }
+    const order = dq.sort === "oldest" ? asc(crmInvoices.createdAt)
+      : dq.sort === "largest" ? desc(crmInvoices.totalCents)
+      : desc(crmInvoices.createdAt);
+    const joinCust = and(
+      eq(crmCustomers.id, crmInvoices.customerId),
+      eq(crmCustomers.orgId, ctx.org.id),
+    );
+
+    const isOverdue = (i: typeof crmInvoices.$inferSelect) =>
+      (i.status === "sent" || i.status === "partial") &&
+      i.dueAt != null && new Date(i.dueAt).getTime() < Date.now() &&
+      (i.paidCents ?? 0) < (i.totalCents ?? 0);
+
+    const divScope = divisionScopeOf(ctx.member);
+    let rows: { doc: typeof crmInvoices.$inferSelect; customerName: string | null }[];
+    let filtered: number;
+    let total: number;
     if (divScope) {
       const maps = await divisionMapsForOrg(ctx.org.id);
-      rows = rows.filter((e) => divisionVisible(divScope, docDivisionFromMaps(maps, e)));
+      const all = await db.select({ doc: crmInvoices, customerName: crmCustomers.displayName })
+        .from(crmInvoices).leftJoin(crmCustomers, joinCust)
+        .where(and(...where)).orderBy(order);
+      const visible = all.filter((r) => divisionVisible(divScope, docDivisionFromMaps(maps, r.doc)));
+      filtered = visible.length;
+      rows = visible.slice(0, 500);
+      const everyDoc = await db.select({
+        projectId: crmInvoices.projectId, estimateId: crmInvoices.estimateId, customerId: crmInvoices.customerId,
+      }).from(crmInvoices).where(eq(crmInvoices.orgId, ctx.org.id));
+      total = everyDoc.filter((d) => divisionVisible(divScope, docDivisionFromMaps(maps, d))).length;
+    } else {
+      rows = await db.select({ doc: crmInvoices, customerName: crmCustomers.displayName })
+        .from(crmInvoices).leftJoin(crmCustomers, joinCust)
+        .where(and(...where)).orderBy(order).limit(500);
+      const [{ n: f }] = await db.select({ n: sql<number>`count(*)::int` })
+        .from(crmInvoices).leftJoin(crmCustomers, joinCust).where(and(...where));
+      filtered = f;
+      const [{ n: t }] = await db.select({ n: sql<number>`count(*)::int` })
+        .from(crmInvoices).where(eq(crmInvoices.orgId, ctx.org.id));
+      total = t;
     }
-    res.json(rows.map((e) => presentEstimate(e, ctx)));
+    res.json({
+      rows: rows.map((r) => ({ ...r.doc, customerName: r.customerName ?? null, overdue: isOverdue(r.doc) })),
+      total,
+      filtered,
+    });
   });
 
   app.post("/api/crm/estimates", async (req: any, res) => {

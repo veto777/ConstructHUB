@@ -17,7 +17,11 @@
  */
 import type { Express } from "express";
 import { randomBytes } from "crypto";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
 import Stripe from "stripe";
+import { z } from "zod";
 import { db } from "../db";
 import {
   crmPaymentAccounts, crmPayments, crmEstimates, crmInvoices, crmCustomers, crmOrgs,
@@ -26,6 +30,8 @@ import { and, eq, isNull, desc, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { requireDocSession } from "./portal";
 import { getBaseUrl } from "../auth";
+import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
+import { uploadToR2, getR2Url } from "../r2";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -62,6 +68,57 @@ async function activeAccount(orgId: string) {
     .orderBy(desc(crmPaymentAccounts.createdAt)).limit(1);
   return row ?? null;
 }
+
+// ── Org payment settings (custom_fields->payments) ──────────────────────────
+
+export type OrgPaymentSettings = {
+  /** Card surcharge in basis points (e.g. 300 = 3.00%); null = not set. */
+  surchargeBps: number | null;
+  /** ON = the client pays the card fee; OFF = the contractor absorbs it. */
+  passFeeToClient: boolean;
+};
+
+export function paymentSettingsOf(org: { customFields: unknown } | null | undefined): OrgPaymentSettings {
+  const p = (org?.customFields as Record<string, any> | null | undefined)?.payments ?? {};
+  const bps = Number(p.surchargeBps);
+  return {
+    surchargeBps: Number.isFinite(bps) && bps > 0 ? Math.min(1000, Math.round(bps)) : null,
+    passFeeToClient: p.passFeeToClient === true,
+  };
+}
+
+/** The fee a client pays on top of `amountCents` when paying by card. 0 when off. */
+export function cardFeeCents(org: { customFields: unknown } | null | undefined, amountCents: number): number {
+  const s = paymentSettingsOf(org);
+  if (!s.passFeeToClient || !s.surchargeBps) return 0;
+  return Math.round((amountCents * s.surchargeBps) / 10000);
+}
+
+// ── Company logo upload ─────────────────────────────────────────────────────
+// R2 when it's fully configured; otherwise local disk under tmp/org-logos,
+// served by the GET route below (logos render on public documents, so the
+// read path must work without an R2 bucket in dev).
+
+const LOGO_DIR = path.join(process.cwd(), "tmp", "org-logos");
+const r2Configured = Boolean(
+  process.env.R2_ENDPOINT && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY,
+);
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+});
+
+/** PNG/JPEG only, checked by magic bytes (mimetype alone is client-supplied). */
+function sniffImage(buf: Buffer): { ext: "png" | "jpg"; contentType: string } | null {
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return { ext: "png", contentType: "image/png" };
+  }
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return { ext: "jpg", contentType: "image/jpeg" };
+  }
+  return null;
+}
+
 
 export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): void {
   // ── Status ────────────────────────────────────────────────────────────────
@@ -244,8 +301,145 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     res.json(rows);
   });
 
+  // ── Org payment settings + financing links ────────────────────────────────
+  // Stored on the org's custom_fields ("payments" and "financingLinks" keys),
+  // merged — never a wholesale custom_fields replace.
+
+  app.get("/api/crm/payments/settings", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageSettings")) return;
+    res.json({
+      payments: paymentSettingsOf(ctx.org),
+      financingLinks: financingLinksOf(ctx.org),
+    });
+  });
+
+  app.put("/api/crm/payments/settings", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageSettings")) return;
+    const parsed = z.object({
+      payments: z.object({
+        surchargeBps: z.number().int().min(0).max(1000).nullable(),
+        passFeeToClient: z.boolean(),
+      }).optional(),
+      financingLinks: financingLinksSchema.optional(),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid payment settings", issues: parsed.error.issues });
+
+    const cf = { ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}) };
+    if (parsed.data.payments) {
+      cf.payments = {
+        surchargeBps: parsed.data.payments.surchargeBps && parsed.data.payments.surchargeBps > 0
+          ? parsed.data.payments.surchargeBps : null,
+        passFeeToClient: parsed.data.payments.passFeeToClient,
+      };
+    }
+    if (parsed.data.financingLinks) {
+      // Exactly one primary: the first link marked primary wins; when none is
+      // marked the first link becomes the client-facing one.
+      let primarySeen = false;
+      cf.financingLinks = parsed.data.financingLinks.map((l) => {
+        const primary = l.primary === true && !primarySeen;
+        if (primary) primarySeen = true;
+        return { label: l.label, url: l.url, primary };
+      });
+    }
+    const [org] = await db.update(crmOrgs).set({ customFields: cf, updatedAt: new Date() })
+      .where(eq(crmOrgs.id, ctx.org.id)).returning();
+    res.json({ payments: paymentSettingsOf(org), financingLinks: financingLinksOf(org) });
+  });
+
+  // ── Company logo upload ───────────────────────────────────────────────────
+
+  app.post("/api/crm/org/logo", (req: any, res, next: any) => {
+    // multer errors (e.g. LIMIT_FILE_SIZE) must become a clean 400, not a 500.
+    logoUpload.single("logo")(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({
+          message: err?.code === "LIMIT_FILE_SIZE" ? "Logo is too large — 2MB maximum." : "Upload failed.",
+        });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageSettings")) return;
+    const file = req.file as Express.Multer.File | undefined;
+    if (!file?.buffer?.length) return res.status(400).json({ message: "Choose a PNG or JPG file (2MB max)." });
+    const kind = sniffImage(file.buffer);
+    if (!kind) return res.status(400).json({ message: "Only PNG or JPG logos are supported." });
+
+    let logoUrl: string;
+    if (r2Configured) {
+      const key = await uploadToR2(file.buffer, kind.contentType, "logos/company", kind.ext);
+      logoUrl = getR2Url(key);
+    } else {
+      fs.mkdirSync(LOGO_DIR, { recursive: true });
+      const name = `${ctx.org.id}-${randomBytes(8).toString("hex")}.${kind.ext}`;
+      fs.writeFileSync(path.join(LOGO_DIR, name), file.buffer);
+      logoUrl = `/api/crm/org-logos/${name}`;
+    }
+    await db.update(crmOrgs).set({ logoUrl, updatedAt: new Date() }).where(eq(crmOrgs.id, ctx.org.id));
+    res.json({ logoUrl });
+  });
+
+  /** Public: locally-stored org logos (logos render on public documents). */
+  app.get("/api/crm/org-logos/:file", (req: any, res) => {
+    const name = String(req.params.file || "");
+    if (!/^[A-Za-z0-9-]+\.(png|jpg)$/.test(name)) return res.status(404).end();
+    const full = path.join(LOGO_DIR, name);
+    if (!full.startsWith(LOGO_DIR) || !fs.existsSync(full)) return res.status(404).end();
+    res.setHeader("Content-Type", name.endsWith(".png") ? "image/png" : "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    fs.createReadStream(full).pipe(res);
+  });
+
   // ── Public: client pays the deposit on an approved estimate ────────────────
   // Hosted Stripe Checkout on the CONNECTED account (direct charge), ACH first.
+
+  /** Public: what the invoice page needs before the client pays — the fee the
+   *  client would pay by card, and the org's primary financing link. Same
+   *  email gate as the document read. */
+  app.get("/api/public/invoices/:token/pay-info", async (req: any, res) => {
+    const t = String(req.params.token || "");
+    const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
+    if (!inv) return res.status(404).json({ message: "This invoice link is no longer valid." });
+    if (!(await requireDocSession(req, res, inv.customerId))) return;
+    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
+    const acct = await activeAccount(inv.orgId);
+    const dueCents = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
+    const settings = paymentSettingsOf(org);
+    const fee = cardFeeCents(org, dueCents);
+    res.json({
+      dueCents,
+      cardAvailable: Boolean(acct?.chargesEnabled && acct.cardEnabled),
+      achAvailable: Boolean(acct?.chargesEnabled && acct.achEnabled),
+      cardFee: settings.passFeeToClient && settings.surchargeBps
+        ? { bps: settings.surchargeBps, feeCents: fee, totalCents: dueCents + fee }
+        : null,
+      financing: getPrimaryFinancing(org),
+    });
+  });
+
+  /** Public: the estimate page's financing link (deposit fee stays contractor-
+   *  absorbed — the surcharge applies to card invoice payments only). */
+  app.get("/api/public/estimates/:token/pay-info", async (req: any, res) => {
+    const t = String(req.params.token || "");
+    const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
+    if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    if (!(await requireDocSession(req, res, est.customerId))) return;
+    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
+    res.json({ financing: getPrimaryFinancing(org) });
+  });
 
   /** Public: pay an invoice. Same direct-charge model as the deposit flow. */
   app.post("/api/public/invoices/:token/pay", async (req: any, res) => {
@@ -273,34 +467,71 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     }
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
+
+    // The client may pick their rail up front (the invoice page offers
+    // separate card/ACH buttons when a card surcharge applies). An explicit
+    // choice pins the session to that one method so an ACH payer is never
+    // charged the card fee.
+    const requested = z.enum(["card", "ach"]).safeParse(req.body?.method);
+    const choice = requested.success ? requested.data : undefined;
+    if (choice === "ach" && !acct.achEnabled) {
+      return res.status(400).json({ message: "Bank transfer (ACH) isn't available for this invoice — please pay by card." });
+    }
+    if (choice === "card" && !acct.cardEnabled) {
+      return res.status(400).json({ message: "Card payment isn't available for this invoice." });
+    }
+
     const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
-    if (acct.achEnabled) methods.push("us_bank_account");
-    if (acct.cardEnabled) methods.push("card");
-    if (!methods.length) methods.push("card");
+    if (choice === "card") methods.push("card");
+    else if (choice === "ach") methods.push("us_bank_account");
+    else {
+      if (acct.achEnabled) methods.push("us_bank_account");
+      if (acct.cardEnabled) methods.push("card");
+      if (!methods.length) methods.push("card");
+    }
+
+    // CC fee passthrough: a clearly-labelled surcharge line on CARD checkout
+    // only, and only when the org turned it on. ACH stays fee-free.
+    const fee = choice === "card" ? cardFeeCents(org, amount) : 0;
+    const settings = paymentSettingsOf(org);
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ quantity: 1, price_data: {
+      currency: acct.defaultCurrency || "usd", unit_amount: amount,
+      product_data: {
+        name: `Invoice ${inv.number ?? ""} — ${inv.title}`,
+        description: org?.name ? `Payable to ${org.name}` : undefined,
+      },
+    }}];
+    if (fee > 0) {
+      lineItems.push({ quantity: 1, price_data: {
+        currency: acct.defaultCurrency || "usd", unit_amount: fee,
+        product_data: {
+          name: `Card processing fee (${((settings.surchargeBps ?? 0) / 100).toFixed(2)}%)`,
+          description: "Covers the card network processing cost. Pay by bank transfer (ACH) to avoid this fee.",
+        },
+      }});
+    }
+
     const base = getBaseUrl(req);
     try {
       const session = await stripe.checkout.sessions.create({
         mode: "payment", payment_method_types: methods,
         customer_email: cust?.email ?? undefined,
-        line_items: [{ quantity: 1, price_data: {
-          currency: acct.defaultCurrency || "usd", unit_amount: amount,
-          product_data: {
-            name: `Invoice ${inv.number ?? ""} — ${inv.title}`,
-            description: org?.name ? `Payable to ${org.name}` : undefined,
-          },
-        }}],
+        line_items: lineItems,
         success_url: `${base}/i/${t}?paid=1`,
         cancel_url: `${base}/i/${t}?paid=0`,
-        metadata: { invoiceId: inv.id, orgId: inv.orgId, customerId: inv.customerId },
+        metadata: { invoiceId: inv.id, orgId: inv.orgId, customerId: inv.customerId,
+          ...(fee > 0 ? { cardFeeCents: String(fee) } : {}) },
       }, { stripeAccount: acct.externalAccountId });
 
       await db.insert(crmPayments).values({
         orgId: inv.orgId, customerId: inv.customerId, invoiceId: inv.id,
         projectId: inv.projectId ?? null, provider: "stripe", externalId: session.id,
         purpose: "progress", amountCents: amount, currency: acct.defaultCurrency || "usd",
-        method: acct.achEnabled ? "ach" : "card", status: "pending", applicationFeeCents: 0,
+        method: choice === "card" ? "card" : choice === "ach" ? "ach" : (acct.achEnabled ? "ach" : "card"),
+        status: "pending", applicationFeeCents: 0,
+        note: fee > 0 ? `Card processing fee $${(fee / 100).toFixed(2)} paid by the client on top.` : null,
       } as any);
-      res.json({ url: session.url, amountCents: amount, achAvailable: acct.achEnabled });
+      res.json({ url: session.url, amountCents: amount, cardFeeCents: fee, achAvailable: acct.achEnabled });
     } catch (e: any) {
       console.error("[crm] invoice checkout failed:", e?.message || e);
       res.status(502).json({ message: String(e?.message || "Could not start checkout").slice(0, 200) });

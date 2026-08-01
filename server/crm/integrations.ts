@@ -14,7 +14,7 @@ import Stripe from "stripe";
 import { db } from "../db";
 import {
   crmPayments, crmInvoices, crmEstimates, crmProjects, crmCustomers, crmOrgs,
-  crmApiKeys, crmWebhooks, crmMembers, crmEstimateEvents,
+  crmApiKeys, crmWebhooks, crmMembers, crmEstimateEvents, crmPaymentAccounts,
   crmNotificationEnabled,
 } from "@shared/schema";
 import { and, eq, desc, sql, isNull } from "drizzle-orm";
@@ -355,11 +355,19 @@ async function applySettlement(
   // Idempotent: Stripe retries, and a succeeded payment must never regress.
   if (pay.status === "succeeded" && status !== "refunded") return;
 
+  // The checkout record guessed the rail (ACH-first); the charge is the truth.
+  // Resolve the actual method so the ledger and the "payment received" email
+  // name what the client really paid with (Visa •••• 4242, bank ACH…).
+  const actual = status === "succeeded"
+    ? await resolveStripeMethod(intentId ?? pay.externalId, pay.orgId)
+    : null;
+
   const [row] = await db.update(crmPayments).set({
     status,
     externalId: intentId ?? pay.externalId,
     failureReason: failure ?? null,
     paidAt: status === "succeeded" ? new Date() : null,
+    ...(actual?.method ? { method: actual.method } : {}),
     updatedAt: new Date(),
   }).where(eq(crmPayments.id, pay.id)).returning();
 
@@ -397,11 +405,49 @@ async function applySettlement(
     estimateId: row.estimateId, invoiceId: row.invoiceId, projectId: row.projectId,
   });
 
-  await notifyPaid(pay).catch(() => {});
+  await notifyPaid(pay, actual?.detail ?? null).catch(() => {});
 }
 
-/** Tell the contractor money landed. */
-async function notifyPaid(pay: typeof crmPayments.$inferSelect) {
+/**
+ * What the client actually paid with, from the PaymentIntent's latest charge
+ * on the CONNECTED account (direct charge — platform reads need stripeAccount).
+ * Best-effort: null on any failure, the settlement must never depend on it.
+ */
+async function resolveStripeMethod(
+  intentId: string | null | undefined, orgId: string,
+): Promise<{ method: "card" | "ach" | null; detail: string } | null> {
+  if (!stripe || !intentId) return null;
+  try {
+    const [acct] = await db.select().from(crmPaymentAccounts)
+      .where(and(eq(crmPaymentAccounts.orgId, orgId), isNull(crmPaymentAccounts.disconnectedAt)))
+      .orderBy(desc(crmPaymentAccounts.createdAt)).limit(1);
+    if (!acct) return null;
+    const pi = await stripe.paymentIntents.retrieve(intentId,
+      { expand: ["latest_charge"] }, { stripeAccount: acct.externalAccountId });
+    const ch = typeof pi.latest_charge === "object" ? pi.latest_charge as Stripe.Charge : null;
+    const pmd = ch?.payment_method_details;
+    if (!pmd) return null;
+    if (pmd.type === "card" && pmd.card) {
+      const brand = (pmd.card.brand ?? "card").replace(/^\w/, (c) => c.toUpperCase());
+      return { method: "card", detail: `${brand} •••• ${pmd.card.last4 ?? "????"}` };
+    }
+    if (pmd.type === "us_bank_account") {
+      const b = pmd.us_bank_account;
+      return {
+        method: "ach",
+        detail: `bank transfer (ACH)${b?.bank_name ? ` — ${b.bank_name}` : ""}${b?.last4 ? ` •••• ${b.last4}` : ""}`,
+      };
+    }
+    return { method: null, detail: pmd.type };
+  } catch (e: any) {
+    console.error("[crm] resolveStripeMethod failed:", e?.message || e);
+    return null;
+  }
+}
+
+/** Tell the contractor money landed. `methodDetail` names the real rail
+ *  ("Visa •••• 4242", "bank transfer (ACH) — Chase •••• 6789") when known. */
+async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: string | null = null) {
   const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, pay.orgId)).limit(1);
   // The org can silence this notification in Settings (default: on).
   if (!crmNotificationEnabled(org?.customFields, "invoicePaid")) return;
@@ -413,11 +459,11 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect) {
   for (const m of members) if (m.role === "owner" && m.email) to.add(m.email);
   if (!to.size) return;
   const amount = `$${(pay.amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  const via = methodDetail ? ` via ${methodDetail}` : pay.method === "ach" ? " by bank transfer (ACH)" : " by card";
   await sendWithFallback({
     to: [...to].join(","),
     subject: `💰 ${amount} received from ${cust?.displayName ?? "a client"}`,
-    html: `<p><strong>${amount}</strong> received from ${cust?.displayName ?? "a client"}` +
-          `${pay.method === "ach" ? " by bank transfer (ACH)" : " by card"}.</p>` +
+    html: `<p><strong>${amount}</strong> received from ${cust?.displayName ?? "a client"}${via}.</p>` +
           `<p>Paid directly into your own Stripe account.</p>`,
   } as any);
 }

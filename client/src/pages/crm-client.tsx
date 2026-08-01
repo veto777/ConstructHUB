@@ -25,6 +25,8 @@ import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
 } from "@/components/crm-ui";
 import { EstimateEngagement } from "@/components/crm-engagement";
+import { EstimateDiscounts } from "@/components/crm-discounts";
+import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "@/components/client-uploads";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -503,6 +505,10 @@ export default function CrmClientPage() {
                       <Layers className="h-4 w-4 mr-2" /> Options
                     </Button>
                   )}
+                  {/* Optional client-selected discount offers — self-contained. */}
+                  {canEstimate && !e.approvedAt && !e.declinedAt && (
+                    <EstimateDiscounts estimate={e} />
+                  )}
                   {canEstimate && !e.approvedAt && !e.declinedAt && (
                     <Button size="sm" variant={e.sentAt ? "outline" : "default"}
                       onClick={() => send.mutate(e.id)} disabled={send.isPending}
@@ -548,6 +554,9 @@ export default function CrmClientPage() {
 
               {/* Engagement (visits/time) + expiry + Extend — self-contained. */}
               <EstimateEngagement estimate={e} canManage={canEstimate} onChanged={refresh} />
+
+              {/* Files pinned to this estimate — show on the client's gated page. */}
+              <EstimateAttach estimateId={e.id} canManage={canEstimate} />
             </div>
           ))}
         </CardContent>
@@ -690,6 +699,11 @@ export default function CrmClientPage() {
         </CardContent>
       </Card>
 
+      {/* Client portal v2 — photos/comments from this client + the org pamphlet shelf. */}
+      <CustomerPhotos customerId={id!} />
+      <CustomerComments customerId={id!} />
+      <OrgPamphlets />
+
       {/* Good / better / best options for one estimate. */}
       {optsFor && (
         <EstimateOptionsDialog estimate={optsFor} open={!!optsFor}
@@ -715,6 +729,8 @@ export default function CrmClientPage() {
                 <SelectContent>
                   <SelectItem value="check">Check</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="wire">Wire transfer</SelectItem>
+                  <SelectItem value="credit_card">Credit card</SelectItem>
                   <SelectItem value="ach">Bank transfer</SelectItem>
                   <SelectItem value="card">Card (taken another way)</SelectItem>
                   <SelectItem value="other">Other</SelectItem>

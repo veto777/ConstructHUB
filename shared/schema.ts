@@ -1019,6 +1019,9 @@ export const crmOrgs = pgTable("crm_orgs", {
   warrantyText: text("warranty_text"),
   // Money defaults (integer cents / basis points — never floats in billing)
   defaultDepositBps: integer("default_deposit_bps").default(0),
+  // Org-wide fallback sales-tax rate (basis points). City → division → org
+  // resolution lives in server/crm/tax.ts; null means "no org default".
+  defaultTaxRateBps: integer("default_tax_rate_bps"),
   currency: text("currency").default("usd"),
   // Set when the owner finishes (or dismisses) the setup checklist, so the
   // portal stops routing them back into onboarding.
@@ -1121,6 +1124,7 @@ export const crmDivisions = pgTable("crm_divisions", {
   // Contact — nullable, falls back to the org's when absent.
   email: text("email"),
   phone: text("phone"),
+  website: text("website"),
   // Branding address — what prints on estimates and invoices.
   addressLine1: text("address_line1"),
   addressLine2: text("address_line2"),
@@ -1131,6 +1135,10 @@ export const crmDivisions = pgTable("crm_divisions", {
   licenseNumber: text("license_number"),
   licenseState: text("license_state"),
   isHeadquarters: boolean("is_headquarters").notNull().default(false),
+  // Per-division settings bag. Holds taxRates — { default: bps, cities:
+  // { CityName: bps } } — the per-division sales-tax override map resolved by
+  // server/crm/tax.ts.
+  customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1167,6 +1175,43 @@ export const crmClientSessions = pgTable("crm_client_sessions", {
 
 export type CrmClientToken = typeof crmClientTokens.$inferSelect;
 export type CrmClientSession = typeof crmClientSessions.$inferSelect;
+
+// ── CRM attachments (client portal v2) ──────────────────────────────────────
+// One table for every file that moves between a contractor and their client:
+// org-level pamphlets (brochures, warranties — refId null), files pinned to a
+// sent estimate (refId = estimate id), and photos the homeowner uploads from
+// the portal (refId = customer id). storagePath is a server-local key, NEVER a
+// public path — every read goes through a session-gated download route.
+export const CRM_ATTACHMENT_KINDS = ["pamphlet", "estimate", "photo"] as const;
+export type CrmAttachmentKind = (typeof CRM_ATTACHMENT_KINDS)[number];
+
+export const crmAttachments = pgTable("crm_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  kind: text("kind").notNull(),
+  refId: varchar("ref_id"),
+  fileName: text("file_name").notNull(),
+  mime: text("mime").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  storagePath: text("storage_path").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CrmAttachment = typeof crmAttachments.$inferSelect;
+
+// ── Client comments (client portal v2) ──────────────────────────────────────
+// Notes a homeowner sends their contractor from the portal ("Questions?").
+// readAt is the contractor-side mark-read; null means unread.
+export const crmClientComments = pgTable("crm_client_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  readAt: timestamp("read_at"),
+});
+
+export type CrmClientComment = typeof crmClientComments.$inferSelect;
 
 // ── Roles & permissions ─────────────────────────────────────────────────────
 // Housecall Pro ships three fixed roles and no custom fields; we ship six
@@ -1263,6 +1308,9 @@ export const CRM_NOTIFICATION_PREFS = [
   "estimateApproved",  // client approved an estimate
   "estimateDeclined",  // client declined an estimate
   "invoicePaid",       // an online payment landed
+  "paymentReceived",   // a manual/offline payment was recorded on an invoice
+  "jobApproved",       // PM notice: an estimate was approved (job awarded)
+  "clientComments",    // a homeowner sent a note from the client portal
 ] as const;
 export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 
@@ -1445,9 +1493,33 @@ export const crmEstimates = pgTable("crm_estimates", {
   signatureIp: text("signature_ip"),
   expiresAt: timestamp("expires_at"),
   createdByMemberId: varchar("created_by_member_id"),
+  // Set at approval: the server-recomputed total after any client-selected
+  // optional discounts, plus which offers were picked (server/crm/discounts.ts).
+  // approvedTotalCents is the number to bill — totalCents stays the quoted one.
+  approvedTotalCents: integer("approved_total_cents"),
+  selectedDiscounts: jsonb("selected_discounts"),
   customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Optional, client-selected discount offers on an estimate. The CREATOR picks
+// which offers to extend (usually from the presets in server/crm/discounts.ts);
+// the client ticks the ones they qualify for on the gated public page, and the
+// server re-computes the approved total — a client-supplied total is never
+// trusted. percentBps is applied to the taxable base.
+export const crmEstimateDiscounts = pgTable("crm_estimate_discounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  estimateId: varchar("estimate_id").notNull(),
+  // Preset code (marketing|military|pay_in_full|bundle|price_match) or "custom".
+  code: text("code").notNull(),
+  label: text("label").notNull(),
+  percentBps: integer("percent_bps").notNull(),
+  conditions: text("conditions"),
+  enabled: boolean("enabled").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const crmEstimateItems = pgTable("crm_estimate_items", {
@@ -1521,6 +1593,7 @@ export type CrmJob = typeof crmJobs.$inferSelect;
 export const insertCrmEstimateSchema = createInsertSchema(crmEstimates).omit({ id: true, createdAt: true, updatedAt: true });
 export type CrmEstimate = typeof crmEstimates.$inferSelect;
 export type CrmEstimateItem = typeof crmEstimateItems.$inferSelect;
+export type CrmEstimateDiscount = typeof crmEstimateDiscounts.$inferSelect;
 
 // ── CRM: connected payment accounts + payments ───────────────────────────────
 // The contractor connects THEIR OWN Stripe/Square account. We never take

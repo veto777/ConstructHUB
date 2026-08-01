@@ -49,6 +49,8 @@ import CrmInboxPage from "@/pages/crm-inbox";
 import CrmClientsPage from "@/pages/crm-clients";
 import CrmClientPage from "@/pages/crm-client";
 import CrmPaymentsPage from "@/pages/crm-payments";
+import CrmEstimatesPage from "@/pages/crm-estimates";
+import CrmInvoicesPage from "@/pages/crm-invoices";
 import CrmPipelinePage from "@/pages/crm-pipeline";
 import CrmPriceBookPage from "@/pages/crm-pricebook";
 import CrmProjectPage from "@/pages/crm-project";
@@ -177,6 +179,8 @@ function PortalRouter() {
       <Route path="/crm/schedule" component={CrmSchedulePage} />
       <Route path="/crm/inbox" component={CrmInboxPage} />
       <Route path="/crm/pipeline" component={CrmPipelinePage} />
+      <Route path="/crm/estimates" component={CrmEstimatesPage} />
+      <Route path="/crm/invoices" component={CrmInvoicesPage} />
       <Route path="/crm/pricebook" component={CrmPriceBookPage} />
       <Route path="/crm/projects/:id" component={CrmProjectPage} />
       <Route path="/crm/payments" component={CrmPaymentsPage} />

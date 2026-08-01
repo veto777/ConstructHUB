@@ -1,5 +1,8 @@
 import { expect, type Page, type Response } from "@playwright/test";
 
+/** Lane-aware origin — same E2E_PORT as baseURL in playwright.config.ts. */
+export const E2E_BASE_URL = `http://127.0.0.1:${process.env.E2E_PORT ?? "8119"}`;
+
 /** Network and console failures collected while a page does its thing. */
 export interface PageGuards {
   consoleErrors: string[];
@@ -87,7 +90,7 @@ export async function grantClientSession(page: Page, customerIds: string[]) {
   const { makeClientSession } = await import("./db");
   const raw = await makeClientSession(customerIds);
   await page.context().addCookies([
-    { name: "crm_client", value: raw, url: "http://127.0.0.1:8119" },
+    { name: "crm_client", value: raw, url: E2E_BASE_URL },
   ]);
 }
 

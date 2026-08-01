@@ -17,7 +17,10 @@ async function divisionsByCode(page: any) {
   return new Map(rows.map((d) => [d.code, d.id]));
 }
 
-test.describe("divisions", () => {
+// @serial: re-roles the dev-bypass user's membership (and restores it in a
+// finally) — every other suite depends on that owner seat, so this file must
+// never run concurrently with them.
+test.describe("divisions", { tag: "@serial" }, () => {
   test("settings card: create, edit, set HQ", async ({ page }) => {
     const guards = watchPage(page);
     const stamp = Date.now().toString(36).slice(-6);
