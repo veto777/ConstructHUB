@@ -41,8 +41,8 @@ import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmReceiptRoutes } from "./receipts";
 import { isPlatformAdminEmail } from "../admin";
-import { getBaseUrl } from "../auth";
-import { sendWithFallback } from "../email";
+import { getBaseUrl, generateAccountId } from "../auth";
+import { sendWithFallback, sendPasswordResetEmail } from "../email";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -147,6 +147,27 @@ function presentMember(m: typeof crmMembers.$inferSelect, canSeeCosts: boolean) 
     lastActiveAt: m.lastActiveAt,
     createdAt: m.createdAt,
   };
+}
+
+/** Shared invite email — create and resend must send the same mail. */
+async function sendInviteEmail(orgName: string, email: string, link: string): Promise<boolean> {
+  try {
+    await sendWithFallback({
+      to: email,
+      subject: `You've been invited to join ${orgName} on ConstructHub CRM`,
+      html: `
+        <p>${orgName} has invited you to join their team on ConstructHub CRM.</p>
+        <p><a href="${link}">Accept the invitation</a></p>
+        <p>This link expires in 14 days. If you weren't expecting it, you can ignore this email.</p>
+      `,
+    });
+    return true;
+  } catch (e: any) {
+    // SMTP failure must not lose the invitation — the caller returns the link
+    // so the UI can offer copy-to-clipboard instead.
+    console.error("[crm] invite email failed:", e?.message || e);
+    return false;
+  }
 }
 
 export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
@@ -505,7 +526,70 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       .set({ status: "disabled", updatedAt: new Date() })
       .where(eq(crmMembers.id, target.id))
       .returning();
+
+    // A disabled member must not be able to walk back in through a still-live
+    // invite link — revoke any pending invitations for the same email.
+    await db
+      .update(crmInvitations)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(crmInvitations.orgId, ctx.org.id),
+          sql`lower(${crmInvitations.email}) = ${target.email.toLowerCase()}`,
+          isNull(crmInvitations.acceptedAt),
+          isNull(crmInvitations.revokedAt),
+        ),
+      );
+
     res.json(presentMember(row, ctx.permissions.seeCosts));
+  });
+
+  /**
+   * Send a set-your-own-password email to a member who has no usable account
+   * (invited but never signed up, or an account with no password). Creates the
+   * users row on demand; the member chooses the password themselves via the
+   * standard reset flow — a password is never generated server-side.
+   */
+  app.post("/api/crm/members/:id/send-password-reset", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageTeam")) return;
+
+    const [target] = await db
+      .select()
+      .from(crmMembers)
+      .where(and(eq(crmMembers.id, req.params.id), eq(crmMembers.orgId, ctx.org.id)))
+      .limit(1);
+    if (!target) return res.status(404).json({ message: "Member not found" });
+
+    const email = target.email.toLowerCase();
+    let [account] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (!account) {
+      [account] = await db
+        .insert(users)
+        .values({
+          email,
+          displayName: target.displayName ?? null,
+          emailVerified: false,
+          accountId: generateAccountId(),
+        })
+        .returning();
+    }
+
+    const resetToken = randomBytes(32).toString("hex");
+    const resetExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    await db.update(users).set({ resetToken, resetExpiry }).where(eq(users.id, account.id));
+
+    let emailed = false;
+    try {
+      await sendPasswordResetEmail(email, resetToken, getBaseUrl(req));
+      emailed = true;
+    } catch (e: any) {
+      console.error("[crm] password reset email failed:", e?.message || e);
+    }
+    res.json({ emailed });
   });
 
   // ── Invitations ───────────────────────────────────────────────────────────
@@ -603,26 +687,43 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     }
 
     const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
-    let emailed = false;
-    try {
-      await sendWithFallback({
-        to: email,
-        subject: `You've been invited to join ${ctx.org.name} on ConstructHub CRM`,
-        html: `
-          <p>${ctx.org.name} has invited you to join their team on ConstructHub CRM.</p>
-          <p><a href="${link}">Accept the invitation</a></p>
-          <p>This link expires in 14 days. If you weren't expecting it, you can ignore this email.</p>
-        `,
-      });
-      emailed = true;
-    } catch (e: any) {
-      // SMTP failure must not lose the invitation — return the link so the UI
-      // can offer copy-to-clipboard instead.
-      console.error("[crm] invite email failed:", e?.message || e);
-    }
+    const emailed = await sendInviteEmail(ctx.org.name, email, link);
 
     const { token: _t, ...safe } = invite;
     res.status(201).json({ invitation: safe, link, emailed });
+  });
+
+  /** Rotate the token + extend the expiry and send the invite mail again. */
+  app.post("/api/crm/invitations/:id/resend", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageTeam")) return;
+
+    const [invite] = await db
+      .select()
+      .from(crmInvitations)
+      .where(and(eq(crmInvitations.id, req.params.id), eq(crmInvitations.orgId, ctx.org.id)))
+      .limit(1);
+    if (!invite || invite.revokedAt) return res.status(404).json({ message: "Invitation not found" });
+    if (invite.acceptedAt) return res.status(409).json({ message: "This invitation has already been used" });
+
+    // A resend is also a rotation: the old link dies so a forwarded stale mail
+    // can't be used after the invite was re-targeted.
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const [updated] = await db
+      .update(crmInvitations)
+      .set({ token, expiresAt })
+      .where(eq(crmInvitations.id, invite.id))
+      .returning();
+
+    const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
+    const emailed = await sendInviteEmail(ctx.org.name, invite.email, link);
+
+    const { token: _t, ...safe } = updated;
+    res.json({ invitation: safe, link, emailed });
   });
 
   app.delete("/api/crm/invitations/:id", async (req: any, res) => {
