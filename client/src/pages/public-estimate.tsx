@@ -209,6 +209,57 @@ export default function PublicEstimatePage() {
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
 
+  // ?terms=1 → the separate Terms & Conditions page (HCP-style hyperlink
+  // target). Same data, same email gate — just a different render.
+  const showTerms = new URLSearchParams(window.location.search).get("terms") === "1";
+  if (showTerms) {
+    const backHref = `/e/${token}${previewGrant ? `?preview=${encodeURIComponent(previewGrant)}` : ""}`;
+    return (
+      <main className="min-h-screen bg-muted/40" style={orgThemeStyle(company?.theme)} data-testid="estimate-terms-root">
+        <PrintLockdown />
+        <header className="sticky top-0 z-30 bg-card border-b">
+          <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+            {company.logoUrl
+              ? <img src={company.logoUrl} alt={company.name} className="h-9 object-contain" />
+              : <span className="font-semibold">{company.name}</span>}
+          </div>
+        </header>
+        <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+          <a href={backHref} className="text-sm text-primary hover:underline" data-testid="link-back-to-estimate">
+            ← Back to estimate
+          </a>
+          <h1 className="text-3xl font-bold tracking-tight">Terms and Conditions</h1>
+          <Card className="shadow-md">
+            <CardContent className="p-5 sm:p-8 space-y-6">
+              {company.termsAndConditions && (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed" data-testid="text-org-terms">
+                  {company.termsAndConditions}
+                </p>
+              )}
+              {e.termsText && (
+                <>
+                  {company.termsAndConditions && <Separator />}
+                  <div>
+                    <div className="font-medium text-sm mb-2">Terms specific to this estimate</div>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed" data-testid="text-estimate-terms">
+                      {e.termsText}
+                    </p>
+                  </div>
+                </>
+              )}
+              {!company.termsAndConditions && !e.termsText && (
+                <p className="text-sm text-muted-foreground">
+                  {company.name} hasn't published terms for this estimate. Contact them with any questions.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <p className="text-center text-xs text-muted-foreground/70 pb-4">{company.name}</p>
+        </div>
+      </main>
+    );
+  }
+
   // Optional discounts — LIVE preview, mirroring the server's approve-time
   // math (server/crm/discounts.ts): the combined concession is capped at the
   // taxable base and tax is charged on the reduced base. The server
@@ -233,11 +284,48 @@ export default function PublicEstimatePage() {
   // payload; re-points --primary for everything below this root.
   const themeStyle = orgThemeStyle(company?.theme);
 
+  const canRespond = !settled && !expired && !preview;
+  const termsHref = `/e/${token}?terms=1${previewGrant ? `&preview=${encodeURIComponent(previewGrant)}` : ""}`;
+  const scrollToSign = () => {
+    document.getElementById("sign-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => document.getElementById("sig")?.focus({ preventScroll: true }), 450);
+  };
+
   return (
-    <main className="min-h-screen bg-muted/40 py-6 px-3 sm:py-10 sm:px-4"
+    <main className={`min-h-screen bg-muted/40 ${canRespond ? "pb-24" : ""}`}
       style={themeStyle} data-testid="public-estimate-root">
       <PrintLockdown />
-      <div className="max-w-3xl mx-auto space-y-5">
+      {/* HCP-style brand bar — the contractor's logo, sticky. */}
+      <header className="sticky top-0 z-30 bg-card border-b">
+        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3" data-testid="estimate-brandbar">
+          {company.logoUrl
+            ? <img src={company.logoUrl} alt={company.name} className="h-9 object-contain" />
+            : <span className="font-semibold">{company.name}</span>}
+        </div>
+      </header>
+      <div className="max-w-3xl mx-auto space-y-5 py-6 px-3 sm:py-8 sm:px-4">
+        {/* Breadcrumb + big title, like the reference portal. */}
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground" data-testid="estimate-breadcrumb">
+            <a href="https://client.constructhub.us" className="hover:underline">Customer Portal</a>
+            <span className="mx-1.5">›</span>Estimates<span className="mx-1.5">›</span>
+            <span className="text-foreground font-medium">View Estimate</span>
+          </div>
+          <div>
+            <div className="font-semibold">{company.name}</div>
+            {(company.addressLine1 || company.city) && (
+              <div className="text-sm text-muted-foreground underline decoration-dotted underline-offset-4">
+                {[
+                  [company.addressLine1, company.addressLine2].filter(Boolean).join(", "),
+                  [company.city, [company.state, company.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+                ].filter(Boolean).join(", ")}
+              </div>
+            )}
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight leading-tight" data-testid="text-estimate-for">
+            Estimate for {customer.displayName}
+          </h1>
+        </div>
         {preview && (
           <Card className="border-amber-500/50 bg-amber-500/5" data-testid="preview-banner">
             <CardContent className="p-4 text-sm text-center">
@@ -375,6 +463,12 @@ export default function PublicEstimatePage() {
             </div>
           </div>
           <CardContent className="p-4 sm:p-8 space-y-6">
+            {payInfo?.financing && (
+              <span className="inline-flex items-center rounded-md bg-primary/10 text-primary text-sm font-medium px-2.5 py-1"
+                data-testid="badge-financing-available">
+                Financing available
+              </span>
+            )}
             <CardTitle className="text-xl">{e.title}</CardTitle>
             {e.introText && <p className="whitespace-pre-wrap text-sm leading-relaxed">{e.introText}</p>}
 
@@ -396,7 +490,8 @@ export default function PublicEstimatePage() {
                     <tr key={i.id} className="block sm:table-row border-t px-4 py-3 sm:p-0">
                       <td className="block sm:table-cell sm:px-4 sm:py-3">
                         <div className="font-medium">{i.name}</div>
-                        {i.description && <div className="text-muted-foreground text-xs mt-0.5">{i.description}</div>}
+                        {/* Full scope of work — multi-line bullets preserved, HCP-style. */}
+                        {i.description && <div className="text-muted-foreground text-xs mt-0.5 whitespace-pre-wrap leading-relaxed">{i.description}</div>}
                       </td>
                       <td className="hidden sm:table-cell px-4 py-3 text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
                       <td className="block sm:table-cell mt-1 sm:mt-0 sm:px-4 sm:py-3 sm:text-right tabular-nums">
@@ -455,13 +550,8 @@ export default function PublicEstimatePage() {
               </div>
             </div>
 
-            {(e.termsText || company.warrantyText) && (
-              <>
-                <Separator />
-                {company.warrantyText && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{company.warrantyText}</p>}
-                {e.termsText && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{e.termsText}</p>}
-              </>
-            )}
+            {/* T&C moved to their own linked page (?terms=1) — see the footer
+                block below. Warranty note renders there too, HCP-style. */}
           </CardContent>
           {/* Footer band — company name · license # · website. The "#" form
               keeps the header's "License X (ST)" string unique for tests. */}
@@ -533,7 +623,7 @@ export default function PublicEstimatePage() {
         )}
 
         {!settled && !expired && !preview && (
-          <Card className="shadow-md border-primary/30">
+          <Card className="shadow-md border-primary/30" id="sign-card">
             <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg">Ready to go ahead?</CardTitle>
               <CardDescription>Type your name to approve. This is your signature.</CardDescription>
@@ -573,6 +663,69 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
+        {/* "Not what you were looking for?" — decline / contact, HCP-style. */}
+        {canRespond && (
+          <div className="text-center space-y-3 py-4" data-testid="section-not-looking">
+            <div className="text-xl font-semibold">Not what you were looking for?</div>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Please let us know if you'd like to request some changes. We'd love to win your business.
+            </p>
+            <div className="flex items-center justify-center gap-5 pt-1">
+              <Button variant="outline" className="rounded-full px-5"
+                onClick={() => { setShowDecline(true); scrollToSign(); }}
+                data-testid="button-decline-shortcut">
+                Decline estimate
+              </Button>
+              {(company.email || company.phone) && (
+                <a href={company.email ? `mailto:${company.email}` : `tel:${company.phone}`}
+                  className="text-sm font-medium text-primary hover:underline" data-testid="link-contact-us">
+                  Contact us
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Footer facts — job address, expiry, warranty, contact card, T&C link. */}
+        <div className="space-y-4 border-t pt-6" data-testid="estimate-footer-info">
+          {(customer.addressLine1 || customer.city) && (
+            <div>
+              <div className="font-semibold text-sm">For:</div>
+              <div className="text-sm text-muted-foreground">
+                {[
+                  [customer.addressLine1, customer.addressLine2].filter(Boolean).join(", "),
+                  [customer.city, [customer.state, customer.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+                ].filter(Boolean).join(", ")}
+              </div>
+            </div>
+          )}
+          {e.expiresAt && (
+            <div className="text-sm">
+              <span className="font-semibold">Expires on:</span>{" "}
+              <span className="text-muted-foreground">{new Date(e.expiresAt).toDateString()}</span>
+            </div>
+          )}
+          {company.warrantyText && (
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{company.warrantyText}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-4 pt-2">
+            {company.logoUrl && (
+              <img src={company.logoUrl} alt={company.name} className="h-14 object-contain" />
+            )}
+            <div className="text-sm">
+              <div className="font-medium">{company.name}</div>
+              {company.phone && <a href={`tel:${company.phone}`} className="block text-primary hover:underline">{company.phone}</a>}
+              {company.email && <a href={`mailto:${company.email}`} className="block text-primary hover:underline">{company.email}</a>}
+            </div>
+          </div>
+          <p className="text-sm">
+            Please make sure to read our{" "}
+            <a href={termsHref} className="text-primary underline font-medium" data-testid="link-terms">
+              Terms and Conditions
+            </a>
+          </p>
+        </div>
+
         {expired && !settled && (
           <Card className="border-destructive/40 bg-destructive/5">
             <CardContent className="p-5 flex items-start gap-3">
@@ -589,6 +742,20 @@ export default function PublicEstimatePage() {
           Private document — it opens only after verifying the email address it was sent to.
         </p>
       </div>
+
+      {/* Sticky bottom Approve bar — always one tap away, HCP-style. Scrolls
+          to the signature card, which is the real (typed-name) approval. */}
+      {canRespond && (
+        <div className="fixed bottom-0 inset-x-0 z-30 bg-card border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          data-testid="estimate-approve-bar">
+          <div className="max-w-3xl mx-auto">
+            <Button size="lg" className="w-full h-12 rounded-full text-base" onClick={scrollToSign}
+              data-testid="button-approve-bar">
+              Approve
+            </Button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -28,7 +28,7 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
-import { portalBaseUrl } from "../site-context";
+import { portalBaseUrl, clientPortalBaseUrl } from "../site-context";
 import { logEvent, presentEstimate } from "./entities";
 import { emitCrmEvent } from "./integrations";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
@@ -191,6 +191,9 @@ function publicEstimateView(
       // estimate never goes out under the WA HQ address.
       ...companyBranding(org, division),
       warrantyText: org.warrantyText,
+      // Org-wide T&C render on a separate linked page (?terms=1), HCP-style —
+      // never inline on the estimate itself.
+      termsAndConditions: org.termsAndConditions,
       // The org's theme accent (server-resolved hex + hsl pair) — the public
       // page sets CSS variables from these verbatim.
       ...themePayload(org.customFields),
@@ -241,36 +244,55 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // The letterhead is the division's when the work belongs to one.
     const branding = companyBranding(ctx.org, await resolveEstimateDivision(est));
 
-    // The email says who it's from and carries the estimate link.
+    // HCP-format email: contractor logo up top, "Approve Estimate #N" headline,
+    // personal note, one big View-estimate button, then the customer-portal
+    // link, contact block and a Terms & Conditions hyperlink.
+    const logoAbs = branding.logoUrl
+      ? (branding.logoUrl.startsWith("http") ? branding.logoUrl : `${base}${branding.logoUrl}`)
+      : null;
+    const portalUrl = clientPortalBaseUrl(req);
+    const termsUrl = `${link}?terms=1`;
+    const addressLine = branding.addressLine1
+      ? `${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `<br>${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}`
+      : "";
     const html = `
-      <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px">
+      <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e5e5e5;padding:28px 24px">
+        ${logoAbs ? `<p style="text-align:center;margin:0 0 14px"><img src="${logoAbs}" alt="${esc(branding.name)}" style="max-height:64px;max-width:260px"></p>` : ""}
+        <h1 style="text-align:center;font-size:26px;margin:6px 0 20px">
+          Approve Estimate${est.number ? ` ${esc(est.number)}` : ""} from ${esc(branding.name)}
+        </h1>
         <p style="font-size:16px">Hi ${esc(cust.displayName)},</p>
         <p style="font-size:16px">
-          ${esc(from)} at <strong>${esc(branding.name)}</strong> has sent you an estimate
-          ${est.number ? `(${esc(est.number)})` : ""} for your review.
+          Please find estimate${est.number ? ` ${esc(est.number)}` : ""} from ${esc(branding.name)} below.
+          Feel free to reach out with any questions or clarification.
         </p>
         ${parsed.data.message ? `<p style="font-size:16px;white-space:pre-wrap">${esc(parsed.data.message)}</p>` : ""}
-        <p style="font-size:22px;margin:18px 0"><strong>${money(est.totalCents)}</strong></p>
-        <p style="margin:28px 0">
-          <a href="${link}" style="background:#4f46e5;color:#fff;padding:13px 24px;border-radius:6px;
+        <p style="font-size:16px;margin:14px 0 0">Thank you,<br>-${esc(from)}${branding.phone ? `<br><a href="tel:${esc(branding.phone)}" style="color:#2563eb">${esc(branding.phone)}</a>` : ""}</p>
+        <p style="text-align:center;margin:30px 0 18px">
+          <a href="${link}" style="background:#2563eb;color:#fff;padding:14px 34px;border-radius:24px;
              text-decoration:none;font-weight:600;font-size:16px;display:inline-block">
-            View &amp; approve your estimate
+            View estimate
           </a>
         </p>
-        <p style="font-size:13px;color:#666">
-          Or paste this into your browser:<br><span style="word-break:break-all">${link}</span>
+        <p style="text-align:center;font-size:14px;margin:0 0 26px">
+          <a href="${portalUrl}" style="color:#2563eb;text-decoration:none">View all estimates in your Customer Portal</a>
         </p>
-        <p style="font-size:13px;color:#666">
-          Only you can open this link — it verifies ${esc(to)}. If it's forwarded to
-          anyone else, they can't get in without access to your inbox.
+        <p style="text-align:center;font-size:13px;color:#444;margin:0 0 4px">
+          ${branding.phone ? `<a href="tel:${esc(branding.phone)}" style="color:#2563eb">${esc(branding.phone)}</a>` : ""}${branding.phone && branding.email ? " | " : ""}${branding.email ? `<a href="mailto:${esc(branding.email)}" style="color:#2563eb">${esc(branding.email)}</a>` : ""}
         </p>
-        <p style="font-size:13px;color:#666">This estimate expires on ${expiresAt.toDateString()}.</p>
+        ${branding.website ? `<p style="text-align:center;font-size:13px;margin:0 0 4px"><a href="${esc(branding.website)}" style="color:#2563eb">${esc(branding.website)}</a></p>` : ""}
+        ${addressLine ? `<p style="text-align:center;font-size:13px;color:#444;margin:10px 0 4px">${addressLine}</p>` : ""}
+        ${branding.licenseNumber ? `<p style="text-align:center;font-size:12px;color:#666;margin:0 0 4px">License ${esc(branding.licenseNumber)}${branding.licenseState ? ` (${esc(branding.licenseState)})` : ""}</p>` : ""}
+        <p style="text-align:center;font-size:14px;margin:14px 0 0">
+          <a href="${termsUrl}" style="color:#2563eb">Terms &amp; Conditions</a>
+        </p>
         <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
-        <p style="font-size:13px;color:#666">
-          ${esc(branding.name)}${branding.phone ? ` &middot; ${esc(branding.phone)}` : ""}
-          ${branding.addressLine1 ? `<br>${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `, ${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}` : ""}
-          ${branding.licenseNumber ? `<br>License ${esc(branding.licenseNumber)}${branding.licenseState ? ` (${esc(branding.licenseState)})` : ""}` : ""}
+        <p style="font-size:12px;color:#666">
+          Only you can open the estimate link — it verifies ${esc(to)}. If it's forwarded to
+          anyone else, they can't get in without access to your inbox.
+          This estimate expires on ${expiresAt.toDateString()}.
         </p>
+        <p style="font-size:12px;color:#999;word-break:break-all">If the button doesn't work, paste this into your browser: ${link}</p>
       </div>`;
 
     let emailed = false;
