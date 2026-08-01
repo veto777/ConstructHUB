@@ -141,6 +141,11 @@ function RequestLink() {
         <p className="text-center text-xs text-muted-foreground/70">
           Secure sign-in by email — only you can open the link.
         </p>
+        <p className="text-center text-xs text-muted-foreground/70">
+          <a href="/crm-terms" className="hover:underline" data-testid="link-portal-terms">Terms</a>
+          <span className="mx-1.5">·</span>
+          <a href="/crm-privacy" className="hover:underline" data-testid="link-portal-privacy">Privacy</a>
+        </p>
       </div>
     </main>
   );
@@ -646,6 +651,10 @@ function Dashboard({ data }: { data: any }) {
             <CrmLogo height={20} className="opacity-60" />
             <p className="text-center text-xs text-muted-foreground/70">
               Signed in by secure email link · your documents only
+              <span className="mx-1.5">·</span>
+              <a href="/crm-terms" className="hover:underline" data-testid="link-portal-terms-footer">Terms</a>
+              <span className="mx-1.5">·</span>
+              <a href="/crm-privacy" className="hover:underline" data-testid="link-portal-privacy-footer">Privacy</a>
             </p>
           </div>
         </CrmPage>

@@ -78,6 +78,7 @@ import AdsConsultantChat from "@/components/ads-consultant-chat";
 import SiteAssistantChat from "@/components/site-assistant-chat";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsOfUsePage from "@/pages/terms-of-use";
+import { CrmTermsPage, CrmPrivacyPage } from "@/pages/crm-legal";
 import MediaLibraryPage from "@/pages/media-library";
 import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
@@ -117,11 +118,15 @@ function DashboardRouter() {
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
       <Route path="/contract/sign/:token" component={ContractSignPage} />
+      <Route path="/crm-terms" component={CrmTermsPage} />
+      <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/lsa-account-manager" component={LsaAccountManagerPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/crm-terms" component={CrmTermsPage} />
+      <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
@@ -159,6 +164,8 @@ function PublicRouter() {
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
       <Route path="/contract/sign/:token" component={ContractSignPage} />
+      <Route path="/crm-terms" component={CrmTermsPage} />
+      <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route component={LandingPage} />
@@ -196,6 +203,8 @@ function PortalRouter() {
       <Route path="/crm/migrate" component={CrmMigratePage} />
       <Route path="/crm/admin" component={CrmAdminPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
+      <Route path="/crm-terms" component={CrmTermsPage} />
+      <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
@@ -211,6 +220,8 @@ function PortalPublicRouter() {
   return (
     <Switch>
       {/* Client-facing links are token-authorised and must never demand a login. */}
+      <Route path="/crm-terms" component={CrmTermsPage} />
+      <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
@@ -232,6 +243,8 @@ function ClientRouter() {
   return (
     <Switch>
       <Route path="/" component={ClientPortalPage} />
+      <Route path="/crm-terms" component={CrmTermsPage} />
+      <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
@@ -270,7 +283,11 @@ function AppContent() {
   // ConstructHUB account. Handle it before the /api/auth/me gate entirely.
   // Client-facing token pages stay full-bleed on this host too.
   if (clientPortal) {
-    if (location.startsWith("/e/")) return <PublicEstimatePage />;
+    if (location === "/crm-terms") return <CrmTermsPage />;
+    if (location === "/crm-privacy") return <CrmPrivacyPage />;
+    if (location === "/crm-terms") return <CrmTermsPage />;
+  if (location === "/crm-privacy") return <CrmPrivacyPage />;
+  if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
     if (location.startsWith("/portal/")) return <PublicPortalPage />;
@@ -308,7 +325,11 @@ function AppContent() {
   if (portal) {
     // Client-facing documents render full-bleed even on the portal host — the
     // homeowner gets a clean page, not the contractor's app frame.
-    if (location.startsWith("/e/")) return <PublicEstimatePage />;
+    if (location === "/crm-terms") return <CrmTermsPage />;
+    if (location === "/crm-privacy") return <CrmPrivacyPage />;
+    if (location === "/crm-terms") return <CrmTermsPage />;
+  if (location === "/crm-privacy") return <CrmPrivacyPage />;
+  if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
     if (location.startsWith("/portal/")) return <PublicPortalPage />;
@@ -375,6 +396,8 @@ function AppContent() {
   }
 
   // Client-facing pages render full-bleed on any host — no app chrome.
+  if (location === "/crm-terms") return <CrmTermsPage />;
+  if (location === "/crm-privacy") return <CrmPrivacyPage />;
   if (location.startsWith("/e/")) return <PublicEstimatePage />;
   if (location.startsWith("/i/")) return <PublicInvoicePage />;
   if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
