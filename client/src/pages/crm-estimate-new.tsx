@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   cartSubtotalCents, lineTotalCents, milliToQty, money, priceToCents, qtyToMilli,
 } from "@/lib/estimate-math";
@@ -52,21 +52,6 @@ const lineNumbers = (l: CartLine) => ({
   quantityMilli: qtyToMilli(l.qtyText),
   unitPriceCents: priceToCents(l.priceText),
 });
-
-/**
- * apiRequest throws "422: {"message":"…"}" — pull the server's own sentence
- * out so a rejection (e.g. the price-floor lock) reads like a sentence in the
- * toast, not like a stack trace.
- */
-const serverMessage = (e: any): string => {
-  const raw = String(e?.message ?? e);
-  const body = raw.replace(/^\d{3}:\s*/, "");
-  try {
-    const j = JSON.parse(body);
-    if (j && typeof j.message === "string") return j.message;
-  } catch { /* not JSON — show it as-is */ }
-  return raw;
-};
 
 interface DoneState {
   sent: boolean;
@@ -129,7 +114,7 @@ export default function CrmEstimateNewPage() {
       queryClient.invalidateQueries({ predicate: (qr) => String(qr.queryKey[0]).startsWith("/api/crm/customers") });
       pick(j);
     } catch (e: any) {
-      toast({ title: "Could not create client", description: String(e.message ?? e), variant: "destructive" });
+      toast({ title: "Could not create client", description: apiErrorMessage(e), variant: "destructive" });
     } finally {
       setCreating(false);
     }
@@ -176,7 +161,7 @@ export default function CrmEstimateNewPage() {
         qtyText: "1", priceText: ((priceCents ?? 0) / 100).toString(),
       }]);
     } catch (e: any) {
-      toast({ title: "Could not price that item", description: String(e.message ?? e), variant: "destructive" });
+      toast({ title: "Could not price that item", description: apiErrorMessage(e), variant: "destructive" });
     } finally {
       setAddingId(null);
     }
@@ -235,11 +220,11 @@ export default function CrmEstimateNewPage() {
         } catch { /* link is a nicety, not a blocker */ }
         setDone({
           sent: false, emailed: false, number: created.number, totalCents: created.totalCents,
-          link, error: String(e.message ?? e),
+          link, error: apiErrorMessage(e),
         });
       }
     } catch (e: any) {
-      toast({ title: "Could not create the estimate", description: serverMessage(e), variant: "destructive" });
+      toast({ title: "Could not create the estimate", description: apiErrorMessage(e), variant: "destructive" });
     } finally {
       setSending(false);
     }

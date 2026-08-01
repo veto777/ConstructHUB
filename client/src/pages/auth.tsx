@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { CHLogo } from "@/components/ch-logo";
@@ -86,8 +86,7 @@ export default function AuthPage() {
       setMessage(data.message);
       toast({ title: "Account created!", description: "Check your email for a verification link." });
     } catch (err: any) {
-      const msg = err.message || "Signup failed";
-      toast({ title: "Signup failed", description: msg, variant: "destructive" });
+      toast({ title: "Signup failed", description: apiErrorMessage(err, "Signup failed"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -105,7 +104,7 @@ export default function AuthPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation("/");
     } catch (err: any) {
-      const msg = err.message || "Login failed";
+      const msg = apiErrorMessage(err, "Login failed");
       if (msg.includes("verify your email")) {
         setMessage(msg);
       }
@@ -150,7 +149,7 @@ export default function AuthPage() {
       setPassword("");
       setConfirmPassword("");
     } catch (err: any) {
-      toast({ title: "Reset failed", description: err.message || "Could not reset password.", variant: "destructive" });
+      toast({ title: "Reset failed", description: apiErrorMessage(err, "Could not reset password."), variant: "destructive" });
     } finally {
       setLoading(false);
     }

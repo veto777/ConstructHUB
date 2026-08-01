@@ -16,7 +16,7 @@ import {
 } from "@/components/crm-ui";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
 /**
@@ -140,7 +140,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
     },
     onError: (e: any) => {
       setDelFor(null);
-      toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" });
+      toast({ title: "Could not delete", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
 
