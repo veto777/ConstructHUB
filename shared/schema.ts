@@ -1213,6 +1213,36 @@ export const crmClientComments = pgTable("crm_client_comments", {
 
 export type CrmClientComment = typeof crmClientComments.$inferSelect;
 
+// ── Client 360: contractor notes + financing click log ──────────────────────
+// crm_customer_notes: contractor-side notes on a client (never shown in the
+// portal). authorMemberId is nullable — imported/system notes have no author;
+// edit/delete is own-note, or any note for owner/admin (server/crm/notes-timeline.ts).
+export const crmCustomerNotes = pgTable("crm_customer_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  authorMemberId: varchar("author_member_id"),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CrmCustomerNote = typeof crmCustomerNotes.$inferSelect;
+
+// crm_finance_clicks: a homeowner tapped a financing link in the client
+// portal. Recorded BEFORE the link opens so the contractor sees "applied for
+// financing via <label>" on the client timeline even when the lender's site
+// never calls back.
+export const crmFinanceClicks = pgTable("crm_finance_clicks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  label: text("label").notNull(),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CrmFinanceClick = typeof crmFinanceClicks.$inferSelect;
+
 // ── Roles & permissions ─────────────────────────────────────────────────────
 // Housecall Pro ships three fixed roles and no custom fields; we ship six
 // construction-shaped roles PLUS per-seat overrides, because a lead carpenter
@@ -1311,6 +1341,7 @@ export const CRM_NOTIFICATION_PREFS = [
   "paymentReceived",   // a manual/offline payment was recorded on an invoice
   "jobApproved",       // PM notice: an estimate was approved (job awarded)
   "clientComments",    // a homeowner sent a note from the client portal
+  "financeClick",      // a homeowner tapped a financing link in the client portal
 ] as const;
 export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 
@@ -2021,6 +2052,7 @@ export const crmPbMaterials = pgTable("crm_pb_materials", {
   imageUrl: text("image_url"),
   active: boolean("active").notNull().default(true),
   costUpdatedAt: timestamp("cost_updated_at"),
+  customFields: jsonb("custom_fields"),     // e.g. hcpStats for mined scopes
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2049,6 +2081,7 @@ export const crmPbItems = pgTable("crm_pb_items", {
   taxable: boolean("taxable").notNull().default(true),
   costCodeId: varchar("cost_code_id"),      // ties the sale straight to the budget
   active: boolean("active").notNull().default(true),
+  customFields: jsonb("custom_fields"),     // e.g. hcpStats for mined scopes
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

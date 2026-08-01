@@ -29,6 +29,7 @@ import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmReportRoutes } from "./reports";
 import { registerCrmClientAuthRoutes } from "./client-auth";
+import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
 import { registerCrmCalendarRoutes } from "./calendar";
 import { registerCrmDivisionRoutes, getDivision } from "./divisions";
@@ -154,6 +155,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmReportRoutes(app, getDevUser);
   // The homeowner client portal takes no contractor session at all.
   registerCrmClientAuthRoutes(app);
+  // Client 360: notes, timeline, financing clicks, portal preview. BEFORE the
+  // attachment routes so its read-only interceptors guard preview sessions.
+  registerCrmClient360Routes(app, getDevUser);
   // Read-only schedule + activity feeds for the mobile ribbon.
   registerCrmScheduleRoutes(app, getDevUser);
   // Calendar sync: tokenized iCal feed + Google Calendar push.

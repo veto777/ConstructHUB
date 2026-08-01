@@ -15,7 +15,7 @@
  * those ids — a homeowner can never reach another customer's documents.
  */
 import type { Express } from "express";
-import { randomBytes, createHash } from "crypto";
+import { randomBytes, createHash, createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { db } from "../db";
 import {
@@ -31,6 +31,7 @@ import {
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { sendWithFallback } from "../email";
 import { clientPortalBaseUrl } from "../site-context";
+import { financingLinksOf, getPrimaryFinancing } from "./financing";
 
 const COOKIE_NAME = "crm_client";
 const TOKEN_TTL_MS = 30 * 60 * 1000; // magic link: 30 minutes
@@ -88,6 +89,53 @@ function setSessionCookie(res: any, token: string, maxAgeMs: number) {
   );
 }
 
+// ── Contractor portal preview ("see what the client sees") ──────────────────
+// The same HMAC-grant pattern as the estimate preview-link (portal.ts), bound
+// to ONE customer id instead of one estimate. The grant itself rides in the
+// `crm_client` cookie behind a `prev.` prefix — stateless, so nothing new to
+// store or sweep, and the 15-minute expiry is re-checked on every request
+// (no sliding). A preview session is READ-ONLY by construction: document
+// gates and engagement tracking resolve only DB-backed sessions, and the
+// write routes (comments / photos / financing-click) refuse it explicitly.
+export const PORTAL_PREVIEW_TTL_MS = 15 * 60 * 1000;
+const PREVIEW_COOKIE_PREFIX = "prev.";
+const previewSecret = () => process.env.SESSION_SECRET || "";
+
+export function mintPortalPreviewGrant(customerId: string): string {
+  const exp = Date.now() + PORTAL_PREVIEW_TTL_MS;
+  const sig = createHmac("sha256", previewSecret())
+    .update(`portal-preview:${customerId}:${exp}`).digest("hex").slice(0, 32);
+  return `${customerId}.${exp}.${sig}`;
+}
+
+/** Verify a portal-preview grant; returns the bound customer id or null. */
+export function verifyPortalPreviewGrant(grant: string): string | null {
+  const secret = previewSecret();
+  if (!secret) return null;
+  const m = /^([0-9a-fA-F-]{36})\.(\d{10,16})\.([0-9a-f]{32})$/.exec(grant);
+  if (!m) return null;
+  const [, customerId, expS, sig] = m;
+  const exp = Number(expS);
+  if (!Number.isFinite(exp) || exp < Date.now()) return null;
+  const expected = createHmac("sha256", secret)
+    .update(`portal-preview:${customerId}:${exp}`).digest("hex").slice(0, 32);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b) ? customerId : null;
+}
+
+/** The customer id of the request's contractor-preview cookie, if any. */
+export function previewCustomerId(req: any): string | null {
+  const token = parseCookies(req)[COOKIE_NAME];
+  if (!token || !token.startsWith(PREVIEW_COOKIE_PREFIX)) return null;
+  return verifyPortalPreviewGrant(token.slice(PREVIEW_COOKIE_PREFIX.length));
+}
+
+/** True when the request carries a valid contractor-preview session. */
+export function isContractorPreview(req: any): boolean {
+  return previewCustomerId(req) !== null;
+}
+
 /**
  * Resolve the `crm_client` cookie to the session's customer ids WITHOUT
  * answering 401 — for routes that branch on the session (the public document
@@ -96,6 +144,10 @@ function setSessionCookie(res: any, token: string, maxAgeMs: number) {
 export async function resolveClientCustomerIds(req: any): Promise<string[]> {
   const token = parseCookies(req)[COOKIE_NAME];
   if (!token || token.length < 32) return [];
+  // A contractor preview is NOT a client session: the document email-gates and
+  // engagement analytics resolve only DB-backed sessions, so preview traffic
+  // can never pose as client behaviour (no views, no dwell time, no approve).
+  if (token.startsWith(PREVIEW_COOKIE_PREFIX)) return [];
   const [sess] = await db
     .select()
     .from(crmClientSessions)
@@ -115,8 +167,17 @@ export async function resolveClientCustomerIds(req: any): Promise<string[]> {
  * The client-portal gate. Resolves the `crm_client` cookie to the session's
  * customer ids (and slides the expiry), or answers 401. No contractor session
  * is involved anywhere in this module.
+ *
+ * A contractor-preview cookie (`prev.` grant) resolves too — marked
+ * contractorPreview so read routes can badge it and write routes can refuse
+ * it. Preview sessions expire with the grant (15 min) and never slide.
  */
-export async function requireClient(req: any, res: any): Promise<{ customerIds: string[] } | null> {
+export async function requireClient(
+  req: any,
+  res: any,
+): Promise<{ customerIds: string[]; contractorPreview?: boolean } | null> {
+  const previewId = previewCustomerId(req);
+  if (previewId) return { customerIds: [previewId], contractorPreview: true };
   const customerIds = await resolveClientCustomerIds(req);
   if (!customerIds.length) {
     res.status(401).json({ message: "Sign in required" });
@@ -229,6 +290,18 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     res.redirect(302, safeNext || `/${devOnly}`);
   });
 
+  // ── Redeem a contractor portal-preview grant ──────────────────────────────
+  // Minted by POST /api/crm/customers/:id/portal-preview (manageCustomers) so
+  // the contractor can open the portal exactly as their client sees it. The
+  // grant becomes a `prev.` cookie: 15-minute, read-only, never tracked.
+  app.get("/api/client/auth/preview", async (req: any, res) => {
+    const devOnly = req.query?.client === "1" ? "?client=1" : "";
+    const customerId = verifyPortalPreviewGrant(String(req.query?.grant || ""));
+    if (!customerId) return res.redirect(302, `/${devOnly}`);
+    setSessionCookie(res, `${PREVIEW_COOKIE_PREFIX}${String(req.query.grant)}`, PORTAL_PREVIEW_TTL_MS);
+    res.redirect(302, `/${devOnly}`);
+  });
+
   // ── Sign out ──────────────────────────────────────────────────────────────
   app.post("/api/client/auth/logout", async (req: any, res) => {
     const token = parseCookies(req)[COOKIE_NAME];
@@ -253,7 +326,7 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     if (!client.customerIds.length) {
       return res.json({
         customer: null, orgs: [], accounts: [], estimates: [], invoices: [],
-        contracts: [], reports: [], pamphlets: [], photos: [],
+        contracts: [], reports: [], pamphlets: [], photos: [], financing: [],
       });
     }
 
@@ -332,7 +405,23 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     });
 
     const primary = customers[0];
+    // The org's financing links, primary first — the portal's Financing
+    // section renders these and records the click before opening them.
+    const financing = orgs.flatMap((o) => {
+      const links = financingLinksOf(o);
+      const primaryLink = getPrimaryFinancing(o);
+      return links.map((l) => ({
+        label: l.label,
+        url: l.url,
+        primary: primaryLink?.url === l.url,
+        orgName: orgs.length > 1 ? o.name : undefined,
+      }));
+    });
     res.json({
+      // Read-only contractor preview ("see what the client sees") — the
+      // portal shows a banner and every write refuses.
+      contractorPreview: client.contractorPreview === true || undefined,
+      financing,
       customer: primary
         ? { displayName: primary.displayName, email: primary.email }
         : null,

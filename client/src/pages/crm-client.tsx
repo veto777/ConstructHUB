@@ -27,6 +27,7 @@ import {
 import { EstimateEngagement } from "@/components/crm-engagement";
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "@/components/client-uploads";
+import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -172,6 +173,7 @@ export default function CrmClientPage() {
   const canInvoice = me?.permissions?.manageInvoices === true;
   const canTakePayment = me?.permissions?.takePayment === true;
   const canManageJobs = me?.permissions?.manageJobs === true;
+  const canManageCustomers = me?.permissions?.manageCustomers === true;
 
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: [`/api/crm/customers/${id}`],
@@ -364,15 +366,18 @@ export default function CrmClientPage() {
                 </div>
               </div>
             </div>
-            {data.portalPath && (
-              <Button variant="outline" size="sm" data-testid="button-copy-portal"
-                onClick={() => {
-                  navigator.clipboard?.writeText(window.location.origin + data.portalPath);
-                  toast({ title: "Client portal link copied" });
-                }}>
-                <Copy className="h-4 w-4 mr-2" /> Copy portal link
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {canManageCustomers && <ViewAsClientButton customerId={id!} />}
+              {data.portalPath && (
+                <Button variant="outline" size="sm" data-testid="button-copy-portal"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(window.location.origin + data.portalPath);
+                    toast({ title: "Client portal link copied" });
+                  }}>
+                  <Copy className="h-4 w-4 mr-2" /> Copy portal link
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -698,6 +703,15 @@ export default function CrmClientPage() {
           ))}
         </CardContent>
       </Card>
+
+      {/* Client 360 — the behaviour log + internal notes (self-contained mounts). */}
+      <CustomerTimeline customerId={id!} />
+      <CustomerNotes
+        customerId={id!}
+        canManage={canManageCustomers}
+        meMemberId={me?.member?.id}
+        meRole={me?.member?.role}
+      />
 
       {/* Client portal v2 — photos/comments from this client + the org pamphlet shelf. */}
       <CustomerPhotos customerId={id!} />

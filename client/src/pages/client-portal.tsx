@@ -10,6 +10,7 @@ import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
 import { PortalPamphlets, PortalPhotoShare, PortalCommentBox } from "@/components/client-uploads";
+import { ContractorPreviewBanner, PortalFinancing } from "@/components/crm-client-360";
 import { CrmLogo } from "@/components/crm-logo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -144,7 +145,7 @@ function RequestLink() {
 function Dashboard({ data }: { data: any }) {
   const {
     customer, orgs = [], estimates = [], invoices = [], contracts = [], reports = [],
-    accounts = [], pamphlets = [], photos = [],
+    accounts = [], pamphlets = [], photos = [], financing = [],
   } = data;
 
   const now = Date.now();
@@ -183,6 +184,11 @@ function Dashboard({ data }: { data: any }) {
             <LogOut className="h-4 w-4 mr-1.5" /> Sign out
           </Button>
         </div>
+
+        {/* Read-only banner when the contractor opens this portal as the client. */}
+        {data.contractorPreview && (
+          <ContractorPreviewBanner customerName={customer?.displayName} />
+        )}
 
         {/* Needs your action */}
         {(awaitingEstimates.length > 0 || unpaidInvoices.length > 0) && (
@@ -404,6 +410,9 @@ function Dashboard({ data }: { data: any }) {
             </div>
           )}
         </section>
+
+        {/* Financing — clicks are recorded before the lender link opens. */}
+        <PortalFinancing financing={financing} preview={data.contractorPreview === true} />
 
         {/* From <company> — org pamphlets (brochures, warranties) */}
         <PortalPamphlets pamphlets={pamphlets} />

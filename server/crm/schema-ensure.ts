@@ -493,6 +493,8 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_divisions ADD COLUMN IF NOT EXISTS website text;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS approved_total_cents integer;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS selected_discounts jsonb;
+    ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS custom_fields jsonb;
+    ALTER TABLE crm_pb_materials ADD COLUMN IF NOT EXISTS custom_fields jsonb;
 
     CREATE TABLE IF NOT EXISTS crm_estimate_discounts (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -598,6 +600,32 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_attachments_ref_idx ON crm_attachments (kind, ref_id);
     CREATE INDEX IF NOT EXISTS crm_client_comments_customer_idx ON crm_client_comments (customer_id);
     CREATE INDEX IF NOT EXISTS crm_client_comments_org_idx ON crm_client_comments (org_id);
+  `);
+
+  // ── Client 360: contractor notes + financing click log ───────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_customer_notes (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      customer_id varchar NOT NULL,
+      author_member_id varchar,
+      body text NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_finance_clicks (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      customer_id varchar NOT NULL,
+      label text NOT NULL,
+      url text NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_customer_notes_customer_idx ON crm_customer_notes (customer_id);
+    CREATE INDEX IF NOT EXISTS crm_customer_notes_org_idx ON crm_customer_notes (org_id);
+    CREATE INDEX IF NOT EXISTS crm_finance_clicks_customer_idx ON crm_finance_clicks (customer_id);
+    CREATE INDEX IF NOT EXISTS crm_finance_clicks_org_idx ON crm_finance_clicks (org_id);
   `);
 
   // Constraints are added separately: they are not IF NOT EXISTS in older
