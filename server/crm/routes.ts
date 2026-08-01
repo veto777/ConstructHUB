@@ -19,6 +19,7 @@ import {
   CRM_ROLE_DEFAULTS,
   CRM_NOTIFICATION_PREFS,
 } from "@shared/schema";
+import { isThemeColorId } from "@shared/theme-colors";
 import { and, eq, desc, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage } from "./tenancy";
 import { registerCrmEntityRoutes } from "./entities";
@@ -77,6 +78,17 @@ const orgPatchSchema = z.object({
   defaultDepositBps: z.number().int().min(0).max(10000).nullable().optional(),
   // Org-wide fallback sales-tax rate (basis points) — see server/crm/tax.ts.
   defaultTaxRateBps: z.number().int().min(0).max(3000).nullable().optional(),
+  // The company theme accent — one of the 20 presets in shared/theme-colors.ts,
+  // merged INTO custom_fields as themeColor (null clears back to the default
+  // orange). Unknown ids are rejected.
+  themeColor: z
+    .string()
+    .max(40)
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || isThemeColorId(v), {
+      message: "Unknown theme colour",
+    }),
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.
   notificationPrefs: z
@@ -358,24 +370,36 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const parsed = orgPatchSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid company profile", issues: parsed.error.issues });
 
-    // notificationPrefs is a virtual field: it merges into custom_fields so the
-    // rest of that jsonb (e.g. HCP import reference data) is never clobbered.
-    const { notificationPrefs, ...profile } = parsed.data;
+    // notificationPrefs and themeColor are virtual fields: they merge into
+    // custom_fields so the rest of that jsonb (e.g. HCP import reference
+    // data) is never clobbered.
+    const { notificationPrefs, themeColor, ...profile } = parsed.data;
+    const mergedCustomFields =
+      notificationPrefs !== undefined || themeColor !== undefined
+        ? (() => {
+            const base = {
+              ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
+            };
+            if (notificationPrefs) {
+              base.notificationPrefs = {
+                ...(((ctx.org.customFields as any)?.notificationPrefs as Record<string, boolean> | undefined) ?? {}),
+                ...notificationPrefs,
+              };
+            }
+            // null = "back to the default orange" — the key comes off entirely
+            // rather than sitting there as an explicit null.
+            if (themeColor !== undefined) {
+              if (themeColor === null) delete base.themeColor;
+              else base.themeColor = themeColor;
+            }
+            return base;
+          })()
+        : undefined;
     const [row] = await db
       .update(crmOrgs)
       .set({
         ...profile,
-        ...(notificationPrefs
-          ? {
-              customFields: {
-                ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
-                notificationPrefs: {
-                  ...(((ctx.org.customFields as any)?.notificationPrefs as Record<string, boolean> | undefined) ?? {}),
-                  ...notificationPrefs,
-                },
-              },
-            }
-          : {}),
+        ...(mergedCustomFields ? { customFields: mergedCustomFields } : {}),
         updatedAt: new Date(),
       })
       .where(eq(crmOrgs.id, ctx.org.id))

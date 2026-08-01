@@ -27,9 +27,14 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
 - **Secrets:** `.env` on vb7 (600) from `Construct_hub_secrets.txt` + **fresh** `SESSION_SECRET` and DB
   password (the Replit-leaked ones were NOT reused). R2 verified live (bucket `constructhub`, has user
   logo uploads). `R2_ENDPOINT`/`R2_BUCKET_NAME` set.
-- **Deploy update flow:** build on tower (`npm run build`) → `rsync -azc dist/ …vb7:~/ConstructHUB/dist/`
-  → `systemctl --user restart constructhub` on vb7. (Use `-c` checksums; a plain `-az` once shipped a
-  partial `dist/data/` and the appraiser seed silently skipped.)
+- **Deploy update flow:** `script/deploy-vb7.sh` — builds on the tower, rsyncs `dist/` (`-azc`
+  checksums; a plain `-az` once shipped a partial `dist/data/` and the appraiser seed silently
+  skipped), **syncs `package.json`/`package-lock.json` and runs `npm ci --omit=dev` on vb7 whenever
+  they differ** (2026-08-01: a deploy shipped `dist/` needing `pdfkit` without installing it — static
+  pages kept serving while every `/api/crm/*` route was dead), restarts `constructhub.service`, then
+  **verifies the boot** (service active, no "Failed to initialize"/"Cannot find module" in the
+  journal, `:8110` 200, `:8110/api/crm/me` 401) and fails loudly instead of leaving a broken deploy
+  live. Do not hand-roll rsync + restart — use the script.
 
 ## What was done (13 commits, all pushed)
 
@@ -136,10 +141,17 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
 - [x] CRM **Stripe Connect webhook** — **DONE 2026-08-01.** Endpoint `we_1TzeAd4e8DdHYZEhJOrdMGU8`
       (`connect=true`) → `/api/crm/stripe/connect-webhook`, all 7 events `server/crm/integrations.ts`
       handles. `STRIPE_CONNECT_WEBHOOK_SECRET` on tower + vb7; verified 400 on unsigned POST.
-- [ ] CRM Stripe Connect **client id** — owner: Stripe Dashboard → Settings → Connect →
-      Platform settings → copy the `ca_…` client ID into `STRIPE_CONNECT_CLIENT_ID` on vb7 `.env` +
-      restart. Until then contractors can't OAuth-connect their own Stripe accounts (the CRM
-      payments settings page reports exactly this as "missing"). Everything else is ready.
+- [x] CRM Stripe Connect **client id** — **DONE 2026-08-01.** Platform profile completed (Platform /
+      direct charges / Stripe-hosted onboarding / Stripe carries risk), OAuth enabled,
+      `STRIPE_CONNECT_CLIENT_ID` (`ca_Uzc1…Rsgf`) on tower + vb7, service restarted.
+- [ ] CRM Connect **OAuth redirect URIs** — owner: Stripe Dashboard → Settings → Connect →
+      Onboarding options → OAuth → Add URI (dashboard-only, no API):
+      `https://portal.constructhub.us/api/crm/payments/connect/stripe/callback`,
+      `https://portal.constructionhub.app/api/crm/payments/connect/stripe/callback`,
+      `https://constructhub.us/api/crm/payments/connect/stripe/callback`.
+      Stripe rejects the OAuth flow until these exist.
+- [ ] Stripe account banner "**Action required** — provide info to keep payouts enabled" — owner,
+      Stripe dashboard → View task (business/identity verification).
 - [ ] Real OpenAI key — `AI_INTEGRATIONS_OPENAI_API_KEY` is a boot-safe dummy; AI consultant/assistant
       endpoints error until a real key is set (Replit's modelfarm proxy no longer exists).
 - [ ] **Export real user data from Replit** — see the "Replit user-data export" section above for the

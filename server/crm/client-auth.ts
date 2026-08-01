@@ -32,6 +32,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { sendWithFallback } from "../email";
 import { clientPortalBaseUrl } from "../site-context";
 import { financingLinksOf, getPrimaryFinancing } from "./financing";
+import { themePayload } from "@shared/theme-colors";
 
 const COOKIE_NAME = "crm_client";
 const TOKEN_TTL_MS = 30 * 60 * 1000; // magic link: 30 minutes
@@ -425,7 +426,12 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       customer: primary
         ? { displayName: primary.displayName, email: primary.email }
         : null,
-      orgs: orgs.map((o) => ({ id: o.id, name: o.name, logoUrl: o.logoUrl })),
+      orgs: orgs.map((o) => ({
+        id: o.id, name: o.name, logoUrl: o.logoUrl,
+        // The org's theme accent (server-resolved) — the portal themes itself
+        // black + this colour.
+        ...themePayload(o.customFields),
+      })),
       // Every customer row this session covers — upload/comment targets.
       accounts: customers.map((c) => ({
         id: c.id, displayName: c.displayName, orgName: orgName.get(c.orgId) ?? null,

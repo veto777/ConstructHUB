@@ -16,6 +16,7 @@ import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
 import { DocGateChallenge } from "@/components/doc-gate";
 import { EstimateAttachments } from "@/components/client-uploads";
+import { orgThemeStyle } from "@/lib/org-theme";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -228,8 +229,13 @@ export default function PublicEstimatePage() {
   const toggleDiscount = (id: string, on: boolean) =>
     setSelectedDiscounts((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
 
+  // The org's company theme — black + their accent. Server-resolved in the
+  // payload; re-points --primary for everything below this root.
+  const themeStyle = orgThemeStyle(company?.theme);
+
   return (
-    <main className="min-h-screen bg-muted/40 py-6 px-3 sm:py-10 sm:px-4">
+    <main className="min-h-screen bg-muted/40 py-6 px-3 sm:py-10 sm:px-4"
+      style={themeStyle} data-testid="public-estimate-root">
       <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
         {preview && (
@@ -296,6 +302,10 @@ export default function PublicEstimatePage() {
             document facts on the right, 'Prepared for' below, footer band
             at the bottom. */}
         <Card className="shadow-md overflow-hidden" data-testid="estimate-document">
+          {/* Letterhead accent line — the org's exact theme hex (inline, so
+              no hsl round-trip drift). */}
+          <div className="h-1.5" style={company?.theme ? { backgroundColor: company.theme.hex } : undefined}
+            data-testid="letterhead-accent" />
           <div className="border-b p-4 sm:p-8 space-y-6">
             <div className="flex flex-wrap justify-between gap-x-8 gap-y-6">
               {/* Letterhead — the company the client hired, not us. */}

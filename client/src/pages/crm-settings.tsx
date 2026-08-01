@@ -18,6 +18,7 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
 } from "@/components/crm-ui";
+import { CRM_THEME_COLORS, resolveOrgTheme } from "@shared/theme-colors";
 
 /**
  * Org settings — company profile, document defaults, notification switches,
@@ -222,6 +223,17 @@ export default function CrmSettingsPage() {
       toast({ title: "Company profile saved" });
     },
     onError: (e: any) => toast({ title: "Could not save company profile", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── Company theme — one of 20 preset accents (customFields.themeColor),
+  //    saved instantly on click; applies to client-facing documents only. ────
+  const saveTheme = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("PATCH", "/api/crm/org", { themeColor: id })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Theme saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save theme", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   // ── Company logo upload (PNG/JPG ≤ 2MB → org.logoUrl, shown on documents) ──
@@ -443,6 +455,7 @@ export default function CrmSettingsPage() {
   }
 
   const acct = payStatus?.account;
+  const theme = resolveOrgTheme(org?.customFields);
   const hookEventChoices = webhookData?.events ?? [];
   const chosenEvents = Object.values(hookEvents).filter(Boolean).length;
   const gcal = gcalStatus?.connection ?? null;
@@ -571,6 +584,58 @@ export default function CrmSettingsPage() {
               {saveCompany.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save company profile
             </Button>
+          </div>
+
+          {/* ── Company theme ── one accent from 20 presets, always paired
+              with black; colours the estimates, invoices, contracts and the
+              client portal — never the CRM workspace itself. Saves on click. */}
+          <div className="border-t pt-4 space-y-3" data-testid="section-company-theme">
+            <div>
+              <div className="text-sm font-medium">Company theme</div>
+              <p className="text-xs text-muted-foreground">
+                The accent on your estimates, invoices, contracts and client portal — always paired with black.
+              </p>
+            </div>
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2" data-testid="theme-swatch-grid">
+              {CRM_THEME_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  title={c.name}
+                  aria-label={`Theme ${c.name}`}
+                  aria-pressed={theme.id === c.id}
+                  disabled={saveTheme.isPending}
+                  onClick={() => saveTheme.mutate(c.id)}
+                  data-testid={`theme-swatch-${c.id}`}
+                  className={`h-9 rounded-md border overflow-hidden transition-shadow disabled:opacity-60 ${
+                    theme.id === c.id
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : "hover:ring-1 hover:ring-foreground/40"
+                  }`}
+                  style={{ background: `linear-gradient(to bottom, #111827 50%, ${c.hex} 50%)` }}
+                />
+              ))}
+            </div>
+            {/* Live preview — a miniature document header in black + the
+                current accent. */}
+            <div className="rounded-lg border overflow-hidden" data-testid="theme-preview-strip">
+              <div className="bg-neutral-900 px-4 py-2.5 flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold truncate" style={{ color: theme.hex }} data-testid="theme-preview-name">
+                  {company.name || org.name}
+                </span>
+                <span className="text-[10px] uppercase tracking-widest text-neutral-400 shrink-0">Estimate</span>
+              </div>
+              <div className="px-4 py-3 flex items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">This is how your documents look</span>
+                <span
+                  className="rounded-md px-3 py-1.5 text-xs font-medium shrink-0"
+                  style={{ backgroundColor: theme.hex, color: theme.onHex }}
+                  data-testid="theme-preview-button"
+                >
+                  Approve estimate
+                </span>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

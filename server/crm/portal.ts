@@ -36,6 +36,7 @@ import { recomputeApprovalTotals } from "./discounts";
 import { storeGeneratedPdf } from "./attachments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
+import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -189,6 +190,9 @@ function publicEstimateView(
       // estimate never goes out under the WA HQ address.
       ...companyBranding(org, division),
       warrantyText: org.warrantyText,
+      // The org's theme accent (server-resolved hex + hsl pair) — the public
+      // page sets CSS variables from these verbatim.
+      ...themePayload(org.customFields),
     },
     customer: {
       displayName: cust.displayName, email: cust.email, phone: cust.phone,
@@ -967,6 +971,9 @@ async function deliverSignedContract(
 
   const pdf = await buildContractPdf({
     branding,
+    // The org's theme accent — the letterhead name prints in it (orange when
+    // the org never picked one).
+    accentHex: resolveOrgTheme(org.customFields).hex,
     orgName: org.name,
     customer: cust,
     estimate: est,
@@ -1144,7 +1151,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         quantityMilli: i.quantityMilli, unitPriceCents: i.unitPriceCents,
         lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
       })),
-      company: companyBranding(org, division),
+      company: { ...companyBranding(org, division), ...themePayload(org.customFields) },
       customer: {
         displayName: cust.displayName, email: cust.email, phone: cust.phone,
         addressLine1: cust.addressLine1, addressLine2: cust.addressLine2,

@@ -13,6 +13,7 @@ import { PortalPamphlets, PortalPhotoShare, PortalCommentBox } from "@/component
 import { ContractorPreviewBanner, PortalFinancing } from "@/components/crm-client-360";
 import { CrmLogo } from "@/components/crm-logo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { orgThemeStyle } from "@/lib/org-theme";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -170,9 +171,13 @@ function Dashboard({ data }: { data: any }) {
   }
 
   const oneOrg = orgs.length === 1 ? orgs[0] : null;
+  // The contractor's company theme — black + their accent. Only a single-org
+  // client gets a themed portal; a multi-org homeowner keeps the neutral
+  // default rather than picking one company's colour over another's.
+  const themeStyle = orgThemeStyle(oneOrg?.theme);
 
   return (
-    <main className="min-h-screen bg-muted/40">
+    <main className="min-h-screen bg-muted/40" style={themeStyle} data-testid="client-portal-root">
       <CrmPage className="max-w-4xl">
         {/* Header: the contractor's branding, never ConstructHUB's app chrome. */}
         <div className="flex flex-wrap items-center justify-between gap-4">

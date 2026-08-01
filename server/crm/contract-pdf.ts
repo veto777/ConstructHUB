@@ -7,8 +7,9 @@
  * (kind='contract', refId = estimate id), emailed to the client AND the
  * company admin, and surfaced in the client portal.
  *
- * Layout: company letterhead (text-based — the company name in brand orange
- * stands in for a logo; embedding remote logo images is deliberately skipped),
+ * Layout: company letterhead (text-based — the company name in the org's
+ * theme accent, brand orange by default, stands in for a logo; embedding
+ * remote logo images is deliberately skipped),
  * a 'Prepared for' client block, the estimate number/dates, every option with
  * its full description and price, the line items, the client-selected optional
  * discounts, the totals block (subtotal → discounts → tax → APPROVED total),
@@ -22,6 +23,12 @@ export const BRAND_ORANGE = "#F97316";
 const INK = "#111827";
 const MUTED = "#6b7280";
 const LINE = "#e5e7eb";
+
+/** The letterhead accent: the org's theme colour when it's a clean #rrggbb,
+ *  the brand orange otherwise. */
+export function pdfAccentHex(hex?: string | null): string {
+  return hex && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : BRAND_ORANGE;
+}
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -42,6 +49,9 @@ export type ContractPdfInput = {
     licenseNumber?: string | null;
     licenseState?: string | null;
   };
+  /** The org's theme accent (shared/theme-colors.ts) — the letterhead company
+   *  name prints in it. Falls back to the brand orange. */
+  accentHex?: string | null;
   /** The org's own name — the signature is made out to it even when the
    *  letterhead is a division's. */
   orgName: string;
@@ -163,8 +173,10 @@ export async function buildContractPdf(
 
   // ── Letterhead ────────────────────────────────────────────────────────────
   const headerTop = doc.y;
-  // Left: the company. The name in brand orange is the text-logo fallback.
-  doc.font("Helvetica-Bold").fontSize(20).fillColor(BRAND_ORANGE).text(b.name, left, headerTop, { width: pageWidth * 0.55 });
+  // Left: the company. The name in the org's theme colour (brand orange by
+  // default) is the text-logo fallback.
+  const accent = pdfAccentHex(input.accentHex);
+  doc.font("Helvetica-Bold").fontSize(20).fillColor(accent).text(b.name, left, headerTop, { width: pageWidth * 0.55 });
   doc.font("Helvetica").fontSize(9).fillColor(MUTED);
   for (const l of addressLines(b)) doc.text(l, { width: pageWidth * 0.55 });
   const contact = [b.phone, b.email, b.website].filter(Boolean).join("  ·  ");
@@ -192,6 +204,11 @@ export async function buildContractPdf(
     .text(money(approvedTotal), metaX, my + 2, { width: metaW, align: "right" });
 
   doc.y = Math.max(doc.y, my) + 14;
+  // pdfkit keeps doc.x wherever the last explicit-x text call left it (the
+  // right-hand meta column here). Without this reset, every coordinate-less
+  // block below renders in that narrow right column and wraps at a handful of
+  // characters per line — the 69-page bug.
+  doc.x = left;
   doc.moveTo(left, doc.y).lineTo(rightEdge, doc.y).lineWidth(1).strokeColor(LINE).stroke();
   doc.moveDown(1.2);
 
@@ -275,16 +292,26 @@ export async function buildContractPdf(
   doc.moveDown(0.3);
   totalRow("Approved total", money(approvedTotal), { bold: true, big: true });
   if (e.depositCents) totalRow("Deposit due", money(e.depositCents));
+  doc.x = left; // leave the right-hand totals column before flowing text
 
-  // ── Terms: the estimate's own terms first, then the org's standing ones ───
+  // ── Terms: the estimate's own terms first, then the org's standing ones.
+  // When they're the same document (the estimate copied the org terms at
+  // creation — the common case), print it ONCE; two 10k-char blocks is how
+  // a 4-page contract becomes a 10-page one.
   const termsBlocks: [string, string][] = [];
-  if (e.termsText?.trim()) termsBlocks.push(["Estimate terms", e.termsText.trim()]);
-  if (input.terms?.trim()) termsBlocks.push(["Terms and conditions", input.terms.trim()]);
+  const estTerms = e.termsText?.trim();
+  const orgTerms = input.terms?.trim();
+  if (estTerms && orgTerms && estTerms !== orgTerms) {
+    termsBlocks.push(["Estimate terms", estTerms], ["Terms and conditions", orgTerms]);
+  } else if (estTerms || orgTerms) {
+    termsBlocks.push(["Terms and conditions", (estTerms || orgTerms)!]);
+  }
   for (const [heading, body] of termsBlocks) {
     doc.moveDown(1);
     doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(heading);
     doc.moveDown(0.3);
     doc.font("Helvetica").fontSize(8.5).fillColor("#374151").text(body, { lineGap: 1.5 });
+    doc.x = left; // pdfkit leaves x wherever the last call ended
   }
 
   // ── Signature ─────────────────────────────────────────────────────────────
@@ -314,9 +341,13 @@ export async function buildContractPdf(
     doc.switchToPage(range.start + p);
     const y = doc.page.height - 48;
     doc.moveTo(left, y - 8).lineTo(rightEdge, y - 8).lineWidth(0.75).strokeColor(LINE).stroke();
-    doc.font("Helvetica").fontSize(7.5).fillColor(MUTED)
-      .text(footerBits, left, y, { width: pageWidth - 90, align: "left", lineBreak: false });
-    doc.text(`Page ${p + 1} of ${range.count}`, rightEdge - 90, y, { width: 90, align: "right", lineBreak: false });
+    doc.font("Helvetica").fontSize(7.5).fillColor(MUTED);
+    // Measured placement, no align/width boxes — right-aligned boxes straddling
+    // the page edge made pdfkit overflow into two phantom pages per stamp.
+    const label = `Page ${p + 1} of ${range.count}`;
+    const labelW = doc.widthOfString(label);
+    doc.text(footerBits, left, y, { lineBreak: false });
+    doc.text(label, rightEdge - labelW, y, { lineBreak: false });
   }
 
   doc.end();

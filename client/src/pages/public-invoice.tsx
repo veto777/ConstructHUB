@@ -8,6 +8,7 @@ import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
 import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
 import { DocGateChallenge } from "@/components/doc-gate";
+import { orgThemeStyle } from "@/lib/org-theme";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -69,6 +70,9 @@ export default function PublicInvoicePage() {
   }
 
   const { invoice: inv, items, company, customer } = data;
+  // The org's company theme — black + their accent, server-resolved in the
+  // payload; re-points --primary for everything below this root.
+  const themeStyle = orgThemeStyle(company?.theme);
   // Only the server says "paid". The ?paid=1 redirect from Stripe just means
   // checkout finished — an ACH debit can still be settling, and the parameter
   // itself is trivially forgeable, so it must never render as "Paid".
@@ -76,7 +80,7 @@ export default function PublicInvoicePage() {
   const processing = !settled && new URLSearchParams(window.location.search).get("paid") === "1";
 
   return (
-    <main className="min-h-screen bg-muted/40 py-10 px-4">
+    <main className="min-h-screen bg-muted/40 py-10 px-4" style={themeStyle} data-testid="public-invoice-root">
       <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
         {settled && (
@@ -109,6 +113,9 @@ export default function PublicInvoicePage() {
         {/* The document itself — same letterhead layout as the estimate:
             company left, document facts right, 'Prepared for', footer band. */}
         <Card className="shadow-md overflow-hidden" data-testid="invoice-document">
+          {/* Letterhead accent line — the org's exact theme hex. */}
+          <div className="h-1.5" style={company?.theme ? { backgroundColor: company.theme.hex } : undefined}
+            data-testid="letterhead-accent" />
           <div className="border-b p-6 sm:p-8 space-y-6">
             <div className="flex flex-wrap justify-between gap-x-8 gap-y-6">
               <div className="space-y-1.5 min-w-0">
