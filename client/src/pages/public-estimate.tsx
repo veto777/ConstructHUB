@@ -93,6 +93,27 @@ function PayCard({ token, company, estimate }: { token: string; company: any; es
   );
 }
 
+/** Sticky top brand bar in the org's chosen base colour (black by default,
+ *  white optional — Settings → Company theme). Logos ride on a white chip
+ *  when the base is dark so any logo stays legible. */
+function BrandBar({ company }: { company: any }) {
+  const dark = (company?.theme?.base ?? "black") === "black";
+  return (
+    <header className="sticky top-0 z-30 border-b" data-testid="estimate-brandbar"
+      style={{ backgroundColor: company?.theme?.baseHex ?? "#111827" }}>
+      <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+        {company?.logoUrl ? (
+          <span className={dark ? "inline-flex bg-white rounded-md px-1.5 py-1" : "inline-flex"}>
+            <img src={company.logoUrl} alt={company?.name} className="h-8 object-contain" />
+          </span>
+        ) : (
+          <span className="font-semibold" style={{ color: company?.theme?.hex }}>{company?.name}</span>
+        )}
+      </div>
+    </header>
+  );
+}
+
 /** The homeowner's estimate page. Authorised by the link PLUS a verified
  *  client session — anonymous browsers get the email-verification challenge. */
 export default function PublicEstimatePage() {
@@ -217,13 +238,7 @@ export default function PublicEstimatePage() {
     return (
       <main className="min-h-screen bg-muted/40" style={orgThemeStyle(company?.theme)} data-testid="estimate-terms-root">
         <PrintLockdown />
-        <header className="sticky top-0 z-30 bg-card border-b">
-          <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
-            {company.logoUrl
-              ? <img src={company.logoUrl} alt={company.name} className="h-9 object-contain" />
-              : <span className="font-semibold">{company.name}</span>}
-          </div>
-        </header>
+        <BrandBar company={company} />
         <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
           <a href={backHref} className="text-sm text-primary hover:underline" data-testid="link-back-to-estimate">
             ← Back to estimate
@@ -295,14 +310,8 @@ export default function PublicEstimatePage() {
     <main className={`min-h-screen bg-muted/40 ${canRespond ? "pb-24" : ""}`}
       style={themeStyle} data-testid="public-estimate-root">
       <PrintLockdown />
-      {/* HCP-style brand bar — the contractor's logo, sticky. */}
-      <header className="sticky top-0 z-30 bg-card border-b">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3" data-testid="estimate-brandbar">
-          {company.logoUrl
-            ? <img src={company.logoUrl} alt={company.name} className="h-9 object-contain" />
-            : <span className="font-semibold">{company.name}</span>}
-        </div>
-      </header>
+      {/* HCP-style brand bar — the contractor's logo on their chosen base. */}
+      <BrandBar company={company} />
       <div className="max-w-3xl mx-auto space-y-5 py-6 px-3 sm:py-8 sm:px-4">
         {/* Breadcrumb + big title, like the reference portal. */}
         <div className="space-y-4">

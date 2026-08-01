@@ -41,6 +41,7 @@ import { registerCrmDiscountRoutes } from "./discounts";
 import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmReceiptRoutes } from "./receipts";
+import { registerCrmQuickBidRoutes } from "./quickbid";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
@@ -90,6 +91,9 @@ const orgPatchSchema = z.object({
     .refine((v) => v === null || v === undefined || isThemeColorId(v), {
       message: "Unknown theme colour",
     }),
+  // The main (band) colour the accent pairs with — black (default) or white.
+  // Merged into custom_fields as themeBase; null clears back to black.
+  themeBase: z.enum(["black", "white"]).nullable().optional(),
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.
   notificationPrefs: z
@@ -212,6 +216,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmAttachmentRoutes(app, getDevUser);
   // Receipts-to-date: preview + one-click send; auto-emailed after payments.
   registerCrmReceiptRoutes(app, getDevUser);
+  // Quick Bid: per-sqft SKUs priced from the client's latest measurement report.
+  registerCrmQuickBidRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -398,9 +404,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -416,6 +422,11 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
             if (themeColor !== undefined) {
               if (themeColor === null) delete base.themeColor;
               else base.themeColor = themeColor;
+            }
+            // null = "back to the default black", same convention as the accent.
+            if (themeBase !== undefined) {
+              if (themeBase === null) delete base.themeBase;
+              else base.themeBase = themeBase;
             }
             return base;
           })()

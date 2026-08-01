@@ -50,6 +50,21 @@ export const CRM_THEME_COLORS: readonly CrmThemeColor[] = [
 export const DEFAULT_THEME_COLOR_ID = "orange";
 export const DEFAULT_THEME_HEX = "#F97316";
 
+/**
+ * The MAIN (band/background) colour the accent pairs with. Historically always
+ * black; orgs may now choose white instead (customFields->>'themeBase').
+ */
+export const THEME_BASES = {
+  black: { hex: "#111827", onHex: "#F9FAFB" },
+  white: { hex: "#FFFFFF", onHex: "#111827" },
+} as const;
+export type ThemeBaseId = keyof typeof THEME_BASES;
+export const DEFAULT_THEME_BASE_ID: ThemeBaseId = "black";
+
+export function isThemeBaseId(v: unknown): v is ThemeBaseId {
+  return v === "black" || v === "white";
+}
+
 /** True only for a real preset id — the org PATCH rejects anything else. */
 export function isThemeColorId(id: unknown): id is string {
   return typeof id === "string" && CRM_THEME_COLORS.some((c) => c.id === id);
@@ -82,15 +97,27 @@ export type ResolvedTheme = CrmThemeColor & {
   hsl: string;
   /** HSL triplet of onHex, for `--primary-foreground`. */
   onHsl: string;
+  /** The main (band) colour the accent pairs with — black or white. */
+  base: ThemeBaseId;
+  baseHex: string;
+  /** Text/icon colour ON the base. */
+  onBaseHex: string;
 };
 
 /** customFields → the full preset. Unknown/missing ids resolve to orange. */
 export function resolveOrgTheme(customFields: unknown): ResolvedTheme {
-  const id = (customFields as Record<string, unknown> | null | undefined)?.themeColor;
+  const cf = customFields as Record<string, unknown> | null | undefined;
+  const id = cf?.themeColor;
   const preset =
     CRM_THEME_COLORS.find((c) => c.id === id) ??
     CRM_THEME_COLORS.find((c) => c.id === DEFAULT_THEME_COLOR_ID)!;
-  return { ...preset, hsl: hexToHslTriplet(preset.hex), onHsl: hexToHslTriplet(preset.onHex) };
+  const base: ThemeBaseId = isThemeBaseId(cf?.themeBase) ? cf.themeBase : DEFAULT_THEME_BASE_ID;
+  return {
+    ...preset,
+    hsl: hexToHslTriplet(preset.hex),
+    onHsl: hexToHslTriplet(preset.onHex),
+    base, baseHex: THEME_BASES[base].hex, onBaseHex: THEME_BASES[base].onHex,
+  };
 }
 
 /**
@@ -100,8 +127,17 @@ export function resolveOrgTheme(customFields: unknown): ResolvedTheme {
  */
 export function themePayload(customFields: unknown): {
   themeColor: string;
-  theme: { hex: string; onHex: string; hsl: string; onHsl: string };
+  theme: {
+    hex: string; onHex: string; hsl: string; onHsl: string;
+    base: ThemeBaseId; baseHex: string; onBaseHex: string;
+  };
 } {
   const t = resolveOrgTheme(customFields);
-  return { themeColor: t.id, theme: { hex: t.hex, onHex: t.onHex, hsl: t.hsl, onHsl: t.onHsl } };
+  return {
+    themeColor: t.id,
+    theme: {
+      hex: t.hex, onHex: t.onHex, hsl: t.hsl, onHsl: t.onHsl,
+      base: t.base, baseHex: t.baseHex, onBaseHex: t.onBaseHex,
+    },
+  };
 }
