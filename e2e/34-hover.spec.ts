@@ -229,12 +229,12 @@ test.describe("HOVER integration @serial", () => {
   test("connect → webhook handshake → completed job on client page + portal", async ({ page }) => {
     const guards = watchPage(page);
 
-    // ── Settings card → Connect HOVER → OAuth round-trip ─────────────────
-    await gotoCrm(page, "/crm/settings");
+    // ── Integrations card → Connect HOVER → OAuth round-trip ─────────────
+    await gotoCrm(page, "/crm/integrations");
     await expect(page.getByTestId("card-hover")).toBeVisible();
     await page.getByTestId("button-connect-hover").click();
-    // connect 302 → stub authorize → stub auto-approve → callback → settings.
-    await page.waitForURL(/\/crm\/settings\?hover=connected/, { timeout: 20_000 });
+    // connect 302 → stub authorize → stub auto-approve → callback → integrations.
+    await page.waitForURL(/\/crm\/integrations\?hover=connected/, { timeout: 20_000 });
     await expect(page.getByTestId("pill-hover-connected")).toBeVisible();
 
     // Webhook registered with the NESTED body, content_type json, OUR url.
@@ -309,7 +309,7 @@ test.describe("HOVER integration @serial", () => {
     expect(Buffer.from(await dl.body()).equals(PDF_BYTES)).toBe(true);
 
     // ── Sync now (re-pull; one dup + one new) and Disconnect ─────────────
-    await gotoCrm(page, "/crm/settings");
+    await gotoCrm(page, "/crm/integrations");
     await expect(page.getByTestId("card-hover")).toBeVisible();
     await page.getByTestId("button-hover-sync").click();
     await expect(page.getByTestId("text-hover-lastsync")).toBeVisible({ timeout: 15_000 });

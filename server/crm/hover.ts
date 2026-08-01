@@ -748,7 +748,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
   app.get("/api/crm/integrations/hover/oauth/callback", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageIntegrations");
     if (!ctx) return;
-    const fail = (why: string) => res.redirect(302, `/crm/settings?hover=error&why=${encodeURIComponent(why)}`);
+    const fail = (why: string) => res.redirect(302, `/crm/integrations?hover=error&why=${encodeURIComponent(why)}`);
 
     const stateOrg = verifyHoverState(String(req.query.state || ""));
     if (!stateOrg || stateOrg !== ctx.org.id) return fail("state");
@@ -787,10 +787,10 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       (e: any) => console.error("[hover] webhook registration failed:", String(e?.message || e).slice(0, 200)),
     );
 
-    res.redirect(302, "/crm/settings?hover=connected");
+    res.redirect(302, "/crm/integrations?hover=connected");
   });
 
-  /** On-demand (re)registration from the settings card. */
+  /** On-demand (re)registration from the integrations card. */
   app.post("/api/crm/integrations/hover/register-webhook", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageIntegrations");
     if (!ctx) return;
