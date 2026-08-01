@@ -302,7 +302,10 @@ export function registerCrmClientAuthRoutes(app: Express): void {
   app.post("/api/client/auth/redeem", async (req: any, res) => {
     const parsed = z.object({ token: z.string().min(32).max(200) }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ ok: false, message: "Invalid pass" });
-    if (!allow(`ip:${clientIp(req)}`, IP_LIMIT)) {
+    // Own bucket: routine document opens must never eat the magic-link budget
+    // (`ip:` bucket) — a family opening a few estimates would lock themselves
+    // out of requesting sign-in links.
+    if (!allow(`redeem:${clientIp(req)}`, IP_LIMIT)) {
       return res.status(429).json({ ok: false, message: "Too many requests. Please try again later." });
     }
 
