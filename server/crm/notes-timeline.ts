@@ -46,7 +46,7 @@ import {
   mintPortalPreviewGrant,
   requireClient,
 } from "./client-auth";
-import { clientPortalBaseUrl } from "../site-context";
+import { clientPortalBaseUrl, portalBaseUrl } from "../site-context";
 import { sendWithFallback } from "../email";
 
 type GetUser = (req: any, res: any) => any;
@@ -464,7 +464,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
         url,
       });
       // Fire-and-forget: the portal never blocks on (or leaks) mail delivery.
-      void notifyFinanceClick(org, cust, label, clientPortalBaseUrl(req))
+      void notifyFinanceClick(org, cust, label, portalBaseUrl(req))
         .catch((e: any) => console.error("[crm] finance-click notify failed:", String(e?.message || e).slice(0, 300)));
       return res.status(201).json({ ok: true });
     }

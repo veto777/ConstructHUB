@@ -46,7 +46,7 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, requireClient } from "./client-auth";
 import { requireDocSession } from "./portal";
 import { sendWithFallback } from "../email";
-import { getBaseUrl } from "../auth";
+import { portalBaseUrl } from "../site-context";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -488,7 +488,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     // Fire-and-forget: the portal never blocks on (or leaks) mail delivery.
     void (async () => {
       const [o] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, cust.orgId)).limit(1);
-      if (o) await notifyClientComment(o, cust, body.trim(), getBaseUrl(req));
+      if (o) await notifyClientComment(o, cust, body.trim(), portalBaseUrl(req));
     })().catch((e: any) => console.error("[crm] client-comment notify failed:", String(e?.message || e).slice(0, 300)));
 
     res.status(201).json({ id: row.id, createdAt: row.createdAt });

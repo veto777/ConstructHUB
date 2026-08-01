@@ -72,11 +72,42 @@ export function clientPortalBaseUrl(req: any): string {
   if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT) {
     return siteBaseUrl(req);
   }
+  const env = envUrl("CLIENT_URL");
+  if (env) return env;
   return `https://${CLIENT_PREFIX}.${siteDomainOf(requestHost(req))}`;
+}
+
+/**
+ * Origin for contractor-facing CRM links (/crm/…) — used in notify emails
+ * triggered by the CLIENT's public request, whose Host is the client portal
+ * (or even the apex), never the portal. So this never trusts requestHost:
+ * PORTAL_URL wins, otherwise the portal subdomain of the caller's domain.
+ */
+export function portalBaseUrl(req: any): string {
+  if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT) {
+    return siteBaseUrl(req);
+  }
+  const env = envUrl("PORTAL_URL");
+  if (env) return env;
+  return `https://${PORTAL_PREFIX}.${siteDomainOf(requestHost(req))}`;
 }
 
 export function isKnownHost(host: string): boolean {
   return ALLOWED_HOSTS.has(normalizeHost(host));
+}
+
+/**
+ * Canonical absolute origins, set per deployment. When present (non-empty)
+ * they win over Host-header derivation in production, so a link generated
+ * from a request that arrived on an unexpected host still points at the
+ * right face of the app:
+ *   PORTAL_URL — the CRM (invite/reset/estimate/invoice links, notify emails)
+ *   CLIENT_URL — the homeowner client portal (magic links)
+ *   APP_URL    — the marketing apex (last-resort fallback)
+ * Unset = derive from the (allowlisted) Host header, exactly as before.
+ */
+function envUrl(name: "PORTAL_URL" | "CLIENT_URL" | "APP_URL"): string {
+  return (process.env[name] || "").trim().replace(/\/+$/, "");
 }
 
 /** Registrable domain for a known host ("portal.constructhub.app" → "constructhub.app"). */
@@ -131,7 +162,12 @@ export function siteBaseUrl(req: any): string {
     const port = String(req?.headers?.host || "").split(":")[1];
     return `${proto}://${host}${port ? `:${port}` : ""}`;
   }
+  // Canonical portal origin wins over the Host header: every consumer of
+  // siteBaseUrl (invite/beta/reset/estimate/invoice links) belongs on the
+  // portal host, and an unexpected Host must not reroute them to the apex.
+  const env = envUrl("PORTAL_URL");
+  if (env) return env;
   const host = requestHost(req);
   if (isKnownHost(host)) return `https://${host}`;
-  return `https://${PRIMARY_DOMAIN}`;
+  return envUrl("APP_URL") || `https://${PRIMARY_DOMAIN}`;
 }
