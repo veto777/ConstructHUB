@@ -507,7 +507,26 @@ export default function CrmEstimateNewPage() {
               data-testid="input-item-search"
               value={itemInput}
               onChange={(e) => setItemInput(e.target.value)}
-              placeholder="Search the price book…"
+              onKeyDown={async (e) => {
+                // Typing a bare SKU number + Enter adds that scope instantly.
+                if (e.key !== "Enter") return;
+                const n = itemInput.trim();
+                if (!/^\d+$/.test(n)) return;
+                e.preventDefault();
+                try {
+                  const r = await apiRequest("GET", `/api/crm/pricebook/items?q=${encodeURIComponent(n)}`);
+                  const hit = ((await r.json()) ?? []).find((x: any) => x.code === n);
+                  if (hit) {
+                    await addItem(hit);
+                    setItemInput("");
+                  } else {
+                    toast({ title: `No SKU #${n} in the price book` });
+                  }
+                } catch {
+                  /* the visible search list still works as a fallback */
+                }
+              }}
+              placeholder="Search the price book — or type a SKU # and press Enter"
               className="h-12 pl-9 text-base"
             />
           </div>
@@ -523,10 +542,22 @@ export default function CrmEstimateNewPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm leading-snug">{i.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {i.code ? `${i.code} · ` : ""}per {i.unit}
+                      {i.code ? `${/^\d+$/.test(i.code) ? `SKU #${i.code}` : i.code} · ` : ""}per {i.unit}
                       {i.flatPriceCents != null ? ` · ${money(i.flatPriceCents)}` : ""}
                     </div>
                   </div>
+                  {i.code && /^\d+$/.test(i.code) && (
+                    <Button
+                      variant="outline"
+                      className="h-11 px-3 shrink-0 font-mono tabular-nums"
+                      disabled={addingId === i.id}
+                      onClick={() => addItem(i)}
+                      data-testid={`button-sku-${i.id}`}
+                      aria-label={`Add SKU number ${i.code}`}
+                    >
+                      #{i.code}
+                    </Button>
+                  )}
                   <Button
                     variant={inCart ? "secondary" : "default"}
                     className="h-11 px-4 shrink-0"

@@ -349,7 +349,16 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       if (!v.ok) return res.status(400).json({ message: `Formula error: ${v.error}` });
     }
     const { parts, ...item } = p.data;
-    const [row] = await db.insert(crmPbItems).values({ ...item, orgId: ctx.org.id } as any).returning();
+    // SKU number: absent a typed code, assign the org's next sequential number
+    // (1, 2, 3…). Custom text codes are left exactly as entered.
+    let code = item.code?.trim() || null;
+    if (!code) {
+      const [r] = await db.select({ n: sql<number>`coalesce(max(${crmPbItems.code}::int), 0)` })
+        .from(crmPbItems)
+        .where(and(eq(crmPbItems.orgId, ctx.org.id), sql`${crmPbItems.code} ~ '^[0-9]{1,9}$'`));
+      code = String(Number(r?.n ?? 0) + 1);
+    }
+    const [row] = await db.insert(crmPbItems).values({ ...item, code, orgId: ctx.org.id } as any).returning();
     if (parts?.length) {
       const bad = parts.find((x) => x.qtyFormula && !validateFormula(x.qtyFormula).ok);
       if (bad) return res.status(400).json({ message: `Part formula error in "${bad.qtyFormula}"` });

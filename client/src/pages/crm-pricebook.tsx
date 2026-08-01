@@ -219,7 +219,7 @@ export default function CrmPriceBookPage() {
                   <div>
                     <div className="font-medium">{i.name}</div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1.5">
-                      {i.code ? `${i.code} · ` : ""}per {i.unit}
+                      {i.code ? `${/^\d+$/.test(i.code) ? `SKU #${i.code}` : i.code} · ` : ""}per {i.unit}
                       <Badge variant="outline" className="text-[10px] font-normal">{i.pricingMode}</Badge>
                     </div>
                   </div>
@@ -463,7 +463,7 @@ export default function CrmPriceBookPage() {
                   <Label className="text-xs">Code</Label>
                   <Input value={dlg.form.code}
                     onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, code: e.target.value } })}
-                    placeholder="RR-ARCH-1L" data-testid="input-item-code" />
+                    placeholder="auto — next SKU number" data-testid="input-item-code" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Unit</Label>

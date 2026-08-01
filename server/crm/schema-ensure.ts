@@ -650,4 +650,33 @@ export async function ensureCrmSchema(): Promise<void> {
       console.warn("[crm] index skipped:", e?.message || e);
     }
   }
+
+  // SKU numbers: every price-book item carries a per-org sequential number
+  // (1, 2, 3…) unless the org typed a custom code. Idempotent — only fills
+  // NULL/blank codes, and numbering continues after the org's highest existing
+  // numeric code so re-runs and later inserts never collide. The {1,9} digit
+  // bound keeps a 60-char digit string from overflowing ::int.
+  try {
+    await pool.query(`
+      WITH maxn AS (
+        SELECT org_id, MAX(code::int) AS n
+        FROM crm_pb_items
+        WHERE code ~ '^[0-9]{1,9}$'
+        GROUP BY org_id
+      ),
+      todo AS (
+        SELECT id, org_id,
+               ROW_NUMBER() OVER (PARTITION BY org_id ORDER BY created_at, id) AS rn
+        FROM crm_pb_items
+        WHERE code IS NULL OR btrim(code) = ''
+      )
+      UPDATE crm_pb_items i
+      SET code = (COALESCE(m.n, 0) + t.rn)::text
+      FROM todo t
+      LEFT JOIN maxn m ON m.org_id = t.org_id
+      WHERE i.id = t.id
+    `);
+  } catch (e: any) {
+    console.warn("[crm] sku backfill skipped:", e?.message || e);
+  }
 }
