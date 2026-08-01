@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import fs from "fs";
+import path from "path";
 
 export type EmailTheme = "navy-orange" | "green-black" | "blue-white" | "black-gold" | "red-white" | "purple-white" | "teal-white" | "white-gray" | "black-white";
 
@@ -189,7 +191,29 @@ export async function trySend(useBackup: boolean, mailOptions: any, replyToSelf:
   return { accepted, rejected, response: info.response };
 }
 
+// Outside production, mail never leaves the box: the full message is appended
+// to tmp/email-outbox.jsonl and the caller sees a normal success. Dev servers
+// and e2e lanes load the real .env (real SMTP creds), and without this guard a
+// test run sends real email from the production address — which happened
+// 2026-08-01 (beta-invite e2e → real send → bounce in the shared inbox).
+// Set EMAIL_ALLOW_REAL=1 to deliberately send real mail from dev.
+const OUTBOX_PATH = path.join(process.cwd(), "tmp", "email-outbox.jsonl");
+function realSendAllowed(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.EMAIL_ALLOW_REAL === "1";
+}
+function sinkToOutbox(mailOptions: any): { accepted: string[]; rejected: string[]; response: string } {
+  const to = [mailOptions.to].flat().filter(Boolean).map(String);
+  fs.mkdirSync(path.dirname(OUTBOX_PATH), { recursive: true });
+  fs.appendFileSync(OUTBOX_PATH, JSON.stringify({
+    at: new Date().toISOString(), to, subject: mailOptions.subject ?? null,
+    from: mailOptions.from ?? null, html: mailOptions.html ?? null, text: mailOptions.text ?? null,
+  }) + "\n");
+  console.log(`[SMTP SINK] Not production — captured to tmp/email-outbox.jsonl instead of sending (to: ${to.join(", ")})`);
+  return { accepted: to, rejected: [], response: "sink: written to tmp/email-outbox.jsonl" };
+}
+
 export async function sendWithFallback(mailOptions: any, replyToSelf = false) {
+  if (!realSendAllowed()) return sinkToOutbox(mailOptions);
   try {
     return await trySend(false, { ...mailOptions }, replyToSelf);
   } catch (primaryErr: any) {
