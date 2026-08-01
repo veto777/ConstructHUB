@@ -64,6 +64,7 @@ import PublicEstimatePage from "@/pages/public-estimate";
 import PublicPortalPage from "@/pages/public-portal";
 import PublicInvoicePage from "@/pages/public-invoice";
 import PublicChangeOrderPage from "@/pages/public-change-order";
+import PublicLeadFormPage from "@/pages/public-lead-form";
 import ClientPortalPage from "@/pages/client-portal";
 import { isPortal, isClientPortal, CRM_NAME } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
@@ -125,6 +126,7 @@ function DashboardRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={NotFound} />
     </Switch>
@@ -199,6 +201,7 @@ function PortalRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       {/* Unknown portal route -> home, which always offers the next action. */}
       <Route component={CrmHomePage} />
@@ -214,6 +217,7 @@ function PortalPublicRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/auth" component={AuthPage} />
@@ -235,6 +239,7 @@ function ClientRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={ClientPortalPage} />
     </Switch>
@@ -273,6 +278,7 @@ function AppContent() {
     if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
+    if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
     if (location.startsWith("/portal/")) return <PublicPortalPage />;
     return <ClientRouter />;
   }
@@ -311,6 +317,7 @@ function AppContent() {
     if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
+    if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
     if (location.startsWith("/portal/")) return <PublicPortalPage />;
     const section =
       location.startsWith("/crm/clients") ? "Clients" :
@@ -378,6 +385,7 @@ function AppContent() {
   if (location.startsWith("/e/")) return <PublicEstimatePage />;
   if (location.startsWith("/i/")) return <PublicInvoicePage />;
   if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
+  if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
   if (location.startsWith("/portal/")) return <PublicPortalPage />;
 
   return (
