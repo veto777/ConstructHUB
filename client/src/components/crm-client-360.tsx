@@ -7,6 +7,8 @@
  *                          owner/admin any
  *   - CustomerTimeline   — the merged behaviour log (events, engagement,
  *                          payments, comments, attachments, financing clicks)
+ *                          folded together with the accountability audit feed
+ *                          (/activity — who on the team changed what)
  *   - ViewAsClientButton — mint a 15-min read-only portal preview grant
  *
  * Portal-facing (mounted in pages/client-portal.tsx):
@@ -24,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2, StickyNote, Activity, Eye, Landmark, MessageSquare, Paperclip,
-  CreditCard, FileText, Pencil, Trash2, ExternalLink,
+  CreditCard, FileText, Pencil, Trash2, ExternalLink, History,
 } from "lucide-react";
 import { SectionTitle, EmptyState } from "@/components/crm-ui";
 
@@ -178,12 +180,22 @@ const TIMELINE_ICONS: Record<string, any> = {
   comment: MessageSquare,
   attachment: Paperclip,
   finance_click: CreditCard,
+  audit: History,
 };
 
 export function CustomerTimeline({ customerId }: { customerId: string }) {
   const { data: entries } = useQuery<any[]>({
     queryKey: [`/api/crm/customers/${customerId}/timeline`],
   });
+  // The accountability feed (audit log) folds into the same list. It is
+  // manageJobs-gated server-side — a member without it just sees the
+  // client-behaviour feed, never an error.
+  const { data: audit } = useQuery<any[]>({
+    queryKey: [`/api/crm/customers/${customerId}/activity`],
+    retry: false,
+  });
+  const merged = [...(entries ?? []), ...(audit ?? [])]
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   return (
     <Card data-testid="section-timeline">
@@ -191,15 +203,15 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
         <SectionTitle
           icon={Activity}
           title="Activity"
-          description="Every send, open, visit, payment and message — newest first."
+          description="Every send, open, visit, payment, message and change — newest first."
         />
       </CardHeader>
       <CardContent className="space-y-1.5">
-        {!entries?.length ? (
+        {!merged.length ? (
           <EmptyState compact icon={Activity} title="No activity yet"
             description="When the client opens an estimate or messages you, it lands here." />
         ) : (
-          entries.map((e: any) => {
+          merged.map((e: any) => {
             const Icon = TIMELINE_ICONS[e.kind] ?? Activity;
             return (
               <div key={e.id} className="flex items-start gap-3 rounded-lg border px-4 py-2.5"

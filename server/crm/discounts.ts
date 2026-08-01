@@ -25,6 +25,7 @@ import { db } from "../db";
 import { crmEstimateDiscounts, crmEstimateItems, crmEstimates } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { logActivity } from "./activity";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -251,6 +252,10 @@ export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): vo
     const fresh = await db.select().from(crmEstimateDiscounts)
       .where(and(eq(crmEstimateDiscounts.orgId, ctx.org.id), eq(crmEstimateDiscounts.estimateId, est.id)))
       .orderBy(asc(crmEstimateDiscounts.sortOrder), asc(crmEstimateDiscounts.createdAt));
+    logActivity(ctx, "discount.updated", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, offers: parsed.data.offers.map((o) => o.code) },
+    });
     res.json({ offers: fresh.map(presentDiscountOffer) });
   });
 }

@@ -628,6 +628,26 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_finance_clicks_org_idx ON crm_finance_clicks (org_id);
   `);
 
+  // ── Accountability: org-wide activity log (who did what, when) ───────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_activity_log (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      actor_member_id varchar,
+      actor_label text NOT NULL,
+      action text NOT NULL,
+      entity_type text,
+      entity_id varchar,
+      customer_id varchar,
+      meta jsonb,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_activity_log_customer_idx ON crm_activity_log (org_id, customer_id);
+    CREATE INDEX IF NOT EXISTS crm_activity_log_actor_idx ON crm_activity_log (org_id, actor_member_id);
+    CREATE INDEX IF NOT EXISTS crm_activity_log_created_idx ON crm_activity_log (org_id, created_at);
+  `);
+
   // Constraints are added separately: they are not IF NOT EXISTS in older
   // Postgres, so each is guarded and allowed to fail benignly if present.
   const guarded = [

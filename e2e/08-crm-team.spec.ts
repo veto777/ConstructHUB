@@ -117,6 +117,16 @@ test.describe("/crm/team", () => {
       await expect(page.getByText("Team member updated", { exact: true })).toBeVisible();
     }
 
+    // Owner audit view: my own row's activity dropdown opens and shows fresh
+    // entries — the profile save and member edits this test just made are in
+    // the accountability log. Read-only: nothing here needs restoring.
+    const meJson = await (await page.request.get("/api/crm/me")).json();
+    const myMemberId = meJson.member.id as string;
+    await page.getByTestId(`button-activity-${myMemberId}`).click();
+    const firstActivity = page.locator('[data-testid^="row-activity-"]').first();
+    await expect(firstActivity).toBeVisible();
+    await expect(firstActivity).toContainText("updated");
+
     guards.assertClean("team curated");
   });
 

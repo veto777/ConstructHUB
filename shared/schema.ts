@@ -1228,6 +1228,27 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
 
 export type CrmCustomerNote = typeof crmCustomerNotes.$inferSelect;
 
+// crm_activity_log: the org-wide accountability feed (HCP-style "who did
+// what, when"). One row per meaningful mutation — sign-ins, document and
+// client writes, team changes, exports. actor_label is a snapshot (member
+// display name, 'client' or 'system') so the row stays truthful after the
+// member is renamed or removed. meta carries field names/amounts only —
+// NEVER passwords, tokens or secrets.
+export const crmActivityLog = pgTable("crm_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  actorMemberId: varchar("actor_member_id"),
+  actorLabel: text("actor_label").notNull(),
+  action: text("action").notNull(), // 'login', 'estimate.created', 'payment.recorded', …
+  entityType: text("entity_type"),
+  entityId: varchar("entity_id"),
+  customerId: varchar("customer_id"), // the client the action relates to, when any
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CrmActivityLogRow = typeof crmActivityLog.$inferSelect;
+
 // crm_finance_clicks: a homeowner tapped a financing link in the client
 // portal. Recorded BEFORE the link opens so the contractor sees "applied for
 // financing via <label>" on the client timeline even when the lender's site
@@ -1267,6 +1288,7 @@ export const CRM_PERMISSIONS = [
   "manageSettings",
   "seeReporting",
   "manageIntegrations",
+  "exportData",         // bulk client export (CSV) — owner by default, grantable per seat
 ] as const;
 export type CrmPermission = (typeof CRM_PERMISSIONS)[number];
 export type CrmPermissionSet = Partial<Record<CrmPermission, boolean>>;
@@ -1276,7 +1298,7 @@ const ALL: CrmPermissionSet = Object.fromEntries(CRM_PERMISSIONS.map((p) => [p, 
 // Defaults per role. A membership's `permissions` jsonb overrides these keys.
 export const CRM_ROLE_DEFAULTS: Record<CrmRole, CrmPermissionSet> = {
   owner: { ...ALL },
-  admin: { ...ALL, manageIntegrations: false },
+  admin: { ...ALL, manageIntegrations: false, exportData: false },
   // Project manager: office-like reach across the whole book of work (all
   // jobs, estimates and customers — they coordinate the work), but cost-blind:
   // sees scopes and their prices, never costs or margins. The back office

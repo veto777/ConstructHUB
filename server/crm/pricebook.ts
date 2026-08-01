@@ -19,6 +19,7 @@ import {
 } from "@shared/schema";
 import { and, eq, asc, desc, ilike, or, sql } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { logActivity } from "./activity";
 import { evalFormula, validateFormula, formulaSymbols, FormulaError } from "./formula";
 
 type GetUser = (req: any, res: any) => any;
@@ -366,6 +367,10 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         ...x, orgId: ctx.org.id, itemId: row.id, sortOrder: i,
       })) as any);
     }
+    logActivity(ctx, "pricebook.updated", {
+      entityType: "pricebook_item", entityId: row.id,
+      meta: { change: "created", name: row.name, code: row.code },
+    });
     res.status(201).json(row);
   });
 
@@ -413,6 +418,10 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         })) as any);
       }
     }
+    logActivity(ctx, "pricebook.updated", {
+      entityType: "pricebook_item", entityId: row.id,
+      meta: { change: "updated", name: row.name, fields: Object.keys(patch) },
+    });
     res.json(row);
   });
 
@@ -426,8 +435,12 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!ctx) return;
     const [row] = await db.update(crmPbItems).set({ active: false, updatedAt: new Date() })
       .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, req.params.id),
-        eq(crmPbItems.active, true))).returning({ id: crmPbItems.id });
+        eq(crmPbItems.active, true))).returning({ id: crmPbItems.id, name: crmPbItems.name });
     if (!row) return res.status(404).json({ message: "Item not found" });
+    logActivity(ctx, "pricebook.updated", {
+      entityType: "pricebook_item", entityId: row.id,
+      meta: { change: "deleted", name: row.name },
+    });
     res.json({ ok: true });
   });
 

@@ -62,6 +62,11 @@ test.describe("/crm/clients/:id", () => {
     await page.getByTestId("button-save-project").click();
     await expect(page.getByText("Project created", { exact: true })).toBeVisible();
 
+    // The accountability feed folds into the client timeline: the estimate
+    // this test just created shows up as a "who did what" audit entry.
+    await gotoCrm(page, URL);
+    await expect(page.getByTestId("section-timeline")).toContainText("created estimate");
+
     guards.assertClean("client detail curated");
   });
 

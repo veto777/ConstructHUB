@@ -43,6 +43,7 @@ import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmReceiptRoutes } from "./receipts";
 import { notifyMemberAccountChange } from "./owner-notify";
+import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
@@ -216,6 +217,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmAttachmentRoutes(app, getDevUser);
   // Receipts-to-date: preview + one-click send; auto-emailed after payments.
   registerCrmReceiptRoutes(app, getDevUser);
+  // Accountability log: per-client and per-member audit feeds.
+  registerCrmActivityRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -278,6 +281,12 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         { id: user.id, email: ctx.member.email, displayName: ctx.member.displayName },
         [...changed],
       );
+    }
+    if (Object.keys(parsed.data).length) {
+      logActivity(ctx, "member.updated", {
+        entityType: "member", entityId: ctx.member.id,
+        meta: { fields: Object.keys(parsed.data), name: ctx.member.displayName || ctx.member.email },
+      });
     }
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
@@ -532,6 +541,12 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         );
       }
     }
+    if (Object.keys(parsed.data).length) {
+      logActivity(ctx, "member.updated", {
+        entityType: "member", entityId: target.id,
+        meta: { fields: Object.keys(parsed.data), name: target.displayName || target.email },
+      });
+    }
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 
@@ -721,6 +736,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
     const emailed = await sendInviteEmail(ctx.org.name, email, link);
 
+    logActivity(ctx, "invitation.sent", {
+      entityType: "invitation", entityId: invite.id,
+      meta: { email: lower, role },
+    });
     const { token: _t, ...safe } = invite;
     res.status(201).json({ invitation: safe, link, emailed });
   });
@@ -754,6 +773,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
     const emailed = await sendInviteEmail(ctx.org.name, invite.email, link);
 
+    logActivity(ctx, "invitation.resent", {
+      entityType: "invitation", entityId: invite.id,
+      meta: { email: invite.email },
+    });
     const { token: _t, ...safe } = updated;
     res.json({ invitation: safe, link, emailed });
   });
@@ -783,6 +806,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
           eq(crmMembers.status, "invited"),
         ),
       );
+    logActivity(ctx, "invitation.revoked", {
+      entityType: "invitation", entityId: invite.id,
+      meta: { email: invite.email },
+    });
     res.json({ ok: true });
   });
 
@@ -862,6 +889,15 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     }
 
     await db.update(crmInvitations).set({ acceptedAt: new Date() }).where(eq(crmInvitations.id, invite.id));
+    recordActivity({
+      orgId: invite.orgId,
+      actorMemberId: placeholder?.id ?? null,
+      actorLabel: account?.displayName || invite.email,
+      action: "invitation.accepted",
+      entityType: "invitation",
+      entityId: invite.id,
+      meta: { email: invite.email, role: invite.role },
+    });
     if (req.session) req.session.activeOrgId = invite.orgId;
     res.json({ ok: true, orgId: invite.orgId });
   });

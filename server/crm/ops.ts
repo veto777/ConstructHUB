@@ -29,6 +29,7 @@ import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { autoSendPaymentReceipt } from "./receipts";
+import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 
@@ -190,6 +191,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       await db.insert(crmInvoiceItems).values(
         d.items.map((it, i) => ({ ...it, orgId: ctx.org.id, invoiceId: inv.id, sortOrder: i })) as any);
     }
+    logActivity(ctx, "invoice.created", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number },
+    });
     res.status(201).json(await recalcInvoice(ctx.org.id, inv.id));
   });
 
@@ -221,6 +226,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       description: i.description, unit: i.unit, unitPriceCents: i.unitPriceCents,
       quantityMilli: Math.round((i.quantityMilli * pct) / 10000), taxable: i.taxable,
     })) as any);
+    logActivity(ctx, "invoice.created", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number, fromEstimate: est.number ?? est.id },
+    });
     res.status(201).json(await recalcInvoice(ctx.org.id, inv.id));
   });
 
@@ -284,6 +293,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     // And email the client their receipt-to-date (honors paymentReceipt).
     autoSendPaymentReceipt(ctx.org.id, inv.id)
       .catch((e: any) => console.error("[crm] auto-receipt failed:", e?.message || e));
+    logActivity(ctx, "payment.recorded", {
+      entityType: "payment", entityId: pay.id, customerId: inv.customerId,
+      meta: { amountCents: pay.amountCents, method: pay.method, number: inv.number, invoiceId: inv.id },
+    });
     res.status(201).json({ payment: pay, invoice: row });
   });
 
@@ -301,6 +314,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const [row] = await db.update(crmInvoices).set({
       voidedAt: new Date(), status: "void", updatedAt: new Date(),
     }).where(eq(crmInvoices.id, inv.id)).returning();
+    logActivity(ctx, "invoice.updated", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number, change: "voided" },
+    });
     res.json(row);
   });
 
@@ -340,6 +357,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       orgId: ctx.org.id, customerId: inv.customerId, authorMemberId: ctx.member.id,
       body: `Invoice ${inv.number ?? inv.id} ("${inv.title}") was permanently deleted by the account owner.`,
     }).catch(() => {});
+    logActivity(ctx, "invoice.deleted", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number, title: inv.title },
+    });
     res.json({ ok: true, deleted: inv.id });
   });
 

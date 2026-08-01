@@ -11,6 +11,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes, randomInt } from "crypto";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
 import { notifyMemberLogin, notifyMemberAccountChange } from "./crm/owner-notify";
+import { logMemberAuth } from "./crm/activity";
 import { resolveGoogleUrl } from "./google-url-resolver";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 
@@ -297,6 +298,8 @@ export async function setupAuth(app: Express) {
         // Owner's "team member signs in" notice (debounced per user/org/hour).
         // Fire-and-forget: mail latency must never sit on the login path.
         notifyMemberLogin(user).catch((e: any) => console.error("[crm] login notify failed:", e?.message || e));
+        // Accountability log: one 'login' row per org the user sits in.
+        logMemberAuth(user, "login").catch((e: any) => console.error("[crm] login activity failed:", e?.message || e));
         res.json({
           id: user.id,
           email: user.email,
@@ -700,8 +703,15 @@ export async function setupAuth(app: Express) {
   });
 
   app.post("/api/auth/logout", (req, res) => {
+    // Capture the actor before the session goes away — a sign-out is only
+    // worth logging when we know who it was.
+    const actor = (req.isAuthenticated?.() && req.user) ? (req.user as any) : null;
     req.logout(() => {
       req.session.destroy(() => {
+        if (actor) {
+          logMemberAuth(actor, "logout")
+            .catch((e: any) => console.error("[crm] logout activity failed:", e?.message || e));
+        }
         res.json({ ok: true });
       });
     });
