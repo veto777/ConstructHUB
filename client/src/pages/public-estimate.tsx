@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { queryClient } from "@/lib/queryClient";
@@ -139,6 +139,49 @@ export default function PublicEstimatePage() {
     retry: false,
   });
 
+  // First-open pass (?k= from the document email): clicking from the inbox
+  // proves inbox possession, so the pass signs the recipient in directly —
+  // no email round-trip on the first open. Redeemed here via POST (scanners
+  // that prefetch the link never consume it); single-use, so a forwarded
+  // copy opened on another device falls back to the email gate below.
+  const firstOpenPass = new URLSearchParams(window.location.search).get("k");
+  const [passState, setPassState] = useState<"idle" | "trying" | "failed">("idle");
+  const needsGate = (() => {
+    const msg = String((error as Error | null)?.message ?? "");
+    if (!msg.startsWith("401:")) return false;
+    try { return JSON.parse(msg.slice(msg.indexOf(":") + 1))?.requiresVerification === true; }
+    catch { return false; }
+  })();
+  useEffect(() => {
+    if (!needsGate || !firstOpenPass || passState !== "idle") return;
+    setPassState("trying");
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/client/auth/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: firstOpenPass }),
+        });
+        if (cancelled) return;
+        if (r.ok) {
+          // The pass is spent — drop it from the URL so what gets saved or
+          // shared is the bare link, then load the document on the session.
+          const url = new URL(window.location.href);
+          url.searchParams.delete("k");
+          window.history.replaceState({}, "", url.toString());
+          setPassState("idle");
+          queryClient.invalidateQueries({ queryKey: [docUrl] });
+        } else {
+          setPassState("failed");
+        }
+      } catch {
+        if (!cancelled) setPassState("failed");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [needsGate, firstOpenPass, passState, docUrl]);
+
   // Engagement heartbeat — starts only once the document has loaded, and
   // never for a contractor preview (that's not client behaviour).
   useEngagementTracker("estimate", token, !!data && !data?.preview);
@@ -183,13 +226,24 @@ export default function PublicEstimatePage() {
     const msg = String((error as Error).message ?? "");
     // 401 requiresVerification = the email gate. The document stays sealed
     // until the visitor proves they own the inbox it was sent to.
-    if (msg.startsWith("401:")) {
-      try {
-        const j = JSON.parse(msg.slice(msg.indexOf(":") + 1));
-        if (j?.requiresVerification) {
-          return <DocGateChallenge docType="estimate" token={token!} />;
-        }
-      } catch { /* fall through to the generic error card */ }
+    if (needsGate) {
+      // A pass is being redeemed — hold the spinner, not the gate.
+      if (firstOpenPass && passState !== "failed") {
+        return <div className="flex justify-center p-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+      }
+      return (
+        <>
+          {passState === "failed" && (
+            <div className="bg-amber-500/10 border-b border-amber-500/40 px-4 py-3 text-center text-sm text-amber-700 dark:text-amber-400"
+              data-testid="text-pass-used">
+              This email link was already used on another device, so we need to confirm it's you —
+              enter your email below and we'll send a fresh link only to the address this document
+              belongs to.
+            </div>
+          )}
+          <DocGateChallenge docType="estimate" token={token!} />
+        </>
+      );
     }
     // 410 = expired. The server sends only org contact details with it (never
     // document content), so this page is all an expired visitor can reach.

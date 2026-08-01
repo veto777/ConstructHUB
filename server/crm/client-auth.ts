@@ -291,6 +291,48 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     res.redirect(302, safeNext || `/${devOnly}`);
   });
 
+  // ── Redeem a first-open pass (the ?k= in a document email) ────────────────
+  // The "View estimate" button carries a single-use pass: clicking from the
+  // inbox IS proof of inbox possession, so the original recipient goes straight
+  // in and the browser keeps a normal session. The pass is redeemed by page JS
+  // via POST — email scanners that prefetch the GET link never consume it. A
+  // forwarded copy opened elsewhere finds the pass already used (or expired)
+  // and falls back to the email-verification gate, which only ever sends a
+  // fresh link to the address on file.
+  app.post("/api/client/auth/redeem", async (req: any, res) => {
+    const parsed = z.object({ token: z.string().min(32).max(200) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ ok: false, message: "Invalid pass" });
+    if (!allow(`ip:${clientIp(req)}`, IP_LIMIT)) {
+      return res.status(429).json({ ok: false, message: "Too many requests. Please try again later." });
+    }
+
+    // Atomic single-use, same rule as the magic link.
+    const [row] = await db
+      .update(crmClientTokens)
+      .set({ usedAt: new Date() })
+      .where(
+        and(
+          eq(crmClientTokens.tokenHash, sha256(parsed.data.token)),
+          isNull(crmClientTokens.usedAt),
+          sql`${crmClientTokens.expiresAt} > now()`,
+        ),
+      )
+      .returning();
+    if (!row) {
+      return res.status(410).json({ ok: false, message: "This link was already used or has expired." });
+    }
+
+    const sessionToken = randomBytes(32).toString("hex");
+    await db.insert(crmClientSessions).values({
+      tokenHash: sha256(sessionToken),
+      customerIds: row.customerIds,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      lastSeenAt: new Date(),
+    });
+    setSessionCookie(res, sessionToken, SESSION_TTL_MS);
+    res.json({ ok: true });
+  });
+
   // ── Redeem a contractor portal-preview grant ──────────────────────────────
   // Minted by POST /api/crm/customers/:id/portal-preview (manageCustomers) so
   // the contractor can open the portal exactly as their client sees it. The

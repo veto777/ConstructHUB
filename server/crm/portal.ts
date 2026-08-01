@@ -31,6 +31,7 @@ import { getBaseUrl } from "../auth";
 import { portalBaseUrl, clientPortalBaseUrl } from "../site-context";
 import { logEvent, presentEstimate } from "./entities";
 import { emitCrmEvent } from "./integrations";
+import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount } from "./sms";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { recomputeApprovalTotals } from "./discounts";
@@ -235,12 +236,23 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (!to) return res.status(400).json({ message: "This client has no email address. Add one first." });
 
     const base = getBaseUrl(req);
-    const link = `${base}/e/${est.publicToken}`;
     const from = ctx.member.displayName || ctx.org.name;
     // Sending starts the expiry clock (default 7 days). Computed once here so
     // the email and the row agree.
     const sentAt = new Date();
     const expiresAt = estimateExpiryOnSend(sentAt);
+
+    // First-open pass: clicking from the inbox proves inbox possession, so the
+    // email's own link signs the recipient straight in (single-use, redeemed by
+    // page JS — see /api/client/auth/redeem). Valid as long as the estimate is.
+    const pass = randomBytes(32).toString("hex");
+    await db.insert(crmClientTokens).values({
+      tokenHash: sha256(pass),
+      customerIds: [cust.id],
+      email: to.toLowerCase(),
+      expiresAt,
+    });
+    const link = `${base}/e/${est.publicToken}?k=${pass}`;
     // The letterhead is the division's when the work belongs to one.
     const branding = companyBranding(ctx.org, await resolveEstimateDivision(est));
 
@@ -251,7 +263,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       ? (branding.logoUrl.startsWith("http") ? branding.logoUrl : `${base}${branding.logoUrl}`)
       : null;
     const portalUrl = clientPortalBaseUrl(req);
-    const termsUrl = `${link}?terms=1`;
+    const termsUrl = `${base}/e/${est.publicToken}?terms=1`;
     const addressLine = branding.addressLine1
       ? `${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `<br>${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}`
       : "";
@@ -409,6 +421,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
           notifyOwner(est.orgId, est, cust, org, "opened").catch(() => {});
         } else {
           await logEvent(est.orgId, est.id, "viewed", "client", req, { firstView: false });
+          // A deduped REPEAT open: the client came back to their bid — fire the
+          // once-per-day "call them" alert (no-op when already alerted today).
+          maybeAlertReengagement({ est, org, cust, req })
+            .catch((e: any) => console.error("[crm] reengagement alert failed:", e?.message || e));
         }
       }
     }
@@ -677,12 +693,13 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // customer) gets a silent no-op, not a tracking row.
     const ids = await resolveClientCustomerIds(req);
     let orgId: string, docId: string;
+    let estRow: typeof crmEstimates.$inferSelect | null = null;
     if (docType === "estimate") {
       const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
       if (!est) return res.status(404).json({ message: "Not found" });
       if (!est.sentAt || est.approvedAt || est.declinedAt) return res.json({ sessionId: null });
       if (!ids.includes(est.customerId)) return res.json({ sessionId: null });
-      orgId = est.orgId; docId = est.id;
+      orgId = est.orgId; docId = est.id; estRow = est;
     } else {
       const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
       if (!inv) return res.status(404).json({ message: "Not found" });
@@ -694,6 +711,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // Timestamps are written from JS, not DB defaults: node-pg and the DB's
     // timezone setting disagree on `timestamp without tz` columns, and mixing
     // the two write paths skews the first ping's gap by hours.
+    // A 2nd+ distinct session on an estimate is a REPEAT visit — counted
+    // before the insert below so the client's very first session never alerts.
+    const priorSessions = estRow ? await priorEstimateSessionCount(estRow.id) : 0;
     const now = new Date();
     const [row] = await db.insert(crmEngagementSessions).values({
       orgId, docType, docId,
@@ -701,6 +721,17 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       ip: clientIp(req) || null,
       userAgent: String(req.headers["user-agent"] || "").slice(0, 300) || null,
     } as any).returning();
+
+    // Repeat session on an already-viewed estimate → the once-per-day
+    // "client is reviewing their bid — call them" alert (fire-and-forget;
+    // a failed alert must never break engagement tracking).
+    if (estRow && priorSessions >= 1 && estRow.firstViewedAt) {
+      (async () => {
+        const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, estRow!.orgId)).limit(1);
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, estRow!.customerId)).limit(1);
+        if (org && cust) await maybeAlertReengagement({ est: estRow!, org, cust, req });
+      })().catch((e: any) => console.error("[crm] reengagement alert failed:", e?.message || e));
+    }
     res.json({ sessionId: row.id });
   });
 
@@ -829,6 +860,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       })),
     });
   });
+
+  // SMS: status/test-send for Settings + the estimate reminder route.
+  registerCrmSmsRoutes(app, getDevUser);
 }
 
 /** Email the org owner (and the estimate's author) when the client acts. */
