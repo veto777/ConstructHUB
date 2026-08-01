@@ -240,6 +240,9 @@ describe("org theme over the API (dev server)", () => {
       expect(pub.body.company.themeColor).toBe("green");
       expect(pub.body.company.theme).toEqual({
         hex: "#16A34A", onHex: "#FFFFFF", hsl: "142 76% 36%", onHsl: "0 0% 100%",
+        // The base (band) colour the accent pairs with — black unless the org
+        // chose white (customFields.themeBase).
+        base: "black", baseHex: "#111827", onBaseHex: "#F9FAFB",
       });
     } finally {
       // Restore the default orange whatever happened above — on THIS suite's
