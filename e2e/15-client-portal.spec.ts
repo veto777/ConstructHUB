@@ -110,21 +110,27 @@ test.describe("client portal — dashboard", () => {
     await expect(action).toContainText("INV-2002");
     await expect(action).not.toContainText("E-2001");
 
+    // The portal is a per-view shell now — each document group lives behind
+    // its own sidebar nav entry.
+    await page.getByTestId("portal-nav-estimates").click();
     await expect(page.getByTestId("section-estimates")).toContainText("E-2001");
     await expect(page.getByTestId("section-estimates")).toContainText("approved");
+    // Isolation: Orozco's estimate never appears.
+    await expect(page.locator("main")).not.toContainText("E-2002");
+    await expect(page.locator("main")).not.toContainText("Downstairs LVP");
+
+    await page.getByTestId("portal-nav-invoices").click();
     await expect(page.getByTestId("section-invoices")).toContainText("INV-2002");
     await expect(page.getByTestId("section-invoices")).toContainText("$13,969.92");
+    // Isolation: Castellano's invoice never appears.
+    await expect(page.locator("main")).not.toContainText("INV-2001");
+    await expect(page.locator("main")).not.toContainText("Guest bath tile");
 
+    await page.getByTestId("portal-nav-contracts").click();
     // The signed contract IS the approved estimate, signature shown.
     const contracts = page.getByTestId("section-contracts");
     await expect(contracts).toContainText("E-2001");
     await expect(contracts).toContainText("Joe Kane");
-
-    // Isolation: Orozco's estimate and Castellano's invoice never appear.
-    await expect(page.locator("main")).not.toContainText("E-2002");
-    await expect(page.locator("main")).not.toContainText("INV-2001");
-    await expect(page.locator("main")).not.toContainText("Downstairs LVP");
-    await expect(page.locator("main")).not.toContainText("Guest bath tile");
 
     guards.assertClean("dashboard grouping + isolation");
   });
@@ -134,6 +140,7 @@ test.describe("client portal — dashboard", () => {
     await signInAsKane(page);
 
     const inv = await q<{ id: string }>(`select id from crm_invoices where number = 'INV-2002' limit 1`);
+    await page.getByTestId("portal-nav-invoices").click();
     await page.getByTestId(`client-invoice-${inv[0].id}`).click();
     await expect(page).toHaveURL(/\/i\//);
     // The existing public invoice page renders — approve/pay surface reused.
@@ -159,7 +166,9 @@ test.describe("client portal — dashboard", () => {
   test("sweep: every button and link on the dashboard", async ({ page }) => {
     await signInAsKane(page);
     const { clicked, labels } = await sweepPage(page, "/?client=1", {
-      ready: '[data-testid="section-contracts"]',
+      // The portal root: section testids are per-view now, so no single one
+      // is on the page at load (the home view is the default).
+      ready: '[data-testid="client-portal-root"]',
     });
     console.log(`client dashboard sweep clicked ${clicked}: ${labels.join(" | ")}`);
     // Sign out (skipped by the sweep guard, curated above) plus the document

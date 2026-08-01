@@ -291,9 +291,10 @@ test.describe("HOVER integration @serial", () => {
     const crm3d = page.getByTestId(`measurement-3d-${measurementId}`);
     await expect(crm3d).toHaveAttribute("href", "https://hover.to/3d/9001");
 
-    // ── Client portal: Measurement reports section ───────────────────────
+    // ── Client portal: Measurement reports view ──────────────────────────
     await grantClientSession(page, [customerId]);
     await gotoCrm(page, "/?client=1");
+    await page.getByTestId("portal-nav-reports").click();
     await expect(page.getByTestId("section-reports")).toBeVisible();
     const portal3d = page.getByTestId(`client-report-3d-${measurementId}`);
     await expect(portal3d).toBeVisible();
