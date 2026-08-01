@@ -15,12 +15,13 @@ test.describe("/crm/payments", () => {
     const connect = page.getByTestId("button-connect-stripe");
     if (await connect.isVisible().catch(() => false)) {
       if (await connect.isEnabled()) {
-        // Configured: clicking starts Stripe onboarding — assert the mutation
-        // fires without a server error; don't follow the external redirect.
-        await Promise.all([
-          page.waitForResponse((r) => r.url().includes("/api/crm/payments/connect/stripe")),
-          connect.click(),
-        ]);
+        // Configured: onboarding hands back a Stripe OAuth URL. Assert the
+        // endpoint fires clean WITHOUT clicking — the click handler navigates
+        // the whole tab off-site (crm-payments.tsx onSuccess sets
+        // location.href), stranding every later assertion on an abandoned
+        // page (same reason the sweep skips this button).
+        const r = await page.request.get("/api/crm/payments/connect/stripe");
+        expect(r.status(), "stripe connect endpoint").toBeLessThan(500);
       } else {
         await expect(page.getByText(/Not configured on this server/)).toBeVisible();
       }
