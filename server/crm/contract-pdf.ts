@@ -325,10 +325,9 @@ export async function buildContractPdf(
     .text(e.signatureName ?? "", { continued: true })
     .font("Helvetica").fontSize(11)
     .text(` on ${signedOn} · ${input.orgName}`);
-  if (e.signatureIp) {
-    doc.moveDown(0.3);
-    doc.font("Helvetica").fontSize(8).fillColor(MUTED).text(`Approval IP: ${e.signatureIp}`);
-  }
+  // The approval IP stays in the DB for dispute evidence but is deliberately
+  // NOT printed: clients should never see backend/technical terms on their
+  // documents (owner directive 2026-08-01).
 
   // ── Footer band + page numbers on EVERY page ──────────────────────────────
   const footerBits = [

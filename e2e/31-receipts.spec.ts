@@ -57,7 +57,9 @@ test.describe("receipts", () => {
     //    without working SMTP, an honest failure — both name the address).
     await page.getByTestId("button-send-receipt").click();
     await expect(
-      page.getByText(new RegExp(`receipt to ${email.replace(/[.@-]/g, "\\$&")}`, "i")).first(),
+      // "Receipt emailed to <addr>" (SMTP up) or "Couldn't email the receipt
+      // to <addr>" (SMTP down) — the dev mailer is genuinely either.
+      page.getByText(new RegExp(`receipt (?:emailed )?to ${email.replace(/[.@-]/g, "\\$&")}`, "i")).first(),
     ).toBeVisible({ timeout: 20_000 });
 
     // ── DB: the email attempt was recorded on the invoice.

@@ -79,7 +79,9 @@ test.describe("/crm/settings", () => {
       ready: 'h1:has-text("Settings")',
       // Connect Google Calendar redirects off-site to the OAuth consent screen
       // (Google creds ARE set in dev), same reason 07 skips Connect Stripe.
-      skip: ({ testid }) => testid === "button-connect-google-calendar",
+      // Connect HOVER is the same shape (real OAuth app creds in .env).
+      skip: ({ testid }) =>
+        testid === "button-connect-google-calendar" || testid === "button-connect-hover",
     });
     console.log(`settings sweep clicked ${clicked}`);
     expect(clicked).toBeGreaterThanOrEqual(10);

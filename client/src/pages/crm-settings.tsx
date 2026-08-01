@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -84,6 +85,10 @@ export default function CrmSettingsPage() {
   const { data: gcalStatus } = useQuery<any>({
     queryKey: ["/api/crm/calendar/google/status"],
     enabled: allowed,
+  });
+  const { data: hoverStatus } = useQuery<any>({
+    queryKey: ["/api/crm/integrations/hover/status"],
+    enabled: allowed && canIntegrations,
   });
 
   // ── Divisions ─────────────────────────────────────────────────────────────
@@ -317,7 +322,10 @@ export default function CrmSettingsPage() {
     queryKey: ["/api/crm/payments/settings"],
     enabled: allowed,
   });
-  const [feeForm, setFeeForm] = useState({ passFeeToClient: false, surchargePct: "" });
+  const [feeForm, setFeeForm] = useState({
+    passFeeToClient: false, surchargePct: "",
+    railMode: "both" as "both" | "ach_only" | "card_only", achOnlyOver: "",
+  });
   const [finLinks, setFinLinks] = useState<{ label: string; url: string; primary?: boolean }[]>([]);
   const [newLink, setNewLink] = useState({ label: "", url: "" });
   useEffect(() => {
@@ -325,6 +333,9 @@ export default function CrmSettingsPage() {
     setFeeForm({
       passFeeToClient: paySettings.payments?.passFeeToClient === true,
       surchargePct: paySettings.payments?.surchargeBps ? String(paySettings.payments.surchargeBps / 100) : "",
+      railMode: paySettings.payments?.railMode === "ach_only" || paySettings.payments?.railMode === "card_only"
+        ? paySettings.payments.railMode : "both",
+      achOnlyOver: paySettings.payments?.achOnlyOverCents ? String(paySettings.payments.achOnlyOverCents / 100) : "",
     });
     setFinLinks(paySettings.financingLinks ?? []);
   }, [paySettings]);
@@ -341,12 +352,17 @@ export default function CrmSettingsPage() {
 
   const saveFee = () => {
     const pct = parseFloat(feeForm.surchargePct);
+    const over = parseFloat(feeForm.achOnlyOver);
     savePaySettings.mutate({
       payments: {
         passFeeToClient: feeForm.passFeeToClient,
         surchargeBps: feeForm.surchargePct.trim() === "" || Number.isNaN(pct)
           ? null
           : Math.round(Math.min(10, Math.max(0, pct)) * 100),
+        railMode: feeForm.railMode,
+        achOnlyOverCents: feeForm.railMode !== "both" || feeForm.achOnlyOver.trim() === "" || Number.isNaN(over) || over <= 0
+          ? null
+          : Math.round(Math.min(1_000_000, over) * 100),
       },
     });
   };
@@ -407,6 +423,48 @@ export default function CrmSettingsPage() {
       toast({ title: "Webhook deleted" });
     },
     onError: (e: any) => toast({ title: "Could not delete webhook", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── HOVER ─────────────────────────────────────────────────────────────────
+  // The OAuth redirect lands back on /crm/settings?hover=connected|error.
+  useEffect(() => {
+    const flag = new URLSearchParams(window.location.search).get("hover");
+    if (flag === "connected") toast({ title: "HOVER connected", description: "Completed jobs will flow in automatically." });
+    else if (flag === "error") toast({ title: "HOVER connection failed", description: "Please try connecting again.", variant: "destructive" });
+    if (flag) window.history.replaceState({}, "", "/crm/settings");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hoverInvalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/integrations/hover/status"] });
+
+  const hoverRegister = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/integrations/hover/register-webhook", {})).json(),
+    onSuccess: (r: any) => {
+      hoverInvalidate();
+      toast(r.ok === false
+        ? { title: "Webhook registration failed", variant: "destructive" }
+        : { title: r.state === "verified" ? "HOVER webhook is live" : "HOVER webhook registered — verifying…" });
+    },
+    onError: (e: any) => toast({ title: "Could not register webhook", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const hoverSync = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/integrations/hover/sync", {})).json(),
+    onSuccess: (r: any) => {
+      hoverInvalidate();
+      toast({ title: "HOVER sync complete", description: `${r.ingested ?? 0} imported, ${r.duplicates ?? 0} already up to date${r.failed ? `, ${r.failed} failed` : ""}.` });
+    },
+    onError: (e: any) => toast({ title: "HOVER sync failed", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const hoverDisconnect = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/integrations/hover/disconnect", {})).json(),
+    onSuccess: () => {
+      hoverInvalidate();
+      toast({ title: "HOVER disconnected" });
+    },
+    onError: (e: any) => toast({ title: "Could not disconnect", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   // ── Calendar sync ─────────────────────────────────────────────────────────
@@ -922,6 +980,55 @@ export default function CrmSettingsPage() {
             )}
           </div>
 
+          {/* Rail policy — the org decides what clients may pay with. */}
+          <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-rail-policy">
+            <div>
+              <div className="text-sm font-medium">Payment methods you offer</div>
+              <p className="text-xs text-muted-foreground">
+                You control the rails — clients only see what you allow. ACH costs 0.8% capped at $5;
+                cards cost 2.9% + 30¢, which adds up fast on large payments.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Allowed methods</Label>
+                <Select value={feeForm.railMode}
+                  onValueChange={(v) => setFeeForm((f) => ({ ...f, railMode: v as typeof f.railMode }))}>
+                  <SelectTrigger className="w-64" data-testid="select-rail-mode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="both">Bank transfer (ACH) + card</SelectItem>
+                    <SelectItem value="ach_only">Bank transfer (ACH) only</SelectItem>
+                    <SelectItem value="card_only">Card only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {feeForm.railMode === "both" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="ach-only-over">ACH only above ($)</Label>
+                  <Input id="ach-only-over" type="number" min={0} step="100" className="w-36"
+                    placeholder="e.g. 5000" data-testid="input-ach-only-over"
+                    value={feeForm.achOnlyOver}
+                    onChange={(e) => setFeeForm((f) => ({ ...f, achOnlyOver: e.target.value }))} />
+                </div>
+              )}
+            </div>
+            {feeForm.railMode === "both" && (
+              <p className="text-xs text-muted-foreground">
+                Leave the threshold blank to always offer both. With a threshold, payments at or above
+                it are bank-transfer only.
+              </p>
+            )}
+            <div className="flex justify-end">
+              <Button size="sm" onClick={saveFee} disabled={savePaySettings.isPending}
+                data-testid="button-save-rail-policy">
+                {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save payment methods
+              </Button>
+            </div>
+          </div>
+
           {/* Card processing fee passthrough — ACH always stays fee-free. */}
           <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-card-fee">
             <div className="flex items-center justify-between gap-4">
@@ -1301,6 +1408,87 @@ export default function CrmSettingsPage() {
                   ))}
                 </div>
               )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── HOVER: measurements in, automatically ───────────────────────── */}
+      <Card data-testid="card-hover">
+        <CardHeader>
+          <SectionTitle
+            icon={Ruler}
+            title="HOVER measurements"
+            description="Connect HOVER once — every completed job lands here with roof & siding measurements, the PDF and the 3D model, and the client is matched automatically."
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!canIntegrations ? (
+            <p className="text-sm text-muted-foreground">
+              You don't have the manageIntegrations permission — ask an admin.
+            </p>
+          ) : !hoverStatus ? (
+            <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : !hoverStatus.configured ? (
+            <EmptyState compact icon={Ruler} title="HOVER isn't configured"
+              description="This deployment has no HOVER OAuth app credentials — ask the platform team." />
+          ) : !hoverStatus.connected ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground max-w-prose">
+                Authorize ConstructHub with your HOVER account. Webhook registration and job
+                ingest happen automatically after that — nothing else to set up.
+              </p>
+              <a href="/api/crm/integrations/hover/connect" data-testid="button-connect-hover">
+                <Button><Ruler className="h-4 w-4 mr-2" /> Connect HOVER</Button>
+              </a>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                <StatusPill tone="success" data-testid="pill-hover-connected">connected</StatusPill>
+                <span className="text-muted-foreground">
+                  since {hoverStatus.connectedAt ? new Date(hoverStatus.connectedAt).toLocaleDateString() : "—"}
+                </span>
+                {hoverStatus.webhook ? (
+                  <span className="flex items-center gap-2" data-testid="text-hover-webhook">
+                    webhook
+                    <StatusPill tone={hoverStatus.webhook.verified ? "success" : "warning"}>
+                      {hoverStatus.webhook.verified ? "verified" : "pending verification"}
+                    </StatusPill>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground" data-testid="text-hover-webhook">webhook not registered</span>
+                )}
+                {hoverStatus.lastSyncAt && (
+                  <span className="text-muted-foreground" data-testid="text-hover-lastsync">
+                    last sync {new Date(hoverStatus.lastSyncAt).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              {hoverStatus.lastError && (
+                <p className="text-sm text-destructive" data-testid="text-hover-error">{hoverStatus.lastError}</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => hoverSync.mutate()}
+                  disabled={hoverSync.isPending} data-testid="button-hover-sync">
+                  {hoverSync.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  Sync now
+                </Button>
+                {(!hoverStatus.webhook || !hoverStatus.webhook.verified) && (
+                  <Button size="sm" variant="outline" onClick={() => hoverRegister.mutate()}
+                    disabled={hoverRegister.isPending} data-testid="button-hover-register">
+                    {hoverRegister.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Register webhook
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                  onClick={() => {
+                    if (window.confirm("Disconnect HOVER? Completed jobs will stop flowing in.")) hoverDisconnect.mutate();
+                  }}
+                  disabled={hoverDisconnect.isPending} data-testid="button-hover-disconnect">
+                  <Unplug className="h-4 w-4 mr-2" /> Disconnect
+                </Button>
+              </div>
             </>
           )}
         </CardContent>

@@ -16,6 +16,9 @@
  *   - contract: the signed-contract PDF minted when an estimate is approved
  *     (refId = estimate id, server/crm/contract-pdf.ts). Clients download it
  *     from the portal contracts section; contractors via the CRM file route.
+ *   - measurement: a provider measurement PDF pulled from HOVER on ingest
+ *     (refId = customer id, server/crm/hover.ts). Clients download it through
+ *     the same gated route; contractors via the CRM file route.
  *
  * Client comments (crm_client_comments) are notes a homeowner sends from the
  * portal; the division's admin members (org owner as fallback) get an email,
@@ -400,7 +403,9 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (!att) return res.status(404).json({ message: "File not found" });
 
     let allowed = false;
-    if (att.kind === "photo") {
+    if (att.kind === "photo" || att.kind === "measurement") {
+      // Both key off the customer (refId = customer id): photos the homeowner
+      // uploaded, measurement PDFs HOVER delivered for their property.
       allowed = !!att.refId && client.customerIds.includes(att.refId);
     } else if (att.kind === "estimate" || att.kind === "contract") {
       // estimate files and the signed-contract PDF both key off the estimate

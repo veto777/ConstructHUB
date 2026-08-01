@@ -475,10 +475,18 @@ export function registerCrmClientAuthRoutes(app: Express): void {
           addressLine1: r.addressLine1, city: r.city, state: r.state, postalCode: r.postalCode,
           squares: r.squaresMilli === null ? null : r.squaresMilli / 1000,
           roofAreaSf: r.roofAreaSfMilli === null ? null : r.roofAreaSfMilli / 1000,
+          sidingSqft: r.wallAreaSfMilli === null ? null : r.wallAreaSfMilli / 1000,
+          windowsCount: raw.summary?.windowsCount ?? null,
           pitch: r.predominantPitch, facetCount: r.facetCount,
           wastePercent: r.wasteSuggestionBps === null ? null : r.wasteSuggestionBps / 100,
           orgName: orgName.get(r.orgId) ?? null,
           downloadUrl: hasSource ? `/api/client/reports/${r.id}/download` : null,
+          // HOVER-ingested rows: the interactive 3D model and the measurement
+          // PDF (downloaded through the session-gated attachment route).
+          model3dUrl: raw.model3dUrl ?? null,
+          pdfDownloadUrl: raw.pdfAttachmentId
+            ? `/api/client/attachments/${raw.pdfAttachmentId}/download`
+            : null,
         };
       }),
     });

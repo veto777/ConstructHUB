@@ -1182,7 +1182,7 @@ export type CrmClientSession = typeof crmClientSessions.$inferSelect;
 // sent estimate (refId = estimate id), and photos the homeowner uploads from
 // the portal (refId = customer id). storagePath is a server-local key, NEVER a
 // public path — every read goes through a session-gated download route.
-export const CRM_ATTACHMENT_KINDS = ["pamphlet", "estimate", "photo"] as const;
+export const CRM_ATTACHMENT_KINDS = ["pamphlet", "estimate", "photo", "measurement"] as const;
 export type CrmAttachmentKind = (typeof CRM_ATTACHMENT_KINDS)[number];
 
 export const crmAttachments = pgTable("crm_attachments", {
@@ -2149,7 +2149,7 @@ export type CrmPbMaterial = typeof crmPbMaterials.$inferSelect;
 // by reading its local files, never by sharing its database, never by
 // importing its code. See analysis/CRM-BRAIN.md §7b before implementing.
 
-export const CRM_MEASUREMENT_PROVIDERS = ["manual", "cladai", "other"] as const;
+export const CRM_MEASUREMENT_PROVIDERS = ["manual", "cladai", "hover", "other"] as const;
 export const CRM_MEASUREMENT_STATUSES = ["draft", "requested", "processing", "ready", "failed"] as const;
 
 export const crmMeasurements = pgTable("crm_measurements", {

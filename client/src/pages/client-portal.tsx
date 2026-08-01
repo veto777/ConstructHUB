@@ -420,13 +420,40 @@ function Dashboard({ data }: { data: any }) {
                           ? `${r.squares.toLocaleString("en-US", { maximumFractionDigits: 2 })} sq`
                           : "—"}
                         {r.pitch ? <span className="text-xs text-muted-foreground"> · {r.pitch}</span> : null}
+                        {(r.sidingSqft || r.windowsCount) && (
+                          <div className="text-xs text-muted-foreground">
+                            {[
+                              r.sidingSqft ? `siding ${Number(r.sidingSqft).toLocaleString("en-US", { maximumFractionDigits: 0 })} sq ft` : null,
+                              r.windowsCount ? `${r.windowsCount} windows` : null,
+                            ].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
                       </td>
                       <td className={crmTable.tdRight}>
-                        {r.downloadUrl && (
-                          <a href={r.downloadUrl} className="font-medium text-primary hover:underline" data-testid={`client-report-download-${r.id}`}>
-                            Download
-                          </a>
-                        )}
+                        <div className="flex flex-col items-end gap-1">
+                          {/* The 3D viewer opens in a NEW TAB, not an iframe:
+                              hover.to/3d/<jobId> currently sends no
+                              X-Frame-Options / frame-ancestors (checked
+                              2026-08), but HOVER ships the viewer as a
+                              standalone page — iframing adds nothing and any
+                              future XFO change would break it silently. */}
+                          {r.model3dUrl && (
+                            <a href={r.model3dUrl} target="_blank" rel="noopener noreferrer"
+                              className="font-medium text-primary hover:underline" data-testid={`client-report-3d-${r.id}`}>
+                              View 3D model
+                            </a>
+                          )}
+                          {r.pdfDownloadUrl && (
+                            <a href={r.pdfDownloadUrl} className="font-medium text-primary hover:underline" data-testid={`client-report-pdf-${r.id}`}>
+                              Measurement PDF
+                            </a>
+                          )}
+                          {r.downloadUrl && (
+                            <a href={r.downloadUrl} className="font-medium text-primary hover:underline" data-testid={`client-report-download-${r.id}`}>
+                              Download
+                            </a>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

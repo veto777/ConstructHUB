@@ -453,7 +453,7 @@ export default function ContractSignPage() {
                   )}
                 </Button>
                 <p className="text-xs text-center text-muted-foreground mt-3">
-                  By clicking "Sign Contract", you are agreeing to a legally binding contract. Your signature, IP address, timestamp, and browser information will be recorded.
+                  By clicking "Sign Contract", you are agreeing to a legally binding contract. Your signature, the date and time, and connection details will be recorded.
                 </p>
               </div>
             </CardContent>

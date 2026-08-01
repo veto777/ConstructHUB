@@ -29,6 +29,7 @@ import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
 import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmReportRoutes } from "./reports";
+import { registerCrmHoverRoutes } from "./hover";
 import { registerCrmClientAuthRoutes } from "./client-auth";
 import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
@@ -187,6 +188,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmMeasurementRoutes(app, getDevUser);
   // Measurement report imports (HOVER upload/paste + provider webhook).
   registerCrmReportRoutes(app, getDevUser);
+  // HOVER integration: OAuth connect, webhook registration/handshake,
+  // HMAC-verified event receiver and completed-job ingest.
+  registerCrmHoverRoutes(app, getDevUser);
   // The homeowner client portal takes no contractor session at all.
   registerCrmClientAuthRoutes(app);
   // Client 360: notes, timeline, financing clicks, portal preview. BEFORE the

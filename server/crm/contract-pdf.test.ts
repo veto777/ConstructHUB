@@ -138,7 +138,10 @@ describe("buildContractPdf", () => {
     expect(t).toContain("Standing terms: payment is due on completion.");
     expect(t).toContain("Signed by");
     expect(t).toContain("Mary Homeowner");
-    expect(t).toContain("203.0.113.10");
+    // The IP is recorded in the DB for dispute evidence but must NEVER print
+    // on a client-facing document (owner directive 2026-08-01).
+    expect(t).not.toContain("203.0.113.10");
+    expect(t).not.toMatch(/\bIP\b/);
 
     // Footer band on the page (the full fixture may spill to a second page).
     expect(t).toMatch(/Page 1 of \d+/);

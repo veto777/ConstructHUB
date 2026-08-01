@@ -32,6 +32,7 @@ import {
 import { EstimateEngagement } from "@/components/crm-engagement";
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "@/components/client-uploads";
+import { CustomerMeasurements } from "@/components/client-measurements";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 
@@ -778,6 +779,9 @@ export default function CrmClientPage() {
         meMemberId={me?.member?.id}
         meRole={me?.member?.role}
       />
+
+      {/* Measurements — HOVER reports + manual entries (self-contained mount). */}
+      <CustomerMeasurements customerId={id!} />
 
       {/* Client portal v2 — photos/comments from this client + the org pamphlet shelf. */}
       <CustomerPhotos customerId={id!} />
