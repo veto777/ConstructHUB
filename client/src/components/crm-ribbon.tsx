@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 /**
  * The CRM's mobile ribbon — the phone counterpart of the sidebar: a frosted,
  * safe-area-aware bar fixed to the bottom with five clean icon+label tabs
- * (Dashboard, Schedule, Inbox, Customers, More). Visible only below the md
+ * (Dashboard, Schedule, Inbox, Clients, More). Visible only below the md
  * breakpoint; the desktop sidebar is untouched. "More" opens a bottom sheet
  * with the rest of the workspace.
  */
@@ -119,7 +119,7 @@ export function CrmRibbon() {
           active={location.startsWith("/crm/schedule")} />
         <RibbonTab href="/crm/inbox" icon={Inbox} label="Inbox" testid="ribbon-tab-inbox"
           active={location.startsWith("/crm/inbox")} />
-        <RibbonTab href="/crm/clients" icon={Users} label="Customers" testid="ribbon-tab-customers"
+        <RibbonTab href="/crm/clients" icon={Users} label="Clients" testid="ribbon-tab-customers"
           active={location.startsWith("/crm/clients")} />
         <RibbonTab icon={MoreHorizontal} label="More" testid="ribbon-tab-more"
           active={moreActive} onClick={() => setMoreOpen(true)} />

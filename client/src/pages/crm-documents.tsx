@@ -65,7 +65,7 @@ const CONFIG: Record<"estimates" | "invoices", DocKindConfig> = {
     endpoint: "/api/crm/estimates",
     title: "Estimates",
     icon: FileText,
-    subtitle: "Every estimate across the company — filter by status, date or customer.",
+    subtitle: "Every estimate across the company — filter by status, date or client.",
     statuses: [
       { key: "draft", label: "Draft" },
       { key: "sent", label: "Sent" },
@@ -79,7 +79,7 @@ const CONFIG: Record<"estimates" | "invoices", DocKindConfig> = {
     endpoint: "/api/crm/invoices",
     title: "Invoices",
     icon: ReceiptText,
-    subtitle: "Every invoice across the company — filter by status, date or customer.",
+    subtitle: "Every invoice across the company — filter by status, date or client.",
     needsPrices: true,
     hasDueColumn: true,
     statuses: [
@@ -318,7 +318,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                   data-testid="input-search"
                   value={qInput}
                   onChange={(e) => setQInput(e.target.value)}
-                  placeholder="Number or customer name…"
+                  placeholder="Number or client name…"
                   className="h-9 pl-8"
                 />
               </div>
@@ -363,7 +363,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
             <thead className={crmTable.thead}>
               <tr>
                 <th className={crmTable.th}>Number</th>
-                <th className={crmTable.th}>Customer</th>
+                <th className={crmTable.th}>Client</th>
                 <th className={cn(crmTable.th, "hidden md:table-cell")}>Title</th>
                 <th className={crmTable.th}>Status</th>
                 <th className={crmTable.thRight}>Total</th>

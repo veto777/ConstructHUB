@@ -185,7 +185,7 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
                   <div className="sm:col-span-2">
                     <Label className="text-xs">Label</Label>
                     <Input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)}
-                      placeholder="Repeat customer" data-testid="input-custom-discount-label" />
+                      placeholder="Repeat client" data-testid="input-custom-discount-label" />
                   </div>
                   <div>
                     <Label className="text-xs">Discount %</Label>

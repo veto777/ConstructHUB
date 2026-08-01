@@ -1195,7 +1195,7 @@ export default function CrmSettingsPage() {
               </div>
               {!apiKeys?.length ? (
                 <EmptyState compact icon={KeyRound} title="No API keys yet"
-                  description="Create one to read your customers, projects, estimates and invoices from your own tools." />
+                  description="Create one to read your clients, projects, estimates and invoices from your own tools." />
               ) : (
                 <div className="space-y-2">
                   {apiKeys.map((k) => (

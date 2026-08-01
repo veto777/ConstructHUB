@@ -177,6 +177,7 @@ export default function CrmHomePage() {
           label="Clients"
           value={clients?.length ?? "—"}
           context="in your book — each with its own portal"
+          href="/crm/clients"
         />
         {canSeePrices ? (
           <MetricCard
@@ -184,6 +185,7 @@ export default function CrmHomePage() {
             label="Pipeline value"
             value={money0(pipelineValue)}
             context={`across ${projects.length} open project${projects.length === 1 ? "" : "s"}`}
+            href="/crm/pipeline"
           />
         ) : (
           <MetricCard
@@ -191,6 +193,7 @@ export default function CrmHomePage() {
             label="Open projects"
             value={projects.length}
             context="across every stage of the board"
+            href="/crm/pipeline"
           />
         )}
         <MetricCard
@@ -198,6 +201,7 @@ export default function CrmHomePage() {
           label="Leads to follow up"
           value={leads.length}
           context={leads.length ? "sitting in the first stage — first touch wins" : "nothing waiting on you"}
+          href="/crm/pipeline"
         />
       </div>
 
