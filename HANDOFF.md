@@ -103,6 +103,9 @@ The new vb7 DB started fresh, so their accounts/purchases don't exist on the liv
 `DATABASE_URL`, `SESSION_SECRET`, `NODE_ENV=production`, `PORT`, Google OAuth
 (`GOOGLE_CLIENT_ID/SECRET`, `GOOGLE_PLACES_API_KEY`), Google Ads/LSA, R2 (`R2_*`), SMTP (`SMTP_*`),
 Stripe (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`), OpenAI (`AI_INTEGRATIONS_OPENAI_*`).
+Canonical link bases (production): `PORTAL_URL=https://portal.constructhub.us`,
+`CLIENT_URL=https://client.constructhub.us`, `APP_URL=https://constructhub.us` — when set they win
+over Host-header derivation for every generated link (invites, magic links, doc emails).
 Local dev only: `DEV_AUTH_BYPASS_USER1=true` (never in prod).
 
 ## Re-running / extending the data pipelines

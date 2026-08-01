@@ -28,6 +28,7 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
+import { portalBaseUrl } from "../site-context";
 import { logEvent, presentEstimate } from "./entities";
 import { emitCrmEvent } from "./integrations";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
@@ -917,7 +918,9 @@ async function notifyJobApproved(
   if (!toList.length) return;
 
   const total = row.approvedTotalCents ?? row.totalCents;
-  const projectLink = est.projectId ? `${getBaseUrl(req)}/crm/projects/${est.projectId}` : null;
+  // The approving request is the CLIENT's (public /e page — its Host may be
+  // the client portal or the apex), but this link is for the contractor's CRM.
+  const projectLink = est.projectId ? `${portalBaseUrl(req)}/crm/projects/${est.projectId}` : null;
   await sendWithFallback({
     to: toList.join(","),
     ...(ccList.length ? { cc: ccList.join(",") } : {}),
