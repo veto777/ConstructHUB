@@ -402,6 +402,7 @@ export default function CrmTeamPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/members"] });
       toast({ title: "Invitation revoked" });
     },
+    onError: (e: any) => toast({ title: "Could not revoke", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   const resendInvite = useMutation({

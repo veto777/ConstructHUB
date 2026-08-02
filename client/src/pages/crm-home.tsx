@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle2, Circle, ArrowRight, Loader2, Users, Building2,
   UserCircle, Lock, Sparkles, KanbanSquare, DollarSign, Activity,
@@ -46,6 +47,7 @@ const money0 = (c?: number | null) =>
 
 /** Portal landing page. Never a dead end: it always offers the next action. */
 export default function CrmHomePage() {
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const { data: ob, isLoading, isError } = useQuery<Onboarding>({ queryKey: ["/api/crm/onboarding"] });
@@ -58,6 +60,7 @@ export default function CrmHomePage() {
   const dismiss = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/onboarding/dismiss", {})).json(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/onboarding"] }),
+    onError: (e: any) => toast({ title: "Could not dismiss the checklist", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   if (isLoading) {

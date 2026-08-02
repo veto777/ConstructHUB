@@ -420,7 +420,8 @@ export default function PublicEstimatePage() {
         {/* Breadcrumb + big title, like the reference portal. */}
         <div className="space-y-4">
           <div className="text-sm text-muted-foreground" data-testid="estimate-breadcrumb">
-            <a href="https://client.constructhub.us" className="hover:underline">Customer Portal</a>
+            <a href={`https://client.${window.location.hostname.replace(/^(portal|client)\./, "")}`}
+              className="hover:underline">Customer Portal</a>
             <span className="mx-1.5">›</span>Estimates<span className="mx-1.5">›</span>
             <span className="text-foreground font-medium">View Estimate</span>
           </div>

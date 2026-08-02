@@ -139,16 +139,12 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
 - [ ] Rotate secrets (Google, SMTP, R2 — provider dashboards; SESSION_SECRET + DB pw already fresh).
       **Stripe: superseded by the cross-wire item below — the leaked key was GGG's, rotate it on the
       GGG side.**
-- [ ] **🚨 2026-08-01 STRIPE CROSS-WIRE FOUND:** the `.env` Stripe keys (from
-      `Construct_hub_secrets.txt` / Replit) belonged to **GGG's Stripe account**
-      (godgritglorypodcast@gmail.com), not ConstructHUB — discovered when the Connect OAuth callback
-      failed ("Authorization code provided does not belong to you"). GGG's account verified clean
-      (0 constructhub charges/subs ever); the two webhook endpoints created there earlier that day
-      were deleted. ConstructHUB's real account: **acct_1TzcYU9yWcdekSaP**; its publishable key is
-      installed tower+vb7. **Remaining:** owner pastes a fresh `sk_live_…` from that account
-      (Developers → API keys → Create secret key) → recreate BOTH webhook endpoints + both
-      `*_WEBHOOK_SECRET`s under it → restart + re-verify. **Also: rotate GGG's Stripe key (it sat in
-      Replit git history) — task belongs to the GGG project.**
+- [x] **2026-08-01 STRIPE CROSS-WIRE — RESOLVED same day.** The `.env` keys were GGG's account;
+      owner minted a fresh `sk_live_…` from the real **acct_1TzcYU9yWcdekSaP**, installed
+      tower+vb7, BOTH webhook endpoints recreated under it with fresh secrets, fail-closed
+      verified, Connect OAuth round-trip confirmed (Alpine Exteriors linked, direct charges +
+      Stripe Checkout working end-to-end). **Still open on the GGG side: rotate GGG's leaked
+      Stripe key (sat in Replit git history) — GGG-project task.**
 - [x] CRM Stripe Connect **client id** — **DONE 2026-08-01.** Platform profile completed (Platform /
       direct charges / Stripe-hosted onboarding / Stripe carries risk), OAuth enabled,
       `STRIPE_CONNECT_CLIENT_ID` (`ca_Uzc1…Rsgf`, correct acct) on tower + vb7.

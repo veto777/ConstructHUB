@@ -876,7 +876,12 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.json({
       estimate: presentEstimate(e, ctx),
       items: items.map((i) => presentEstimateItem(i, ctx)),
-      events,
+      // The client's IP is audit data, not team reading material — same /24
+      // redaction the engagement endpoint applies (portal.ts redactIpPrefix).
+      events: events.map((ev) => ({
+        ...ev,
+        ip: ev.ip ? ev.ip.replace(/^((?:\d{1,3}\.){2}\d{1,3})\.\d{1,3}$/, "$1.x") : ev.ip,
+      })),
       customer: cust ? { id: cust.id, displayName: cust.displayName, email: cust.email, phone: cust.phone } : null,
       publicPath: ctx.permissions.manageEstimates ? `/e/${e.publicToken}` : undefined,
     });

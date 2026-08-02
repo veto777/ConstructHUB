@@ -36,6 +36,7 @@ export default function CrmPaymentsPage() {
   const disconnect = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/payments/disconnect", {})).json(),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/crm/payments/status"] }); toast({ title: "Disconnected" }); },
+    onError: (e: any) => toast({ title: "Could not disconnect", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   if (isLoading) {

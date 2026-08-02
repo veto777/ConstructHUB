@@ -31,7 +31,7 @@ import { registerCrmLeadCaptureRoutes } from "./lead-capture";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmReportRoutes } from "./reports";
 import { registerCrmHoverRoutes } from "./hover";
-import { registerCrmClientAuthRoutes } from "./client-auth";
+import { registerCrmClientAuthRoutes, allow as rateAllow } from "./client-auth";
 import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
 import { registerCrmCalendarRoutes } from "./calendar";
@@ -135,6 +135,29 @@ const inviteSchema = z.object({
   displayName: z.string().max(120).optional(),
   divisionId: z.string().max(64).nullable().optional(),
 });
+
+/**
+ * The org row goes to EVERY member, but custom_fields accumulates integration
+ * secrets that individual routes gate behind manageIntegrations: Google
+ * Calendar refresh tokens (org + per-member), HOVER's encrypted token blobs,
+ * the lead-capture token, the calendar feed token. Strip them all — the UI
+ * only needs the presentation keys (theme, prefs, payments, price lock, …).
+ */
+const ORG_SECRET_CF_KEYS = [
+  "googleCalendar", "googleCalendarMembers", "hover", "hoverWebhook",
+  "leadCaptureToken", "calendarFeedToken",
+] as const;
+function presentOrg<T extends { customFields?: unknown }>(org: T): T {
+  const cf = org.customFields as Record<string, unknown> | null | undefined;
+  if (!cf) return org;
+  const clean = { ...cf };
+  for (const k of Object.keys(clean)) {
+    if ((ORG_SECRET_CF_KEYS as readonly string[]).includes(k) || /Enc$|Token$|Secret$/i.test(k)) {
+      delete clean[k];
+    }
+  }
+  return { ...org, customFields: clean };
+}
 
 /** Strip anything the caller isn't allowed to see (cost rates are privileged). */
 function presentMember(m: typeof crmMembers.$inferSelect, canSeeCosts: boolean) {
@@ -255,7 +278,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       // Platform (ConstructHUB staff) admin — gates the /crm/admin console.
       // Distinct from the org "admin" ROLE, which is scoped to one org.
       isPlatformAdmin: isPlatformAdminEmail(account?.email),
-      org: ctx.org,
+      org: presentOrg(ctx.org),
       member: presentMember(ctx.member, ctx.permissions.seeCosts),
       permissions: ctx.permissions,
       orgs,
@@ -414,7 +437,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    res.json(ctx.org);
+    res.json(presentOrg(ctx.org));
   });
 
   app.patch("/api/crm/org", async (req: any, res) => {
@@ -466,7 +489,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       })
       .where(eq(crmOrgs.id, ctx.org.id))
       .returning();
-    res.json(row);
+    res.json(presentOrg(row));
   });
 
   // ── Team ──────────────────────────────────────────────────────────────────
@@ -617,6 +640,11 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageTeam")) return;
+    // Sends real email to the member's address — cap it so a self-serve org
+    // can't be used as an email-bomb primitive against arbitrary inboxes.
+    if (!rateAllow(`pwreset:${ctx.org.id}`, 10)) {
+      return res.status(429).json({ message: "Too many reset emails — try again later." });
+    }
 
     const [target] = await db
       .select()

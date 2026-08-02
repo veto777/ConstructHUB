@@ -522,8 +522,12 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     else if (choice === "ach") methods.push("us_bank_account");
     else {
       // ACH listed first so it is the default choice when both are offered.
+      // With a card surcharge configured, an UNPINNED session must not offer
+      // card at all — the fee line only exists on explicit card checkouts, so
+      // offering card here would let the payer skip the configured surcharge.
+      const surcharge = cardFeeCents(org, amount) > 0;
       if (rails.ach) methods.push("us_bank_account");
-      if (rails.card) methods.push("card");
+      if (rails.card && !(surcharge && rails.ach)) methods.push("card");
     }
 
     // CC fee passthrough: a clearly-labelled surcharge line on CARD checkout
@@ -582,7 +586,12 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!(await requireDocSession(req, res, est.customerId))) return;
     if (!est.approvedAt) return res.status(409).json({ message: "Approve the estimate first." });
 
-    const amount = est.depositCents && est.depositCents > 0 ? est.depositCents : est.totalCents;
+    // Pay-in-full must charge the SIGNED amount: an approval with selected
+    // optional discounts persists the recomputed approvedTotalCents, and the
+    // contract PDF + notifications all show it — the charge must match.
+    const amount = est.depositCents && est.depositCents > 0
+      ? est.depositCents
+      : (est.approvedTotalCents ?? est.totalCents);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay." });
 
     // Double-pay guard: the deposit must not be collectable twice.
