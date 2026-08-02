@@ -336,6 +336,7 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
         subject: "You're invited to the ConstructHub CRM beta",
         html: `
           <p>You're invited to the ConstructHub CRM beta — unlimited access during beta.</p>
+          <p><strong>This link creates a brand-new workspace for your own company</strong> — your clients, your price book, your team. Nothing is shared with anyone else.</p>
           <p><a href="${link}">Create your account</a></p>
           <p>This link expires in ${BETA_INVITE_DAYS} days and can be used once. If you weren't expecting it, you can ignore this email.</p>
         `,
