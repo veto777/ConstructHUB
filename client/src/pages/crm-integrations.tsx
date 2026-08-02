@@ -141,7 +141,11 @@ export default function CrmIntegrationsPage() {
     mutationFn: async () => (await apiRequest("POST", "/api/crm/integrations/hover/sync", {})).json(),
     onSuccess: (r: any) => {
       hoverInvalidate();
-      toast({ title: "HOVER sync complete", description: `${r.ingested ?? 0} imported, ${r.duplicates ?? 0} already up to date${r.failed ? `, ${r.failed} failed` : ""}.` });
+      const attached = (r.attachedByEmail ?? 0) + (r.attachedByPhone ?? 0) + (r.attachedByAddress ?? 0);
+      toast({
+        title: "HOVER sync complete",
+        description: `${r.scanned ?? 0} scanned — ${attached} matched to clients, ${r.created ?? 0} created, ${r.duplicates ?? 0} already up to date${r.ambiguous ? `, ${r.ambiguous} ambiguous` : ""}${r.errors?.length ? `, ${r.errors.length} failed` : ""}.`,
+      });
     },
     onError: (e: any) => toast({ title: "HOVER sync failed", description: String(e.message ?? e), variant: "destructive" }),
   });
@@ -227,6 +231,17 @@ export default function CrmIntegrationsPage() {
               </div>
               {hoverStatus.lastError && (
                 <p className="text-sm text-destructive" data-testid="text-hover-error">{hoverStatus.lastError}</p>
+              )}
+              {hoverStatus.lastSyncReport && (
+                <p className="text-xs text-muted-foreground" data-testid="text-hover-syncreport">
+                  Last sync: {hoverStatus.lastSyncReport.scanned} scanned
+                  {" · "}{hoverStatus.lastSyncReport.attachedByEmail} matched by email
+                  {" · "}{hoverStatus.lastSyncReport.attachedByPhone} by phone
+                  {" · "}{hoverStatus.lastSyncReport.attachedByAddress} by address
+                  {" · "}{hoverStatus.lastSyncReport.created} created
+                  {hoverStatus.lastSyncReport.ambiguous ? ` · ${hoverStatus.lastSyncReport.ambiguous} ambiguous` : ""}
+                  {hoverStatus.lastSyncReport.errors?.length ? ` · ${hoverStatus.lastSyncReport.errors.length} errors` : ""}
+                </p>
               )}
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => hoverSync.mutate()}

@@ -415,6 +415,7 @@ export async function ensureCrmSchema(): Promise<void> {
       category_id varchar, code text, name text NOT NULL, description text,
       unit text NOT NULL DEFAULT 'ea', pricing_mode text NOT NULL DEFAULT 'computed',
       flat_price_cents integer, flat_cost_cents integer, percent_bps integer,
+      rate_cents_per_sqft integer, sqft_metric text,
       qty_formula text, placeholders jsonb,
       markup_bps integer NOT NULL DEFAULT 0, min_charge_cents integer,
       taxable boolean NOT NULL DEFAULT true, cost_code_id varchar,
@@ -495,6 +496,10 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS selected_discounts jsonb;
     ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_pb_materials ADD COLUMN IF NOT EXISTS custom_fields jsonb;
+    -- per_sqft pricing mode (Quick Bid): rate per sq ft + which measurement
+    -- metric supplies the quantity.
+    ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS rate_cents_per_sqft integer;
+    ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS sqft_metric text;
 
     CREATE TABLE IF NOT EXISTS crm_estimate_discounts (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

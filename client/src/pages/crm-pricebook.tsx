@@ -96,7 +96,7 @@ export default function CrmPriceBookPage() {
   // ── price chart SKU: add / edit / delete ──
   const emptyItemForm = {
     name: "", code: "", unit: "ea", pricingMode: "computed",
-    flatPrice: "", flatCost: "", description: "",
+    flatPrice: "", flatCost: "", ratePerSqft: "", sqftMetric: "auto", description: "",
   };
   // dlg.id null → creating; otherwise editing that item.
   const [dlg, setDlg] = useState<{ id: string | null; form: typeof emptyItemForm } | null>(null);
@@ -107,6 +107,8 @@ export default function CrmPriceBookPage() {
       pricingMode: i.pricingMode ?? "computed",
       flatPrice: i.flatPriceCents != null ? (i.flatPriceCents / 100).toString() : "",
       flatCost: i.flatCostCents != null ? (i.flatCostCents / 100).toString() : "",
+      ratePerSqft: i.rateCentsPerSqft != null ? (i.rateCentsPerSqft / 100).toString() : "",
+      sqftMetric: i.sqftMetric ?? "auto",
       description: i.description ?? "",
     },
   });
@@ -121,6 +123,10 @@ export default function CrmPriceBookPage() {
       if (dlg.form.pricingMode === "flat") {
         body.flatPriceCents = Math.round((parseFloat(dlg.form.flatPrice) || 0) * 100);
         body.flatCostCents = Math.round((parseFloat(dlg.form.flatCost) || 0) * 100);
+      }
+      if (dlg.form.pricingMode === "per_sqft") {
+        body.rateCentsPerSqft = Math.round((parseFloat(dlg.form.ratePerSqft) || 0) * 100);
+        body.sqftMetric = dlg.form.sqftMetric === "auto" ? null : dlg.form.sqftMetric;
       }
       const r = await apiRequest(dlg.id ? "PATCH" : "POST",
         dlg.id ? `/api/crm/pricebook/items/${dlg.id}` : "/api/crm/pricebook/items", body);
@@ -219,8 +225,16 @@ export default function CrmPriceBookPage() {
                   <div>
                     <div className="font-medium">{i.name}</div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1.5">
-                      {i.code ? `${/^\d+$/.test(i.code) ? `SKU #${i.code}` : i.code} · ` : ""}per {i.unit}
+                      {i.code ? `${/^\d+$/.test(i.code) ? `SKU #${i.code}` : i.code} · ` : ""}
+                      {i.pricingMode === "per_sqft"
+                        ? (i.rateCentsPerSqft != null ? `${money(i.rateCentsPerSqft)}/sq ft` : "no rate set")
+                        : `per ${i.unit}`}
                       <Badge variant="outline" className="text-[10px] font-normal">{i.pricingMode}</Badge>
+                      {i.pricingMode === "per_sqft" && i.customFields?.quickBidRate?.placeholder && (
+                        <Badge variant="outline" className="text-[10px] font-normal text-amber-600 border-amber-600/40">
+                          placeholder rate — set yours
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -505,6 +519,28 @@ export default function CrmPriceBookPage() {
                           data-testid="input-item-flat-cost" />
                       </div>
                     )}
+                  </>
+                )}
+                {dlg.form.pricingMode === "per_sqft" && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Rate $/sq ft</Label>
+                      <Input type="number" step="0.01" value={dlg.form.ratePerSqft}
+                        onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, ratePerSqft: e.target.value } })}
+                        placeholder="18.00" data-testid="input-item-rate-sqft" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Measured area</Label>
+                      <Select value={dlg.form.sqftMetric}
+                        onValueChange={(v) => setDlg({ ...dlg, form: { ...dlg.form, sqftMetric: v } })}>
+                        <SelectTrigger data-testid="select-item-sqft-metric"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">auto (from the name)</SelectItem>
+                          <SelectItem value="roof">roof sq ft</SelectItem>
+                          <SelectItem value="siding">siding sq ft</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </>
                 )}
               </div>

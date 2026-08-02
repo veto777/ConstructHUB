@@ -24,7 +24,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, CheckCircle2, XCircle, Copy,
-  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin,
+  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
@@ -35,6 +35,7 @@ import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "
 import { CustomerMeasurements } from "@/components/client-measurements";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
+import { QuickBid } from "@/components/crm-quick-bid";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -217,6 +218,23 @@ export default function CrmClientPage() {
 
   // ── Estimate options (good / better / best) ───────────────────────────────
   const [optsFor, setOptsFor] = useState<any | null>(null);
+
+  // ── Bid reminder (email + optional text) ──────────────────────────────────
+  const remind = useMutation({
+    mutationFn: async (estimateId: string) =>
+      (await apiRequest("POST", `/api/crm/estimates/${estimateId}/remind`, {})).json(),
+    onSuccess: (r: any) => {
+      refresh();
+      const parts: string[] = [];
+      if (r.emailed) parts.push("email sent");
+      if (r.texted) parts.push(r.smsProvider === "log" ? "text recorded (SMS not configured)" : "text sent");
+      toast({
+        title: "Reminder recorded",
+        description: parts.length ? parts.join(" + ") : "Nothing to send — the client has no reachable contact.",
+      });
+    },
+    onError: (e: any) => toast({ title: "Could not send reminder", description: String(e.message ?? e), variant: "destructive" }),
+  });
 
   // ── Invoices ──────────────────────────────────────────────────────────────
   const convert = useMutation({
@@ -454,6 +472,13 @@ export default function CrmClientPage() {
             description="You'll see exactly when the client opens one."
           />
           {canEstimate && (
+            <QuickBid
+              customerId={id!}
+              customerEmail={c.email}
+              customerAddress={[c.addressLine1, c.city, c.state].filter(Boolean).join(", ") || null}
+            />
+          )}
+          {canEstimate && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" data-testid="button-new-estimate"><Plus className="h-4 w-4 mr-2" /> New estimate</Button>
@@ -584,6 +609,15 @@ export default function CrmClientPage() {
                       data-testid={`button-send-${e.id}`}>
                       {send.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                       {e.sentAt ? "Resend" : "Send"}
+                    </Button>
+                  )}
+                  {/* Nudge a client whose estimate is sitting unanswered. */}
+                  {canEstimate && e.sentAt && !e.approvedAt && !e.declinedAt && (
+                    <Button size="sm" variant="ghost"
+                      onClick={() => remind.mutate(e.id)} disabled={remind.isPending}
+                      data-testid={`button-remind-${e.id}`}>
+                      {remind.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BellRing className="h-4 w-4 mr-2" />}
+                      Remind
                     </Button>
                   )}
                   {canInvoice && e.approvedAt && (

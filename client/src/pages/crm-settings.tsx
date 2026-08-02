@@ -14,7 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud,
-  CalendarDays, RefreshCw, Unplug, Ruler,
+  CalendarDays, RefreshCw, Unplug, Ruler, MessageSquare,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
@@ -36,6 +36,7 @@ const NOTIFICATIONS = [
   { key: "estimateDeclined", label: "Estimate declined", description: "A client declined an estimate." },
   { key: "invoicePaid", label: "Payment received", description: "An online payment landed in your Stripe account." },
   { key: "paymentReceived", label: "Manual payment recorded", description: "A cash, check, wire or card payment was recorded on an invoice." },
+  { key: "clientReengaged", label: "Client re-engaged", description: "A client re-opened an estimate — you get an email and a text to call them." },
 ] as const;
 
 type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
@@ -227,6 +228,16 @@ export default function CrmSettingsPage() {
     },
     onError: (e: any) => toast({ title: "Could not save theme", description: String(e.message ?? e), variant: "destructive" }),
   });
+  // The main (band) colour the accent pairs with — black or white.
+  const saveThemeBase = useMutation({
+    mutationFn: async (base: "black" | "white") =>
+      (await apiRequest("PATCH", "/api/crm/org", { themeBase: base })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Theme saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save theme", description: String(e.message ?? e), variant: "destructive" }),
+  });
 
   // ── Company logo upload (PNG/JPG ≤ 2MB → org.logoUrl, shown on documents) ──
   const uploadLogo = useMutation({
@@ -302,6 +313,23 @@ export default function CrmSettingsPage() {
       toast({ title: "Notification preferences saved" });
     },
     onError: (e: any) => toast({ title: "Could not save notifications", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // ── SMS (Twilio) ──────────────────────────────────────────────────────────
+  // Honest configuration state: the server names the missing env vars; the
+  // test-text control only lights up when texting can actually work.
+  const canIntegrations = me?.permissions?.manageIntegrations === true;
+  const { data: smsStatus } = useQuery<any>({
+    queryKey: ["/api/crm/sms/status"],
+    enabled: allowed,
+  });
+  const [smsTestTo, setSmsTestTo] = useState("");
+  const smsTest = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", "/api/crm/sms/test", { to: smsTestTo.trim() })).json(),
+    onSuccess: (r: any) =>
+      toast({ title: "Test text sent", description: `Delivered via ${r.provider} to ${r.to}.` }),
+    onError: (e: any) => toast({ title: "Test text failed", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   // ── Payments: card fee passthrough + financing links ──────────────────────
@@ -541,8 +569,29 @@ export default function CrmSettingsPage() {
             <div>
               <div className="text-sm font-medium">Company theme</div>
               <p className="text-xs text-muted-foreground">
-                The accent on your estimates, invoices, contracts and client portal — always paired with black.
+                The accent on your estimates, invoices, contracts and client portal — paired with a black or white base, your choice.
               </p>
+            </div>
+            {/* Base: the main band colour the accent sits on. */}
+            <div className="flex items-center gap-2" data-testid="theme-base-picker">
+              <span className="text-xs text-muted-foreground mr-1">Main color</span>
+              {(["black", "white"] as const).map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  aria-pressed={theme.base === b}
+                  disabled={saveThemeBase.isPending}
+                  onClick={() => saveThemeBase.mutate(b)}
+                  data-testid={`theme-base-${b}`}
+                  className={`h-8 px-3.5 rounded-md border text-xs font-medium capitalize transition-shadow disabled:opacity-60 ${
+                    b === "black" ? "bg-[#111827] text-white" : "bg-white text-[#111827]"
+                  } ${theme.base === b
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : "hover:ring-1 hover:ring-foreground/40"}`}
+                >
+                  {b}
+                </button>
+              ))}
             </div>
             <div className="grid grid-cols-5 sm:grid-cols-10 gap-2" data-testid="theme-swatch-grid">
               {CRM_THEME_COLORS.map((c) => (
@@ -560,18 +609,20 @@ export default function CrmSettingsPage() {
                       ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                       : "hover:ring-1 hover:ring-foreground/40"
                   }`}
-                  style={{ background: `linear-gradient(to bottom, #111827 50%, ${c.hex} 50%)` }}
+                  style={{ background: `linear-gradient(to bottom, ${theme.baseHex} 50%, ${c.hex} 50%)` }}
                 />
               ))}
             </div>
-            {/* Live preview — a miniature document header in black + the
-                current accent. */}
+            {/* Live preview — a miniature document header in the chosen base +
+                the current accent. */}
             <div className="rounded-lg border overflow-hidden" data-testid="theme-preview-strip">
-              <div className="bg-neutral-900 px-4 py-2.5 flex items-center justify-between gap-3">
+              <div className={`px-4 py-2.5 flex items-center justify-between gap-3 ${theme.base === "white" ? "border-b" : ""}`}
+                style={{ backgroundColor: theme.baseHex }}>
                 <span className="text-sm font-semibold truncate" style={{ color: theme.hex }} data-testid="theme-preview-name">
                   {company.name || org.name}
                 </span>
-                <span className="text-[10px] uppercase tracking-widest text-neutral-400 shrink-0">Estimate</span>
+                <span className="text-[10px] uppercase tracking-widest shrink-0"
+                  style={{ color: theme.base === "white" ? "#6B7280" : "#9CA3AF" }}>Estimate</span>
               </div>
               <div className="px-4 py-3 flex items-center justify-between gap-3">
                 <span className="text-xs text-muted-foreground">This is how your documents look</span>
@@ -833,6 +884,63 @@ export default function CrmSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── SMS (Twilio) ────────────────────────────────────────────────── */}
+      <Card data-testid="card-sms">
+        <CardHeader>
+          <SectionTitle
+            icon={MessageSquare}
+            title="SMS"
+            description="Text bid reminders to clients, and get a text the moment a client re-opens their estimate."
+          />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1">
+              {smsStatus?.configured ? (
+                <>
+                  <div className="font-medium" data-testid="text-sms-configured">
+                    Texting via Twilio from {smsStatus.fromNumber}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Reminder texts and re-engagement alerts send as real SMS.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="font-medium" data-testid="text-sms-not-configured">SMS is not configured</div>
+                  <div className="text-xs text-muted-foreground" data-testid="text-sms-missing">
+                    Set {(smsStatus?.missing?.length ? smsStatus.missing : ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]).join(", ")} on
+                    the server to enable texting. Until then, texts are recorded to the server log instead of being sent.
+                  </div>
+                </>
+              )}
+            </div>
+            {smsStatus && (
+              <StatusPill tone={smsStatus.configured ? "success" : "neutral"} data-testid="pill-sms-status">
+                {smsStatus.configured ? "Configured" : "Not configured"}
+              </StatusPill>
+            )}
+          </div>
+          {canIntegrations && (
+            <div className="flex flex-wrap items-end gap-3 border-t pt-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="sms-test-to">Send a test text</Label>
+                <Input id="sms-test-to" className="w-56" placeholder="+1 555 123 4567"
+                  value={smsTestTo} onChange={(e) => setSmsTestTo(e.target.value)}
+                  data-testid="input-sms-test-to" />
+              </div>
+              <Button size="sm" variant="outline"
+                onClick={() => smsTest.mutate()}
+                disabled={!smsStatus?.configured || !smsTestTo.trim() || smsTest.isPending}
+                data-testid="button-sms-test-send">
+                {smsTest.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-2" />}
+                Send test text
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Payments ────────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -1084,9 +1192,11 @@ export default function CrmSettingsPage() {
           <div className="space-y-3 border-t pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-medium">Google Calendar (push sync)</div>
+                <div className="text-sm font-medium">Company Google Calendar (push sync)</div>
                 <p className="text-xs text-muted-foreground">
-                  Writes your appointments into a dedicated "ConstructHub CRM" calendar in your Google account.
+                  The company-wide calendar: EVERY appointment, written into a dedicated "ConstructHub CRM"
+                  calendar in the connected Google account. Optional — each team member can also connect
+                  their own calendar (just their assignments) under Team &amp; Company → My profile.
                 </p>
               </div>
               {gcalStatus && (
@@ -1251,6 +1361,13 @@ export default function CrmSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <p className="text-center text-xs text-muted-foreground/70 pb-2">
+        ConstructHUB CRM{" "}
+        <a href="/crm-terms" className="hover:underline" data-testid="link-crm-terms">Terms of Service</a>
+        <span className="mx-1.5">·</span>
+        <a href="/crm-privacy" className="hover:underline" data-testid="link-crm-privacy">Privacy Policy</a>
+      </p>
     </CrmPage>
   );
 }

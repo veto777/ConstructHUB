@@ -14,7 +14,7 @@ import {
   crmPbCategories, crmPbLaborRates, crmPbMaterials, crmPbItems, crmPbItemParts,
   crmPbItemAccessories, crmPbPackages, crmPbPackageItems, crmEstimates, crmEstimateItems,
   crmEstimateOptions,
-  CRM_PB_PRICING_MODES, CRM_PB_UNITS, CRM_PB_SYMBOLS,
+  CRM_PB_PRICING_MODES, CRM_PB_UNITS, CRM_PB_SYMBOLS, CRM_PB_SQFT_METRICS,
   crmMeasurements, CRM_MEASUREMENT_PROVIDERS,
 } from "@shared/schema";
 import { and, eq, asc, desc, ilike, or, sql } from "drizzle-orm";
@@ -70,12 +70,16 @@ export async function expandItem(
 
   const lines: ExpandedLine[] = [];
 
-  // Flat and percentage assemblies are a single line — no expansion.
-  if (item.pricingMode === "flat" || item.pricingMode === "percentage") {
-    const unitPrice = item.flatPriceCents ?? 0;
+  // Flat, percentage and per-sqft assemblies are a single line — no expansion.
+  // per_sqft: the caller's qty IS the measured area (sqft), priced at the
+  // item's rate per sq ft. Quick Bid (quickbid.ts) supplies that qty from the
+  // customer's measurement report.
+  if (item.pricingMode === "flat" || item.pricingMode === "percentage" || item.pricingMode === "per_sqft") {
+    const perSqft = item.pricingMode === "per_sqft";
+    const unitPrice = perSqft ? (item.rateCentsPerSqft ?? 0) : (item.flatPriceCents ?? 0);
     lines.push({
       kind: "labor", name: item.name, description: item.description,
-      quantityMilli: Math.round(effectiveQty * 1000), unit: item.unit,
+      quantityMilli: Math.round(effectiveQty * 1000), unit: perSqft ? "sf" : item.unit,
       unitPriceCents: unitPrice, unitCostCents: item.flatCostCents ?? null,
       taxable: item.taxable, costCodeId: item.costCodeId, source: `item:${item.id}`,
     });
@@ -302,6 +306,10 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     flatPriceCents: z.number().int().min(0).nullable().optional(),
     flatCostCents: z.number().int().min(0).nullable().optional(),
     percentBps: z.number().int().min(0).max(100000).nullable().optional(),
+    // per_sqft mode: rate per square foot + the measurement metric that
+    // supplies the area at bid time (null = infer from the item name).
+    rateCentsPerSqft: z.number().int().min(0).max(10_000_000).nullable().optional(),
+    sqftMetric: z.enum(CRM_PB_SQFT_METRICS as unknown as [string, ...string[]]).nullable().optional(),
     qtyFormula: z.string().max(500).nullable().optional(),
     placeholders: z.array(z.object({
       symbol: z.string().max(30), label: z.string().max(80).optional(),
@@ -334,6 +342,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       ...i,
       flatPriceCents: ctx.permissions.seePrices ? i.flatPriceCents : undefined,
       flatCostCents: ctx.permissions.seeCosts ? i.flatCostCents : undefined,
+      rateCentsPerSqft: ctx.permissions.seePrices ? i.rateCentsPerSqft : undefined,
       formulaSymbols: i.qtyFormula ? formulaSymbols(i.qtyFormula) : [],
     })));
   });

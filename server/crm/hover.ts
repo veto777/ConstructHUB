@@ -24,10 +24,13 @@
  *      (developers.hover.to/docs/webhook-signature-verification — sha256
  *      preferred, sha1 accepted). Unsigned or mis-signed traffic gets a 401.
  *   4. Ingest: job-state-changed-v2 with state "completed" → GET /api/v3/jobs/<id>
- *      → dedupe-match or create the customer (lower(email) OR digit-normalized
- *      phone, the same idiom as POST /api/crm/customers; the job address is the
- *      SERVICE address), create the crm_measurements row (provider "hover",
- *      status "ready", externalId "hover:<jobId>" so redelivery never
+ *      → attach to the org's customer by lower(email), digit-normalized phone,
+ *      or — when both fail — the NORMALIZED service address (line1 stripped +
+ *      5-digit zip, same normalization both sides; exactly one customer at the
+ *      address attaches, 2+ creates a flagged customer instead of guessing),
+ *      else create the customer from the job. Then create the crm_measurements
+ *      row (provider "hover", status "ready", externalId "hover:<jobId>" so
+ *      redelivery never
  *      duplicates), store the measurement PDF as a gated crm_attachments row
  *      (kind "measurement"), and record the embeddable 3D viewer URL
  *      (machete_blob.OptInFeature.designProUrl, of the form
@@ -55,7 +58,7 @@ import {
 } from "crypto";
 import { db } from "../db";
 import { crmCustomers, crmMeasurements, crmOrgs } from "@shared/schema";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
 import { storeGeneratedPdf } from "./attachments";
@@ -122,6 +125,19 @@ export interface HoverWebhookState {
   verifiedAt?: string | null;
 }
 
+/** What a sync-now run did, persisted for the settings card. */
+export interface HoverSyncReport {
+  scanned: number;
+  attachedByEmail: number;
+  attachedByPhone: number;
+  attachedByAddress: number;
+  created: number;
+  ambiguous: number;
+  duplicates: number;
+  errors: string[];
+  at: string;
+}
+
 export interface HoverConn {
   refreshTokenEnc: string;
   scopes?: string | null;
@@ -130,6 +146,7 @@ export interface HoverConn {
   webhook?: HoverWebhookState | null;
   lastSyncAt?: string | null;
   lastError?: string | null;
+  lastSyncReport?: HoverSyncReport | null;
 }
 
 async function readHoverConn(orgId: string): Promise<HoverConn | null> {
@@ -538,31 +555,99 @@ function trimJson(value: unknown): unknown {
   }
 }
 
-/** Dedupe-match a customer the same way POST /api/crm/customers does. */
-async function matchHoverCustomer(orgId: string, email?: string | null, phone?: string | null) {
-  const conds = [
-    email ? sql`lower(${crmCustomers.email}) = ${email.toLowerCase()}` : null,
-    phone && digits(phone).length >= 7
-      ? sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${digits(phone)}`
-      : null,
-  ].filter(Boolean) as any[];
-  if (!conds.length) return null;
-  const [existing] = await db
+/**
+ * Canonical service-address key: lowercase line1 with punctuation and extra
+ * whitespace stripped, plus the 5-digit zip. The SAME normalization runs on
+ * the job's address and on each candidate customer's address, so formatting
+ * differences ("123 PINE st." / "123 Pine St", "98101-1234" / "98101") never
+ * decide a match. Null when either side is too thin to trust.
+ */
+export function normalizeHoverAddress(line1?: string | null, zip?: string | null): string | null {
+  const line = String(line1 ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const zip5 = String(zip ?? "").replace(/\D/g, "").slice(0, 5);
+  if (!line || zip5.length !== 5) return null;
+  return `${line}|${zip5}`;
+}
+
+/**
+ * Address fallback after email/phone dedupe fails. Candidates are narrowed in
+ * SQL by 5-digit zip, then compared with the exact normalized key in JS.
+ * Confidence rules: exactly one customer at the address → attach; two or
+ * more → ambiguous (the caller creates a NEW customer and flags it, never
+ * guesses); zero → no match (the caller creates from the job).
+ */
+async function matchHoverCustomerByAddress(
+  orgId: string, addressLine1?: string | null, postalCode?: string | null,
+) {
+  const key = normalizeHoverAddress(addressLine1, postalCode);
+  if (!key) return { matches: [] as (typeof crmCustomers.$inferSelect)[] };
+  const zip5 = key.split("|")[1];
+  const candidates = await db
     .select()
     .from(crmCustomers)
-    .where(and(eq(crmCustomers.orgId, orgId), isNull(crmCustomers.archivedAt), or(...conds) as any))
-    .limit(1);
-  return existing ?? null;
+    .where(and(
+      eq(crmCustomers.orgId, orgId),
+      isNull(crmCustomers.archivedAt),
+      sql`left(regexp_replace(coalesce(${crmCustomers.postalCode}, ''), '[^0-9]', '', 'g'), 5) = ${zip5}`,
+    ));
+  return { matches: candidates.filter((c) => normalizeHoverAddress(c.addressLine1, c.postalCode) === key) };
+}
+
+/**
+ * Dedupe-match a customer the same way POST /api/crm/customers does — email
+ * first, then digit-normalized phone — reporting WHICH key matched so the
+ * sync report can attribute the attach.
+ */
+async function matchHoverCustomer(
+  orgId: string, email?: string | null, phone?: string | null,
+): Promise<{ customer: typeof crmCustomers.$inferSelect; via: "email" | "phone" } | null> {
+  if (email) {
+    const [hit] = await db
+      .select()
+      .from(crmCustomers)
+      .where(and(
+        eq(crmCustomers.orgId, orgId),
+        isNull(crmCustomers.archivedAt),
+        sql`lower(${crmCustomers.email}) = ${email.toLowerCase()}`,
+      ))
+      .limit(1);
+    if (hit) return { customer: hit, via: "email" };
+  }
+  if (phone && digits(phone).length >= 7) {
+    const [hit] = await db
+      .select()
+      .from(crmCustomers)
+      .where(and(
+        eq(crmCustomers.orgId, orgId),
+        isNull(crmCustomers.archivedAt),
+        sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${digits(phone)}`,
+      ))
+      .limit(1);
+    if (hit) return { customer: hit, via: "phone" };
+  }
+  return null;
 }
 
 /**
  * Pull a completed HOVER job into the CRM. Idempotent on externalId
  * "hover:<jobId>" — a redelivered event (HOVER retries up to 25 times) or a
  * sync-now re-pull updates nothing and reports the existing row.
+ *
+ * Customer attach order: email → phone → normalized service address. Address
+ * matching runs BEFORE any customer is created, and never guesses: exactly
+ * one customer at the address attaches; two or more creates a NEW customer
+ * flagged customFields.hoverAmbiguous; zero creates from the job as before.
  */
 export async function ingestHoverJob(
   orgId: string, jobId: string, fetchFn: FetchFn = fetch,
-): Promise<{ measurementId: string; customerId: string | null; created: boolean; duplicate?: boolean }> {
+): Promise<{
+  measurementId: string; customerId: string | null; created: boolean; duplicate?: boolean;
+  matchedVia: "email" | "phone" | "address" | null; ambiguous: boolean; customerCreated: boolean;
+}> {
   const externalId = `hover:${jobId}`;
   const [existing] = await db
     .select()
@@ -570,7 +655,10 @@ export async function ingestHoverJob(
     .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.externalId, externalId)))
     .limit(1);
   if (existing) {
-    return { measurementId: existing.id, customerId: existing.customerId, created: false, duplicate: true };
+    return {
+      measurementId: existing.id, customerId: existing.customerId, created: false, duplicate: true,
+      matchedVia: null, ambiguous: false, customerCreated: false,
+    };
   }
 
   const token = await getHoverAccessToken(orgId, fetchFn);
@@ -591,10 +679,28 @@ export async function ingestHoverJob(
   }
   const summary = summarizeHoverMeasurements(fullJson);
 
-  // Customer: dedupe on email/phone; create with the job's service address.
-  // A matched customer's record is never clobbered by HOVER data.
+  // Customer: dedupe on email, then phone, then the normalized service
+  // address — BEFORE creating anyone. A matched customer's record is never
+  // clobbered by HOVER data, and an ambiguous address never attaches.
   const c = parsed.contact;
-  let customer = await matchHoverCustomer(orgId, c.email, c.phone);
+  let customer: typeof crmCustomers.$inferSelect | null = null;
+  let matchedVia: "email" | "phone" | "address" | null = null;
+  let ambiguous = false;
+  const byContact = await matchHoverCustomer(orgId, c.email, c.phone);
+  if (byContact) {
+    customer = byContact.customer;
+    matchedVia = byContact.via;
+  } else {
+    const byAddress = await matchHoverCustomerByAddress(orgId, c.addressLine1, c.postalCode);
+    if (byAddress.matches.length === 1) {
+      customer = byAddress.matches[0];
+      matchedVia = "address";
+    } else if (byAddress.matches.length > 1) {
+      // Two+ customers at the same address: never guess — a new customer is
+      // created below, flagged so a human can merge deliberately.
+      ambiguous = true;
+    }
+  }
   let customerCreated = false;
   if (!customer && (c.name || c.email || c.phone)) {
     const nameParts = c.name?.trim().split(/\s+/) ?? [];
@@ -613,6 +719,7 @@ export async function ingestHoverJob(
         postalCode: c.postalCode ?? null,
         portalToken: randomBytes(24).toString("hex"),
         notes: `Created from HOVER job ${jobId}.`,
+        ...(ambiguous ? { customFields: { hoverAmbiguous: true } } : {}),
       } as any)
       .returning();
     customerCreated = true;
@@ -641,6 +748,8 @@ export async function ingestHoverJob(
         importSource: "hover",
         hoverJobId: jobId,
         model3dUrl: parsed.model3dUrl,
+        matchedVia,
+        ...(ambiguous ? { hoverAmbiguous: true } : {}),
         summary,
         photoCount: parsed.photoUrls.length,
         fullJson: trimJson(fullJson),
@@ -682,7 +791,10 @@ export async function ingestHoverJob(
     }
   }
 
-  return { measurementId: row.id, customerId: customer?.id ?? null, created: true, duplicate: false };
+  return {
+    measurementId: row.id, customerId: customer?.id ?? null, created: true, duplicate: false,
+    matchedVia, ambiguous, customerCreated,
+  };
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
@@ -725,6 +837,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
         : null,
       lastSyncAt: conn?.lastSyncAt ?? null,
       lastError: conn?.lastError ?? null,
+      lastSyncReport: conn?.lastSyncReport ?? null,
     });
   });
 
@@ -804,7 +917,15 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     }
   });
 
-  /** Re-pull the jobs list and ingest anything completed we don't have yet. */
+  /**
+   * Re-pull the jobs list and ingest anything completed we don't have yet —
+   * the backfill path for jobs that predate the webhook. Returns (and
+   * persists for the settings card) a per-run report: how each completed job
+   * attached (email → phone → address), how many customers were created, how
+   * many attaches were ambiguous (new flagged customer, never a guess), and
+   * per-job errors. Buckets are disjoint: an ambiguous attach counts under
+   * `ambiguous`, not `created`.
+   */
   app.post("/api/crm/integrations/hover/sync", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageIntegrations");
     if (!ctx) return;
@@ -819,24 +940,40 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       return res.status(502).json({ message: "Could not list HOVER jobs." });
     }
     const jobs: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
-    let ingested = 0;
-    let duplicates = 0;
-    let failed = 0;
+    const report = {
+      scanned: jobs.length,
+      attachedByEmail: 0,
+      attachedByPhone: 0,
+      attachedByAddress: 0,
+      created: 0,
+      ambiguous: 0,
+      duplicates: 0,
+      errors: [] as string[],
+    };
     for (const j of jobs) {
       const state = String(j?.state ?? j?.status ?? "").toLowerCase();
       const id = j?.id ?? j?.job_id;
       if (!id || !state.startsWith("complete")) continue;
       try {
         const r = await ingestHoverJob(ctx.org.id, String(id));
-        if (r.duplicate) duplicates++;
-        else ingested++;
+        if (r.duplicate) report.duplicates++;
+        else if (r.ambiguous) report.ambiguous++;
+        else if (r.matchedVia === "email") report.attachedByEmail++;
+        else if (r.matchedVia === "phone") report.attachedByPhone++;
+        else if (r.matchedVia === "address") report.attachedByAddress++;
+        else if (r.customerCreated) report.created++;
       } catch (e: any) {
-        failed++;
+        report.errors.push(`job ${id}: ${String(e?.message || e).slice(0, 120)}`);
         console.error(`[hover] sync ingest job ${id} failed:`, String(e?.message || e).slice(0, 200));
       }
     }
-    await writeHoverConn(ctx.org.id, { lastSyncAt: new Date().toISOString(), lastError: null }).catch(() => {});
-    res.json({ ok: true, jobsSeen: jobs.length, ingested, duplicates, failed });
+    const lastSyncReport: HoverSyncReport = { ...report, at: new Date().toISOString() };
+    await writeHoverConn(ctx.org.id, {
+      lastSyncAt: lastSyncReport.at,
+      lastError: report.errors.length ? report.errors[0] : null,
+      lastSyncReport,
+    }).catch(() => {});
+    res.json({ ok: true, ...report });
   });
 
   /** Disconnect: delete the HOVER webhook (best effort) and wipe the tokens. */
@@ -992,6 +1129,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
           pitch: r.predominantPitch,
           wastePercent: r.wasteSuggestionBps === null ? null : r.wasteSuggestionBps / 100,
           hoverJobId: raw.hoverJobId ?? null,
+          matchedVia: raw.matchedVia ?? null,
           model3dUrl: raw.model3dUrl ?? null,
           pdfUrl: raw.pdfAttachmentId ? `/api/crm/attachments/${raw.pdfAttachmentId}/file` : null,
         };

@@ -182,7 +182,7 @@ describe("estimate option guards", () => {
 
     // Approve it through the public token (as the verified client).
     const send = await api(`/api/crm/estimates/${est.body.id}/send`, { method: "POST", body: "{}" }, cookie);
-    const token = send.body.link.split("/e/")[1];
+    const token = send.body.link.split("/e/")[1].split("?")[0];
     const approve = await api(`/api/public/estimates/${token}/respond`, {
       method: "POST", body: JSON.stringify({ decision: "approve", signatureName: "Vitest Signer" }),
     }, await clientCookie(customerId));

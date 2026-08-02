@@ -78,6 +78,33 @@ function stubJob(id: number, email: string | null) {
   };
 }
 
+/** A job at an arbitrary address/contact — the address-matching fixtures. */
+function stubJobAt(
+  id: number,
+  contact: { name?: string; email?: string; phone?: string } | null,
+  location: { line1: string; city?: string; state?: string; zip: string },
+) {
+  return {
+    id,
+    name: `Stub HOVER job ${id}`,
+    contact: contact ?? {},
+    location: {
+      address_line_1: location.line1,
+      city: location.city ?? "Seattle",
+      state: location.state ?? "WA",
+      zip: location.zip,
+    },
+    models: [
+      {
+        artifacts: [
+          { type: "measurements_json", url: `${STUB}/artifacts/measurements.json` },
+          { type: "measurement_pdf", url: `${STUB}/artifacts/measurements.pdf` },
+        ],
+      },
+    ],
+  };
+}
+
 interface StubWebhook {
   id: number;
   url: string;
@@ -95,6 +122,7 @@ const stub = {
   deletedWebhooks: [] as number[],
   registrationBodies: [] as any[],
   verifiedCodes: [] as string[],
+  extraJobs: new Map<number, any>(),
   nextWebhookId: 55501,
   currentRefreshToken: "rt-1",
   accessCounter: 0,
@@ -225,12 +253,14 @@ function startStub(): Promise<void> {
           { id: 9001, state: "completed" },
           { id: 9002, state: "completed" },
           { id: 9003, state: "in_progress" },
+          ...[...stub.extraJobs.keys()].map((id) => ({ id, state: "completed" })),
         ],
       });
     }
     const jobMatch = /^\/api\/v3\/jobs\/(\d+)$/.exec(url.pathname);
     if (jobMatch) {
       const id = Number(jobMatch[1]);
+      if (stub.extraJobs.has(id)) return json(200, stub.extraJobs.get(id));
       if (id !== 9001 && id !== 9002) return json(404, { error: "no such job" });
       return json(200, stubJob(id, id === 9001 ? "hover-vitest@example.com" : null));
     }
@@ -283,7 +313,10 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
       [orgId, savedCustomFields === null ? null : JSON.stringify(savedCustomFields)]);
     await q(`delete from crm_attachments where org_id = $1 and kind = 'measurement' and file_name like 'hover-measurements-%'`, [orgId]);
     await q(`delete from crm_measurements where org_id = $1 and external_id like 'hover:%'`, [orgId]);
-    await q(`delete from crm_customers where org_id = $1 and email in ('hover-vitest@example.com')`, [orgId]);
+    await q(`delete from crm_customers where org_id = $1 and email in (
+      'hover-vitest@example.com', 'addr-seed@example.com', 'twin1@example.com',
+      'twin2@example.com', 'twin-new@example.com', 'fresh-face@example.com',
+      'different-9004@example.com')`, [orgId]);
     try { fs.unlinkSync(STUB_FILE); } catch {}
     await new Promise((r) => stub.server?.close(r));
     await pool.end();
@@ -432,25 +465,151 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
     stub.refreshTokensSeen.forEach((t, i) => expect(t).toBe(`rt-${i + 1}`));
   });
 
-  it("sync-now pulls completed jobs (skipping known + unfinished)", async () => {
+  it("sync-now pulls completed jobs (skipping known + unfinished) and reports the attach path", async () => {
     const res = await api("/api/crm/integrations/hover/sync", { method: "POST" });
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.jobsSeen).toBe(3);
-    expect(res.body.duplicates).toBe(1); // 9001 already ingested
-    expect(res.body.ingested).toBe(1);   // 9002 is new
-    expect(res.body.failed).toBe(0);
+    expect(res.body.scanned).toBe(3);
+    expect(res.body.duplicates).toBe(1);        // 9001 already ingested
+    // 9002 has no contact at all, but its service address is 123 Pine St
+    // 98101 — exactly the customer 9001 created — so it attaches BY ADDRESS.
+    expect(res.body.attachedByAddress).toBe(1);
+    expect(res.body.attachedByEmail).toBe(0);
+    expect(res.body.attachedByPhone).toBe(0);
+    expect(res.body.created).toBe(0);
+    expect(res.body.ambiguous).toBe(0);
+    expect(res.body.errors).toEqual([]);
 
     const rows = await q<any>(
       `select * from crm_measurements where org_id = $1 and external_id = 'hover:9002'`, [orgId]);
     expect(rows.length).toBe(1);
-    // No contact on 9002 → no customer, and the 3D URL fell back to the
-    // deterministic hover.to/3d/<jobId> form.
-    expect(rows[0].customer_id).toBeNull();
+    const custs = await q<any>(
+      `select id from crm_customers where org_id = $1 and email = 'hover-vitest@example.com'`, [orgId]);
+    expect(rows[0].customer_id).toBe(custs[0].id);
+    expect((rows[0].raw_payload as any).matchedVia).toBe("address");
+    // The 3D URL fell back to the deterministic hover.to/3d/<jobId> form.
     expect((rows[0].raw_payload as any).model3dUrl).toBe("https://hover.to/3d/9002");
 
     const status = (await api("/api/crm/integrations/hover/status")).body;
     expect(status.lastSyncAt).toBeTruthy();
+    // The report is persisted for the settings card.
+    expect(status.lastSyncReport?.attachedByAddress).toBe(1);
+    expect(status.lastSyncReport?.scanned).toBe(3);
+    expect(status.lastSyncReport?.at).toBeTruthy();
+  });
+
+  // ── Address matching (confidence rules) ─────────────────────────────────
+
+  const seedCustomer = async (email: string, line1: string, zip: string) => {
+    const rows = await q<{ id: string }>(
+      `insert into crm_customers (org_id, display_name, email, address_line1, city, state, postal_code, portal_token)
+       values ($1, $2, $3, $4, 'Seattle', 'WA', $5, md5(random()::text)) returning id`,
+      [orgId, `Seeded ${email}`, email, line1, zip],
+    );
+    return rows[0].id;
+  };
+
+  /** Fire a signed job-state-changed-v2 (completed) event at the receiver. */
+  const fireCompleted = async (jobId: number) => {
+    const wh = [...stub.webhooks.values()][0];
+    const body = JSON.stringify({ event: "job-state-changed-v2", state: "completed", job_id: jobId });
+    const res = await api(RECEIVER_PATH, { method: "POST", headers: sign(body, wh.id, wh.hmac_secret), body });
+    expect(res.status).toBe(200);
+  };
+
+  it("exact address match: a different-email job attaches to the existing customer", async () => {
+    const custId = await seedCustomer("addr-seed@example.com", "77 BIRCH rd.", "98102-4455");
+    stub.extraJobs.set(9004, stubJobAt(9004,
+      { name: "Different Person", email: "different-9004@example.com", phone: "(425) 555-0100" },
+      { line1: "77 Birch Rd", zip: "98102" }));
+    await fireCompleted(9004);
+
+    const m = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9004'`, [orgId]);
+    expect(m.length).toBe(1);
+    expect(m[0].customer_id).toBe(custId);
+    expect((m[0].raw_payload as any).matchedVia).toBe("address");
+    // The matched customer was never clobbered, and no duplicate was created.
+    const strangers = await q<any>(
+      `select id from crm_customers where org_id = $1 and email = 'different-9004@example.com'`, [orgId]);
+    expect(strangers.length).toBe(0);
+    const seeded = await q<any>(`select email, address_line1 from crm_customers where id = $1`, [custId]);
+    expect(seeded[0].email).toBe("addr-seed@example.com");
+  });
+
+  it("ambiguous address (2+ customers): creates a NEW flagged customer, never guesses", async () => {
+    await seedCustomer("twin1@example.com", "9 Twin Ct", "98103");
+    await seedCustomer("twin2@example.com", "9 twin ct", "98103");
+    stub.extraJobs.set(9005, stubJobAt(9005,
+      { name: "Twin Newcomer", email: "twin-new@example.com" },
+      { line1: "9 Twin Ct", zip: "98103" }));
+    await fireCompleted(9005);
+
+    const created = await q<any>(
+      `select * from crm_customers where org_id = $1 and email = 'twin-new@example.com'`, [orgId]);
+    expect(created.length).toBe(1);
+    expect((created[0].custom_fields as any)?.hoverAmbiguous).toBe(true);
+    // The measurement points at the flagged NEW customer, not either twin.
+    const m = await q<any>(
+      `select customer_id, raw_payload from crm_measurements where org_id = $1 and external_id = 'hover:9005'`, [orgId]);
+    expect(m.length).toBe(1);
+    expect(m[0].customer_id).toBe(created[0].id);
+    expect((m[0].raw_payload as any).matchedVia).toBeNull();
+    expect((m[0].raw_payload as any).hoverAmbiguous).toBe(true);
+  });
+
+  it("no address match: creates the customer from the job (unchanged behavior)", async () => {
+    stub.extraJobs.set(9006, stubJobAt(9006,
+      { name: "Fresh Face", email: "fresh-face@example.com" },
+      { line1: "500 Nowhere Blvd", zip: "98501" }));
+    await fireCompleted(9006);
+
+    const created = await q<any>(
+      `select id, custom_fields from crm_customers where org_id = $1 and email = 'fresh-face@example.com'`, [orgId]);
+    expect(created.length).toBe(1);
+    expect((created[0].custom_fields as any)?.hoverAmbiguous).toBeUndefined();
+    const m = await q<any>(
+      `select customer_id, raw_payload from crm_measurements where org_id = $1 and external_id = 'hover:9006'`, [orgId]);
+    expect(m.length).toBe(1);
+    expect(m[0].customer_id).toBe(created[0].id);
+    expect((m[0].raw_payload as any).matchedVia).toBeNull();
+  });
+
+  it("re-sync is idempotent with address matching on: everything is a duplicate", async () => {
+    const before = await q<{ n: string }>(
+      `select count(*)::text as n from crm_customers where org_id = $1`, [orgId]);
+    const res = await api("/api/crm/integrations/hover/sync", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(res.body.scanned).toBe(6);           // 9001–9006 (9003 in_progress)
+    expect(res.body.duplicates).toBe(5);
+    expect(res.body.attachedByEmail).toBe(0);
+    expect(res.body.attachedByPhone).toBe(0);
+    expect(res.body.attachedByAddress).toBe(0);
+    expect(res.body.created).toBe(0);
+    expect(res.body.ambiguous).toBe(0);
+    expect(res.body.errors).toEqual([]);
+    const after = await q<{ n: string }>(
+      `select count(*)::text as n from crm_customers where org_id = $1`, [orgId]);
+    expect(after[0].n).toBe(before[0].n);
+    // …and the persisted report mirrors the response.
+    const org = await q<{ custom_fields: any }>(`select custom_fields from crm_orgs where id = $1`, [orgId]);
+    const report = org[0].custom_fields.hover.lastSyncReport;
+    expect(report.duplicates).toBe(5);
+    expect(report.attachedByAddress).toBe(0);
+    expect(report.errors).toEqual([]);
+  });
+
+  it("unit: address normalization is case/punctuation/zip+4-insensitive", () => {
+    const n = hover.normalizeHoverAddress;
+    expect(n("123 Pine St", "98101")).toBe("123 pine st|98101");
+    expect(n("123 PINE st.", "98101-1234")).toBe("123 pine st|98101");
+    expect(n("  123   Pine   St  ", "98101")).toBe("123 pine st|98101");
+    // Same address, different formatting → the same key on both sides.
+    expect(n("77 BIRCH rd.", "98102-4455")).toBe(n("77 Birch Rd", "98102"));
+    // Too thin to trust → null (never matches).
+    expect(n(null, "98101")).toBeNull();
+    expect(n("123 Pine St", null)).toBeNull();
+    expect(n("123 Pine St", "9810")).toBeNull();
+    expect(n("", "98101")).toBeNull();
   });
 
   it("disconnect deletes the HOVER webhook and wipes the stored tokens", async () => {

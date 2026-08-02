@@ -107,9 +107,9 @@ describe("money pipeline", () => {
     // 4. Send: always returns a copyable link, even if SMTP is down.
     const send = await api(`/api/crm/estimates/${est.body.id}/send`, { method: "POST", body: "{}" }, cookie);
     expect(send.status).toBe(200);
-    expect(send.body.link).toMatch(/\/e\/[0-9a-f]{48}$/);
+    expect(send.body.link).toMatch(/\/e\/[0-9a-f]{48}\?k=[0-9a-f]{64}$/);
     expect(send.body.estimate.status).toBe("sent");
-    const token = send.body.link.split("/e/")[1];
+    const token = send.body.link.split("/e/")[1].split("?")[0];
 
     // 5. Public view (as the verified client — the route is email-gated):
     //    first open flips sent → viewed and counts ONE view; a refresh from

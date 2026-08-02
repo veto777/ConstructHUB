@@ -1343,6 +1343,7 @@ export const CRM_NOTIFICATION_PREFS = [
   "jobApproved",       // PM notice: an estimate was approved (job awarded)
   "clientComments",    // a homeowner sent a note from the client portal
   "financeClick",      // a homeowner tapped a financing link in the client portal
+  "clientReengaged",   // a client re-opened an estimate — "call them now" alert (email + SMS)
 ] as const;
 export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 
@@ -2004,7 +2005,14 @@ export type CrmChangeOrder = typeof crmChangeOrders.$inferSelect;
 //  - Ours, which neither has: an explicit wasteFactorBps field, so nobody has
 //    to bury "* 1.10" in a formula string and later wonder why.
 
-export const CRM_PB_PRICING_MODES = ["flat", "computed", "formula", "percentage"] as const;
+export const CRM_PB_PRICING_MODES = ["flat", "computed", "formula", "percentage", "per_sqft"] as const;
+
+/**
+ * per_sqft mode: which measurement metric supplies the quantity at bid time.
+ * "roof" → roof area (roof_area_sf_milli), "siding" → wall/siding area
+ * (wall_area_sf_milli). Quick Bid (server/crm/quickbid.ts) consumes this.
+ */
+export const CRM_PB_SQFT_METRICS = ["roof", "siding"] as const;
 export const CRM_PB_UNITS = [
   "ea", "sq", "sf", "lf", "cy", "hr", "day", "gal", "lb", "ton", "roll", "bundle", "sheet", "job",
 ] as const;
@@ -2073,6 +2081,11 @@ export const crmPbItems = pgTable("crm_pb_items", {
   flatCostCents: integer("flat_cost_cents"),
   // percentage mode (Leap's isPercentage) — e.g. a 15% overhead line
   percentBps: integer("percent_bps"),
+  // per_sqft mode: price = rate × sqft pulled from the customer's measurement
+  // report (HOVER/CladAI) at bid time. sqftMetric picks the metric; null means
+  // infer from the item name (roof* → roof, otherwise siding).
+  rateCentsPerSqft: integer("rate_cents_per_sqft"),
+  sqftMetric: text("sqft_metric"),
   // formula mode: "[SQUARES] * 1.1 + 2" with named placeholders
   qtyFormula: text("qty_formula"),
   placeholders: jsonb("placeholders"),      // [{symbol,label,defaultValue}]

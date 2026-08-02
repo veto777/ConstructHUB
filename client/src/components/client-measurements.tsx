@@ -50,6 +50,9 @@ export function CustomerMeasurements({ customerId }: { customerId: string }) {
                 <div className="text-xs text-muted-foreground">
                   {[m.addressLine1, m.city, m.state].filter(Boolean).join(", ") || "—"}
                   {m.date ? ` · ${new Date(m.date).toLocaleDateString()}` : ""}
+                  {m.matchedVia === "address" && (
+                    <span data-testid={`measurement-matchedvia-${m.id}`}> · matched by address</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

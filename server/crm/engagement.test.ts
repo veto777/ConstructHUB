@@ -142,7 +142,7 @@ describe("expiry + engagement against the dev server", () => {
   it("extend pushes expiry out while unanswered, and is refused after approval", async () => {
     const est = await makeSentEstimate();
     const send = await api(`/api/crm/estimates/${est.id}/send`, { method: "POST", body: "{}" }, cookie);
-    const token = send.body.link.split("/e/")[1];
+    const token = send.body.link.split("/e/")[1].split("?")[0];
 
     // Extend by 10 days → roughly now + 10d (and later than the +7d from send).
     const ext = await api(`/api/crm/estimates/${est.id}/extend`, {
@@ -174,7 +174,7 @@ describe("expiry + engagement against the dev server", () => {
   it("heartbeats accumulate capped, server-side duration; CRM read redacts IPs", async () => {
     const est = await makeSentEstimate();
     const send = await api(`/api/crm/estimates/${est.id}/send`, { method: "POST", body: "{}" }, cookie);
-    const token = send.body.link.split("/e/")[1];
+    const token = send.body.link.split("/e/")[1].split("?")[0];
 
     // The engagement session opens as the verified client — anonymous
     // browsers get a silent no-op from the gated start route.
