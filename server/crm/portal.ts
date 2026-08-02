@@ -50,6 +50,20 @@ const money = (c?: number | null) =>
 const esc = (s?: string | null) =>
   String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
 
+/**
+ * Reply-To for client-facing sends: the salesperson who created the bid, NOT
+ * the generic org/admin inbox (the HCP behavior the owner hates — a client
+ * hitting Reply must land with the person who sent the bid).
+ */
+async function senderReplyTo(createdByMemberId: string | null | undefined, fallback?: string | null): Promise<string | undefined> {
+  if (createdByMemberId) {
+    const [m] = await db.select({ email: crmMembers.email }).from(crmMembers)
+      .where(eq(crmMembers.id, createdByMemberId)).limit(1);
+    if (m?.email) return m.email;
+  }
+  return fallback || undefined;
+}
+
 const clientIp = (req: any) =>
   String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
     .split(",")[0].trim().slice(0, 60);
@@ -314,7 +328,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         to,
         subject: `Estimate from ${branding.name}${est.number ? ` — ${est.number}` : ""}`,
         html,
-        replyTo: branding.email || undefined,
+        replyTo: ctx.member.email || (await senderReplyTo(est.createdByMemberId, branding.email)),
       } as any);
       emailed = true;
     } catch (e: any) {
@@ -1083,7 +1097,7 @@ async function deliverSignedContract(
   };
 
   if (clientTo.length) {
-    await sendWithFallback({ ...mail, to: clientTo.join(","), html: html(false), replyTo: branding.email || undefined } as any)
+    await sendWithFallback({ ...mail, to: clientTo.join(","), html: html(false), replyTo: await senderReplyTo(est.createdByMemberId, branding.email) } as any)
       .catch((e: any) => console.error("[crm] contract email (client) failed:", String(e?.message || e).slice(0, 300)));
   }
   if (adminTo.length) {
@@ -1151,7 +1165,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
               ${branding.licenseNumber ? `<br>License ${esc(branding.licenseNumber)}${branding.licenseState ? ` (${esc(branding.licenseState)})` : ""}` : ""}
             </p>
           </div>`,
-        replyTo: branding.email || undefined,
+        replyTo: ctx.member.email || branding.email || undefined,
       } as any);
       emailed = true;
     } catch (e: any) {
