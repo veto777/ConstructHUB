@@ -76,6 +76,17 @@ test.describe("platform admin console", { tag: "@serial" }, () => {
 });
 
 test.describe("beta invites", { tag: "@serial" }, () => {
+  test("a signed-in browser opening a beta link sees the choice card — never a workspace", async ({ page }) => {
+    // Regression: /auth wasn't routed on the signed-in portal, so an invite
+    // link fell through to the home fallback and dumped the signed-in user
+    // into their own org — which read as the invite "sharing" that data.
+    await gotoCrm(page, "/auth?beta=deadbeefdeadbeef");
+    await expect(page.getByTestId("card-beta-signed-in")).toBeVisible();
+    await expect(page.getByTestId("button-beta-signout")).toBeVisible();
+    // And no workspace chrome behind it.
+    await expect(page.getByTestId("card-setup")).not.toBeVisible();
+  });
+
   test("create in the UI, accept at signup, unlimited seats", async ({ page }) => {
     const guards = watchPage(page);
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

@@ -207,6 +207,12 @@ function PortalRouter() {
       <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
       <Route path="/crm-privacy" component={CrmPrivacyPage} />
+      {/* /auth must exist on the SIGNED-IN portal too: a beta-invite link
+          (/auth?beta=…) opened in a signed-in browser previously fell through
+          to the home fallback — dumping the owner into their own workspace and
+          looking like the invite "shared" it. AuthPage shows the sign-out /
+          continue choice card in that state. */}
+      <Route path="/auth" component={AuthPage} />
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
@@ -290,9 +296,7 @@ function AppContent() {
   if (clientPortal) {
     if (location === "/crm-terms") return <CrmTermsPage />;
     if (location === "/crm-privacy") return <CrmPrivacyPage />;
-    if (location === "/crm-terms") return <CrmTermsPage />;
-  if (location === "/crm-privacy") return <CrmPrivacyPage />;
-  if (location.startsWith("/e/")) return <PublicEstimatePage />;
+    if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
     if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
@@ -333,9 +337,10 @@ function AppContent() {
     // homeowner gets a clean page, not the contractor's app frame.
     if (location === "/crm-terms") return <CrmTermsPage />;
     if (location === "/crm-privacy") return <CrmPrivacyPage />;
-    if (location === "/crm-terms") return <CrmTermsPage />;
-  if (location === "/crm-privacy") return <CrmPrivacyPage />;
-  if (location.startsWith("/e/")) return <PublicEstimatePage />;
+    // A beta-invite link (/auth?beta=…) opened while signed in renders the
+    // full-bleed choice card — never silently the signed-in workspace.
+    if (location.startsWith("/auth")) return <AuthPage />;
+    if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
     if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
