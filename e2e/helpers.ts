@@ -161,6 +161,9 @@ export async function sweepPage(
       // every later iteration. The client portal's own sign-out (curated in
       // 15-client-portal) gets the same treatment.
       if (testid === "button-logout" || testid === "button-client-logout") { target = -1; continue; }
+      // tel:/mailto: links don't navigate to a page — clicking one in headless
+      // chrome lands on an empty body and fails the render check below.
+      if (/^(tel|mailto):/.test(href)) { target = -1; continue; }
       if (opts.skip?.(info)) { target = -1; continue; }
       target = i;
       break;
