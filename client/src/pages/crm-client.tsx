@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -21,10 +21,11 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { milliToQty, priceToCents, qtyToMilli } from "@/lib/estimate-math";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  ArrowLeft, Plus, Loader2, Send, Eye, CheckCircle2, XCircle, Copy,
-  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, Pencil,
+  ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
+  FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, Pencil, Search,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
@@ -53,11 +54,26 @@ const BLANK: Item = {
 };
 
 /**
- * Good / better / best tiers for one estimate. Options are presentation-only
- * (the priced line items stay canonical); they render on the client's public
- * page. showTotal defaults off — Leap leaked tier pricing up front and it
- * scared clients off before they read the scope.
+ * Good / better / best options for one estimate, in two honest flavours:
+ * an option WITH line items is a client-selectable scope — it renders as a
+ * checkbox on the public estimate page and the server computes its totals
+ * from the lines (never from a typed-in total). An option WITHOUT items is
+ * a legacy display tier. Lines come from the price book (same tap-to-add
+ * search as the quick builder) or whole packages via options/from-package.
+ * showTotal defaults off — Leap leaked tier pricing up front and it scared
+ * clients off before they read the scope.
  */
+interface OptionLine {
+  /** Price-book item id (re-tapping the same item bumps its qty). */
+  key: string;
+  name: string;
+  unit: string | null;
+  taxable: boolean;
+  /** Raw text keeps typing natural ("2." stays put); numbers are derived. */
+  qtyText: string;
+  priceText: string;
+}
+
 function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
   estimate: any; open: boolean; onOpenChange: (o: boolean) => void;
 }) {
@@ -73,27 +89,121 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
   const [recommended, setRecommended] = useState(false);
   const [showTotal, setShowTotal] = useState(false);
 
+  // ── Scope lines: price-book search → tap-to-add cart ──────────────────────
+  const [itemInput, setItemInput] = useState("");
+  const [itemQ, setItemQ] = useState("");
+  const [lines, setLines] = useState<OptionLine[]>([]);
+  const [addingId, setAddingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setItemQ(itemInput.trim()), 250);
+    return () => clearTimeout(t);
+  }, [itemInput]);
+
+  const { data: pbItems } = useQuery<any[]>({
+    queryKey: [`/api/crm/pricebook/items${itemQ ? `?q=${encodeURIComponent(itemQ)}` : ""}`],
+    enabled: open,
+  });
+
+  const addItem = async (item: any) => {
+    const existing = lines.find((l) => l.key === item.id);
+    if (existing) {
+      setLines(lines.map((l) => l.key === item.id
+        ? { ...l, qtyText: String(qtyToMilli(l.qtyText) / 1000 + 1) }
+        : l));
+      return;
+    }
+    setAddingId(item.id);
+    try {
+      // Flat items carry their price; computed assemblies expand server-side
+      // for one unit and the per-unit price is what the contractor edits.
+      let priceCents: number | null = item.flatPriceCents ?? null;
+      if (priceCents == null) {
+        const r = await apiRequest("POST", `/api/crm/pricebook/items/${item.id}/preview`, { quantityMilli: 1000 });
+        priceCents = (await r.json()).totalPriceCents ?? 0;
+      }
+      setLines((ls) => [...ls, {
+        key: item.id, name: item.name, unit: item.unit ?? null, taxable: item.taxable ?? true,
+        qtyText: "1", priceText: ((priceCents ?? 0) / 100).toString(),
+      }]);
+    } catch (e: any) {
+      toast({ title: "Could not price that item", description: apiErrorMessage(e), variant: "destructive" });
+    } finally {
+      setAddingId(null);
+    }
+  };
+
+  const setLine = (key: string, patch: Partial<OptionLine>) =>
+    setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  const linesSubtotal = lines.reduce(
+    (s, l) => s + Math.round((priceToCents(l.priceText) * qtyToMilli(l.qtyText)) / 1000), 0);
+
+  const resetForm = () => {
+    setName(""); setDescription(""); setTotal("");
+    setRecommended(false); setShowTotal(false); setLines([]); setItemInput("");
+  };
+
   const add = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/estimates/${estimate.id}/options`, {
         name,
         tier: (options?.length ?? 0) + 1,
         description: description || null,
-        totalCents: Math.round((parseFloat(total) || 0) * 100),
+        // Lines present → the option is client-selectable and the server
+        // computes totals from them; the typed total is only the display
+        // tier's price and ignored when lines ride along.
+        ...(lines.length
+          ? {
+            items: lines.map((l) => ({
+              kind: "labor", name: l.name, unit: l.unit, taxable: l.taxable,
+              quantityMilli: qtyToMilli(l.qtyText), unitPriceCents: priceToCents(l.priceText),
+            })),
+          }
+          : { totalCents: Math.round((parseFloat(total) || 0) * 100) }),
         recommended,
         showTotal,
       })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${estimate.id}/options`] });
-      setName(""); setDescription(""); setTotal(""); setRecommended(false); setShowTotal(false);
+      resetForm();
       toast({ title: "Option added", description: "It appears on the client's estimate page." });
     },
     onError: (e: any) => toast({ title: "Could not add option", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
+  const remove = useMutation({
+    mutationFn: async (optionId: string) =>
+      (await apiRequest("DELETE", `/api/crm/estimates/${estimate.id}/options/${optionId}`)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${estimate.id}/options`] });
+      toast({ title: "Option removed" });
+    },
+    onError: (e: any) => toast({ title: "Could not remove option", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
+  // ── Packages: one click expands a price-book package into a scoped option ──
+  const { data: packages } = useQuery<any[]>({
+    queryKey: ["/api/crm/pricebook/packages"],
+    enabled: open,
+  });
+  const [packageId, setPackageId] = useState("");
+  const addPackage = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", `/api/crm/estimates/${estimate.id}/options/from-package`, {
+        packageId, recommended, showTotal,
+      })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${estimate.id}/options`] });
+      setPackageId("");
+      toast({ title: "Option added", description: "The package's scope rides along — the client can tick it." });
+    },
+    onError: (e: any) => toast({ title: "Could not add the package", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Good / better / best — {estimate.number}</DialogTitle>
         </DialogHeader>
@@ -110,15 +220,25 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
               <div key={o.id} className="border rounded-md p-3 flex flex-wrap items-center justify-between gap-2"
                 data-testid={`option-${o.id}`}>
                 <div className="min-w-0">
-                  <div className="font-medium flex items-center gap-2">
+                  <div className="font-medium flex flex-wrap items-center gap-2">
                     {o.name}
                     {o.recommended && <Badge className="text-[10px]">recommended</Badge>}
+                    {Array.isArray(o.items) && o.items.length > 0
+                      ? <Badge variant="secondary" className="text-[10px]">client picks · {o.items.length} line{o.items.length === 1 ? "" : "s"}</Badge>
+                      : <Badge variant="outline" className="text-[10px]">display tier</Badge>}
                   </div>
                   {o.description && <div className="text-sm text-muted-foreground truncate">{o.description}</div>}
                 </div>
-                {o.totalCents != null && (
-                  <div className="font-medium">{money(o.totalCents)}{!o.showTotal && <span className="text-xs text-muted-foreground"> · hidden from client</span>}</div>
-                )}
+                <div className="flex items-center gap-1">
+                  {o.totalCents != null && (
+                    <div className="font-medium">{money(o.totalCents)}{!o.showTotal && <span className="text-xs text-muted-foreground"> · hidden from client</span>}</div>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => remove.mutate(o.id)}
+                    disabled={remove.isPending}
+                    data-testid={`button-remove-option-${o.id}`} aria-label={`Remove ${o.name}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -136,7 +256,9 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
             <div>
               <Label htmlFor="opt-total">Total $</Label>
               <Input id="opt-total" type="number" step="0.01" value={total}
-                onChange={(e) => setTotal(e.target.value)} data-testid="input-option-total" />
+                onChange={(e) => setTotal(e.target.value)} data-testid="input-option-total"
+                disabled={lines.length > 0}
+                placeholder={lines.length > 0 ? "computed from the lines" : undefined} />
             </div>
           </div>
           <div>
@@ -144,6 +266,90 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
             <Textarea id="opt-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="30-year architectural shingles, standard underlayment" />
           </div>
+
+          {/* Scope lines: with lines the client ticks this option on their
+              estimate page; without, it's a display tier only. */}
+          <div className="rounded-md border border-dashed p-3 space-y-2.5">
+            <p className="text-xs text-muted-foreground">
+              Add lines from the price book and this option becomes a checkbox the client can pick —
+              the total is computed from the lines. No lines and it's a display tier only.
+            </p>
+            {lines.length > 0 && (
+              <div className="space-y-2">
+                {lines.map((l) => (
+                  <div key={l.key} className="rounded-lg border p-2.5 space-y-2" data-testid={`option-line-${l.key}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm font-medium leading-snug min-w-0">{l.name}</div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 -mr-1 -mt-1 text-muted-foreground"
+                        onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
+                        data-testid={`button-option-line-remove-${l.key}`} aria-label={`Remove ${l.name}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="w-20">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Qty{l.unit ? ` (${l.unit})` : ""}
+                        </div>
+                        <Input value={l.qtyText} inputMode="decimal" className="h-9"
+                          onChange={(e) => setLine(l.key, { qtyText: e.target.value })}
+                          data-testid={`input-option-line-qty-${l.key}`} aria-label={`Quantity for ${l.name}`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Price $</div>
+                        <Input value={l.priceText} inputMode="decimal" className="h-9"
+                          onChange={(e) => setLine(l.key, { priceText: e.target.value })}
+                          data-testid={`input-option-line-price-${l.key}`} aria-label={`Unit price for ${l.name}`} />
+                      </div>
+                      <div className="text-right tabular-nums font-medium text-sm pb-1.5 w-20">
+                        {money(Math.round((priceToCents(l.priceText) * qtyToMilli(l.qtyText)) / 1000))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div className="text-right text-sm">
+                  Lines total <span className="font-semibold tabular-nums" data-testid="text-option-lines-total">{money(linesSubtotal)}</span>
+                  <span className="text-xs text-muted-foreground"> · tax added at the estimate's rate</span>
+                </div>
+              </div>
+            )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={itemInput} onChange={(e) => setItemInput(e.target.value)}
+                placeholder="Search the price book to add a line…"
+                className="h-10 pl-9"
+                data-testid="input-option-item-search" />
+            </div>
+            {(pbItems ?? []).length > 0 && (
+              <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                {(pbItems ?? []).slice(0, 8).map((i) => {
+                  const inCart = lines.some((l) => l.key === i.id);
+                  return (
+                    <div key={i.id} className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2"
+                      data-testid={`option-pb-row-${i.id}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm leading-snug">{i.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          per {i.unit}{i.flatPriceCents != null ? ` · ${money(i.flatPriceCents)}` : ""}
+                        </div>
+                      </div>
+                      <Button variant={inCart ? "secondary" : "outline"} size="sm" className="h-9 shrink-0"
+                        disabled={addingId === i.id}
+                        onClick={() => addItem(i)}
+                        data-testid={`button-option-pb-add-${i.id}`}>
+                        {addingId === i.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : inCart
+                            ? <><Check className="h-4 w-4 mr-1" /> +1</>
+                            : <><Plus className="h-4 w-4 mr-1" /> Add</>}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={recommended} onCheckedChange={(c) => setRecommended(c === true)}
@@ -157,6 +363,36 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
             </label>
           </div>
         </div>
+
+        {/* A whole price-book package becomes a scoped option in one click —
+            the server expands it, prices it, and attaches the lines. */}
+        {(packages ?? []).length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <Label>…or add a whole package as an option</Label>
+              <div className="flex gap-2">
+                <Select value={packageId} onValueChange={setPackageId}>
+                  <SelectTrigger className="flex-1" data-testid="select-option-package">
+                    <SelectValue placeholder="Pick a price-book package" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(packages ?? []).map((p) => (
+                      <SelectItem key={p.id} value={p.id} data-testid={`package-item-${p.id}`}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={() => addPackage.mutate()}
+                  disabled={!packageId || addPackage.isPending}
+                  data-testid="button-add-package-option">
+                  {addPackage.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Add package
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
 
         <DialogFooter>
           <Button onClick={() => add.mutate()} disabled={!name.trim() || add.isPending}
