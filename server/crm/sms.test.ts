@@ -1,7 +1,7 @@
 /**
- * SMS (Twilio) + estimate reminders + engagement re-engagement alerts.
+ * SMS (SignalWire) + estimate reminders + engagement re-engagement alerts.
  *
- * Part 1 is pure/provider tests: Twilio payload shape against a mocked fetch,
+ * Part 1 is pure/provider tests: SignalWire payload shape against a mocked fetch,
  * not-configured honesty, the recording log provider, phone normalisation —
  * no server needed. Env is read AT CALL TIME by the module, so tests flip
  * process.env freely (always restored).
@@ -37,12 +37,12 @@ const pool = new pg.Pool({
     "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
 });
 
-const TWILIO_KEYS = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"] as const;
+const SW_KEYS = ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"] as const;
 
-/** Run fn with the Twilio env set to `vals` (undefined = unset); always restores. */
-async function withTwilioEnv<T>(vals: Record<string, string | undefined>, fn: () => Promise<T> | T): Promise<T> {
-  const saved = Object.fromEntries(TWILIO_KEYS.map((k) => [k, process.env[k]]));
-  for (const k of TWILIO_KEYS) {
+/** Run fn with the SignalWire env set to `vals` (undefined = unset); always restores. */
+async function withSwEnv<T>(vals: Record<string, string | undefined>, fn: () => Promise<T> | T): Promise<T> {
+  const saved = Object.fromEntries(SW_KEYS.map((k) => [k, process.env[k]]));
+  for (const k of SW_KEYS) {
     const v = vals[k];
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
@@ -50,7 +50,7 @@ async function withTwilioEnv<T>(vals: Record<string, string | undefined>, fn: ()
   try {
     return await fn();
   } finally {
-    for (const k of TWILIO_KEYS) {
+    for (const k of SW_KEYS) {
       if (saved[k] === undefined) delete process.env[k];
       else process.env[k] = saved[k];
     }
@@ -63,25 +63,25 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("sms configuration honesty (pure)", () => {
   it("not-configured names every missing env var and hides the from-number", async () => {
-    await withTwilioEnv({}, async () => {
+    await withSwEnv({}, async () => {
       expect(smsConfigured()).toBe(false);
-      expect(smsMissingEnv()).toEqual([...TWILIO_KEYS]);
+      expect(smsMissingEnv()).toEqual([...SW_KEYS]);
       const s = smsStatus();
       expect(s.configured).toBe(false);
-      expect(s.missing).toEqual([...TWILIO_KEYS]);
+      expect(s.missing).toEqual([...SW_KEYS]);
       expect(s.fromNumber).toBeNull();
     });
   });
 
   it("partial env is still not configured — and says exactly which are left", async () => {
-    await withTwilioEnv({ TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: undefined, TWILIO_FROM_NUMBER: "+15550001111" }, async () => {
+    await withSwEnv({ SIGNALWIRE_SPACE_URL: "x.signalwire.com", SIGNALWIRE_PROJECT_ID: "proj-1", SIGNALWIRE_API_TOKEN: undefined, SIGNALWIRE_FROM_NUMBER: "+15550001111" }, async () => {
       expect(smsConfigured()).toBe(false);
-      expect(smsMissingEnv()).toEqual(["TWILIO_AUTH_TOKEN"]);
+      expect(smsMissingEnv()).toEqual(["SIGNALWIRE_API_TOKEN"]);
     });
   });
 
   it("fully set env is configured; the status never leaks the auth token", async () => {
-    await withTwilioEnv({ TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: "secret-token", TWILIO_FROM_NUMBER: "+15550001111" }, async () => {
+    await withSwEnv({ SIGNALWIRE_SPACE_URL: "x.signalwire.com", SIGNALWIRE_PROJECT_ID: "proj-1", SIGNALWIRE_API_TOKEN: "secret-token", SIGNALWIRE_FROM_NUMBER: "+15550001111" }, async () => {
       expect(smsConfigured()).toBe(true);
       const s = smsStatus();
       expect(s.configured).toBe(true);
@@ -104,10 +104,10 @@ describe("normalizePhone (pure)", () => {
   });
 });
 
-describe("twilio provider payload shape (mocked fetch)", () => {
+describe("signalwire provider payload shape (mocked fetch)", () => {
   it("POSTs From/To/Body to Accounts/{SID}/Messages.json with basic auth", async () => {
-    await withTwilioEnv(
-      { TWILIO_ACCOUNT_SID: "ACtest123", TWILIO_AUTH_TOKEN: "tok-xyz", TWILIO_FROM_NUMBER: "+15550001111" },
+    await withSwEnv(
+      { SIGNALWIRE_SPACE_URL: "construct-hub.signalwire.com", SIGNALWIRE_PROJECT_ID: "proj-abc", SIGNALWIRE_API_TOKEN: "tok-xyz", SIGNALWIRE_FROM_NUMBER: "+15550001111" },
       async () => {
         const calls: { url: string; init: any }[] = [];
         vi.stubGlobal("fetch", async (url: any, init: any) => {
@@ -116,13 +116,13 @@ describe("twilio provider payload shape (mocked fetch)", () => {
         });
 
         const r = await sendSms("+15551234567", "your estimate is waiting");
-        expect(r).toEqual({ ok: true, provider: "twilio", sid: "SMabc123" });
+        expect(r).toEqual({ ok: true, provider: "signalwire", sid: "SMabc123" });
 
         expect(calls).toHaveLength(1);
         const { url, init } = calls[0];
-        expect(url).toBe("https://api.twilio.com/2010-04-01/Accounts/ACtest123/Messages.json");
+        expect(url).toBe("https://construct-hub.signalwire.com/api/laml/2010-04-01/Accounts/proj-abc/Messages.json");
         expect(init.method).toBe("POST");
-        expect(init.headers.Authorization).toBe(`Basic ${Buffer.from("ACtest123:tok-xyz").toString("base64")}`);
+        expect(init.headers.Authorization).toBe(`Basic ${Buffer.from("proj-abc:tok-xyz").toString("base64")}`);
         expect(init.headers["Content-Type"]).toBe("application/x-www-form-urlencoded");
         const params = new URLSearchParams(init.body);
         expect(params.get("From")).toBe("+15550001111");
@@ -132,16 +132,16 @@ describe("twilio provider payload shape (mocked fetch)", () => {
     );
   });
 
-  it("a Twilio rejection comes back as ok:false with the message — never throws", async () => {
-    await withTwilioEnv(
-      { TWILIO_ACCOUNT_SID: "ACtest123", TWILIO_AUTH_TOKEN: "tok-xyz", TWILIO_FROM_NUMBER: "+15550001111" },
+  it("a SignalWire rejection comes back as ok:false with the message — never throws", async () => {
+    await withSwEnv(
+      { SIGNALWIRE_SPACE_URL: "construct-hub.signalwire.com", SIGNALWIRE_PROJECT_ID: "proj-abc", SIGNALWIRE_API_TOKEN: "tok-xyz", SIGNALWIRE_FROM_NUMBER: "+15550001111" },
       async () => {
         vi.stubGlobal("fetch", async () => ({
           ok: false, status: 400, json: async () => ({ message: "The 'To' number is not a valid phone number." }),
         }));
         const r = await sendSms("+1555", "hi");
         expect(r.ok).toBe(false);
-        expect(r.provider).toBe("twilio");
+        expect(r.provider).toBe("signalwire");
         expect(r.error).toContain("not a valid phone number");
       },
     );
@@ -151,7 +151,7 @@ describe("twilio provider payload shape (mocked fetch)", () => {
 describe("log provider (the unconfigured seam)", () => {
   it("records to the outbox instead of sending and names itself 'log'", async () => {
     const outbox = path.join(process.cwd(), "tmp", `sms-test-${Date.now()}.jsonl`);
-    await withTwilioEnv({}, async () => {
+    await withSwEnv({}, async () => {
       const savedPath = process.env.SMS_OUTBOX_PATH;
       process.env.SMS_OUTBOX_PATH = outbox;
       try {
@@ -255,11 +255,11 @@ describe("reminders + reengagement alerts against the dev server", () => {
     return { est: est.body, customerId: cust.body.id as string, token: send.body.link.split("/e/")[1].split("?")[0] as string };
   }
 
-  it("sms status is honestly not-configured on the dev server (no Twilio env)", async () => {
+  it("sms status is honestly not-configured on the dev server (no carrier env)", async () => {
     const r = await api("/api/crm/sms/status", {}, cookie);
     expect(r.status).toBe(200);
     expect(r.body.configured).toBe(false);
-    expect(r.body.missing).toEqual(expect.arrayContaining(["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]));
+    expect(r.body.missing).toEqual(expect.arrayContaining(["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"]));
     // …and the test-send refuses rather than pretending.
     const t = await api("/api/crm/sms/test", { method: "POST", body: JSON.stringify({ to: "+15551234567" }) }, cookie);
     expect(t.status).toBe(503);
@@ -272,7 +272,7 @@ describe("reminders + reengagement alerts against the dev server", () => {
     expect(r1.status).toBe(200);
     expect(r1.body.emailed).toBe(true);
     expect(r1.body.texted).toBe(true);
-    // Twilio is unconfigured on the dev server → the recording log provider.
+    // No carrier configured on the dev server → the recording log provider.
     expect(r1.body.smsProvider).toBe("log");
     expect(r1.body.reminders).toHaveLength(1);
     expect(r1.body.reminders[0].channel).toBe("email+sms");
@@ -340,7 +340,7 @@ describe("reminders + reengagement alerts against the dev server", () => {
       expect(marker.lastDay).toBe(reengagementDayKey());
       expect(marker.count).toBe(1);
       expect(marker.textedTo).toBe("+15550100001");
-      expect(marker.smsProvider).toBe("log"); // Twilio unconfigured → recorded
+      expect(marker.smsProvider).toBe("log"); // no carrier → recorded
 
       // The email attempt landed in the dev outbox.
       const outbox = fs.readFileSync(path.join(process.cwd(), "tmp", "email-outbox.jsonl"), "utf8");

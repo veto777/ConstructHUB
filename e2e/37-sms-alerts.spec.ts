@@ -5,9 +5,9 @@ import { gotoCrm, grantClientSession, makeEstimate, ORGS, switchOrg, watchPage }
 import { q } from "./db";
 
 /**
- * SMS (Twilio) + engagement re-engagement alerts.
+ * SMS (SignalWire) + engagement re-engagement alerts.
  *
- * No Twilio credentials exist in dev — the whole point is that the feature is
+ * No carrier credentials exist in dev — the whole point is that the feature is
  * honest about that: the Settings card names the missing env vars, the
  * reminder still emails (and RECORDS the text via the log provider), and the
  * "client is reviewing their bid again" alert fires email + a recorded text.
@@ -33,9 +33,9 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
     await expect(page.getByTestId("text-sms-not-configured")).toBeVisible();
     // The card names exactly which env vars are missing, Stripe-style.
     const missing = await page.getByTestId("text-sms-missing").innerText();
-    expect(missing).toContain("TWILIO_ACCOUNT_SID");
-    expect(missing).toContain("TWILIO_AUTH_TOKEN");
-    expect(missing).toContain("TWILIO_FROM_NUMBER");
+    expect(missing).toContain("SIGNALWIRE_SPACE_URL");
+    expect(missing).toContain("SIGNALWIRE_API_TOKEN");
+    expect(missing).toContain("SIGNALWIRE_FROM_NUMBER");
     // The test-send control is disabled rather than pretending it could work.
     await expect(page.getByTestId("button-sms-test-send")).toBeDisabled();
 
@@ -48,7 +48,7 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
     const guards = watchPage(page);
     const { customerId, estimateId } = await makeEstimate(page);
     // Give the client a mobile so the SMS leg runs (recorded by the log
-    // provider — Twilio is unconfigured in dev).
+    // provider — no carrier is configured in dev).
     await q(`update crm_customers set phone = '+15550119988' where id = $1`, [customerId]);
 
     const send = await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
@@ -70,7 +70,7 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
     expect(rows[0].r[0].by).toBeTruthy();
     expect(rows[0].r[0].at).toBeTruthy();
 
-    // The text went to the log provider (Twilio unconfigured) — not to Twilio.
+    // The text went to the log provider (no carrier configured) — not to SignalWire.
     const smsLog = fs.readFileSync(SMS_OUTBOX, "utf8");
     expect(smsLog).toContain('"provider":"log"');
     expect(smsLog).toContain("+15550119988");
@@ -114,7 +114,7 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
       const marker = await markerOf(estimateId);
       expect(marker.count).toBe(1);
       expect(marker.lastDay).toBe(new Date().toISOString().slice(0, 10));
-      expect(marker.smsProvider).toBe("log"); // recorded, not sent — Twilio unconfigured
+      expect(marker.smsProvider).toBe("log"); // recorded, not sent — no carrier configured
       expect(marker.textedTo).toBe("+15550100001");
 
       // The email attempt landed in the dev outbox…

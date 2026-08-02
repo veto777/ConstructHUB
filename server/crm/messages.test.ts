@@ -2,7 +2,7 @@
  * Quick messages (Create menu → Message).
  *
  * Part 1 is pure/provider: the timeline note marker and the delivery seam
- * (text through the recording log provider when Twilio is unconfigured) —
+ * (text through the recording log provider when no carrier is configured) —
  * env is read AT CALL TIME, so tests flip process.env freely (restored).
  *
  * Part 2 exercises the running dev server like sms.test.ts does:
@@ -33,15 +33,15 @@ const pool = new pg.Pool({
     "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
 });
 
-const TWILIO_KEYS = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"] as const;
+const SW_KEYS = ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"] as const;
 
-async function withoutTwilio<T>(fn: () => Promise<T> | T): Promise<T> {
-  const saved = Object.fromEntries(TWILIO_KEYS.map((k) => [k, process.env[k]]));
-  for (const k of TWILIO_KEYS) delete process.env[k];
+async function withoutCarrier<T>(fn: () => Promise<T> | T): Promise<T> {
+  const saved = Object.fromEntries(SW_KEYS.map((k) => [k, process.env[k]]));
+  for (const k of SW_KEYS) delete process.env[k];
   try {
     return await fn();
   } finally {
-    for (const k of TWILIO_KEYS) {
+    for (const k of SW_KEYS) {
       if (saved[k] === undefined) delete process.env[k];
       else process.env[k] = saved[k];
     }
@@ -83,7 +83,7 @@ describe("outbound message note marker (pure)", () => {
 describe("deliverQuickMessage — text via the log provider when unconfigured", () => {
   it("records instead of sending and names the provider honestly", async () => {
     const outbox = path.join(process.cwd(), "tmp", `qm-test-${Date.now()}.jsonl`);
-    await withoutTwilio(async () => {
+    await withoutCarrier(async () => {
       const savedPath = process.env.SMS_OUTBOX_PATH;
       process.env.SMS_OUTBOX_PATH = outbox;
       try {
@@ -179,7 +179,7 @@ describe("POST /api/crm/messages against the dev server", () => {
     expect(r.status).toBe(409);
     expect(r.body.message).toContain("Texting is off");
     expect(r.body.message).toContain("Settings");
-    expect(r.body.missing).toEqual(expect.arrayContaining(["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]));
+    expect(r.body.missing).toEqual(expect.arrayContaining(["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"]));
 
     // Nothing was recorded — a refused send leaves no "you sent" entry.
     const tl = await api(`/api/crm/customers/${customerId}/timeline`, {}, cookie);

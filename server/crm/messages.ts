@@ -5,7 +5,7 @@
  * Channel honesty (the whole point):
  *   - Email always works — sendWithFallback sinks to the dev outbox when no
  *     SMTP is configured, exactly like estimate sends.
- *   - Text works ONLY when Twilio is configured (server/crm/sms.ts
+ *   - Text works ONLY when SignalWire is configured (server/crm/sms.ts
  *     smsConfigured()). When it isn't, the route refuses with a 409 that
  *     names the missing env vars and points at Settings — the composer never
  *     shows a clickable dead Text button, and the API never pretends either.
@@ -64,7 +64,7 @@ export async function deliverQuickMessage(args: {
   body: string;
   orgName: string;
   replyTo?: string;
-}): Promise<{ ok: boolean; provider: "email" | "twilio" | "signalwire" | "log"; error?: string }> {
+}): Promise<{ ok: boolean; provider: "email" | "signalwire" | "log"; error?: string }> {
   const { channel, to, body, orgName, replyTo } = args;
   if (channel === "email") {
     await sendWithFallback({

@@ -320,7 +320,7 @@ export default function CrmSettingsPage() {
     onError: (e: any) => toast({ title: "Could not save notifications", description: String(e.message ?? e), variant: "destructive" }),
   });
 
-  // ── SMS (Twilio) ──────────────────────────────────────────────────────────
+  // ── SMS (SignalWire) ──────────────────────────────────────────────────────
   // Honest configuration state: the server names the missing env vars; the
   // test-text control only lights up when texting can actually work.
   const canIntegrations = me?.permissions?.manageIntegrations === true;
@@ -968,7 +968,7 @@ export default function CrmSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* ── SMS (Twilio) ────────────────────────────────────────────────── */}
+      {/* ── SMS (SignalWire) ───────────────────────────────────────────── */}
       <Card data-testid="card-sms">
         <CardHeader>
           <SectionTitle
@@ -984,7 +984,7 @@ export default function CrmSettingsPage() {
               {smsStatus?.configured ? (
                 <>
                   <div className="font-medium" data-testid="text-sms-configured">
-                    Texting via {smsStatus.provider === "signalwire" ? "SignalWire" : "Twilio"} from {smsStatus.fromNumber}
+                    Texting via SignalWire from {smsStatus.fromNumber}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Reminder texts and re-engagement alerts send as real SMS.
@@ -994,7 +994,7 @@ export default function CrmSettingsPage() {
                 <>
                   <div className="font-medium" data-testid="text-sms-not-configured">SMS is not configured</div>
                   <div className="text-xs text-muted-foreground" data-testid="text-sms-missing">
-                    Set {(smsStatus?.missing?.length ? smsStatus.missing : ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]).join(", ")} on
+                    Set {(smsStatus?.missing?.length ? smsStatus.missing : ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"]).join(", ")} on
                     the server to enable texting. Until then, texts are recorded to the server log instead of being sent.
                   </div>
                   <div className="text-xs text-muted-foreground mt-1" data-testid="text-sms-gray-note">
