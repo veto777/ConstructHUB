@@ -179,6 +179,7 @@ export default function TermsOfUsePage() {
               <li>Damages resulting from unauthorized access to your account.</li>
               <li>Service interruptions, downtime, or data loss.</li>
             </ul>
+            <p className="mb-2"><strong>Data retention and backups.</strong> You acknowledge that any data you store on the platform — including clients, estimates, invoices, projects, notes, and uploaded files — may be deleted or lost at any time, for any reason, including technical failure, human error, security incidents, or termination of your account. ConstructHUB maintains internal disaster-recovery backups for its own operational purposes only, retains them for no more than a few days, and does not guarantee that any specific record can be restored. You are solely responsible for maintaining your own independent copies of your data. The platform provides scheduled self-service backup exports (Settings &rarr; Backups), and it is your responsibility to enable and use them. ConstructHUB is not responsible or liable for any deletion, loss, corruption, or unavailability of your data under any circumstances.</p>
             <p>OUR TOTAL LIABILITY FOR ANY CLAIM ARISING FROM OR RELATED TO THESE TERMS SHALL NOT EXCEED THE AMOUNT YOU PAID TO CONSTRUCTHUB IN THE 12 MONTHS PRECEDING THE CLAIM.</p>
           </section>
 

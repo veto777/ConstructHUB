@@ -10,6 +10,7 @@ import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { CrmCreateMenu } from "@/components/crm-create-menu";
+import { InfoTip } from "@/components/info-tip";
 import { useTheme } from "@/components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,8 @@ import { cn } from "@/lib/utils";
 
 const MORE_LINKS: {
   title: string; url: string; icon: LucideIcon; testid: string;
+  /** ⓘ help-dialog key (lib/info-content.ts) shown beside the row. */
+  infoKey: string;
   /** Permission required to see this item; undefined = everyone. */
   perm?: string;
   /** Platform admins only (ConstructHUB staff — see /api/crm/me). */
@@ -31,33 +34,39 @@ const MORE_LINKS: {
   active: (l: string) => boolean;
 }[] = [
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
+    infoKey: "pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "ribbon-more-estimates",
+    infoKey: "estimates",
     active: (l) => l.startsWith("/crm/estimates") && l !== "/crm/estimates/new" },
   // The one-tap fast path — the action a field user wants from the driveway.
   { title: "New estimate", url: "/crm/estimates/new", icon: FilePlus2, testid: "ribbon-more-new-estimate",
+    infoKey: "estimate-new",
     active: (l) => l === "/crm/estimates/new" },
   // Gated like the API: invoices are money, seePrices only.
   { title: "Invoices", url: "/crm/invoices", icon: ReceiptText, testid: "ribbon-more-invoices",
-    perm: "seePrices",
+    infoKey: "invoices", perm: "seePrices",
     active: (l) => l.startsWith("/crm/invoices") },
   { title: "Price book", url: "/crm/pricebook", icon: BookOpen, testid: "ribbon-more-pricebook",
+    infoKey: "pricebook",
     active: (l) => l.startsWith("/crm/pricebook") },
   { title: "Payments", url: "/crm/payments", icon: CreditCard, testid: "ribbon-more-payments",
+    infoKey: "payments",
     active: (l) => l.startsWith("/crm/payments") },
   { title: "Team & Company", url: "/crm/team", icon: Building2, testid: "ribbon-more-team",
+    infoKey: "team",
     active: (l) => l.startsWith("/crm/team") },
   // Gated like the sidebar, next to Settings where it grew from.
   { title: "Integrations", url: "/crm/integrations", icon: Blocks, testid: "ribbon-more-integrations",
-    perm: "manageSettings",
+    infoKey: "integrations", perm: "manageSettings",
     active: (l) => l.startsWith("/crm/integrations") },
   // Gated like the sidebar: only members with manageSettings see Settings.
   { title: "Settings", url: "/crm/settings", icon: Settings, testid: "ribbon-more-settings",
-    perm: "manageSettings",
+    infoKey: "settings", perm: "manageSettings",
     active: (l) => l.startsWith("/crm/settings") },
   // ConstructHUB staff only, like the sidebar.
   { title: "Platform Admin", url: "/crm/admin", icon: ShieldCheck, testid: "ribbon-more-admin",
-    platformAdmin: true,
+    infoKey: "admin", platformAdmin: true,
     active: (l) => l.startsWith("/crm/admin") },
 ];
 
@@ -160,16 +169,19 @@ export function CrmRibbon() {
               (!l.perm || me?.permissions?.[l.perm] === true) &&
               (!l.platformAdmin || me?.isPlatformAdmin === true),
             ).map((l) => (
-              <Link key={l.url} href={l.url} data-testid={l.testid} onClick={() => setMoreOpen(false)}
-                className={cn(
-                  "flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium transition-colors",
-                  l.active(location)
-                    ? "bg-primary/10 text-primary"
-                    : "text-foreground hover:bg-accent",
-                )}>
-                <l.icon className="h-5 w-5 shrink-0" strokeWidth={1.8} />
-                {l.title}
-              </Link>
+              <div key={l.url} className="flex items-center gap-1">
+                <Link href={l.url} data-testid={l.testid} onClick={() => setMoreOpen(false)}
+                  className={cn(
+                    "flex flex-1 items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium transition-colors",
+                    l.active(location)
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground hover:bg-accent",
+                  )}>
+                  <l.icon className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+                  {l.title}
+                </Link>
+                <InfoTip k={l.infoKey} className="h-11 w-11 my-0 mx-0" />
+              </div>
             ))}
             <button
               type="button"

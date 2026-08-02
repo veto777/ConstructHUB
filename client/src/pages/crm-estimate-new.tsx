@@ -14,6 +14,7 @@ import {
   Plus, Search, Send, Trash2, UserPlus, X,
 } from "lucide-react";
 import { InitialAvatar } from "@/components/crm-ui";
+import { InfoTip } from "@/components/info-tip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -313,7 +314,10 @@ export default function CrmEstimateNewPage() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight leading-tight">New estimate</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-xl font-semibold tracking-tight leading-tight">New estimate</h1>
+            <InfoTip k="estimate-new" />
+          </div>
           <div className="text-xs text-muted-foreground" data-testid="text-step">
             Step {step} of 3 — {step === 1 ? "pick the client" : step === 2 ? "add the work" : "review & send"}
           </div>

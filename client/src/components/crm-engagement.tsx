@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Eye, CalendarPlus, Loader2 } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
 
 /** Compact duration: 45s → "<1m", 720s → "12m", 3900s → "1h 5m". */
 function fmtDuration(secs: number): string {
@@ -64,6 +65,9 @@ export function EstimateEngagement({ estimate: e, canManage, onChanged }: Props)
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground"
       data-testid={`engagement-${e.id}`}>
+      {e.sentAt && (
+        <InfoTip k="engagement" className="h-6 w-6 my-0 mx-0 [&>svg]:h-3 [&>svg]:w-3" />
+      )}
       {eng && eng.visits > 0 && (
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-1 hover:text-foreground">
@@ -84,6 +88,7 @@ export function EstimateEngagement({ estimate: e, canManage, onChanged }: Props)
       {e.expiresAt && !settled && (
         <span className={expired ? "text-destructive font-medium" : ""}>
           {expired ? `Expired ${day(e.expiresAt)}` : `Expires ${day(e.expiresAt)}`}
+          <InfoTip k="estimate-expiry" className="h-6 w-6 my-0 mx-0 ml-1 [&>svg]:h-3 [&>svg]:w-3" />
         </span>
       )}
       {canManage && !settled && e.sentAt && (

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { InfoTip } from "@/components/info-tip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud,
-  CalendarDays, RefreshCw, Unplug, Ruler, MessageSquare, Lock,
+  CalendarDays, RefreshCw, Unplug, Ruler, MessageSquare, Lock, DatabaseBackup,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
@@ -364,6 +365,52 @@ export default function CrmSettingsPage() {
     return floorPct.trim() === "" || Number.isNaN(pct) ? null : Math.round(Math.min(100, Math.max(0, pct)) * 100);
   };
 
+  // ── Auto-backup (owner only) ──────────────────────────────────────────────
+  // custom_fields->'backup' — the server merges on save, so lastSentAt and
+  // lastError come back on the org and render read-only below.
+  const backupCfg: { lastSentAt?: string | null; lastError?: string | null } =
+    (org?.customFields as any)?.backup ?? {};
+  const [backupForm, setBackupForm] = useState({
+    enabled: false,
+    frequency: "weekly" as "weekly" | "biweekly",
+    format: "csv" as "csv" | "xlsx",
+    email: "",
+  });
+  useEffect(() => {
+    if (!org) return;
+    const b = (org.customFields as any)?.backup ?? {};
+    setBackupForm({
+      enabled: b.enabled === true,
+      frequency: b.frequency === "biweekly" ? "biweekly" : "weekly",
+      format: b.format === "xlsx" ? "xlsx" : "csv",
+      email: b.email ?? org.email ?? me?.member?.email ?? "",
+    });
+    // Only re-seed the form when the org itself changes, not on every save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org?.id]);
+
+  const saveBackup = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("PUT", "/api/crm/backups/settings", backupForm)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Backup settings saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save backup settings", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const sendBackupNow = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/backups/send-now", {})).json(),
+    onSuccess: (r: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({
+        title: "Backup sent",
+        description: `${r.rows.clients} clients, ${r.rows.estimates} estimates, ${r.rows.invoices} invoices · ${(r.bytes / 1024).toFixed(1)} KB to ${r.recipient}`,
+      });
+    },
+    onError: (e: any) => toast({ title: "Backup failed", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   // ── Payments: card fee passthrough + financing links ──────────────────────
   const { data: paySettings } = useQuery<any>({
     queryKey: ["/api/crm/payments/settings"],
@@ -474,6 +521,7 @@ export default function CrmSettingsPage() {
       <CrmPageHeader
         icon={Settings}
         title="Settings"
+        infoKey="settings"
         subtitle="Company profile, document defaults, notifications and calendar."
       />
 
@@ -483,6 +531,7 @@ export default function CrmSettingsPage() {
           <SectionTitle
             icon={Building2}
             title="Company profile"
+            infoKey="settings-company"
             description="Appears on estimates, invoices and the client portal."
           />
         </CardHeader>
@@ -599,7 +648,7 @@ export default function CrmSettingsPage() {
               client portal — never the CRM workspace itself. Saves on click. */}
           <div className="border-t pt-4 space-y-3" data-testid="section-company-theme">
             <div>
-              <div className="text-sm font-medium">Company theme</div>
+              <div className="text-sm font-medium flex items-center gap-1">Company theme<InfoTip k="settings-theme" /></div>
               <p className="text-xs text-muted-foreground">
                 The accent on your estimates, invoices, contracts and client portal — paired with a black or white base, your choice.
               </p>
@@ -677,6 +726,7 @@ export default function CrmSettingsPage() {
           <SectionTitle
             icon={MapPin}
             title="Divisions"
+            infoKey="divisions"
             description="Operating arms of your company (e.g. a WA headquarters and a FL division). A project's division sets the name, address and license that print on its estimates and invoices — and admins can be scoped to one."
           />
         </CardHeader>
@@ -828,6 +878,7 @@ export default function CrmSettingsPage() {
           <SectionTitle
             icon={FileText}
             title="Estimate & invoice defaults"
+            infoKey="settings-defaults"
             description="Pre-filled on every new document; editable per document."
           />
         </CardHeader>
@@ -895,6 +946,7 @@ export default function CrmSettingsPage() {
           <SectionTitle
             icon={Bell}
             title="Notifications"
+            infoKey="settings-notifications"
             description="Emails the system sends to you. Emails to your clients (the estimate or invoice itself) always send."
           />
         </CardHeader>
@@ -922,6 +974,7 @@ export default function CrmSettingsPage() {
           <SectionTitle
             icon={MessageSquare}
             title="SMS"
+            infoKey="settings-sms"
             description="Text bid reminders to clients, and get a text the moment a client re-opens their estimate."
           />
         </CardHeader>
@@ -982,6 +1035,7 @@ export default function CrmSettingsPage() {
             <SectionTitle
               icon={Lock}
               title="Price floor lock"
+              infoKey="price-lock"
               description="Reps can price above the floor, never below. You can still edit SKUs, price charts and discounts anytime."
             />
           </CardHeader>
@@ -1023,12 +1077,103 @@ export default function CrmSettingsPage() {
         </Card>
       )}
 
+      {/* ── Auto-backup (owner only) ────────────────────────────────────── */}
+      {isOwner && (
+        <Card data-testid="card-backup">
+          <CardHeader>
+            <SectionTitle
+              icon={DatabaseBackup}
+              title="Auto-backup"
+              description="Your whole book of business — clients, estimates and invoices — emailed to you every week or two."
+              infoKey="backups"
+            />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium">Automatic email backups</div>
+                <div className="text-xs text-muted-foreground">
+                  When a backup comes due it's generated and emailed automatically (checked every 15 minutes).
+                </div>
+              </div>
+              <Switch
+                checked={backupForm.enabled}
+                onCheckedChange={(v) => setBackupForm((f) => ({ ...f, enabled: v }))}
+                data-testid="switch-backup-enabled"
+              />
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label>Frequency</Label>
+                <Select value={backupForm.frequency}
+                  onValueChange={(v) => setBackupForm((f) => ({ ...f, frequency: v as typeof f.frequency }))}>
+                  <SelectTrigger className="w-44" data-testid="select-backup-frequency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Every week</SelectItem>
+                    <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Format</Label>
+                <Select value={backupForm.format}
+                  onValueChange={(v) => setBackupForm((f) => ({ ...f, format: v as typeof f.format }))}>
+                  <SelectTrigger className="w-56" data-testid="select-backup-format">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="csv">CSV (three files)</SelectItem>
+                    <SelectItem value="xlsx">Excel (.xls, three sheets)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="backup-email">Send to</Label>
+                <Input id="backup-email" type="email" className="w-64"
+                  data-testid="input-backup-email" placeholder="you@company.com"
+                  value={backupForm.email}
+                  onChange={(e) => setBackupForm((f) => ({ ...f, email: e.target.value }))} />
+              </div>
+              <Button onClick={() => saveBackup.mutate()}
+                disabled={saveBackup.isPending || !backupForm.email.trim()}
+                data-testid="button-save-backup">
+                {saveBackup.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save backup settings
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+              <Button variant="outline" onClick={() => sendBackupNow.mutate()}
+                disabled={sendBackupNow.isPending}
+                data-testid="button-send-backup-now">
+                {sendBackupNow.isPending
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <DatabaseBackup className="h-4 w-4 mr-2" />}
+                Send backup now
+              </Button>
+              <div className="text-xs text-muted-foreground" data-testid="text-backup-last-sent">
+                {backupCfg.lastSentAt
+                  ? `Last sent ${new Date(backupCfg.lastSentAt).toLocaleString()}`
+                  : "Never sent yet"}
+              </div>
+            </div>
+            {backupCfg.lastError && (
+              <p className="text-xs text-destructive" data-testid="text-backup-error">
+                Last backup failed: {backupCfg.lastError}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Payments ────────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <SectionTitle
             icon={CreditCard}
             title="Payments"
+            infoKey="settings-payments"
             description="Your own Stripe account, via Stripe Connect."
             actions={
               <Link href="/crm/payments" data-testid="link-payments"
@@ -1154,7 +1299,7 @@ export default function CrmSettingsPage() {
           {/* Financing links — the primary one shows on estimates & invoices. */}
           <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-financing">
             <div>
-              <div className="text-sm font-medium">Financing links</div>
+              <div className="text-sm font-medium flex items-center gap-1">Financing links<InfoTip k="financing" /></div>
               <p className="text-xs text-muted-foreground">
                 Up to 10 lender or partner links. The primary one appears as "Finance this project →"
                 on your estimates, invoices and the client portal.
@@ -1227,6 +1372,7 @@ export default function CrmSettingsPage() {
           <SectionTitle
             icon={CalendarDays}
             title="Calendar"
+            infoKey="settings-calendar"
             description="Your schedule in the calendar app you already use — subscribe anywhere, or push to Google Calendar."
           />
         </CardHeader>
@@ -1425,6 +1571,7 @@ export default function CrmSettingsPage() {
           <SectionTitle
             icon={Tag}
             title="Lead sources"
+            infoKey="lead-sources"
             description="Where your clients come from. Set per client on the client's page."
           />
         </CardHeader>

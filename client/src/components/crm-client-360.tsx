@@ -90,6 +90,7 @@ export function CustomerNotes({ customerId, canManage, meMemberId, meRole }: {
           icon={StickyNote}
           title="Notes"
           description="Internal notes about this client — never shown in their portal."
+          infoKey="client-notes"
         />
       </CardHeader>
       <CardContent className="space-y-3">
@@ -204,6 +205,7 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
           icon={Activity}
           title="Activity"
           description="Every send, open, visit, payment, message and change — newest first."
+          infoKey="client-timeline"
         />
       </CardHeader>
       <CardContent className="space-y-1.5">

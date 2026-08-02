@@ -28,6 +28,7 @@ export function CustomerMeasurements({ customerId }: { customerId: string }) {
           icon={Ruler}
           title="Measurements"
           description="HOVER reports and manual measurements for this client's property."
+          infoKey="measurements"
         />
       </CardHeader>
       <CardContent className="space-y-2">

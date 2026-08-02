@@ -60,6 +60,7 @@ export default function CrmPaymentsPage() {
       <CrmPageHeader
         icon={Landmark}
         title="Payments"
+        infoKey="payments"
         subtitle="Connect your own Stripe account. Money goes straight to you — we never hold it."
       />
 

@@ -10,6 +10,7 @@ import {
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
+import { InfoTip } from "@/components/info-tip";
 import { PortalPamphlets, PortalPhotoShare, PortalCommentBox } from "@/components/client-uploads";
 import { ContractorPreviewBanner, PortalFinancing } from "@/components/crm-client-360";
 import { CrmLogo } from "@/components/crm-logo";
@@ -268,7 +269,7 @@ function Dashboard({ data }: { data: any }) {
 
   const estimatesSection = (
     <section className="space-y-3" data-testid="section-estimates">
-      <SectionTitle icon={FileText} title="Estimates" />
+      <SectionTitle icon={FileText} title="Estimates" infoKey="portal-estimates" />
       {!estimates.length ? (
         <Card><EmptyState compact icon={FileText} title="No estimates yet"
           description="When your contractor sends an estimate, it shows up here." /></Card>
@@ -322,7 +323,7 @@ function Dashboard({ data }: { data: any }) {
 
   const invoicesSection = (
     <section className="space-y-3" data-testid="section-invoices">
-      <SectionTitle icon={Receipt} title="Invoices & receipts" />
+      <SectionTitle icon={Receipt} title="Invoices & receipts" infoKey="portal-invoices" />
       {!invoices.length ? (
         <Card><EmptyState compact icon={Receipt} title="No invoices yet"
           description="Invoices and receipts from your contractor appear here." /></Card>
@@ -368,7 +369,7 @@ function Dashboard({ data }: { data: any }) {
 
   const contractsSection = (
     <section className="space-y-3" data-testid="section-contracts">
-      <SectionTitle icon={ShieldCheck} title="Signed contracts" />
+      <SectionTitle icon={ShieldCheck} title="Signed contracts" infoKey="signed-contracts" />
       {!contracts.length ? (
         <Card><EmptyState compact icon={ShieldCheck} title="No signed contracts yet"
           description="Estimates you approve become your signed contracts." /></Card>
@@ -418,7 +419,7 @@ function Dashboard({ data }: { data: any }) {
 
   const reportsSection = (
     <section className="space-y-3" data-testid="section-reports">
-      <SectionTitle icon={Ruler} title="Measurement reports" />
+      <SectionTitle icon={Ruler} title="Measurement reports" infoKey="portal-reports" />
       {!reports.length ? (
         <Card><EmptyState compact icon={Ruler} title="No measurement reports yet"
           description="Roof or property measurement reports your contractor files for you appear here." /></Card>
@@ -627,9 +628,12 @@ function Dashboard({ data }: { data: any }) {
                 <img src={oneOrg.logoUrl} alt={oneOrg.name} className="h-11 w-11 rounded-xl object-contain bg-card border" />
               )}
               <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight leading-tight" data-testid="text-org-name">
-                  {oneOrg ? oneOrg.name : "Your documents"}
-                </h1>
+                <div className="flex items-center gap-1">
+                  <h1 className="text-2xl font-semibold tracking-tight leading-tight" data-testid="text-org-name">
+                    {oneOrg ? oneOrg.name : "Your documents"}
+                  </h1>
+                  <InfoTip k="portal" />
+                </div>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   Welcome, {customer?.displayName ?? "there"}
                   {orgs.length > 1 ? ` · ${orgs.map((o: any) => o.name).join(" · ")}` : ""}

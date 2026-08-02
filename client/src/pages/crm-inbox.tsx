@@ -78,6 +78,7 @@ export default function CrmInboxPage() {
       <CrmPageHeader
         icon={Inbox}
         title="Inbox"
+        infoKey="inbox"
         subtitle="What your clients are doing, as it happens."
       />
 

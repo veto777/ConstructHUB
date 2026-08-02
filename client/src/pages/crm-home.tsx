@@ -14,6 +14,7 @@ import {
 import {
   CrmPage, MetricCard, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
+import { InfoTip } from "@/components/info-tip";
 
 interface Step {
   key: string;
@@ -97,9 +98,12 @@ export default function CrmHomePage() {
   return (
     <CrmPage>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {me?.org?.name ? me.org.name : "Welcome"}
-        </h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {me?.org?.name ? me.org.name : "Welcome"}
+          </h1>
+          <InfoTip k="dashboard" />
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
           {ob.requiredComplete
             ? "Your workspace is set up — here's where things stand."

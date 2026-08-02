@@ -131,6 +131,7 @@ export default function CrmReportsPage() {
       <CrmPageHeader
         icon={Ruler}
         title="Measurement reports"
+        infoKey="reports"
         subtitle="Import a HOVER or CladAI report — the client is matched or created from it automatically."
       />
 

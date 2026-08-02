@@ -70,6 +70,7 @@ export default function CrmSchedulePage() {
       <CrmPageHeader
         icon={CalendarDays}
         title="Schedule"
+        infoKey="schedule"
         subtitle="Every visit across your projects, day by day."
         actions={
           <div className="flex items-center gap-1 rounded-full border bg-muted/40 p-1" data-testid="schedule-range">

@@ -77,6 +77,7 @@ export default function CrmClientsPage() {
       <CrmPageHeader
         icon={Users}
         title="Clients"
+        infoKey="clients"
         subtitle="Every client gets their own portal the moment you create them."
         actions={canManage ? (
           <Dialog open={open} onOpenChange={setOpen}>

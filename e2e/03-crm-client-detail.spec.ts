@@ -71,6 +71,10 @@ test.describe("/crm/clients/:id", () => {
   });
 
   test("sweep: every button and link", async ({ page }) => {
+    // The ⓘ info tips added ~8 controls (each opening a dialog the sweep
+    // closes) to what was already the suite's slowest sweep — it now needs
+    // more than the default 240s at 4 workers.
+    test.slow();
     const { clicked, labels } = await sweepPage(page, URL, {
       ready: "h1",
     });

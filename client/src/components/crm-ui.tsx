@@ -2,6 +2,7 @@ import * as React from "react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
+import { InfoTip } from "@/components/info-tip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -40,11 +41,14 @@ export function CrmPageHeader({
   title,
   subtitle,
   actions,
+  infoKey,
 }: {
   icon?: LucideIcon;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Mounts a ⓘ help dialog (lib/info-content.ts) beside the title. */
+  infoKey?: string;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -55,7 +59,10 @@ export function CrmPageHeader({
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight leading-tight">{title}</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight leading-tight">{title}</h1>
+            {infoKey && <InfoTip k={infoKey} />}
+          </div>
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
       </div>
@@ -356,11 +363,14 @@ export function SectionTitle({
   title,
   description,
   actions,
+  infoKey,
 }: {
   icon?: LucideIcon;
   title: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Mounts a ⓘ help dialog (lib/info-content.ts) beside the title. */
+  infoKey?: string;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -368,6 +378,7 @@ export function SectionTitle({
         <div className="flex items-center gap-2 text-base font-semibold">
           {Icon && <Icon className="h-4 w-4 text-muted-foreground" strokeWidth={1.8} />}
           {title}
+          {infoKey && <InfoTip k={infoKey} />}
         </div>
         {description && (
           <p className="text-sm text-muted-foreground mt-0.5">{description}</p>

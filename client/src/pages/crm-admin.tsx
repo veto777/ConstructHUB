@@ -189,6 +189,7 @@ export default function CrmAdminPage() {
       <CrmPageHeader
         icon={ShieldCheck}
         title="Platform admin"
+        infoKey="admin"
         subtitle="Every account and organization on ConstructHub — read-only monitoring."
       />
 
@@ -332,6 +333,7 @@ export default function CrmAdminPage() {
             icon={Rocket}
             title="Beta invites"
             description="Invited accounts get unlimited CRM access for the duration of the beta."
+            infoKey="beta-invites"
           />
           <form
             className="flex flex-wrap items-center gap-2"

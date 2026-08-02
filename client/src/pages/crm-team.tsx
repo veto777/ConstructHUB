@@ -22,6 +22,7 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, roleTone,
 } from "@/components/crm-ui";
+import { InfoTip } from "@/components/info-tip";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type PermissionMap = Record<string, boolean>;
@@ -483,6 +484,7 @@ export default function CrmTeamPage() {
       <CrmPageHeader
         icon={Users}
         title="Team & Company"
+        infoKey="team"
         subtitle="Your profile, your company details, and who can do what."
       />
 
@@ -684,6 +686,7 @@ export default function CrmTeamPage() {
             <Card>
               <CardHeader>
                 <SectionTitle
+                  infoKey="team-invite"
                   title="Invite someone"
                   description="They'll get an email with a link that expires in 14 days."
                 />
@@ -778,6 +781,7 @@ export default function CrmTeamPage() {
           <Card>
             <CardHeader>
               <SectionTitle
+                infoKey="team-members"
                 title="Team members"
                 description="Roles set the defaults. Toggle any individual permission to override them for one person."
               />
@@ -813,6 +817,7 @@ export default function CrmTeamPage() {
                         ) : (
                           <StatusPill tone={roleTone(m.role)}>{m.role}</StatusPill>
                         )}
+                        <InfoTip k={`role-${m.role}`} />
                         {divisions && divisions.length > 0 && (
                           canManageTeam && !isOwner ? (
                             <Select value={m.divisionId ?? "all"}

@@ -69,6 +69,7 @@ export default function CrmPipelinePage() {
       <CrmPageHeader
         icon={KanbanSquare}
         title="Pipeline"
+        infoKey="pipeline"
         subtitle={`${projects.length} project${projects.length === 1 ? "" : "s"} · drag a card to move it, or use the stage menu.`}
       />
 

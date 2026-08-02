@@ -191,6 +191,7 @@ export default function CrmMigratePage() {
       <CrmPageHeader
         icon={UploadCloud}
         title="Bring your data with you"
+        infoKey="migrate"
         subtitle="Import clients, estimates and invoices from Jobber, QuickBooks, Leap or any spreadsheet — no copy-paste marathon."
       />
 

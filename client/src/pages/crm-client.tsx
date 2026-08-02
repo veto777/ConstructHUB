@@ -38,6 +38,7 @@ import { CustomerMeasurements } from "@/components/client-measurements";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { QuickBid } from "@/components/crm-quick-bid";
+import { InfoTip } from "@/components/info-tip";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -669,7 +670,10 @@ export default function CrmClientPage() {
             <div className="flex items-start gap-4 min-w-0">
               <InitialAvatar name={c.displayName} className="h-14 w-14 text-lg" />
               <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight">{c.displayName}</h1>
+                <div className="flex items-center gap-1">
+                  <h1 className="text-2xl font-semibold tracking-tight">{c.displayName}</h1>
+                  <InfoTip k="client-detail" />
+                </div>
                 {c.companyName && <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>}
                 <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
                   {c.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{c.email}</span>}
@@ -803,6 +807,7 @@ export default function CrmClientPage() {
             icon={FileText}
             title="Estimates"
             description="You'll see exactly when the client opens one."
+            infoKey="client-estimates"
           />
           {canEstimate && (
             <QuickBid
@@ -1012,6 +1017,7 @@ export default function CrmClientPage() {
               icon={Receipt}
               title="Invoices"
               description="Send the link, take the payment online, or record a check."
+              infoKey="client-invoices"
             />
           </CardHeader>
           <CardContent className="space-y-2">
@@ -1094,6 +1100,7 @@ export default function CrmClientPage() {
           <SectionTitle
             title="Projects"
             description="Approving an estimate moves its project to Approved automatically."
+            infoKey="client-projects"
           />
           {canManageJobs && (
             <Dialog open={projOpen} onOpenChange={setProjOpen}>

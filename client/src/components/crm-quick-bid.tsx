@@ -24,6 +24,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { InfoTip } from "@/components/info-tip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Ruler, Send, Zap } from "lucide-react";
 
@@ -179,12 +180,15 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
 
   return (
     <>
-      <Button size="sm" variant="outline" disabled={!!disabledReason}
-        title={disabledReason ?? "Price per-sqft SKUs from the latest measurement report"}
-        onClick={() => { setStep("pick"); setOpen(true); }}
-        data-testid="button-quick-bid">
-        <Zap className="h-4 w-4 mr-2" /> Quick Bid
-      </Button>
+      <span className="inline-flex items-center gap-0.5">
+        <Button size="sm" variant="outline" disabled={!!disabledReason}
+          title={disabledReason ?? "Price per-sqft SKUs from the latest measurement report"}
+          onClick={() => { setStep("pick"); setOpen(true); }}
+          data-testid="button-quick-bid">
+          <Zap className="h-4 w-4 mr-2" /> Quick Bid
+        </Button>
+        <InfoTip k="quick-bid" />
+      </span>
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setStep("pick"); setEstimate(null); setDirty(false); } }}>
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto"

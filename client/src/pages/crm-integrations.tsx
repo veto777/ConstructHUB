@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { InfoTip } from "@/components/info-tip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -192,6 +193,7 @@ export default function CrmIntegrationsPage() {
       <CrmPageHeader
         icon={Blocks}
         title="Integrations"
+        infoKey="integrations"
         subtitle="Every connection and API in one place — measurements, payments, calendars and your own tools."
       />
 
@@ -201,6 +203,7 @@ export default function CrmIntegrationsPage() {
           <SectionTitle
             icon={Ruler}
             title="HOVER measurements"
+            infoKey="hover"
             description="Connect HOVER once — every completed job lands here with roof & siding measurements, the PDF and the 3D model, and the client is matched automatically."
           />
         </CardHeader>
@@ -267,6 +270,7 @@ export default function CrmIntegrationsPage() {
                   {hoverSync.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                   Sync now
                 </Button>
+                <InfoTip k="hover-sync" />
                 {(!hoverStatus.webhook || !hoverStatus.webhook.verified) && (
                   <Button size="sm" variant="outline" onClick={() => hoverRegister.mutate()}
                     disabled={hoverRegister.isPending} data-testid="button-hover-register">
@@ -293,6 +297,7 @@ export default function CrmIntegrationsPage() {
           <SectionTitle
             icon={Magnet}
             title="Lead capture"
+            infoKey="lead-capture"
             description="Embed this form on your website — every submission lands in Clients tagged website-lead, and the owner gets an email."
           />
         </CardHeader>
@@ -438,6 +443,7 @@ export default function CrmIntegrationsPage() {
           <SectionTitle
             icon={KeyRound}
             title="API keys"
+            infoKey="api-keys"
             description="Read-only access to your data from your own tools, via /api/v1."
           />
         </CardHeader>
@@ -511,6 +517,7 @@ export default function CrmIntegrationsPage() {
           <SectionTitle
             icon={Webhook}
             title="Webhooks"
+            infoKey="webhooks"
             description="POST signed events to your own endpoint when things happen in the CRM."
           />
         </CardHeader>

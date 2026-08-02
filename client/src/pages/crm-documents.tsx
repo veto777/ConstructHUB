@@ -15,6 +15,7 @@ import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable,
 } from "@/components/crm-ui";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
+import { InfoTip } from "@/components/info-tip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -188,7 +189,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
   if (cfg.needsPrices && me && !allowed) {
     return (
       <CrmPage>
-        <CrmPageHeader icon={cfg.icon} title={cfg.title} />
+        <CrmPageHeader icon={cfg.icon} title={cfg.title} infoKey={kind} />
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
             You don't have permission to see invoices. Ask an owner or admin.
@@ -212,7 +213,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
 
   return (
     <CrmPage wide>
-      <CrmPageHeader icon={cfg.icon} title={cfg.title} subtitle={cfg.subtitle} actions={actions} />
+      <CrmPageHeader icon={cfg.icon} title={cfg.title} subtitle={cfg.subtitle} actions={actions} infoKey={kind} />
 
       <Card>
         <CardContent className="p-4 sm:p-5 space-y-4">
@@ -447,7 +448,10 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
         <AlertDialogContent data-testid="dialog-delete-doc">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {kind === "estimates" ? "estimate" : "invoice"} {delFor?.number ?? ""}?
+              <span className="inline-flex items-center gap-1">
+                Delete {kind === "estimates" ? "estimate" : "invoice"} {delFor?.number ?? ""}?
+                <InfoTip k="owner-delete" />
+              </span>
             </AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes {delFor?.number ?? "this document"}

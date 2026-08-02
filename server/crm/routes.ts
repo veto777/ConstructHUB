@@ -45,6 +45,7 @@ import { registerCrmReceiptRoutes } from "./receipts";
 import { registerCrmQuickBidRoutes } from "./quickbid";
 import { registerCrmMessageRoutes } from "./messages";
 import { notifyMemberAccountChange } from "./owner-notify";
+import { registerCrmBackupRoutes } from "./backups";
 import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
@@ -251,6 +252,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmMessageRoutes(app, getDevUser);
   // Accountability log: per-client and per-member audit feeds.
   registerCrmActivityRoutes(app, getDevUser);
+  // Auto-backup: owner-only settings + send-now; boots the backup scheduler.
+  registerCrmBackupRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 

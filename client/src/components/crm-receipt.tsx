@@ -8,6 +8,7 @@ import { Loader2, ReceiptText, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { StatusPill } from "@/components/crm-ui";
+import { InfoTip } from "@/components/info-tip";
 
 /**
  * The 1–2 button receipt: click "Receipt" to open the receipt-to-date preview
@@ -63,7 +64,12 @@ export function InvoiceReceiptButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
-            <DialogTitle>Receipt — {receipt?.invoice?.number ?? invoiceNumber ?? "invoice"}</DialogTitle>
+            <DialogTitle>
+              <span className="inline-flex items-center gap-1">
+                Receipt — {receipt?.invoice?.number ?? invoiceNumber ?? "invoice"}
+                <InfoTip k="receipts" />
+              </span>
+            </DialogTitle>
           </DialogHeader>
 
           {isLoading ? (

@@ -179,6 +179,7 @@ export default function CrmPriceBookPage() {
       <CrmPageHeader
         icon={BookOpen}
         title="Price book"
+        infoKey="pricebook"
         subtitle="Price each SKU once, then estimate by quantity. Waste factors are a real field, not a formula trick."
         actions={canManage && !itemsLoading && !items?.length ? (
           <Button variant="outline" onClick={() => seed.mutate()} disabled={seed.isPending} data-testid="button-seed-pb">

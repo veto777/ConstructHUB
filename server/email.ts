@@ -207,9 +207,18 @@ function realSendAllowed(): boolean {
 function sinkToOutbox(mailOptions: any): { accepted: string[]; rejected: string[]; response: string } {
   const to = [mailOptions.to].flat().filter(Boolean).map(String);
   fs.mkdirSync(path.dirname(OUTBOX_PATH), { recursive: true });
+  // Attachments are captured too (base64) so dev/e2e can assert on what a
+  // "sent" file actually contained — e.g. the CRM auto-backup export.
+  const attachments = (Array.isArray(mailOptions.attachments) ? mailOptions.attachments : []).map((a: any) => ({
+    filename: a?.filename ?? null,
+    contentType: a?.contentType ?? null,
+    size: a?.content != null ? Buffer.byteLength(Buffer.from(a.content)) : 0,
+    contentBase64: a?.content != null ? Buffer.from(a.content).toString("base64") : null,
+  }));
   fs.appendFileSync(OUTBOX_PATH, JSON.stringify({
     at: new Date().toISOString(), to, subject: mailOptions.subject ?? null,
     from: mailOptions.from ?? null, html: mailOptions.html ?? null, text: mailOptions.text ?? null,
+    attachments,
   }) + "\n");
   console.log(`[SMTP SINK] Not production — captured to tmp/email-outbox.jsonl instead of sending (to: ${to.join(", ")})`);
   return { accepted: to, rejected: [], response: "sink: written to tmp/email-outbox.jsonl" };
