@@ -48,6 +48,7 @@ import {
 } from "./client-auth";
 import { clientPortalBaseUrl, portalBaseUrl } from "../site-context";
 import { sendWithFallback } from "../email";
+import { isOutboundMessageNote } from "./messages";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -73,7 +74,7 @@ export function canModifyNote(
 
 export type TimelineEntry = {
   id: string;
-  kind: "estimate_event" | "engagement" | "payment" | "comment" | "attachment" | "finance_click";
+  kind: "estimate_event" | "engagement" | "payment" | "comment" | "attachment" | "finance_click" | "message";
   verb: string;
   text: string;
   ref: string | null;          // document ref (E-101, INV-204) where relevant
@@ -309,7 +310,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     const refOf = (d: { number: string | null; title: string } | undefined) =>
       d ? d.number ?? d.title : null;
 
-    const [events, sessions, payments, comments, photos, estimateAtts, clicks] = await Promise.all([
+    const [events, sessions, payments, comments, notes, photos, estimateAtts, clicks] = await Promise.all([
       estIds.length
         ? db.select().from(crmEstimateEvents)
             .where(and(
@@ -328,6 +329,11 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       db.select().from(crmClientComments)
         .where(and(eq(crmClientComments.orgId, orgId), eq(crmClientComments.customerId, customerId)))
         .orderBy(desc(crmClientComments.createdAt)).limit(100),
+      // Contractor notes — only the outbound-message marker subset lands on
+      // the timeline (see messages.ts); plain notes stay in the notes surface.
+      db.select().from(crmCustomerNotes)
+        .where(and(eq(crmCustomerNotes.orgId, orgId), eq(crmCustomerNotes.customerId, customerId)))
+        .orderBy(desc(crmCustomerNotes.createdAt)).limit(100),
       db.select().from(crmAttachments)
         .where(and(
           eq(crmAttachments.orgId, orgId),
@@ -398,6 +404,18 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
         text: `Sent a message from the portal — “${c.body.length > 80 ? `${c.body.slice(0, 80)}…` : c.body}”`,
         ref: null,
         at: (c.createdAt ?? new Date()).toISOString(),
+      });
+    }
+
+    // Outbound quick messages (Create menu → Message). The note body already
+    // reads as the timeline sentence: 'Message sent via email to joe@…: "…"'.
+    for (const n of notes) {
+      if (!isOutboundMessageNote(n.body)) continue;
+      entries.push({
+        id: `msg-${n.id}`, kind: "message", verb: "message",
+        text: n.body,
+        ref: null,
+        at: (n.createdAt ?? new Date()).toISOString(),
       });
     }
 

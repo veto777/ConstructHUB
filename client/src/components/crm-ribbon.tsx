@@ -2,12 +2,14 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, type LucideIcon,
+  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
+import { CrmCreateMenu } from "@/components/crm-create-menu";
 import { useTheme } from "@/components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -140,6 +142,20 @@ export function CrmRibbon() {
             <SheetDescription className="sr-only">The rest of your workspace.</SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-1">
+            {/* The global Create menu — same items as the sidebar's button. */}
+            <CrmCreateMenu
+              trigger={
+                <button
+                  type="button"
+                  data-testid="ribbon-button-create"
+                  className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-semibold bg-primary text-primary-foreground transition-colors"
+                >
+                  <Plus className="h-5 w-5 shrink-0" strokeWidth={2.2} />
+                  Create
+                  <ChevronRight className="h-4 w-4 ml-auto opacity-70" />
+                </button>
+              }
+            />
             {MORE_LINKS.filter((l) =>
               (!l.perm || me?.permissions?.[l.perm] === true) &&
               (!l.platformAdmin || me?.isPlatformAdmin === true),

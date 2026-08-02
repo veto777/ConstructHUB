@@ -42,6 +42,7 @@ import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmReceiptRoutes } from "./receipts";
 import { registerCrmQuickBidRoutes } from "./quickbid";
+import { registerCrmMessageRoutes } from "./messages";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
@@ -218,6 +219,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmReceiptRoutes(app, getDevUser);
   // Quick Bid: per-sqft SKUs priced from the client's latest measurement report.
   registerCrmQuickBidRoutes(app, getDevUser);
+  // Quick messages (Create menu → Message): email/text a client, timeline-recorded.
+  registerCrmMessageRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 

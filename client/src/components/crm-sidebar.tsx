@@ -1,10 +1,12 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, type LucideIcon,
+  Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { CHLogo } from "@/components/ch-logo";
 import { CrmLogo } from "@/components/crm-logo";
+import { CrmCreateMenu } from "@/components/crm-create-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -109,6 +111,21 @@ export function CrmSidebar() {
           </div>
           <CHLogo height={22} className="hidden group-data-[collapsible=icon]:inline-flex" />
         </Link>
+
+        {/* The global Create menu — estimate, invoice, lead, message, client. */}
+        <CrmCreateMenu
+          trigger={
+            <button
+              type="button"
+              data-testid="button-create"
+              className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-[13px] font-semibold shadow-sm hover:opacity-90 transition-opacity"
+            >
+              <Plus className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+              <span className="group-data-[collapsible=icon]:hidden">Create</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70 group-data-[collapsible=icon]:hidden" />
+            </button>
+          }
+        />
       </SidebarHeader>
 
       <SidebarSeparator className="mx-0" />

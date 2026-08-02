@@ -912,6 +912,9 @@ export default function CrmSettingsPage() {
                     Set {(smsStatus?.missing?.length ? smsStatus.missing : ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]).join(", ")} on
                     the server to enable texting. Until then, texts are recorded to the server log instead of being sent.
                   </div>
+                  <div className="text-xs text-muted-foreground mt-1" data-testid="text-sms-gray-note">
+                    Quick messages to clients stay email-only while this is off — the Text option is grayed out everywhere until it's enabled here.
+                  </div>
                 </>
               )}
             </div>
