@@ -33,10 +33,24 @@ type GetUser = (req: any, res: any) => any;
 // ── Configuration ───────────────────────────────────────────────────────────
 
 export const TWILIO_ENV_VARS = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"] as const;
+export const SIGNALWIRE_ENV_VARS = [
+  "SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER",
+] as const;
+
+/**
+ * Which carrier this process is aimed at. SignalWire wins once ANY of its
+ * vars is set (it's the org's chosen provider); a box with only Twilio vars
+ * keeps working; a box with neither reports the Twilio list (legacy default —
+ * also what the not-configured tests pin).
+ */
+function activeProviderVars(): readonly string[] {
+  if (SIGNALWIRE_ENV_VARS.some((k) => process.env[k])) return SIGNALWIRE_ENV_VARS;
+  return TWILIO_ENV_VARS;
+}
 
 /** Names of the env vars that still need to be set (empty = fully configured). */
 export function smsMissingEnv(): string[] {
-  return TWILIO_ENV_VARS.filter((k) => !process.env[k]);
+  return activeProviderVars().filter((k) => !process.env[k]);
 }
 
 export function smsConfigured(): boolean {
@@ -46,10 +60,14 @@ export function smsConfigured(): boolean {
 /** What the Settings card renders — never leaks the auth token. */
 export function smsStatus() {
   const missing = smsMissingEnv();
+  const signalwire = activeProviderVars() === SIGNALWIRE_ENV_VARS;
   return {
     configured: missing.length === 0,
     missing,
-    fromNumber: missing.length === 0 ? process.env.TWILIO_FROM_NUMBER! : null,
+    provider: missing.length === 0 ? (signalwire ? "signalwire" : "twilio") : null,
+    fromNumber: missing.length === 0
+      ? (signalwire ? process.env.SIGNALWIRE_FROM_NUMBER! : process.env.TWILIO_FROM_NUMBER!)
+      : null,
   };
 }
 
@@ -57,7 +75,7 @@ export function smsStatus() {
 
 export type SmsResult = {
   ok: boolean;
-  provider: "twilio" | "log";
+  provider: "twilio" | "signalwire" | "log";
   sid?: string | null;
   error?: string | null;
 };
@@ -75,7 +93,7 @@ function logProviderSend(to: string, body: string): SmsResult {
     fs.mkdirSync(path.dirname(LOG_PATH()), { recursive: true });
     fs.appendFileSync(LOG_PATH(), JSON.stringify(entry) + "\n");
   } catch { /* a full disk must not break a bid reminder */ }
-  console.log(`[SMS LOG] Twilio not configured — recorded instead of sending (to: ${to})`);
+  console.log(`[SMS LOG] no carrier configured — recorded instead of sending (to: ${to})`);
   return { ok: true, provider: "log", sid: null };
 }
 
@@ -109,13 +127,46 @@ async function twilioSend(to: string, body: string): Promise<SmsResult> {
   }
 }
 
+/** SignalWire Compatibility API — Twilio-shaped: POST {space}/api/laml/2010-04-01/
+ *  Accounts/{project}/Messages.json, basic auth project:token. */
+async function signalwireSend(to: string, body: string): Promise<SmsResult> {
+  const space = process.env.SIGNALWIRE_SPACE_URL!.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const project = process.env.SIGNALWIRE_PROJECT_ID!;
+  const token = process.env.SIGNALWIRE_API_TOKEN!;
+  const from = process.env.SIGNALWIRE_FROM_NUMBER!;
+  try {
+    const resp = await fetch(
+      `https://${space}/api/laml/2010-04-01/Accounts/${encodeURIComponent(project)}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${project}:${token}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ From: from, To: to, Body: body }).toString(),
+      },
+    );
+    const payload: any = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      const msg = String(payload?.message ?? `SignalWire HTTP ${resp.status}`).slice(0, 300);
+      console.error("[sms] SignalWire send failed:", msg);
+      return { ok: false, provider: "signalwire", error: msg };
+    }
+    return { ok: true, provider: "signalwire", sid: payload?.sid ?? null };
+  } catch (e: any) {
+    console.error("[sms] SignalWire send failed:", e?.message || e);
+    return { ok: false, provider: "signalwire", error: String(e?.message || e).slice(0, 300) };
+  }
+}
+
 /**
- * Send a text. Twilio when configured, the recording log provider when not —
- * check `result.provider` before telling a user a text "went out".
+ * Send a text. The configured carrier when one is fully set up (SignalWire
+ * preferred, Twilio legacy), the recording log provider when not — check
+ * `result.provider` before telling a user a text "went out".
  */
 export async function sendSms(to: string, body: string): Promise<SmsResult> {
   if (!smsConfigured()) return logProviderSend(to, body);
-  return twilioSend(to, body);
+  return activeProviderVars() === SIGNALWIRE_ENV_VARS ? signalwireSend(to, body) : twilioSend(to, body);
 }
 
 /** Loose E.164 sanity: optional +, 7–15 digits. Returns null when unusable. */

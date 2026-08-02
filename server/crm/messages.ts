@@ -64,7 +64,7 @@ export async function deliverQuickMessage(args: {
   body: string;
   orgName: string;
   replyTo?: string;
-}): Promise<{ ok: boolean; provider: "email" | "twilio" | "log"; error?: string }> {
+}): Promise<{ ok: boolean; provider: "email" | "twilio" | "signalwire" | "log"; error?: string }> {
   const { channel, to, body, orgName, replyTo } = args;
   if (channel === "email") {
     await sendWithFallback({
