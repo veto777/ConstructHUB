@@ -22,10 +22,6 @@ export default function AuthPage() {
     queryKey: ["/api/auth/me"],
   });
 
-  useEffect(() => {
-    if (user) setLocation("/");
-  }, [user, setLocation]);
-
   const params = new URLSearchParams(window.location.search);
   const errorParam = params.get("error");
   const modeParam = params.get("mode");
@@ -33,6 +29,14 @@ export default function AuthPage() {
   // CRM beta invite: /auth?beta=<token> starts in signup mode and the token
   // rides along through email/password signup or the Google OAuth round-trip.
   const betaParam = params.get("beta");
+
+  useEffect(() => {
+    // A beta invite is a NEW-workspace signup. Silently bouncing an
+    // already-signed-in browser into its existing workspace made it look
+    // like the invite "shared" that workspace's data — never redirect here;
+    // the choice card below handles it instead.
+    if (user && !betaParam) setLocation("/");
+  }, [user, betaParam, setLocation]);
 
   const initialMode: AuthMode =
     modeParam === "reset-password" && tokenParam ? "reset-password" :
@@ -167,6 +171,43 @@ export default function AuthPage() {
       setLoading(false);
     }
   };
+
+  // All hooks above are unconditional; this early return is hooks-safe.
+  if (user && betaParam) {
+    return (
+      <div className="min-h-screen bg-background flex items-start justify-center py-16 px-4">
+        <div className="w-full max-w-md rounded-xl border bg-card p-6 space-y-4 shadow-md" data-testid="card-beta-signed-in">
+          <h1 className="text-xl font-semibold">You're already signed in</h1>
+          <p className="text-sm text-muted-foreground">
+            This browser is signed in as <strong>{user.email}</strong>. A beta invite creates a{" "}
+            <strong>brand-new, empty workspace</strong> — it never opens an existing one. To accept
+            the invite as a new account, sign out first; or keep working in your current workspace.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="button-beta-signout"
+              className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+              onClick={async () => {
+                await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+                window.location.reload();
+              }}
+            >
+              Sign out &amp; accept the invite
+            </button>
+            <button
+              type="button"
+              data-testid="button-beta-continue"
+              className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium"
+              onClick={() => setLocation("/")}
+            >
+              Go to my workspace
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-start sm:items-center justify-center bg-background p-4 overflow-y-auto py-8">

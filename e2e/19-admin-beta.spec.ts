@@ -126,6 +126,13 @@ test.describe("beta invites", { tag: "@serial" }, () => {
     expect(me.seats.plan).toBe("beta");
     expect(me.seats.limit).toBe(-1);
 
+    // EMPTY SLAB (owner directive 2026-08-02): a beta invite always lands on a
+    // brand-new workspace the invitee owns — never an existing org's data.
+    expect(me.member.role).toBe("owner");
+    expect(me.org.ownerUserId).not.toBe(1);
+    const customers = await (await page.request.get("/api/crm/customers")).json();
+    expect(Array.isArray(customers) ? customers.length : -1).toBe(0);
+
     // Hand the browser back to the dev-bypass user and clean up the account.
     await page.request.post("/api/auth/logout", {});
     await q(`delete from crm_members where user_id in (select id from users where email = $1)`, [email]);
