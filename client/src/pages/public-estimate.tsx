@@ -128,6 +128,10 @@ export default function PublicEstimatePage() {
   // Optional discount offers the client has ticked (ids). Preview only —
   // the server re-computes the real approved total on submit.
   const [selectedDiscounts, setSelectedDiscounts] = useState<string[]>([]);
+  // Client-selectable scopes: ticked option ids + the review step before the
+  // estimate is regenerated with just the chosen scopes.
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [reviewing, setReviewing] = useState(false);
 
   // A contractor preview grant rides in the page URL — forward it to the API.
   const previewGrant = new URLSearchParams(window.location.search).get("preview");
@@ -217,6 +221,36 @@ export default function PublicEstimatePage() {
       queryClient.invalidateQueries({ queryKey: [docUrl] });
     },
     onError: (e: any) => toast({ title: "Could not submit", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // A selection-generated estimate pre-ticks the discounts the client already
+  // chose on the source document (server maps them by code to this doc's ids).
+  useEffect(() => {
+    if (Array.isArray(data?.preselectedDiscounts)) setSelectedDiscounts(data.preselectedDiscounts);
+    // Only when the document first loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.preselectedDiscounts]);
+
+  // Generate the "your selections" estimate from the ticked scopes, then go
+  // there — the normal approve flow signs exactly what the client picked.
+  const generate = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/public/estimates/${token}/select-options`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          optionIds: selectedOptions,
+          selectedDiscounts: selectedDiscounts.length ? selectedDiscounts : undefined,
+        }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Something went wrong");
+      return r.json();
+    },
+    onSuccess: (j: any) => {
+      toast({ title: `Estimate ${j.number ?? ""} created`, description: "Review and approve it to lock in your selections." });
+      window.location.href = `/e/${j.token}`;
+    },
+    onError: (e: any) => toast({ title: "Could not create your estimate", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -350,6 +384,21 @@ export default function PublicEstimatePage() {
   const toggleDiscount = (id: string, on: boolean) =>
     setSelectedDiscounts((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
 
+  // ── Client-selectable scopes ──────────────────────────────────────────────
+  // Options carrying their own line items are checkboxes; the live total uses
+  // the server's per-option subtotal/taxable and mirrors the approve-time
+  // discount math (server/crm/discounts.ts). The server regenerates the real
+  // document — this is only what the client sees before confirming.
+  const selectable: any[] = (options ?? []).filter((o: any) => o.selectable);
+  const chosenOptions = selectable.filter((o) => selectedOptions.includes(o.id));
+  const selSubtotalCents = chosenOptions.reduce((s, o) => s + (o.subtotalCents ?? 0), 0);
+  const selTaxableCents = chosenOptions.reduce((s, o) => s + (o.taxableCents ?? 0), 0);
+  const selDiscountCents = Math.round((selTaxableCents * selBps) / 10_000);
+  const selTaxCents = Math.round(((selTaxableCents - selDiscountCents) * (e.taxRateBps ?? 0)) / 10_000);
+  const selTotalCents = Math.max(0, selSubtotalCents - selDiscountCents + selTaxCents);
+  const toggleOption = (id: string, on: boolean) =>
+    setSelectedOptions((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
+
   // The org's company theme — black + their accent. Server-resolved in the
   // payload; re-points --primary for everything below this root.
   const themeStyle = orgThemeStyle(company?.theme);
@@ -423,7 +472,125 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
-        {options?.length > 1 && (
+        {selectable.length > 0 && !settled && !expired && !preview ? (
+          <Card className="shadow-sm" data-testid="options-checklist">
+            <CardHeader>
+              <CardTitle className="text-lg">Choose your scopes</CardTitle>
+              <CardDescription>
+                {reviewing
+                  ? "Check your selection — anything struck through is left out of your new estimate."
+                  : `${company.name} put together ${selectable.length} scopes for this job. Tick the ones you want — the total updates as you go.`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {selectable.map((o: any) => {
+                  const on = selectedOptions.includes(o.id);
+                  // Review step: unchosen scopes show struck through; chosen
+                  // ones read normally. Before review, cards are checkboxes.
+                  if (reviewing && !on) {
+                    return (
+                      <div key={o.id}
+                        className="rounded-lg border p-4 bg-card text-muted-foreground"
+                        data-testid={`struck-option-${o.id}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium line-through">{o.name}</span>
+                        </div>
+                        {o.description && <p className="text-xs mt-1.5 line-through">{o.description}</p>}
+                        {o.subtotalCents != null && (
+                          <div className="text-xl font-semibold tabular-nums mt-3 line-through">{money(o.subtotalCents)}</div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <label key={o.id}
+                      className={`rounded-lg border p-4 transition-colors ${reviewing ? "" : "cursor-pointer"} ${
+                        on ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
+                      data-testid={`option-${o.tier}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{o.name}</span>
+                        {reviewing ? (
+                          <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                        ) : (
+                          <Checkbox
+                            className="h-5 w-5"
+                            checked={on}
+                            onCheckedChange={(c) => toggleOption(o.id, c === true)}
+                            data-testid={`checkbox-option-${o.id}`}
+                          />
+                        )}
+                      </div>
+                      {o.description && <p className="text-xs text-muted-foreground mt-1.5">{o.description}</p>}
+                      {o.subtotalCents != null && (
+                        <div className="text-xl font-semibold tabular-nums mt-3">{money(o.subtotalCents)}</div>
+                      )}
+                      {o.recommended && !reviewing && (
+                        <div className="mt-2"><StatusPill tone="info" dot={false}>recommended</StatusPill></div>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+
+              {reviewing ? (
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <div className="w-full max-w-xs text-sm space-y-1.5" data-testid="review-totals">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="font-medium tabular-nums" data-testid="text-review-subtotal">{money(selSubtotalCents)}</span>
+                      </div>
+                      {selDiscountCents > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Optional discounts</span>
+                          <span className="font-medium tabular-nums" data-testid="text-review-discount">−{money(selDiscountCents)}</span>
+                        </div>
+                      )}
+                      {selTaxCents > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Tax</span>
+                          <span className="font-medium tabular-nums" data-testid="text-review-tax">{money(selTaxCents)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t pt-2 text-lg font-bold">
+                        Total <span className="tabular-nums" data-testid="text-review-total">{money(selTotalCents)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button className="w-full sm:w-auto h-12 sm:h-10"
+                      disabled={generate.isPending}
+                      onClick={() => generate.mutate()}
+                      data-testid="button-generate-estimate">
+                      {generate.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Generate my estimate
+                    </Button>
+                    <Button variant="outline" className="w-full sm:w-auto h-12 sm:h-10"
+                      onClick={() => setReviewing(false)} data-testid="button-back-to-options">
+                      Back
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This creates a new estimate with just your chosen scopes — you approve that one to lock it in.
+                    Nothing is final until you sign.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Your total: </span>
+                    <strong className="tabular-nums" data-testid="text-options-total">{money(selTotalCents)}</strong>
+                  </div>
+                  <Button className="h-10" disabled={selectedOptions.length === 0}
+                    onClick={() => setReviewing(true)} data-testid="button-review-selection">
+                    Review selection
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : options?.length > 1 && (
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg">Choose your option</CardTitle>

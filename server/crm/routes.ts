@@ -27,6 +27,7 @@ import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./porta
 import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
 import { registerCrmIntegrationRoutes } from "./integrations";
+import { registerCrmLeadCaptureRoutes } from "./lead-capture";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmReportRoutes } from "./reports";
 import { registerCrmHoverRoutes } from "./hover";
@@ -43,6 +44,8 @@ import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmReceiptRoutes } from "./receipts";
 import { registerCrmQuickBidRoutes } from "./quickbid";
 import { registerCrmMessageRoutes } from "./messages";
+import { notifyMemberAccountChange } from "./owner-notify";
+import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
@@ -189,6 +192,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmOpsRoutes(app, getDevUser);
   registerCrmPhaseRoutes(app, getDevUser);
   registerCrmIntegrationRoutes(app);
+  // Lead capture: embeddable website form -> crm_customers + owner email.
+  registerCrmLeadCaptureRoutes(app, getDevUser);
   registerCrmPriceBookRoutes(app, getDevUser);
   registerCrmMeasurementRoutes(app, getDevUser);
   // Measurement report imports (HOVER upload/paste + provider webhook).
@@ -221,6 +226,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmQuickBidRoutes(app, getDevUser);
   // Quick messages (Create menu → Message): email/text a client, timeline-recorded.
   registerCrmMessageRoutes(app, getDevUser);
+  // Accountability log: per-client and per-member audit feeds.
+  registerCrmActivityRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -274,6 +281,22 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(crmMembers.id, ctx.member.id))
       .returning();
+
+    // Owner's "account changed" notice — field names only.
+    const changed = (["displayName", "title", "phone", "avatarUrl"] as const)
+      .filter((k) => parsed.data[k] !== undefined);
+    if (changed.length) {
+      await notifyMemberAccountChange(
+        { id: user.id, email: ctx.member.email, displayName: ctx.member.displayName },
+        [...changed],
+      );
+    }
+    if (Object.keys(parsed.data).length) {
+      logActivity(ctx, "member.updated", {
+        entityType: "member", entityId: ctx.member.id,
+        meta: { fields: Object.keys(parsed.data), name: ctx.member.displayName || ctx.member.email },
+      });
+    }
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 
@@ -518,6 +541,26 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(crmMembers.id, target.id))
       .returning();
+
+    // Owner's "account changed" notice when a member edits their OWN profile
+    // through the team route — field names only. An admin editing someone
+    // else's seat is the owner's own action, not the member's.
+    if (target.id === ctx.member.id) {
+      const changed = (["displayName", "title", "phone"] as const)
+        .filter((k) => parsed.data[k] !== undefined);
+      if (changed.length) {
+        await notifyMemberAccountChange(
+          { id: user.id, email: ctx.member.email, displayName: ctx.member.displayName },
+          [...changed],
+        );
+      }
+    }
+    if (Object.keys(parsed.data).length) {
+      logActivity(ctx, "member.updated", {
+        entityType: "member", entityId: target.id,
+        meta: { fields: Object.keys(parsed.data), name: target.displayName || target.email },
+      });
+    }
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 
@@ -707,6 +750,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
     const emailed = await sendInviteEmail(ctx.org.name, email, link);
 
+    logActivity(ctx, "invitation.sent", {
+      entityType: "invitation", entityId: invite.id,
+      meta: { email: lower, role },
+    });
     const { token: _t, ...safe } = invite;
     res.status(201).json({ invitation: safe, link, emailed });
   });
@@ -740,6 +787,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
     const emailed = await sendInviteEmail(ctx.org.name, invite.email, link);
 
+    logActivity(ctx, "invitation.resent", {
+      entityType: "invitation", entityId: invite.id,
+      meta: { email: invite.email },
+    });
     const { token: _t, ...safe } = updated;
     res.json({ invitation: safe, link, emailed });
   });
@@ -769,6 +820,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
           eq(crmMembers.status, "invited"),
         ),
       );
+    logActivity(ctx, "invitation.revoked", {
+      entityType: "invitation", entityId: invite.id,
+      meta: { email: invite.email },
+    });
     res.json({ ok: true });
   });
 
@@ -848,6 +903,15 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     }
 
     await db.update(crmInvitations).set({ acceptedAt: new Date() }).where(eq(crmInvitations.id, invite.id));
+    recordActivity({
+      orgId: invite.orgId,
+      actorMemberId: placeholder?.id ?? null,
+      actorLabel: account?.displayName || invite.email,
+      action: "invitation.accepted",
+      entityType: "invitation",
+      entityId: invite.id,
+      meta: { email: invite.email, role: invite.role },
+    });
     if (req.session) req.session.activeOrgId = invite.orgId;
     res.json({ ok: true, orgId: invite.orgId });
   });

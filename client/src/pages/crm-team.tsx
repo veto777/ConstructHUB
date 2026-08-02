@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Users, Building2, UserCircle, ShieldCheck, Mail, Loader2, Trash2,
-  Copy, AlertTriangle, Plus, Check, ArrowRight, RefreshCw, KeyRound,
+  Copy, AlertTriangle, Plus, Check, ArrowRight, RefreshCw, KeyRound, History,
   CalendarDays, Unplug,
 } from "lucide-react";
 import {
@@ -126,7 +126,48 @@ const PERM_LABEL: Record<string, string> = {
   manageSettings: "Manage company settings",
   seeReporting: "See reporting",
   manageIntegrations: "Manage integrations",
+  exportData: "Export client data (CSV)",
 };
+
+/** Owner-only expandable audit feed for one member — everything they did, newest first. */
+function MemberActivity({ memberId }: { memberId: string }) {
+  const [open, setOpen] = useState(false);
+  const { data: rows, isLoading } = useQuery<any[]>({
+    queryKey: [`/api/crm/members/${memberId}/activity`],
+    enabled: open,
+  });
+  return (
+    <div>
+      <Button type="button" variant="ghost" size="sm" className="-ml-2 text-muted-foreground"
+        onClick={() => setOpen((o) => !o)}
+        data-testid={`button-activity-${memberId}`}>
+        <History className="h-4 w-4 mr-1.5" />
+        {open ? "Hide activity" : "Activity"}
+      </Button>
+      {open && (
+        <div className="mt-1 space-y-1.5">
+          {isLoading ? (
+            <p className="text-xs text-muted-foreground px-2 py-1">Loading…</p>
+          ) : !rows?.length ? (
+            <p className="text-xs text-muted-foreground px-2 py-1" data-testid="text-activity-empty">
+              No activity recorded yet.
+            </p>
+          ) : (
+            rows.map((r: any) => (
+              <div key={r.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-1.5"
+                data-testid={`row-activity-${r.id}`}>
+                <span className="text-sm truncate">{r.text}</span>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {new Date(r.at).toLocaleString()}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function humanMoney(cents?: number | null) {
   if (cents === null || cents === undefined) return "";
@@ -844,6 +885,10 @@ export default function CrmTeamPage() {
                         <Check className="h-3 w-3" /> The owner has every permission and can't be changed here.
                       </p>
                     )}
+
+                    {/* The audit feed is owner-eyes-only (server enforces the
+                        same gate — the dropdown is just the UI for it). */}
+                    {me.member.role === "owner" && <MemberActivity memberId={m.id} />}
                   </div>
                 );
               })}

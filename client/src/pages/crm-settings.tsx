@@ -14,7 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud,
-  CalendarDays, RefreshCw, Unplug, Ruler, MessageSquare,
+  CalendarDays, RefreshCw, Unplug, Ruler, MessageSquare, Lock,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
@@ -37,6 +37,10 @@ const NOTIFICATIONS = [
   { key: "invoicePaid", label: "Payment received", description: "An online payment landed in your Stripe account." },
   { key: "paymentReceived", label: "Manual payment recorded", description: "A cash, check, wire or card payment was recorded on an invoice." },
   { key: "clientReengaged", label: "Client re-engaged", description: "A client re-opened an estimate — you get an email and a text to call them." },
+  { key: "estimateSent", label: "Bid sent to client", description: "A team member sent an estimate to a client." },
+  { key: "memberLogin", label: "Team member signs in", description: "Someone on your team signed in (at most one email per person per hour)." },
+  { key: "memberAccountChange", label: "Team member changes their account", description: "A team member changed their own profile details or password." },
+  { key: "leadReceived", label: "Website lead received", description: "A lead came in through your website lead form." },
 ] as const;
 
 type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
@@ -331,6 +335,34 @@ export default function CrmSettingsPage() {
       toast({ title: "Test text sent", description: `Delivered via ${r.provider} to ${r.to}.` }),
     onError: (e: any) => toast({ title: "Test text failed", description: String(e.message ?? e), variant: "destructive" }),
   });
+
+  // ── Price-floor lock (owner only) ─────────────────────────────────────────
+  // custom_fields->'priceFloorLock' — reps can price above the floor, never
+  // below. The owner is always exempt (they set the prices).
+  const isOwner = me?.member?.role === "owner";
+  const priceFloorLock: { enabled?: boolean; floorBps?: number } =
+    (org?.customFields as any)?.priceFloorLock ?? {};
+  const [floorPct, setFloorPct] = useState("");
+  useEffect(() => {
+    setFloorPct(priceFloorLock.floorBps != null ? String(priceFloorLock.floorBps / 100) : "");
+    // Only re-seed the input when the stored value changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceFloorLock.floorBps]);
+
+  const saveLock = useMutation({
+    mutationFn: async (body: { enabled: boolean; floorBps: number | null }) =>
+      (await apiRequest("PUT", "/api/crm/org/price-floor-lock", body)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Price lock saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save the price lock", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  const lockBps = () => {
+    const pct = parseFloat(floorPct);
+    return floorPct.trim() === "" || Number.isNaN(pct) ? null : Math.round(Math.min(100, Math.max(0, pct)) * 100);
+  };
 
   // ── Payments: card fee passthrough + financing links ──────────────────────
   const { data: paySettings } = useQuery<any>({
@@ -943,6 +975,53 @@ export default function CrmSettingsPage() {
           )}
         </CardContent>
       </Card>
+      {/* ── Price-floor lock (owner only) ───────────────────────────────── */}
+      {isOwner && (
+        <Card data-testid="card-price-lock">
+          <CardHeader>
+            <SectionTitle
+              icon={Lock}
+              title="Price floor lock"
+              description="Reps can price above the floor, never below. You can still edit SKUs, price charts and discounts anytime."
+            />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium">Lock pricing</div>
+                <div className="text-xs text-muted-foreground">
+                  The floor is each price-book SKU's current price — or its cost when no SKU matches.
+                </div>
+              </div>
+              <Switch
+                checked={priceFloorLock.enabled === true}
+                onCheckedChange={(v) => saveLock.mutate({ enabled: v, floorBps: lockBps() })}
+                disabled={saveLock.isPending}
+                data-testid="switch-price-lock"
+              />
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="price-floor-bps">Floor margin over cost (%)</Label>
+                <Input id="price-floor-bps" type="number" min={0} max={100} step="0.5" className="w-40"
+                  data-testid="input-price-floor-bps" placeholder="e.g. 30"
+                  value={floorPct}
+                  onChange={(e) => setFloorPct(e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Optional — floor at cost + this margin instead of the SKU price. Only meaningful where a cost exists.
+                </p>
+              </div>
+              <Button
+                onClick={() => saveLock.mutate({ enabled: priceFloorLock.enabled === true, floorBps: lockBps() })}
+                disabled={saveLock.isPending}
+                data-testid="button-save-price-floor">
+                {saveLock.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save floor
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Payments ────────────────────────────────────────────────────── */}
       <Card>

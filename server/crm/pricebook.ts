@@ -16,10 +16,13 @@ import {
   crmEstimateOptions,
   CRM_PB_PRICING_MODES, CRM_PB_UNITS, CRM_PB_SYMBOLS, CRM_PB_SQFT_METRICS,
   crmMeasurements, CRM_MEASUREMENT_PROVIDERS,
+  crmOrgs,
 } from "@shared/schema";
 import { and, eq, asc, desc, ilike, or, sql } from "drizzle-orm";
-import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { requireOrg, requireOwnerRole, requirePermission, type OrgContext } from "./tenancy";
+import { logActivity } from "./activity";
 import { evalFormula, validateFormula, formulaSymbols, FormulaError } from "./formula";
+import { priceFloorLockOf } from "./price-floor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -155,6 +158,33 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (perm && !requirePermission(res, ctx, perm)) return null;
     return ctx;
   }
+
+  // ── Price-floor lock (org setting, owner only) ────────────────────────────
+  // Lives in custom_fields->'priceFloorLock' — merged, never a wholesale
+  // replace, like notificationPrefs on PATCH /api/crm/org (routes.ts, which
+  // this lane does not touch). Enforcement is in entities.ts/discounts.ts;
+  // the owner's price chart and discounts stay editable regardless.
+  app.put("/api/crm/org/price-floor-lock", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (!requireOwnerRole(res, ctx)) return;
+    const p = z.object({
+      enabled: z.boolean(),
+      floorBps: z.number().int().min(0).max(10_000).nullable().optional(),
+    }).safeParse(req.body);
+    if (!p.success) return res.status(400).json({ message: "Invalid price-floor lock", issues: p.error.issues });
+
+    const base = { ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}) };
+    base.priceFloorLock = {
+      enabled: p.data.enabled,
+      ...(p.data.floorBps != null ? { floorBps: p.data.floorBps } : {}),
+    };
+    const [row] = await db.update(crmOrgs)
+      .set({ customFields: base, updatedAt: new Date() })
+      .where(eq(crmOrgs.id, ctx.org.id))
+      .returning();
+    res.json({ ...row, priceFloorLock: priceFloorLockOf(row?.customFields) });
+  });
 
   // ── Reference data ────────────────────────────────────────────────────────
 
@@ -375,6 +405,10 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         ...x, orgId: ctx.org.id, itemId: row.id, sortOrder: i,
       })) as any);
     }
+    logActivity(ctx, "pricebook.updated", {
+      entityType: "pricebook_item", entityId: row.id,
+      meta: { change: "created", name: row.name, code: row.code },
+    });
     res.status(201).json(row);
   });
 
@@ -422,6 +456,10 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         })) as any);
       }
     }
+    logActivity(ctx, "pricebook.updated", {
+      entityType: "pricebook_item", entityId: row.id,
+      meta: { change: "updated", name: row.name, fields: Object.keys(patch) },
+    });
     res.json(row);
   });
 
@@ -435,8 +473,12 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!ctx) return;
     const [row] = await db.update(crmPbItems).set({ active: false, updatedAt: new Date() })
       .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, req.params.id),
-        eq(crmPbItems.active, true))).returning({ id: crmPbItems.id });
+        eq(crmPbItems.active, true))).returning({ id: crmPbItems.id, name: crmPbItems.name });
     if (!row) return res.status(404).json({ message: "Item not found" });
+    logActivity(ctx, "pricebook.updated", {
+      entityType: "pricebook_item", entityId: row.id,
+      meta: { change: "deleted", name: row.name },
+    });
     res.json({ ok: true });
   });
 
@@ -659,6 +701,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
 
     let subtotal = 0, taxable = 0;
     const warnings: string[] = [];
+    const scopeLines: ExpandedLine[] = [];
     for (const pi of pkgItems) {
       let r;
       try {
@@ -671,6 +714,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         const line = Math.round((l.unitPriceCents * l.quantityMilli) / 1000);
         subtotal += line;
         if (l.taxable) taxable += line;
+        scopeLines.push(l);
       }
     }
     const tax = Math.round((taxable * (est.taxRateBps || 0)) / 10000);
@@ -678,6 +722,14 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       orgId: ctx.org.id, estimateId: est.id, name: pkg.name, tier: pkg.tier,
       description: pkg.description ?? null, recommended: p.data.recommended,
       showTotal: p.data.showTotal, subtotalCents: subtotal, totalCents: subtotal + tax,
+      // The expanded scope rides on the option so the client can select it on
+      // the public page (portal.ts select-options regenerates the estimate).
+      items: scopeLines.map((l) => ({
+        kind: l.kind, name: l.name, description: l.description,
+        quantityMilli: l.quantityMilli, unit: l.unit,
+        unitPriceCents: l.unitPriceCents, unitCostCents: l.unitCostCents,
+        taxable: l.taxable,
+      })),
     } as any).returning();
     res.status(201).json({ option: row, warnings });
   });

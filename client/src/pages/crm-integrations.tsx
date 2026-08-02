@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Blocks, KeyRound, Webhook, Ruler, Loader2, Copy, Trash2, ArrowRight,
-  RefreshCw, Unplug, CreditCard, CalendarDays, Sparkles,
+  RefreshCw, Unplug, CreditCard, CalendarDays, Sparkles, Magnet,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, SectionTitle,
@@ -58,6 +58,20 @@ export default function CrmIntegrationsPage() {
   const { data: hoverStatus } = useQuery<any>({
     queryKey: ["/api/crm/integrations/hover/status"],
     enabled: allowed && canIntegrations,
+  });
+  const { data: leadCapture } = useQuery<{ token: string; formUrl: string; leads30d: number }>({
+    queryKey: ["/api/crm/integrations/lead-capture"],
+    enabled: allowed && canIntegrations,
+  });
+
+  // ── Lead capture ──────────────────────────────────────────────────────────
+  const rotateLeadToken = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/integrations/lead-capture/rotate", {})).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/integrations/lead-capture"] });
+      toast({ title: "Lead form link rotated", description: "Every old copy of the form link stopped working." });
+    },
+    onError: (e: any) => toast({ title: "Could not rotate the link", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   // ── API keys ──────────────────────────────────────────────────────────────
@@ -168,6 +182,10 @@ export default function CrmIntegrationsPage() {
   const gcal = gcalStatus?.connection ?? null;
   const hookEventChoices = webhookData?.events ?? [];
   const chosenEvents = Object.values(hookEvents).filter(Boolean).length;
+  const leadFormUrl = leadCapture?.formUrl ?? "";
+  const leadEmbed = leadFormUrl
+    ? `<iframe src="${leadFormUrl}" style="width:100%;max-width:560px;height:640px;border:0;" title="Request an estimate"></iframe>`
+    : "";
 
   return (
     <CrmPage className="max-w-4xl">
@@ -262,6 +280,78 @@ export default function CrmIntegrationsPage() {
                   }}
                   disabled={hoverDisconnect.isPending} data-testid="button-hover-disconnect">
                   <Unplug className="h-4 w-4 mr-2" /> Disconnect
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Lead capture: the embeddable website form ───────────────────── */}
+      <Card data-testid="card-lead-capture">
+        <CardHeader>
+          <SectionTitle
+            icon={Magnet}
+            title="Lead capture"
+            description="Embed this form on your website — every submission lands in Clients tagged website-lead, and the owner gets an email."
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!canIntegrations ? (
+            <p className="text-sm text-muted-foreground">
+              You don't have the manageIntegrations permission — ask an admin.
+            </p>
+          ) : !leadCapture ? (
+            <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <>
+              <div className="flex items-center gap-x-4 gap-y-1 text-sm">
+                <span className="text-muted-foreground" data-testid="text-lead-count">
+                  {leadCapture.leads30d} lead{leadCapture.leads30d === 1 ? "" : "s"} in the last 30 days
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Direct link</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={leadFormUrl} data-testid="input-lead-form-url"
+                    onFocus={(e) => e.target.select()} />
+                  <Button size="sm" variant="outline" className="shrink-0" data-testid="button-copy-lead-link"
+                    onClick={() => {
+                      if (leadFormUrl) navigator.clipboard?.writeText(leadFormUrl).catch(() => {});
+                      toast({ title: "Copied" });
+                    }}>
+                    <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Embed on your site</Label>
+                <div className="flex gap-2">
+                  <code className="flex-1 rounded bg-muted px-2 py-1.5 text-xs font-mono break-all"
+                    data-testid="text-lead-embed">{leadEmbed}</code>
+                  <Button size="sm" variant="outline" className="shrink-0" data-testid="button-copy-lead-embed"
+                    onClick={() => {
+                      if (leadEmbed) navigator.clipboard?.writeText(leadEmbed).catch(() => {});
+                      toast({ title: "Copied" });
+                    }}>
+                    <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Anyone with the link can send you a lead — that's the point. If it ever ends up in the
+                wrong hands, rotate it: every embedded copy and shared link of the old form stops working.
+              </p>
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" data-testid="button-rotate-lead-token"
+                  onClick={() => {
+                    if (window.confirm("Rotate the lead form link? Every embedded copy and shared link of the old form will stop working.")) {
+                      rotateLeadToken.mutate();
+                    }
+                  }}
+                  disabled={rotateLeadToken.isPending}>
+                  {rotateLeadToken.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                  Rotate link
                 </Button>
               </div>
             </>

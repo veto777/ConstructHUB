@@ -25,6 +25,8 @@ import { db } from "../db";
 import { crmEstimateDiscounts, crmEstimateItems, crmEstimates } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { logActivity } from "./activity";
+import { floorTotalCents, formatCents, loadPricebookIndex, priceFloorLockOf } from "./price-floor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -232,6 +234,26 @@ export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): vo
     if (est.approvedAt) return res.status(409).json({ message: "This estimate has been approved — offers are locked." });
     if (est.declinedAt) return res.status(409).json({ message: "This estimate has been declined — offers are locked." });
 
+    // Price-floor lock: a non-owner may not extend offers that could take the
+    // pre-tax total below the sum of the line floors (all enabled offers
+    // ticked at once is the worst case the client can select).
+    const lock = priceFloorLockOf(ctx.org.customFields);
+    if (lock.enabled && ctx.member.role !== "owner") {
+      const items = await db.select().from(crmEstimateItems)
+        .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, est.id)));
+      const floorTotal = floorTotalCents(items, await loadPricebookIndex(ctx.org.id), lock);
+      if (floorTotal > 0) {
+        const enabled = parsed.data.offers.filter((o) => o.enabled);
+        const totals = computeApprovalTotals(items, est.taxRateBps, enabled);
+        const preTax = totals.subtotalCents - totals.lineDiscountCents - totals.optionalDiscountCents;
+        if (preTax < floorTotal) {
+          return res.status(422).json({
+            message: `Price lock: these discounts would take the total to ${formatCents(preTax)} — below the ${formatCents(floorTotal)} floor set by the owner`,
+          });
+        }
+      }
+    }
+
     await db.delete(crmEstimateDiscounts)
       .where(and(eq(crmEstimateDiscounts.orgId, ctx.org.id), eq(crmEstimateDiscounts.estimateId, est.id)));
     if (parsed.data.offers.length) {
@@ -251,6 +273,10 @@ export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): vo
     const fresh = await db.select().from(crmEstimateDiscounts)
       .where(and(eq(crmEstimateDiscounts.orgId, ctx.org.id), eq(crmEstimateDiscounts.estimateId, est.id)))
       .orderBy(asc(crmEstimateDiscounts.sortOrder), asc(crmEstimateDiscounts.createdAt));
+    logActivity(ctx, "discount.updated", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, offers: parsed.data.offers.map((o) => o.code) },
+    });
     res.json({ offers: fresh.map(presentDiscountOffer) });
   });
 }

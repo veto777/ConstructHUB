@@ -355,6 +355,7 @@ export async function ensureCrmSchema(): Promise<void> {
       description text, recommended boolean NOT NULL DEFAULT false,
       show_total boolean NOT NULL DEFAULT true,
       subtotal_cents integer NOT NULL DEFAULT 0, total_cents integer NOT NULL DEFAULT 0,
+      items jsonb,
       selected_at timestamp, created_at timestamp DEFAULT now());
 
     CREATE TABLE IF NOT EXISTS crm_api_keys (
@@ -500,6 +501,9 @@ export async function ensureCrmSchema(): Promise<void> {
     -- metric supplies the quantity.
     ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS rate_cents_per_sqft integer;
     ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS sqft_metric text;
+    -- Client-selectable scopes: an option carrying its own line items is a
+    -- checkbox on the public estimate page (server/crm/portal.ts select-options).
+    ALTER TABLE crm_estimate_options ADD COLUMN IF NOT EXISTS items jsonb;
 
     CREATE TABLE IF NOT EXISTS crm_estimate_discounts (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -631,6 +635,26 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_customer_notes_org_idx ON crm_customer_notes (org_id);
     CREATE INDEX IF NOT EXISTS crm_finance_clicks_customer_idx ON crm_finance_clicks (customer_id);
     CREATE INDEX IF NOT EXISTS crm_finance_clicks_org_idx ON crm_finance_clicks (org_id);
+  `);
+
+  // ── Accountability: org-wide activity log (who did what, when) ───────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_activity_log (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      actor_member_id varchar,
+      actor_label text NOT NULL,
+      action text NOT NULL,
+      entity_type text,
+      entity_id varchar,
+      customer_id varchar,
+      meta jsonb,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_activity_log_customer_idx ON crm_activity_log (org_id, customer_id);
+    CREATE INDEX IF NOT EXISTS crm_activity_log_actor_idx ON crm_activity_log (org_id, actor_member_id);
+    CREATE INDEX IF NOT EXISTS crm_activity_log_created_idx ON crm_activity_log (org_id, created_at);
   `);
 
   // Constraints are added separately: they are not IF NOT EXISTS in older

@@ -25,9 +25,11 @@ import {
 } from "@shared/schema";
 import { and, eq, desc, asc, ilike, or, sql, isNull, inArray, gte, lte } from "drizzle-orm";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
+import { logActivity } from "./activity";
 import {
   divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, getDivision,
 } from "./divisions";
+import { priceFloorViolation } from "./price-floor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -352,7 +354,45 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const [row] = await db.insert(crmCustomers).values({
       ...parsed.data, orgId: ctx.org.id, ownerMemberId: ctx.member.id, portalToken: token(),
     } as any).returning();
+    logActivity(ctx, "customer.created", {
+      entityType: "customer", entityId: row.id, customerId: row.id,
+      meta: { name: row.displayName },
+    });
     res.status(201).json({ ...row, portalToken: undefined, portalPath: `/portal/${row.portalToken}` });
+  });
+
+  /**
+   * Bulk client export — one CSV of the org's clients. Gated by the
+   * exportData permission (owner by default, grantable per seat on the team
+   * page); every export lands in the activity log as data.exported.
+   * Registered BEFORE /api/crm/customers/:id so "export.csv" is never read
+   * as a customer id.
+   */
+  app.get("/api/crm/customers/export.csv", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "exportData");
+    if (!ctx) return;
+
+    const rows = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), isNull(crmCustomers.archivedAt)))
+      .orderBy(asc(crmCustomers.displayName)).limit(10000);
+
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = ["id", "name", "email", "phone", "address", "city", "state", "postal_code", "created_at"];
+    const lines = rows.map((c) => [
+      c.id, c.displayName, c.email, c.phone, c.addressLine1, c.city, c.state, c.postalCode,
+      c.createdAt ? new Date(c.createdAt).toISOString() : "",
+    ].map(esc).join(","));
+    const csv = [header.join(","), ...lines].join("\n") + "\n";
+
+    logActivity(ctx, "data.exported", {
+      entityType: "customers", meta: { rows: rows.length },
+    });
+    res.setHeader("content-type", "text/csv; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="${ctx.org.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-clients.csv"`);
+    res.send(csv);
   });
 
   app.get("/api/crm/customers/:id", async (req: any, res) => {
@@ -388,6 +428,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id)))
       .returning();
     if (!row) return res.status(404).json({ message: "Customer not found" });
+    logActivity(ctx, "customer.updated", {
+      entityType: "customer", entityId: row.id, customerId: row.id,
+      meta: { fields: Object.keys(parsed.data) },
+    });
     res.json({ ...row, portalToken: undefined });
   });
 
@@ -468,6 +512,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
     console.log(`[crm] owner ${ctx.member.id} deleted customer ${c.id} (${c.displayName}) in org ${orgId}` +
       (force ? ` — force tree: ${estimates} estimates, ${invoices} invoices, ${projects} projects` : ""));
+    logActivity(ctx, "customer.deleted", {
+      entityType: "customer", entityId: c.id, customerId: c.id,
+      meta: { name: c.displayName, force },
+    });
     res.json({ ok: true, deleted: c.id, force });
   });
 
@@ -780,6 +828,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, d.customerId))).limit(1);
     if (!cust) return res.status(400).json({ message: "Customer not found in this organization" });
 
+    // Price-floor lock: non-owners may price above the floor, never below.
+    const floorMsg = await priceFloorViolation(ctx, d.items);
+    if (floorMsg) return res.status(422).json({ message: floorMsg });
+
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEstimates)
       .where(eq(crmEstimates.orgId, ctx.org.id));
 
@@ -800,6 +852,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     }
     const fresh = await recalcEstimate(ctx.org.id, est.id);
     await logEvent(ctx.org.id, est.id, "created", ctx.member.id, req);
+    logActivity(ctx, "estimate.created", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, totalCents: fresh?.totalCents ?? est.totalCents },
+    });
     res.status(201).json(presentEstimate(fresh ?? est, ctx));
   });
 
@@ -836,6 +892,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (!e) return res.status(404).json({ message: "Estimate not found" });
     if (e.approvedAt) return res.status(409).json({ message: "This estimate has been approved and can no longer be edited." });
 
+    // Price-floor lock: non-owners may price above the floor, never below.
+    const floorMsg = await priceFloorViolation(ctx, parsed.data.items);
+    if (floorMsg) return res.status(422).json({ message: floorMsg });
+
     await db.delete(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, e.id)));
     if (parsed.data.items.length) {
@@ -844,6 +904,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       );
     }
     const fresh = await recalcEstimate(ctx.org.id, e.id);
+    logActivity(ctx, "estimate.updated", {
+      entityType: "estimate", entityId: e.id, customerId: e.customerId,
+      meta: { number: e.number, fields: ["items"] },
+    });
     res.json(presentEstimate(fresh ?? e, ctx));
   });
 
@@ -873,6 +937,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     console.log(`[crm] owner ${ctx.member.id} deleted estimate ${e.number ?? e.id} (${e.id}) in org ${ctx.org.id}`);
     await logDeletionNote(ctx.org.id, e.customerId, ctx.member.id,
       `Estimate ${e.number ?? e.id} ("${e.title}") was permanently deleted by the account owner.`);
+    logActivity(ctx, "estimate.deleted", {
+      entityType: "estimate", entityId: e.id, customerId: e.customerId,
+      meta: { number: e.number, title: e.title },
+    });
     res.json({ ok: true, deleted: e.id });
   });
 
