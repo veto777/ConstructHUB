@@ -32,6 +32,7 @@ import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { autoSendPaymentReceipt } from "./receipts";
 import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
+import { textOrgOwners } from "./sms";
 import { getBaseUrl } from "../auth";
 
 type GetUser = (req: any, res: any) => any;
@@ -89,6 +90,9 @@ async function notifyPaymentRecorded(
           ` for invoice <strong>${doc}</strong>${inv.title ? ` (${inv.title})` : ""}.</p>` +
           `<p>Recorded manually in ConstructHub CRM.</p>`,
   } as any);
+
+  // Money landing is worth a buzz in the pocket — opt-in per org.
+  await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}.`);
 }
 
 export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {

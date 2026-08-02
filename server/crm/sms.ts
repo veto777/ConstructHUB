@@ -392,3 +392,44 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     });
   });
 }
+
+// ── Owner text alerts (money events) ────────────────────────────────────────
+
+/**
+ * Text the org's owner(s) when something important happens — a signed
+ * approval, money landing. Opt-in per org via customFields.smsAlerts
+ * (default OFF: texting costs money and nobody should be surprised by it;
+ * the matching EMAIL notification is what's on by default).
+ *
+ * Recipients: active owner members' mobiles, falling back to the org's main
+ * phone. Best-effort — a carrier hiccup never breaks an approval or a payment.
+ */
+export function smsAlertsEnabled(customFields: unknown): boolean {
+  const v = (customFields as Record<string, unknown> | null | undefined)?.smsAlerts;
+  return v === true;
+}
+
+export async function textOrgOwners(
+  org: typeof crmOrgs.$inferSelect,
+  body: string,
+): Promise<void> {
+  if (!smsAlertsEnabled(org.customFields)) return;
+  if (!smsConfigured()) return; // no carrier → say nothing, log nothing to pretend
+
+  const members = await db.select().from(crmMembers)
+    .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
+  const numbers = new Set<string>();
+  for (const m of members) {
+    if (m.role !== "owner") continue;
+    const p = normalizePhone(m.phone);
+    if (p) numbers.add(p);
+  }
+  if (!numbers.size) {
+    const fallback = normalizePhone(org.phone);
+    if (fallback) numbers.add(fallback);
+  }
+  for (const to of numbers) {
+    await sendSms(to, body).catch((e: any) =>
+      console.error("[crm] owner text alert failed:", e?.message || e));
+  }
+}

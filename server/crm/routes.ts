@@ -99,6 +99,9 @@ const orgPatchSchema = z.object({
   // The main (band) colour the accent pairs with — black (default) or white.
   // Merged into custom_fields as themeBase; null clears back to black.
   themeBase: z.enum(["black", "white"]).nullable().optional(),
+  // Text alerts to the owner's mobile on signed approvals and payments.
+  // Opt-in (default off): texting costs money per message.
+  smsAlerts: z.boolean().optional(),
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.
   notificationPrefs: z
@@ -456,9 +459,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, smsAlerts, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -480,6 +483,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
               if (themeBase === null) delete base.themeBase;
               else base.themeBase = themeBase;
             }
+            if (smsAlerts !== undefined) base.smsAlerts = smsAlerts;
             return base;
           })()
         : undefined;

@@ -33,7 +33,7 @@ import { logEvent, presentEstimate, recalcEstimate } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
 import { recordActivity } from "./activity";
-import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount } from "./sms";
+import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners } from "./sms";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
@@ -1131,6 +1131,18 @@ async function notifyOwner(
     subject,
     html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
   } as any).catch((e: any) => console.error("[crm] owner notify failed:", e?.message || e));
+
+  // The signature is the moment that matters — text it too when the org
+  // turned SMS alerts on (opt-in; the email above is the default channel).
+  if (event === "approved") {
+    await textOrgOwners(
+      org,
+      `${org.name}: ${cust.displayName} SIGNED estimate ${est.number ?? ""} for ` +
+      `${money(est.approvedTotalCents ?? est.totalCents)}.`.replace(/\s+/g, " "),
+    );
+  } else if (event === "declined") {
+    await textOrgOwners(org, `${org.name}: ${cust.displayName} declined estimate ${est.number ?? ""}.`);
+  }
 }
 
 // ── PM auto-email on approval ───────────────────────────────────────────────

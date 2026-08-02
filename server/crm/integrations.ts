@@ -20,6 +20,7 @@ import {
 import { and, eq, desc, sql, isNull } from "drizzle-orm";
 import { sendWithFallback } from "../email";
 import { autoSendPaymentReceipt } from "./receipts";
+import { textOrgOwners } from "./sms";
 
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const CONNECT_WEBHOOK_SECRET = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
@@ -470,4 +471,9 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: st
     html: `<p><strong>${amount}</strong> received from ${cust?.displayName ?? "a client"}${via}.</p>` +
           `<p>Paid directly into your own Stripe account.</p>`,
   } as any);
+
+  // Money landing is worth a buzz in the pocket — opt-in per org.
+  if (org) {
+    await textOrgOwners(org, `${org.name}: ${amount} received from ${cust?.displayName ?? "a client"}${via}.`);
+  }
 }

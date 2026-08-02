@@ -390,3 +390,16 @@ describe("reminders + reengagement alerts against the dev server", () => {
     }
   });
 });
+
+// ── Owner text alerts (opt-in) ──────────────────────────────────────────────
+
+describe("owner text alerts opt-in", () => {
+  it("smsAlertsEnabled is OFF unless the org explicitly turned it on", async () => {
+    const { smsAlertsEnabled } = await import("./sms");
+    expect(smsAlertsEnabled(null)).toBe(false);
+    expect(smsAlertsEnabled({})).toBe(false);
+    expect(smsAlertsEnabled({ smsAlerts: false })).toBe(false);
+    expect(smsAlertsEnabled({ smsAlerts: "yes" })).toBe(false);
+    expect(smsAlertsEnabled({ smsAlerts: true })).toBe(true);
+  });
+});

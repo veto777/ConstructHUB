@@ -233,6 +233,16 @@ export default function CrmSettingsPage() {
     },
     onError: (e: any) => toast({ title: "Could not save theme", description: String(e.message ?? e), variant: "destructive" }),
   });
+  // Owner text alerts on signed approvals + payments (opt-in, costs money).
+  const saveSmsAlerts = useMutation({
+    mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { smsAlerts: on })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Text alerts saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save text alerts", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   // The main (band) colour the accent pairs with — black or white.
   const saveThemeBase = useMutation({
     mutationFn: async (base: "black" | "white") =>
@@ -975,7 +985,7 @@ export default function CrmSettingsPage() {
             icon={MessageSquare}
             title="SMS"
             infoKey="settings-sms"
-            description="Text bid reminders to clients, and get a text the moment a client re-opens their estimate."
+            description="Text bid reminders to clients, and get a text when a bid is signed, money lands, or a client re-opens their estimate."
           />
         </CardHeader>
         <CardContent className="space-y-3">
@@ -1009,6 +1019,22 @@ export default function CrmSettingsPage() {
               </StatusPill>
             )}
           </div>
+          <div className="flex items-center justify-between gap-4 border-t pt-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Text me when a bid is signed or money lands</div>
+              <p className="text-xs text-muted-foreground">
+                Sends to the owner's mobile (Team &amp; Company → My profile), or the company phone.
+                Off by default — each text costs a fraction of a cent.
+              </p>
+            </div>
+            <Switch
+              checked={(org?.customFields as any)?.smsAlerts === true}
+              onCheckedChange={(v) => saveSmsAlerts.mutate(v)}
+              disabled={saveSmsAlerts.isPending || !smsStatus?.configured}
+              data-testid="switch-sms-alerts"
+            />
+          </div>
+
           {canIntegrations && (
             <div className="flex flex-wrap items-end gap-3 border-t pt-3">
               <div className="space-y-1.5">
