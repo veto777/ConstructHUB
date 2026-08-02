@@ -350,4 +350,20 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
     const { tokenHash: _h, ...safe } = invite;
     res.status(201).json({ invite: { ...safe, status: "pending" }, link, emailed });
   });
+
+  /** Revoke a PENDING invite: the row (and with it the only copy of the token
+   *  hash) is deleted, so the emailed link stops minting beta access. An
+   *  accepted invite can't be revoked — the account already exists. */
+  app.delete("/api/admin/beta-invites/:id", async (req: any, res) => {
+    const admin = await requirePlatformAdmin(req, res, getDevUser);
+    if (!admin) return;
+    const [inv] = await db.select().from(crmBetaInvites)
+      .where(eq(crmBetaInvites.id, req.params.id)).limit(1);
+    if (!inv) return res.status(404).json({ message: "Invite not found" });
+    if (inv.acceptedAt) {
+      return res.status(409).json({ message: "This invite was already accepted — the account exists. Manage the user instead." });
+    }
+    await db.delete(crmBetaInvites).where(eq(crmBetaInvites.id, inv.id));
+    res.json({ ok: true });
+  });
 }

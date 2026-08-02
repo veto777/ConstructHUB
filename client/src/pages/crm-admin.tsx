@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard,
-  Search, Mail, Copy, Check, Loader2, Rocket,
+  Search, Mail, Copy, Check, Loader2, Rocket, Ban,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, MetricCard, StatusPill, EmptyState, ErrorCard,
@@ -152,6 +152,18 @@ export default function CrmAdminPage() {
     },
     onError: (err: any) => {
       toast({ title: "Invite failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Revoke = delete the pending row; the emailed link dies with its token hash.
+  const revokeInvite = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/admin/beta-invites/${id}`)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/beta-invites"] });
+      toast({ title: "Invite revoked", description: "The invite link no longer works." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not revoke", description: err.message, variant: "destructive" });
     },
   });
 
@@ -391,6 +403,7 @@ export default function CrmAdminPage() {
                     <th className={crmTable.th}>Status</th>
                     <th className={crmTable.th}>Sent</th>
                     <th className={crmTable.th}>Expires</th>
+                    <th className={crmTable.thRight}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -402,6 +415,19 @@ export default function CrmAdminPage() {
                       </td>
                       <td className={crmTable.td}><span className="text-xs text-muted-foreground">{day(inv.createdAt)}</span></td>
                       <td className={crmTable.td}><span className="text-xs text-muted-foreground">{day(inv.expiresAt)}</span></td>
+                      <td className={crmTable.tdRight}>
+                        {inv.status === "pending" && (
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                            onClick={() => revokeInvite.mutate(inv.id)}
+                            disabled={revokeInvite.isPending}
+                            data-testid={`button-revoke-beta-${inv.id}`}>
+                            {revokeInvite.isPending
+                              ? <Loader2 className="h-3.5 w-3.5 mr-1" />
+                              : <Ban className="h-3.5 w-3.5 mr-1" />}
+                            Revoke
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
