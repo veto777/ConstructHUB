@@ -204,6 +204,9 @@ function PortalRouter() {
       <Route path="/crm/reports" component={CrmReportsPage} />
       <Route path="/crm/migrate" component={CrmMigratePage} />
       <Route path="/crm/admin" component={CrmAdminPage} />
+      {/* Platform-wide console at the short URL too — every user and org
+          across the platform; the page 403s anyone but platform admins. */}
+      <Route path="/admin" component={CrmAdminPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
       <Route path="/crm-privacy" component={CrmPrivacyPage} />
