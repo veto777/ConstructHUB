@@ -292,14 +292,18 @@ export function PortalContact({ accounts, onMessageNow }: {
 export function PortalContactFooter({ office }: { office: Office | null | undefined }) {
   if (!office || (!office.email && !office.phone && !office.website)) return null;
   return (
-    <footer className="border-t mt-8 py-4 text-center text-xs text-muted-foreground space-x-3"
+    <footer className="border-t mt-8 py-4 px-3 text-xs text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 max-w-full"
       data-testid="portal-contact-footer">
-      <span className="font-medium">{office.name ?? "Contact us"}:</span>
-      {office.phone && <a href={`tel:${office.phone}`} className="hover:text-foreground">{office.phone}</a>}
-      {office.email && <a href={`mailto:${office.email}`} className="hover:text-foreground">{office.email}</a>}
+      <span className="font-medium">{office.name ?? "Contact us"}</span>
+      {office.phone && (
+        <a href={`tel:${office.phone}`} className="hover:text-foreground whitespace-nowrap">{office.phone}</a>
+      )}
+      {office.email && (
+        <a href={`mailto:${office.email}`} className="hover:text-foreground break-all">{office.email}</a>
+      )}
       {office.website && (
         <a href={office.website.startsWith("http") ? office.website : `https://${office.website}`}
-          target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+          target="_blank" rel="noopener noreferrer" className="hover:text-foreground break-all">
           {office.website.replace(/^https?:\/\//, "")}
         </a>
       )}
