@@ -361,11 +361,21 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       const est = estById.get(e.estimateId);
       if (!est) continue;
       const ref = refOf(est);
+      const meta = (e.meta ?? {}) as Record<string, any>;
+      // Every type is EXPLICIT — an unmapped type is skipped, never mislabeled
+      // (unknown types used to fall through to "declined").
       const text =
         e.type === "sent" ? `Estimate ${ref} sent to the client`
         : e.type === "viewed" ? `Client opened estimate ${ref}`
         : e.type === "approved" ? `Client approved (signed) estimate ${ref}`
-        : `Client declined estimate ${ref}`;
+        : e.type === "declined" ? `Client declined estimate ${ref}`
+        : e.type === "shared" ? `Client shared estimate ${ref} with ${meta.sharedWith ?? "someone"}`
+        : e.type === "access_denied" ? `Blocked access attempt on estimate ${ref} — typed ${meta.attemptedEmail ?? "an unknown email"}`
+        : e.type === "forward_detected" ? `Estimate ${ref} link opened on a second device — likely forwarded`
+        : e.type === "options_selected" ? `Client selected their scopes on estimate ${ref}`
+        : e.type === "extended" ? `Estimate ${ref} expiry extended`
+        : null;
+      if (!text) continue;
       entries.push({
         id: `ev-${e.id}`, kind: "estimate_event", verb: e.type, text, ref,
         at: (e.createdAt ?? new Date()).toISOString(),

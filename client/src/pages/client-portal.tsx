@@ -219,6 +219,30 @@ function Dashboard({ data }: { data: any }) {
     onError: (e: any) => toast({ title: "Upload failed", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  // Share an estimate with a spouse/co-decision-maker straight from the
+  // portal — they get their own secure link, the contractor sees who/when.
+  const [shareFor, setShareFor] = useState<any | null>(null);
+  const [shareEmail, setShareEmail] = useState("");
+  const shareEstimate = useMutation({
+    mutationFn: async () => {
+      const tok = String(shareFor?.link ?? "").split("/e/")[1]?.split("?")[0];
+      const r = await fetch(`/api/public/estimates/${tok}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ email: shareEmail.trim() }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || "Could not share");
+      return j;
+    },
+    onSuccess: (j: any) => {
+      toast({ title: "Shared", description: `We emailed ${j.sharedWith} their own secure link.` });
+      setShareFor(null); setShareEmail("");
+    },
+    onError: (e: any) => toast({ title: "Could not share", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   const oneOrg = orgs.length === 1 ? orgs[0] : null;
   // The contractor's company theme — black + their accent. Only a single-org
   // client gets a themed portal; a multi-org homeowner keeps the neutral
@@ -282,6 +306,7 @@ function Dashboard({ data }: { data: any }) {
                 <th className={crmTable.th}>Status</th>
                 <th className={crmTable.th}>Sent</th>
                 <th className={crmTable.thRight}>Total</th>
+                <th className={crmTable.thRight}></th>
               </tr>
             </thead>
             <tbody>
@@ -312,11 +337,46 @@ function Dashboard({ data }: { data: any }) {
                   </td>
                   <td className={crmTable.td}>{day(e.sentAt) ?? "—"}</td>
                   <td className={crmTable.tdRight}>{money(e.totalCents)}</td>
+                  <td className={crmTable.tdRight}>
+                    {!preview && (
+                      <button type="button" className="text-primary hover:underline text-sm font-medium"
+                        onClick={() => { setShareFor(e); setShareEmail(""); }}
+                        data-testid={`button-portal-share-${e.id}`}>
+                        Share
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {shareFor && (
+        <Card className="border-primary/30" data-testid="portal-share-card">
+          <CardContent className="p-4 space-y-2">
+            <div className="text-sm font-medium">
+              Share {shareFor.number ? `${shareFor.number} · ` : ""}{shareFor.title} with someone
+            </div>
+            <p className="text-xs text-muted-foreground">
+              They'll get their own secure email link — nothing is public.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input type="email" value={shareEmail} placeholder="their@email.com"
+                onChange={(ev) => setShareEmail(ev.target.value)} className="flex-1 h-11"
+                data-testid="input-portal-share-email" />
+              <div className="flex gap-2">
+                <Button className="h-11"
+                  disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(shareEmail.trim()) || shareEstimate.isPending}
+                  onClick={() => shareEstimate.mutate()} data-testid="button-portal-share-send">
+                  {shareEstimate.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Send secure link
+                </Button>
+                <Button variant="ghost" className="h-11" onClick={() => setShareFor(null)}>Cancel</Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </section>
   );
