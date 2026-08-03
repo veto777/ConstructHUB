@@ -3,9 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
   Loader2, FileText, Receipt, ShieldCheck, Mail, ArrowRight, LogOut, Inbox, Ruler,
-  LayoutDashboard, Camera, MessageSquare, FolderOpen, Image as ImageIcon, Phone, type LucideIcon,
+  LayoutDashboard, Camera, MessageSquare, FolderOpen, Image as ImageIcon, Phone, Menu, type LucideIcon,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
@@ -177,6 +178,8 @@ function Dashboard({ data }: { data: any }) {
   const [view, setView] = useState<ViewKey>("home");
   // Set when the client taps "Message now" on a specific person.
   const [messageTo, setMessageTo] = useState<string | null>(null);
+  // Mobile hamburger drawer — the full tool list, like the contractor side.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const captureRef = useRef<HTMLInputElement>(null);
   const preview = data.contractorPreview === true;
 
@@ -710,9 +713,52 @@ function Dashboard({ data }: { data: any }) {
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={signOut} className="md:hidden" data-testid="button-client-logout-mobile">
-              <LogOut className="h-4 w-4 mr-1.5" /> Sign out
-            </Button>
+            <div className="flex items-center gap-2 md:hidden">
+              <Button variant="outline" size="sm" onClick={signOut} data-testid="button-client-logout-mobile">
+                <LogOut className="h-4 w-4 mr-1.5" /> Sign out
+              </Button>
+              <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-9 w-9" aria-label="All tools"
+                    data-testid="button-portal-menu">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-64 bg-sidebar text-sidebar-foreground border-sidebar-border p-0">
+                  <SheetTitle className="sr-only">Menu</SheetTitle>
+                  <div className="px-4 pt-5 pb-3">
+                    <CrmLogo height={22} />
+                  </div>
+                  <nav className="px-2 space-y-1" data-testid="portal-drawer-nav">
+                    {SIDEBAR_NAV.map((item) => {
+                      const active = view === item.key;
+                      const n = badge(item.key);
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => { setView(item.key); setDrawerOpen(false); }}
+                          data-testid={`portal-drawer-${item.key}`}
+                          className={`flex w-full items-center gap-3 rounded-lg px-3 h-10 text-sm font-medium transition-colors ${
+                            active
+                              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                              : "text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                          }`}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+                          <span className="flex-1 text-left">{item.title}</span>
+                          {n != null && (
+                            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-[18px] text-center font-semibold">
+                              {n}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
 
           {/* Read-only banner when the contractor opens this portal as the client. */}
@@ -752,18 +798,26 @@ function Dashboard({ data }: { data: any }) {
           <div className="relative flex justify-center">
             <button
               type="button"
-              disabled={preview || capture.isPending || !customerId}
-              onClick={() => captureRef.current?.click()}
+              disabled={capture.isPending}
+              onClick={() => {
+                if (preview) {
+                  toast({ title: "Read-only preview", description: "Uploads are disabled while viewing as the client." });
+                  return;
+                }
+                if (!customerId) {
+                  toast({ title: "No account yet", description: "Photos unlock once your contractor links a document to you.", variant: "destructive" });
+                  return;
+                }
+                captureRef.current?.click();
+              }}
               data-testid="button-portal-capture"
               aria-label="Capture a photo of the house"
-              title={preview ? "Uploads are disabled in contractor preview" : "Capture a photo"}
-              className="absolute -top-6 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background flex items-center justify-center disabled:opacity-60 active:scale-95 transition-transform"
+              className={`absolute -top-5 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background flex items-center justify-center active:scale-95 transition-transform ${preview ? "opacity-60" : ""}`}
             >
               {capture.isPending
                 ? <Loader2 className="h-6 w-6 animate-spin" />
                 : <Camera className="h-6 w-6" strokeWidth={2} />}
             </button>
-            <span className="pb-1.5 text-[10px] font-medium text-sidebar-foreground/60">Capture</span>
           </div>
           {([
             { key: "photos" as ViewKey, title: "Photos", icon: ImageIcon },
