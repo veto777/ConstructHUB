@@ -24,8 +24,7 @@
  *      (developers.hover.to/docs/webhook-signature-verification — sha256
  *      preferred, sha1 accepted). Unsigned or mis-signed traffic gets a 401.
  *   4. Ingest: job-state-changed-v2 with state "completed" → GET /api/v3/jobs/<id>
- *      → attach to the org's customer by lower(email), digit-normalized phone,
- *      or — when both fail — the NORMALIZED service address (line1 stripped +
+ *      → attach to the org's customer by NORMALIZED service address first (line1 stripped +
  *      5-digit zip, same normalization both sides; exactly one customer at the
  *      address attaches, 2+ creates a flagged customer instead of guessing),
  *      else create the customer from the job. Then create the crm_measurements
@@ -57,7 +56,7 @@ import {
   createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual,
 } from "crypto";
 import { db } from "../db";
-import { crmCustomers, crmMeasurements, crmOrgs } from "@shared/schema";
+import { crmCustomers, crmMeasurements, crmOrgs , crmMembers } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
@@ -637,11 +636,26 @@ async function matchHoverCustomer(
  * "hover:<jobId>" — a redelivered event (HOVER retries up to 25 times) or a
  * sync-now re-pull updates nothing and reports the existing row.
  *
- * Customer attach order: email → phone → normalized service address. Address
- * matching runs BEFORE any customer is created, and never guesses: exactly
- * one customer at the address attaches; two or more creates a NEW customer
- * flagged customFields.hoverAmbiguous; zero creates from the job as before.
+ * Customer attach order: normalized service address → email → phone (and a
+ * contact belonging to org STAFF never attaches). Matching runs BEFORE any
+ * customer is created, and never guesses: exactly one customer at the address
+ * attaches; two or more creates a NEW customer flagged
+ * customFields.hoverAmbiguous; zero creates from the job as before.
  */
+/** True when the job's contact is one of the org's own people — a capture
+ *  ordered by staff must never attach the property to the staff member. */
+async function isOrgMemberContact(
+  orgId: string, email?: string | null, phone?: string | null,
+): Promise<boolean> {
+  const em = (email ?? "").trim().toLowerCase();
+  const ph = String(phone ?? "").replace(/\D/g, "");
+  if (!em && !ph) return false;
+  const members = await db.select().from(crmMembers)
+    .where(and(eq(crmMembers.orgId, orgId), eq(crmMembers.status, "active")));
+  return members.some((m) =>
+    (em && (m.email ?? "").toLowerCase() === em) ||
+    (ph && ph.length >= 7 && String(m.phone ?? "").replace(/\D/g, "") === ph));
+}
 export async function ingestHoverJob(
   orgId: string, jobId: string, fetchFn: FetchFn = fetch,
 ): Promise<{
@@ -679,26 +693,29 @@ export async function ingestHoverJob(
   }
   const summary = summarizeHoverMeasurements(fullJson);
 
-  // Customer: dedupe on email, then phone, then the normalized service
-  // address — BEFORE creating anyone. A matched customer's record is never
-  // clobbered by HOVER data, and an ambiguous address never attaches.
+  // Customer attach: the SERVICE ADDRESS is ground truth and runs FIRST —
+  // HOVER captures are usually ordered by the contractor's own crew, so the
+  // job's contact email/phone is often a STAFF member, and contact-first
+  // matching attached homeowners' properties to employees (2026-08-02: 706
+  // measurements piled onto 13 records, 3 of them staff). Contact matching
+  // is the fallback, and never attaches to an org member's identity.
   const c = parsed.contact;
   let customer: typeof crmCustomers.$inferSelect | null = null;
   let matchedVia: "email" | "phone" | "address" | null = null;
   let ambiguous = false;
-  const byContact = await matchHoverCustomer(orgId, c.email, c.phone);
-  if (byContact) {
-    customer = byContact.customer;
-    matchedVia = byContact.via;
+  const byAddress = await matchHoverCustomerByAddress(orgId, c.addressLine1, c.postalCode);
+  if (byAddress.matches.length === 1) {
+    customer = byAddress.matches[0];
+    matchedVia = "address";
+  } else if (byAddress.matches.length > 1) {
+    // Two+ customers at the same address: never guess — a new customer is
+    // created below, flagged so a human can merge deliberately.
+    ambiguous = true;
   } else {
-    const byAddress = await matchHoverCustomerByAddress(orgId, c.addressLine1, c.postalCode);
-    if (byAddress.matches.length === 1) {
-      customer = byAddress.matches[0];
-      matchedVia = "address";
-    } else if (byAddress.matches.length > 1) {
-      // Two+ customers at the same address: never guess — a new customer is
-      // created below, flagged so a human can merge deliberately.
-      ambiguous = true;
+    const byContact = await matchHoverCustomer(orgId, c.email, c.phone);
+    if (byContact && !(await isOrgMemberContact(orgId, c.email, c.phone))) {
+      customer = byContact.customer;
+      matchedVia = byContact.via;
     }
   }
   let customerCreated = false;

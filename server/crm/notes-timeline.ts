@@ -363,9 +363,9 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       const ref = refOf(est);
       const text =
         e.type === "sent" ? `Estimate ${ref} sent to the client`
-        : e.type === "viewed" ? `Opened estimate ${ref}`
-        : e.type === "approved" ? `Estimate ${ref} approved (signed)`
-        : `Estimate ${ref} declined`;
+        : e.type === "viewed" ? `Client opened estimate ${ref}`
+        : e.type === "approved" ? `Client approved (signed) estimate ${ref}`
+        : `Client declined estimate ${ref}`;
       entries.push({
         id: `ev-${e.id}`, kind: "estimate_event", verb: e.type, text, ref,
         at: (e.createdAt ?? new Date()).toISOString(),
@@ -379,7 +379,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       const ref = refOf(doc);
       entries.push({
         id: `eng-${s.id}`, kind: "engagement", verb: "opened",
-        text: `Opened ${s.docType} ${ref} · stayed ${formatDurationSecs(s.durationSecs ?? 0)}`,
+        text: `Client opened ${s.docType} ${ref} · stayed ${formatDurationSecs(s.durationSecs ?? 0)}`,
         ref,
         at: (s.startedAt ?? new Date()).toISOString(),
         durationSecs: s.durationSecs ?? 0,

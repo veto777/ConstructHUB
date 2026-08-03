@@ -185,6 +185,10 @@ const TIMELINE_ICONS: Record<string, any> = {
 };
 
 export function CustomerTimeline({ customerId }: { customerId: string }) {
+  // Stepped reveal: 10 first, then 50, then everything — a busy client's
+  // feed shouldn't be a mile-long scroll.
+  const STEPS = [10, 50, Infinity];
+  const [stepIdx, setStepIdx] = useState(0);
   const { data: entries } = useQuery<any[]>({
     queryKey: [`/api/crm/customers/${customerId}/timeline`],
   });
@@ -197,6 +201,8 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
   });
   const merged = [...(entries ?? []), ...(audit ?? [])]
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  const shown = merged.slice(0, STEPS[stepIdx]);
+  const hiddenCount = merged.length - shown.length;
 
   return (
     <Card data-testid="section-timeline">
@@ -213,7 +219,7 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
           <EmptyState compact icon={Activity} title="No activity yet"
             description="When the client opens an estimate or messages you, it lands here." />
         ) : (
-          merged.map((e: any) => {
+          shown.map((e: any) => {
             const Icon = TIMELINE_ICONS[e.kind] ?? Activity;
             return (
               <div key={e.id} className="flex items-start gap-3 rounded-lg border px-4 py-2.5"
@@ -228,6 +234,22 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
               </div>
             );
           })
+        )}
+        {hiddenCount > 0 && (
+          <button type="button"
+            className="w-full rounded-lg border border-dashed border-border/60 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            onClick={() => setStepIdx((i) => Math.min(i + 1, STEPS.length - 1))}
+            data-testid="button-timeline-more">
+            Show {Math.min(hiddenCount, STEPS[stepIdx + 1] === Infinity ? hiddenCount : STEPS[stepIdx + 1] - STEPS[stepIdx])} more ({shown.length} of {merged.length})
+          </button>
+        )}
+        {stepIdx > 0 && hiddenCount === 0 && merged.length > STEPS[0] && (
+          <button type="button"
+            className="w-full rounded-lg py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setStepIdx(0)}
+            data-testid="button-timeline-less">
+            Show less
+          </button>
         )}
       </CardContent>
     </Card>
