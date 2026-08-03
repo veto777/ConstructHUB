@@ -496,6 +496,9 @@ export interface ParsedHoverJob {
   measurementsJsonUrl: string | null;
   pdfUrl: string | null;
   photoUrls: string[];
+  /** The job LABEL ("Karmy", "123 Pine remodel") — in practice usually the
+   *  client's name; used as a display-name fallback, never for matching. */
+  jobName: string | null;
 }
 
 export function parseHoverJob(job: any): ParsedHoverJob {
@@ -542,6 +545,7 @@ export function parseHoverJob(job: any): ParsedHoverJob {
     measurementsJsonUrl,
     pdfUrl,
     photoUrls,
+    jobName: pick(job, ["name", "job.name", "job_name"]),
   };
 }
 
@@ -717,6 +721,80 @@ export async function importHoverJobPhotos(
   return stored;
 }
 
+/**
+ * Attach the job to an existing client or CREATE one so the contractor never
+ * opens the portal to an empty book. Match: address → contact (staff never
+ * matches). Create: from the homeowner's contact when it's a real homeowner;
+ * a capture ordered by STAFF gets the job label + address only — the staff
+ * member's own name/email must never become the client record. Display name
+ * preference: contact name → job label → street address.
+ */
+async function linkOrCreateHoverCustomer(
+  orgId: string,
+  jobId: string,
+  c: ParsedHoverJob["contact"],
+  jobName: string | null,
+): Promise<{
+  customer: typeof crmCustomers.$inferSelect | null;
+  matchedVia: "email" | "phone" | "address" | null;
+  ambiguous: boolean;
+  customerCreated: boolean;
+}> {
+  let customer: typeof crmCustomers.$inferSelect | null = null;
+  let matchedVia: "email" | "phone" | "address" | null = null;
+  let ambiguous = false;
+  const byAddress = await matchHoverCustomerByAddress(orgId, c.addressLine1, c.postalCode);
+  if (byAddress.matches.length === 1) {
+    customer = byAddress.matches[0];
+    matchedVia = "address";
+  } else if (byAddress.matches.length > 1) {
+    // Two+ customers at the same address: never guess — a new customer is
+    // created below, flagged so a human can merge deliberately.
+    ambiguous = true;
+  } else {
+    const byContact = await matchHoverCustomer(orgId, c.email, c.phone);
+    if (byContact && !(await isOrgMemberContact(orgId, c.email, c.phone))) {
+      customer = byContact.customer;
+      matchedVia = byContact.via;
+    }
+  }
+
+  let customerCreated = false;
+  if (!customer && (c.name || c.email || c.phone || c.addressLine1 || jobName)) {
+    const staffContact = await isOrgMemberContact(orgId, c.email, c.phone);
+    const name = staffContact ? null : c.name?.trim() || null;
+    const email = staffContact ? null : c.email ?? null;
+    const phone = staffContact ? null : c.phone ?? null;
+    const displayName =
+      name || jobName?.trim() || c.addressLine1?.trim() || email || phone || "HOVER import";
+    const nameParts = name?.split(/\s+/) ?? [];
+    [customer] = await db
+      .insert(crmCustomers)
+      .values({
+        orgId,
+        displayName,
+        firstName: nameParts.length > 1 ? nameParts[0] : null,
+        lastName: nameParts.length > 1 ? nameParts.slice(1).join(" ") : null,
+        email,
+        phone,
+        addressLine1: c.addressLine1 ?? null,
+        city: c.city ?? null,
+        state: c.state ?? null,
+        postalCode: c.postalCode ?? null,
+        portalToken: randomBytes(24).toString("hex"),
+        notes: `Created from HOVER job ${jobId}.${staffContact ? " Capture was ordered by your own team — add the homeowner's contact info." : ""}`,
+        customFields: {
+          hoverAutoCreated: true,
+          ...(ambiguous ? { hoverAmbiguous: true } : {}),
+          ...(!name ? { hoverNeedsContact: true } : {}),
+        },
+      } as any)
+      .returning();
+    customerCreated = true;
+  }
+  return { customer, matchedVia, ambiguous, customerCreated };
+}
+
 export async function ingestHoverJob(
   orgId: string, jobId: string, fetchFn: FetchFn = fetch,
 ): Promise<{
@@ -730,12 +808,16 @@ export async function ingestHoverJob(
     .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.externalId, externalId)))
     .limit(1);
   if (existing) {
-    // Photos arrived after the first ingest (or this build) — top them up,
-    // but not on every pass: a stamp keeps the 6-hourly sync from
-    // re-fetching every job's detail payload forever.
+    // Two catch-up jobs on already-ingested measurements:
+    //  - ADOPT: a row that never linked to a client gets one now (match or
+    //    create) — the contractor should never open the portal to a hole.
+    //  - PHOTOS: top up capture photos; a stamp keeps the 6-hourly sync from
+    //    re-fetching every job's detail payload forever.
+    let adoptedCustomerId = existing.customerId;
+    let adoptedCreated = false;
     const photosSyncedAt = (existing.rawPayload as any)?.photosSyncedAt;
     const fresh = photosSyncedAt && Date.now() - new Date(photosSyncedAt).getTime() < 7 * 24 * 3600_000;
-    if (existing.customerId && !fresh) {
+    if (!existing.customerId || !fresh) {
       try {
         const token0 = await getHoverAccessToken(orgId, fetchFn);
         const { apiBase: base0 } = hoverBases();
@@ -743,19 +825,40 @@ export async function ingestHoverJob(
         const det0 = await fetchFn(`${base0}/v3/jobs/${encodeURIComponent(jobId)}`, { headers: auth0 });
         if (det0.ok) {
           const job0 = (await det0.json()) as any;
-          await importHoverJobPhotos(orgId, jobId, existing.customerId, job0, auth0, fetchFn);
-          await db.update(crmMeasurements).set({
-            rawPayload: { ...((existing.rawPayload as object) ?? {}), photosSyncedAt: new Date().toISOString() } as any,
-            updatedAt: new Date(),
-          }).where(eq(crmMeasurements.id, existing.id));
+          if (!adoptedCustomerId) {
+            const parsed0 = parseHoverJob(job0);
+            const linked0 = await linkOrCreateHoverCustomer(orgId, jobId, parsed0.contact, parsed0.jobName);
+            if (linked0.customer) {
+              adoptedCustomerId = linked0.customer.id;
+              adoptedCreated = linked0.customerCreated;
+              await db.update(crmMeasurements).set({
+                customerId: adoptedCustomerId,
+                rawPayload: {
+                  ...((existing.rawPayload as object) ?? {}),
+                  adoptedVia: linked0.matchedVia ?? (linked0.customerCreated ? "created" : null),
+                  adoptedAt: new Date().toISOString(),
+                } as any,
+                updatedAt: new Date(),
+              }).where(eq(crmMeasurements.id, existing.id));
+            }
+          }
+          if (adoptedCustomerId) {
+            await importHoverJobPhotos(orgId, jobId, adoptedCustomerId, job0, auth0, fetchFn);
+            const [cur] = await db.select({ rawPayload: crmMeasurements.rawPayload }).from(crmMeasurements)
+              .where(eq(crmMeasurements.id, existing.id)).limit(1);
+            await db.update(crmMeasurements).set({
+              rawPayload: { ...((cur?.rawPayload as object) ?? {}), photosSyncedAt: new Date().toISOString() } as any,
+              updatedAt: new Date(),
+            }).where(eq(crmMeasurements.id, existing.id));
+          }
         }
       } catch (e: any) {
-        console.error(`[hover] photo top-up for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
+        console.error(`[hover] catch-up for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
       }
     }
     return {
-      measurementId: existing.id, customerId: existing.customerId, created: false, duplicate: true,
-      matchedVia: null, ambiguous: false, customerCreated: false,
+      measurementId: existing.id, customerId: adoptedCustomerId, created: false, duplicate: true,
+      matchedVia: null, ambiguous: false, customerCreated: adoptedCreated,
     };
   }
 
@@ -784,47 +887,11 @@ export async function ingestHoverJob(
   // measurements piled onto 13 records, 3 of them staff). Contact matching
   // is the fallback, and never attaches to an org member's identity.
   const c = parsed.contact;
-  let customer: typeof crmCustomers.$inferSelect | null = null;
-  let matchedVia: "email" | "phone" | "address" | null = null;
-  let ambiguous = false;
-  const byAddress = await matchHoverCustomerByAddress(orgId, c.addressLine1, c.postalCode);
-  if (byAddress.matches.length === 1) {
-    customer = byAddress.matches[0];
-    matchedVia = "address";
-  } else if (byAddress.matches.length > 1) {
-    // Two+ customers at the same address: never guess — a new customer is
-    // created below, flagged so a human can merge deliberately.
-    ambiguous = true;
-  } else {
-    const byContact = await matchHoverCustomer(orgId, c.email, c.phone);
-    if (byContact && !(await isOrgMemberContact(orgId, c.email, c.phone))) {
-      customer = byContact.customer;
-      matchedVia = byContact.via;
-    }
-  }
-  let customerCreated = false;
-  if (!customer && (c.name || c.email || c.phone)) {
-    const nameParts = c.name?.trim().split(/\s+/) ?? [];
-    [customer] = await db
-      .insert(crmCustomers)
-      .values({
-        orgId,
-        displayName: c.name?.trim() || c.email || c.phone || "HOVER import",
-        firstName: nameParts.length > 1 ? nameParts[0] : null,
-        lastName: nameParts.length > 1 ? nameParts.slice(1).join(" ") : null,
-        email: c.email ?? null,
-        phone: c.phone ?? null,
-        addressLine1: c.addressLine1 ?? null,
-        city: c.city ?? null,
-        state: c.state ?? null,
-        postalCode: c.postalCode ?? null,
-        portalToken: randomBytes(24).toString("hex"),
-        notes: `Created from HOVER job ${jobId}.`,
-        ...(ambiguous ? { customFields: { hoverAmbiguous: true } } : {}),
-      } as any)
-      .returning();
-    customerCreated = true;
-  }
+  const linked = await linkOrCreateHoverCustomer(orgId, jobId, c, parsed.jobName);
+  const customer = linked.customer;
+  const matchedVia = linked.matchedVia;
+  const ambiguous = linked.ambiguous;
+  const customerCreated = linked.customerCreated;
 
   const [row] = await db
     .insert(crmMeasurements)
