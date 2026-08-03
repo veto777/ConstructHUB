@@ -810,7 +810,7 @@ function Dashboard({ data }: { data: any }) {
               }}
               data-testid="button-portal-capture"
               aria-label="Capture a photo of the house"
-              className={`absolute -top-6 z-10 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-sidebar flex items-center justify-center active:scale-95 transition-transform ${preview ? "opacity-60" : ""}`}
+              className="absolute -top-6 z-10 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-sidebar flex items-center justify-center active:scale-95 transition-transform"
             >
               {capture.isPending
                 ? <Loader2 className="h-6 w-6 animate-spin" />
