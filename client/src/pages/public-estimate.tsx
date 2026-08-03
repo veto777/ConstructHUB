@@ -25,6 +25,52 @@ const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null)
 
 /** Deposit payment, shown only after approval. ACH is highlighted because it is
  *  dramatically cheaper on a large deposit and the client should know. */
+/** "Have a question?" — lands in the contractor's Messages inbox, tagged
+ *  with this estimate, and pings whoever is assigned to the job. */
+function AskQuestionCard({ token, repName }: { token: string; repName: string | null }) {
+  const { toast } = useToast();
+  const [body, setBody] = useState("");
+  const [sent, setSent] = useState(false);
+  const send = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/public/estimates/${token}/comment`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ body }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || "Could not send");
+      return j;
+    },
+    onSuccess: () => { setSent(true); setBody(""); },
+    onError: (e: any) => toast({ title: "Could not send", description: String(e.message ?? e), variant: "destructive" }),
+  });
+  return (
+    <Card data-testid="card-ask-question">
+      <CardContent className="p-4 space-y-2">
+        <div className="font-medium text-sm">
+          Questions about this estimate?{repName ? ` ${repName} answers fast.` : ""}
+        </div>
+        {sent ? (
+          <p className="text-sm text-emerald-600 dark:text-emerald-400" data-testid="text-question-sent">
+            Sent — you'll get a reply by email, and it's saved in your customer portal.
+          </p>
+        ) : (
+          <div className="flex gap-2">
+            <Textarea rows={2} className="resize-none" placeholder="Ask anything — scope, timing, materials…"
+              value={body} onChange={(ev) => setBody(ev.target.value)} data-testid="input-ask-question" />
+            <Button className="self-end" disabled={!body.trim() || send.isPending}
+              onClick={() => send.mutate()} data-testid="button-ask-question">
+              {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function PayCard({ token, company, estimate }: { token: string; company: any; estimate: any }) {
   const { toast } = useToast();
   // ?paid=1 is only the Stripe redirect hint — "Paid" comes from the server.
@@ -369,7 +415,7 @@ export default function PublicEstimatePage() {
     );
   }
 
-  const { estimate: e, items, company, customer, options, preview, discountOffers } = data;
+  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep } = data;
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
 
@@ -980,6 +1026,28 @@ export default function PublicEstimatePage() {
         )}
 
         {/* Footer facts — job address, expiry, warranty, contact card, T&C link. */}
+        {/* Who to talk to — the client should never wonder who their person is. */}
+        {salesRep && (
+          <Card data-testid="card-sales-rep">
+            <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Your {salesRep.role === "Sales" ? "salesperson" : "contact"}</div>
+                <div className="font-semibold">{salesRep.name}</div>
+                <div className="text-sm space-x-3">
+                  {salesRep.phone && (
+                    <a href={`tel:${salesRep.phone}`} className="text-primary hover:underline" data-testid="link-salesrep-phone">{salesRep.phone}</a>
+                  )}
+                  {salesRep.email && (
+                    <a href={`mailto:${salesRep.email}`} className="text-primary hover:underline break-all" data-testid="link-salesrep-email">{salesRep.email}</a>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!preview && <AskQuestionCard token={token!} repName={salesRep?.name ?? null} />}
+
         <div className="space-y-4 border-t pt-6" data-testid="estimate-footer-info">
           {(customer.addressLine1 || customer.city) && (
             <div>

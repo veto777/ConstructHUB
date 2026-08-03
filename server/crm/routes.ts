@@ -49,6 +49,7 @@ import { notifyMemberAccountChange } from "./owner-notify";
 import { registerCrmBackupRoutes } from "./backups";
 import { registerCrmNotificationRoutes } from "./notify";
 import { registerCrmStatsRoutes } from "./stats";
+import { registerCrmInboxRoutes } from "./inbox";
 import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
@@ -280,6 +281,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmBackupRoutes(app, getDevUser);
   registerCrmNotificationRoutes(app, getDevUser);
   registerCrmStatsRoutes(app, getDevUser);
+  registerCrmInboxRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
@@ -927,6 +929,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!user) return;
     const token = String(req.body?.token || "");
     if (!token) return res.status(400).json({ message: "token required" });
+    // Clients must always know who to reach: every member registers with a
+    // direct line. Normalized loosely here; the join form collects it.
+    const phoneRaw = String(req.body?.phone || "").trim();
+    const phoneDigits = phoneRaw.replace(/[^\d]/g, "");
 
     const [invite] = await db.select().from(crmInvitations).where(eq(crmInvitations.token, token)).limit(1);
     if (!invite || invite.revokedAt) return res.status(404).json({ message: "Invitation not found" });
@@ -955,6 +961,16 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       )
       .limit(1);
 
+    if (!phoneDigits && !(placeholder as any)?.phone) {
+      return res.status(400).json({
+        message: "A direct phone number is required — your clients need to know how to reach you.",
+        phoneRequired: true,
+      });
+    }
+    if (phoneRaw && (phoneDigits.length < 7 || phoneDigits.length > 15)) {
+      return res.status(400).json({ message: "That phone number doesn't look right." });
+    }
+
     if (placeholder) {
       await db
         .update(crmMembers)
@@ -963,6 +979,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
           status: "active",
           displayName: placeholder.displayName ?? account?.displayName ?? null,
           avatarUrl: account?.avatarUrl ?? null,
+          phone: phoneRaw || (placeholder as any).phone || null,
           updatedAt: new Date(),
         })
         .where(eq(crmMembers.id, placeholder.id));
@@ -976,6 +993,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         permissions: invite.permissions ?? null,
         divisionId: invite.divisionId ?? null,
         displayName: account?.displayName ?? null,
+        phone: phoneRaw || null,
         avatarUrl: account?.avatarUrl ?? null,
       });
     }

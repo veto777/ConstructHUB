@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, UserPlus, AlertTriangle, HardHat } from "lucide-react";
@@ -49,8 +51,9 @@ export default function CrmJoinPage() {
     retry: false,
   });
 
+  const [phone, setPhone] = useState("");
   const accept = useMutation({
-    mutationFn: async () => (await apiRequest("POST", "/api/crm/invitations/accept", { token })).json(),
+    mutationFn: async () => (await apiRequest("POST", "/api/crm/invitations/accept", { token, phone })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
       toast({ title: "Welcome aboard" });
@@ -117,11 +120,20 @@ export default function CrmJoinPage() {
                     <StatusPill tone={roleTone(data.role)}>{data.role}</StatusPill>
                   </div>
                 </div>
+                <div>
+                  <Label htmlFor="join-phone">Your direct phone number *</Label>
+                  <Input id="join-phone" type="tel" placeholder="(555) 123-4567" value={phone}
+                    onChange={(e) => setPhone(e.target.value)} data-testid="input-join-phone" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Clients on your jobs see this — they need to know exactly who to reach.
+                  </p>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   You must be signed in as {data.email} to accept. If you don't have an account yet,
                   create one with that email address first.
                 </p>
-                <Button className="w-full" onClick={() => accept.mutate()} disabled={accept.isPending}
+                <Button className="w-full" onClick={() => accept.mutate()}
+                  disabled={accept.isPending || phone.replace(/[^\d]/g, "").length < 7}
                   data-testid="button-accept-invite">
                   {accept.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Accept invitation
                 </Button>

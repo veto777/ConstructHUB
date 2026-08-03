@@ -180,13 +180,48 @@ const present = (a: typeof crmAttachments.$inferSelect, url: string) => ({
   downloadUrl: `${url}/${a.id}/file`,
 });
 
-/** Email the division's admin members (org owner fallback) about a new client
- *  comment. Silenced by the org's 'clientComments' notification pref. */
-async function notifyClientComment(
+/**
+ * Who owns this client's communication? The person assigned to the job:
+ * the latest project's PM, else its sales rep, else whoever wrote the
+ * latest estimate. Communication is the business — this person must never
+ * miss a client message.
+ */
+export async function assignedMemberFor(
+  orgId: string, customerId: string,
+): Promise<{ memberId: string | null; divisionId: string | null }> {
+  const [proj] = await db
+    .select({
+      divisionId: crmProjects.divisionId,
+      pm: crmProjects.projectManagerMemberId,
+      sales: crmProjects.salesMemberId,
+    })
+    .from(crmProjects)
+    .where(and(eq(crmProjects.orgId, orgId), eq(crmProjects.customerId, customerId)))
+    .orderBy(desc(crmProjects.createdAt))
+    .limit(1);
+  let memberId = proj?.pm ?? proj?.sales ?? null;
+  if (!memberId) {
+    const [est] = await db
+      .select({ createdByMemberId: crmEstimates.createdByMemberId })
+      .from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.customerId, customerId)))
+      .orderBy(desc(crmEstimates.createdAt))
+      .limit(1);
+    memberId = est?.createdByMemberId ?? null;
+  }
+  return { memberId, divisionId: proj?.divisionId ?? null };
+}
+
+/** Notify about a new client message: the assigned member FIRST (bell +
+ *  email + text per prefs), then the division admins, owner fallback.
+ *  Silenced by the org's 'clientComments' notification pref. */
+export async function notifyClientComment(
   org: { id: string; name: string; email: string | null; customFields: unknown },
   customer: typeof crmCustomers.$inferSelect,
   body: string,
   baseUrl: string,
+  estimateRef?: string | null,
+  toMemberId?: string | null,
 ) {
   if (!["inApp","email","sms"].some((c) => crmNotificationChannel(org.customFields, "clientComments", c as any))) return;
 
@@ -195,25 +230,28 @@ async function notifyClientComment(
     .from(crmMembers)
     .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
 
+  // The client addressed someone by name — that person IS the assignee.
+  const resolved = await assignedMemberFor(org.id, customer.id);
+  const assignedId = toMemberId ?? resolved.memberId;
+  const divisionId = resolved.divisionId;
+  const context = estimateRef ? ` about estimate ${estimateRef}` : "";
+
   await notifyMembers({
     org: org as any, pref: "clientComments",
-    title: `${customer.displayName} left a comment`,
+    title: `${customer.displayName} sent a message${context}`,
     body: body.slice(0, 200),
-    link: `/crm/clients/${customer.id}`,
-    extraMemberIds: members.filter((m) => m.role === "admin").map((m) => m.id),
+    link: `/crm/inbox?c=${customer.id}`,
+    extraMemberIds: [
+      ...(assignedId ? [assignedId] : []),
+      ...members.filter((m) => m.role === "admin").map((m) => m.id),
+    ],
   });
 
-  // The customer's division is their most recent project's; admins pinned to
-  // another division are not on the hook for this client.
-  const [proj] = await db
-    .select({ divisionId: crmProjects.divisionId })
-    .from(crmProjects)
-    .where(eq(crmProjects.customerId, customer.id))
-    .orderBy(desc(crmProjects.createdAt))
-    .limit(1);
-  const divisionId = proj?.divisionId ?? null;
-
+  // Email: the assigned member is always on it; division admins ride along
+  // (admins pinned to another division are not on the hook for this client).
   const recipients = new Set<string>();
+  const assigned = members.find((m) => m.id === assignedId);
+  if (assigned?.email) recipients.add(assigned.email);
   for (const m of members) {
     if (m.role !== "admin") continue;
     if (divisionId && m.divisionId && m.divisionId !== divisionId) continue;
@@ -234,14 +272,16 @@ async function notifyClientComment(
   console.log(`[crm] client comment notification → ${to}`);
   await sendWithFallback({
     to,
-    subject: `💬 ${customer.displayName} sent you a message`,
+    subject: `💬 ${customer.displayName} sent you a message${context} — reply quickly`,
     html: `
       <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
-        <p style="font-size:16px"><strong>${esc(customer.displayName)}</strong> sent a note from the client portal:</p>
+        <p style="font-size:16px"><strong>${esc(customer.displayName)}</strong> sent a note from the client portal${esc(context)}:</p>
         <blockquote style="border-left:3px solid #4f46e5;margin:16px 0;padding:8px 14px;color:#333;white-space:pre-wrap">${esc(body)}</blockquote>
         <p style="font-size:14px">
+          <a href="${baseUrl}/crm/inbox?c=${customer.id}">Reply in Messages</a> ·
           <a href="${baseUrl}/crm/clients/${customer.id}">Open ${esc(customer.displayName)} in the CRM</a>
         </p>
+        <p style="font-size:12px;color:#666">A client waiting on an answer is a client shopping elsewhere — a fast reply wins the job.</p>
       </div>`,
   } as any).catch((e: any) => console.error("[crm] client-comment notify failed:", String(e?.message || e).slice(0, 300)));
 }
@@ -478,10 +518,15 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     const client = await requireClient(req, res);
     if (!client) return;
     const parsed = z
-      .object({ customerId: z.string().max(64), body: z.string().min(1).max(4000) })
+      .object({
+        customerId: z.string().max(64),
+        body: z.string().min(1).max(4000),
+        estimateId: z.string().max(64).optional(),
+        toMemberId: z.string().max(64).optional(),
+      })
       .safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Enter a message first" });
-    const { customerId, body } = parsed.data;
+    const { customerId, body, estimateId, toMemberId } = parsed.data;
     if (!client.customerIds.includes(customerId)) {
       return res.status(403).json({ message: "That is not your account" });
     }
@@ -496,21 +541,76 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       .limit(1);
     if (!cust) return res.status(404).json({ message: "Customer not found" });
 
+    // estimateId is advisory context — verify it belongs to this customer
+    // before storing it, silently drop it otherwise.
+    let estRef: string | null = null;
+    let estId: string | null = null;
+    if (estimateId) {
+      const [est] = await db.select({ id: crmEstimates.id, number: crmEstimates.number })
+        .from(crmEstimates)
+        .where(and(eq(crmEstimates.id, estimateId), eq(crmEstimates.customerId, customerId)))
+        .limit(1);
+      if (est) { estId = est.id; estRef = est.number; }
+    }
+
+    // "Message Mike" — only a real active member of this client's org.
+    let toId: string | null = null;
+    if (toMemberId) {
+      const [m] = await db.select({ id: crmMembers.id }).from(crmMembers)
+        .where(and(eq(crmMembers.id, toMemberId), eq(crmMembers.orgId, cust.orgId), eq(crmMembers.status, "active")))
+        .limit(1);
+      toId = m?.id ?? null;
+    }
+
     const [row] = await db
       .insert(crmClientComments)
-      .values({ orgId: cust.orgId, customerId, body: body.trim() })
+      .values({ orgId: cust.orgId, customerId, body: body.trim(), estimateId: estId, toMemberId: toId })
       .returning();
 
     // Fire-and-forget: the portal never blocks on (or leaks) mail delivery.
     void (async () => {
       const [o] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, cust.orgId)).limit(1);
-      if (o) await notifyClientComment(o, cust, body.trim(), portalBaseUrl(req));
+      if (o) await notifyClientComment(o, cust, body.trim(), portalBaseUrl(req), estRef, toId);
     })().catch((e: any) => console.error("[crm] client-comment notify failed:", String(e?.message || e).slice(0, 300)));
 
     res.status(201).json({ id: row.id, createdAt: row.createdAt });
   });
 
   // ── Public estimate page: attachments ride the same email gate ────────────
+
+  // "Ask a question" on the estimate page itself — lands in the same inbox
+  // thread, tagged with the estimate, and pings the assigned member.
+  app.post("/api/public/estimates/:token/comment", async (req: any, res) => {
+    const t = String(req.params.token || "");
+    if (t.length < 24) return res.status(404).json({ message: "Not found" });
+    const parsed = z.object({ body: z.string().min(1).max(4000) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Enter a message first" });
+    const [est] = await db
+      .select()
+      .from(crmEstimates)
+      .where(eq(crmEstimates.publicToken, t))
+      .limit(1);
+    if (!est) return res.status(404).json({ message: "Not found" });
+    if (!(await requireDocSession(req, res, est.customerId))) return;
+    if (!rateAllow(`ccomment:${est.customerId}`, 30)) {
+      return res.status(429).json({ message: "Too many messages. Please try again later." });
+    }
+    const [cust] = await db.select().from(crmCustomers)
+      .where(eq(crmCustomers.id, est.customerId)).limit(1);
+    if (!cust) return res.status(404).json({ message: "Not found" });
+
+    const [row] = await db.insert(crmClientComments).values({
+      orgId: est.orgId, customerId: est.customerId,
+      body: parsed.data.body.trim(), estimateId: est.id,
+    }).returning();
+
+    void (async () => {
+      const [o] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
+      if (o) await notifyClientComment(o, cust, parsed.data.body.trim(), portalBaseUrl(req), est.number);
+    })().catch((e: any) => console.error("[crm] estimate-comment notify failed:", String(e?.message || e).slice(0, 300)));
+
+    res.status(201).json({ id: row.id, createdAt: row.createdAt });
+  });
 
   app.get("/api/public/estimates/:token/attachments", async (req: any, res) => {
     const t = String(req.params.token || "");

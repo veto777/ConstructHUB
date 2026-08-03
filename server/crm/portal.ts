@@ -515,6 +515,27 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const settledPayments = await db.select({ id: crmPayments.id }).from(crmPayments)
       .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
 
+    // The client must always see WHO their salesperson is and how to reach
+    // them — the estimate writer first, the project's sales rep as fallback.
+    let salesRep: { name: string; email: string | null; phone: string | null; role: string } | null = null;
+    {
+      let repId = est.createdByMemberId ?? null;
+      if (!repId && est.projectId) {
+        const [p] = await db.select({ sales: crmProjects.salesMemberId }).from(crmProjects)
+          .where(eq(crmProjects.id, est.projectId)).limit(1);
+        repId = p?.sales ?? null;
+      }
+      if (repId) {
+        const [m] = await db.select().from(crmMembers)
+          .where(and(eq(crmMembers.id, repId), eq(crmMembers.orgId, est.orgId))).limit(1);
+        if (m) salesRep = {
+          name: m.displayName || m.email || "Your salesperson",
+          email: m.email, phone: m.phone,
+          role: m.role === "owner" ? "Owner" : m.role === "sales" ? "Sales" : "Project Manager",
+        };
+      }
+    }
+
     const view = publicEstimateView(current, items, org, cust, division);
     // Optional discount offers the client may tick (enabled ones only). The
     // client page previews with them; the approve route re-computes from the
@@ -529,6 +550,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     res.json({
       ...view,
       preview: preview || undefined, // read-only: the page hides approve/pay
+      salesRep,
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
       discountOffers: discountOffers.map((o) => ({
         id: o.id, code: o.code, label: o.label,

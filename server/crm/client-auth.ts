@@ -497,6 +497,8 @@ export function registerCrmClientAuthRoutes(app: Express): void {
         : null,
       orgs: orgs.map((o) => ({
         id: o.id, name: o.name, logoUrl: o.logoUrl,
+        // Public contact details — the portal's Contact us tab and footer.
+        email: o.email, phone: o.phone, website: o.website,
         // The org's theme accent (server-resolved) — the portal themes itself
         // black + this colour.
         ...themePayload(o.customFields),

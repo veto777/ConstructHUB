@@ -478,6 +478,9 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS onboarding_dismissed_at timestamp;
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS invoice_id varchar;
+    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS author_member_id varchar;
+    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS estimate_id varchar;
+    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS to_member_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
     ALTER TABLE crm_projects ADD COLUMN IF NOT EXISTS division_id varchar;
     ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS division_id varchar;

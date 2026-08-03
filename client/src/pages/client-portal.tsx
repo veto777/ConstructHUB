@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Loader2, FileText, Receipt, ShieldCheck, Mail, ArrowRight, LogOut, Inbox, Ruler,
-  LayoutDashboard, Camera, MessageSquare, FolderOpen, Image as ImageIcon, type LucideIcon,
+  LayoutDashboard, Camera, MessageSquare, FolderOpen, Image as ImageIcon, Phone, type LucideIcon,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
-import { PortalPamphlets, PortalPhotoShare, PortalCommentBox } from "@/components/client-uploads";
+import { PortalPamphlets, PortalPhotoShare } from "@/components/client-uploads";
+import { PortalMessages, PortalContact, PortalContactFooter } from "@/components/portal-messages";
 import { ContractorPreviewBanner, PortalFinancing } from "@/components/crm-client-360";
 import { CrmLogo } from "@/components/crm-logo";
 import { useToast } from "@/hooks/use-toast";
@@ -154,7 +155,7 @@ function RequestLink() {
 
 /* ── Signed in: CRM-style shell + views ──────────────────────────────────── */
 
-type ViewKey = "home" | "estimates" | "invoices" | "contracts" | "reports" | "photos" | "messages" | "documents";
+type ViewKey = "home" | "estimates" | "invoices" | "contracts" | "reports" | "photos" | "messages" | "contact" | "documents";
 
 const SIDEBAR_NAV: { key: ViewKey; title: string; icon: LucideIcon }[] = [
   { key: "home", title: "Home", icon: LayoutDashboard },
@@ -164,6 +165,7 @@ const SIDEBAR_NAV: { key: ViewKey; title: string; icon: LucideIcon }[] = [
   { key: "reports", title: "Measurement reports", icon: Ruler },
   { key: "photos", title: "Photos", icon: Camera },
   { key: "messages", title: "Messages", icon: MessageSquare },
+  { key: "contact", title: "Contact us", icon: Phone },
 ];
 
 function Dashboard({ data }: { data: any }) {
@@ -173,6 +175,8 @@ function Dashboard({ data }: { data: any }) {
   } = data;
   const { toast } = useToast();
   const [view, setView] = useState<ViewKey>("home");
+  // Set when the client taps "Message now" on a specific person.
+  const [messageTo, setMessageTo] = useState<string | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
   const preview = data.contractorPreview === true;
 
@@ -573,7 +577,13 @@ function Dashboard({ data }: { data: any }) {
     contracts: contractsSection,
     reports: reportsSection,
     photos: <PortalPhotoShare accounts={accounts} photos={photos} />,
-    messages: <PortalCommentBox accounts={accounts} />,
+    messages: <PortalMessages accounts={accounts} focusMemberId={messageTo} />,
+    contact: (
+      <PortalContact
+        accounts={accounts}
+        onMessageNow={(memberId) => { setMessageTo(memberId); setView("messages"); }}
+      />
+    ),
     // The mobile ribbon's "Docs" tab: everything, stacked.
     documents: (
       <>
@@ -709,6 +719,9 @@ function Dashboard({ data }: { data: any }) {
           {preview && <ContractorPreviewBanner customerName={customer?.displayName} />}
 
           {viewBody[view]}
+
+          {/* Always-there contact strip — the client can always find us. */}
+          <PortalContactFooter office={orgs?.[0] ?? null} />
 
           <div className="flex flex-col items-center gap-2.5 pb-4">
             {/* The CRM powers this portal; the header above stays the contractor's. */}

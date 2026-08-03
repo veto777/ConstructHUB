@@ -1207,6 +1207,15 @@ export const crmClientComments = pgTable("crm_client_comments", {
   orgId: varchar("org_id").notNull(),
   customerId: varchar("customer_id").notNull(),
   body: text("body").notNull(),
+  // null = the client wrote it; set = a team member's reply (the thread is
+  // two-way: replies show in the client portal and go out by email too).
+  authorMemberId: varchar("author_member_id"),
+  // Set when the message was written from an estimate page — "in response
+  // to estimate E-2041" context in the inbox.
+  estimateId: varchar("estimate_id"),
+  // The client picked a specific person ("Message Mike") — routes the
+  // notification to them first. Null = the whole team/office.
+  toMemberId: varchar("to_member_id"),
   createdAt: timestamp("created_at").defaultNow(),
   readAt: timestamp("read_at"),
 });

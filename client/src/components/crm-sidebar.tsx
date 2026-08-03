@@ -78,6 +78,12 @@ export function CrmSidebar() {
     queryKey: ["/api/auth/me"],
   });
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  // Unanswered client messages — the badge that makes silence loud.
+  const { data: inboxSummary } = useQuery<{ unreadTotal: number }>({
+    queryKey: ["/api/crm/inbox"],
+    refetchInterval: 30_000,
+  });
+  const msgUnread = inboxSummary?.unreadTotal ?? 0;
 
   const displayName = me?.member?.displayName || user?.displayName || user?.email || "";
   const orgName = me?.org?.name;
@@ -153,6 +159,12 @@ export function CrmSidebar() {
                     <Link href={item.url} data-testid={item.testid} className="flex items-center gap-3 w-full">
                       <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.9} />
                       <span className="text-[13px] font-medium">{item.title}</span>
+                      {item.url === "/crm/inbox" && msgUnread > 0 && (
+                        <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] leading-[18px] text-center font-semibold"
+                          data-testid="badge-messages-unread">
+                          {msgUnread > 99 ? "99+" : msgUnread}
+                        </span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
