@@ -209,6 +209,8 @@ export function roleTone(role?: string | null): PillTone {
       return "violet";
     case "admin":
       return "info";
+    case "sales":
+      return "warning";
     case "pm":
       return "teal";
     case "office":

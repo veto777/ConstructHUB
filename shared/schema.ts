@@ -1270,7 +1270,7 @@ export type CrmFinanceClick = typeof crmFinanceClicks.$inferSelect;
 // who can approve change orders but not see company reporting is a real and
 // common case that fixed roles cannot express.
 
-export const CRM_ROLES = ["owner", "admin", "pm", "office", "field", "subcontractor"] as const;
+export const CRM_ROLES = ["owner", "admin", "sales", "pm", "office", "field", "subcontractor"] as const;
 export type CrmRole = (typeof CRM_ROLES)[number];
 
 export const CRM_PERMISSIONS = [
@@ -1299,6 +1299,19 @@ const ALL: CrmPermissionSet = Object.fromEntries(CRM_PERMISSIONS.map((p) => [p, 
 export const CRM_ROLE_DEFAULTS: Record<CrmRole, CrmPermissionSet> = {
   owner: { ...ALL },
   admin: { ...ALL, manageIntegrations: false, exportData: false },
+  // Sales rep: owns the SELL side end to end — writes and sends bids, prices
+  // them (price book + costs/margins, so they can discount intelligently),
+  // approves change orders and takes the deposit. Deliberately NOT operations:
+  // no job scheduling or dispatch, and none of the back office (team,
+  // settings, integrations, bulk export). The owner's price-floor lock still
+  // binds them — reps price above the floor, never below.
+  sales: {
+    viewAllJobs: true, manageJobs: false, manageCustomers: true, manageEstimates: true,
+    manageInvoices: true, takePayment: true, seePrices: true, seeCosts: true,
+    approveChangeOrders: true, managePriceBook: true, manageTeam: false,
+    manageSettings: false, seeReporting: true, manageIntegrations: false,
+    exportData: false,
+  },
   // Project manager: office-like reach across the whole book of work (all
   // jobs, estimates and customers — they coordinate the work), but cost-blind:
   // sees scopes and their prices, never costs or margins. The back office

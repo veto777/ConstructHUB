@@ -106,6 +106,7 @@ interface Invitation {
 const ROLE_BLURB: Record<string, string> = {
   owner: "Full control, holds the subscription. Cannot be removed or demoted.",
   admin: "Everything except integrations. For a co-owner or general manager.",
+  sales: "Sells the job: writes and prices bids, sees costs and margins, edits the price book, approves change orders and takes deposits. No scheduling or back office.",
   pm: "Runs jobs, estimates and clients across the whole book. Sees prices, never costs.",
   office: "Scheduling, clients, estimates, invoices and payments. No costs or margins.",
   field: "Sees only their own assigned jobs. Price-blind by default.",
