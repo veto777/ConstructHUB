@@ -20,6 +20,7 @@ import {
 } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { sendWithFallback } from "../email";
+import { notifyMembers } from "./notify";
 
 const esc = (s?: string | null) =>
   String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
@@ -54,6 +55,12 @@ export async function notifyOrgOwners(args: {
   if (!crmNotificationEnabled(args.org.customFields, args.pref)) return false;
   const to = await orgOwnerEmails(args.org.id, args.excludeEmails);
   if (!to.length) return false;
+
+  // The bell mirrors the email (and texts when that channel is on).
+  await notifyMembers({
+    org: args.org, pref: args.pref, title: args.subject.replace(/^[^\w]*\s*/, ""),
+    link: args.link ?? null,
+  });
 
   await sendWithFallback({
     to: to.join(","),

@@ -25,7 +25,9 @@ import {
   crmCustomers,
   crmLeadSources,
   crmNotificationEnabled,
+  crmNotificationChannel,
 } from "@shared/schema";
+import { notifyMembers } from "./notify";
 import { and, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { portalBaseUrl } from "../site-context";
@@ -123,7 +125,7 @@ async function notifyLeadReceived(
   owner: typeof crmMembers.$inferSelect | null,
   lead: { name: string; email?: string | null; phone?: string | null; message?: string | null },
 ) {
-  if (!crmNotificationEnabled(org.customFields, "leadReceived")) return;
+  if (!["inApp","email","sms"].some((c) => crmNotificationChannel(org.customFields, "leadReceived", c as any))) return;
 
   const recipients = new Set<string>();
   if (owner?.email) recipients.add(owner.email);
@@ -135,6 +137,13 @@ async function notifyLeadReceived(
   if (!recipients.size) return;
 
   const contact = [lead.email, lead.phone].filter(Boolean).map(esc).join(" · ");
+  await notifyMembers({
+    org, pref: "leadReceived",
+    title: `New website lead — ${lead.name}`,
+    body: [lead.email, lead.phone].filter(Boolean).join(" · ") || null,
+    link: "/crm/clients",
+  });
+  if (!crmNotificationChannel(org.customFields, "leadReceived", "email")) return;
   await sendWithFallback({
     to: [...recipients].join(","),
     subject: `🌐 New website lead — ${lead.name}`,

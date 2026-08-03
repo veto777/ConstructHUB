@@ -43,7 +43,9 @@ import {
   crmOrgs,
   crmProjects,
   crmNotificationEnabled,
+  crmNotificationChannel,
 } from "@shared/schema";
+import { notifyMembers } from "./notify";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, requireClient } from "./client-auth";
@@ -186,12 +188,20 @@ async function notifyClientComment(
   body: string,
   baseUrl: string,
 ) {
-  if (!crmNotificationEnabled(org.customFields, "clientComments")) return;
+  if (!["inApp","email","sms"].some((c) => crmNotificationChannel(org.customFields, "clientComments", c as any))) return;
 
   const members = await db
     .select()
     .from(crmMembers)
     .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
+
+  await notifyMembers({
+    org: org as any, pref: "clientComments",
+    title: `${customer.displayName} left a comment`,
+    body: body.slice(0, 200),
+    link: `/crm/clients/${customer.id}`,
+    extraMemberIds: members.filter((m) => m.role === "admin").map((m) => m.id),
+  });
 
   // The customer's division is their most recent project's; admins pinned to
   // another division are not on the hook for this client.
@@ -217,6 +227,7 @@ async function notifyClientComment(
     if (!recipients.size && org.email) recipients.add(org.email);
   }
   if (!recipients.size) return;
+  if (!crmNotificationChannel(org.customFields, "clientComments", "email")) return;
 
   const to = [...recipients].join(",");
   // Dev has no SMTP — the send is logged/stubbed there; the row is the record.

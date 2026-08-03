@@ -680,6 +680,36 @@ export async function ensureCrmSchema(): Promise<void> {
     }
   }
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_notifications (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      member_id varchar NOT NULL,
+      type text NOT NULL,
+      title text NOT NULL,
+      body text,
+      link text,
+      read_at timestamp,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS crm_notifications_member_idx
+      ON crm_notifications (member_id, read_at, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS crm_team_activity (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      member_id varchar,
+      actor_label text,
+      type text NOT NULL,
+      title text NOT NULL,
+      link text,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS crm_team_activity_org_idx
+      ON crm_team_activity (org_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS crm_notifications_org_idx ON crm_notifications (org_id);
+  `);
+
   // SKU numbers: every price-book item carries a per-org sequential number
   // (1, 2, 3…) unless the org typed a custom code. Idempotent — only fills
   // NULL/blank codes, and numbering continues after the org's highest existing

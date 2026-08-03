@@ -47,6 +47,8 @@ import { registerCrmQuickBidRoutes } from "./quickbid";
 import { registerCrmMessageRoutes } from "./messages";
 import { notifyMemberAccountChange } from "./owner-notify";
 import { registerCrmBackupRoutes } from "./backups";
+import { registerCrmNotificationRoutes } from "./notify";
+import { registerCrmStatsRoutes } from "./stats";
 import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
@@ -118,7 +120,10 @@ const orgPatchSchema = z.object({
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.
   notificationPrefs: z
-    .record(z.boolean())
+    .record(z.union([
+      z.boolean(),
+      z.object({ inApp: z.boolean().optional(), email: z.boolean().optional(), sms: z.boolean().optional() }),
+    ]))
     .refine((o) => Object.keys(o).every((k) => (CRM_NOTIFICATION_PREFS as readonly string[]).includes(k)), {
       message: "Unknown notification preference key",
     })
@@ -273,6 +278,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmActivityRoutes(app, getDevUser);
   // Auto-backup: owner-only settings + send-now; boots the backup scheduler.
   registerCrmBackupRoutes(app, getDevUser);
+  registerCrmNotificationRoutes(app, getDevUser);
+  registerCrmStatsRoutes(app, getDevUser);
 
   // ── Identity ──────────────────────────────────────────────────────────────
 

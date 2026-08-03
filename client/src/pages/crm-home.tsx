@@ -9,8 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle2, Circle, ArrowRight, Loader2, Users, Building2,
   UserCircle, Lock, Sparkles, KanbanSquare, DollarSign, Activity,
-  AlertCircle, Inbox,
+  AlertCircle, Inbox, FileText, Trophy, CalendarClock, ReceiptText,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CrmPage, MetricCard, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
@@ -43,6 +44,42 @@ const STEP_ICON: Record<string, any> = {
   team: Users,
 };
 
+type ActivityItem = { id: string; at: string; actor: string; text: string; link: string | null };
+
+function timeAgo(iso: string): string {
+  const sec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 60) return "just now";
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 7 * 86400) return `${Math.floor(sec / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+/** HCP-style headline number: big count, dollar total underneath. */
+function HeadlineCard({ icon: Icon, label, stat, showMoney, href, testid }: {
+  icon: any; label: string; stat?: { count: number; totalCents: number };
+  showMoney: boolean; href: string; testid: string;
+}) {
+  return (
+    <Link href={href}>
+      <Card className="hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full" data-testid={testid}>
+        <CardContent className="p-4 flex items-start gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+            <Icon className="h-4 w-4" strokeWidth={1.8} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-2xl font-semibold tabular-nums leading-none">{stat ? stat.count : "—"}</div>
+            <div className="text-sm text-muted-foreground mt-1">{label}</div>
+            {showMoney && (
+              <div className="text-xs font-medium tabular-nums mt-0.5">{stat ? money0(stat.totalCents) : ""}</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 const money0 = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
@@ -56,6 +93,11 @@ export default function CrmHomePage() {
   // Dashboard metrics — read-only rollups over endpoints the app already has.
   const { data: clients } = useQuery<any[]>({ queryKey: ["/api/crm/customers"] });
   const { data: pipeline } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
+  const { data: stats } = useQuery<any>({ queryKey: ["/api/crm/stats"] });
+  const { data: activityData } = useQuery<{ activity: ActivityItem[] }>({
+    queryKey: ["/api/crm/team-activity"],
+    refetchInterval: 60_000,
+  });
   const canSeePrices = me?.permissions?.seePrices === true;
 
   const dismiss = useMutation({
@@ -177,6 +219,18 @@ export default function CrmHomePage() {
         </Card>
       )}
 
+      {/* The headline numbers — count on top, dollars underneath. */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <HeadlineCard icon={FileText} label="Open estimates" stat={stats?.openEstimates}
+          showMoney={canSeePrices} href="/crm/estimates" testid="card-stat-open-estimates" />
+        <HeadlineCard icon={Trophy} label="Jobs won" stat={stats?.jobsWon}
+          showMoney={canSeePrices} href="/crm/pipeline" testid="card-stat-jobs-won" />
+        <HeadlineCard icon={CalendarClock} label="Unscheduled jobs" stat={stats?.unscheduledJobs}
+          showMoney={canSeePrices} href="/crm/pipeline" testid="card-stat-unscheduled" />
+        <HeadlineCard icon={ReceiptText} label="Open invoices" stat={stats?.openInvoices}
+          showMoney={canSeePrices} href="/crm/invoices" testid="card-stat-open-invoices" />
+      </div>
+
       {/* The numbers row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard
@@ -250,15 +304,45 @@ export default function CrmHomePage() {
           </CardContent>
         </Card>
 
-        {/* Recent activity */}
-        <Card>
+        {/* Team activity + recent projects */}
+        <Card data-testid="card-team-activity">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="h-4 w-4 text-muted-foreground" /> Recent projects
+              <Activity className="h-4 w-4 text-muted-foreground" /> Activity
             </CardTitle>
-            <CardDescription>The latest work on the board.</CardDescription>
+            <CardDescription>What your team and your clients are doing.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-1.5">
+          <CardContent>
+            <Tabs defaultValue="team">
+              <TabsList className="mb-2 h-8">
+                <TabsTrigger value="team" className="text-xs" data-testid="tab-team-activity">Team Activity</TabsTrigger>
+                <TabsTrigger value="projects" className="text-xs" data-testid="tab-recent-projects">Recent projects</TabsTrigger>
+              </TabsList>
+              <TabsContent value="team" className="space-y-0.5">
+                {(activityData?.activity ?? []).length === 0 && (
+                  <EmptyState
+                    compact
+                    icon={Activity}
+                    title="Nothing yet"
+                    description="Sent bids, signatures, payments and schedule moves show up here."
+                  />
+                )}
+                {(activityData?.activity ?? []).slice(0, 12).map((a) => {
+                  const row = (
+                    <div className="flex items-start justify-between gap-3 rounded-lg px-3 py-2 hover:bg-accent transition-colors cursor-pointer">
+                      <div className="min-w-0 text-sm leading-snug">
+                        <span className="font-medium">{a.actor}</span>{" "}
+                        <span className="text-muted-foreground">{a.text}</span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground shrink-0 mt-0.5">{timeAgo(a.at)}</span>
+                    </div>
+                  );
+                  return a.link
+                    ? <Link key={a.id} href={a.link}>{row}</Link>
+                    : <div key={a.id}>{row}</div>;
+                })}
+              </TabsContent>
+              <TabsContent value="projects" className="space-y-1.5">
             {recent.length === 0 ? (
               <EmptyState
                 compact
@@ -288,6 +372,8 @@ export default function CrmHomePage() {
                 </Link>
               ))
             )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>

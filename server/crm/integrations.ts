@@ -21,6 +21,7 @@ import { and, eq, desc, sql, isNull } from "drizzle-orm";
 import { sendWithFallback } from "../email";
 import { autoSendPaymentReceipt } from "./receipts";
 import { textOrgOwners } from "./sms";
+import { notifyMembers } from "./notify";
 
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const CONNECT_WEBHOOK_SECRET = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
@@ -474,6 +475,12 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: st
 
   // Money landing is worth a buzz in the pocket — opt-in per org.
   if (org) {
-    await textOrgOwners(org, `${org.name}: ${amount} received from ${cust?.displayName ?? "a client"}${via}.`);
+    await notifyMembers({
+      org, pref: "invoicePaid",
+      title: `${amount} received from ${cust?.displayName ?? "a client"}${via}`,
+      link: cust ? `/crm/clients/${cust.id}` : null,
+      smsHandled: true,
+    });
+    await textOrgOwners(org, `${org.name}: ${amount} received from ${cust?.displayName ?? "a client"}${via}.`, "invoicePaid");
   }
 }

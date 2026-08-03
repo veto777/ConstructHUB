@@ -522,7 +522,10 @@ export function parseHoverJob(job: any): ParsedHoverJob {
       // Contact fields only — the job-level "name" is the job LABEL ("123
       // Pine remodel"), not a person, so it never seeds a customer record.
       name: pick(job, ["contact.name", "contact_name", "homeowner.name", "customer.name"]),
-      email: pick(job, ["contact.email", "contact_email", "homeowner.email", "customer.email", "email", "deliverable_email"]),
+      // Some HOVER payloads carry "mailto:" prefixes copied out of email
+      // clients — strip them or they become the client's visible name.
+      email: pick(job, ["contact.email", "contact_email", "homeowner.email", "customer.email", "email", "deliverable_email"])
+        ?.replace(/^mailto:/i, "").trim() || null,
       phone: pick(job, ["contact.phone", "contact_phone", "homeowner.phone", "customer.phone", "phone"]),
       // The job's address is the SERVICE address (where the roof is).
       // v3 shape (probed 2026-08-03): address.location_line_1 / city /

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown,
+  Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown, Inbox,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -41,6 +41,8 @@ const NAV: {
     active: (l: string) => l === "/" || l === "/crm" || l === "/crm/home" },
   { title: "Clients", url: "/crm/clients", icon: Users, testid: "link-portal-nav-clients",
     active: (l: string) => l.startsWith("/crm/clients") },
+  { title: "Messages", url: "/crm/inbox", icon: Inbox, testid: "link-portal-nav-messages",
+    active: (l: string) => l.startsWith("/crm/inbox") },
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "link-portal-nav-pipeline",
     active: (l: string) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "link-portal-nav-estimates",

@@ -24,6 +24,7 @@ import {
   CRM_PROJECT_STAGE_META, CRM_ESTIMATE_STATUSES, CRM_INVOICE_STATUSES,
 } from "@shared/schema";
 import { and, eq, desc, asc, ilike, or, sql, isNull, inArray, gte, lte } from "drizzle-orm";
+import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
 import {
@@ -317,8 +318,23 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     }
     const rows = await db.select().from(crmCustomers).where(and(...where))
       .orderBy(desc(crmCustomers.createdAt)).limit(500);
+    // Bid outcome per client, for the Won / Undecided / Declined tabs: any
+    // approved estimate wins; else an open (sent/viewed) one means undecided;
+    // else any declined means declined; no bids → null.
+    const agg = await db.select({
+      customerId: crmEstimates.customerId,
+      approved: sql<number>`count(*) filter (where ${crmEstimates.status} = 'approved')::int`,
+      open: sql<number>`count(*) filter (where ${crmEstimates.status} in ('sent','viewed'))::int`,
+      declined: sql<number>`count(*) filter (where ${crmEstimates.status} = 'declined')::int`,
+    }).from(crmEstimates).where(eq(crmEstimates.orgId, ctx.org.id))
+      .groupBy(crmEstimates.customerId);
+    const outcome = new Map<string, string>();
+    for (const a of agg) {
+      outcome.set(a.customerId,
+        a.approved > 0 ? "won" : a.open > 0 ? "undecided" : a.declined > 0 ? "declined" : "none");
+    }
     // The client list itself is shareable with a PM; pricing lives elsewhere.
-    res.json(rows.map((c) => ({ ...c, portalToken: undefined })));
+    res.json(rows.map((c) => ({ ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none" })));
   });
 
   app.post("/api/crm/customers", async (req: any, res) => {
@@ -579,11 +595,21 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const div = await getDivision(ctx.org.id, parsed.data.divisionId);
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
+    const [before] = await db.select({ status: crmProjects.status }).from(crmProjects)
+      .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).limit(1);
     const patch: any = { ...parsed.data, updatedAt: new Date() };
     if (parsed.data.status) patch.stageChangedAt = new Date();
     const [row] = await db.update(crmProjects).set(patch)
       .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).returning();
     if (!row) return res.status(404).json({ message: "Project not found" });
+    if (parsed.data.status && before && before.status !== parsed.data.status) {
+      await logTeamActivity({
+        orgId: ctx.org.id, memberId: ctx.member.id,
+        type: "projectStage",
+        title: `moved ${row.name} to ${projectStageLabel(row.status)}`,
+        link: `/crm/projects/${row.id}`,
+      });
+    }
     res.json(presentProject(row, ctx));
   });
 
@@ -624,9 +650,21 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (!ctx) return;
     const parsed = jobSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid job", issues: parsed.error.issues });
+    const [beforeJob] = await db.select({ status: crmJobs.status }).from(crmJobs)
+      .where(and(eq(crmJobs.orgId, ctx.org.id), eq(crmJobs.id, req.params.id))).limit(1);
     const [row] = await db.update(crmJobs).set({ ...parsed.data, updatedAt: new Date() } as any)
       .where(and(eq(crmJobs.orgId, ctx.org.id), eq(crmJobs.id, req.params.id))).returning();
     if (!row) return res.status(404).json({ message: "Job not found" });
+    if (parsed.data.status && beforeJob && beforeJob.status !== parsed.data.status) {
+      await logTeamActivity({
+        orgId: ctx.org.id, memberId: ctx.member.id,
+        type: "jobStatus",
+        title: parsed.data.status === "scheduled"
+          ? `scheduled ${row.name}`
+          : `moved job ${row.name} to ${row.status.replace(/_/g, " ")}`,
+        link: `/crm/projects/${row.projectId}`,
+      });
+    }
     res.json(row);
   });
 

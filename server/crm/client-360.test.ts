@@ -278,7 +278,7 @@ describe("client 360 (dev server)", () => {
     const texts = entries.map((e) => e.text);
 
     expect(texts.some((t: string) => t === `Estimate ${estNumber} sent to the client`)).toBe(true);
-    expect(texts.some((t: string) => t === `Opened estimate ${estNumber} · stayed 4m 12s`)).toBe(true);
+    expect(texts.some((t: string) => t === `Client opened estimate ${estNumber} · stayed 4m 12s`)).toBe(true);
     expect(texts.some((t: string) => t.includes("Sent a message from the portal"))).toBe(true);
     expect(texts.some((t: string) => t === "Applied for financing via Acme Finance")).toBe(true);
 

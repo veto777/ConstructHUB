@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
 import { CrmRibbon } from "@/components/crm-ribbon";
+import { CrmNotificationsBell } from "@/components/crm-notifications-bell";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CartProvider } from "@/contexts/cart-context";
@@ -352,6 +353,7 @@ function AppContent() {
       location.startsWith("/crm/clients") ? "Clients" :
       location.startsWith("/crm/schedule") ? "Schedule" :
       location.startsWith("/crm/inbox") ? "Inbox" :
+      location.startsWith("/crm/inbox") ? "Messages" :
       location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
       location.startsWith("/crm/pricebook") ? "Price book" :
       location.startsWith("/crm/payments") ? "Payments" :
@@ -369,6 +371,9 @@ function AppContent() {
             <header className="flex items-center gap-3 px-4 h-12 border-b border-border/40 bg-background/80 backdrop-blur sticky top-0 z-50">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <span className="text-sm text-muted-foreground" data-testid="text-crm-section">{section}</span>
+              <div className="ml-auto flex items-center">
+                <CrmNotificationsBell />
+              </div>
             </header>
             {/* Bottom padding keeps content clear of the mobile ribbon; desktop is unchanged. */}
             <main className="flex-1 overflow-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">

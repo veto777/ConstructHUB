@@ -34,6 +34,7 @@ import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
 import { recordActivity } from "./activity";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault } from "./sms";
+import { notifyMembers } from "./notify";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
@@ -1271,6 +1272,14 @@ async function notifyOwner(
     : event === "declined" ? `❌ ${cust.displayName} declined estimate ${est.number ?? ""}`.trim()
     : `👀 ${cust.displayName} opened estimate ${est.number ?? ""}`.trim();
 
+  await notifyMembers({
+    org, pref,
+    title: subject.replace(/^[^\w]*\s*/, ""),
+    link: `/crm/clients/${cust.id}`,
+    extraMemberIds: est.createdByMemberId ? [est.createdByMemberId] : [],
+    smsHandled: event === "approved" || event === "declined",
+  });
+
   const body =
     event === "approved"
       ? `<p><strong>${esc(cust.displayName)}</strong> approved estimate ${esc(est.number ?? "")} for <strong>${money(est.approvedTotalCents ?? est.totalCents)}</strong>.</p>
@@ -1293,9 +1302,10 @@ async function notifyOwner(
       org,
       `${org.name}: ${cust.displayName} SIGNED estimate ${est.number ?? ""} for ` +
       `${money(est.approvedTotalCents ?? est.totalCents)}.`.replace(/\s+/g, " "),
+      "estimateApproved",
     );
   } else if (event === "declined") {
-    await textOrgOwners(org, `${org.name}: ${cust.displayName} declined estimate ${est.number ?? ""}.`);
+    await textOrgOwners(org, `${org.name}: ${cust.displayName} declined estimate ${est.number ?? ""}.`, "estimateDeclined");
   }
 }
 

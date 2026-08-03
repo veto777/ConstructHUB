@@ -33,6 +33,7 @@ import { autoSendPaymentReceipt } from "./receipts";
 import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
 import { textOrgOwners } from "./sms";
+import { notifyMembers } from "./notify";
 import { getBaseUrl } from "../auth";
 
 type GetUser = (req: any, res: any) => any;
@@ -92,7 +93,12 @@ async function notifyPaymentRecorded(
   } as any);
 
   // Money landing is worth a buzz in the pocket — opt-in per org.
-  await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}.`);
+  await notifyMembers({
+    org, pref: "paymentReceived",
+    title: `${amount} received via ${via} from ${who} for invoice ${doc}`,
+    smsHandled: true,
+  });
+  await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}.`, "paymentReceived");
 }
 
 export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {

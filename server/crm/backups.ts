@@ -31,12 +31,14 @@ type GetUser = (req: any, res: any) => any;
 
 // ── Config (custom_fields->'backup') ─────────────────────────────────────────
 
-export type BackupFrequency = "weekly" | "biweekly";
+export type BackupFrequency = "weekly" | "biweekly" | "custom";
 export type BackupFormat = "csv" | "xlsx";
 
 export interface BackupConfig {
   enabled: boolean;
   frequency: BackupFrequency;
+  /** Days between backups when frequency is "custom" (1–90). */
+  customDays: number | null;
   format: BackupFormat;
   email: string | null;
   lastSentAt: string | null;
@@ -48,7 +50,9 @@ export function backupConfigOf(customFields: unknown): BackupConfig {
   const b = ((customFields as Record<string, unknown> | null | undefined)?.backup ?? {}) as Record<string, unknown>;
   return {
     enabled: b.enabled === true,
-    frequency: b.frequency === "biweekly" ? "biweekly" : "weekly",
+    frequency: b.frequency === "biweekly" || b.frequency === "custom" ? b.frequency : "weekly",
+    customDays: Number.isInteger(b.customDays) && (b.customDays as number) >= 1 && (b.customDays as number) <= 90
+      ? (b.customDays as number) : null,
     format: b.format === "xlsx" ? "xlsx" : "csv",
     email: typeof b.email === "string" ? b.email : null,
     lastSentAt: typeof b.lastSentAt === "string" ? b.lastSentAt : null,
@@ -57,10 +61,19 @@ export function backupConfigOf(customFields: unknown): BackupConfig {
   };
 }
 
-export const BACKUP_FREQUENCY_MS: Record<BackupFrequency, number> = {
+export const BACKUP_FREQUENCY_MS: Record<Exclude<BackupFrequency, "custom">, number> = {
   weekly: 7 * 24 * 60 * 60 * 1000,
   biweekly: 14 * 24 * 60 * 60 * 1000,
 };
+
+/** The interval a config actually means — custom uses its own day count
+ *  (falling back to weekly if the day count is missing/corrupt). */
+export function backupIntervalMs(cfg: BackupConfig): number {
+  if (cfg.frequency === "custom") {
+    return (cfg.customDays ?? 7) * 24 * 60 * 60 * 1000;
+  }
+  return BACKUP_FREQUENCY_MS[cfg.frequency];
+}
 
 /**
  * Due when enabled and (never sent) or (lastSentAt + frequency <= now).
@@ -72,7 +85,7 @@ export function isBackupDue(cfg: BackupConfig, now: Date = new Date()): boolean 
   if (!cfg.lastSentAt) return true;
   const last = Date.parse(cfg.lastSentAt);
   if (Number.isNaN(last)) return true;
-  return now.getTime() - last >= BACKUP_FREQUENCY_MS[cfg.frequency];
+  return now.getTime() - last >= backupIntervalMs(cfg);
 }
 
 // ── CSV (RFC 4180, by hand) ───────────────────────────────────────────────────
@@ -336,9 +349,13 @@ export function startBackupScheduler(): void {
 
 const backupSettingsSchema = z.object({
   enabled: z.boolean(),
-  frequency: z.enum(["weekly", "biweekly"]),
+  frequency: z.enum(["weekly", "biweekly", "custom"]),
+  /** Required when frequency is "custom": days between backups. */
+  customDays: z.number().int().min(1).max(90).nullable().optional(),
   format: z.enum(["csv", "xlsx"]),
   email: z.string().email().max(320),
+}).refine((v) => v.frequency !== "custom" || (v.customDays ?? 0) >= 1, {
+  message: "Choose how many days between backups (1–90).",
 });
 
 export function registerCrmBackupRoutes(app: Express, getDevUser: GetUser): void {

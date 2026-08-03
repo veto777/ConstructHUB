@@ -22,6 +22,9 @@ import { db } from "../db";
 import {
   crmCustomers, crmEstimates, crmMembers, crmOrgs, crmProjects,
   crmEngagementSessions, crmNotificationEnabled,
+  crmNotificationChannel,
+  crmNotifications,
+  type CrmNotificationPref,
 } from "@shared/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
@@ -280,7 +283,8 @@ export async function maybeAlertReengagement(args: {
   req: any;
 }): Promise<boolean> {
   const { est, org, cust, req } = args;
-  if (!crmNotificationEnabled(org.customFields, "clientReengaged")) return false;
+  if (!["inApp", "email", "sms"].some((c) => crmNotificationChannel(org.customFields, "clientReengaged", c as any))
+      && !smsAlertsEnabled(org.customFields)) return false;
 
   const cf = { ...((est.customFields as Record<string, any> | null) ?? {}) };
   const prior = (cf.reengagementAlerts as { lastDay?: string; count?: number } | undefined) ?? null;
@@ -300,14 +304,15 @@ export async function maybeAlertReengagement(args: {
   }
   if (!targets.length) targets = members.filter((m) => m.role === "owner");
 
-  const emails = [...new Set(targets.map((m) => m.email).filter(Boolean))] as string[];
-  if (!emails.length) return false;
+  const emails = crmNotificationChannel(org.customFields, "clientReengaged", "email")
+    ? ([...new Set(targets.map((m) => m.email).filter(Boolean))] as string[])
+    : [];
 
   const clientLink = `${portalBaseUrl(req)}/crm/clients/${cust.id}`;
   const estLabel = est.number ? `estimate ${est.number}` : "their estimate";
   const total = money(est.totalCents);
 
-  await sendWithFallback({
+  if (emails.length) await sendWithFallback({
     to: emails.join(","),
     subject: `👀 ${cust.displayName} is reviewing ${estLabel} again — good time to call`,
     html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
@@ -319,7 +324,13 @@ export async function maybeAlertReengagement(args: {
 
   // Text the person who should make the call. The owner's fallback is the
   // org's main phone; anyone else without a mobile simply doesn't get a text.
-  const smsPerson = targets.find((t) => t.phone) ?? targets.find((t) => t.role === "owner");
+  // The text is part of the feature (call-them-now urgency) and has always
+  // fired by default — only an explicit sms:false in Settings silences it.
+  const reengPref = ((org.customFields as any)?.notificationPrefs ?? {}).clientReengaged;
+  const smsExplicitlyOff = typeof reengPref === "object" && reengPref !== null && reengPref.sms === false;
+  const smsPerson = smsExplicitlyOff
+    ? undefined
+    : (targets.find((t) => t.phone) ?? targets.find((t) => t.role === "owner"));
   const smsTo = normalizePhone(smsPerson?.phone ?? (smsPerson?.role === "owner" ? org.phone : null));
   let smsResult: SmsResult | null = null;
   if (smsTo) {
@@ -328,6 +339,14 @@ export async function maybeAlertReengagement(args: {
       `${cust.displayName} is reviewing ${estLabel}${total ? ` (${total})` : ""} again — good time to call. ${clientLink}`,
       org.customFields,
     );
+  }
+
+  if (crmNotificationChannel(org.customFields, "clientReengaged", "inApp")) {
+    await db.insert(crmNotifications).values(targets.map((m) => ({
+      orgId: org.id, memberId: m.id, type: "clientReengaged",
+      title: `${cust.displayName} is reviewing ${estLabel}${total ? ` (${total})` : ""} again — good time to call`,
+      link: `/crm/clients/${cust.id}`,
+    }))).catch((e: any) => console.error("[crm] reengagement notification failed:", e?.message || e));
   }
 
   // Mark AFTER the sends so a crashed alert can retry on the next open; the
@@ -586,8 +605,11 @@ export function smsAlertsEnabled(customFields: unknown): boolean {
 export async function textOrgOwners(
   org: typeof crmOrgs.$inferSelect,
   body: string,
+  pref?: CrmNotificationPref,
 ): Promise<void> {
-  if (!smsAlertsEnabled(org.customFields)) return;
+  // The legacy master toggle OR the per-event text channel from Settings.
+  const perPref = pref ? crmNotificationChannel(org.customFields, pref, "sms") : false;
+  if (!smsAlertsEnabled(org.customFields) && !perPref) return;
   if (!resolveSmsSender(org.customFields)) return; // no sender → say nothing
 
   const members = await db.select().from(crmMembers)

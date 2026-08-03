@@ -1389,10 +1389,60 @@ export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 
 /** Default ON; only an explicit `false` silences a notification. */
 export function crmNotificationEnabled(customFields: unknown, pref: CrmNotificationPref): boolean {
-  const prefs = (customFields as Record<string, unknown> | null | undefined)?.notificationPrefs;
-  if (!prefs || typeof prefs !== "object") return true;
-  return (prefs as Record<string, unknown>)[pref] !== false;
+  // Legacy alias: "is the EMAIL channel on for this pref".
+  return crmNotificationChannel(customFields, pref, "email");
 }
+
+export type CrmNotificationChannelName = "inApp" | "email" | "sms";
+
+/**
+ * Per-pref, per-channel switch. A stored boolean is the legacy shape and
+ * governs in-app + email together (sms stays opt-in); an object picks each
+ * channel. Absent → in-app ON, email ON, sms OFF.
+ */
+export function crmNotificationChannel(
+  customFields: unknown, pref: CrmNotificationPref, channel: CrmNotificationChannelName,
+): boolean {
+  const prefs = (customFields as Record<string, unknown> | null | undefined)?.notificationPrefs;
+  const v = prefs && typeof prefs === "object" ? (prefs as Record<string, unknown>)[pref] : undefined;
+  if (v === undefined || v === null) return channel !== "sms";
+  if (typeof v === "boolean") return channel === "sms" ? false : v;
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    if (o[channel] === undefined) return channel !== "sms";
+    return o[channel] === true;
+  }
+  return channel !== "sms";
+}
+
+/** In-app notifications — the bell. One row per recipient member. */
+export const crmNotifications = pgTable("crm_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  memberId: varchar("member_id").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  link: text("link"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/**
+ * Org-wide team activity — "Mike approved the job", "Andrey scheduled Job 62".
+ * Written at the action sites (project stage moves, job scheduling); the
+ * /api/crm/activity feed merges this with estimate events and payments.
+ */
+export const crmTeamActivity = pgTable("crm_team_activity", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  memberId: varchar("member_id"),
+  actorLabel: text("actor_label"),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  link: text("link"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // ── CRM: customers, projects, jobs, estimates, client portal ────────────────
 // Everything here is org-scoped (crm_orgs), never user-scoped.

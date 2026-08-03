@@ -42,6 +42,10 @@ const NOTIFICATIONS = [
   { key: "memberLogin", label: "Team member signs in", description: "Someone on your team signed in (at most one email per person per hour)." },
   { key: "memberAccountChange", label: "Team member changes their account", description: "A team member changed their own profile details or password." },
   { key: "leadReceived", label: "Website lead received", description: "A lead came in through your website lead form." },
+  { key: "jobApproved", label: "Job approved (PM email)", description: "The project-manager handoff email when a client signs." },
+  { key: "clientComments", label: "Client comments", description: "A client sent a message or photo from their portal." },
+  { key: "financeClick", label: "Financing interest", description: "A client clicked the financing option on an estimate." },
+  { key: "paymentReceipt", label: "Payment receipts", description: "The receipt email that goes out when a payment is recorded." },
 ] as const;
 
 type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
@@ -387,12 +391,20 @@ export default function CrmSettingsPage() {
   });
 
   // ── Notifications ─────────────────────────────────────────────────────────
-  const notifPrefs: Record<string, boolean> =
+  // A pref is a legacy boolean (governs in-app + email) or a per-channel
+  // object {inApp, email, sms}. Mirrors crmNotificationChannel on the server.
+  const notifPrefs: Record<string, boolean | Record<string, boolean>> =
     (org?.customFields as any)?.notificationPrefs ?? {};
-  const notifOn = (k: NotifKey) => notifPrefs[k] !== false;
+  const chanOn = (k: NotifKey, ch: "inApp" | "email" | "sms"): boolean => {
+    const v = notifPrefs[k];
+    if (v === undefined || v === null) return ch !== "sms";
+    if (typeof v === "boolean") return ch === "sms" ? false : v;
+    const o = v as Record<string, boolean>;
+    return o[ch] === undefined ? ch !== "sms" : o[ch] === true;
+  };
 
   const saveNotif = useMutation({
-    mutationFn: async (patch: Record<string, boolean>) =>
+    mutationFn: async (patch: Record<string, boolean | Record<string, boolean>>) =>
       (await apiRequest("PATCH", "/api/crm/org", { notificationPrefs: patch })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
@@ -453,7 +465,8 @@ export default function CrmSettingsPage() {
     (org?.customFields as any)?.backup ?? {};
   const [backupForm, setBackupForm] = useState({
     enabled: false,
-    frequency: "weekly" as "weekly" | "biweekly",
+    frequency: "weekly" as "weekly" | "biweekly" | "custom",
+    customDays: "",
     format: "csv" as "csv" | "xlsx",
     email: "",
   });
@@ -462,7 +475,8 @@ export default function CrmSettingsPage() {
     const b = (org.customFields as any)?.backup ?? {};
     setBackupForm({
       enabled: b.enabled === true,
-      frequency: b.frequency === "biweekly" ? "biweekly" : "weekly",
+      frequency: b.frequency === "biweekly" || b.frequency === "custom" ? b.frequency : "weekly",
+      customDays: b.customDays ? String(b.customDays) : "",
       format: b.format === "xlsx" ? "xlsx" : "csv",
       email: b.email ?? org.email ?? me?.member?.email ?? "",
     });
@@ -472,7 +486,13 @@ export default function CrmSettingsPage() {
 
   const saveBackup = useMutation({
     mutationFn: async () =>
-      (await apiRequest("PUT", "/api/crm/backups/settings", backupForm)).json(),
+      (await apiRequest("PUT", "/api/crm/backups/settings", {
+        enabled: backupForm.enabled,
+        frequency: backupForm.frequency,
+        customDays: backupForm.frequency === "custom" ? (parseInt(backupForm.customDays) || null) : null,
+        format: backupForm.format,
+        email: backupForm.email.trim(),
+      })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
       toast({ title: "Backup settings saved" });
@@ -1031,21 +1051,44 @@ export default function CrmSettingsPage() {
             description="Emails the system sends to you. Emails to your clients (the estimate or invoice itself) always send."
           />
         </CardHeader>
-        <CardContent className="divide-y">
-          {NOTIFICATIONS.map((n) => (
-            <div key={n.key} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-              <div>
-                <div className="text-sm font-medium">{n.label}</div>
-                <div className="text-xs text-muted-foreground">{n.description}</div>
+        <CardContent>
+          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 text-xs text-muted-foreground pb-2 border-b">
+            <span />
+            <span className="w-10 text-center">In-app</span>
+            <span className="w-10 text-center">Email</span>
+            <span className="w-10 text-center">Text</span>
+          </div>
+          <div className="divide-y">
+            {NOTIFICATIONS.map((n) => (
+              <div key={n.key} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 py-3 last:pb-0">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{n.label}</div>
+                  <div className="text-xs text-muted-foreground">{n.description}</div>
+                </div>
+                {(["inApp", "email", "sms"] as const).map((ch) => (
+                  <div key={ch} className="w-10 flex justify-center">
+                    <Switch
+                      checked={chanOn(n.key, ch)}
+                      onCheckedChange={(v) =>
+                        saveNotif.mutate({
+                          [n.key]: {
+                            inApp: ch === "inApp" ? v : chanOn(n.key, "inApp"),
+                            email: ch === "email" ? v : chanOn(n.key, "email"),
+                            sms: ch === "sms" ? v : chanOn(n.key, "sms"),
+                          },
+                        })
+                      }
+                      disabled={saveNotif.isPending}
+                      data-testid={ch === "email" ? `switch-notif-${n.key}` : `switch-notif-${n.key}-${ch}`}
+                    />
+                  </div>
+                ))}
               </div>
-              <Switch
-                checked={notifOn(n.key)}
-                onCheckedChange={(v) => saveNotif.mutate({ [n.key]: v })}
-                disabled={saveNotif.isPending}
-                data-testid={`switch-notif-${n.key}`}
-              />
-            </div>
-          ))}
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground pt-3">
+            Text alerts also need a text sender set up in the Text messaging card above.
+          </p>
         </CardContent>
       </Card>
 
@@ -1374,9 +1417,19 @@ export default function CrmSettingsPage() {
                   <SelectContent>
                     <SelectItem value="weekly">Every week</SelectItem>
                     <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                    <SelectItem value="custom">Custom…</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {backupForm.frequency === "custom" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="backup-days">Every N days</Label>
+                  <Input id="backup-days" type="number" min={1} max={90} className="w-28"
+                    placeholder="e.g. 3" value={backupForm.customDays}
+                    onChange={(e) => setBackupForm((f) => ({ ...f, customDays: e.target.value }))}
+                    data-testid="input-backup-custom-days" />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>Format</Label>
                 <Select value={backupForm.format}

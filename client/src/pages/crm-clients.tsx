@@ -26,7 +26,21 @@ interface Client {
   tags: string[] | null;
   portalLastSeenAt: string | null;
   createdAt: string | null;
+  bidStatus?: "won" | "undecided" | "declined" | "none";
 }
+
+const BID_TABS = [
+  { key: "all", label: "All" },
+  { key: "won", label: "Job Won" },
+  { key: "undecided", label: "Undecided" },
+  { key: "declined", label: "Declined" },
+] as const;
+
+const BID_PILL: Record<string, { label: string; cls: string }> = {
+  won: { label: "Job Won", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  undecided: { label: "Undecided", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
+  declined: { label: "Declined", cls: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
+};
 
 const EMPTY = {
   displayName: "", firstName: "", lastName: "", companyName: "",
@@ -37,6 +51,7 @@ export default function CrmClientsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [q, setQ] = useState("");
+  const [tab, setTab] = useState<(typeof BID_TABS)[number]["key"]>("all");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
 
@@ -147,10 +162,30 @@ export default function CrmClientsPage() {
         ) : undefined}
       />
 
-      <div className="relative max-w-md">
-        <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
-        <Input className="pl-9 bg-card" placeholder="Search name, email, phone or address"
-          value={q} onChange={(e) => setQ(e.target.value)} data-testid="input-search-clients" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-md flex-1 min-w-[220px]">
+          <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+          <Input className="pl-9 bg-card" placeholder="Search name, email, phone or address"
+            value={q} onChange={(e) => setQ(e.target.value)} data-testid="input-search-clients" />
+        </div>
+        {/* Bid outcome tabs — where does every client stand on their bid? */}
+        <div className="inline-flex rounded-lg border bg-card p-0.5" data-testid="tabs-bid-status">
+          {BID_TABS.map((t) => {
+            const n = t.key === "all"
+              ? clients?.length ?? 0
+              : clients?.filter((c) => c.bidStatus === t.key).length ?? 0;
+            return (
+              <button key={t.key}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setTab(t.key)}
+                data-testid={`tab-bid-${t.key}`}>
+                {t.label} <span className="opacity-70 tabular-nums">{n}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {isLoading ? (
@@ -173,6 +208,9 @@ export default function CrmClientsPage() {
           />
         </Card>
       ) : (
+        (() => {
+          const shown = tab === "all" ? clients : clients.filter((c) => c.bidStatus === tab);
+          return (
         <div className={crmTable.wrapper}>
           <table className={crmTable.table}>
             <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
@@ -180,12 +218,18 @@ export default function CrmClientsPage() {
                 <th className={crmTable.th}>Client</th>
                 <th className={crmTable.th}>Contact</th>
                 <th className={`${crmTable.th} hidden sm:table-cell`}>Address</th>
+                <th className={`${crmTable.th} hidden sm:table-cell`}>Bid</th>
                 <th className={`${crmTable.th} hidden sm:table-cell`}>Added</th>
                 <th className="w-10" />
               </tr>
             </thead>
             <tbody>
-              {clients.map((c) => (
+              {shown.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground" data-testid="text-bid-tab-empty">
+                  No clients in this bucket yet.
+                </td></tr>
+              )}
+              {shown.map((c) => (
                 <tr key={c.id} className={`${crmTable.tr} ${crmTableCards.tr} cursor-pointer`}
                   onClick={() => navigate(`/crm/clients/${c.id}`)}
                   data-testid={`client-${c.id}`}>
@@ -225,6 +269,14 @@ export default function CrmClientsPage() {
                       </div>
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
+                  <td className={`${crmTable.td} hidden sm:table-cell`}>
+                    {c.bidStatus && BID_PILL[c.bidStatus] ? (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${BID_PILL[c.bidStatus].cls}`}
+                        data-testid={`pill-bid-${c.id}`}>
+                        {BID_PILL[c.bidStatus].label}
+                      </span>
+                    ) : <span className="text-muted-foreground text-sm">—</span>}
+                  </td>
                   <td className={`${crmTable.td} hidden sm:table-cell text-sm text-muted-foreground whitespace-nowrap`}>
                     {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
                   </td>
@@ -238,6 +290,8 @@ export default function CrmClientsPage() {
             </tbody>
           </table>
         </div>
+          );
+        })()
       )}
     </CrmPage>
   );
