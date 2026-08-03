@@ -525,10 +525,13 @@ export function parseHoverJob(job: any): ParsedHoverJob {
       email: pick(job, ["contact.email", "contact_email", "homeowner.email", "customer.email", "email", "deliverable_email"]),
       phone: pick(job, ["contact.phone", "contact_phone", "homeowner.phone", "customer.phone", "phone"]),
       // The job's address is the SERVICE address (where the roof is).
-      addressLine1: pick(job, ["location.address_line_1", "location.address", "address_line_1", "address.line1", "address"]),
-      city: pick(job, ["location.city", "city", "address.city"]),
-      state: pick(job, ["location.state", "state", "address.state"]),
-      postalCode: pick(job, ["location.zip", "location.postal_code", "zip", "postal_code", "address.zip"]),
+      // v3 shape (probed 2026-08-03): address.location_line_1 / city /
+      // region / postal_code. Older aliases kept as fallbacks; plain
+      // "address" removed — it's an OBJECT in v3 and stringified to junk.
+      addressLine1: pick(job, ["address.location_line_1", "location.address_line_1", "address_line_1", "address.line1"]),
+      city: pick(job, ["address.city", "location.city", "city"]),
+      state: pick(job, ["address.region", "address.state", "location.state", "state"]),
+      postalCode: pick(job, ["address.postal_code", "location.zip", "location.postal_code", "zip", "postal_code", "address.zip"]),
     },
     model3dUrl,
     measurementsJsonUrl,
