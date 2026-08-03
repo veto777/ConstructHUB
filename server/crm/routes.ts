@@ -105,6 +105,16 @@ const orgPatchSchema = z.object({
   smsAlerts: z.boolean().optional(),
   // Default for texting the estimate link when a bid is sent.
   smsEstimates: z.boolean().optional(),
+  // Org-default bid discount offers — auto-applied to every estimate on send
+  // (per-estimate Discounts dialog can still adjust). Merged into
+  // custom_fields as discountDefaults.
+  discountDefaults: z.array(z.object({
+    code: z.string().min(1).max(40),
+    label: z.string().min(1).max(120),
+    percentBps: z.number().int().min(0).max(10_000),
+    conditions: z.string().max(1000).nullable().optional(),
+    enabled: z.boolean().default(true),
+  })).max(20).optional(),
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.
   notificationPrefs: z
@@ -465,9 +475,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, discountDefaults, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || discountDefaults !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -491,6 +501,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
             }
             if (smsAlerts !== undefined) base.smsAlerts = smsAlerts;
             if (smsEstimates !== undefined) base.smsEstimates = smsEstimates;
+            if (discountDefaults !== undefined) base.discountDefaults = discountDefaults;
             return base;
           })()
         : undefined;

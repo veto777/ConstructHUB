@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
-  Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud,
+  Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud, Plus,
   CalendarDays, RefreshCw, Unplug, Ruler, MessageSquare, Lock, DatabaseBackup,
 } from "lucide-react";
 import {
@@ -273,6 +273,35 @@ export default function CrmSettingsPage() {
       toast({ title: "Estimate texting saved" });
     },
     onError: (e: any) => toast({ title: "Could not save", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // Org-default bid discounts — the standard offers every sent estimate
+  // starts with (the per-estimate Discounts dialog can still adjust one bid).
+  const DISCOUNT_PRESETS = [
+    { code: "marketing", label: "Marketing discount", percentBps: 100, conditions: "Yard signage during the job + 1 month after, and an honest review." },
+    { code: "military", label: "Military discount", percentBps: 200, conditions: "Military ID required." },
+    { code: "pay_in_full", label: "Pay-in-full discount", percentBps: 500, conditions: "Paid in full immediately." },
+    { code: "bundle", label: "Bundle discount (trifecta)", percentBps: 500, conditions: "Siding + roofing + windows — all three required." },
+  ];
+  const [discForm, setDiscForm] = useState<{ code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean }[]>([]);
+  const [discCustom, setDiscCustom] = useState({ label: "", pct: "", conditions: "" });
+  useEffect(() => {
+    const saved = (org?.customFields as any)?.discountDefaults;
+    if (Array.isArray(saved) && saved.length) {
+      setDiscForm(saved.map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled !== false })));
+    } else {
+      setDiscForm(DISCOUNT_PRESETS.map((p) => ({ ...p, enabled: false })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org?.customFields]);
+  const saveDiscounts = useMutation({
+    mutationFn: async (next: typeof discForm) =>
+      (await apiRequest("PATCH", "/api/crm/org", { discountDefaults: next })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Bid discounts saved", description: "New estimates start with these offers when sent." });
+    },
+    onError: (e: any) => toast({ title: "Could not save discounts", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   // Owner text alerts on signed approvals + payments (opt-in, costs money).
@@ -1017,6 +1046,81 @@ export default function CrmSettingsPage() {
               />
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* ── Bid discounts (org defaults) ────────────────────────────────── */}
+      <Card data-testid="card-bid-discounts">
+        <CardHeader>
+          <SectionTitle
+            icon={Tag}
+            title="Bid discounts"
+            description="The offers every sent estimate starts with. Clients tick what they qualify for on the bid, and the total updates — the Discounts button on any single estimate can still adjust that one."
+          />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {discForm.map((o, idx) => (
+            <div key={o.code} className="flex items-start justify-between gap-3 rounded-lg border p-3"
+              data-testid={`default-discount-${o.code}`}>
+              <div className="min-w-0">
+                <div className="text-sm font-medium">
+                  {o.label} <span className="text-primary">−{(o.percentBps / 100).toLocaleString("en-US")}%</span>
+                </div>
+                {o.conditions && <div className="text-xs text-muted-foreground mt-0.5">{o.conditions}</div>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Switch checked={o.enabled}
+                  onCheckedChange={(v) => {
+                    const next = discForm.map((x, i) => (i === idx ? { ...x, enabled: v === true } : x));
+                    setDiscForm(next); saveDiscounts.mutate(next);
+                  }}
+                  data-testid={`switch-discount-${o.code}`} />
+                {!DISCOUNT_PRESETS.some((p) => p.code === o.code) && (
+                  <Button size="sm" variant="ghost" className="text-destructive"
+                    onClick={() => { const next = discForm.filter((_, i) => i !== idx); setDiscForm(next); saveDiscounts.mutate(next); }}
+                    data-testid={`button-remove-discount-${o.code}`}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+          <div className="flex flex-wrap items-end gap-2 border-t pt-3">
+            <div className="space-y-1.5 flex-1 min-w-40">
+              <Label htmlFor="disc-label">Your own offer</Label>
+              <Input id="disc-label" placeholder="e.g. Referral discount" value={discCustom.label}
+                onChange={(e) => setDiscCustom((f) => ({ ...f, label: e.target.value }))}
+                data-testid="input-discount-label" />
+            </div>
+            <div className="space-y-1.5 w-24">
+              <Label htmlFor="disc-pct">%</Label>
+              <Input id="disc-pct" type="number" min={0} max={100} step="0.5" value={discCustom.pct}
+                onChange={(e) => setDiscCustom((f) => ({ ...f, pct: e.target.value }))}
+                data-testid="input-discount-pct" />
+            </div>
+            <div className="space-y-1.5 flex-1 min-w-48">
+              <Label htmlFor="disc-cond">Conditions (optional)</Label>
+              <Input id="disc-cond" placeholder="What qualifies" value={discCustom.conditions}
+                onChange={(e) => setDiscCustom((f) => ({ ...f, conditions: e.target.value }))}
+                data-testid="input-discount-conditions" />
+            </div>
+            <Button size="sm"
+              disabled={!discCustom.label.trim() || !(parseFloat(discCustom.pct) > 0) || saveDiscounts.isPending}
+              onClick={() => {
+                const next = [...discForm, {
+                  code: `custom-${Date.now().toString(36)}`,
+                  label: discCustom.label.trim(),
+                  percentBps: Math.round(Math.min(100, parseFloat(discCustom.pct)) * 100),
+                  conditions: discCustom.conditions.trim() || null,
+                  enabled: true,
+                }];
+                setDiscForm(next); saveDiscounts.mutate(next);
+                setDiscCustom({ label: "", pct: "", conditions: "" });
+              }}
+              data-testid="button-add-discount">
+              <Plus className="h-4 w-4 mr-1" /> Add
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

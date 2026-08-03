@@ -260,6 +260,27 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const sentAt = new Date();
     const expiresAt = estimateExpiryOnSend(sentAt);
 
+    // Bid discounts: an estimate with no offers of its own inherits the org's
+    // default set at send time — Settings decides the standard offers, the
+    // per-estimate Discounts dialog still adjusts individual bids.
+    const [anyOffer] = await db.select({ id: crmEstimateDiscounts.id }).from(crmEstimateDiscounts)
+      .where(and(eq(crmEstimateDiscounts.orgId, ctx.org.id), eq(crmEstimateDiscounts.estimateId, est.id))).limit(1);
+    const defaults = (ctx.org.customFields as any)?.discountDefaults;
+    if (!anyOffer && Array.isArray(defaults) && defaults.length) {
+      await db.insert(crmEstimateDiscounts).values(
+        defaults
+          .filter((o: any) => o && o.enabled !== false && o.code && o.label)
+          .slice(0, 20)
+          .map((o: any, idx: number) => ({
+            orgId: ctx.org.id, estimateId: est.id,
+            code: String(o.code).slice(0, 40), label: String(o.label).slice(0, 120),
+            percentBps: Math.max(0, Math.min(10_000, Math.round(Number(o.percentBps) || 0))),
+            conditions: o.conditions ? String(o.conditions).slice(0, 1000) : null,
+            enabled: true, sortOrder: idx,
+          })),
+      ).catch((e: any) => console.error("[crm] default discounts seed failed:", e?.message || e));
+    }
+
     // First-open pass: clicking from the inbox proves inbox possession, so the
     // email's own link signs the recipient straight in (single-use, redeemed by
     // page JS — see /api/client/auth/redeem). Valid as long as the estimate is.
