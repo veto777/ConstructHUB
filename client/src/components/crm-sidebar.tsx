@@ -66,9 +66,9 @@ const NAV: {
     perm: "manageSettings",
     active: (l: string) => l.startsWith("/crm/settings") },
   // Gated: ConstructHUB staff only — cross-account monitoring, never org-scoped.
-  { title: "Platform Admin", url: "/crm/admin", icon: ShieldCheck, testid: "link-portal-nav-admin",
+  { title: "Platform Admin", url: "/admin", icon: ShieldCheck, testid: "link-portal-nav-admin",
     platformAdmin: true,
-    active: (l: string) => l.startsWith("/crm/admin") },
+    active: (l: string) => l.startsWith("/crm/admin") || l === "/admin" },
 ];
 
 export function CrmSidebar() {

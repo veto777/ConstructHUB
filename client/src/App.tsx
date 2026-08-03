@@ -61,6 +61,7 @@ import CrmIntegrationsPage from "@/pages/crm-integrations";
 import CrmReportsPage from "@/pages/crm-reports";
 import CrmMigratePage from "@/pages/crm-migrate";
 import CrmAdminPage from "@/pages/crm-admin";
+import { CrmLogo } from "@/components/crm-logo";
 import PublicEstimatePage from "@/pages/public-estimate";
 import PublicPortalPage from "@/pages/public-portal";
 import PublicInvoicePage from "@/pages/public-invoice";
@@ -337,6 +338,31 @@ function AppContent() {
   // The portal has its own app frame: a branded sidebar, a slim top bar with
   // just the collapse trigger and the current section — no marketing chrome.
   if (portal) {
+    // Platform Admin is CROSS-ORG — it must never wear a workspace's chrome
+    // (an org sidebar around platform-wide data reads as that org's data).
+    // It gets its own full-bleed shell at /admin; /crm/admin lands here too.
+    if (location === "/admin" || location === "/crm/admin") {
+      return (
+        <div className="min-h-screen bg-muted/30 flex flex-col">
+          <header className="h-12 px-4 flex items-center justify-between bg-sidebar text-sidebar-foreground border-b border-sidebar-border sticky top-0 z-50">
+            <div className="flex items-center gap-2.5">
+              <CrmLogo height={20} />
+              <span className="text-[11px] font-semibold uppercase tracking-widest rounded bg-sidebar-primary text-sidebar-primary-foreground px-1.5 py-0.5">
+                Platform Admin
+              </span>
+            </div>
+            <Link href="/crm" className="text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              data-testid="link-admin-back-to-workspace">
+              ← Back to my workspace
+            </Link>
+          </header>
+          <main className="flex-1 overflow-auto">
+            <CrmAdminPage />
+          </main>
+        </div>
+      );
+    }
+
     // Client-facing documents render full-bleed even on the portal host — the
     // homeowner gets a clean page, not the contractor's app frame.
     if (location === "/crm-terms") return <CrmTermsPage />;
