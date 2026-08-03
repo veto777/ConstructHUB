@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, CalendarPlus, Loader2 } from "lucide-react";
+import { Eye, CalendarPlus, Loader2, ShieldAlert, Forward, Users } from "lucide-react";
 import { InfoTip } from "@/components/info-tip";
 
 /** Compact duration: 45s → "<1m", 720s → "12m", 3900s → "1h 5m". */
@@ -80,6 +80,34 @@ export function EstimateEngagement({ estimate: e, canManage, onChanged }: Props)
               <li key={i}>
                 {new Date(s.startedAt).toLocaleString()} · {fmtDuration(s.durationSecs)}
                 {s.ip ? ` · ${s.ip}` : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {/* Access intelligence: denied gate attempts (who was typed), forward
+          detection, and the client's explicit shares. */}
+      {(eng?.accessEvents?.length ?? 0) > 0 && (
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-1 text-amber-600 dark:text-amber-500 hover:text-foreground"
+            data-testid={`access-events-${e.id}`}>
+            <ShieldAlert className="h-3 w-3" />
+            {eng.accessEvents.length} access {eng.accessEvents.length === 1 ? "event" : "events"}
+          </summary>
+          <ul className="mt-1 space-y-0.5 border-l pl-3" data-testid={`access-events-list-${e.id}`}>
+            {eng.accessEvents.map((ev: any, i: number) => (
+              <li key={i} className="flex items-center gap-1.5">
+                {ev.type === "shared" ? <Users className="h-3 w-3 shrink-0" />
+                  : ev.type === "forward_detected" ? <Forward className="h-3 w-3 shrink-0" />
+                  : <ShieldAlert className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-500" />}
+                <span>
+                  {ev.type === "shared"
+                    ? `Client shared with ${ev.email}`
+                    : ev.type === "forward_detected"
+                      ? "Emailed link opened on a second device — likely forwarded"
+                      : `Access attempt as ${ev.email ?? "unknown"} — not on this estimate's list`}
+                  {" · "}{new Date(ev.at).toLocaleString()}
+                </span>
               </li>
             ))}
           </ul>

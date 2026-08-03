@@ -93,6 +93,60 @@ function PayCard({ token, company, estimate }: { token: string; company: any; es
   );
 }
 
+/** The verified client adds a spouse/co-signer: they get their own gated
+ *  link by email, and the share is recorded for the contractor. */
+function ShareEstimateCard({ token }: { token: string }) {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [sharedWith, setSharedWith] = useState<string[]>([]);
+  const share = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/public/estimates/${token}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || "Could not share");
+      return j;
+    },
+    onSuccess: (j: any) => {
+      setSharedWith((xs) => [...xs, j.sharedWith]);
+      setEmail("");
+      toast({ title: "Shared", description: `We emailed ${j.sharedWith} a secure link.` });
+    },
+    onError: (e: any) => toast({ title: "Could not share", description: String(e.message ?? e), variant: "destructive" }),
+  });
+  return (
+    <Card className="shadow-sm" data-testid="share-estimate-card">
+      <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-2">
+        <CardTitle className="text-base">Need someone else to see this?</CardTitle>
+        <CardDescription>
+          Share it with a spouse or co-decision-maker — they'll get their own secure link by email.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-4 sm:p-6 pt-2 sm:pt-2 space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input type="email" value={email} placeholder="their@email.com"
+            onChange={(ev) => setEmail(ev.target.value)}
+            className="flex-1 h-11" data-testid="input-share-email" />
+          <Button variant="outline" className="h-11"
+            disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) || share.isPending}
+            onClick={() => share.mutate()} data-testid="button-share-estimate">
+            {share.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Send secure link
+          </Button>
+        </div>
+        {sharedWith.length > 0 && (
+          <p className="text-xs text-muted-foreground" data-testid="text-shared-with">
+            Shared with {sharedWith.join(", ")}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /** Sticky top brand bar in the org's chosen base colour (black by default,
  *  white optional — Settings → Company theme). Logos ride on a white chip
  *  when the base is dark so any logo stays legible. */
@@ -169,7 +223,7 @@ export default function PublicEstimatePage() {
         const r = await fetch("/api/client/auth/redeem", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: firstOpenPass }),
+          body: JSON.stringify({ token: firstOpenPass, docToken: token }),
         });
         if (r.ok) {
           // The pass is spent and the session cookie is set — navigate to the
@@ -803,6 +857,10 @@ export default function PublicEstimatePage() {
 
         {/* Files the contractor pinned to this estimate (same email gate). */}
         {!preview && <EstimateAttachments token={token!} />}
+
+        {/* Share with someone else — a spouse or co-signer gets their own
+            secure link, and the contractor sees who was added. */}
+        {!preview && !expired && <ShareEstimateCard token={token!} />}
 
         {offers.length > 0 && !settled && !expired && (
           <Card className="shadow-md" data-testid="discounts-section">

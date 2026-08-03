@@ -834,6 +834,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     let sentTo: string | null = null;
     let docLabel = "a document";
     let nextPath = "";
+    let estId: string | null = null;
+    let sharedEmails: string[] = [];
     if (docType === "estimate") {
       const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
       if (est) {
@@ -842,6 +844,13 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         sentTo = est.sentToEmail;
         docLabel = est.number ? `estimate ${est.number}` : "an estimate";
         nextPath = `/e/${t}`;
+        estId = est.id;
+        // Emails the CLIENT explicitly shared this estimate with (see the
+        // /share route below) are allowed through the same gate.
+        const cf = (est.customFields ?? {}) as Record<string, any>;
+        sharedEmails = Array.isArray(cf.sharedEmails)
+          ? cf.sharedEmails.map((x: any) => String(x).toLowerCase())
+          : [];
       }
     } else {
       const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
@@ -854,11 +863,22 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       }
     }
 
-    // Case-insensitive match against the customer record OR the send-time
-    // override address (the email that actually received the quote).
+    // Case-insensitive match against the customer record, the send-time
+    // override address (the email that actually received the quote), or an
+    // email the client explicitly shared the estimate with.
     const matches = Boolean(cust && org) && (
-      (cust!.email ?? "").toLowerCase() === email || (sentTo ?? "").toLowerCase() === email
+      (cust!.email ?? "").toLowerCase() === email
+      || (sentTo ?? "").toLowerCase() === email
+      || sharedEmails.includes(email)
     );
+
+    // Access intelligence for the contractor: a REAL document + an email that
+    // is NOT on its allowlist usually means a forwarded copy — record who was
+    // typed. The response below stays identical either way (never an
+    // enumeration oracle), and the route's rate limits cap the volume.
+    if (!matches && estId && org) {
+      await logEvent(org.id, estId, "access_denied", "visitor", req, { attemptedEmail: email });
+    }
 
     if (matches) {
       const raw = randomBytes(32).toString("hex");
@@ -895,6 +915,79 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }
 
     res.json({ sent: true });
+  });
+
+  /**
+   * The verified client shares their estimate with someone else — a spouse,
+   * a co-signer. The new email joins the gate's allowlist, gets its own
+   * secure access link immediately, and the contractor sees who was added on
+   * the engagement panel. This turns covert forwarding into tracked sharing.
+   */
+  app.post("/api/public/estimates/:token/share", async (req: any, res) => {
+    const t = String(req.params.token || "");
+    const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
+    if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    // Only the verified client can share — never an anonymous visitor.
+    if (!(await requireDocSession(req, res, est.customerId))) return;
+
+    const parsed = z.object({ email: z.string().email().max(320) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Enter a valid email address" });
+    const email = parsed.data.email.trim().toLowerCase();
+
+    const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
+    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
+    if (!cust || !org) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    if ((cust.email ?? "").toLowerCase() === email || (est.sentToEmail ?? "").toLowerCase() === email) {
+      return res.status(400).json({ message: "That email already has access." });
+    }
+
+    const cf = { ...((est.customFields as Record<string, any> | null) ?? {}) };
+    const shared: string[] = Array.isArray(cf.sharedEmails)
+      ? cf.sharedEmails.map((x: any) => String(x).toLowerCase())
+      : [];
+    if (shared.includes(email)) return res.status(400).json({ message: "That email already has access." });
+    if (shared.length >= 5) {
+      return res.status(409).json({ message: "This estimate has been shared with the maximum of 5 people." });
+    }
+    shared.push(email);
+    cf.sharedEmails = shared;
+    await db.update(crmEstimates).set({ customFields: cf, updatedAt: new Date() })
+      .where(eq(crmEstimates.id, est.id));
+
+    await logEvent(est.orgId, est.id, "shared", "client", req, { sharedWith: email });
+
+    // Their own secure access link, straight away — same shape as the gate's.
+    const raw = randomBytes(32).toString("hex");
+    await db.insert(crmClientTokens).values({
+      tokenHash: sha256(raw),
+      customerIds: [cust.id],
+      email,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    });
+    const docLabel = est.number ? `estimate ${est.number}` : "an estimate";
+    const link = `${getBaseUrl(req)}/api/client/auth/verify?token=${raw}&next=${encodeURIComponent(`/e/${t}`)}`;
+    try {
+      await sendWithFallback({
+        to: email,
+        subject: `${cust.displayName} shared ${docLabel} from ${org.name} with you`,
+        html: `
+          <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px">
+            <p style="font-size:16px">Hi,</p>
+            <p style="font-size:16px"><strong>${esc(cust.displayName)}</strong> shared ${esc(docLabel)}
+               from <strong>${esc(org.name)}</strong> with you.</p>
+            <p style="margin:28px 0">
+              <a href="${link}" style="background:#4f46e5;color:#fff;padding:13px 24px;border-radius:6px;
+                 text-decoration:none;font-weight:600;font-size:16px;display:inline-block">Open the estimate</a>
+            </p>
+            <p style="font-size:13px;color:#666">This link expires in 30 minutes and can only be used once —
+               after that, the page can send a fresh link to this address.</p>
+          </div>`,
+      } as any);
+    } catch (e: any) {
+      console.error("[crm] share email failed:", String(e?.message || e).slice(0, 300));
+      return res.status(502).json({ message: "Could not send the email — please try again." });
+    }
+    res.json({ ok: true, sharedWith: email });
   });
 
   /** Contractor preview: mint a 15-minute read-only grant for the client
@@ -1019,6 +1112,17 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       ))
       .orderBy(desc(crmEngagementSessions.startedAt)).limit(100);
 
+    // Access intelligence: denied gate attempts (who was typed), forward
+    // detection (a spent first-open pass reused elsewhere), and explicit
+    // shares by the client.
+    const accessEvents = await db.select().from(crmEstimateEvents)
+      .where(and(
+        eq(crmEstimateEvents.orgId, ctx.org.id),
+        eq(crmEstimateEvents.estimateId, est.id),
+        sql`${crmEstimateEvents.type} in ('access_denied','forward_detected','shared')`,
+      ))
+      .orderBy(desc(crmEstimateEvents.createdAt)).limit(50);
+
     res.json({
       visits: sessions.length,
       totalSecs: sessions.reduce((s, x) => s + (x.durationSecs ?? 0), 0),
@@ -1028,6 +1132,11 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         durationSecs: s.durationSecs,
         ip: redactIpPrefix(s.ip),
         userAgent: s.userAgent,
+      })),
+      accessEvents: accessEvents.map((ev) => ({
+        type: ev.type,
+        at: ev.createdAt,
+        email: (ev.meta as any)?.attemptedEmail ?? (ev.meta as any)?.sharedWith ?? null,
       })),
     });
   });

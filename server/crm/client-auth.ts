@@ -32,6 +32,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { sendWithFallback } from "../email";
 import { clientPortalBaseUrl } from "../site-context";
 import { financingLinksOf, getPrimaryFinancing } from "./financing";
+import { logEvent } from "./entities";
 import { themePayload } from "@shared/theme-colors";
 
 const COOKIE_NAME = "crm_client";
@@ -300,7 +301,12 @@ export function registerCrmClientAuthRoutes(app: Express): void {
   // and falls back to the email-verification gate, which only ever sends a
   // fresh link to the address on file.
   app.post("/api/client/auth/redeem", async (req: any, res) => {
-    const parsed = z.object({ token: z.string().min(32).max(200) }).safeParse(req.body ?? {});
+    const parsed = z.object({
+      token: z.string().min(32).max(200),
+      /** The document the pass rode on — lets a failed redeem log forward
+       *  detection against the right estimate. */
+      docToken: z.string().min(24).max(120).optional(),
+    }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ ok: false, message: "Invalid pass" });
     // Own bucket: routine document opens must never eat the magic-link budget
     // (`ip:` bucket) — a family opening a few estimates would lock themselves
@@ -322,6 +328,24 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       )
       .returning();
     if (!row) {
+      // Forward detection: if this pass EXISTS but was already spent, a real
+      // emailed link is being reused on another device — almost always a
+      // forwarded email. Tell the contractor via the estimate's event log.
+      // A token we have no record of proves nothing and logs nothing.
+      if (parsed.data.docToken) {
+        const [spent] = await db.select().from(crmClientTokens)
+          .where(eq(crmClientTokens.tokenHash, sha256(parsed.data.token))).limit(1);
+        if (spent?.usedAt) {
+          const [est] = await db.select().from(crmEstimates)
+            .where(eq(crmEstimates.publicToken, parsed.data.docToken)).limit(1);
+          const ids = Array.isArray(spent.customerIds) ? spent.customerIds : [];
+          if (est && ids.includes(est.customerId)) {
+            await logEvent(est.orgId, est.id, "forward_detected", "visitor", req, {
+              note: "emailed link opened on a second device",
+            });
+          }
+        }
+      }
       return res.status(410).json({ ok: false, message: "This link was already used or has expired." });
     }
 
