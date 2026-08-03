@@ -56,11 +56,11 @@ import {
   createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual,
 } from "crypto";
 import { db } from "../db";
-import { crmCustomers, crmMeasurements, crmOrgs , crmMembers } from "@shared/schema";
+import { crmCustomers, crmMeasurements, crmAttachments, crmOrgs , crmMembers } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
-import { storeGeneratedPdf } from "./attachments";
+import { storeGeneratedPdf, storeGeneratedFile } from "./attachments";
 import { oauthBaseUrl } from "../site-context";
 
 type GetUser = (req: any, res: any) => any;
@@ -146,6 +146,8 @@ export interface HoverConn {
   lastSyncAt?: string | null;
   lastError?: string | null;
   lastSyncReport?: HoverSyncReport | null;
+  /** Auto-sync cadence in hours (default 6). */
+  syncEveryHours?: number | null;
 }
 
 async function readHoverConn(orgId: string): Promise<HoverConn | null> {
@@ -662,6 +664,59 @@ async function isOrgMemberContact(
     (em && (m.email ?? "").toLowerCase() === em) ||
     (ph && ph.length >= 7 && String(m.phone ?? "").replace(/\D/g, "") === ph));
 }
+/**
+ * Pull the job's capture photos ("before" photos) onto the client's profile:
+ * kind "photo" / refId customer — exactly where a client's own uploads land,
+ * so the contractor's Client 360 AND the client portal show them with zero
+ * extra plumbing. Idempotent per HOVER image id; capped per job.
+ */
+export async function importHoverJobPhotos(
+  orgId: string, jobId: string, customerId: string, job: any,
+  auth: Record<string, string>, fetchFn: FetchFn = fetch,
+): Promise<number> {
+  const models: any[] = job?.job?.models ?? job?.models ?? [];
+  const images: { id: string; url: string }[] = [];
+  for (const m of models) {
+    for (const img of m?.images ?? []) {
+      const url = img?.image?.url ?? img?.url;
+      const id = img?.id;
+      if (id != null && typeof url === "string") images.push({ id: String(id), url });
+    }
+  }
+  if (!images.length) return 0;
+
+  const existing = await db.select({ fileName: crmAttachments.fileName }).from(crmAttachments)
+    .where(and(
+      eq(crmAttachments.orgId, orgId),
+      eq(crmAttachments.kind, "photo"),
+      eq(crmAttachments.refId, customerId),
+    ));
+  const have = new Set(existing.map((a) => a.fileName));
+
+  let stored = 0;
+  for (const img of images.slice(0, 20)) {
+    const fileName = `hover-${jobId}-${img.id}.jpg`;
+    if (have.has(fileName)) continue;
+    try {
+      const r = await fetchFn(img.url, { headers: auth });
+      if (!r.ok) continue;
+      const mime = (r.headers.get("content-type") || "image/jpeg").split(";")[0];
+      if (!/^image\//.test(mime)) continue;
+      const buffer = Buffer.from(await r.arrayBuffer());
+      if (!buffer.length || buffer.length > 15 * 1024 * 1024) continue;
+      await storeGeneratedFile({
+        orgId, kind: "photo", refId: customerId, fileName, buffer,
+        mime, ext: mime === "image/png" ? "png" : "jpg",
+      });
+      stored++;
+    } catch (e: any) {
+      console.error(`[hover] photo ${img.id} for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
+    }
+  }
+  if (stored) console.log(`[hover] imported ${stored} photos for job ${jobId} -> customer ${customerId}`);
+  return stored;
+}
+
 export async function ingestHoverJob(
   orgId: string, jobId: string, fetchFn: FetchFn = fetch,
 ): Promise<{
@@ -675,6 +730,21 @@ export async function ingestHoverJob(
     .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.externalId, externalId)))
     .limit(1);
   if (existing) {
+    // Photos arrived after the first ingest (or this build) — top them up.
+    if (existing.customerId) {
+      try {
+        const token0 = await getHoverAccessToken(orgId, fetchFn);
+        const { apiBase: base0 } = hoverBases();
+        const auth0 = { authorization: `Bearer ${token0}` };
+        const det0 = await fetchFn(`${base0}/v3/jobs/${encodeURIComponent(jobId)}`, { headers: auth0 });
+        if (det0.ok) {
+          const job0 = (await det0.json()) as any;
+          await importHoverJobPhotos(orgId, jobId, existing.customerId, job0, auth0, fetchFn);
+        }
+      } catch (e: any) {
+        console.error(`[hover] photo top-up for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
+      }
+    }
     return {
       measurementId: existing.id, customerId: existing.customerId, created: false, duplicate: true,
       matchedVia: null, ambiguous: false, customerCreated: false,
@@ -814,10 +884,102 @@ export async function ingestHoverJob(
     }
   }
 
+  if (customer?.id) {
+    await importHoverJobPhotos(orgId, jobId, customer.id, job, auth, fetchFn)
+      .catch((e: any) => console.error(`[hover] photos for job ${jobId} failed:`, String(e?.message || e).slice(0, 120)));
+  }
+
   return {
     measurementId: row.id, customerId: customer?.id ?? null, created: true, duplicate: false,
     matchedVia, ambiguous, customerCreated,
   };
+}
+
+// ── Sync (manual button + auto-schedule) ────────────────────────────────────
+
+export type HoverSyncRunReport = {
+  scanned: number; attachedByEmail: number; attachedByPhone: number; attachedByAddress: number;
+  created: number; ambiguous: number; duplicates: number; errors: string[];
+};
+
+/** One full sync pass: list completed HOVER jobs, ingest each (idempotent —
+ *  existing jobs just top up photos). Used by the Sync button AND the
+ *  scheduler. */
+export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
+  const { status, json } = await hoverApi(orgId, "GET", "/v2/jobs").catch((e: any) => {
+    return { status: 0, json: { error: String(e?.message || e) } } as any;
+  });
+  if (status !== 200) {
+    await writeHoverConn(orgId, { lastError: `jobs list failed (${status || "network"})` }).catch(() => {});
+    throw new Error("Could not list HOVER jobs.");
+  }
+  const jobs: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
+  const report: HoverSyncRunReport = {
+    scanned: jobs.length,
+    attachedByEmail: 0, attachedByPhone: 0, attachedByAddress: 0,
+    created: 0, ambiguous: 0, duplicates: 0, errors: [],
+  };
+  for (const j of jobs) {
+    const state = String(j?.state ?? j?.status ?? "").toLowerCase();
+    const id = j?.id ?? j?.job_id;
+    if (!id || !state.startsWith("complete")) continue;
+    try {
+      const r = await ingestHoverJob(orgId, String(id));
+      if (r.duplicate) report.duplicates++;
+      else if (r.ambiguous) report.ambiguous++;
+      else if (r.matchedVia === "email") report.attachedByEmail++;
+      else if (r.matchedVia === "phone") report.attachedByPhone++;
+      else if (r.matchedVia === "address") report.attachedByAddress++;
+      else if (r.customerCreated) report.created++;
+    } catch (e: any) {
+      report.errors.push(`job ${id}: ${String(e?.message || e).slice(0, 120)}`);
+      console.error(`[hover] sync ingest job ${id} failed:`, String(e?.message || e).slice(0, 200));
+    }
+  }
+  const lastSyncReport: HoverSyncReport = { ...report, at: new Date().toISOString() };
+  await writeHoverConn(orgId, {
+    lastSyncAt: lastSyncReport.at,
+    lastError: report.errors.length ? report.errors[0] : null,
+    lastSyncReport,
+  }).catch(() => {});
+  return report;
+}
+
+/** Allowed auto-sync cadences, in hours. 6h is the default. */
+export const HOVER_SYNC_HOURS = [1, 2, 4, 6, 12, 24, 168] as const;
+const HOVER_TICK_MS = 10 * 60 * 1000;
+let hoverSchedulerStarted = false;
+const hoverSyncRunning = new Set<string>();
+
+export async function runDueHoverSyncs(now: Date = new Date()): Promise<void> {
+  const orgs = await db.select().from(crmOrgs)
+    .where(sql`${crmOrgs.customFields} -> 'hover' ->> 'refreshTokenEnc' IS NOT NULL`);
+  for (const org of orgs) {
+    const hover = ((org.customFields as any) ?? {}).hover ?? {};
+    const hours = Number(hover.syncEveryHours) || 6;
+    const last = hover.lastSyncAt ? new Date(hover.lastSyncAt).getTime() : 0;
+    if (now.getTime() - last < hours * 3600_000) continue;
+    if (hoverSyncRunning.has(org.id)) continue;
+    hoverSyncRunning.add(org.id);
+    try {
+      const r = await runHoverSync(org.id);
+      console.log(`[hover] auto-sync org ${org.id}: scanned ${r.scanned}, dup ${r.duplicates}, errors ${r.errors.length}`);
+    } catch (e: any) {
+      // Never crash the app over a sync; the card surfaces lastError.
+      console.error(`[hover] auto-sync org ${org.id} failed:`, String(e?.message || e).slice(0, 200));
+    } finally {
+      hoverSyncRunning.delete(org.id);
+    }
+  }
+}
+
+export function startHoverScheduler(): void {
+  if (hoverSchedulerStarted) return;
+  hoverSchedulerStarted = true;
+  const timer = setInterval(() => {
+    runDueHoverSyncs().catch((e) => console.error("[hover] scheduler tick failed:", e?.message || e));
+  }, HOVER_TICK_MS);
+  timer.unref();
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
@@ -830,6 +992,7 @@ const clientIp = (req: any) =>
     .split(",")[0].trim().slice(0, 60);
 
 export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void {
+  startHoverScheduler();
   async function ctxFor(req: any, res: any, perm?: any) {
     const user = getDevUser(req, res);
     if (!user) return null;
@@ -861,6 +1024,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       lastSyncAt: conn?.lastSyncAt ?? null,
       lastError: conn?.lastError ?? null,
       lastSyncReport: conn?.lastSyncReport ?? null,
+      syncEveryHours: Number(conn?.syncEveryHours) || 6,
     });
   });
 
@@ -954,49 +1118,24 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     if (!ctx) return;
     const conn = await readHoverConn(ctx.org.id);
     if (!conn) return res.status(409).json({ message: "Connect HOVER first." });
+    try {
+      const report = await runHoverSync(ctx.org.id);
+      res.json({ ok: true, ...report });
+    } catch {
+      res.status(502).json({ message: "Could not list HOVER jobs." });
+    }
+  });
 
-    const { status, json } = await hoverApi(ctx.org.id, "GET", "/v2/jobs").catch((e: any) => {
-      return { status: 0, json: { error: String(e?.message || e) } };
-    });
-    if (status !== 200) {
-      await writeHoverConn(ctx.org.id, { lastError: `jobs list failed (${status || "network"})` }).catch(() => {});
-      return res.status(502).json({ message: "Could not list HOVER jobs." });
+  /** Auto-sync cadence — every 6h by default, 1h to weekly. */
+  app.post("/api/crm/integrations/hover/schedule", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageIntegrations");
+    if (!ctx) return;
+    const hours = Number(req.body?.hours);
+    if (!(HOVER_SYNC_HOURS as readonly number[]).includes(hours)) {
+      return res.status(400).json({ message: "Pick a supported cadence." });
     }
-    const jobs: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
-    const report = {
-      scanned: jobs.length,
-      attachedByEmail: 0,
-      attachedByPhone: 0,
-      attachedByAddress: 0,
-      created: 0,
-      ambiguous: 0,
-      duplicates: 0,
-      errors: [] as string[],
-    };
-    for (const j of jobs) {
-      const state = String(j?.state ?? j?.status ?? "").toLowerCase();
-      const id = j?.id ?? j?.job_id;
-      if (!id || !state.startsWith("complete")) continue;
-      try {
-        const r = await ingestHoverJob(ctx.org.id, String(id));
-        if (r.duplicate) report.duplicates++;
-        else if (r.ambiguous) report.ambiguous++;
-        else if (r.matchedVia === "email") report.attachedByEmail++;
-        else if (r.matchedVia === "phone") report.attachedByPhone++;
-        else if (r.matchedVia === "address") report.attachedByAddress++;
-        else if (r.customerCreated) report.created++;
-      } catch (e: any) {
-        report.errors.push(`job ${id}: ${String(e?.message || e).slice(0, 120)}`);
-        console.error(`[hover] sync ingest job ${id} failed:`, String(e?.message || e).slice(0, 200));
-      }
-    }
-    const lastSyncReport: HoverSyncReport = { ...report, at: new Date().toISOString() };
-    await writeHoverConn(ctx.org.id, {
-      lastSyncAt: lastSyncReport.at,
-      lastError: report.errors.length ? report.errors[0] : null,
-      lastSyncReport,
-    }).catch(() => {});
-    res.json({ ok: true, ...report });
+    await writeHoverConn(ctx.org.id, { syncEveryHours: hours });
+    res.json({ ok: true, syncEveryHours: hours });
   });
 
   /** Disconnect: delete the HOVER webhook (best effort) and wipe the tokens. */

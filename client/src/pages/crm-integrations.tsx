@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { InfoTip } from "@/components/info-tip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -165,6 +166,16 @@ export default function CrmIntegrationsPage() {
     onError: (e: any) => toast({ title: "HOVER sync failed", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  const hoverSchedule = useMutation({
+    mutationFn: async (hours: number) =>
+      (await apiRequest("POST", "/api/crm/integrations/hover/schedule", { hours })).json(),
+    onSuccess: () => {
+      hoverInvalidate();
+      toast({ title: "Auto-sync schedule saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save schedule", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   const hoverDisconnect = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/integrations/hover/disconnect", {})).json(),
     onSuccess: () => {
@@ -264,6 +275,29 @@ export default function CrmIntegrationsPage() {
                   {hoverStatus.lastSyncReport.errors?.length ? ` · ${hoverStatus.lastSyncReport.errors.length} errors` : ""}
                 </p>
               )}
+              {/* New jobs, measurements and photos flow in on their own —
+                  the cadence just decides how fresh "fresh" is. */}
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Auto-sync</span>
+                <Select
+                  value={String(hoverStatus.syncEveryHours ?? 6)}
+                  onValueChange={(v) => hoverSchedule.mutate(Number(v))}
+                  disabled={hoverSchedule.isPending}
+                >
+                  <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-hover-cadence">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Every hour</SelectItem>
+                    <SelectItem value="2">Every 2 hours</SelectItem>
+                    <SelectItem value="4">Every 4 hours</SelectItem>
+                    <SelectItem value="6">Every 6 hours (default)</SelectItem>
+                    <SelectItem value="12">Every 12 hours</SelectItem>
+                    <SelectItem value="24">Once a day</SelectItem>
+                    <SelectItem value="168">Once a week</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => hoverSync.mutate()}
                   disabled={hoverSync.isPending} data-testid="button-hover-sync">

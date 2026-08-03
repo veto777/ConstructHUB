@@ -129,14 +129,16 @@ async function storeFile(
  * storage as uploads — same directory, same containment rule, same gated
  * reads. kind is 'contract', refId the estimate id; the row is the record.
  */
-export async function storeGeneratedPdf(args: {
+export async function storeGeneratedFile(args: {
   orgId: string;
   kind: string;
   refId: string | null;
   fileName: string;
   buffer: Buffer;
+  mime: string;
+  ext: string;
 }): Promise<typeof crmAttachments.$inferSelect> {
-  const storagePath = `${args.orgId}/${randomUUID()}.pdf`;
+  const storagePath = `${args.orgId}/${randomUUID()}.${args.ext}`;
   const abs = path.join(STORAGE_DIR, storagePath);
   await fs.promises.mkdir(path.dirname(abs), { recursive: true });
   await fs.promises.writeFile(abs, args.buffer);
@@ -145,11 +147,21 @@ export async function storeGeneratedPdf(args: {
     kind: args.kind,
     refId: args.refId,
     fileName: safeName(args.fileName),
-    mime: "application/pdf",
+    mime: args.mime,
     sizeBytes: args.buffer.length,
     storagePath,
   }).returning();
   return row;
+}
+
+export async function storeGeneratedPdf(args: {
+  orgId: string;
+  kind: string;
+  refId: string | null;
+  fileName: string;
+  buffer: Buffer;
+}): Promise<typeof crmAttachments.$inferSelect> {
+  return storeGeneratedFile({ ...args, mime: "application/pdf", ext: "pdf" });
 }
 
 function streamAttachment(res: any, att: typeof crmAttachments.$inferSelect, inline: boolean) {
