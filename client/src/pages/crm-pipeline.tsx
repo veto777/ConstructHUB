@@ -37,6 +37,10 @@ export default function CrmPipelinePage() {
   const { data, isLoading, isError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
   const canMove = me?.permissions?.manageJobs === true;
   const canSeePrices = me?.permissions?.seePrices === true;
+  // Tall columns collapse: the first few cards show, the rest sit behind an
+  // explicit "Show more". MUST be declared before the loading early-returns —
+  // a hook after a conditional return crashes the tree when data arrives.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const move = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) =>
@@ -62,10 +66,7 @@ export default function CrmPipelinePage() {
   }
 
   const stages: any[] = data.stages ?? [];
-  // Tall columns collapse: the first few cards show, the rest sit behind an
-  // explicit "Show more" so a 42-card Approved lane doesn't scroll forever.
   const COLLAPSED_COUNT = 5;
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const projects: any[] = data.projects ?? [];
   const groups = [...new Set(stages.map((s) => s.group))];
 
