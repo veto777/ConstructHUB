@@ -607,13 +607,22 @@ export default function CrmClientPage() {
     onError: (e: any) => toast({ title: "Could not create estimate", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
+  // "Also text it" — defaults to the org's setting, overridable per send.
+  const { data: smsStatus } = useQuery<any>({ queryKey: ["/api/crm/sms/status"] });
+  const { data: orgForSms } = useQuery<any>({ queryKey: ["/api/crm/org"] });
+  const [alsoText, setAlsoText] = useState<boolean>(false);
+  useEffect(() => {
+    setAlsoText((orgForSms?.customFields as any)?.smsEstimates === true);
+  }, [orgForSms?.customFields]);
+
   const send = useMutation({
     mutationFn: async (estimateId: string) =>
-      (await apiRequest("POST", `/api/crm/estimates/${estimateId}/send`, {})).json(),
+      (await apiRequest("POST", `/api/crm/estimates/${estimateId}/send`, { sms: alsoText })).json(),
     onSuccess: (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
       if (r.emailed) {
-        toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}.` });
+        const textPart = r.texted ? " and texted" : r.smsError ? ` (text failed: ${r.smsError})` : "";
+        toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}${textPart}.` });
       } else {
         navigator.clipboard?.writeText(window.location.origin + r.link);
         toast({
@@ -947,6 +956,13 @@ export default function CrmClientPage() {
                   {/* Optional client-selected discount offers — self-contained. */}
                   {canEstimate && !e.approvedAt && !e.declinedAt && (
                     <EstimateDiscounts estimate={e} />
+                  )}
+                  {canEstimate && !e.approvedAt && !e.declinedAt && smsStatus?.configured && c.phone && (
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
+                      data-testid={`toggle-send-sms-${e.id}`}>
+                      <Checkbox checked={alsoText} onCheckedChange={(v) => setAlsoText(v === true)} />
+                      Also text it
+                    </label>
                   )}
                   {canEstimate && !e.approvedAt && !e.declinedAt && (
                     <Button size="sm" variant={e.sentAt ? "outline" : "default"}

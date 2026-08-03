@@ -265,6 +265,16 @@ export default function CrmSettingsPage() {
     onError: (e: any) => toast({ title: "Could not save the sender", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  // Default for "also text the estimate" when sending a bid.
+  const saveSmsEstimates = useMutation({
+    mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { smsEstimates: on })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Estimate texting saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   // Owner text alerts on signed approvals + payments (opt-in, costs money).
   const saveSmsAlerts = useMutation({
     mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { smsAlerts: on })).json(),
@@ -1123,6 +1133,22 @@ export default function CrmSettingsPage() {
               </div>
             </div>
           )}
+
+          <div className="flex items-center justify-between gap-4 border-t pt-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Text estimates to clients</div>
+              <p className="text-xs text-muted-foreground">
+                When you send a bid, also text the client a link. You can still flip this per send;
+                clients without a mobile just get the email.
+              </p>
+            </div>
+            <Switch
+              checked={(org?.customFields as any)?.smsEstimates === true}
+              onCheckedChange={(v) => saveSmsEstimates.mutate(v)}
+              disabled={saveSmsEstimates.isPending || !smsStatus?.configured}
+              data-testid="switch-sms-estimates"
+            />
+          </div>
 
           <div className="flex items-center justify-between gap-4 border-t pt-3">
             <div className="min-w-0">

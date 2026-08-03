@@ -33,7 +33,7 @@ import { logEvent, presentEstimate, recalcEstimate } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
 import { recordActivity } from "./activity";
-import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners } from "./sms";
+import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault } from "./sms";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
@@ -239,6 +239,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const parsed = z.object({
       email: z.string().email().optional(),
       message: z.string().max(4000).optional(),
+      /** Also text the link. Omitted → the org's default (customFields.smsEstimates). */
+      sms: z.boolean().optional(),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid send request", issues: parsed.error.issues });
 
@@ -345,7 +347,29 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       sentAt, expiresAt, sentToEmail: to, updatedAt: new Date(),
     }).where(eq(crmEstimates.id, est.id)).returning();
 
-    await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, { to, emailed, emailError });
+    // Text the estimate link too, when the org (or this send) asked for it and
+    // the client actually has a mobile. Best-effort: a carrier hiccup never
+    // undoes a send that already happened.
+    const wantSms = parsed.data.sms ?? smsEstimatesDefault(ctx.org.customFields);
+    let texted = false;
+    let smsTo: string | null = null;
+    let smsError: string | null = null;
+    if (wantSms) {
+      smsTo = normalizePhone(cust.phone);
+      if (smsTo) {
+        const r = await sendSms(
+          smsTo,
+          `${branding.name}: your estimate${est.number ? ` ${est.number}` : ""} for ${money(est.totalCents)} is ready — ${link}`,
+          ctx.org.customFields,
+        );
+        texted = r.ok && r.provider !== "log";
+        smsError = r.error ?? (r.provider === "log" ? "texting is not configured" : null);
+      } else {
+        smsError = "this client has no mobile number";
+      }
+    }
+
+    await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, { to, emailed, emailError, texted, smsTo, smsError });
 
     // Owner's "bid sent" notice — fires even when the client copy failed to
     // send (the estimate is marked sent either way; the link is live).
@@ -369,7 +393,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         .catch(() => {});
     }
 
-    res.json({ estimate: presentEstimate(row, ctx), link, emailed, emailError });
+    res.json({ estimate: presentEstimate(row, ctx), link, emailed, emailError, texted, smsTo, smsError });
   });
 
   // ── Public: the client's estimate page ────────────────────────────────────

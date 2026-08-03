@@ -32,6 +32,7 @@ import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pric
 import { registerCrmReportRoutes } from "./reports";
 import { registerCrmHoverRoutes } from "./hover";
 import { registerCrmClientAuthRoutes, allow as rateAllow } from "./client-auth";
+import { sendSms, normalizePhone } from "./sms";
 import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
 import { registerCrmCalendarRoutes } from "./calendar";
@@ -102,6 +103,8 @@ const orgPatchSchema = z.object({
   // Text alerts to the owner's mobile on signed approvals and payments.
   // Opt-in (default off): texting costs money per message.
   smsAlerts: z.boolean().optional(),
+  // Default for texting the estimate link when a bid is sent.
+  smsEstimates: z.boolean().optional(),
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.
   notificationPrefs: z
@@ -134,6 +137,9 @@ const memberPatchSchema = z.object({
 
 const inviteSchema = z.object({
   email: z.string().email(),
+  /** Text the invite too (needs a mobile). */
+  phone: z.string().max(40).nullable().optional(),
+  sms: z.boolean().optional(),
   role: roleSchema.default("field"),
   permissions: permissionsSchema.optional(),
   displayName: z.string().max(120).optional(),
@@ -459,9 +465,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, smsAlerts, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -484,6 +490,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
               else base.themeBase = themeBase;
             }
             if (smsAlerts !== undefined) base.smsAlerts = smsAlerts;
+            if (smsEstimates !== undefined) base.smsEstimates = smsEstimates;
             return base;
           })()
         : undefined;
@@ -785,12 +792,30 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
     const emailed = await sendInviteEmail(ctx.org.name, email, link);
 
+    // Text it too when asked — a field tech reads a text long before an email.
+    let texted = false;
+    let smsError: string | null = null;
+    if (parsed.data.sms) {
+      const to = normalizePhone(parsed.data.phone);
+      if (!to) {
+        smsError = "no valid mobile number";
+      } else {
+        const r = await sendSms(
+          to,
+          `${ctx.org.name} invited you to their team on ConstructHub CRM: ${link}`,
+          ctx.org.customFields,
+        );
+        texted = r.ok && r.provider !== "log";
+        smsError = r.error ?? (r.provider === "log" ? "texting is not configured" : null);
+      }
+    }
+
     logActivity(ctx, "invitation.sent", {
       entityType: "invitation", entityId: invite.id,
       meta: { email: lower, role },
     });
     const { token: _t, ...safe } = invite;
-    res.status(201).json({ invitation: safe, link, emailed });
+    res.status(201).json({ invitation: safe, link, emailed, texted, smsError });
   });
 
   /** Rotate the token + extend the expiry and send the invite mail again. */

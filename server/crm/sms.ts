@@ -573,6 +573,11 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
  * Recipients: active owner members' mobiles, falling back to the org's main
  * phone. Best-effort — a carrier hiccup never breaks an approval or a payment.
  */
+/** Org default for "text the estimate link when I send a bid" (default OFF). */
+export function smsEstimatesDefault(customFields: unknown): boolean {
+  return (customFields as Record<string, unknown> | null | undefined)?.smsEstimates === true;
+}
+
 export function smsAlertsEnabled(customFields: unknown): boolean {
   const v = (customFields as Record<string, unknown> | null | undefined)?.smsAlerts;
   return v === true;

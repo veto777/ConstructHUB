@@ -109,6 +109,8 @@ export default function CrmAdminPage() {
   const [userSearch, setUserSearch] = useState("");
   const [detailOrgId, setDetailOrgId] = useState<string | null>(null);
   const [betaEmail, setBetaEmail] = useState("");
+  // Optional: text the invite too.
+  const [betaPhone, setBetaPhone] = useState("");
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -138,16 +140,25 @@ export default function CrmAdminPage() {
 
   const sendInvite = useMutation({
     mutationFn: async (email: string) => {
-      const res = await apiRequest("POST", "/api/admin/beta-invites", { email });
+      const res = await apiRequest("POST", "/api/admin/beta-invites", {
+        email,
+        phone: betaPhone.trim() || null,
+        sms: Boolean(betaPhone.trim()),
+      });
       return res.json();
     },
-    onSuccess: (data: { link: string; emailed: boolean }) => {
+    onSuccess: (data: { link: string; emailed: boolean; texted?: boolean; smsError?: string | null }) => {
       setBetaEmail("");
+      setBetaPhone("");
       setLastLink(data.emailed ? null : data.link);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/beta-invites"] });
       toast({
         title: data.emailed ? "Beta invite sent" : "Invite created",
-        description: data.emailed ? undefined : "Email delivery failed — copy the link below.",
+        description: data.texted
+          ? "Emailed and texted."
+          : data.smsError
+            ? `Emailed — text failed: ${data.smsError}`
+            : data.emailed ? undefined : "Email delivery failed — copy the link below.",
       });
     },
     onError: (err: any) => {
@@ -366,6 +377,14 @@ export default function CrmAdminPage() {
                 data-testid="input-beta-email"
               />
             </div>
+            <Input
+              type="tel"
+              value={betaPhone}
+              onChange={(e) => setBetaPhone(e.target.value)}
+              placeholder="mobile (optional)"
+              className="h-9 w-44"
+              data-testid="input-beta-phone"
+            />
             <Button type="submit" size="sm" disabled={sendInvite.isPending} data-testid="button-send-beta-invite">
               {sendInvite.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
               Send invite

@@ -375,6 +375,9 @@ export default function CrmTeamPage() {
   const [inviteRole, setInviteRole] = useState("field");
   const [inviteDivision, setInviteDivision] = useState("all");
   const [lastLink, setLastLink] = useState<string | null>(null);
+  // Optional: text the invite too (a field tech reads a text, not an inbox).
+  const [invitePhone, setInvitePhone] = useState("");
+  const { data: smsStatus } = useQuery<any>({ queryKey: ["/api/crm/sms/status"] });
 
   const invite = useMutation({
     mutationFn: async () =>
@@ -382,15 +385,22 @@ export default function CrmTeamPage() {
         email: inviteEmail,
         role: inviteRole,
         divisionId: inviteDivision === "all" ? null : inviteDivision,
+        phone: invitePhone.trim() || null,
+        sms: Boolean(invitePhone.trim()),
       })).json(),
     onSuccess: (data: any) => {
       setInviteEmail("");
+      setInvitePhone("");
       setLastLink(data.link ?? null);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invitations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/members"] });
       toast({
         title: data.emailed ? "Invitation sent" : "Invitation created",
-        description: data.emailed ? undefined : "Email delivery failed — copy the link below instead.",
+        description: data.texted
+          ? "Emailed and texted."
+          : data.smsError
+            ? `Emailed — text failed: ${data.smsError}`
+            : data.emailed ? undefined : "Email delivery failed — copy the link below instead.",
       });
     },
     onError: (e: any) => toast({ title: "Could not invite", description: String(e.message ?? e), variant: "destructive" }),
@@ -688,7 +698,7 @@ export default function CrmTeamPage() {
                 <SectionTitle
                   infoKey="team-invite"
                   title="Invite someone"
-                  description="They'll get an email with a link that expires in 14 days."
+                  description="They'll get an email with a link that expires in 14 days — add a mobile to text it too."
                 />
               </CardHeader>
               <CardContent className="space-y-3">
@@ -696,6 +706,11 @@ export default function CrmTeamPage() {
                   <Input placeholder="name@company.com" value={inviteEmail} type="email"
                     data-testid="input-invite-email"
                     onChange={(e) => setInviteEmail(e.target.value)} className="flex-1" />
+                  {smsStatus?.configured && (
+                    <Input placeholder="mobile (optional) — also text it" value={invitePhone} type="tel"
+                      data-testid="input-invite-phone"
+                      onChange={(e) => setInvitePhone(e.target.value)} className="sm:w-56" />
+                  )}
                   <Select value={inviteRole} onValueChange={setInviteRole}>
                     <SelectTrigger className="sm:w-48" data-testid="select-invite-role">
                       <SelectValue />

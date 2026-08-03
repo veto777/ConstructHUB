@@ -28,6 +28,7 @@ import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 import { getSeatUsage } from "./tenancy";
 import { hashBetaToken, BETA_INVITE_DAYS } from "./beta";
+import { sendSms, normalizePhone } from "./sms";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -55,7 +56,12 @@ async function plansByUserId() {
   return map;
 }
 
-const betaInviteSchema = z.object({ email: z.string().email() });
+const betaInviteSchema = z.object({
+  email: z.string().email(),
+  /** Optionally text the invite as well (platform admin's choice). */
+  phone: z.string().max(40).nullable().optional(),
+  sms: z.boolean().optional(),
+});
 
 export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void {
   /** Headline counters for the whole platform. */
@@ -348,8 +354,26 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
       console.error("[crm] beta invite email failed:", e?.message || e);
     }
 
+    // Text it too when asked — contractors live on their phones.
+    let texted = false;
+    let smsError: string | null = null;
+    if (parsed.data.sms) {
+      const to = normalizePhone(parsed.data.phone);
+      if (!to) {
+        smsError = "no valid mobile number";
+      } else {
+        // Platform-level send: no org context, so the shared platform number.
+        const r = await sendSms(
+          to,
+          `You're invited to the ConstructHub CRM beta — this link creates your own workspace: ${link}`,
+        );
+        texted = r.ok && r.provider !== "log";
+        smsError = r.error ?? (r.provider === "log" ? "texting is not configured" : null);
+      }
+    }
+
     const { tokenHash: _h, ...safe } = invite;
-    res.status(201).json({ invite: { ...safe, status: "pending" }, link, emailed });
+    res.status(201).json({ invite: { ...safe, status: "pending" }, link, emailed, texted, smsError });
   });
 
   /** Revoke a PENDING invite: the row (and with it the only copy of the token
