@@ -730,8 +730,12 @@ export async function ingestHoverJob(
     .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.externalId, externalId)))
     .limit(1);
   if (existing) {
-    // Photos arrived after the first ingest (or this build) — top them up.
-    if (existing.customerId) {
+    // Photos arrived after the first ingest (or this build) — top them up,
+    // but not on every pass: a stamp keeps the 6-hourly sync from
+    // re-fetching every job's detail payload forever.
+    const photosSyncedAt = (existing.rawPayload as any)?.photosSyncedAt;
+    const fresh = photosSyncedAt && Date.now() - new Date(photosSyncedAt).getTime() < 7 * 24 * 3600_000;
+    if (existing.customerId && !fresh) {
       try {
         const token0 = await getHoverAccessToken(orgId, fetchFn);
         const { apiBase: base0 } = hoverBases();
@@ -740,6 +744,10 @@ export async function ingestHoverJob(
         if (det0.ok) {
           const job0 = (await det0.json()) as any;
           await importHoverJobPhotos(orgId, jobId, existing.customerId, job0, auth0, fetchFn);
+          await db.update(crmMeasurements).set({
+            rawPayload: { ...((existing.rawPayload as object) ?? {}), photosSyncedAt: new Date().toISOString() } as any,
+            updatedAt: new Date(),
+          }).where(eq(crmMeasurements.id, existing.id));
         }
       } catch (e: any) {
         console.error(`[hover] photo top-up for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
@@ -886,6 +894,10 @@ export async function ingestHoverJob(
 
   if (customer?.id) {
     await importHoverJobPhotos(orgId, jobId, customer.id, job, auth, fetchFn)
+      .then(() => db.update(crmMeasurements).set({
+        rawPayload: { ...(row.rawPayload as object), photosSyncedAt: new Date().toISOString() } as any,
+        updatedAt: new Date(),
+      }).where(eq(crmMeasurements.id, row.id)))
       .catch((e: any) => console.error(`[hover] photos for job ${jobId} failed:`, String(e?.message || e).slice(0, 120)));
   }
 
@@ -906,14 +918,25 @@ export type HoverSyncRunReport = {
  *  existing jobs just top up photos). Used by the Sync button AND the
  *  scheduler. */
 export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
-  const { status, json } = await hoverApi(orgId, "GET", "/v2/jobs").catch((e: any) => {
-    return { status: 0, json: { error: String(e?.message || e) } } as any;
-  });
-  if (status !== 200) {
-    await writeHoverConn(orgId, { lastError: `jobs list failed (${status || "network"})` }).catch(() => {});
-    throw new Error("Could not list HOVER jobs.");
+  // The list is paginated (25/page, per_page is ignored) — walk every page.
+  const jobs: any[] = [];
+  let totalPages = 1;
+  for (let page = 1; page <= Math.min(totalPages, 80); page++) {
+    const { status, json } = await hoverApi(orgId, "GET", `/v2/jobs?page=${page}`).catch((e: any) => {
+      return { status: 0, json: { error: String(e?.message || e) } } as any;
+    });
+    if (status !== 200) {
+      if (page === 1) {
+        await writeHoverConn(orgId, { lastError: `jobs list failed (${status || "network"})` }).catch(() => {});
+        throw new Error("Could not list HOVER jobs.");
+      }
+      break; // keep what we have — a late page failing shouldn't void the run
+    }
+    const batch: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
+    jobs.push(...batch);
+    totalPages = Number(json?.pagination?.total_pages) || totalPages;
+    if (!batch.length) break;
   }
-  const jobs: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
   const report: HoverSyncRunReport = {
     scanned: jobs.length,
     attachedByEmail: 0, attachedByPhone: 0, attachedByAddress: 0,
