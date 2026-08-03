@@ -34,3 +34,6 @@ tunnel/dns-rollback/
 # playwright
 test-results/
 playwright-report/
+
+# Business documents (EIN, filings) — never commit, never push to GitHub.
+private/

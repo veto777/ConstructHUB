@@ -133,6 +133,12 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
 (`Screenshot_2026-06-19_215545_*.png`, `image_17819205*.png`, `image_17819315*.png`, `image_17819317*.png`),
 `.agents/memory/competitor-intel-flag.md`, `replit.md`, `client/src/lib/features.ts`.
 
+## Business records (not in git)
+- **EIN assignment letter (IRS):** `~/ConstructHUB/private/EIN_ConstructHUB.pdf` on the tower.
+  `private/` is gitignored — business documents never reach GitHub. Captured by the 48h 3-tier
+  backup (internal `/mnt/data/site-backups/constructhub/*.code.tgz`, external, R2), so it survives
+  a tower loss. Needed for: A2P 10DLC brand registration, Stripe business verification, banking.
+
 ## Open items
 - [ ] **2026-09-08: reapply for GBP API access** (see "GBP API access timeline" above — cloud reminder armed).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").
