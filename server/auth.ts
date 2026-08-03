@@ -31,6 +31,7 @@ declare module "express-session" {
     pending2FAUserId?: number;
     /** CRM beta invite token, carried through the Google OAuth round-trip. */
     betaToken?: string;
+    authNext?: string;
   }
 }
 
@@ -181,6 +182,11 @@ export async function setupAuth(app: Express) {
     if (typeof req.query.beta === "string" && req.query.beta) {
       req.session.betaToken = req.query.beta;
     }
+    // So does a post-login destination (team-invite accept page) — relative
+    // paths only, never an absolute URL (open-redirect guard).
+    if (typeof req.query.next === "string" && /^\/[^\/]/.test(req.query.next)) {
+      req.session.authNext = req.query.next;
+    }
     const scopes = ["profile", "email"];
     if (gbp) {
       scopes.push("https://www.googleapis.com/auth/business.manage");
@@ -212,7 +218,11 @@ export async function setupAuth(app: Express) {
           }
         }
       } catch {}
-      res.redirect("/?auth=success");
+      const nextPath = typeof req.session.authNext === "string" && /^\/[^\/]/.test(req.session.authNext)
+        ? req.session.authNext
+        : null;
+      delete req.session.authNext;
+      res.redirect(nextPath ?? "/?auth=success");
     }
   );
 

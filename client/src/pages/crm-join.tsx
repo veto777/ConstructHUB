@@ -52,6 +52,11 @@ export default function CrmJoinPage() {
   });
 
   const [phone, setPhone] = useState("");
+  // Who am I? Signed-out visitors get routed through /auth and back here.
+  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const authNext = `/crm/join?token=${encodeURIComponent(token ?? "")}`;
+  const toAuth = (mode: "login" | "signup") =>
+    (window.location.href = `/auth?mode=${mode}&next=${encodeURIComponent(authNext)}`);
   const accept = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/invitations/accept", { token, phone })).json(),
     onSuccess: () => {
@@ -59,8 +64,15 @@ export default function CrmJoinPage() {
       toast({ title: "Welcome aboard" });
       navigate("/crm/team");
     },
-    onError: (e: any) =>
-      toast({ title: "Could not accept", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => {
+      const msg = String(e.message ?? e);
+      if (msg.startsWith("401")) {
+        // Not signed in — the fix is a sign-in, not an error toast.
+        toAuth("login");
+        return;
+      }
+      toast({ title: "Could not accept", description: msg, variant: "destructive" });
+    },
   });
 
   if (!token) {
@@ -128,15 +140,34 @@ export default function CrmJoinPage() {
                     Clients on your jobs see this — they need to know exactly who to reach.
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  You must be signed in as {data.email} to accept. If you don't have an account yet,
-                  create one with that email address first.
-                </p>
-                <Button className="w-full" onClick={() => accept.mutate()}
-                  disabled={accept.isPending || phone.replace(/[^\d]/g, "").length < 7}
-                  data-testid="button-accept-invite">
-                  {accept.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Accept invitation
-                </Button>
+                {me ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Signed in as {me.email}.{me.email?.toLowerCase() !== data.email?.toLowerCase()
+                        ? ` This invitation was sent to ${data.email} — sign in with that account to accept.` : ""}
+                    </p>
+                    <Button className="w-full" onClick={() => accept.mutate()}
+                      disabled={accept.isPending || phone.replace(/[^\d]/g, "").length < 7}
+                      data-testid="button-accept-invite">
+                      {accept.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Accept invitation
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      First, sign in (or create an account) as <strong>{data.email}</strong> — then you'll
+                      land right back here to accept.
+                    </p>
+                    <Button className="w-full" onClick={() => toAuth("signup")}
+                      data-testid="button-join-create-account">
+                      Create my account
+                    </Button>
+                    <Button className="w-full" variant="outline" onClick={() => toAuth("login")}
+                      data-testid="button-join-signin">
+                      I already have an account — sign in
+                    </Button>
+                  </>
+                )}
               </>
             )}
           </CardContent>
