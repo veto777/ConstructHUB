@@ -24,6 +24,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { isPlatformAdminEmail } from "../admin";
+import { timingSafeEqual } from "crypto";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 import { getSeatUsage } from "./tenancy";
@@ -37,12 +38,44 @@ type GetUser = (req: any, res: any) => any;
  * demo autologin), so the email always comes from the users row — never from
  * the session object. Responds and returns null when the caller isn't one.
  */
-async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUser) {
+export function adminGateConfigured(): boolean {
+  return !!(process.env.ADMIN_GATE_USER && process.env.ADMIN_GATE_PASS);
+}
+
+/** Constant-time-ish compare — never leak length via early exit. */
+function safeEq(a: string, b: string): boolean {
+  const A = Buffer.from(a), B = Buffer.from(b);
+  if (A.length !== B.length) {
+    timingSafeEqual(A, A); // burn the same time either way
+    return false;
+  }
+  return timingSafeEqual(A, B);
+}
+
+const gateAttempts = new Map<string, { n: number; resetAt: number }>();
+function gateAllow(ip: string): boolean {
+  const now = Date.now();
+  const cur = gateAttempts.get(ip);
+  if (!cur || cur.resetAt < now) {
+    gateAttempts.set(ip, { n: 1, resetAt: now + 15 * 60 * 1000 });
+    return true;
+  }
+  cur.n++;
+  return cur.n <= 8;
+}
+
+export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUser) {
   const user = getDevUser(req, res);
   if (!user) return null;
   const [account] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
   if (!account || !isPlatformAdminEmail(account.email)) {
     res.status(403).json({ message: "Platform admin access required" });
+    return null;
+  }
+  // Second factor for the cross-org console: the admin passphrase, once per
+  // session. Only enforced where the credentials are configured (prod).
+  if (adminGateConfigured() && req.session?.platformAdminGate !== true) {
+    res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
     return null;
   }
   return account;
@@ -64,6 +97,27 @@ const betaInviteSchema = z.object({
 });
 
 export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void {
+  /** The /admin login wall. Status says whether the form is needed. */
+  app.get("/api/admin/gate", (req: any, res) => {
+    res.json({
+      gateConfigured: adminGateConfigured(),
+      gatePassed: req.session?.platformAdminGate === true,
+    });
+  });
+
+  app.post("/api/admin/gate", (req: any, res) => {
+    if (!adminGateConfigured()) return res.status(409).json({ message: "Gate not configured" });
+    const ip = String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim();
+    if (!gateAllow(ip)) return res.status(429).json({ message: "Too many attempts. Try again later." });
+    const u = String(req.body?.username ?? "");
+    const p = String(req.body?.password ?? "");
+    if (!safeEq(u, process.env.ADMIN_GATE_USER!) || !safeEq(p, process.env.ADMIN_GATE_PASS!)) {
+      return res.status(401).json({ message: "Wrong username or password" });
+    }
+    req.session.platformAdminGate = true;
+    res.json({ ok: true });
+  });
+
   /** Headline counters for the whole platform. */
   app.get("/api/admin/overview", async (req: any, res) => {
     const admin = await requirePlatformAdmin(req, res, getDevUser);

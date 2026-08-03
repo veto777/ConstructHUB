@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
 import { CrmRibbon } from "@/components/crm-ribbon";
 import { CrmNotificationsBell } from "@/components/crm-notifications-bell";
+import { CookieConsent } from "@/components/cookie-consent";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CartProvider } from "@/contexts/cart-context";
@@ -495,6 +496,7 @@ function App() {
         <CartProvider>
           <TooltipProvider>
             <AppContent />
+            <CookieConsent />
             <Toaster />
           </TooltipProvider>
         </CartProvider>

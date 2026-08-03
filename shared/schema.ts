@@ -1438,6 +1438,23 @@ export const crmNotifications = pgTable("crm_notifications", {
 });
 
 /**
+ * First-party visitor analytics — pageviews with visitor cookie id, signed-in
+ * user when known, IP and UA. Only written for visitors who ACCEPTED the
+ * cookie banner. Platform-level (no org scoping); read from Platform Admin.
+ */
+export const chAnalyticsEvents = pgTable("ch_analytics_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  visitorId: varchar("visitor_id").notNull(),
+  userId: integer("user_id"),
+  type: text("type").notNull().default("pageview"),
+  path: text("path").notNull(),
+  referrer: text("referrer"),
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/**
  * Org-wide team activity — "Mike approved the job", "Andrey scheduled Job 62".
  * Written at the action sites (project stage moves, job scheduling); the
  * /api/crm/activity feed merges this with estimate events and payments.

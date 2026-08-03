@@ -136,6 +136,8 @@ export async function registerRoutes(
     await ensureCrmSchema();
     const { registerCrmRoutes } = await import("./crm/routes");
     registerCrmRoutes(app, getDevUser);
+    const { registerAnalyticsRoutes } = await import("./analytics");
+    registerAnalyticsRoutes(app, getDevUser);
   } catch (e: any) {
     console.error("Failed to initialize CRM module:", e?.message || e);
   }

@@ -710,6 +710,20 @@ export async function ensureCrmSchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS crm_team_activity_org_idx
       ON crm_team_activity (org_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ch_analytics_events (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      visitor_id varchar NOT NULL,
+      user_id integer,
+      type text NOT NULL DEFAULT 'pageview',
+      path text NOT NULL,
+      referrer text,
+      ip text,
+      user_agent text,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS ch_analytics_time_idx ON ch_analytics_events (created_at DESC);
+    CREATE INDEX IF NOT EXISTS ch_analytics_visitor_idx ON ch_analytics_events (visitor_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS crm_notifications_org_idx ON crm_notifications (org_id);
   `);
 

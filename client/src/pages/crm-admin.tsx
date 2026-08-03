@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import {Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard,
+  ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard, Activity,
   Search, Mail, Copy, Check, Loader2, Rocket, Ban,
 } from "lucide-react";
 import {
@@ -117,25 +118,48 @@ export default function CrmAdminPage() {
   const { data: me, isLoading: meLoading } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const isAdmin = me?.isPlatformAdmin === true;
 
+  // The /admin login wall — the passphrase second factor (enforced when the
+  // server has credentials configured). Data queries hold until it passes.
+  const { data: gate, isLoading: gateLoading } = useQuery<{ gateConfigured: boolean; gatePassed: boolean }>({
+    queryKey: ["/api/admin/gate"],
+  });
+  const gateOpen = !!gate && (!gate.gateConfigured || gate.gatePassed);
+  const [gateUser, setGateUser] = useState("");
+  const [gatePass, setGatePass] = useState("");
+  const gateLogin = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", "/api/admin/gate", { username: gateUser, password: gatePass })).json(),
+    onSuccess: () => {
+      setGatePass("");
+      queryClient.invalidateQueries();
+    },
+    onError: (e: any) => toast({ title: "Sign-in failed", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   const { data: overview } = useQuery<Overview>({
     queryKey: ["/api/admin/overview"],
-    enabled: isAdmin,
+    enabled: isAdmin && gateOpen,
   });
   const { data: users } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
-    enabled: isAdmin,
+    enabled: isAdmin && gateOpen,
   });
   const { data: orgs } = useQuery<AdminOrg[]>({
     queryKey: ["/api/admin/orgs"],
-    enabled: isAdmin,
+    enabled: isAdmin && gateOpen,
   });
   const { data: invites } = useQuery<BetaInvite[]>({
     queryKey: ["/api/admin/beta-invites"],
-    enabled: isAdmin,
+    enabled: isAdmin && gateOpen,
+  });
+  const { data: analytics } = useQuery<any>({
+    queryKey: ["/api/admin/analytics"],
+    enabled: isAdmin && gateOpen,
+    refetchInterval: 60_000,
   });
   const { data: orgDetail } = useQuery<OrgDetail>({
     queryKey: ["/api/admin/orgs", detailOrgId],
-    enabled: isAdmin && !!detailOrgId,
+    enabled: isAdmin && gateOpen && !!detailOrgId,
   });
 
   const sendInvite = useMutation({
@@ -194,6 +218,50 @@ export default function CrmAdminPage() {
         title="Platform admins only"
         description="This console is for the ConstructHUB team. Your account isn't on the platform admin list."
       />
+    );
+  }
+
+  if (gateLoading) {
+    return (
+      <CrmPage>
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </CrmPage>
+    );
+  }
+
+  if (!gateOpen) {
+    return (
+      <CrmPage>
+        <div className="max-w-sm mx-auto mt-16">
+          <Card data-testid="card-admin-gate">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShieldCheck className="h-5 w-5 text-primary" /> Platform Admin sign-in
+              </CardTitle>
+              <CardDescription>The cross-account console needs its own credentials.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label htmlFor="gate-user">Username</Label>
+                <Input id="gate-user" autoComplete="username" value={gateUser}
+                  onChange={(e) => setGateUser(e.target.value)} data-testid="input-admin-gate-user" />
+              </div>
+              <div>
+                <Label htmlFor="gate-pass">Password</Label>
+                <Input id="gate-pass" type="password" autoComplete="current-password" value={gatePass}
+                  onKeyDown={(e) => { if (e.key === "Enter" && gateUser && gatePass) gateLogin.mutate(); }}
+                  onChange={(e) => setGatePass(e.target.value)} data-testid="input-admin-gate-pass" />
+              </div>
+              <Button className="w-full" disabled={!gateUser || !gatePass || gateLogin.isPending}
+                onClick={() => gateLogin.mutate()} data-testid="button-admin-gate-login">
+                {gateLogin.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Sign in
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </CrmPage>
     );
   }
 
@@ -541,6 +609,78 @@ export default function CrmAdminPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* ── Visitor analytics (consent-gated first-party tracking) ────────── */}
+      <div className="space-y-3" data-testid="section-admin-analytics">
+        <SectionTitle icon={Activity} title="Visitor analytics"
+          description="Consent-gated first-party tracking — pages, visitors, IPs. Only visitors who accepted the cookie banner appear here." />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Card><CardContent className="p-4">
+            <div className="text-2xl font-semibold tabular-nums">{analytics?.last24h?.visitors ?? "—"}</div>
+            <div className="text-xs text-muted-foreground mt-1">visitors · 24h</div>
+          </CardContent></Card>
+          <Card><CardContent className="p-4">
+            <div className="text-2xl font-semibold tabular-nums">{analytics?.last24h?.events ?? "—"}</div>
+            <div className="text-xs text-muted-foreground mt-1">pageviews · 24h</div>
+          </CardContent></Card>
+          <Card><CardContent className="p-4">
+            <div className="text-2xl font-semibold tabular-nums">{analytics?.last7d?.visitors ?? "—"}</div>
+            <div className="text-xs text-muted-foreground mt-1">visitors · 7d</div>
+          </CardContent></Card>
+          <Card><CardContent className="p-4">
+            <div className="text-2xl font-semibold tabular-nums">{analytics?.last7d?.events ?? "—"}</div>
+            <div className="text-xs text-muted-foreground mt-1">pageviews · 7d</div>
+          </CardContent></Card>
+        </div>
+        {(analytics?.topPages?.length ?? 0) > 0 && (
+          <Card><CardContent className="p-4">
+            <div className="text-sm font-medium mb-2">Top pages · 7d</div>
+            <div className="space-y-1">
+              {analytics.topPages.map((tp: any) => (
+                <div key={tp.path} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="truncate text-muted-foreground">{tp.path}</span>
+                  <span className="tabular-nums font-medium shrink-0">{tp.views}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent></Card>
+        )}
+        <div className={crmTable.wrapper}>
+          <table className={crmTable.table}>
+            <thead className={crmTable.thead}>
+              <tr>
+                <th className={crmTable.th}>When</th>
+                <th className={crmTable.th}>Who</th>
+                <th className={crmTable.th}>Page</th>
+                <th className={crmTable.th}>IP</th>
+                <th className={`${crmTable.th} hidden lg:table-cell`}>Device</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(analytics?.recent ?? []).length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No tracked visits yet — they appear once visitors accept the cookie banner.
+                </td></tr>
+              )}
+              {(analytics?.recent ?? []).map((r: any) => (
+                <tr key={r.id} className={crmTable.tr}>
+                  <td className={`${crmTable.td} whitespace-nowrap text-muted-foreground`}>
+                    {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
+                  </td>
+                  <td className={crmTable.td}>
+                    {r.email
+                      ? <span className="font-medium">{r.email}</span>
+                      : <span className="text-muted-foreground">visitor {r.visitorId}</span>}
+                  </td>
+                  <td className={`${crmTable.td} max-w-[220px] truncate`}>{r.path}</td>
+                  <td className={`${crmTable.td} tabular-nums text-muted-foreground`}>{r.ip || "—"}</td>
+                  <td className={`${crmTable.td} hidden lg:table-cell max-w-[260px] truncate text-muted-foreground`}>{r.userAgent}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
       </div>
     </CrmPage>
   );
