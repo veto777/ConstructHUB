@@ -17,6 +17,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { db } from "../db";
 import {
   crmCustomers, crmEstimates, crmMembers, crmOrgs, crmProjects,
@@ -47,14 +48,121 @@ export function smsConfigured(): boolean {
 }
 
 /** What the Settings card renders — never leaks the auth token. */
-export function smsStatus() {
+export function smsStatus(orgCustomFields?: unknown) {
   const missing = smsMissingEnv();
+  // An org on its OWN account can text even when the platform has no carrier.
+  const sender = resolveSmsSender(orgCustomFields);
   return {
-    configured: missing.length === 0,
+    configured: Boolean(sender),
+    // Only meaningful for platform/dedicated senders; a BYO org fills its own.
     missing,
-    provider: missing.length === 0 ? "signalwire" : null,
-    fromNumber: missing.length === 0 ? process.env.SIGNALWIRE_FROM_NUMBER! : null,
+    provider: sender ? "signalwire" : null,
+    mode: sender?.mode ?? orgSmsConfig(orgCustomFields).mode,
+    fromNumber: sender?.from ?? null,
   };
+}
+
+// ── Per-org sender: shared platform number, own number, or own account ─────
+
+/**
+ * Every org picks how its texts go out (Settings → SMS):
+ *   "platform"  — the shared ConstructHUB number (default; nothing to set up)
+ *   "dedicated" — the org's own number, provisioned in ConstructHUB's carrier
+ *                 account: platform credentials, THEIR number in the From
+ *   "byo"       — the org's own SignalWire account entirely: their space,
+ *                 project, token and number, billed and 10DLC-registered to
+ *                 them. The token is encrypted at rest (AES-256-GCM).
+ *
+ * Anything missing or malformed falls back to the platform sender rather
+ * than failing a send — an org can never silently lose its texts to a typo.
+ */
+export type OrgSmsMode = "platform" | "dedicated" | "byo";
+export type OrgSmsConfig = {
+  mode: OrgSmsMode;
+  fromNumber?: string | null;
+  spaceUrl?: string | null;
+  projectId?: string | null;
+  /** AES-256-GCM blob — never the raw token. */
+  apiTokenEnc?: string | null;
+};
+
+const smsBoxKey = () =>
+  createHash("sha256")
+    .update(`sms-secret-box:${process.env.SESSION_SECRET || "dev-only-insecure-session-secret"}`)
+    .digest();
+
+export function encryptSmsSecret(plain: string): string {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", smsBoxKey(), iv);
+  const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
+  return `v1.${iv.toString("base64")}.${c.getAuthTag().toString("base64")}.${ct.toString("base64")}`;
+}
+
+export function decryptSmsSecret(enc: string): string | null {
+  try {
+    const [v, iv, tag, ct] = enc.split(".");
+    if (v !== "v1") return null;
+    const d = createDecipheriv("aes-256-gcm", smsBoxKey(), Buffer.from(iv, "base64"));
+    d.setAuthTag(Buffer.from(tag, "base64"));
+    return Buffer.concat([d.update(Buffer.from(ct, "base64")), d.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+export function orgSmsConfig(customFields: unknown): OrgSmsConfig {
+  const raw = (customFields as Record<string, any> | null | undefined)?.sms;
+  const mode: OrgSmsMode =
+    raw?.mode === "dedicated" || raw?.mode === "byo" ? raw.mode : "platform";
+  return {
+    mode,
+    fromNumber: raw?.fromNumber ?? null,
+    spaceUrl: raw?.spaceUrl ?? null,
+    projectId: raw?.projectId ?? null,
+    apiTokenEnc: raw?.apiTokenEnc ?? null,
+  };
+}
+
+export type SmsSender = {
+  space: string; project: string; token: string; from: string;
+  /** Which of the three modes actually produced this sender. */
+  mode: OrgSmsMode;
+};
+
+/** The platform sender from env, or null when the platform isn't configured. */
+function platformSender(): Omit<SmsSender, "mode"> | null {
+  if (!smsConfigured()) return null;
+  return {
+    space: process.env.SIGNALWIRE_SPACE_URL!.replace(/^https?:\/\//, "").replace(/\/$/, ""),
+    project: process.env.SIGNALWIRE_PROJECT_ID!,
+    token: process.env.SIGNALWIRE_API_TOKEN!,
+    from: process.env.SIGNALWIRE_FROM_NUMBER!,
+  };
+}
+
+/**
+ * Resolve who a given org's texts come FROM. Pure apart from env reads —
+ * unit-tested. Returns null only when nothing can send at all.
+ */
+export function resolveSmsSender(customFields: unknown): SmsSender | null {
+  const cfg = orgSmsConfig(customFields);
+  const platform = platformSender();
+
+  if (cfg.mode === "byo") {
+    const token = cfg.apiTokenEnc ? decryptSmsSecret(cfg.apiTokenEnc) : null;
+    const space = cfg.spaceUrl?.replace(/^https?:\/\//, "").replace(/\/$/, "") || null;
+    if (space && cfg.projectId && token && cfg.fromNumber) {
+      return { space, project: cfg.projectId, token, from: cfg.fromNumber, mode: "byo" };
+    }
+    return platform ? { ...platform, mode: "platform" } : null; // incomplete BYO → platform
+  }
+
+  if (cfg.mode === "dedicated" && cfg.fromNumber && platform) {
+    // Their number, the platform's carrier account.
+    return { ...platform, from: cfg.fromNumber, mode: "dedicated" };
+  }
+
+  return platform ? { ...platform, mode: "platform" } : null;
 }
 
 // ── The provider seam ───────────────────────────────────────────────────────
@@ -85,11 +193,8 @@ function logProviderSend(to: string, body: string): SmsResult {
 
 /** SignalWire Compatibility API — Twilio-shaped: POST {space}/api/laml/2010-04-01/
  *  Accounts/{project}/Messages.json, basic auth project:token. */
-async function signalwireSend(to: string, body: string): Promise<SmsResult> {
-  const space = process.env.SIGNALWIRE_SPACE_URL!.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  const project = process.env.SIGNALWIRE_PROJECT_ID!;
-  const token = process.env.SIGNALWIRE_API_TOKEN!;
-  const from = process.env.SIGNALWIRE_FROM_NUMBER!;
+async function signalwireSend(to: string, body: string, sender: SmsSender): Promise<SmsResult> {
+  const { space, project, token, from } = sender;
   try {
     const resp = await fetch(
       `https://${space}/api/laml/2010-04-01/Accounts/${encodeURIComponent(project)}/Messages.json`,
@@ -116,12 +221,19 @@ async function signalwireSend(to: string, body: string): Promise<SmsResult> {
 }
 
 /**
- * Send a text: SignalWire when configured, the recording log provider when
- * not — check `result.provider` before telling a user a text "went out".
+ * Send a text: SignalWire when a sender resolves, the recording log provider
+ * when nothing can send — check `result.provider` before telling a user a
+ * text "went out". Pass the org's customFields to use ITS sender (own number
+ * or own account); omit them for platform-level sends.
  */
-export async function sendSms(to: string, body: string): Promise<SmsResult> {
-  if (!smsConfigured()) return logProviderSend(to, body);
-  return signalwireSend(to, body);
+export async function sendSms(
+  to: string,
+  body: string,
+  orgCustomFields?: unknown,
+): Promise<SmsResult> {
+  const sender = resolveSmsSender(orgCustomFields);
+  if (!sender) return logProviderSend(to, body);
+  return signalwireSend(to, body, sender);
 }
 
 /** Loose E.164 sanity: optional +, 7–15 digits. Returns null when unusable. */
@@ -214,6 +326,7 @@ export async function maybeAlertReengagement(args: {
     smsResult = await sendSms(
       smsTo,
       `${cust.displayName} is reviewing ${estLabel}${total ? ` (${total})` : ""} again — good time to call. ${clientLink}`,
+      org.customFields,
     );
   }
 
@@ -255,12 +368,67 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    res.json(smsStatus());
+    res.json(smsStatus(ctx.org.customFields));
   });
 
   /** Send a real test text — manageIntegrations only. Honest 503 when the
    *  carrier env vars are missing (the log provider is for system sends, not
    *  for pretending a test reached a phone). */
+  /** The org's own sender setup: shared platform number, own number, or own
+   *  SignalWire account. manageIntegrations only; the token is write-only
+   *  (stored encrypted, never returned). */
+  app.put("/api/crm/sms/sender", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageIntegrations")) return;
+
+    const parsed = z.object({
+      mode: z.enum(["platform", "dedicated", "byo"]),
+      fromNumber: z.string().max(20).nullable().optional(),
+      spaceUrl: z.string().max(200).nullable().optional(),
+      projectId: z.string().max(100).nullable().optional(),
+      /** Raw token — encrypted here, never stored or echoed in the clear. */
+      apiToken: z.string().max(200).nullable().optional(),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid SMS sender", issues: parsed.error.issues });
+    const p = parsed.data;
+
+    const from = p.fromNumber ? normalizePhone(p.fromNumber) : null;
+    if (p.mode !== "platform" && !from) {
+      return res.status(400).json({ message: "A valid From number is required for your own number or account." });
+    }
+    if (p.mode === "byo" && !(p.spaceUrl && p.projectId)) {
+      return res.status(400).json({ message: "Your own account needs a space URL and project id." });
+    }
+
+    const cf = { ...((ctx.org.customFields as Record<string, any> | null) ?? {}) };
+    const prior = orgSmsConfig(cf);
+    if (p.mode === "platform") {
+      delete cf.sms;
+    } else {
+      cf.sms = {
+        mode: p.mode,
+        fromNumber: from,
+        spaceUrl: p.mode === "byo" ? p.spaceUrl : null,
+        projectId: p.mode === "byo" ? p.projectId : null,
+        // Keep the stored token when the form leaves it blank (edit without
+        // re-typing); clear it when switching away from BYO.
+        apiTokenEnc: p.mode === "byo"
+          ? (p.apiToken ? encryptSmsSecret(p.apiToken) : prior.apiTokenEnc ?? null)
+          : null,
+      };
+      if (p.mode === "byo" && !cf.sms.apiTokenEnc) {
+        return res.status(400).json({ message: "Your own account needs an API token." });
+      }
+    }
+    const [row] = await db.update(crmOrgs)
+      .set({ customFields: cf, updatedAt: new Date() })
+      .where(eq(crmOrgs.id, ctx.org.id)).returning();
+    res.json(smsStatus(row.customFields));
+  });
+
   app.post("/api/crm/sms/test", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -284,7 +452,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     const to = normalizePhone(parsed.data.to);
     if (!to) return res.status(400).json({ message: "That doesn't look like a phone number." });
 
-    const result = await sendSms(to, parsed.data.body?.trim() || `Test text from ${ctx.org.name} — SMS is working.`);
+    const result = await sendSms(to, parsed.data.body?.trim() || `Test text from ${ctx.org.name} — SMS is working.`, ctx.org.customFields);
     if (!result.ok) return res.status(502).json({ message: `SignalWire rejected the text: ${result.error}` });
     res.json({ ok: true, provider: result.provider, sid: result.sid, to });
   });
@@ -360,6 +528,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
       const r = await sendSms(
         phone,
         `${ctx.org.name}: reminder — ${estLabel}${total ? ` for ${total}` : ""} is waiting: ${link}`,
+        ctx.org.customFields,
       );
       texted = r.ok;
       smsProvider = r.provider;
@@ -414,7 +583,7 @@ export async function textOrgOwners(
   body: string,
 ): Promise<void> {
   if (!smsAlertsEnabled(org.customFields)) return;
-  if (!smsConfigured()) return; // no carrier → say nothing, log nothing to pretend
+  if (!resolveSmsSender(org.customFields)) return; // no sender → say nothing
 
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
@@ -429,7 +598,7 @@ export async function textOrgOwners(
     if (fallback) numbers.add(fallback);
   }
   for (const to of numbers) {
-    await sendSms(to, body).catch((e: any) =>
+    await sendSms(to, body, org.customFields).catch((e: any) =>
       console.error("[crm] owner text alert failed:", e?.message || e));
   }
 }

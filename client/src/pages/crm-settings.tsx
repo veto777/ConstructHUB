@@ -233,6 +233,38 @@ export default function CrmSettingsPage() {
     },
     onError: (e: any) => toast({ title: "Could not save theme", description: String(e.message ?? e), variant: "destructive" }),
   });
+  // Which number this company's texts come FROM.
+  const [senderForm, setSenderForm] = useState<{
+    mode: "platform" | "dedicated" | "byo"; fromNumber: string; spaceUrl: string; projectId: string; apiToken: string;
+  }>({ mode: "platform", fromNumber: "", spaceUrl: "", projectId: "", apiToken: "" });
+  useEffect(() => {
+    const sms = (org?.customFields as any)?.sms;
+    setSenderForm({
+      mode: sms?.mode === "dedicated" || sms?.mode === "byo" ? sms.mode : "platform",
+      fromNumber: sms?.fromNumber ?? "",
+      spaceUrl: sms?.spaceUrl ?? "",
+      projectId: sms?.projectId ?? "",
+      apiToken: "", // write-only: never echoed back
+    });
+  }, [org?.customFields]);
+
+  const saveSender = useMutation({
+    mutationFn: async () => (await apiRequest("PUT", "/api/crm/sms/sender", {
+      mode: senderForm.mode,
+      fromNumber: senderForm.fromNumber.trim() || null,
+      spaceUrl: senderForm.spaceUrl.trim() || null,
+      projectId: senderForm.projectId.trim() || null,
+      apiToken: senderForm.apiToken.trim() || null,
+    })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/sms/status"] });
+      setSenderForm((f) => ({ ...f, apiToken: "" }));
+      toast({ title: "Text sender saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save the sender", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   // Owner text alerts on signed approvals + payments (opt-in, costs money).
   const saveSmsAlerts = useMutation({
     mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { smsAlerts: on })).json(),
@@ -1019,6 +1051,79 @@ export default function CrmSettingsPage() {
               </StatusPill>
             )}
           </div>
+          {canIntegrations && (
+            <div className="border-t pt-3 space-y-3" data-testid="section-sms-sender">
+              <div>
+                <div className="text-sm font-medium">Which number your texts come from</div>
+                <p className="text-xs text-muted-foreground">
+                  Every text names your company either way — this is the number that shows on the client's phone.
+                </p>
+              </div>
+              <Select value={senderForm.mode}
+                onValueChange={(v) => setSenderForm((f) => ({ ...f, mode: v as typeof f.mode }))}>
+                <SelectTrigger className="w-full sm:w-96" data-testid="select-sms-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="platform">Shared ConstructHUB number (nothing to set up)</SelectItem>
+                  <SelectItem value="dedicated">My own number, billed through ConstructHUB</SelectItem>
+                  <SelectItem value="byo">My own SignalWire account (billed to me)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {senderForm.mode !== "platform" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="sms-from">Your text number</Label>
+                  <Input id="sms-from" className="w-full sm:w-64" placeholder="+1 360 555 0134"
+                    value={senderForm.fromNumber}
+                    onChange={(e) => setSenderForm((f) => ({ ...f, fromNumber: e.target.value }))}
+                    data-testid="input-sms-from" />
+                  {senderForm.mode === "dedicated" && (
+                    <p className="text-xs text-muted-foreground">
+                      Ask us to provision this number for you — it stays on ConstructHUB's carrier account.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {senderForm.mode === "byo" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sms-space">SignalWire space URL</Label>
+                    <Input id="sms-space" placeholder="yourcompany.signalwire.com"
+                      value={senderForm.spaceUrl}
+                      onChange={(e) => setSenderForm((f) => ({ ...f, spaceUrl: e.target.value }))}
+                      data-testid="input-sms-space" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sms-project">Project ID</Label>
+                    <Input id="sms-project" value={senderForm.projectId}
+                      onChange={(e) => setSenderForm((f) => ({ ...f, projectId: e.target.value }))}
+                      data-testid="input-sms-project" />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="sms-token">API token</Label>
+                    <Input id="sms-token" type="password" placeholder="leave blank to keep the saved token"
+                      value={senderForm.apiToken}
+                      onChange={(e) => setSenderForm((f) => ({ ...f, apiToken: e.target.value }))}
+                      data-testid="input-sms-token" />
+                    <p className="text-xs text-muted-foreground">
+                      Stored encrypted and never shown again. Your texts bill to your own SignalWire account.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button size="sm" onClick={() => saveSender.mutate()} disabled={saveSender.isPending}
+                  data-testid="button-save-sms-sender">
+                  {saveSender.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save sender
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-4 border-t pt-3">
             <div className="min-w-0">
               <div className="text-sm font-medium">Text me when a bid is signed or money lands</div>
