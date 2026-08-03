@@ -697,34 +697,14 @@ function Dashboard({ data }: { data: any }) {
               sidebar on desktop and here on mobile. */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3.5 min-w-0">
-              {oneOrg?.logoUrl && (
-                <img src={oneOrg.logoUrl} alt={oneOrg.name} className="h-11 w-11 rounded-xl object-contain bg-card border" />
-              )}
-              <div className="min-w-0">
-                <div className="flex items-center gap-1">
-                  <h1 className="text-2xl font-semibold tracking-tight leading-tight" data-testid="text-org-name">
-                    {oneOrg ? oneOrg.name : "Your documents"}
-                  </h1>
-                  <InfoTip k="portal" />
-                </div>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Welcome, {customer?.displayName ?? "there"}
-                  {orgs.length > 1 ? ` · ${orgs.map((o: any) => o.name).join(" · ")}` : ""}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 md:hidden">
-              <Button variant="outline" size="sm" onClick={signOut} data-testid="button-client-logout-mobile">
-                <LogOut className="h-4 w-4 mr-1.5" /> Sign out
-              </Button>
               <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9" aria-label="All tools"
+                  <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 md:hidden" aria-label="All tools"
                     data-testid="button-portal-menu">
                     <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-64 bg-sidebar text-sidebar-foreground border-sidebar-border p-0">
+                <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground border-sidebar-border p-0">
                   <SheetTitle className="sr-only">Menu</SheetTitle>
                   <div className="px-4 pt-5 pb-3">
                     <CrmLogo height={22} />
@@ -758,7 +738,25 @@ function Dashboard({ data }: { data: any }) {
                   </nav>
                 </SheetContent>
               </Sheet>
+              {oneOrg?.logoUrl && (
+                <img src={oneOrg.logoUrl} alt={oneOrg.name} className="h-11 w-11 rounded-xl object-contain bg-card border" />
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-1">
+                  <h1 className="text-2xl font-semibold tracking-tight leading-tight" data-testid="text-org-name">
+                    {oneOrg ? oneOrg.name : "Your documents"}
+                  </h1>
+                  <InfoTip k="portal" />
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Welcome, {customer?.displayName ?? "there"}
+                  {orgs.length > 1 ? ` · ${orgs.map((o: any) => o.name).join(" · ")}` : ""}
+                </p>
+              </div>
             </div>
+            <Button variant="outline" size="sm" onClick={signOut} className="md:hidden" data-testid="button-client-logout-mobile">
+              <LogOut className="h-4 w-4 mr-1.5" /> Sign out
+            </Button>
           </div>
 
           {/* Read-only banner when the contractor opens this portal as the client. */}
@@ -795,7 +793,7 @@ function Dashboard({ data }: { data: any }) {
           ]).map((t) => (
             <RibbonTab key={t.key} title={t.title} icon={t.icon} active={view === t.key} badge={badge(t.key)} onTap={() => setView(t.key)} />
           ))}
-          <div className="relative flex justify-center">
+          <div className="relative h-16 flex justify-center">
             <button
               type="button"
               disabled={capture.isPending}
@@ -812,7 +810,7 @@ function Dashboard({ data }: { data: any }) {
               }}
               data-testid="button-portal-capture"
               aria-label="Capture a photo of the house"
-              className={`absolute -top-5 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background flex items-center justify-center active:scale-95 transition-transform ${preview ? "opacity-60" : ""}`}
+              className={`absolute -top-6 z-10 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background flex items-center justify-center active:scale-95 transition-transform ${preview ? "opacity-60" : ""}`}
             >
               {capture.isPending
                 ? <Loader2 className="h-6 w-6 animate-spin" />
