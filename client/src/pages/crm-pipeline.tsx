@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +7,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, KanbanSquare, ArrowRight } from "lucide-react";
+import { Loader2, KanbanSquare, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard } from "@/components/crm-ui";
 import { Button } from "@/components/ui/button";
 
@@ -61,6 +62,10 @@ export default function CrmPipelinePage() {
   }
 
   const stages: any[] = data.stages ?? [];
+  // Tall columns collapse: the first few cards show, the rest sit behind an
+  // explicit "Show more" so a 42-card Approved lane doesn't scroll forever.
+  const COLLAPSED_COUNT = 5;
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const projects: any[] = data.projects ?? [];
   const groups = [...new Set(stages.map((s) => s.group))];
 
@@ -85,6 +90,9 @@ export default function CrmPipelinePage() {
             <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-proximity">
               {groupStages.map((s) => {
                 const inStage = projects.filter((p) => p.status === s.key);
+                const isOpen = expanded[s.key] === true;
+                const visible = isOpen ? inStage : inStage.slice(0, COLLAPSED_COUNT);
+                const hidden = inStage.length - visible.length;
                 return (
                   <div key={s.key} className="min-w-[260px] w-[260px] shrink-0 snap-start"
                     onDragOver={(e) => canMove && e.preventDefault()}
@@ -101,7 +109,7 @@ export default function CrmPipelinePage() {
                       </span>
                     </div>
                     <div className="space-y-2 min-h-[80px] rounded-xl border border-border/50 bg-muted/40 p-2">
-                      {inStage.map((p) => (
+                      {visible.map((p) => (
                         <div key={p.id}
                           draggable={canMove}
                           onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
@@ -142,6 +150,22 @@ export default function CrmPipelinePage() {
                           )}
                         </div>
                       ))}
+                      {hidden > 0 && (
+                        <button type="button"
+                          className="w-full rounded-lg border border-dashed border-border/60 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                          onClick={() => setExpanded((x) => ({ ...x, [s.key]: true }))}
+                          data-testid={`button-show-more-${s.key}`}>
+                          Show {hidden} more <ChevronDown className="inline h-3 w-3 ml-0.5" />
+                        </button>
+                      )}
+                      {isOpen && inStage.length > COLLAPSED_COUNT && (
+                        <button type="button"
+                          className="w-full rounded-lg py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => setExpanded((x) => ({ ...x, [s.key]: false }))}
+                          data-testid={`button-show-less-${s.key}`}>
+                          Show less <ChevronUp className="inline h-3 w-3 ml-0.5" />
+                        </button>
+                      )}
                       {!inStage.length && (
                         <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-lg">
                           Drop a project here
