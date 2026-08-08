@@ -317,6 +317,15 @@ describe("reminders + reengagement alerts against the dev server", () => {
       `update crm_members set phone = '+15550100001' where id = (select created_by_member_id from crm_estimates where id = $1)`, [est.id],
     );
 
+    // The SMS leg honors the channel matrix (default sms: OFF) — turn the
+    // clientReengaged sms channel ON for this run.
+    const org = await api("/api/crm/org", {}, cookie);
+    const priorPref = org.body.customFields?.notificationPrefs?.clientReengaged;
+    const prefOn = await api("/api/crm/org", {
+      method: "PATCH", body: JSON.stringify({ notificationPrefs: { clientReengaged: { sms: true } } }),
+    }, cookie);
+    expect(prefOn.status).toBe(200);
+
     try {
       const client = await clientCookie(customerId);
 
@@ -358,6 +367,67 @@ describe("reminders + reengagement alerts against the dev server", () => {
         `update crm_members set phone = $2 where id = (select created_by_member_id from crm_estimates where id = $1)`,
         [est.id, priorPhone],
       );
+      await api("/api/crm/org", {
+        method: "PATCH", body: JSON.stringify({ notificationPrefs: { clientReengaged: priorPref ?? true } }),
+      }, cookie);
+    }
+  });
+
+  it("the sms leg honors the channel matrix: OFF unless the sms channel or legacy smsAlerts is on", async () => {
+    const org = await api("/api/crm/org", {}, cookie);
+    expect(org.status).toBe(200);
+    const priorPref = org.body.customFields?.notificationPrefs?.clientReengaged;
+    const priorSmsAlerts = org.body.customFields?.smsAlerts;
+
+    const setState = async (pref: unknown, smsAlerts: boolean) => {
+      const r = await api("/api/crm/org", {
+        method: "PATCH",
+        body: JSON.stringify({ notificationPrefs: { clientReengaged: pref }, smsAlerts }),
+      }, cookie);
+      expect(r.status).toBe(200);
+    };
+
+    /** Fresh estimate → 2nd distinct session → the alert. Returns the marker. */
+    const run = async () => {
+      const { est, customerId, token } = await makeSentEstimate();
+      const priorPhone = (await pool.query(
+        `select phone from crm_members where id = (select created_by_member_id from crm_estimates where id = $1)`, [est.id],
+      )).rows[0]?.phone ?? null;
+      await pool.query(
+        `update crm_members set phone = '+15550100002' where id = (select created_by_member_id from crm_estimates where id = $1)`, [est.id],
+      );
+      try {
+        const client = await clientCookie(customerId);
+        await api(`/api/public/estimates/${token}`, {}, client);
+        await api("/api/public/engagement/start", {
+          method: "POST", body: JSON.stringify({ docType: "estimate", token }),
+        }, client);
+        await api("/api/public/engagement/start", {
+          method: "POST", body: JSON.stringify({ docType: "estimate", token }),
+        }, client);
+        const marker = await poll(() => getMarker(est.id), (m) => !!m);
+        expect(marker).toBeTruthy(); // the alert itself fires (in-app/email still on)
+        return marker;
+      } finally {
+        await pool.query(
+          `update crm_members set phone = $2 where id = (select created_by_member_id from crm_estimates where id = $1)`,
+          [est.id, priorPhone],
+        );
+      }
+    };
+
+    try {
+      // Object without an sms key, and legacy boolean true: both are sms OFF
+      // in the matrix — the alert fires but no text goes out.
+      await setState({ inApp: true, email: true }, false);
+      expect((await run()).textedTo ?? null).toBeNull();
+      await setState(true, false);
+      expect((await run()).textedTo ?? null).toBeNull();
+      // The legacy smsAlerts master toggle is the pre-matrix escape hatch.
+      await setState(true, true);
+      expect((await run()).textedTo).toBe("+15550100002");
+    } finally {
+      await setState(priorPref ?? true, priorSmsAlerts ?? false);
     }
   });
 
