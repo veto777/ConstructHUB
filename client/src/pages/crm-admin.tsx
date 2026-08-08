@@ -243,6 +243,10 @@ export default function CrmAdminPage() {
               <CardDescription>The cross-account console needs its own credentials.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (gateUser && gatePass && !gateLogin.isPending) gateLogin.mutate();
+              }} className="space-y-3">
               <div>
                 <Label htmlFor="gate-user">Username</Label>
                 <Input id="gate-user" autoComplete="username" value={gateUser}
@@ -251,13 +255,13 @@ export default function CrmAdminPage() {
               <div>
                 <Label htmlFor="gate-pass">Password</Label>
                 <Input id="gate-pass" type="password" autoComplete="current-password" value={gatePass}
-                  onKeyDown={(e) => { if (e.key === "Enter" && gateUser && gatePass) gateLogin.mutate(); }}
                   onChange={(e) => setGatePass(e.target.value)} data-testid="input-admin-gate-pass" />
               </div>
-              <Button className="w-full" disabled={!gateUser || !gatePass || gateLogin.isPending}
-                onClick={() => gateLogin.mutate()} data-testid="button-admin-gate-login">
+              <Button type="submit" className="w-full" disabled={!gateUser || !gatePass || gateLogin.isPending}
+                data-testid="button-admin-gate-login">
                 {gateLogin.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Sign in
               </Button>
+              </form>
             </CardContent>
           </Card>
         </div>
