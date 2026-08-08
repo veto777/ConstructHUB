@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -51,6 +51,12 @@ export default function CrmClientsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [q, setQ] = useState("");
+  // Debounce so each keystroke doesn't fire its own server request.
+  const [qDebounced, setQDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q), 250);
+    return () => clearTimeout(t);
+  }, [q]);
   const [tab, setTab] = useState<(typeof BID_TABS)[number]["key"]>("all");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
@@ -59,9 +65,9 @@ export default function CrmClientsPage() {
   const canManage = me?.permissions?.manageCustomers === true;
 
   const { data: clients, isLoading, isError } = useQuery<Client[]>({
-    queryKey: ["/api/crm/customers", q ? `?q=${encodeURIComponent(q)}` : ""],
+    queryKey: ["/api/crm/customers", qDebounced ? `?q=${encodeURIComponent(qDebounced)}` : ""],
     queryFn: async () => {
-      const r = await fetch(`/api/crm/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`, { credentials: "include" });
+      const r = await fetch(`/api/crm/customers${qDebounced ? `?q=${encodeURIComponent(qDebounced)}` : ""}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     },
