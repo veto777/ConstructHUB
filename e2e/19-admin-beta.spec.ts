@@ -47,8 +47,10 @@ test.describe("platform admin console", { tag: "@serial" }, () => {
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("sheet-org-detail")).not.toBeVisible();
 
-    // Sidebar shows the gated nav item for an admin.
-    await expect(page.getByTestId("link-portal-nav-admin")).toBeVisible();
+    // The console wears its own standalone shell (cross-org data never sits
+    // inside a workspace's sidebar) — back link present, org sidebar absent.
+    await expect(page.getByTestId("link-admin-back-to-workspace")).toBeVisible();
+    await expect(page.locator('[data-slot="sidebar"]')).toHaveCount(0);
 
     guards.assertClean("admin console");
   });
