@@ -14,9 +14,13 @@
  *   3. An org whose owner is beta-flagged reports unlimited seats and a real
  *      invitation that would 402 any free-plan org sails through.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createHash } from "crypto";
+import { spawn, execSync, type ChildProcess } from "child_process";
+import { createWriteStream } from "fs";
 import pg from "pg";
+import { ADMIN_EMAILS } from "../admin";
+import { safeEq, gateClientIp, gateOpen, gateRecordFailure, gateClear } from "./admin";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
 const DATABASE_URL =
@@ -222,5 +226,199 @@ describe("beta accounts are unlimited", () => {
         await q(`update subscriptions set plan = $1, status = $2 where user_id = 1`, [before[0].plan, before[0].status]);
       }
     }
+  });
+});
+
+
+/**
+ * Configured-gate coverage. The dev server runs WITHOUT ADMIN_GATE_USER/PASS
+ * (gate off), so this suite spawns its own server on :8199 with the gate
+ * configured and kills it in afterAll. Never touches 8119/8129/8139.
+ */
+const GATE_PORT = 8199;
+const GBASE = `http://127.0.0.1:${GATE_PORT}`;
+const GATE_USER = "vt-gate-admin";
+const GATE_PASS = "vt-gate-pass-123";
+
+function cookieFrom(r: Response): string {
+  const m = (r.headers.get("set-cookie") || "").match(/connect\.sid=[^;]+/);
+  return m ? m[0] : "";
+}
+
+function postGate(body: any, cookie = "", xff?: string) {
+  return fetch(`${GBASE}/api/admin/gate`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(cookie ? { cookie } : {}),
+      ...(xff ? { "x-forwarded-for": xff } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("safeEq (unit)", () => {
+  it("true only for identical strings, length mismatches included", () => {
+    expect(safeEq("s3cret", "s3cret")).toBe(true);
+    expect(safeEq("", "")).toBe(true);
+    expect(safeEq("s3cret", "s3creT")).toBe(false);
+    expect(safeEq("s3cret", "s3cret-longer")).toBe(false);
+    expect(safeEq("s3cret-longer", "s3cret")).toBe(false);
+  });
+});
+
+describe("gate brute-force limiter (unit)", () => {
+  it("keys on req.ip only — spoofable headers never reach the bucket key", () => {
+    const req = {
+      ip: "9.9.9.9",
+      headers: { "cf-connecting-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2, 3.3.3.3" },
+    };
+    expect(gateClientIp(req)).toBe("9.9.9.9");
+  });
+
+  it("caps at 8 failures a window; a success (gateClear) restores access", () => {
+    const key = `unit-${Date.now()}-${Math.random()}`;
+    expect(gateOpen(key)).toBe(true);
+    for (let i = 0; i < 7; i++) gateRecordFailure(key);
+    expect(gateOpen(key)).toBe(true);
+    gateRecordFailure(key);
+    expect(gateOpen(key)).toBe(false);
+    gateClear(key);
+    expect(gateOpen(key)).toBe(true);
+  });
+});
+
+describe("configured admin gate (:8199 child server)", () => {
+  let child: ChildProcess | null = null;
+
+  beforeAll(async () => {
+    child = spawn("npx", ["tsx", "server/index.ts"], {
+      env: {
+        ...process.env,
+        PORT: String(GATE_PORT),
+        DEV_AUTH_BYPASS_USER1: "true",
+        ADMIN_GATE_USER: GATE_USER,
+        ADMIN_GATE_PASS: GATE_PASS,
+        OPENAI_API_KEY: "dummy-not-used",
+        HOVER_CLIENT_SECRET: "dummy-hover-secret",
+        GOOGLE_CLIENT_SECRET: "dummy",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true, // own process group, so afterAll can kill npx AND tsx
+    });
+    const log = createWriteStream("/tmp/gate-server-8199.log");
+    child.stdout?.pipe(log);
+    child.stderr?.pipe(log);
+
+    const deadline = Date.now() + 120_000;
+    let up = false;
+    while (Date.now() < deadline) {
+      try {
+        const r = await fetch(`${GBASE}/api/admin/gate`);
+        if (r.status === 200) {
+          up = true;
+          break;
+        }
+      } catch { /* not listening yet */ }
+      await new Promise((r) => setTimeout(r, 750));
+    }
+    if (!up) throw new Error("gate child server never came up on :8199 — see /tmp/gate-server-8199.log");
+  }, 150_000);
+
+  afterAll(async () => {
+    try {
+      if (child?.pid) process.kill(-child.pid, "SIGKILL");
+    } catch { /* already dead */ }
+    try {
+      execSync("fuser -k 8199/tcp 2>/dev/null || true");
+    } catch { /* best effort */ }
+  });
+
+  it("reports configured, 403s admin APIs until the gate is passed, then 200s", async () => {
+    const status = await (await fetch(`${GBASE}/api/admin/gate`)).json();
+    expect(status.gateConfigured).toBe(true);
+    expect(status.gatePassed).toBe(false);
+
+    // The dev-bypass user IS a platform admin, so only the missing second
+    // factor can be blocking this request.
+    const blocked = await fetch(`${GBASE}/api/admin/analytics`);
+    expect(blocked.status).toBe(403);
+    expect((await blocked.json()).gateRequired).toBe(true);
+
+    const wrong = await postGate({ username: GATE_USER, password: "nope" });
+    expect(wrong.status).toBe(401);
+
+    const ok = await postGate({ username: GATE_USER, password: GATE_PASS });
+    expect(ok.status).toBe(200);
+    const cookie = cookieFrom(ok);
+    expect(cookie).toBeTruthy();
+
+    const authed = await fetch(`${GBASE}/api/admin/analytics`, { headers: { cookie } });
+    expect(authed.status).toBe(200);
+  });
+
+  it("an LSA route 403s a signed-in platform admin who never passed the gate", async () => {
+    // Sign up + verify + promote a throwaway account onto the platform admin
+    // email list, then log in for real (adminGuard wants req.isAuthenticated,
+    // which the dev bypass does NOT fake).
+    const email = `vt-lsagate-${stamp}@example.com`;
+    const adminEmail = ADMIN_EMAILS[0];
+    let userId: number | null = null;
+    try {
+      const signup = await fetch(`${GBASE}/api/auth/signup`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: "gatepassword1" }),
+      });
+      expect(signup.status).toBe(200);
+      const { rows } = await q(`select id from users where email = $1`, [email]);
+      userId = rows[0].id;
+      await q(`update users set email_verified = true, email = $1 where id = $2`, [adminEmail, userId]);
+
+      const login = await fetch(`${GBASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, password: "gatepassword1" }),
+      });
+      expect(login.status).toBe(200);
+      const cookie = cookieFrom(login);
+      expect(cookie).toBeTruthy();
+
+      // Admin session, no gate → both adminGuard (LSA) and the test-email
+      // route must refuse with the gate marker, not serve.
+      const lsa = await fetch(`${GBASE}/api/admin/lsa/manager`, { headers: { cookie } });
+      expect(lsa.status).toBe(403);
+      expect((await lsa.json()).gateRequired).toBe(true);
+
+      const testEmail = await fetch(`${GBASE}/api/admin/test-email`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(testEmail.status).toBe(403);
+      expect((await testEmail.json()).gateRequired).toBe(true);
+
+      // Pass the gate on this session and the LSA route opens.
+      const gate = await postGate({ username: GATE_USER, password: GATE_PASS }, cookie);
+      expect(gate.status).toBe(200);
+      const lsaOk = await fetch(`${GBASE}/api/admin/lsa/manager`, { headers: { cookie } });
+      expect(lsaOk.status).toBe(200);
+    } finally {
+      if (userId != null) await q(`delete from users where id = $1`, [userId]);
+    }
+  });
+
+  it("8 wrong passwords lock the ip — attempt 9 is a 429 even with the right password", async () => {
+    // NOTE: on a directly-connected dev box `trust proxy: 1` lets XFF steer
+    // req.ip, so each test run uses its own fixed XFF for an isolated bucket.
+    // The XFF-rotation guarantee itself is pinned by the gateClientIp unit
+    // test above (the bucket key never comes from headers).
+    const xff = `10.254.${Math.floor(Math.random() * 250) + 1}.1`;
+    for (let i = 0; i < 8; i++) {
+      const r = await postGate({ username: GATE_USER, password: `wrong-${i}` }, "", xff);
+      expect(r.status).toBe(401);
+    }
+    const ninth = await postGate({ username: GATE_USER, password: GATE_PASS }, "", xff);
+    expect(ninth.status).toBe(429);
   });
 });
