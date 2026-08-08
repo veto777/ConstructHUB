@@ -71,14 +71,14 @@ const IP_LIMIT = 30;
 const EMAIL_LIMIT = 5;
 const buckets = new Map<string, number[]>();
 
-export function allow(key: string, limit: number): boolean {
+export function allow(key: string, limit: number, cost = 1): boolean {
   const now = Date.now();
   const hits = (buckets.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (hits.length >= limit) {
+  if (hits.length + cost > limit) {
     buckets.set(key, hits);
     return false;
   }
-  hits.push(now);
+  for (let i = 0; i < cost; i++) hits.push(now);
   buckets.set(key, hits);
   return true;
 }
