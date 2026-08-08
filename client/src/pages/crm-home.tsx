@@ -93,9 +93,9 @@ export default function CrmHomePage() {
 
   // Dashboard metrics — read-only rollups over endpoints the app already has.
   const { data: clients } = useQuery<any[]>({ queryKey: ["/api/crm/customers"] });
-  const { data: pipeline } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
+  const { data: pipeline, isError: pipelineError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
   const { data: stats } = useQuery<any>({ queryKey: ["/api/crm/stats"] });
-  const { data: activityData } = useQuery<{ activity: ActivityItem[] }>({
+  const { data: activityData, isError: activityError } = useQuery<{ activity: ActivityItem[] }>({
     queryKey: ["/api/crm/team-activity"],
     refetchInterval: 60_000,
   });
@@ -279,7 +279,9 @@ export default function CrmHomePage() {
             <CardDescription>Leads that haven't moved yet.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1.5">
-            {leads.length === 0 ? (
+            {pipelineError ? (
+              <p className="text-sm text-destructive">Couldn't load projects — check your connection and refresh the page.</p>
+            ) : leads.length === 0 ? (
               <EmptyState
                 compact
                 icon={CheckCircle2}
@@ -322,7 +324,9 @@ export default function CrmHomePage() {
                 <TabsTrigger value="projects" className="text-xs" data-testid="tab-recent-projects">Recent projects</TabsTrigger>
               </TabsList>
               <TabsContent value="team" className="space-y-0.5">
-                {(activityData?.activity ?? []).length === 0 && (
+                {activityError ? (
+                  <p className="text-sm text-destructive px-3 py-2">Couldn't load team activity — refresh to try again.</p>
+                ) : (activityData?.activity ?? []).length === 0 && (
                   <EmptyState
                     compact
                     icon={Activity}
@@ -346,7 +350,9 @@ export default function CrmHomePage() {
                 })}
               </TabsContent>
               <TabsContent value="projects" className="space-y-1.5">
-            {recent.length === 0 ? (
+            {pipelineError ? (
+              <p className="text-sm text-destructive px-3 py-2">Couldn't load projects — check your connection and refresh the page.</p>
+            ) : recent.length === 0 ? (
               <EmptyState
                 compact
                 icon={KanbanSquare}

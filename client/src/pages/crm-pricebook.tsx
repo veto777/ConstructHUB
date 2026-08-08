@@ -163,7 +163,7 @@ export default function CrmPriceBookPage() {
 
   // ── assembly preview ──
   const [prev, setPrev] = useState<{ id: string; qty: string } | null>(null);
-  const { data: preview } = useQuery<any>({
+  const { data: preview, isError: previewError } = useQuery<any>({
     queryKey: [`/api/crm/pricebook/items/${prev?.id}/preview`, prev?.qty],
     enabled: !!prev,
     queryFn: async () => {
@@ -308,6 +308,11 @@ export default function CrmPriceBookPage() {
                       </div>
                     )}
                   </div>
+                )}
+                {prev?.id === i.id && previewError && (
+                  <p className="text-sm text-destructive mt-2" data-testid={`preview-error-${i.id}`}>
+                    Couldn't preview this SKU — check your connection and try again.
+                  </p>
                 )}
               </CardContent>
             </Card>

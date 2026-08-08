@@ -84,7 +84,7 @@ export default function CrmEstimateNewPage() {
     return () => clearTimeout(t);
   }, [qInput]);
 
-  const { data: customers, isLoading: customersLoading } = useQuery<CustomerLite[]>({
+  const { data: customers, isLoading: customersLoading, isError: customersError } = useQuery<CustomerLite[]>({
     queryKey: [`/api/crm/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`],
     enabled: step === 1 && !customer,
   });
@@ -132,7 +132,7 @@ export default function CrmEstimateNewPage() {
     return () => clearTimeout(t);
   }, [itemInput]);
 
-  const { data: pbItems, isLoading: pbLoading } = useQuery<any[]>({
+  const { data: pbItems, isLoading: pbLoading, isError: pbError } = useQuery<any[]>({
     queryKey: [`/api/crm/pricebook/items${itemQ ? `?q=${encodeURIComponent(itemQ)}` : ""}`],
     enabled: step === 2,
   });
@@ -395,6 +395,10 @@ export default function CrmEstimateNewPage() {
           <div className="space-y-2">
             {customersLoading ? (
               <div className="flex justify-center p-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : customersError ? (
+              <p className="text-sm text-destructive text-center py-6">
+                Couldn't load clients — check your connection and refresh.
+              </p>
             ) : (customers ?? []).slice(0, 8).map((c) => (
               <button
                 key={c.id}
@@ -538,6 +542,10 @@ export default function CrmEstimateNewPage() {
           <div className="space-y-2">
             {pbLoading ? (
               <div className="flex justify-center p-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : pbError ? (
+              <p className="text-sm text-destructive text-center py-6">
+                Couldn't load price-book items — check your connection and refresh.
+              </p>
             ) : (pbItems ?? []).slice(0, 12).map((i) => {
               const inCart = lines.some((l) => l.key === i.id);
               return (

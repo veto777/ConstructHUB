@@ -115,12 +115,12 @@ export default function CrmAdminPage() {
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const { data: me, isLoading: meLoading } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const { data: me, isLoading: meLoading, isError: meError } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const isAdmin = me?.isPlatformAdmin === true;
 
   // The /admin login wall — the passphrase second factor (enforced when the
   // server has credentials configured). Data queries hold until it passes.
-  const { data: gate, isLoading: gateLoading } = useQuery<{ gateConfigured: boolean; gatePassed: boolean }>({
+  const { data: gate, isLoading: gateLoading, isError: gateError } = useQuery<{ gateConfigured: boolean; gatePassed: boolean }>({
     queryKey: ["/api/admin/gate"],
   });
   const gateOpen = !!gate && (!gate.gateConfigured || gate.gatePassed);
@@ -140,24 +140,24 @@ export default function CrmAdminPage() {
     queryKey: ["/api/admin/overview"],
     enabled: isAdmin && gateOpen,
   });
-  const { data: users } = useQuery<AdminUser[]>({
+  const { data: users, isError: usersError } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
     enabled: isAdmin && gateOpen,
   });
-  const { data: orgs } = useQuery<AdminOrg[]>({
+  const { data: orgs, isError: orgsError } = useQuery<AdminOrg[]>({
     queryKey: ["/api/admin/orgs"],
     enabled: isAdmin && gateOpen,
   });
-  const { data: invites } = useQuery<BetaInvite[]>({
+  const { data: invites, isError: invitesError } = useQuery<BetaInvite[]>({
     queryKey: ["/api/admin/beta-invites"],
     enabled: isAdmin && gateOpen,
   });
-  const { data: analytics } = useQuery<any>({
+  const { data: analytics, isError: analyticsError } = useQuery<any>({
     queryKey: ["/api/admin/analytics"],
     enabled: isAdmin && gateOpen,
     refetchInterval: 60_000,
   });
-  const { data: orgDetail } = useQuery<OrgDetail>({
+  const { data: orgDetail, isError: orgDetailError } = useQuery<OrgDetail>({
     queryKey: ["/api/admin/orgs", detailOrgId],
     enabled: isAdmin && gateOpen && !!detailOrgId,
   });
@@ -212,6 +212,15 @@ export default function CrmAdminPage() {
     );
   }
 
+  if (meError) {
+    return (
+      <ErrorCard
+        title="Couldn't load your account"
+        description="Check your connection and refresh the page."
+      />
+    );
+  }
+
   if (!isAdmin) {
     return (
       <ErrorCard
@@ -235,6 +244,9 @@ export default function CrmAdminPage() {
     return (
       <CrmPage>
         <div className="max-w-sm mx-auto mt-16">
+          {gateError && (
+            <p className="text-sm text-destructive mb-3">Couldn't check the gate — refresh the page to try again.</p>
+          )}
           <Card data-testid="card-admin-gate">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -329,7 +341,9 @@ export default function CrmAdminPage() {
               </div>
             }
           />
-          {filteredUsers.length === 0 ? (
+          {usersError ? (
+            <p className="text-sm text-destructive">Couldn't load users — refresh to try again.</p>
+          ) : filteredUsers.length === 0 ? (
             <EmptyState icon={Users} title="No users found" compact />
           ) : (
             <div className={crmTable.wrapper}>
@@ -381,6 +395,9 @@ export default function CrmAdminPage() {
       <Card data-testid="card-orgs" id="card-orgs" className="scroll-mt-6">
         <CardContent className="p-4 sm:p-5 space-y-4">
           <SectionTitle icon={Building2} title="Organizations" description={`${orgs?.length ?? 0} orgs — click one for detail`} />
+          {orgsError ? (
+            <p className="text-sm text-destructive">Couldn't load organizations — refresh to try again.</p>
+          ) : (
           <div className={crmTable.wrapper}>
             <table className={crmTable.table} data-testid="table-orgs">
               <thead className={crmTable.thead}>
@@ -418,6 +435,7 @@ export default function CrmAdminPage() {
               </tbody>
             </table>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -483,7 +501,9 @@ export default function CrmAdminPage() {
             </div>
           )}
 
-          {(invites ?? []).length === 0 ? (
+          {invitesError ? (
+            <p className="text-sm text-destructive">Couldn't load beta invites — refresh to try again.</p>
+          ) : (invites ?? []).length === 0 ? (
             <EmptyState icon={Rocket} title="No invites yet" description="Invite a contractor to start the beta." compact />
           ) : (
             <div className={crmTable.wrapper}>
@@ -537,7 +557,9 @@ export default function CrmAdminPage() {
               {orgDetail?.owner?.email ?? ""} · <PlanPill plan={orgDetail?.plan ?? { plan: "free", status: "inactive" }} beta={!!orgDetail?.owner?.betaAt} />
             </SheetDescription>
           </SheetHeader>
-          {!orgDetail ? (
+          {orgDetailError ? (
+            <p className="px-4 py-8 text-sm text-destructive">Couldn't load this organization — close the drawer and try again.</p>
+          ) : !orgDetail ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <div className="space-y-6 px-4 pb-8">
@@ -661,7 +683,12 @@ export default function CrmAdminPage() {
               </tr>
             </thead>
             <tbody>
-              {(analytics?.recent ?? []).length === 0 && (
+              {analyticsError && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-destructive">
+                  Couldn't load visitor analytics — refresh to try again.
+                </td></tr>
+              )}
+              {!analyticsError && (analytics?.recent ?? []).length === 0 && (
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
                   No tracked visits yet — they appear once visitors accept the cookie banner.
                 </td></tr>

@@ -64,7 +64,7 @@ function MessagesPane({ selected }: { selected: string | null }) {
   const [reply, setReply] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: inbox, isLoading } = useQuery<{ unreadTotal: number; threads: Thread[] }>({
+  const { data: inbox, isLoading, isError } = useQuery<{ unreadTotal: number; threads: Thread[] }>({
     queryKey: ["/api/crm/inbox"],
     refetchInterval: 20_000,
   });
@@ -117,6 +117,10 @@ function MessagesPane({ selected }: { selected: string | null }) {
 
   if (isLoading) {
     return <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return <ErrorCard title="Couldn't load messages" description="Check your connection and refresh the page." />;
   }
 
   if (!threads.length) {

@@ -33,14 +33,14 @@ export default function CrmProjectPage() {
   const { data: projects, isLoading, isError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
   const project = projects?.projects?.find((p: any) => p.id === id);
 
-  const { data: costing } = useQuery<any>({
+  const { data: costing, isError: costingError } = useQuery<any>({
     queryKey: [`/api/crm/projects/${id}/costing`], enabled: !!id && seeCosts, retry: false,
   });
-  const { data: cos } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/change-orders`], enabled: !!id });
-  const { data: punch } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/punch-items`], enabled: !!id });
-  const { data: logs } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/daily-logs`], enabled: !!id });
-  const { data: sels } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/selections`], enabled: !!id });
-  const { data: permits } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/permits/suggest`], enabled: !!id });
+  const { data: cos, isLoading: cosLoading, isError: cosError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/change-orders`], enabled: !!id });
+  const { data: punch, isError: punchError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/punch-items`], enabled: !!id });
+  const { data: logs, isError: logsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/daily-logs`], enabled: !!id });
+  const { data: sels, isError: selsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/selections`], enabled: !!id });
+  const { data: permits, isError: permitsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/permits/suggest`], enabled: !!id });
 
   const post = (path: string, body: any, label: string, key: string) =>
     apiRequest("POST", `/api/crm/projects/${id}/${path}`, body).then(async (r) => {
@@ -150,6 +150,8 @@ export default function CrmProjectPage() {
             <CardContent>
               {!seeCosts ? (
                 <p className="text-sm text-muted-foreground">You don't have permission to see costs.</p>
+              ) : costingError ? (
+                <p className="text-sm text-destructive">Couldn't load costing — check your connection and refresh the page.</p>
               ) : !costing?.lines?.length ? (
                 <EmptyState compact icon={DollarSign} title="No budget lines on this project yet" />
               ) : (
@@ -227,7 +229,11 @@ export default function CrmProjectPage() {
                   </StatusPill>
                 </div>
               ))}
-              {!cos?.length && <EmptyState compact icon={FileDiff} title="No change orders" />}
+              {cosLoading ? (
+                <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : cosError ? (
+                <p className="text-sm text-destructive">Couldn't load change orders — refresh to try again.</p>
+              ) : !cos?.length && <EmptyState compact icon={FileDiff} title="No change orders" />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -257,7 +263,9 @@ export default function CrmProjectPage() {
                   <StatusPill tone={p.status === "done" ? "success" : "neutral"}>{p.status}</StatusPill>
                 </div>
               ))}
-              {!punch?.length && <EmptyState compact icon={ClipboardCheck} title="Nothing on the punch list" />}
+              {punchError ? (
+                <p className="text-sm text-destructive">Couldn't load the punch list — refresh to try again.</p>
+              ) : !punch?.length && <EmptyState compact icon={ClipboardCheck} title="Nothing on the punch list" />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -293,7 +301,9 @@ export default function CrmProjectPage() {
                   <div className="text-sm mt-1 whitespace-pre-wrap">{l.workCompleted}</div>
                 </div>
               ))}
-              {!logs?.length && <EmptyState compact icon={NotebookPen} title="No logs yet" />}
+              {logsError ? (
+                <p className="text-sm text-destructive">Couldn't load daily logs — refresh to try again.</p>
+              ) : !logs?.length && <EmptyState compact icon={NotebookPen} title="No logs yet" />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -339,7 +349,9 @@ export default function CrmProjectPage() {
                   </div>
                 );
               })}
-              {!sels?.length && <EmptyState compact icon={Palette} title="No selections yet" />}
+              {selsError ? (
+                <p className="text-sm text-destructive">Couldn't load selections — refresh to try again.</p>
+              ) : !sels?.length && <EmptyState compact icon={Palette} title="No selections yet" />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -353,6 +365,9 @@ export default function CrmProjectPage() {
               />
             </CardHeader>
             <CardContent className="space-y-2">
+              {permitsError && (
+                <p className="text-sm text-destructive">Couldn't load permit suggestions — refresh to try again.</p>
+              )}
               {permits?.message && <p className="text-sm text-muted-foreground">{permits.message}</p>}
               {permits?.jurisdiction && (
                 <p className="text-sm text-muted-foreground">Matched on <strong>{permits.jurisdiction}</strong></p>
