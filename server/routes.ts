@@ -23,6 +23,7 @@ import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sen
 import { getBaseUrl } from "./auth";
 import { eq, and, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { isPlatformAdmin as isAdmin } from "./admin";
+import { platformGatePassed } from "./crm/admin";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -3371,6 +3372,9 @@ Rules:
     if (!req.isAuthenticated() || !isAdmin(req.user as any)) {
       return res.status(403).json({ message: "Admin only" });
     }
+    if (!platformGatePassed(req)) {
+      return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+    }
     const { useBackup } = req.body;
     const label = useBackup ? "BACKUP" : "PRIMARY";
     const targetEmail = (req.user as any).email;
@@ -6017,6 +6021,12 @@ Requirements:
   function adminGuard(req: any, res: any): boolean {
     if (!req.isAuthenticated() || !isAdmin(req.user as any)) {
       res.status(403).json({ message: "Admin access required" });
+      return false;
+    }
+    // Same second-factor wall as requirePlatformAdmin — the LSA console must
+    // not be reachable on a session that never passed the admin gate.
+    if (!platformGatePassed(req)) {
+      res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
       return false;
     }
     return true;
