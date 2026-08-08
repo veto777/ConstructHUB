@@ -24,7 +24,6 @@ import {
   crmMembers,
   crmCustomers,
   crmLeadSources,
-  crmNotificationEnabled,
   crmNotificationChannel,
 } from "@shared/schema";
 import { notifyMembers } from "./notify";
@@ -127,6 +126,15 @@ async function notifyLeadReceived(
 ) {
   if (!["inApp","email","sms"].some((c) => crmNotificationChannel(org.customFields, "leadReceived", c as any))) return;
 
+  // The bell (and sms channel) never depend on there being an email inbox.
+  await notifyMembers({
+    org, pref: "leadReceived",
+    title: `New website lead — ${lead.name}`,
+    body: [lead.email, lead.phone].filter(Boolean).join(" · ") || null,
+    link: "/crm/clients",
+  });
+  if (!crmNotificationChannel(org.customFields, "leadReceived", "email")) return;
+
   const recipients = new Set<string>();
   if (owner?.email) recipients.add(owner.email);
   const members = await db.select().from(crmMembers)
@@ -137,13 +145,6 @@ async function notifyLeadReceived(
   if (!recipients.size) return;
 
   const contact = [lead.email, lead.phone].filter(Boolean).map(esc).join(" · ");
-  await notifyMembers({
-    org, pref: "leadReceived",
-    title: `New website lead — ${lead.name}`,
-    body: [lead.email, lead.phone].filter(Boolean).join(" · ") || null,
-    link: "/crm/clients",
-  });
-  if (!crmNotificationChannel(org.customFields, "leadReceived", "email")) return;
   await sendWithFallback({
     to: [...recipients].join(","),
     subject: `🌐 New website lead — ${lead.name}`,

@@ -324,11 +324,12 @@ export async function maybeAlertReengagement(args: {
 
   // Text the person who should make the call. The owner's fallback is the
   // org's main phone; anyone else without a mobile simply doesn't get a text.
-  // The text is part of the feature (call-them-now urgency) and has always
-  // fired by default — only an explicit sms:false in Settings silences it.
-  const reengPref = ((org.customFields as any)?.notificationPrefs ?? {}).clientReengaged;
-  const smsExplicitlyOff = typeof reengPref === "object" && reengPref !== null && reengPref.sms === false;
-  const smsPerson = smsExplicitlyOff
+  // The text honors the channel matrix like every other sms send: it fires
+  // when the clientReengaged sms channel is ON, or when the org turned on the
+  // legacy smsAlerts master toggle (the pre-matrix escape hatch).
+  const smsOn = crmNotificationChannel(org.customFields, "clientReengaged", "sms")
+    || smsAlertsEnabled(org.customFields);
+  const smsPerson = !smsOn
     ? undefined
     : (targets.find((t) => t.phone) ?? targets.find((t) => t.role === "owner"));
   const smsTo = normalizePhone(smsPerson?.phone ?? (smsPerson?.role === "owner" ? org.phone : null));

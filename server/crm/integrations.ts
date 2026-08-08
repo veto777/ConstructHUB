@@ -15,7 +15,7 @@ import { db } from "../db";
 import {
   crmPayments, crmInvoices, crmEstimates, crmProjects, crmCustomers, crmOrgs,
   crmApiKeys, crmWebhooks, crmMembers, crmEstimateEvents, crmPaymentAccounts,
-  crmNotificationEnabled,
+  crmNotificationChannel,
 } from "@shared/schema";
 import { and, eq, desc, sql, isNull } from "drizzle-orm";
 import { sendWithFallback } from "../email";
@@ -455,25 +455,20 @@ async function resolveStripeMethod(
  *  ("Visa •••• 4242", "bank transfer (ACH) — Chase •••• 6789") when known. */
 async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: string | null = null) {
   const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, pay.orgId)).limit(1);
-  // The org can silence this notification in Settings (default: on).
-  if (!crmNotificationEnabled(org?.customFields, "invoicePaid")) return;
+  // The org can silence this notification in Settings (default: on); the gate
+  // is per-channel — any of in-app/email/sms ON keeps the event alive.
+  if (!["inApp", "email", "sms"].some((c) => crmNotificationChannel(org?.customFields, "invoicePaid", c as any))) return;
   const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, pay.customerId)).limit(1);
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, pay.orgId), eq(crmMembers.status, "active")));
   const to = new Set<string>();
   if (org?.email) to.add(org.email);
   for (const m of members) if (m.role === "owner" && m.email) to.add(m.email);
-  if (!to.size) return;
   const amount = `$${(pay.amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
   const via = methodDetail ? ` via ${methodDetail}` : pay.method === "ach" ? " by bank transfer (ACH)" : " by card";
-  await sendWithFallback({
-    to: [...to].join(","),
-    subject: `💰 ${amount} received from ${cust?.displayName ?? "a client"}`,
-    html: `<p><strong>${amount}</strong> received from ${cust?.displayName ?? "a client"}${via}.</p>` +
-          `<p>Paid directly into your own Stripe account.</p>`,
-  } as any);
 
-  // Money landing is worth a buzz in the pocket — opt-in per org.
+  // Money landing is worth a buzz in the pocket — opt-in per org. The bell
+  // never depends on there being an email inbox.
   if (org) {
     await notifyMembers({
       org, pref: "invoicePaid",
@@ -482,5 +477,14 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: st
       smsHandled: true,
     });
     await textOrgOwners(org, `${org.name}: ${amount} received from ${cust?.displayName ?? "a client"}${via}.`, "invoicePaid");
+  }
+
+  if (to.size && crmNotificationChannel(org?.customFields, "invoicePaid", "email")) {
+    await sendWithFallback({
+      to: [...to].join(","),
+      subject: `💰 ${amount} received from ${cust?.displayName ?? "a client"}`,
+      html: `<p><strong>${amount}</strong> received from ${cust?.displayName ?? "a client"}${via}.</p>` +
+            `<p>Paid directly into your own Stripe account.</p>`,
+    } as any);
   }
 }

@@ -248,6 +248,8 @@ export async function notifyClientComment(
   const divisionId = resolved.divisionId;
   const context = estimateRef ? ` about estimate ${estimateRef}` : "";
 
+  // The bell/sms fan-out matches the email fan-out below: admins pinned to
+  // another division are not on the hook for this client.
   await notifyMembers({
     org: org as any, pref: "clientComments",
     title: `${customer.displayName} sent a message${context}`,
@@ -255,7 +257,9 @@ export async function notifyClientComment(
     link: `/crm/inbox?c=${customer.id}`,
     extraMemberIds: [
       ...(assignedId ? [assignedId] : []),
-      ...members.filter((m) => m.role === "admin").map((m) => m.id),
+      ...members
+        .filter((m) => m.role === "admin" && !(divisionId && m.divisionId && m.divisionId !== divisionId))
+        .map((m) => m.id),
     ],
   });
 
