@@ -10,6 +10,9 @@
  *     and owner pass), the reply endpoint 429s past 60/member/org, the portal
  *     team endpoint 429s past 60, read on a bogus customer 404s, and
  *     unreadTotal counts unread beyond the 200-thread page.
+ *  5. /api/client/team tenancy: a client session from another org gets 403
+ *     on this org's customer, and its own customer returns only its own
+ *     org's members.
  *
  * Requires the dev server:
  *   DATABASE_URL=… DEV_AUTH_BYPASS_USER1=true PORT=8119 npx tsx --env-file=.env server/index.ts
@@ -181,6 +184,50 @@ describe("messages inbox", () => {
     } finally {
       await q(`DELETE FROM crm_client_sessions WHERE customer_ids::text like '%' || $1 || '%'`, [c.id]);
       await q(`DELETE FROM crm_customers WHERE id = $1`, [c.id]);
+    }
+  });
+
+  it("client/team: another org's customer → 403; own org returns only its own members", async () => {
+    // A whole second org with its own member, customer, and an estimate the
+    // member created (so the team list is provably non-empty).
+    const [{ id: orgB }] = await q<{ id: string }>(
+      `INSERT INTO crm_orgs (name, owner_user_id) VALUES ($1, 1) RETURNING id`,
+      [`Inbox Team OrgB ${suffix}`]);
+    const [{ id: memberB }] = await q<{ id: string }>(
+      `INSERT INTO crm_members (org_id, user_id, email, role, status, display_name)
+       VALUES ($1, 1, $2, 'owner', 'active', 'OrgB Owner') RETURNING id`,
+      [orgB, `inbox-teamb-${suffix}@example.com`]);
+    const [{ id: custB }] = await q<{ id: string }>(
+      `INSERT INTO crm_customers (org_id, display_name, email, portal_token)
+       VALUES ($1, $2, $3, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')) RETURNING id`,
+      [orgB, `Inbox TeamB ${suffix}`, `inbox-teamb-${suffix}@example.com`]);
+    const [{ id: estB }] = await q<{ id: string }>(
+      `INSERT INTO crm_estimates (org_id, customer_id, number, status, total_cents, public_token, created_by_member_id)
+       VALUES ($1, $2, $3, 'sent', 1000, $4, $5) RETURNING id`,
+      [orgB, custB, `EST-TB-${suffix}`, `etok-teamb-${suffix}`, memberB]);
+    try {
+      const raw = await makeClientSession([custB]);
+      const cc = `crm_client=${raw}`;
+
+      // Org B's client asking about the DEFAULT org's customer → 403.
+      const cross = await fetch(`${BASE}/api/client/team?customerId=${customerId}`, {
+        headers: { cookie: cc },
+      });
+      expect(cross.status).toBe(403);
+      await cross.arrayBuffer().catch(() => {});
+
+      // Their own customer → 200, and only org B's members come back.
+      const own = await api(`/api/client/team?customerId=${custB}`, {}, cc);
+      expect(own.status).toBe(200);
+      expect(own.body.team.map((t: any) => t.memberId)).toEqual([memberB]);
+      expect(own.body.team.some((t: any) => t.memberId === memberId)).toBe(false);
+      expect(own.body.office.name).toBe(`Inbox Team OrgB ${suffix}`);
+    } finally {
+      await q(`DELETE FROM crm_client_sessions WHERE customer_ids::text like '%' || $1 || '%'`, [custB]);
+      await q(`DELETE FROM crm_estimates WHERE id = $1`, [estB]);
+      await q(`DELETE FROM crm_customers WHERE id = $1`, [custB]);
+      await q(`DELETE FROM crm_members WHERE id = $1`, [memberB]);
+      await q(`DELETE FROM crm_orgs WHERE id = $1`, [orgB]);
     }
   });
 });

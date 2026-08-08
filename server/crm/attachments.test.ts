@@ -266,4 +266,57 @@ describe("client portal v2 — attachments + comments (dev server)", () => {
       `select read_at from crm_client_comments where id = $1`, [post.body.id]);
     expect(after[0].read_at).not.toBeNull();
   });
+
+  it("estimate-tagged public comment: doc-session gate + 4000-char cap", async () => {
+    // Estimate B belongs to customer B — its doc session must not open A's page.
+    const estB = await api("/api/crm/estimates", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customerId: custB,
+        title: "Vitest attachment estimate B",
+        items: [{ kind: "labor", name: "line", quantityMilli: 1000, unitPriceCents: 500, taxable: true, hiddenFromClient: false, sortOrder: 0 }],
+      }),
+    }, cookie);
+    expect(estB.status).toBe(201);
+    const [tokB] = await q<{ public_token: string }>(
+      `select public_token from crm_estimates where id = $1`, [estB.body.id]);
+    try {
+      const post = (token: string, body: unknown, cc?: string) =>
+        api(`/api/public/estimates/${token}/comment`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }, cc);
+
+      // No doc session → 401.
+      const anon = await post(publicTokenA, { body: "Question about line 3" });
+      expect(anon.status).toBe(401);
+
+      const rawB = await makeClientSession([custB]);
+      const ccB = `crm_client=${rawB}`;
+      // Estimate B's session against estimate A's token → 401.
+      const wrong = await post(publicTokenA, { body: "session from another estimate" }, ccB);
+      expect(wrong.status).toBe(401);
+
+      // …while the same session comments on estimate B fine, tagged with B.
+      const ok = await post(tokB.public_token, { body: "On estimate B this works" }, ccB);
+      expect(ok.status).toBe(201);
+      const [row] = await q<{ estimate_id: string | null }>(
+        `select estimate_id from crm_client_comments where id = $1`, [ok.body.id]);
+      expect(row.estimate_id).toBe(estB.body.id);
+
+      // Over the 4000-char cap → 400, even with a valid session for A.
+      const rawA = await makeClientSession([custA]);
+      const huge = await post(publicTokenA, { body: "x".repeat(4001) }, `crm_client=${rawA}`);
+      expect(huge.status).toBe(400);
+      const [leak] = await q<{ n: number }>(
+        `select count(*)::int as n from crm_client_comments where customer_id = $1 and estimate_id = $2`,
+        [custA, estimateA]);
+      expect(leak.n).toBe(0);
+    } finally {
+      await q(`delete from crm_estimate_items where estimate_id = $1`, [estB.body.id]);
+      await q(`delete from crm_estimates where id = $1`, [estB.body.id]);
+    }
+  });
 });

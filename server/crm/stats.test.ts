@@ -252,4 +252,25 @@ describe("crm stats + team activity (dev server)", () => {
       `e:${evViewedId}`,
     ]);
   });
+
+  it("team-activity: ?limit clamps at 100 and a bogus limit falls back to the default", async () => {
+    // 105 extra rows: an unclamped limit would return them all (109 feed
+    // items total with the fixtures).
+    await q(
+      `insert into crm_team_activity (org_id, member_id, type, title, created_at)
+       select $1, $2, 'note', 'Vitest clamp ' || g,
+              now() - interval '2 hours' + (g || ' seconds')::interval
+       from generate_series(1, 105) g`,
+      [orgA, memberA]);
+    try {
+      const big = await api("/api/crm/team-activity?limit=999999", {}, cookie);
+      expect(big.status).toBe(200);
+      expect(big.body.activity.length).toBe(100);
+      const dflt = await api("/api/crm/team-activity?limit=abc", {}, cookie);
+      expect(dflt.status).toBe(200);
+      expect(dflt.body.activity.length).toBe(40);
+    } finally {
+      await q(`delete from crm_team_activity where org_id = $1 and title like 'Vitest clamp %'`, [orgA]);
+    }
+  });
 });
