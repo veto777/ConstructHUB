@@ -105,8 +105,23 @@ function stubJobAt(
   };
 }
 
-interface StubWebhook {
-  id: number;
+/** A job whose models carry importable capture images (m.images — the shape
+ *  importHoverJobPhotos reads). */
+function stubJobWithImages(
+  id: number,
+  contact: { name?: string; email?: string; phone?: string } | null,
+  location: { line1: string; city?: string; state?: string; zip: string },
+  imageIds: string[],
+) {
+  const job: any = stubJobAt(id, contact, location);
+  job.models[0].images = imageIds.map((imgId) => ({
+    id: imgId,
+    image: { url: `${STUB}/artifacts/photo1.jpg` },
+  }));
+  return job;
+}
+
+interface StubWebhook {  id: number;
   url: string;
   hmac_secret: string;
   code: string;
@@ -123,6 +138,7 @@ const stub = {
   registrationBodies: [] as any[],
   verifiedCodes: [] as string[],
   extraJobs: new Map<number, any>(),
+  failPhotos: false,
   nextWebhookId: 55501,
   currentRefreshToken: "rt-1",
   accessCounter: 0,
@@ -276,6 +292,12 @@ function startStub(): Promise<void> {
       res.writeHead(200, { "content-type": "image/jpeg" });
       return res.end(Buffer.from("ffd8ffe0 stub", "hex"));
     }
+    if (url.pathname === "/artifacts/photo-flaky.jpg") {
+      // Toggled by the stamp-on-failure test: 500 until the "retry".
+      if (stub.failPhotos) return json(500, { error: "flaky photo fetch" });
+      res.writeHead(200, { "content-type": "image/jpeg" });
+      return res.end(Buffer.from("ffd8ffe0 stub", "hex"));
+    }
 
     json(404, { error: `stub: no route ${req.method} ${url.pathname}` });
   });
@@ -288,6 +310,7 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
   let orgId: string;
   let savedCustomFields: any;
   let hover: typeof import("./hover");
+  let orgBId: string | null = null;
 
   beforeAll(async () => {
     hover = await import("./hover");
@@ -312,11 +335,22 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
     await q(`update crm_orgs set custom_fields = $2::jsonb where id = $1`,
       [orgId, savedCustomFields === null ? null : JSON.stringify(savedCustomFields)]);
     await q(`delete from crm_attachments where org_id = $1 and kind = 'measurement' and file_name like 'hover-measurements-%'`, [orgId]);
+    await q(`delete from crm_attachments where org_id = $1 and kind = 'photo' and file_name like 'hover-%'`, [orgId]);
     await q(`delete from crm_measurements where org_id = $1 and external_id like 'hover:%'`, [orgId]);
     await q(`delete from crm_customers where org_id = $1 and email in (
       'hover-vitest@example.com', 'addr-seed@example.com', 'twin1@example.com',
       'twin2@example.com', 'twin-new@example.com', 'fresh-face@example.com',
-      'different-9004@example.com')`, [orgId]);
+      'different-9004@example.com', 'noname-9010@example.com', 'conc-9011@example.com',
+      'flaky-9012@example.com', 'adopt-9015@example.com')`, [orgId]);
+    // Staff-scrubbed customers carry no email — sweep by the flow's marker.
+    await q(`delete from crm_customers where org_id = $1 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId]);
+    await q(`delete from crm_members where org_id = $1 and email = 'staff-scrub@example.com'`, [orgId]);
+    if (orgBId) {
+      await q(`delete from crm_attachments where org_id = $1`, [orgBId]);
+      await q(`delete from crm_measurements where org_id = $1`, [orgBId]);
+      await q(`delete from crm_customers where org_id = $1`, [orgBId]);
+      await q(`delete from crm_orgs where id = $1`, [orgBId]);
+    }
     try { fs.unlinkSync(STUB_FILE); } catch {}
     await new Promise((r) => stub.server?.close(r));
     await pool.end();
@@ -612,6 +646,144 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
     expect(n("", "98101")).toBeNull();
   });
 
+  // ── Defect regressions: photos, stamps, staff scrub, adoption ────────────
+
+  it("display name falls back to the job label when the contact has no name", async () => {
+    stub.extraJobs.set(9010, stubJobAt(9010,
+      { email: "noname-9010@example.com" },
+      { line1: "10 Label Way", zip: "98120" }));
+    await fireCompleted(9010);
+
+    const custs = await q<any>(
+      `select * from crm_customers where org_id = $1 and email = 'noname-9010@example.com'`, [orgId]);
+    expect(custs.length).toBe(1);
+    expect(custs[0].display_name).toBe("Stub HOVER job 9010");
+    expect(custs[0].first_name).toBeNull();
+  });
+
+  it("concurrent double-delivery of the same job ingests once (one measurement, customer, photo set)", async () => {
+    stub.extraJobs.set(9011, stubJobWithImages(9011,
+      { name: "Conc Urrent", email: "conc-9011@example.com" },
+      { line1: "11 Race Way", zip: "98124" }, ["c1", "c2"]));
+    // Two webhook deliveries in flight at the same moment — the per-job
+    // ingest lock must serialize them.
+    await Promise.all([fireCompleted(9011), fireCompleted(9011)]);
+
+    const m = await q<any>(
+      `select id from crm_measurements where org_id = $1 and external_id = 'hover:9011'`, [orgId]);
+    expect(m.length).toBe(1);
+    const custs = await q<any>(
+      `select id from crm_customers where org_id = $1 and email = 'conc-9011@example.com'`, [orgId]);
+    expect(custs.length).toBe(1);
+    const atts = await q<any>(
+      `select file_name from crm_attachments where org_id = $1 and kind = 'photo' and file_name like 'hover-9011-%'`, [orgId]);
+    expect(atts.length).toBe(2);
+  });
+
+  it("photo import is idempotent — a redelivery adds no duplicate attachment rows", async () => {
+    await fireCompleted(9011);
+    const atts = await q<any>(
+      `select file_name from crm_attachments where org_id = $1 and kind = 'photo' and file_name like 'hover-9011-%'`, [orgId]);
+    expect(atts.length).toBe(2);
+    const m = await q<any>(
+      `select id from crm_measurements where org_id = $1 and external_id = 'hover:9011'`, [orgId]);
+    expect(m.length).toBe(1);
+  });
+
+  it("photosSyncedAt is NOT stamped on a failed photo fetch; a succeeding retry stamps it", async () => {
+    const flaky = stubJobWithImages(9012,
+      { name: "Flaky Fetch", email: "flaky-9012@example.com" },
+      { line1: "12 Flaky Ct", zip: "98125" }, ["fl1"]);
+    flaky.models[0].images[0].image.url = `${STUB}/artifacts/photo-flaky.jpg`;
+    stub.extraJobs.set(9012, flaky);
+
+    stub.failPhotos = true;
+    await fireCompleted(9012);
+    let m = await q<any>(
+      `select raw_payload from crm_measurements where org_id = $1 and external_id = 'hover:9012'`, [orgId]);
+    expect(m.length).toBe(1);
+    expect((m[0].raw_payload as any).photosSyncedAt).toBeUndefined();
+    let atts = await q<any>(
+      `select id from crm_attachments where org_id = $1 and kind = 'photo' and file_name like 'hover-9012-%'`, [orgId]);
+    expect(atts.length).toBe(0);
+
+    stub.failPhotos = false;
+    await fireCompleted(9012);
+    m = await q<any>(
+      `select raw_payload from crm_measurements where org_id = $1 and external_id = 'hover:9012'`, [orgId]);
+    expect((m[0].raw_payload as any).photosSyncedAt).toBeTruthy();
+    atts = await q<any>(
+      `select id from crm_attachments where org_id = $1 and kind = 'photo' and file_name like 'hover-9012-%'`, [orgId]);
+    expect(atts.length).toBe(1);
+  });
+
+  it("staff-ordered capture: the created customer carries NONE of the staff contact", async () => {
+    await q(
+      `insert into crm_members (org_id, email, role, status, display_name, phone)
+       values ($1, 'staff-scrub@example.com', 'field', 'active', 'Scott Staff', '(206) 555-7777')`, [orgId]);
+    stub.extraJobs.set(9013, stubJobAt(9013,
+      { name: "Scott Staff", email: "staff-scrub@example.com", phone: "(206) 555-7777" },
+      { line1: "13 Staff Ln", zip: "98121" }));
+    await fireCompleted(9013);
+
+    const custs = await q<any>(
+      `select * from crm_customers where org_id = $1 and address_line1 = '13 Staff Ln'`, [orgId]);
+    expect(custs.length).toBe(1);
+    expect(custs[0].email).toBeNull();
+    expect(custs[0].phone).toBeNull();
+    expect(custs[0].display_name).toBe("Stub HOVER job 9013"); // job label fallback
+    expect((custs[0].custom_fields as any)?.hoverNeedsContact).toBe(true);
+    expect(custs[0].notes).toContain("your own team");
+  });
+
+  it("mixed contact (staff email + homeowner phone): only the staff field is scrubbed", async () => {
+    stub.extraJobs.set(9014, stubJobAt(9014,
+      { name: "Scott Staff", email: "staff-scrub@example.com", phone: "(425) 555-9999" },
+      { line1: "14 Mixed Ave", zip: "98122" }));
+    await fireCompleted(9014);
+
+    const custs = await q<any>(
+      `select * from crm_customers where org_id = $1 and address_line1 = '14 Mixed Ave'`, [orgId]);
+    expect(custs.length).toBe(1);
+    expect(custs[0].email).toBeNull();                    // staff email scrubbed
+    expect(custs[0].phone).toBe("(425) 555-9999");        // homeowner phone kept
+    expect((custs[0].custom_fields as any)?.hoverNeedsContact).toBe(true);
+  });
+
+  it("adoption: an unlinked measurement links to the customer on redelivery", async () => {
+    // First delivery: no contact, no address, no job label — nothing to
+    // match or create from, so the measurement lands with customerId null.
+    stub.extraJobs.set(9015, {
+      id: 9015,
+      models: [{
+        artifacts: [
+          { type: "measurements_json", url: `${STUB}/artifacts/measurements.json` },
+          { type: "measurement_pdf", url: `${STUB}/artifacts/measurements.pdf` },
+        ],
+      }],
+    });
+    await fireCompleted(9015);
+    let m = await q<any>(
+      `select customer_id from crm_measurements where org_id = $1 and external_id = 'hover:9015'`, [orgId]);
+    expect(m.length).toBe(1);
+    expect(m[0].customer_id).toBeNull();
+
+    // HOVER backfills the contact; the redelivered event adopts it.
+    stub.extraJobs.set(9015, stubJobAt(9015,
+      { name: "Adam Adoptee", email: "adopt-9015@example.com" },
+      { line1: "15 Adopt Pl", zip: "98123" }));
+    await fireCompleted(9015);
+
+    const custs = await q<any>(
+      `select id from crm_customers where org_id = $1 and email = 'adopt-9015@example.com'`, [orgId]);
+    expect(custs.length).toBe(1);
+    m = await q<any>(
+      `select customer_id, raw_payload from crm_measurements where org_id = $1 and external_id = 'hover:9015'`, [orgId]);
+    expect(m.length).toBe(1);
+    expect(m[0].customer_id).toBe(custs[0].id);
+    expect((m[0].raw_payload as any).adoptedVia).toBe("created");
+  });
+
   it("disconnect deletes the HOVER webhook and wipes the stored tokens", async () => {
     const res = await api("/api/crm/integrations/hover/disconnect", { method: "POST" });
     expect(res.status).toBe(200);
@@ -623,6 +795,64 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
     expect(status.webhook).toBeNull();
     const org = await q<{ custom_fields: any }>(`select custom_fields from crm_orgs where id = $1`, [orgId]);
     expect(org[0].custom_fields?.hover).toBeUndefined();
+  });
+
+  it("tenant isolation: a second org's ingest can't link or adopt org A's data", async () => {
+    const rows = await q<{ id: string }>(
+      `insert into crm_orgs (name, owner_user_id) values ('HOVER Vitest Org B', 1) returning id`);
+    orgBId = rows[0].id;
+    await q(`update crm_orgs set custom_fields = $2::jsonb where id = $1`, [orgBId, JSON.stringify({
+      hover: { refreshTokenEnc: hover.encryptHoverSecret("rt-orgB"), connectedAt: new Date().toISOString() },
+    })]);
+
+    // Org B's token endpoint is answered locally so the stub's rotating
+    // refresh-token chain (org A's) is never disturbed; API calls pass
+    // through to the stub untouched (it doesn't validate bearer tokens).
+    const orgBFetch = (async (url: any, init: any) => {
+      if (String(url).includes("/oauth/token")) {
+        return new Response(JSON.stringify({
+          access_token: "at-orgB", refresh_token: "rt-orgB", expires_in: 7200,
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return fetch(url, init);
+    }) as typeof fetch;
+
+    // Org A's state before org B does anything.
+    const custA = await q<any>(
+      `select id from crm_customers where org_id = $1 and email = 'hover-vitest@example.com'`, [orgId]);
+    expect(custA.length).toBe(1);
+    const mA0 = await q<any>(
+      `select id, customer_id from crm_measurements where org_id = $1 and external_id = 'hover:9001'`, [orgId]);
+    expect(mA0.length).toBe(1);
+
+    // Same service address as org A's 9001 customer — must NOT attach to it.
+    stub.extraJobs.set(9016, stubJobAt(9016,
+      { name: "Org B Customer", email: "orgb-9016@example.com" },
+      { line1: "123 Pine St", zip: "98101" }));
+    const r1 = await hover.ingestHoverJob(orgBId, "9016", orgBFetch);
+    expect(r1.created).toBe(true);
+    expect(r1.customerCreated).toBe(true); // created its OWN customer
+    const custB = await q<any>(
+      `select id from crm_customers where org_id = $1 and email = 'orgb-9016@example.com'`, [orgBId]);
+    expect(custB.length).toBe(1);
+    expect(r1.customerId).toBe(custB[0].id);
+
+    // Org B ingests the SAME job id org A already holds — externalId is
+    // org-scoped, so org B gets its own measurement (attached by address
+    // within org B) instead of adopting or touching org A's row.
+    const r2 = await hover.ingestHoverJob(orgBId, "9001", orgBFetch);
+    expect(r2.created).toBe(true);
+    const mB = await q<any>(
+      `select id, customer_id from crm_measurements where org_id = $1 and external_id = 'hover:9001'`, [orgBId]);
+    expect(mB.length).toBe(1);
+    expect(mB[0].customer_id).toBe(custB[0].id);
+
+    // Org A's customer and measurement are exactly as before.
+    const mA1 = await q<any>(
+      `select id, customer_id from crm_measurements where org_id = $1 and external_id = 'hover:9001'`, [orgId]);
+    expect(mA1.length).toBe(1);
+    expect(mA1[0].id).toBe(mA0[0].id);
+    expect(mA1[0].customer_id).toBe(custA[0].id);
   });
 
   // ── Pure units (no server involved) ───────────────────────────────────────
