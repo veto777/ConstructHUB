@@ -113,7 +113,7 @@ test.describe("client 360 — timeline", () => {
       await gotoCrm(page, `/crm/clients/${customerId}`);
       const timeline = page.getByTestId("section-timeline");
       await expect(timeline).toBeVisible({ timeout: 15_000 });
-      await expect(timeline).toContainText(`Opened estimate ${est.number} · stayed 4m 12s`);
+      await expect(timeline).toContainText(`opened estimate ${est.number} · stayed 4m 12s`);
       // …and the send event from the real flow sits in the same feed.
       await expect(timeline).toContainText(`Estimate ${est.number} sent to the client`);
 
@@ -194,11 +194,11 @@ test.describe("client 360 — view as client", () => {
         await expect(popup.getByTestId("banner-contractor-preview")).toBeVisible({ timeout: 20_000 });
         await expect(popup.getByTestId("text-org-name")).toBeVisible();
 
-        // A comment post refuses with a clear toast — and writes nothing.
-        // Comments live behind the sidebar's Messages view.
+        // A message post refuses with a clear toast — and writes nothing.
+        // Messages live behind the sidebar's Messages view.
         await popup.getByTestId("portal-nav-messages").click();
-        await popup.getByTestId("input-client-comment").fill("Preview must not post this");
-        await popup.getByTestId("button-send-comment").click();
+        await popup.getByTestId("input-portal-message").fill("Preview must not post this");
+        await popup.getByTestId("button-portal-message-send").click();
         await expect(popup.getByText(/read-only — sign in as the client/i)).toBeVisible({ timeout: 10_000 });
         const rows = await q(`select id from crm_client_comments where customer_id = $1`, [customerId]);
         expect(rows.length).toBe(0);

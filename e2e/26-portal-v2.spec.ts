@@ -176,13 +176,14 @@ test.describe("client portal v2 — photos + comments", () => {
     try {
       await grantClientSession(page, [customerId]);
       await gotoCrm(page, "/?client=1");
-      // Comments live behind the sidebar's Messages view.
+      // Messages live behind the sidebar's Messages view.
       await page.getByTestId("portal-nav-messages").click();
-      await expect(page.getByTestId("section-comment-box")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId("portal-messages")).toBeVisible({ timeout: 15_000 });
 
-      await page.getByTestId("input-client-comment").fill("Can we move the start date to next Friday?");
-      await page.getByTestId("button-send-comment").click();
-      await expect(page.getByTestId("text-comment-sent")).toBeVisible();
+      await page.getByTestId("input-portal-message").fill("Can we move the start date to next Friday?");
+      await page.getByTestId("button-portal-message-send").click();
+      // The sent message lands in the thread.
+      await expect(page.getByTestId("portal-messages")).toContainText("next Friday", { timeout: 15_000 });
 
       // The email is stubbed/logged in dev — the DB row is the record.
       const rows = await q<{ id: string; read_at: Date | null }>(

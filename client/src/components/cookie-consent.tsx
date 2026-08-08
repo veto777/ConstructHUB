@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
+import { isClientPortal } from "@/lib/site";
 
 function readCookie(name: string): string | null {
   for (const part of document.cookie.split(";")) {
@@ -74,7 +75,9 @@ export function CookieConsent() {
   // portal pages have a sticky bottom bar (Approve, portal ribbon); the CRM
   // has the mobile ribbon below sm. Float above those; otherwise bottom.
   // Desktop anchors the card to the corner so it covers less content.
-  const aboveActionBar = /^\/(e|i|co|portal)\//.test(location);
+  // The homeowner client portal lives at "/" behind ?client=1 — check
+  // isClientPortal(), not the pathname.
+  const aboveActionBar = /^\/(e|i|co|portal)\//.test(location) || isClientPortal();
   const inCrm = location.startsWith("/crm");
 
   return (

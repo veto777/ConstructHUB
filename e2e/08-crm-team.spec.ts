@@ -94,12 +94,13 @@ test.describe("/crm/team", () => {
     const memberId = (await memberRow.getAttribute("data-testid"))!.replace("member-", "");
     const roleSelect = page.getByTestId(`select-role-${memberId}`);
     if (await roleSelect.isVisible().catch(() => false)) {
-      // Idempotent: remember the current role, switch to any NON-owner option
-      // (owner is the first option — picking it exhausts the non-owner pool
-      // and breaks the next run), then restore the original.
+      // Idempotent: remember the current role, switch to a DIFFERENT
+      // non-owner option (re-selecting the current role never fires
+      // onValueChange — no mutation, no toast), then restore the original.
       const originalRole = (await roleSelect.innerText()).trim();
+      const targetName = /^field$/i.test(originalRole) ? /office/i : /field/i;
       await roleSelect.click();
-      await page.getByRole("option", { name: /field|office/i }).first().click();
+      await page.getByRole("option", { name: targetName }).first().click();
       await expect(page.getByText("Team member updated", { exact: true })).toBeVisible();
       await roleSelect.click();
       await page.getByRole("option", { name: originalRole, exact: true }).first().click();
