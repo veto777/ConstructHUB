@@ -379,7 +379,6 @@ function AppContent() {
     const section =
       location.startsWith("/crm/clients") ? "Clients" :
       location.startsWith("/crm/schedule") ? "Schedule" :
-      location.startsWith("/crm/inbox") ? "Inbox" :
       location.startsWith("/crm/inbox") ? "Messages" :
       location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
       location.startsWith("/crm/pricebook") ? "Price book" :
