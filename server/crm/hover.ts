@@ -961,10 +961,18 @@ export async function ingestHoverJob(
 
   if (customer?.id) {
     await importHoverJobPhotos(orgId, jobId, customer.id, job, auth, fetchFn)
-      .then(() => db.update(crmMeasurements).set({
-        rawPayload: { ...(row.rawPayload as object), photosSyncedAt: new Date().toISOString() } as any,
-        updatedAt: new Date(),
-      }).where(eq(crmMeasurements.id, row.id)))
+      .then(async () => {
+        // Merge against the CURRENT payload — the PDF block above may already
+        // have added pdfAttachmentId; spreading the stale row would wipe it.
+        const [cur] = await db
+          .select({ rawPayload: crmMeasurements.rawPayload })
+          .from(crmMeasurements)
+          .where(eq(crmMeasurements.id, row.id));
+        return db.update(crmMeasurements).set({
+          rawPayload: { ...((cur?.rawPayload ?? row.rawPayload) as object), photosSyncedAt: new Date().toISOString() } as any,
+          updatedAt: new Date(),
+        }).where(eq(crmMeasurements.id, row.id));
+      })
       .catch((e: any) => console.error(`[hover] photos for job ${jobId} failed:`, String(e?.message || e).slice(0, 120)));
   }
 
