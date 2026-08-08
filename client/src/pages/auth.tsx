@@ -29,9 +29,12 @@ export default function AuthPage() {
   // CRM beta invite: /auth?beta=<token> starts in signup mode and the token
   // rides along through email/password signup or the Google OAuth round-trip.
   const betaParam = params.get("beta");
-  // Post-auth destination (e.g. a team-invite accept page). Relative only.
+  // Post-auth destination (e.g. a team-invite accept page). Same-origin paths
+  // only — mirrors safeNextPath in server/auth.ts: one leading "/", never
+  // "//host", no backslash (browsers resolve "/\host" off-origin), no
+  // whitespace/control chars.
   const rawNext = params.get("next");
-  const nextParam = rawNext && /^\/[^\/]/.test(rawNext) ? rawNext : null;
+  const nextParam = rawNext && /^\/(?!\/)[^\\\x00-\x20\x7f]*$/.test(rawNext) ? rawNext : null;
 
   useEffect(() => {
     // A beta invite is a NEW-workspace signup. Silently bouncing an
