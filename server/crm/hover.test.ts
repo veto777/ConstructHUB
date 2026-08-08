@@ -513,6 +513,9 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
     expect(res.body.created).toBe(0);
     expect(res.body.ambiguous).toBe(0);
     expect(res.body.errors).toEqual([]);
+    // The stub's list omits pagination.total_pages; 3 jobs is a short page,
+    // so the walk stops after page 1 without claiming truncation.
+    expect(res.body.truncated).toBe(false);
 
     const rows = await q<any>(
       `select * from crm_measurements where org_id = $1 and external_id = 'hover:9002'`, [orgId]);
@@ -911,5 +914,56 @@ describe("HOVER integration (dev server + stub HOVER)", () => {
     expect(hover.summarizeHoverMeasurements(null)).toEqual({
       roofSqft: null, sidingSqft: null, windowsCount: null, stories: null, pitch: null, wasteBps: null,
     });
+  });
+
+  it("unit: a missing total_pages keeps the walk going while pages come back full", async () => {
+    const fullPage = Array.from({ length: hover.HOVER_JOBS_PAGE_SIZE }, (_, i) => ({ id: 100 + i }));
+    const seen: number[] = [];
+    const walk = await hover.walkHoverJobsPages(async (page) => {
+      seen.push(page);
+      // No pagination block at all — the old walk stopped after page 1.
+      return page === 1
+        ? { status: 200, json: { results: fullPage } }
+        : { status: 200, json: { results: [{ id: 9000 }] } }; // short page = last
+    });
+    expect(seen).toEqual([1, 2]);
+    expect(walk.jobs.length).toBe(hover.HOVER_JOBS_PAGE_SIZE + 1);
+    expect(walk.truncated).toBe(false);
+    expect(walk.firstPageError).toBeNull();
+  });
+
+  it("unit: a reported total_pages stops the walk on the last page", async () => {
+    const seen: number[] = [];
+    const walk = await hover.walkHoverJobsPages(async (page) => {
+      seen.push(page);
+      return { status: 200, json: { results: [{ id: page }], pagination: { total_pages: 2 } } };
+    });
+    expect(seen).toEqual([1, 2]);
+    expect(walk.jobs.length).toBe(2);
+    expect(walk.truncated).toBe(false);
+  });
+
+  it("unit: hitting the 80-page cap with pages left reports truncated", async () => {
+    const fullPage = Array.from({ length: hover.HOVER_JOBS_PAGE_SIZE }, () => ({ id: 1 }));
+    const walk = await hover.walkHoverJobsPages(async () => ({
+      status: 200,
+      json: { results: fullPage, pagination: { total_pages: 500 } },
+    }));
+    expect(walk.jobs.length).toBe(hover.HOVER_SYNC_MAX_PAGES * hover.HOVER_JOBS_PAGE_SIZE);
+    expect(walk.truncated).toBe(true);
+  });
+
+  it("unit: a page-1 failure is surfaced, a late-page failure keeps the haul", async () => {
+    const failed = await hover.walkHoverJobsPages(async () => ({ status: 500, json: {} }));
+    expect(failed.firstPageError).toBe(500);
+    expect(failed.jobs).toEqual([]);
+
+    const partial = await hover.walkHoverJobsPages(async (page) =>
+      page === 1
+        ? { status: 200, json: { results: [{ id: 1 }], pagination: { total_pages: 3 } } }
+        : { status: 500, json: {} });
+    expect(partial.firstPageError).toBeNull();
+    expect(partial.jobs).toEqual([{ id: 1 }]);
+    expect(partial.truncated).toBe(false);
   });
 });

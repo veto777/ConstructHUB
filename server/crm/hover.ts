@@ -134,6 +134,8 @@ export interface HoverSyncReport {
   ambiguous: number;
   duplicates: number;
   errors: string[];
+  /** True when the 80-page cap cut the jobs walk short — older jobs were NOT scanned. */
+  truncated: boolean;
   at: string;
 }
 
@@ -1057,35 +1059,71 @@ async function ingestHoverJobInner(
 export type HoverSyncRunReport = {
   scanned: number; attachedByEmail: number; attachedByPhone: number; attachedByAddress: number;
   created: number; ambiguous: number; duplicates: number; errors: string[];
+  /** True when the 80-page cap cut the jobs walk short — older jobs were NOT scanned. */
+  truncated: boolean;
 };
+
+/** HOVER paginates the jobs list 25/page (per_page is ignored). */
+export const HOVER_JOBS_PAGE_SIZE = 25;
+/** Hard cap on the page walk so a huge job history can't hang a sync. */
+export const HOVER_SYNC_MAX_PAGES = 80;
+
+export type HoverJobsWalk = {
+  jobs: any[];
+  /** True when the walk stopped at HOVER_SYNC_MAX_PAGES with more pages left. */
+  truncated: boolean;
+  /** HTTP status of a failed page-1 fetch (0 = network); null when page 1 loaded. */
+  firstPageError: number | null;
+};
+
+/** The page-walk policy, split from transport so tests can drive it with a stub:
+ *  - walk every page up to the reported pagination.total_pages;
+ *  - when a page omits total_pages, keep going while pages come back FULL
+ *    (a short page is always the last);
+ *  - never pass HOVER_SYNC_MAX_PAGES, and SAY when the cap truncated the walk. */
+export async function walkHoverJobsPages(
+  fetchPage: (page: number) => Promise<{ status: number; json: any }>,
+): Promise<HoverJobsWalk> {
+  const jobs: any[] = [];
+  let totalPages: number | null = null; // unknown until a page reports it
+  let truncated = false;
+  for (let page = 1; page <= HOVER_SYNC_MAX_PAGES; page++) {
+    if (totalPages !== null && page > totalPages) break;
+    const { status, json } = await fetchPage(page);
+    if (status !== 200) {
+      if (page === 1) return { jobs, truncated, firstPageError: status };
+      break; // keep what we have — a late page failing shouldn't void the run
+    }
+    const batch: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
+    jobs.push(...batch);
+    const reported = Number(json?.pagination?.total_pages);
+    if (Number.isFinite(reported) && reported > 0) totalPages = reported;
+    if (!batch.length) break;
+    const morePages = totalPages !== null ? page < totalPages : batch.length >= HOVER_JOBS_PAGE_SIZE;
+    if (!morePages) break;
+    if (page === HOVER_SYNC_MAX_PAGES) truncated = true;
+  }
+  return { jobs, truncated, firstPageError: null };
+}
 
 /** One full sync pass: list completed HOVER jobs, ingest each (idempotent —
  *  existing jobs just top up photos). Used by the Sync button AND the
  *  scheduler. */
 export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
-  // The list is paginated (25/page, per_page is ignored) — walk every page.
-  const jobs: any[] = [];
-  let totalPages = 1;
-  for (let page = 1; page <= Math.min(totalPages, 80); page++) {
-    const { status, json } = await hoverApi(orgId, "GET", `/v2/jobs?page=${page}`).catch((e: any) => {
+  const walk = await walkHoverJobsPages((page) =>
+    hoverApi(orgId, "GET", `/v2/jobs?page=${page}`).catch((e: any) => {
       return { status: 0, json: { error: String(e?.message || e) } } as any;
-    });
-    if (status !== 200) {
-      if (page === 1) {
-        await writeHoverConn(orgId, { lastError: `jobs list failed (${status || "network"})` }).catch(() => {});
-        throw new Error("Could not list HOVER jobs.");
-      }
-      break; // keep what we have — a late page failing shouldn't void the run
-    }
-    const batch: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
-    jobs.push(...batch);
-    totalPages = Number(json?.pagination?.total_pages) || totalPages;
-    if (!batch.length) break;
+    }));
+  if (walk.firstPageError !== null) {
+    await writeHoverConn(orgId, { lastError: `jobs list failed (${walk.firstPageError || "network"})` }).catch(() => {});
+    throw new Error("Could not list HOVER jobs.");
   }
+  const { jobs } = walk;
   const report: HoverSyncRunReport = {
     scanned: jobs.length,
     attachedByEmail: 0, attachedByPhone: 0, attachedByAddress: 0,
     created: 0, ambiguous: 0, duplicates: 0, errors: [],
+    truncated: walk.truncated,
   };
   for (const j of jobs) {
     const state = String(j?.state ?? j?.status ?? "").toLowerCase();
