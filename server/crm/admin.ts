@@ -24,7 +24,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { isPlatformAdminEmail } from "../admin";
-import { timingSafeEqual } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 import { getSeatUsage } from "./tenancy";
@@ -42,26 +42,55 @@ export function adminGateConfigured(): boolean {
   return !!(process.env.ADMIN_GATE_USER && process.env.ADMIN_GATE_PASS);
 }
 
-/** Constant-time-ish compare — never leak length via early exit. */
-function safeEq(a: string, b: string): boolean {
-  const A = Buffer.from(a), B = Buffer.from(b);
-  if (A.length !== B.length) {
-    timingSafeEqual(A, A); // burn the same time either way
-    return false;
-  }
+/** Constant-time compare on SHA-256 digests — no length leak, no early exit. */
+export function safeEq(a: string, b: string): boolean {
+  const A = createHash("sha256").update(a).digest();
+  const B = createHash("sha256").update(b).digest();
   return timingSafeEqual(A, B);
 }
 
+const GATE_WINDOW_MS = 15 * 60 * 1000;
+const GATE_LIMIT = 8;
 const gateAttempts = new Map<string, { n: number; resetAt: number }>();
-function gateAllow(ip: string): boolean {
+
+/**
+ * The limiter key is the edge-reported client ONLY — never the raw
+ * cf-connecting-ip / x-forwarded-for headers, which a direct client can
+ * rotate at will to mint a fresh budget on every request. server/index.ts
+ * sets `trust proxy: 1`, so req.ip is the address the trusted edge reported.
+ */
+export function gateClientIp(req: any): string {
+  return String(req.ip || "");
+}
+
+/** True while the key still has attempts left this window. Read-only. */
+export function gateOpen(key: string): boolean {
+  const cur = gateAttempts.get(key);
+  return !cur || cur.resetAt < Date.now() || cur.n < GATE_LIMIT;
+}
+
+/**
+ * Count ONE failed sign-in. Only wrong credentials ever reach this — a bare
+ * request (or someone else's brute force) can't burn a victim IP's budget
+ * without actually guessing. Sweeps expired entries once the map grows so
+ * one-off attacker IPs can't accumulate forever.
+ */
+export function gateRecordFailure(key: string): void {
   const now = Date.now();
-  const cur = gateAttempts.get(ip);
-  if (!cur || cur.resetAt < now) {
-    gateAttempts.set(ip, { n: 1, resetAt: now + 15 * 60 * 1000 });
-    return true;
+  if (gateAttempts.size >= 1000) {
+    for (const [k, v] of gateAttempts) if (v.resetAt < now) gateAttempts.delete(k);
   }
-  cur.n++;
-  return cur.n <= 8;
+  const cur = gateAttempts.get(key);
+  if (!cur || cur.resetAt < now) {
+    gateAttempts.set(key, { n: 1, resetAt: now + GATE_WINDOW_MS });
+  } else {
+    cur.n++;
+  }
+}
+
+/** Successful sign-in clears the slate for that key. */
+export function gateClear(key: string): void {
+  gateAttempts.delete(key);
 }
 
 export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUser) {
@@ -79,6 +108,15 @@ export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUs
     return null;
   }
   return account;
+}
+
+/**
+ * Second-factor gate check for admin surfaces guarded OUTSIDE this module
+ * (the LSA console + test-email routes in routes.ts). No-op unless the gate
+ * credentials are configured, so dev keeps its current behavior.
+ */
+export function platformGatePassed(req: any): boolean {
+  return !adminGateConfigured() || req.session?.platformAdminGate === true;
 }
 
 /** Per-owner subscription plan, keyed by user id (one subscriptions row each). */
@@ -107,13 +145,15 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
 
   app.post("/api/admin/gate", (req: any, res) => {
     if (!adminGateConfigured()) return res.status(409).json({ message: "Gate not configured" });
-    const ip = String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim();
-    if (!gateAllow(ip)) return res.status(429).json({ message: "Too many attempts. Try again later." });
+    const ip = gateClientIp(req);
+    if (!gateOpen(ip)) return res.status(429).json({ message: "Too many attempts. Try again later." });
     const u = String(req.body?.username ?? "");
     const p = String(req.body?.password ?? "");
     if (!safeEq(u, process.env.ADMIN_GATE_USER!) || !safeEq(p, process.env.ADMIN_GATE_PASS!)) {
+      gateRecordFailure(ip);
       return res.status(401).json({ message: "Wrong username or password" });
     }
+    gateClear(ip);
     req.session.platformAdminGate = true;
     res.json({ ok: true });
   });
