@@ -203,7 +203,7 @@ export async function setupAuth(app: Express) {
     "/api/auth/google/callback",
     (req, res, next) => {
       const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
-      passport.authenticate("google", { failureRedirect: "/auth?error=google-failed", callbackURL } as any)(req, res, next);
+      passport.authenticate("google", { failureRedirect: "/auth?error=google-failed", callbackURL, keepSessionInfo: true } as any)(req, res, next);
     },
     async (req, res) => {
       try {
@@ -211,7 +211,9 @@ export async function setupAuth(app: Express) {
           const [fullUser] = await db.select().from(users).where(eq(users.id, req.user.id));
           if (fullUser?.totpEnabled && fullUser?.totpSecret) {
             req.session.pending2FAUserId = fullUser.id;
-            req.logout(() => {
+            // keepSessionInfo: passport's logout regenerates the session,
+            // which would wipe the pending 2FA marker we just set.
+            req.logout({ keepSessionInfo: true } as any, () => {
               res.redirect("/auth?mode=2fa");
             });
             return;
@@ -395,13 +397,14 @@ export async function setupAuth(app: Express) {
         .set({ emailVerified: true, verificationToken: null, verificationExpiry: null })
         .where(eq(users.id, user.id));
 
+      // passport.regenerate on login wipes the session — capture (and clear)
+      // the destination BEFORE req.login. A signup that started from an
+      // invite link lands back on it instead of the generic home page.
+      const nextPath = typeof req.session.authNext === "string" && /^\/[^\/\\]/.test(req.session.authNext)
+        ? req.session.authNext
+        : null;
+      delete req.session.authNext;
       req.login(user, () => {
-        // A signup that started from an invite link lands back on it after
-        // verification, instead of the generic home page.
-        const nextPath = typeof req.session.authNext === "string" && /^\/[^\/\\]/.test(req.session.authNext)
-          ? req.session.authNext
-          : null;
-        delete req.session.authNext;
         res.redirect(nextPath ?? "/?auth=verified");
       });
     } catch (err) {
