@@ -45,9 +45,13 @@ export function CookieConsent() {
   const [consent, setConsent] = useState<string | null>(() => readCookie("ch_consent"));
   const [saving, setSaving] = useState(false);
 
-  // Track every route change once consent is granted.
+  // Track every route change once consent is granted. Bearer-token document
+  // paths (/e/<token>, /i/<token>, …) are normalized so the tokens never land
+  // in the analytics tables or the /admin Top-pages list.
   useEffect(() => {
-    if (consent === "granted") sendPageview(location);
+    if (consent !== "granted") return;
+    const path = location.replace(/^\/(e|i|co|portal|lead-form)\/[^/?]+/, "/$1/:token");
+    sendPageview(path);
   }, [location, consent]);
 
   if (consent) return null;
@@ -66,9 +70,15 @@ export function CookieConsent() {
     setSaving(false);
   };
 
+  // On document/portal pages a sticky action bar (Approve, portal ribbon)
+  // owns the bottom edge — float the banner above it instead of covering the
+  // page's primary action. 76px ≈ the bar's height; when no bar is rendered
+  // the banner just sits a little higher, which is harmless.
+  const aboveActionBar = /^\/(e|i|co|portal)\//.test(location);
+
   return (
     <div
-      className="fixed bottom-0 inset-x-0 z-[100] p-3 sm:p-4"
+      className={`fixed inset-x-0 z-[100] p-3 sm:p-4 ${aboveActionBar ? "bottom-[76px]" : "bottom-0"}`}
       data-testid="cookie-consent-banner"
     >
       <div className="mx-auto max-w-2xl rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">

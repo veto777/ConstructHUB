@@ -55,10 +55,12 @@ function useTeam(customerId?: string) {
 
 /* ── Messages ────────────────────────────────────────────────────────────── */
 
-export function PortalMessages({ accounts, focusMemberId }: {
+export function PortalMessages({ accounts, focusMemberId, onFocusConsumed }: {
   accounts: any[];
   /** Preselect "To" — set when the client tapped "Message now" on a person. */
   focusMemberId?: string | null;
+  /** Called once the preselect is applied, so it doesn't stick for later visits. */
+  onFocusConsumed?: () => void;
 }) {
   const { toast } = useToast();
   const customerId = accounts?.[0]?.id;
@@ -67,7 +69,10 @@ export function PortalMessages({ accounts, focusMemberId }: {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (focusMemberId) setToMemberId(focusMemberId);
+    if (focusMemberId) {
+      setToMemberId(focusMemberId);
+      onFocusConsumed?.();
+    }
   }, [focusMemberId]);
 
   const { data: team } = useTeam(customerId);

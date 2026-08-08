@@ -552,7 +552,7 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
-        {settled === "approved" && (
+        {settled === "approved" && !preview && (
           <PayCard token={token!} company={company} estimate={e} />
         )}
 

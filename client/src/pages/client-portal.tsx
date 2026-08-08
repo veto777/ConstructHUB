@@ -580,7 +580,7 @@ function Dashboard({ data }: { data: any }) {
     contracts: contractsSection,
     reports: reportsSection,
     photos: <PortalPhotoShare accounts={accounts} photos={photos} />,
-    messages: <PortalMessages accounts={accounts} focusMemberId={messageTo} />,
+    messages: <PortalMessages accounts={accounts} focusMemberId={messageTo} onFocusConsumed={() => setMessageTo(null)} />,
     contact: (
       <PortalContact
         accounts={accounts}
