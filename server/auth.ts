@@ -184,7 +184,7 @@ export async function setupAuth(app: Express) {
     }
     // So does a post-login destination (team-invite accept page) — relative
     // paths only, never an absolute URL (open-redirect guard).
-    if (typeof req.query.next === "string" && /^\/[^\/]/.test(req.query.next)) {
+    if (typeof req.query.next === "string" && /^\/[^\/\\]/.test(req.query.next)) {
       req.session.authNext = req.query.next;
     }
     const scopes = ["profile", "email"];
@@ -218,7 +218,7 @@ export async function setupAuth(app: Express) {
           }
         }
       } catch {}
-      const nextPath = typeof req.session.authNext === "string" && /^\/[^\/]/.test(req.session.authNext)
+      const nextPath = typeof req.session.authNext === "string" && /^\/[^\/\\]/.test(req.session.authNext)
         ? req.session.authNext
         : null;
       delete req.session.authNext;
@@ -228,12 +228,18 @@ export async function setupAuth(app: Express) {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, displayName, beta } = req.body;
+      const { email, password, displayName, beta, next } = req.body;
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
       if (password.length < 8) {
         return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      // Carry the post-signup destination (e.g. a /crm/join invite) through
+      // email verification — same trick as the Google OAuth authNext.
+      if (typeof next === "string" && /^\/[^\/\\]/.test(next)) {
+        req.session.authNext = next;
       }
 
       const existing = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
@@ -390,7 +396,13 @@ export async function setupAuth(app: Express) {
         .where(eq(users.id, user.id));
 
       req.login(user, () => {
-        res.redirect("/?auth=verified");
+        // A signup that started from an invite link lands back on it after
+        // verification, instead of the generic home page.
+        const nextPath = typeof req.session.authNext === "string" && /^\/[^\/\\]/.test(req.session.authNext)
+          ? req.session.authNext
+          : null;
+        delete req.session.authNext;
+        res.redirect(nextPath ?? "/?auth=verified");
       });
     } catch (err) {
       res.redirect("/auth?error=verification-failed");

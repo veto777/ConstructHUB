@@ -31,7 +31,7 @@ export default function AuthPage() {
   const betaParam = params.get("beta");
   // Post-auth destination (e.g. a team-invite accept page). Relative only.
   const rawNext = params.get("next");
-  const nextParam = rawNext && /^\/[^\/]/.test(rawNext) ? rawNext : null;
+  const nextParam = rawNext && /^\/[^\/\\]/.test(rawNext) ? rawNext : null;
 
   useEffect(() => {
     // A beta invite is a NEW-workspace signup. Silently bouncing an
@@ -88,6 +88,7 @@ export default function AuthPage() {
         password,
         displayName: displayName.trim() || undefined,
         beta: betaParam || undefined,
+        next: nextParam || undefined,
       });
       const data = await res.json();
       setMessage(data.message);
