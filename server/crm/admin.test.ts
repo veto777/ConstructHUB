@@ -398,11 +398,18 @@ describe("configured admin gate (:8199 child server)", () => {
       expect(testEmail.status).toBe(403);
       expect((await testEmail.json()).gateRequired).toBe(true);
 
+      // The beta-codes routes (inline isAdmin checks) sit behind the same wall.
+      const beta = await fetch(`${GBASE}/api/beta-codes`, { headers: { cookie } });
+      expect(beta.status).toBe(403);
+      expect((await beta.json()).gateRequired).toBe(true);
+
       // Pass the gate on this session and the LSA route opens.
       const gate = await postGate({ username: GATE_USER, password: GATE_PASS }, cookie);
       expect(gate.status).toBe(200);
       const lsaOk = await fetch(`${GBASE}/api/admin/lsa/manager`, { headers: { cookie } });
       expect(lsaOk.status).toBe(200);
+      const betaOk = await fetch(`${GBASE}/api/beta-codes`, { headers: { cookie } });
+      expect(betaOk.status).toBe(200);
     } finally {
       if (userId != null) await q(`delete from users where id = $1`, [userId]);
     }

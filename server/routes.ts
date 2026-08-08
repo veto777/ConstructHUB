@@ -5541,6 +5541,10 @@ Requirements:
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
+      // Same second-factor wall as requirePlatformAdmin (see adminGuard).
+      if (!platformGatePassed(req)) {
+        return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+      }
 
       const { trialDays, recipientEmail, recipientName } = req.body || {};
       const isUnlimited = trialDays === 0;
@@ -5581,6 +5585,10 @@ Requirements:
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
+      // Same second-factor wall as requirePlatformAdmin (see adminGuard).
+      if (!platformGatePassed(req)) {
+        return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+      }
 
       const codes = await storage.getAllBetaAccessCodes();
       const enriched = await Promise.all(codes.map(async (c) => {
@@ -5607,6 +5615,10 @@ Requirements:
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
+      // Same second-factor wall as requirePlatformAdmin (see adminGuard).
+      if (!platformGatePassed(req)) {
+        return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+      }
 
       const id = parseInt(req.params.id);
       const code = await storage.revokeBetaAccessCode(id);
