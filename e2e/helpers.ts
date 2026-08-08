@@ -76,6 +76,13 @@ export function watchPage(page: Page): PageGuards {
 
 /** Navigate and wait until the SPA has settled past its loading spinner. */
 export async function gotoCrm(page: Page, path: string) {
+  // The consent banner is verified in its own spec (44-cookie-consent);
+  // everywhere else its card must not cover controls under test. Declining
+  // is the least-invasive pre-answer.
+  const ctx = page.context();
+  if (!(await ctx.cookies(E2E_BASE_URL)).some((c) => c.name === "ch_consent")) {
+    await ctx.addCookies([{ name: "ch_consent", value: "denied", url: E2E_BASE_URL }]);
+  }
   await page.goto(path);
   await page.waitForLoadState("networkidle");
 }
