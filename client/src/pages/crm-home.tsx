@@ -179,7 +179,7 @@ export default function CrmHomePage() {
                   data-testid={`step-${s.key}`}
                 >
                   {s.done ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   ) : s.locked ? (
                     <Lock className="h-5 w-5 text-muted-foreground shrink-0" />
                   ) : (
