@@ -17,7 +17,7 @@ import {
   CRM_PROJECT_STAGE_META,
 } from "@shared/schema";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { requireOrg } from "./tenancy";
+import { requireOrg, requirePermission } from "./tenancy";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -50,6 +50,9 @@ export function projectStageLabel(status: string): string {
 
 const OPEN_ESTIMATE = ["sent", "viewed"] as const;
 const OPEN_INVOICE = ["sent", "partial"] as const;
+// Only these estimate-event types render in the team feed (see the loop
+// below); filtering in SQL keeps the limit*2 fetch budget for renderable rows.
+const FEED_EVENT_TYPES = ["sent", "viewed", "approved", "declined", "shared"] as const;
 
 export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void {
   app.get("/api/crm/stats", async (req: any, res) => {
@@ -57,6 +60,8 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Org-wide revenue rollups — reporting seats only (field/sub are blind).
+    if (!requirePermission(res, ctx, "seeReporting")) return;
     const orgId = ctx.org.id;
 
     const [openEst] = await db.select({
@@ -87,7 +92,9 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
 
     const [openInv] = await db.select({
       count: sql<number>`count(*)::int`,
-      totalCents: sql<number>`coalesce(sum(${crmInvoices.totalCents} - ${crmInvoices.paidCents}), 0)::bigint`,
+      // greatest() per row: a corrupt paid > total invoice must not drag the
+      // org-wide open-balance below zero.
+      totalCents: sql<number>`coalesce(sum(greatest(${crmInvoices.totalCents} - ${crmInvoices.paidCents}, 0)), 0)::bigint`,
     }).from(crmInvoices).where(and(
       eq(crmInvoices.orgId, orgId),
       inArray(crmInvoices.status, [...OPEN_INVOICE]),
@@ -108,6 +115,8 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Per-payment amounts and customer names — reporting seats only.
+    if (!requirePermission(res, ctx, "seeReporting")) return;
     const orgId = ctx.org.id;
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "40")) || 40));
 
@@ -146,9 +155,20 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       customerId: crmEstimates.customerId,
       custName: crmCustomers.displayName,
     }).from(crmEstimateEvents)
-      .innerJoin(crmEstimates, eq(crmEstimateEvents.estimateId, crmEstimates.id))
-      .innerJoin(crmCustomers, eq(crmEstimates.customerId, crmCustomers.id))
-      .where(eq(crmEstimateEvents.orgId, orgId))
+      // Org predicates on every join, not just the where: a row whose FK
+      // points at another org's record must drop out, not render.
+      .innerJoin(crmEstimates, and(
+        eq(crmEstimateEvents.estimateId, crmEstimates.id),
+        eq(crmEstimates.orgId, orgId),
+      ))
+      .innerJoin(crmCustomers, and(
+        eq(crmEstimates.customerId, crmCustomers.id),
+        eq(crmCustomers.orgId, orgId),
+      ))
+      .where(and(
+        eq(crmEstimateEvents.orgId, orgId),
+        inArray(crmEstimateEvents.type, [...FEED_EVENT_TYPES]),
+      ))
       .orderBy(desc(crmEstimateEvents.createdAt)).limit(limit * 2);
     for (const e of events) {
       const ref = e.estNumber ? `estimate ${e.estNumber}` : "an estimate";
@@ -179,7 +199,10 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       customerId: crmPayments.customerId,
       custName: crmCustomers.displayName,
     }).from(crmPayments)
-      .innerJoin(crmCustomers, eq(crmPayments.customerId, crmCustomers.id))
+      .innerJoin(crmCustomers, and(
+        eq(crmPayments.customerId, crmCustomers.id),
+        eq(crmCustomers.orgId, orgId),
+      ))
       .where(and(eq(crmPayments.orgId, orgId), eq(crmPayments.status, "succeeded")))
       .orderBy(desc(crmPayments.createdAt)).limit(limit);
     for (const p of pays) {
