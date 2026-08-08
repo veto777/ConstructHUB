@@ -302,17 +302,48 @@ describe("inbox gates + reply throttle (Aspire org)", () => {
   });
 
   it("reply is throttled per member+org: over 60 in the window → 429", async () => {
-    // The sales probe above already spent one hit on this member's bucket, so
-    // don't assert an exact count of 201s — assert the bucket clamps at 60
-    // allowed and everything past it is 429.
-    const statuses: number[] = [];
-    for (let i = 0; i < 65; i++) {
-      const r = await api(`/api/crm/inbox/${gateCust}/reply`, {
-        method: "POST", body: JSON.stringify({ body: `flood ${i}` }),
-      }, ac);
-      statuses.push(r.status);
+    // Runs in a per-run scratch org: the throttle bucket is keyed org+member and
+    // lives in the server process, so reusing the Aspire member makes repeated
+    // suite runs within one 15-min window poison each other.
+    const [{ id: scratchOrg }] = await q<{ id: string }>(
+      `insert into crm_orgs (name, owner_user_id) values ($1, 1) returning id`,
+      [`Vitest Inbox Flood ${suffix}`]);
+    const [{ id: scratchMember }] = await q<{ id: string }>(
+      `insert into crm_members (org_id, user_id, email, role, status, display_name)
+       values ($1, 1, $2, 'owner', 'active', 'Flood Owner') returning id`,
+      [scratchOrg, `inbox-flood-${suffix}@example.com`]);
+    let scratchCust = "";
+    try {
+      const me = await api("/api/crm/me");
+      const sw = await api("/api/crm/org/switch", {
+        method: "POST", body: JSON.stringify({ orgId: scratchOrg }),
+      }, me.cookie);
+      expect(sw.status).toBe(200);
+      const cust = await api("/api/crm/customers", {
+        method: "POST",
+        body: JSON.stringify({
+          displayName: `Inbox Flood ${suffix}`,
+          email: `inbox-flood-cust-${suffix}@example.com`,
+        }),
+      }, sw.cookie);
+      expect(cust.status).toBe(201);
+      scratchCust = cust.body.id;
+
+      const statuses: number[] = [];
+      for (let i = 0; i < 65; i++) {
+        const r = await api(`/api/crm/inbox/${scratchCust}/reply`, {
+          method: "POST", body: JSON.stringify({ body: `flood ${i}` }),
+        }, sw.cookie);
+        statuses.push(r.status);
+      }
+      // A fresh bucket allows exactly 60; everything past it is 429.
+      expect(statuses.filter((s) => s === 201).length).toBe(60);
+      expect(statuses[statuses.length - 1]).toBe(429);
+    } finally {
+      await q(`delete from crm_client_comments where org_id = $1`, [scratchOrg]);
+      if (scratchCust) await q(`delete from crm_customers where id = $1`, [scratchCust]);
+      await q(`delete from crm_members where id = $1`, [scratchMember]);
+      await q(`delete from crm_orgs where id = $1`, [scratchOrg]);
     }
-    expect(statuses.filter((s) => s === 201).length).toBeLessThanOrEqual(60);
-    expect(statuses[statuses.length - 1]).toBe(429);
   });
 });
