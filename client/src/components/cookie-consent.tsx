@@ -70,18 +70,24 @@ export function CookieConsent() {
     setSaving(false);
   };
 
-  // On document/portal pages a sticky action bar (Approve, portal ribbon)
-  // owns the bottom edge — float the banner above it instead of covering the
-  // page's primary action. 76px ≈ the bar's height; when no bar is rendered
-  // the banner just sits a little higher, which is harmless.
+  // Placement: never sit on top of the page's primary action. Document and
+  // portal pages have a sticky bottom bar (Approve, portal ribbon); the CRM
+  // has the mobile ribbon below sm. Float above those; otherwise bottom.
+  // Desktop anchors the card to the corner so it covers less content.
   const aboveActionBar = /^\/(e|i|co|portal)\//.test(location);
+  const inCrm = location.startsWith("/crm");
 
   return (
+    // pointer-events-none on the wrapper: the full-width strip must not
+    // swallow clicks meant for content behind it (it blanketed the e2e
+    // suite's clicks when it shipped).
     <div
-      className={`fixed inset-x-0 z-[100] p-3 sm:p-4 ${aboveActionBar ? "bottom-[76px]" : "bottom-0"}`}
+      className={`fixed inset-x-0 z-[100] p-3 sm:p-4 pointer-events-none flex justify-center sm:justify-end ${
+        aboveActionBar ? "bottom-[76px]" : inCrm ? "bottom-[76px] sm:bottom-0" : "bottom-0"
+      }`}
       data-testid="cookie-consent-banner"
     >
-      <div className="mx-auto max-w-2xl rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="pointer-events-auto w-full max-w-2xl sm:max-w-lg rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-start gap-2.5 min-w-0 flex-1">
           <Cookie className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
