@@ -44,6 +44,9 @@ test.describe("/crm/clients", () => {
   test("sweep: every button and link", async ({ page }) => {
     const { clicked, labels } = await sweepPage(page, "/crm/clients", {
       ready: 'h1:has-text("Clients")',
+      // The lane DB accumulates ~1k test clients; row links are redundant
+      // after the first few — cap so 80 full-page reloads can't blow 240s.
+      maxClicks: 30,
     });
     console.log(`clients sweep clicked ${clicked}: ${labels.join(" | ")}`);
     expect(clicked).toBeGreaterThanOrEqual(12);

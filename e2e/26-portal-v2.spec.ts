@@ -185,10 +185,14 @@ test.describe("client portal v2 — photos + comments", () => {
       // The sent message lands in the thread.
       await expect(page.getByTestId("portal-messages")).toContainText("next Friday", { timeout: 15_000 });
 
-      // The email is stubbed/logged in dev — the DB row is the record.
-      const rows = await q<{ id: string; read_at: Date | null }>(
-        `select id, read_at from crm_client_comments where customer_id = $1`, [customerId]);
-      expect(rows.length).toBe(1);
+      // The email is stubbed/logged in dev — the DB row is the record. Poll:
+      // the UI refetch can render the message a beat before this read lands.
+      let rows: Array<{ id: string; read_at: Date | null }> = [];
+      await expect.poll(async () => {
+        rows = await q<{ id: string; read_at: Date | null }>(
+          `select id, read_at from crm_client_comments where customer_id = $1`, [customerId]);
+        return rows.length;
+      }).toBe(1);
       expect(rows[0].read_at).toBeNull();
 
       // Contractor side: the comment shows on the client detail…

@@ -25,6 +25,9 @@ test.describe("/crm/join", () => {
       await gotoCrm(page, `/crm/join?token=${token}`);
       await expect(page.getByText(email, { exact: true })).toBeVisible();
       await expect(page.getByText(/invited you to ConstructHub CRM/)).toBeVisible();
+      // Phone is required — the accept button stays disabled without it.
+      await expect(page.getByTestId("button-accept-invite")).toBeDisabled();
+      await page.getByTestId("input-join-phone").fill("(555) 010-2233");
       await page.getByTestId("button-accept-invite").click();
       await expect(page.getByText("Could not accept", { exact: true })).toBeVisible();
     } finally {
