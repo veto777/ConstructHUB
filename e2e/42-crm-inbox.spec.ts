@@ -32,8 +32,8 @@ test.beforeEach(async ({ page }) => switchOrg(page, ORGS.alpine));
 async function clientSays(page: any, name: string, body: string): Promise<string> {
   const customerId = await makeCustomer(page, name);
   await grantClientSession(page, [customerId]);
-  const r = await page.request.post(`/api/client/comments?customerId=${customerId}`, {
-    data: { body },
+  const r = await page.request.post("/api/client/comments", {
+    data: { customerId, body },
   });
   if (!r.ok()) throw new Error(`client comment failed: ${r.status()} ${await r.text()}`);
   return customerId;
