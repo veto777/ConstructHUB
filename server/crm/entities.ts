@@ -320,13 +320,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .orderBy(desc(crmCustomers.createdAt)).limit(500);
     // Bid outcome per client, for the Won / Undecided / Declined tabs: any
     // approved estimate wins; else an open (sent/viewed) one means undecided;
-    // else any declined means declined; no bids → null.
-    const agg = await db.select({
+    // else any declined means declined; no bids → null. Scoped to the listed
+    // page — aggregating the whole org's estimates on every list call is
+    // wasted work once an org outgrows the 500-row page.
+    const listedIds = rows.map((c) => c.id);
+    const agg = listedIds.length === 0 ? [] : await db.select({
       customerId: crmEstimates.customerId,
       approved: sql<number>`count(*) filter (where ${crmEstimates.status} = 'approved')::int`,
       open: sql<number>`count(*) filter (where ${crmEstimates.status} in ('sent','viewed'))::int`,
       declined: sql<number>`count(*) filter (where ${crmEstimates.status} = 'declined')::int`,
-    }).from(crmEstimates).where(eq(crmEstimates.orgId, ctx.org.id))
+    }).from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.customerId, listedIds)))
       .groupBy(crmEstimates.customerId);
     const outcome = new Map<string, string>();
     for (const a of agg) {

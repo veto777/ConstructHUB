@@ -943,8 +943,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
     const [account] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
     // The invite is addressed to an email; accepting from a different account
-    // would silently give the wrong person access.
-    if (account?.email && account.email.toLowerCase() !== invite.email.toLowerCase()) {
+    // would silently give the wrong person access. An account with no email
+    // can never prove the binding, so it's refused outright too.
+    const accountEmail = account?.email?.trim().toLowerCase();
+    if (!accountEmail || accountEmail !== invite.email.toLowerCase()) {
       return res.status(403).json({
         message: `This invitation was sent to ${invite.email}. Sign in as that account to accept it.`,
       });
@@ -967,8 +969,20 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         phoneRequired: true,
       });
     }
-    if (phoneRaw && (phoneDigits.length < 7 || phoneDigits.length > 15)) {
+    if (phoneRaw && (phoneDigits.length < 7 || phoneDigits.length > 15 || /^(\d)\1+$/.test(phoneDigits))) {
       return res.status(400).json({ message: "That phone number doesn't look right." });
+    }
+
+    // Atomic single-use claim: concurrent accepts race on this UPDATE and
+    // only one flips accepted_at — the loser gets a clean 409 here instead of
+    // a 500 from the member upsert below.
+    const [claimed] = await db
+      .update(crmInvitations)
+      .set({ acceptedAt: new Date() })
+      .where(and(eq(crmInvitations.id, invite.id), isNull(crmInvitations.acceptedAt)))
+      .returning({ id: crmInvitations.id });
+    if (!claimed) {
+      return res.status(409).json({ message: "This invitation has already been used" });
     }
 
     if (placeholder) {
@@ -998,7 +1012,6 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       });
     }
 
-    await db.update(crmInvitations).set({ acceptedAt: new Date() }).where(eq(crmInvitations.id, invite.id));
     recordActivity({
       orgId: invite.orgId,
       actorMemberId: placeholder?.id ?? null,

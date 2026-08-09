@@ -21,6 +21,7 @@ import {
   crmEstimateEvents, crmEngagementSessions,
   CRM_PROJECT_STAGE_META,
   crmNotificationEnabled,
+  crmNotificationChannel,
   crmClientTokens,
 } from "@shared/schema";
 import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
@@ -399,6 +400,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       org: ctx.org,
       pref: "estimateSent",
       excludeEmails: [ctx.member.email],
+      excludeMemberIds: [ctx.member.id],
       subject: `📤 Bid sent to ${cust.displayName}${est.number ? ` — ${est.number}` : ""}`,
       bodyHtml:
         `<p><strong>${esc(ctx.member.displayName || from)}</strong> sent estimate ` +
@@ -1275,9 +1277,10 @@ async function notifyOwner(
   reason?: string,
 ) {
   // The org can silence each notification type in Settings (default: on).
+  // The gate is per-channel: any of in-app/email/sms ON keeps the event alive.
   const pref =
     event === "opened" ? "estimateViewed" : event === "approved" ? "estimateApproved" : "estimateDeclined";
-  if (!crmNotificationEnabled(org.customFields, pref)) return;
+  if (!["inApp", "email", "sms"].some((c) => crmNotificationChannel(org.customFields, pref, c as any))) return;
 
   const recipients = new Set<string>();
   if (org.email) recipients.add(org.email);
@@ -1287,7 +1290,6 @@ async function notifyOwner(
     if (m.id === est.createdByMemberId && m.email) recipients.add(m.email);
     if (m.role === "owner" && m.email) recipients.add(m.email);
   }
-  if (!recipients.size) return;
 
   const subject =
     event === "approved" ? `✅ ${cust.displayName} approved estimate ${est.number ?? ""}`.trim()
@@ -1311,11 +1313,13 @@ async function notifyOwner(
          ${reason ? `<p>Reason: ${esc(reason)}</p>` : ""}`
       : `<p><strong>${esc(cust.displayName)}</strong> just opened estimate ${esc(est.number ?? "")} (${money(est.totalCents)}) for the first time.</p>`;
 
-  await sendWithFallback({
-    to: [...recipients].join(","),
-    subject,
-    html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
-  } as any).catch((e: any) => console.error("[crm] owner notify failed:", e?.message || e));
+  if (recipients.size && crmNotificationChannel(org.customFields, pref, "email")) {
+    await sendWithFallback({
+      to: [...recipients].join(","),
+      subject,
+      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
+    } as any).catch((e: any) => console.error("[crm] owner notify failed:", e?.message || e));
+  }
 
   // The signature is the moment that matters — text it too when the org
   // turned SMS alerts on (opt-in; the email above is the default channel).

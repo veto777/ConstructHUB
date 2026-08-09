@@ -293,13 +293,18 @@ export async function sendBackupForOrg(org: OrgRow, cfg: BackupConfig): Promise<
   return { rows, bytes, format: cfg.format, recipient, files: attachments.map((a) => a.filename) };
 }
 
-/** Merge a patch into custom_fields->'backup' — the rest of the jsonb is never touched. */
+/** Merge a patch into custom_fields->'backup' — the rest of the jsonb is never touched.
+ *  Done as one atomic jsonb merge (not read-modify-write), so a scheduler stamp
+ *  concurrent with a settings PUT can't lose one of the two updates. */
 async function stampBackup(orgId: string, patch: Partial<BackupConfig>): Promise<void> {
-  const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
-  if (!org) return;
-  const customFields = { ...((org.customFields as Record<string, unknown> | null) ?? {}) };
-  customFields.backup = { ...backupConfigOf(org.customFields), ...patch };
-  await db.update(crmOrgs).set({ customFields, updatedAt: new Date() }).where(eq(crmOrgs.id, orgId));
+  await db.update(crmOrgs).set({
+    customFields: sql`jsonb_set(
+      coalesce(${crmOrgs.customFields}, '{}'::jsonb),
+      '{backup}',
+      coalesce(${crmOrgs.customFields} -> 'backup', '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
+    )`,
+    updatedAt: new Date(),
+  }).where(eq(crmOrgs.id, orgId));
 }
 
 // ── Scheduler (single-instance — see the module docstring) ───────────────────

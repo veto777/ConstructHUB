@@ -6,11 +6,19 @@
  *     the thread carries both sides in order.
  *  3. A message addressed to a member (toMemberId) surfaces that name; a
  *     bogus toMemberId on the portal POST is dropped, not stored.
+ *  4. Gates + throttles: field role gets 403 on all four staff routes (sales
+ *     and owner pass), the reply endpoint 429s past 60/member/org, the portal
+ *     team endpoint 429s past 60, read on a bogus customer 404s, and
+ *     unreadTotal counts unread beyond the 200-thread page.
+ *  5. /api/client/team tenancy: a client session from another org gets 403
+ *     on this org's customer, and its own customer returns only its own
+ *     org's members.
  *
  * Requires the dev server:
  *   DATABASE_URL=… DEV_AUTH_BYPASS_USER1=true PORT=8119 npx tsx --env-file=.env server/index.ts
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import pg from "pg";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
@@ -22,12 +30,34 @@ const pool = new pg.Pool({
 const q = <T = any>(text: string, params: any[] = []) =>
   pool.query(text, params).then((r) => r.rows as T[]);
 
-async function api(path: string, opts: RequestInit = {}) {
+async function api(path: string, opts: RequestInit = {}, cookie?: string) {
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
-    headers: { "content-type": "application/json", ...(opts.headers || {}) },
+    headers: {
+      "content-type": "application/json",
+      ...(cookie ? { cookie } : {}),
+      ...(opts.headers || {}),
+    },
   });
-  return { status: res.status, body: await res.json().catch(() => null) };
+  const setCookie = res.headers.get("set-cookie");
+  return {
+    status: res.status,
+    body: await res.json().catch(() => null),
+    cookie: setCookie?.split(";")[0] ?? cookie,
+  };
+}
+
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+/** Insert a client session row as a redeemed magic link would; returns the RAW cookie token. */
+async function makeClientSession(customerIds: string[]): Promise<string> {
+  const raw = randomBytes(32).toString("hex");
+  await q(
+    `insert into crm_client_sessions (token_hash, customer_ids, expires_at, last_seen_at)
+     values ($1, $2::jsonb, now() + interval '30 days', now())`,
+    [sha256(raw), JSON.stringify(customerIds)],
+  );
+  return raw;
 }
 
 let orgId: string, memberId: string, customerId: string;
@@ -103,5 +133,217 @@ describe("messages inbox", () => {
     const msg = thread.body.messages.find((m: any) => m.body === "For you specifically");
     expect(msg).toBeTruthy();
     expect(msg.toMemberName).toBeTruthy();
+  });
+
+  it("read on a customer that doesn't exist → 404, no silent no-op", async () => {
+    const r = await api(`/api/crm/inbox/${randomUUID()}/read`, { method: "POST", body: "{}" });
+    expect(r.status).toBe(404);
+  });
+
+  it("unreadTotal counts unread beyond the 200-thread page", async () => {
+    // 201 fresh threads, one unread message each: the returned page fills at
+    // 200 rows but the badge must still count all 201.
+    const ids = (await q<{ id: string }>(
+      `INSERT INTO crm_customers (org_id, display_name, email, portal_token)
+       SELECT $1, 'Inbox Page ' || g || ' ${suffix}',
+              'inbox-page-' || g || '-${suffix}@example.com',
+              replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')
+       FROM generate_series(1, 201) g RETURNING id`, [orgId])).map((r) => r.id);
+    try {
+      await q(
+        `INSERT INTO crm_client_comments (org_id, customer_id, body)
+         SELECT $1, id, 'page filler ${suffix}' FROM unnest($2::uuid[]) AS id`,
+        [orgId, ids]);
+      const list = await api("/api/crm/inbox");
+      expect(list.status).toBe(200);
+      expect(list.body.threads.length).toBe(200);
+      expect(list.body.unreadTotal).toBeGreaterThanOrEqual(201);
+    } finally {
+      await q(`DELETE FROM crm_client_comments WHERE customer_id = any($1)`, [ids]);
+      await q(`DELETE FROM crm_customers WHERE id = any($1)`, [ids]);
+    }
+  });
+
+  it("client/team is throttled: over 60 requests → 429", async () => {
+    const [c] = await q<{ id: string }>(
+      `INSERT INTO crm_customers (org_id, display_name, email, portal_token)
+       VALUES ($1, $2, $3, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')) RETURNING id`,
+      [orgId, `Inbox Team ${suffix}`, `inbox-team-${suffix}@example.com`]);
+    try {
+      const raw = await makeClientSession([c.id]);
+      let last = 0;
+      for (let i = 0; i < 61; i++) {
+        const r = await fetch(`${BASE}/api/client/team?customerId=${c.id}`, {
+          headers: { cookie: `crm_client=${raw}` },
+        });
+        last = r.status;
+        if (i === 0) expect(r.status).toBe(200);
+        await r.arrayBuffer().catch(() => {});
+      }
+      expect(last).toBe(429);
+    } finally {
+      await q(`DELETE FROM crm_client_sessions WHERE customer_ids::text like '%' || $1 || '%'`, [c.id]);
+      await q(`DELETE FROM crm_customers WHERE id = $1`, [c.id]);
+    }
+  });
+
+  it("client/team: another org's customer → 403; own org returns only its own members", async () => {
+    // A whole second org with its own member, customer, and an estimate the
+    // member created (so the team list is provably non-empty).
+    const [{ id: orgB }] = await q<{ id: string }>(
+      `INSERT INTO crm_orgs (name, owner_user_id) VALUES ($1, 1) RETURNING id`,
+      [`Inbox Team OrgB ${suffix}`]);
+    const [{ id: memberB }] = await q<{ id: string }>(
+      `INSERT INTO crm_members (org_id, user_id, email, role, status, display_name)
+       VALUES ($1, 1, $2, 'owner', 'active', 'OrgB Owner') RETURNING id`,
+      [orgB, `inbox-teamb-${suffix}@example.com`]);
+    const [{ id: custB }] = await q<{ id: string }>(
+      `INSERT INTO crm_customers (org_id, display_name, email, portal_token)
+       VALUES ($1, $2, $3, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')) RETURNING id`,
+      [orgB, `Inbox TeamB ${suffix}`, `inbox-teamb-${suffix}@example.com`]);
+    const [{ id: estB }] = await q<{ id: string }>(
+      `INSERT INTO crm_estimates (org_id, customer_id, number, status, total_cents, public_token, created_by_member_id)
+       VALUES ($1, $2, $3, 'sent', 1000, $4, $5) RETURNING id`,
+      [orgB, custB, `EST-TB-${suffix}`, `etok-teamb-${suffix}`, memberB]);
+    try {
+      const raw = await makeClientSession([custB]);
+      const cc = `crm_client=${raw}`;
+
+      // Org B's client asking about the DEFAULT org's customer → 403.
+      const cross = await fetch(`${BASE}/api/client/team?customerId=${customerId}`, {
+        headers: { cookie: cc },
+      });
+      expect(cross.status).toBe(403);
+      await cross.arrayBuffer().catch(() => {});
+
+      // Their own customer → 200, and only org B's members come back.
+      const own = await api(`/api/client/team?customerId=${custB}`, {}, cc);
+      expect(own.status).toBe(200);
+      expect(own.body.team.map((t: any) => t.memberId)).toEqual([memberB]);
+      expect(own.body.team.some((t: any) => t.memberId === memberId)).toBe(false);
+      expect(own.body.office.name).toBe(`Inbox Team OrgB ${suffix}`);
+    } finally {
+      await q(`DELETE FROM crm_client_sessions WHERE customer_ids::text like '%' || $1 || '%'`, [custB]);
+      await q(`DELETE FROM crm_estimates WHERE id = $1`, [estB]);
+      await q(`DELETE FROM crm_customers WHERE id = $1`, [custB]);
+      await q(`DELETE FROM crm_members WHERE id = $1`, [memberB]);
+      await q(`DELETE FROM crm_orgs WHERE id = $1`, [orgB]);
+    }
+  });
+});
+
+// Role flips and the reply-flood probe run in the ASPIRE org: the default
+// org's member powers every other suite's happy path, and the reply bucket is
+// keyed per member+org — flooding it in the default org would 429 the other
+// inbox tests. The role is always restored in a finally.
+describe("inbox gates + reply throttle (Aspire org)", () => {
+  const ASPIRE = "b839980a-ad26-44d4-9e83-df427bd60fe8";
+  let ac: string | undefined; // session pinned to the Aspire org
+  let aspireMemberId = "";
+  let gateCust = "";
+
+  beforeAll(async () => {
+    const me = await api("/api/crm/me");
+    const sw = await api("/api/crm/org/switch", {
+      method: "POST", body: JSON.stringify({ orgId: ASPIRE }),
+    }, me.cookie);
+    expect(sw.status).toBe(200);
+    ac = sw.cookie;
+    const [{ id }] = await q<{ id: string }>(
+      `select id from crm_members where org_id = $1 and user_id = 1`, [ASPIRE]);
+    aspireMemberId = id;
+    // Created while still owner — customer writes are manageCustomers-gated.
+    const cust = await api("/api/crm/customers", {
+      method: "POST",
+      body: JSON.stringify({
+        displayName: `Inbox Gate ${suffix}`,
+        email: `inbox-gate-${suffix}@example.com`,
+      }),
+    }, ac);
+    expect(cust.status).toBe(201);
+    gateCust = cust.body.id;
+  });
+
+  afterAll(async () => {
+    await q(`update crm_members set role = 'owner' where id = $1`, [aspireMemberId]);
+    await q(`delete from crm_client_comments where customer_id = $1`, [gateCust]);
+    await q(`delete from crm_customers where id = $1`, [gateCust]);
+  });
+
+  it("field role → 403 on all four inbox routes; sales and owner pass", async () => {
+    await q(`update crm_members set role = 'field' where id = $1`, [aspireMemberId]);
+    try {
+      expect((await api("/api/crm/inbox", {}, ac)).status).toBe(403);
+      expect((await api(`/api/crm/inbox/${gateCust}`, {}, ac)).status).toBe(403);
+      expect((await api(`/api/crm/inbox/${gateCust}/read`, { method: "POST", body: "{}" }, ac)).status).toBe(403);
+      expect((await api(`/api/crm/inbox/${gateCust}/reply`, {
+        method: "POST", body: JSON.stringify({ body: "should never send" }),
+      }, ac)).status).toBe(403);
+    } finally {
+      await q(`update crm_members set role = 'owner' where id = $1`, [aspireMemberId]);
+    }
+
+    await q(`update crm_members set role = 'sales' where id = $1`, [aspireMemberId]);
+    try {
+      expect((await api("/api/crm/inbox", {}, ac)).status).toBe(200);
+      expect((await api(`/api/crm/inbox/${gateCust}`, {}, ac)).status).toBe(200);
+      expect((await api(`/api/crm/inbox/${gateCust}/read`, { method: "POST", body: "{}" }, ac)).status).toBe(200);
+      expect((await api(`/api/crm/inbox/${gateCust}/reply`, {
+        method: "POST", body: JSON.stringify({ body: "sales can reply" }),
+      }, ac)).status).toBe(201);
+    } finally {
+      await q(`update crm_members set role = 'owner' where id = $1`, [aspireMemberId]);
+    }
+
+    // A customer from ANOTHER org (this one) addressed on the default-org
+    // session reads as 404, not a silent 200 no-op.
+    const cross = await api(`/api/crm/inbox/${gateCust}/read`, { method: "POST", body: "{}" });
+    expect(cross.status).toBe(404);
+  });
+
+  it("reply is throttled per member+org: over 60 in the window → 429", async () => {
+    // Runs in a per-run scratch org: the throttle bucket is keyed org+member and
+    // lives in the server process, so reusing the Aspire member makes repeated
+    // suite runs within one 15-min window poison each other.
+    const [{ id: scratchOrg }] = await q<{ id: string }>(
+      `insert into crm_orgs (name, owner_user_id) values ($1, 1) returning id`,
+      [`Vitest Inbox Flood ${suffix}`]);
+    const [{ id: scratchMember }] = await q<{ id: string }>(
+      `insert into crm_members (org_id, user_id, email, role, status, display_name)
+       values ($1, 1, $2, 'owner', 'active', 'Flood Owner') returning id`,
+      [scratchOrg, `inbox-flood-${suffix}@example.com`]);
+    let scratchCust = "";
+    try {
+      const me = await api("/api/crm/me");
+      const sw = await api("/api/crm/org/switch", {
+        method: "POST", body: JSON.stringify({ orgId: scratchOrg }),
+      }, me.cookie);
+      expect(sw.status).toBe(200);
+      const cust = await api("/api/crm/customers", {
+        method: "POST",
+        body: JSON.stringify({
+          displayName: `Inbox Flood ${suffix}`,
+          email: `inbox-flood-cust-${suffix}@example.com`,
+        }),
+      }, sw.cookie);
+      expect(cust.status).toBe(201);
+      scratchCust = cust.body.id;
+
+      const statuses: number[] = [];
+      for (let i = 0; i < 65; i++) {
+        const r = await api(`/api/crm/inbox/${scratchCust}/reply`, {
+          method: "POST", body: JSON.stringify({ body: `flood ${i}` }),
+        }, sw.cookie);
+        statuses.push(r.status);
+      }
+      // A fresh bucket allows exactly 60; everything past it is 429.
+      expect(statuses.filter((s) => s === 201).length).toBe(60);
+      expect(statuses[statuses.length - 1]).toBe(429);
+    } finally {
+      await q(`delete from crm_client_comments where org_id = $1`, [scratchOrg]);
+      if (scratchCust) await q(`delete from crm_customers where id = $1`, [scratchCust]);
+      await q(`delete from crm_members where id = $1`, [scratchMember]);
+      await q(`delete from crm_orgs where id = $1`, [scratchOrg]);
+    }
   });
 });

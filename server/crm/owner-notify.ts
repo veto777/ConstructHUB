@@ -15,7 +15,7 @@ import { db } from "../db";
 import {
   crmMembers,
   crmOrgs,
-  crmNotificationEnabled,
+  crmNotificationChannel,
   type CrmNotificationPref,
 } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
@@ -49,18 +49,25 @@ export async function notifyOrgOwners(args: {
   bodyHtml: string;
   /** Never mail the actor, even when they hold an owner seat. */
   excludeEmails?: string[];
+  /** Never bell/text the actor either — the member id behind excludeEmails. */
+  excludeMemberIds?: string[];
   link?: string;
   linkLabel?: string;
 }): Promise<boolean> {
-  if (!crmNotificationEnabled(args.org.customFields, args.pref)) return false;
-  const to = await orgOwnerEmails(args.org.id, args.excludeEmails);
-  if (!to.length) return false;
+  // Per-channel gate: any of in-app/email/sms ON keeps the event alive.
+  if (!["inApp", "email", "sms"].some((c) => crmNotificationChannel(args.org.customFields, args.pref, c as any))) return false;
 
-  // The bell mirrors the email (and texts when that channel is on).
+  // The bell mirrors the email (and texts when that channel is on) — and it
+  // never depends on there being an email inbox left after exclusions.
   await notifyMembers({
     org: args.org, pref: args.pref, title: args.subject.replace(/^[^\w]*\s*/, ""),
     link: args.link ?? null,
+    excludeMemberIds: args.excludeMemberIds,
   });
+
+  if (!crmNotificationChannel(args.org.customFields, args.pref, "email")) return false;
+  const to = await orgOwnerEmails(args.org.id, args.excludeEmails);
+  if (!to.length) return false;
 
   await sendWithFallback({
     to: to.join(","),
@@ -110,6 +117,7 @@ export async function notifyMemberLogin(user: Actor): Promise<void> {
       org,
       pref: "memberLogin",
       excludeEmails: [user.email],
+      excludeMemberIds: [member.id],
       subject: `🔐 ${actorName(user, member)} signed in`,
       bodyHtml:
         `<p><strong>${esc(actorName(user, member))}</strong> (${esc(user.email)}) signed in to ` +
@@ -132,6 +140,7 @@ export async function notifyMemberAccountChange(user: Actor, fields: string[]): 
       org,
       pref: "memberAccountChange",
       excludeEmails: [user.email],
+      excludeMemberIds: [member.id],
       subject: `✏️ ${actorName(user, member)} updated their account`,
       bodyHtml:
         `<p><strong>${esc(actorName(user, member))}</strong> (${esc(user.email)}) changed ` +

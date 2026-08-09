@@ -15,6 +15,22 @@ import { logMemberAuth } from "./crm/activity";
 import { resolveGoogleUrl } from "./google-url-resolver";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 
+/**
+ * Open-redirect guard for post-auth `next` destinations. Only a plain
+ * same-origin path survives: exactly one leading `/` (never `//host`), no
+ * backslash anywhere (browsers resolve `/\host` as `//host`), no control
+ * chars or whitespace. Anything else returns null and the caller falls back
+ * to the default destination.
+ */
+export function safeNextPath(next: string | undefined | null): string | null {
+  if (!next || typeof next !== "string" || next.length > 2048) return null;
+  if (/[\x00-\x20\x7f\\]/.test(next)) return null;
+  if (next[0] !== "/" || next[1] === "/") return null;
+  const url = new URL(next, "http://local");
+  if (url.origin !== "http://local" || !url.pathname.startsWith("/")) return null;
+  return next;
+}
+
 export function generateAccountId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const len = 4 + randomInt(4);
@@ -113,6 +129,11 @@ export async function setupAuth(app: Express) {
         try {
           const googleId = profile.id;
           const email = profile.emails?.[0]?.value || "";
+          // An account with no email can't be told apart from any other
+          // email-less account (every "" would match the same row) and can
+          // never satisfy invite email-binding — refuse the login instead of
+          // storing an empty email.
+          if (!email) return done(null, false);
           const displayName = profile.displayName || null;
           const avatarUrl = profile.photos?.[0]?.value || null;
 
@@ -182,10 +203,11 @@ export async function setupAuth(app: Express) {
     if (typeof req.query.beta === "string" && req.query.beta) {
       req.session.betaToken = req.query.beta;
     }
-    // So does a post-login destination (team-invite accept page) — relative
-    // paths only, never an absolute URL (open-redirect guard).
-    if (typeof req.query.next === "string" && /^\/[^\/]/.test(req.query.next)) {
-      req.session.authNext = req.query.next;
+    // So does a post-login destination (team-invite accept page) — same-origin
+    // paths only, never anything a browser could resolve off-origin.
+    const safeNext = safeNextPath(typeof req.query.next === "string" ? req.query.next : undefined);
+    if (safeNext) {
+      req.session.authNext = safeNext;
     }
     const scopes = ["profile", "email"];
     if (gbp) {
@@ -218,9 +240,10 @@ export async function setupAuth(app: Express) {
           }
         }
       } catch {}
-      const nextPath = typeof req.session.authNext === "string" && /^\/[^\/]/.test(req.session.authNext)
-        ? req.session.authNext
-        : null;
+      // Re-checked here: the stashed value only ever passed safeNextPath,
+      // but the session is server-side state from an earlier request —
+      // validate again before putting it in a Location header.
+      const nextPath = safeNextPath(req.session.authNext);
       delete req.session.authNext;
       res.redirect(nextPath ?? "/?auth=success");
     }

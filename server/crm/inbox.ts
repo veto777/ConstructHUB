@@ -23,7 +23,7 @@ import {
   crmProjects, crmJobs,
 } from "@shared/schema";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { requireOrg } from "./tenancy";
+import { requireOrg, requirePermission } from "./tenancy";
 import { requireClient, allow as rateAllow } from "./client-auth";
 import { sendWithFallback } from "../email";
 
@@ -49,6 +49,7 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageCustomers")) return;
 
     // One row per client: newest message + unread count (client-authored,
     // never our own replies).
@@ -68,7 +69,16 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
       LIMIT 200
     `);
     const rows = (threads as any).rows ?? threads;
-    const unreadTotal = rows.reduce((n: number, t: any) => n + (t.unread ?? 0), 0);
+    // The list above is capped at 200 rows — count unread over the WHOLE org
+    // so the badge doesn't silently undercount when the page is full.
+    const unreadRows = (await db.execute(sql`
+      SELECT count(*)::int AS n
+      FROM crm_client_comments
+      WHERE org_id = ${ctx.org.id}
+        AND author_member_id IS NULL
+        AND read_at IS NULL
+    `) as any).rows ?? [];
+    const unreadTotal: number = unreadRows[0]?.n ?? 0;
     res.json({ unreadTotal, threads: rows });
   });
 
@@ -78,6 +88,7 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageCustomers")) return;
     const [cust] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.customerId)))
       .limit(1);
@@ -114,10 +125,15 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageCustomers")) return;
+    const [cust] = await db.select({ id: crmCustomers.id }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.customerId)))
+      .limit(1);
+    if (!cust) return res.status(404).json({ message: "Client not found" });
     await db.update(crmClientComments).set({ readAt: new Date() })
       .where(and(
         eq(crmClientComments.orgId, ctx.org.id),
-        eq(crmClientComments.customerId, req.params.customerId),
+        eq(crmClientComments.customerId, cust.id),
         isNull(crmClientComments.authorMemberId),
         isNull(crmClientComments.readAt),
       ));
@@ -130,6 +146,11 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageCustomers")) return;
+    // Every reply sends an external email — throttle per member per org.
+    if (!rateAllow(`crmreply:${ctx.org.id}:${ctx.member.id}`, 60)) {
+      return res.status(429).json({ message: "Too many messages. Please try again later." });
+    }
     const parsed = z.object({ body: z.string().min(1).max(4000) }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Write a message first" });
     const [cust] = await db.select().from(crmCustomers)
@@ -182,6 +203,9 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     const customerId = String(req.query.customerId || "");
     if (!client.customerIds.includes(customerId)) {
       return res.status(403).json({ message: "That is not your account" });
+    }
+    if (!rateAllow(`cteam:${customerId}`, 60)) {
+      return res.status(429).json({ message: "Too many requests. Please try again later." });
     }
     const [cust] = await db.select().from(crmCustomers)
       .where(eq(crmCustomers.id, customerId)).limit(1);

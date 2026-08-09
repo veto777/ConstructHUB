@@ -20,7 +20,7 @@ import {
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
   crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers,
-  crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes,
+  crmNotificationChannel, crmEngagementSessions, crmCustomerNotes,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES, CRM_APPOINTMENT_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
   CRM_LINE_ITEM_KINDS,
@@ -64,41 +64,48 @@ export function invoiceDeleteRefusal(
 }
 
 /** Tell the org owner money landed on an invoice (manual entry). Best-effort:
- *  email must never fail the request that recorded the payment. */
+ *  email must never fail the request that recorded the payment. The member who
+ *  recorded it (`actorMemberId`) is excluded — they were there. */
 async function notifyPaymentRecorded(
   org: typeof crmOrgs.$inferSelect,
   inv: typeof crmInvoices.$inferSelect,
   amountCents: number,
   method: string,
+  actorMemberId?: string | null,
 ) {
-  // The org can silence this notification in Settings (default: on).
-  if (!crmNotificationEnabled(org.customFields, "paymentReceived")) return;
+  // The org can silence this notification in Settings (default: on); the gate
+  // is per-channel — any of in-app/email/sms ON keeps the event alive.
+  if (!["inApp", "email", "sms"].some((c) => crmNotificationChannel(org.customFields, "paymentReceived", c as any))) return;
   const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
   const owners = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active"), eq(crmMembers.role, "owner")));
   const to = new Set<string>();
   if (org.email) to.add(org.email);
-  for (const m of owners) if (m.email) to.add(m.email);
-  if (!to.size) return;
+  for (const m of owners) if (m.email && m.id !== actorMemberId) to.add(m.email);
   const amount = `$${(amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
   const via = METHOD_LABELS[method] ?? method;
   const who = cust?.displayName ?? "a client";
   const doc = inv.number ?? "an invoice";
-  await sendWithFallback({
-    to: [...to].join(","),
-    subject: `Payment received — ${amount} via ${via} from ${who} for invoice ${inv.number ?? ""}`.trim(),
-    html: `<p><strong>${amount}</strong> received via <strong>${via}</strong> from ${who}` +
-          ` for invoice <strong>${doc}</strong>${inv.title ? ` (${inv.title})` : ""}.</p>` +
-          `<p>Recorded manually in ConstructHub CRM.</p>`,
-  } as any);
 
-  // Money landing is worth a buzz in the pocket — opt-in per org.
+  // Money landing is worth a buzz in the pocket — opt-in per org. The bell
+  // never depends on there being an email inbox.
   await notifyMembers({
     org, pref: "paymentReceived",
     title: `${amount} received via ${via} from ${who} for invoice ${doc}`,
+    excludeMemberIds: actorMemberId ? [actorMemberId] : [],
     smsHandled: true,
   });
   await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}.`, "paymentReceived");
+
+  if (to.size && crmNotificationChannel(org.customFields, "paymentReceived", "email")) {
+    await sendWithFallback({
+      to: [...to].join(","),
+      subject: `Payment received — ${amount} via ${via} from ${who} for invoice ${inv.number ?? ""}`.trim(),
+      html: `<p><strong>${amount}</strong> received via <strong>${via}</strong> from ${who}` +
+            ` for invoice <strong>${doc}</strong>${inv.title ? ` (${inv.title})` : ""}.</p>` +
+            `<p>Recorded manually in ConstructHub CRM.</p>`,
+    } as any);
+  }
 }
 
 export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
@@ -299,7 +306,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       invoiceId: inv.id, projectId: inv.projectId,
     });
     // Tell the owner money landed (honors the paymentReceived notification pref).
-    notifyPaymentRecorded(ctx.org, inv, parsed.data.amountCents, parsed.data.method)
+    notifyPaymentRecorded(ctx.org, inv, parsed.data.amountCents, parsed.data.method, ctx.member.id)
       .catch((e: any) => console.error("[crm] payment-recorded email failed:", e?.message || e));
     // And email the client their receipt-to-date (honors paymentReceipt).
     autoSendPaymentReceipt(ctx.org.id, inv.id)

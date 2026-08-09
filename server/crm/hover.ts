@@ -134,6 +134,8 @@ export interface HoverSyncReport {
   ambiguous: number;
   duplicates: number;
   errors: string[];
+  /** True when the 80-page cap cut the jobs walk short — older jobs were NOT scanned. */
+  truncated: boolean;
   at: string;
 }
 
@@ -439,6 +441,13 @@ function findDesignProUrl(node: unknown): string | null {
   return null;
 }
 
+/**
+ * Per-job cap on imported capture photos. The advertised list (photoUrls) and
+ * the actual import share this one cap so photoCount never promises more than
+ * the import will store.
+ */
+export const HOVER_PHOTO_CAP = 20;
+
 const num = (v: unknown): number | null => {
   const n = typeof v === "string" ? Number(v.replace(/,/g, "")) : v;
   return typeof n === "number" && Number.isFinite(n) ? n : null;
@@ -512,7 +521,7 @@ export function parseHoverJob(job: any): ParsedHoverJob {
     all.find((u) => /measurements?[^\s"']*\.pdf(\?|$)/i.test(u)) ??
     all.find((u) => /\.pdf(\?|$)/i.test(u)) ??
     null;
-  const photoUrls = all.filter((u) => /\.(jpe?g|png|heic|webp)(\?|$)/i.test(u)).slice(0, 50);
+  const photoUrls = all.filter((u) => /\.(jpe?g|png|heic|webp)(\?|$)/i.test(u)).slice(0, HOVER_PHOTO_CAP);
 
   const jobId = pick(job, ["id", "job_id"]);
   const model3dUrl =
@@ -659,25 +668,46 @@ async function matchHoverCustomer(
 async function isOrgMemberContact(
   orgId: string, email?: string | null, phone?: string | null,
 ): Promise<boolean> {
+  const f = await matchOrgMemberContactFields(orgId, email, phone);
+  return f.email || f.phone;
+}
+
+/**
+ * WHICH of the job's contact fields belong to an active org member, tracked
+ * independently — a capture ordered by staff often carries the staff member's
+ * email but the homeowner's real phone (or vice versa), and only the fields
+ * that actually match staff may be scrubbed from the created customer.
+ */
+async function matchOrgMemberContactFields(
+  orgId: string, email?: string | null, phone?: string | null,
+): Promise<{ email: boolean; phone: boolean }> {
   const em = (email ?? "").trim().toLowerCase();
   const ph = String(phone ?? "").replace(/\D/g, "");
-  if (!em && !ph) return false;
+  const result = { email: false, phone: false };
+  if (!em && !ph) return result;
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, orgId), eq(crmMembers.status, "active")));
-  return members.some((m) =>
-    (em && (m.email ?? "").toLowerCase() === em) ||
-    (ph && ph.length >= 7 && String(m.phone ?? "").replace(/\D/g, "") === ph));
+  for (const m of members) {
+    if (em && (m.email ?? "").toLowerCase() === em) result.email = true;
+    if (ph && ph.length >= 7 && String(m.phone ?? "").replace(/\D/g, "") === ph) result.phone = true;
+  }
+  return result;
 }
 /**
  * Pull the job's capture photos ("before" photos) onto the client's profile:
  * kind "photo" / refId customer — exactly where a client's own uploads land,
  * so the contractor's Client 360 AND the client portal show them with zero
  * extra plumbing. Idempotent per HOVER image id; capped per job.
+ *
+ * Reports { stored, expected, complete }: `complete` is false when any
+ * attempted photo could not be fetched/stored, so callers only stamp
+ * photosSyncedAt on a complete import — a partial failure must be retried by
+ * a later sync instead of being marked synced for 7 days.
  */
 export async function importHoverJobPhotos(
   orgId: string, jobId: string, customerId: string, job: any,
   auth: Record<string, string>, fetchFn: FetchFn = fetch,
-): Promise<number> {
+): Promise<{ stored: number; expected: number; complete: boolean }> {
   const models: any[] = job?.job?.models ?? job?.models ?? [];
   const images: { id: string; url: string }[] = [];
   for (const m of models) {
@@ -687,7 +717,8 @@ export async function importHoverJobPhotos(
       if (id != null && typeof url === "string") images.push({ id: String(id), url });
     }
   }
-  if (!images.length) return 0;
+  const wanted = images.slice(0, HOVER_PHOTO_CAP);
+  if (!wanted.length) return { stored: 0, expected: 0, complete: true };
 
   const existing = await db.select({ fileName: crmAttachments.fileName }).from(crmAttachments)
     .where(and(
@@ -698,27 +729,32 @@ export async function importHoverJobPhotos(
   const have = new Set(existing.map((a) => a.fileName));
 
   let stored = 0;
-  for (const img of images.slice(0, 20)) {
+  let failed = 0;
+  for (const img of wanted) {
     const fileName = `hover-${jobId}-${img.id}.jpg`;
+    // Re-checked per image inside the (serialized) ingest so a photo stored
+    // by an earlier ingest of the same job is never duplicated.
     if (have.has(fileName)) continue;
     try {
       const r = await fetchFn(img.url, { headers: auth });
-      if (!r.ok) continue;
+      if (!r.ok) { failed++; continue; }
       const mime = (r.headers.get("content-type") || "image/jpeg").split(";")[0];
-      if (!/^image\//.test(mime)) continue;
+      if (!/^image\//.test(mime)) { failed++; continue; }
       const buffer = Buffer.from(await r.arrayBuffer());
-      if (!buffer.length || buffer.length > 15 * 1024 * 1024) continue;
+      if (!buffer.length || buffer.length > 15 * 1024 * 1024) { failed++; continue; }
       await storeGeneratedFile({
         orgId, kind: "photo", refId: customerId, fileName, buffer,
         mime, ext: mime === "image/png" ? "png" : "jpg",
       });
+      have.add(fileName);
       stored++;
     } catch (e: any) {
+      failed++;
       console.error(`[hover] photo ${img.id} for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
     }
   }
   if (stored) console.log(`[hover] imported ${stored} photos for job ${jobId} -> customer ${customerId}`);
-  return stored;
+  return { stored, expected: wanted.length, complete: failed === 0 };
 }
 
 /**
@@ -761,10 +797,15 @@ async function linkOrCreateHoverCustomer(
 
   let customerCreated = false;
   if (!customer && (c.name || c.email || c.phone || c.addressLine1 || jobName)) {
-    const staffContact = await isOrgMemberContact(orgId, c.email, c.phone);
+    // Scrub ONLY the fields that actually match staff contacts: a capture
+    // ordered with a staff email but the homeowner's phone keeps the phone.
+    // The name goes whenever any field matched — it belongs to the same
+    // contact block as the staff identity.
+    const staffFields = await matchOrgMemberContactFields(orgId, c.email, c.phone);
+    const staffContact = staffFields.email || staffFields.phone;
     const name = staffContact ? null : c.name?.trim() || null;
-    const email = staffContact ? null : c.email ?? null;
-    const phone = staffContact ? null : c.phone ?? null;
+    const email = staffFields.email ? null : c.email ?? null;
+    const phone = staffFields.phone ? null : c.phone ?? null;
     const displayName =
       name || jobName?.trim() || c.addressLine1?.trim() || email || phone || "HOVER import";
     const nameParts = name?.split(/\s+/) ?? [];
@@ -795,12 +836,53 @@ async function linkOrCreateHoverCustomer(
   return { customer, matchedVia, ambiguous, customerCreated };
 }
 
-export async function ingestHoverJob(
-  orgId: string, jobId: string, fetchFn: FetchFn = fetch,
-): Promise<{
+export interface HoverIngestResult {
   measurementId: string; customerId: string | null; created: boolean; duplicate?: boolean;
   matchedVia: "email" | "phone" | "address" | null; ambiguous: boolean; customerCreated: boolean;
-}> {
+}
+
+// ── Per-job ingest serialization ────────────────────────────────────────────
+// Ingest is read-then-write throughout (measurement lookup by externalId,
+// customer match/create, photo dedupe by fileName) and the
+// (provider, external_id) index is NON-unique, so two concurrent deliveries
+// of the same job (a HOVER retry racing sync-now, or the manual sync racing
+// the webhook) would duplicate customers, measurements and photo attachments.
+// This Map<org:job, Promise> chain serializes same-job ingests in-process,
+// the same single-instance idiom as hoverSyncRunning. CAVEAT: a multi-instance
+// deployment would need a DB unique constraint or advisory lock instead.
+const ingestChains = new Map<string, Promise<unknown>>();
+
+export function ingestHoverJob(
+  orgId: string, jobId: string, fetchFn: FetchFn = fetch,
+): Promise<HoverIngestResult> {
+  const key = `${orgId}:${jobId}`;
+  const run = (ingestChains.get(key) ?? Promise.resolve())
+    .catch(() => {})
+    .then(() => ingestHoverJobInner(orgId, jobId, fetchFn));
+  ingestChains.set(key, run);
+  // Drop the chain link once settled so the map can't grow unbounded.
+  void run.then(
+    () => { if (ingestChains.get(key) === run) ingestChains.delete(key); },
+    () => { if (ingestChains.get(key) === run) ingestChains.delete(key); },
+  );
+  return run;
+}
+
+/** Merge a patch into a measurement's raw_payload, re-reading the CURRENT
+ *  value first so concurrent blocks (PDF attach, photo stamp, adoption)
+ *  never clobber each other's keys with a stale insert-time snapshot. */
+async function mergeMeasurementRaw(measurementId: string, patch: Record<string, unknown>): Promise<void> {
+  const [cur] = await db.select({ rawPayload: crmMeasurements.rawPayload }).from(crmMeasurements)
+    .where(eq(crmMeasurements.id, measurementId)).limit(1);
+  await db.update(crmMeasurements).set({
+    rawPayload: { ...((cur?.rawPayload as object) ?? {}), ...patch } as any,
+    updatedAt: new Date(),
+  }).where(eq(crmMeasurements.id, measurementId));
+}
+
+async function ingestHoverJobInner(
+  orgId: string, jobId: string, fetchFn: FetchFn = fetch,
+): Promise<HoverIngestResult> {
   const externalId = `hover:${jobId}`;
   const [existing] = await db
     .select()
@@ -843,13 +925,11 @@ export async function ingestHoverJob(
             }
           }
           if (adoptedCustomerId) {
-            await importHoverJobPhotos(orgId, jobId, adoptedCustomerId, job0, auth0, fetchFn);
-            const [cur] = await db.select({ rawPayload: crmMeasurements.rawPayload }).from(crmMeasurements)
-              .where(eq(crmMeasurements.id, existing.id)).limit(1);
-            await db.update(crmMeasurements).set({
-              rawPayload: { ...((cur?.rawPayload as object) ?? {}), photosSyncedAt: new Date().toISOString() } as any,
-              updatedAt: new Date(),
-            }).where(eq(crmMeasurements.id, existing.id));
+            const photos = await importHoverJobPhotos(orgId, jobId, adoptedCustomerId, job0, auth0, fetchFn);
+            // Stamp only a COMPLETE import — a partial one retries next sync.
+            if (photos.complete) {
+              await mergeMeasurementRaw(existing.id, { photosSyncedAt: new Date().toISOString() });
+            }
           }
         }
       } catch (e: any) {
@@ -944,13 +1024,7 @@ export async function ingestHoverJob(
             fileName: `hover-measurements-${jobId}.pdf`,
             buffer,
           });
-          await db
-            .update(crmMeasurements)
-            .set({
-              rawPayload: { ...(row.rawPayload as object), pdfAttachmentId: att.id } as any,
-              updatedAt: new Date(),
-            })
-            .where(eq(crmMeasurements.id, row.id));
+          await mergeMeasurementRaw(row.id, { pdfAttachmentId: att.id });
         }
       }
     } catch (e: any) {
@@ -960,12 +1034,18 @@ export async function ingestHoverJob(
   }
 
   if (customer?.id) {
-    await importHoverJobPhotos(orgId, jobId, customer.id, job, auth, fetchFn)
-      .then(() => db.update(crmMeasurements).set({
-        rawPayload: { ...(row.rawPayload as object), photosSyncedAt: new Date().toISOString() } as any,
-        updatedAt: new Date(),
-      }).where(eq(crmMeasurements.id, row.id)))
-      .catch((e: any) => console.error(`[hover] photos for job ${jobId} failed:`, String(e?.message || e).slice(0, 120)));
+    try {
+      const photos = await importHoverJobPhotos(orgId, jobId, customer.id, job, auth, fetchFn);
+      // Merge onto the CURRENT rawPayload (the PDF block may already have
+      // written pdfAttachmentId) and stamp only a COMPLETE import, so a job
+      // whose photo fetches failed is retried by a later sync instead of
+      // being marked synced for 7 days.
+      if (photos.complete) {
+        await mergeMeasurementRaw(row.id, { photosSyncedAt: new Date().toISOString() });
+      }
+    } catch (e: any) {
+      console.error(`[hover] photos for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
+    }
   }
 
   return {
@@ -979,35 +1059,71 @@ export async function ingestHoverJob(
 export type HoverSyncRunReport = {
   scanned: number; attachedByEmail: number; attachedByPhone: number; attachedByAddress: number;
   created: number; ambiguous: number; duplicates: number; errors: string[];
+  /** True when the 80-page cap cut the jobs walk short — older jobs were NOT scanned. */
+  truncated: boolean;
 };
+
+/** HOVER paginates the jobs list 25/page (per_page is ignored). */
+export const HOVER_JOBS_PAGE_SIZE = 25;
+/** Hard cap on the page walk so a huge job history can't hang a sync. */
+export const HOVER_SYNC_MAX_PAGES = 80;
+
+export type HoverJobsWalk = {
+  jobs: any[];
+  /** True when the walk stopped at HOVER_SYNC_MAX_PAGES with more pages left. */
+  truncated: boolean;
+  /** HTTP status of a failed page-1 fetch (0 = network); null when page 1 loaded. */
+  firstPageError: number | null;
+};
+
+/** The page-walk policy, split from transport so tests can drive it with a stub:
+ *  - walk every page up to the reported pagination.total_pages;
+ *  - when a page omits total_pages, keep going while pages come back FULL
+ *    (a short page is always the last);
+ *  - never pass HOVER_SYNC_MAX_PAGES, and SAY when the cap truncated the walk. */
+export async function walkHoverJobsPages(
+  fetchPage: (page: number) => Promise<{ status: number; json: any }>,
+): Promise<HoverJobsWalk> {
+  const jobs: any[] = [];
+  let totalPages: number | null = null; // unknown until a page reports it
+  let truncated = false;
+  for (let page = 1; page <= HOVER_SYNC_MAX_PAGES; page++) {
+    if (totalPages !== null && page > totalPages) break;
+    const { status, json } = await fetchPage(page);
+    if (status !== 200) {
+      if (page === 1) return { jobs, truncated, firstPageError: status };
+      break; // keep what we have — a late page failing shouldn't void the run
+    }
+    const batch: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
+    jobs.push(...batch);
+    const reported = Number(json?.pagination?.total_pages);
+    if (Number.isFinite(reported) && reported > 0) totalPages = reported;
+    if (!batch.length) break;
+    const morePages = totalPages !== null ? page < totalPages : batch.length >= HOVER_JOBS_PAGE_SIZE;
+    if (!morePages) break;
+    if (page === HOVER_SYNC_MAX_PAGES) truncated = true;
+  }
+  return { jobs, truncated, firstPageError: null };
+}
 
 /** One full sync pass: list completed HOVER jobs, ingest each (idempotent —
  *  existing jobs just top up photos). Used by the Sync button AND the
  *  scheduler. */
 export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
-  // The list is paginated (25/page, per_page is ignored) — walk every page.
-  const jobs: any[] = [];
-  let totalPages = 1;
-  for (let page = 1; page <= Math.min(totalPages, 80); page++) {
-    const { status, json } = await hoverApi(orgId, "GET", `/v2/jobs?page=${page}`).catch((e: any) => {
+  const walk = await walkHoverJobsPages((page) =>
+    hoverApi(orgId, "GET", `/v2/jobs?page=${page}`).catch((e: any) => {
       return { status: 0, json: { error: String(e?.message || e) } } as any;
-    });
-    if (status !== 200) {
-      if (page === 1) {
-        await writeHoverConn(orgId, { lastError: `jobs list failed (${status || "network"})` }).catch(() => {});
-        throw new Error("Could not list HOVER jobs.");
-      }
-      break; // keep what we have — a late page failing shouldn't void the run
-    }
-    const batch: any[] = Array.isArray(json) ? json : (json?.results ?? json?.jobs ?? []);
-    jobs.push(...batch);
-    totalPages = Number(json?.pagination?.total_pages) || totalPages;
-    if (!batch.length) break;
+    }));
+  if (walk.firstPageError !== null) {
+    await writeHoverConn(orgId, { lastError: `jobs list failed (${walk.firstPageError || "network"})` }).catch(() => {});
+    throw new Error("Could not list HOVER jobs.");
   }
+  const { jobs } = walk;
   const report: HoverSyncRunReport = {
     scanned: jobs.length,
     attachedByEmail: 0, attachedByPhone: 0, attachedByAddress: 0,
     created: 0, ambiguous: 0, duplicates: 0, errors: [],
+    truncated: walk.truncated,
   };
   for (const j of jobs) {
     const state = String(j?.state ?? j?.status ?? "").toLowerCase();
