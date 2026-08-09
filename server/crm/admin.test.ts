@@ -299,9 +299,20 @@ describe("configured admin gate (:8199 child server)", () => {
         DEV_AUTH_BYPASS_USER1: "true",
         ADMIN_GATE_USER: GATE_USER,
         ADMIN_GATE_PASS: GATE_PASS,
+        // A self-contained boot env so the child comes up regardless of the
+        // runner's ambient .env (DATABASE_URL falls back to the dev DB; the
+        // rest are dummies — this test never calls Stripe/Google/HOVER/OpenAI).
+        DATABASE_URL: process.env.DATABASE_URL
+          || process.env.CRM_TEST_DATABASE_URL
+          || "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev",
+        SESSION_SECRET: process.env.SESSION_SECRET || "test-session-secret-admin-gate",
+        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || "sk_test_dummy",
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "dummy.apps.googleusercontent.com",
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "dummy",
         OPENAI_API_KEY: "dummy-not-used",
+        AI_INTEGRATIONS_OPENAI_API_KEY: "dummy-not-used",
+        HOVER_CLIENT_ID: process.env.HOVER_CLIENT_ID || "dummy-hover-id",
         HOVER_CLIENT_SECRET: "dummy-hover-secret",
-        GOOGLE_CLIENT_SECRET: "dummy",
       },
       stdio: ["ignore", "pipe", "pipe"],
       detached: true, // own process group, so afterAll can kill npx AND tsx

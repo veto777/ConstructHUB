@@ -6,8 +6,24 @@ import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
 import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS } from "./catalog";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-01-27.acacia" as any,
+// Lazily constructed: importing PLANS / helpers from this module (tenancy,
+// tests) must not require STRIPE_SECRET_KEY. The client is only built when a
+// Stripe API call actually runs.
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2025-01-27.acacia" as any,
+    });
+  }
+  return _stripe;
+}
+const stripe = new Proxy({} as Stripe, {
+  get(_t, prop) {
+    const client = getStripe() as any;
+    const v = client[prop];
+    return typeof v === "function" ? v.bind(client) : v;
+  },
 });
 
 // current_period_end moved from the Subscription object to
