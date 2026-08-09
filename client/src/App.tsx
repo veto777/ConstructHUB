@@ -71,6 +71,7 @@ import PublicLeadFormPage from "@/pages/public-lead-form";
 import ClientPortalPage from "@/pages/client-portal";
 import { isPortal, isClientPortal, CRM_NAME } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
+import CrmGatewayPage from "@/pages/crm-gateway";
 import VpnShieldPage from "@/pages/vpn-shield";
 import IndividualPricingPage from "@/pages/individual-pricing";
 import HomePage from "@/pages/home";
@@ -114,6 +115,7 @@ function DashboardRouter() {
       <Route path="/lsa-guide" component={LsaGuidePage} />
       <Route path="/lsa-leads" component={LsaLeadsPage} />
       <Route path="/ip-tracker" component={IpTrackerPage} />
+      <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
@@ -161,6 +163,7 @@ function PublicRouter() {
       <Route path="/google-ad-fraud" component={GoogleAdFraudPage} />
       <Route path="/lsa-guide" component={LsaGuidePage} />
       <Route path="/ip-tracker" component={IpTrackerPage} />
+      <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingPage} />
       <Route path="/permits-landing" component={PermitsLandingPage} />

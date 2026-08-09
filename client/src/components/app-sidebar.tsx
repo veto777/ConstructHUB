@@ -5,6 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Zap, Star,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
+  KanbanSquare, ArrowRight,
 } from "lucide-react";
 import permitsLogo from "@assets/Permits_1772157993497.png";
 import spyLogo from "@assets/Spy_logo_1772157993496.png";
@@ -268,6 +269,28 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
+        {/* ConstructHub CRM — a separate product/membership. Prominent pathway
+            in, gated behind the /crm-app gateway (member → portal, else plans). */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild data-active={location === "/crm-app"}>
+                  <Link href="/crm-app" data-testid="link-nav-crm" className="flex items-center gap-2 w-full">
+                    <KanbanSquare className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                    <span className="font-semibold">CRM</span>
+                    <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-primary/80">
+                      Membership <ArrowRight className="h-3 w-3" />
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
