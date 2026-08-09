@@ -266,11 +266,13 @@ export default function CompetitorsLandingPage() {
             <a href="#get-started" className="hover:text-white transition-colors" data-testid="link-nav-start">Get Started</a>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
-            <Link href="/settings">
-              <button className="hidden sm:inline-flex items-center justify-center rounded-md h-9 w-9 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
-                <Settings className="h-4 w-4" />
-              </button>
-            </Link>
+            {user && (
+              <Link href="/settings">
+                <button className="hidden sm:inline-flex items-center justify-center rounded-md h-9 w-9 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+                  <Settings className="h-4 w-4" />
+                </button>
+              </Link>
+            )}
             <div className="text-white"><CartSheet /></div>
             <div className="text-white"><ThemeToggle /></div>
             {user ? (

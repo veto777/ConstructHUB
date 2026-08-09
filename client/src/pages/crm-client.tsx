@@ -81,7 +81,7 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
   estimate: any; open: boolean; onOpenChange: (o: boolean) => void;
 }) {
   const { toast } = useToast();
-  const { data: options, isLoading } = useQuery<any[]>({
+  const { data: options, isLoading, isError } = useQuery<any[]>({
     queryKey: [`/api/crm/estimates/${estimate.id}/options`],
     enabled: open,
   });
@@ -213,6 +213,10 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
 
         {isLoading ? (
           <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : isError ? (
+          <p className="text-sm text-destructive">
+            Couldn't load options — check your connection and try again.
+          </p>
         ) : !options?.length ? (
           <p className="text-sm text-muted-foreground">
             No options yet. Add two or three and the client picks between them on their estimate page.

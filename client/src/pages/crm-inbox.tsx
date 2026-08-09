@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,12 +64,12 @@ function MessagesPane({ selected }: { selected: string | null }) {
   const [reply, setReply] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: inbox, isLoading } = useQuery<{ unreadTotal: number; threads: Thread[] }>({
+  const { data: inbox, isLoading, isError } = useQuery<{ unreadTotal: number; threads: Thread[] }>({
     queryKey: ["/api/crm/inbox"],
     refetchInterval: 20_000,
   });
 
-  const { data: thread } = useQuery<{ customer: any; messages: Message[] }>({
+  const { data: thread, isError: threadError } = useQuery<{ customer: any; messages: Message[] }>({
     queryKey: ["/api/crm/inbox", selected],
     queryFn: async () => {
       const r = await fetch(`/api/crm/inbox/${selected}`, { credentials: "include" });
@@ -80,7 +80,9 @@ function MessagesPane({ selected }: { selected: string | null }) {
     refetchInterval: 15_000,
   });
 
-  // Opening a thread reads it — like a text conversation.
+  // Opening a thread reads it — like a text conversation. No latch: a client
+  // message that arrives while the thread is open (15s refetch) gets read too;
+  // the server UPDATE is a no-op once nothing is unread.
   const markRead = useMutation({
     mutationFn: (customerId: string) =>
       apiRequest("POST", `/api/crm/inbox/${customerId}/read`),
@@ -88,10 +90,8 @@ function MessagesPane({ selected }: { selected: string | null }) {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/inbox"] });
     },
   });
-  const readOnce = useRef<string | null>(null);
   useEffect(() => {
-    if (selected && thread && readOnce.current !== selected) {
-      readOnce.current = selected;
+    if (selected && thread) {
       const hasUnread = thread.messages.some((m) => m.fromClient && !m.readAt);
       if (hasUnread) markRead.mutate(selected);
     }
@@ -117,6 +117,10 @@ function MessagesPane({ selected }: { selected: string | null }) {
 
   if (isLoading) {
     return <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return <ErrorCard title="Couldn't load messages" description="Check your connection and refresh the page." />;
   }
 
   if (!threads.length) {
@@ -187,8 +191,8 @@ function MessagesPane({ selected }: { selected: string | null }) {
           <>
             <InitialAvatar name={thread.customer.displayName} />
             <div className="min-w-0">
-              <a href={`/crm/clients/${thread.customer.id}`}
-                className="font-medium text-sm hover:underline">{thread.customer.displayName}</a>
+              <Link href={`/crm/clients/${thread.customer.id}`}
+                className="font-medium text-sm hover:underline">{thread.customer.displayName}</Link>
               {thread.customer.email && (
                 <div className="text-xs text-muted-foreground truncate">{thread.customer.email}</div>
               )}
@@ -196,6 +200,15 @@ function MessagesPane({ selected }: { selected: string | null }) {
           </>
         )}
       </div>
+      {threadError ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 py-16 text-center min-h-[280px]">
+          <AlertTriangle className="h-6 w-6 text-muted-foreground" />
+          <p className="text-sm font-medium">This conversation isn't available</p>
+          <p className="text-xs text-muted-foreground">
+            The client may have been deleted. Pick another conversation from the list.
+          </p>
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[280px] max-h-[52vh]">
         {(thread?.messages ?? []).map((m) => (
           <div key={m.id} className={`flex ${m.fromClient ? "justify-start" : "justify-end"}`}>
@@ -220,15 +233,17 @@ function MessagesPane({ selected }: { selected: string | null }) {
         ))}
         <div ref={bottomRef} />
       </div>
+      )}
       <div className="border-t p-3 flex gap-2">
         <Textarea
           rows={2}
           className="resize-none"
           placeholder="Reply — it lands in their portal and their email…"
           value={reply}
+          disabled={!thread || threadError}
           onChange={(e) => setReply(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && reply.trim()) {
+            if (e.key === "Enter" && !e.shiftKey && reply.trim() && !sendReply.isPending) {
               e.preventDefault();
               sendReply.mutate();
             }
@@ -237,7 +252,7 @@ function MessagesPane({ selected }: { selected: string | null }) {
         />
         <Button
           className="self-end"
-          disabled={!reply.trim() || sendReply.isPending}
+          disabled={!thread || threadError || !reply.trim() || sendReply.isPending}
           onClick={() => sendReply.mutate()}
           data-testid="button-inbox-send"
         >
@@ -357,11 +372,10 @@ function ActivityPane() {
 /* ── Page ───────────────────────────────────────────────────────────────── */
 
 export default function CrmInboxPage() {
-  // wouter's useLocation strips the query string — read ?c= directly, and
-  // let location changes retrigger the read.
-  const [location] = useLocation();
-  void location;
-  const selected = new URLSearchParams(window.location.search).get("c");
+  // wouter's useLocation only tracks the pathname — a ?c= change wouldn't
+  // re-render the page. useSearch subscribes to the query string instead.
+  const search = useSearch();
+  const selected = new URLSearchParams(search).get("c");
 
   const { data: inbox } = useQuery<{ unreadTotal: number }>({ queryKey: ["/api/crm/inbox"] });
   const unread = inbox?.unreadTotal ?? 0;

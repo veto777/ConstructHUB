@@ -71,11 +71,11 @@ export default function CrmSettingsPage() {
     queryKey: ["/api/crm/payments/status"],
     enabled: allowed,
   });
-  const { data: leadSources } = useQuery<any[]>({
+  const { data: leadSources, isError: leadSourcesError } = useQuery<any[]>({
     queryKey: ["/api/crm/lead-sources"],
     enabled: allowed,
   });
-  const { data: divisions } = useQuery<any[]>({
+  const { data: divisions, isError: divisionsError } = useQuery<any[]>({
     queryKey: ["/api/crm/divisions"],
     enabled: allowed,
   });
@@ -513,7 +513,7 @@ export default function CrmSettingsPage() {
   });
 
   // ── Payments: card fee passthrough + financing links ──────────────────────
-  const { data: paySettings } = useQuery<any>({
+  const { data: paySettings, isError: paySettingsError } = useQuery<any>({
     queryKey: ["/api/crm/payments/settings"],
     enabled: allowed,
   });
@@ -832,6 +832,9 @@ export default function CrmSettingsPage() {
           />
         </CardHeader>
         <CardContent className="space-y-4">
+          {divisionsError && (
+            <p className="text-sm text-destructive">Couldn't load divisions — refresh to try again.</p>
+          )}
           {divisions && divisions.length > 0 && (
             <div className="space-y-2">
               {divisions.map((d) => (
@@ -1519,6 +1522,15 @@ export default function CrmSettingsPage() {
             )}
           </div>
 
+          {/* On a settings load error the fee/rail form would show hardcoded
+              defaults — saving those would silently overwrite the real
+              settings, so the whole form hides behind an honest error. */}
+          {paySettingsError ? (
+            <p className="mt-6 border-t pt-4 text-sm text-destructive" data-testid="text-payment-settings-error">
+              Couldn't load payment settings — refresh the page before changing them.
+            </p>
+          ) : (
+          <>
           {/* Rail policy — the org decides what clients may pay with. */}
           <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-rail-policy">
             <div>
@@ -1677,6 +1689,8 @@ export default function CrmSettingsPage() {
               </div>
             )}
           </div>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -1890,7 +1904,9 @@ export default function CrmSettingsPage() {
           />
         </CardHeader>
         <CardContent>
-          {!leadSources?.length ? (
+          {leadSourcesError ? (
+            <p className="text-sm text-destructive">Couldn't load lead sources — refresh to try again.</p>
+          ) : !leadSources?.length ? (
             <EmptyState compact icon={Tag} title="No lead sources yet"
               description="Sources appear here as they're added to clients." />
           ) : (

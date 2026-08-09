@@ -225,7 +225,7 @@ export async function setupAuth(app: Express) {
     "/api/auth/google/callback",
     (req, res, next) => {
       const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
-      passport.authenticate("google", { failureRedirect: "/auth?error=google-failed", callbackURL } as any)(req, res, next);
+      passport.authenticate("google", { failureRedirect: "/auth?error=google-failed", callbackURL, keepSessionInfo: true } as any)(req, res, next);
     },
     async (req, res) => {
       try {
@@ -233,7 +233,9 @@ export async function setupAuth(app: Express) {
           const [fullUser] = await db.select().from(users).where(eq(users.id, req.user.id));
           if (fullUser?.totpEnabled && fullUser?.totpSecret) {
             req.session.pending2FAUserId = fullUser.id;
-            req.logout(() => {
+            // keepSessionInfo: passport's logout regenerates the session,
+            // which would wipe the pending 2FA marker we just set.
+            req.logout({ keepSessionInfo: true } as any, () => {
               res.redirect("/auth?mode=2fa");
             });
             return;
@@ -251,12 +253,18 @@ export async function setupAuth(app: Express) {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, displayName, beta } = req.body;
+      const { email, password, displayName, beta, next } = req.body;
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
       if (password.length < 8) {
         return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      // Carry the post-signup destination (e.g. a /crm/join invite) through
+      // email verification — same trick as the Google OAuth authNext.
+      if (typeof next === "string" && /^\/[^\/\\]/.test(next)) {
+        req.session.authNext = next;
       }
 
       const existing = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
@@ -412,8 +420,15 @@ export async function setupAuth(app: Express) {
         .set({ emailVerified: true, verificationToken: null, verificationExpiry: null })
         .where(eq(users.id, user.id));
 
+      // passport.regenerate on login wipes the session — capture (and clear)
+      // the destination BEFORE req.login. A signup that started from an
+      // invite link lands back on it instead of the generic home page.
+      const nextPath = typeof req.session.authNext === "string" && /^\/[^\/\\]/.test(req.session.authNext)
+        ? req.session.authNext
+        : null;
+      delete req.session.authNext;
       req.login(user, () => {
-        res.redirect("/?auth=verified");
+        res.redirect(nextPath ?? "/?auth=verified");
       });
     } catch (err) {
       res.redirect("/auth?error=verification-failed");

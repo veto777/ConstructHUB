@@ -15,7 +15,7 @@ import {
   RefreshCw, Unplug, CreditCard, CalendarDays, Sparkles, Magnet,
 } from "lucide-react";
 import {
-  CrmPage, CrmPageHeader, StatusPill, EmptyState, SectionTitle,
+  CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
 } from "@/components/crm-ui";
 
 /**
@@ -33,7 +33,7 @@ export default function CrmIntegrationsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const { data: me, isLoading: meLoading } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const { data: me, isLoading: meLoading, isError: meError } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const allowed = me?.permissions?.manageSettings === true;
   const canIntegrations = me?.permissions?.manageIntegrations === true;
 
@@ -49,19 +49,19 @@ export default function CrmIntegrationsPage() {
     queryKey: ["/api/crm/calendar/google/status"],
     enabled: allowed,
   });
-  const { data: apiKeys } = useQuery<any[]>({
+  const { data: apiKeys, isError: keysError } = useQuery<any[]>({
     queryKey: ["/api/crm/api-keys"],
     enabled: allowed && canIntegrations,
   });
-  const { data: webhookData } = useQuery<{ webhooks: any[]; events: string[] }>({
+  const { data: webhookData, isError: hooksError } = useQuery<{ webhooks: any[]; events: string[] }>({
     queryKey: ["/api/crm/webhooks"],
     enabled: allowed && canIntegrations,
   });
-  const { data: hoverStatus } = useQuery<any>({
+  const { data: hoverStatus, isError: hoverError } = useQuery<any>({
     queryKey: ["/api/crm/integrations/hover/status"],
     enabled: allowed && canIntegrations,
   });
-  const { data: leadCapture } = useQuery<{ token: string; formUrl: string; leads30d: number }>({
+  const { data: leadCapture, isError: leadCaptureError } = useQuery<{ token: string; formUrl: string; leads30d: number }>({
     queryKey: ["/api/crm/integrations/lead-capture"],
     enabled: allowed && canIntegrations,
   });
@@ -188,6 +188,9 @@ export default function CrmIntegrationsPage() {
   if (meLoading) {
     return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
+  if (meError) {
+    return <ErrorCard title="Couldn't load integrations" description="Check your connection and refresh the page." />;
+  }
   if (!allowed) return null; // redirect effect above fires; nothing to render
 
   const acct = payStatus?.account;
@@ -223,6 +226,8 @@ export default function CrmIntegrationsPage() {
             <p className="text-sm text-muted-foreground">
               You don't have the manageIntegrations permission — ask an admin.
             </p>
+          ) : hoverError ? (
+            <p className="text-sm text-destructive">Couldn't load the HOVER status — refresh to try again.</p>
           ) : !hoverStatus ? (
             <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : !hoverStatus.configured ? (
@@ -340,6 +345,8 @@ export default function CrmIntegrationsPage() {
             <p className="text-sm text-muted-foreground">
               You don't have the manageIntegrations permission — ask an admin.
             </p>
+          ) : leadCaptureError ? (
+            <p className="text-sm text-destructive">Couldn't load the lead capture settings — refresh to try again.</p>
           ) : !leadCapture ? (
             <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : (
@@ -518,7 +525,9 @@ export default function CrmIntegrationsPage() {
                   Create key
                 </Button>
               </div>
-              {!apiKeys?.length ? (
+              {keysError ? (
+                <p className="text-sm text-destructive">Couldn't load API keys — refresh to try again.</p>
+              ) : !apiKeys?.length ? (
                 <EmptyState compact icon={KeyRound} title="No API keys yet"
                   description="Create one to read your clients, projects, estimates and invoices from your own tools." />
               ) : (
@@ -599,7 +608,9 @@ export default function CrmIntegrationsPage() {
                   </Button>
                 </div>
               </div>
-              {!webhookData?.webhooks?.length ? (
+              {hooksError ? (
+                <p className="text-sm text-destructive">Couldn't load webhooks — refresh to try again.</p>
+              ) : !webhookData?.webhooks?.length ? (
                 <EmptyState compact icon={Webhook} title="No webhooks yet"
                   description="Add an endpoint and pick the events it should receive. Payloads are HMAC-signed." />
               ) : (

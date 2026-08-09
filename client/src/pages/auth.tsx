@@ -91,6 +91,7 @@ export default function AuthPage() {
         password,
         displayName: displayName.trim() || undefined,
         beta: betaParam || undefined,
+        next: nextParam || undefined,
       });
       const data = await res.json();
       setMessage(data.message);

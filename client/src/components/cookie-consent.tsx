@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
+import { isClientPortal } from "@/lib/site";
 
 function readCookie(name: string): string | null {
   for (const part of document.cookie.split(";")) {
@@ -45,9 +46,13 @@ export function CookieConsent() {
   const [consent, setConsent] = useState<string | null>(() => readCookie("ch_consent"));
   const [saving, setSaving] = useState(false);
 
-  // Track every route change once consent is granted.
+  // Track every route change once consent is granted. Bearer-token document
+  // paths (/e/<token>, /i/<token>, …) are normalized so the tokens never land
+  // in the analytics tables or the /admin Top-pages list.
   useEffect(() => {
-    if (consent === "granted") sendPageview(location);
+    if (consent !== "granted") return;
+    const path = location.replace(/^\/(e|i|co|portal|lead-form)\/[^/?]+/, "/$1/:token");
+    sendPageview(path);
   }, [location, consent]);
 
   if (consent) return null;
@@ -66,12 +71,26 @@ export function CookieConsent() {
     setSaving(false);
   };
 
+  // Placement: never sit on top of the page's primary action. Document and
+  // portal pages have a sticky bottom bar (Approve, portal ribbon); the CRM
+  // has the mobile ribbon below sm. Float above those; otherwise bottom.
+  // Desktop anchors the card to the corner so it covers less content.
+  // The homeowner client portal lives at "/" behind ?client=1 — check
+  // isClientPortal(), not the pathname.
+  const aboveActionBar = /^\/(e|i|co|portal)\//.test(location) || isClientPortal();
+  const inCrm = location.startsWith("/crm");
+
   return (
+    // pointer-events-none on the wrapper: the full-width strip must not
+    // swallow clicks meant for content behind it (it blanketed the e2e
+    // suite's clicks when it shipped).
     <div
-      className="fixed bottom-0 inset-x-0 z-[100] p-3 sm:p-4"
+      className={`fixed inset-x-0 z-[100] p-3 sm:p-4 pointer-events-none flex justify-center sm:justify-end ${
+        aboveActionBar ? "bottom-[76px]" : inCrm ? "bottom-[76px] sm:bottom-0" : "bottom-0"
+      }`}
       data-testid="cookie-consent-banner"
     >
-      <div className="mx-auto max-w-2xl rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="pointer-events-auto w-full max-w-2xl sm:max-w-lg rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-start gap-2.5 min-w-0 flex-1">
           <Cookie className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">

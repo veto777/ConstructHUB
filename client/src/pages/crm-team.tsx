@@ -134,7 +134,7 @@ const PERM_LABEL: Record<string, string> = {
 /** Owner-only expandable audit feed for one member — everything they did, newest first. */
 function MemberActivity({ memberId }: { memberId: string }) {
   const [open, setOpen] = useState(false);
-  const { data: rows, isLoading } = useQuery<any[]>({
+  const { data: rows, isLoading, isError } = useQuery<any[]>({
     queryKey: [`/api/crm/members/${memberId}/activity`],
     enabled: open,
   });
@@ -150,6 +150,8 @@ function MemberActivity({ memberId }: { memberId: string }) {
         <div className="mt-1 space-y-1.5">
           {isLoading ? (
             <p className="text-xs text-muted-foreground px-2 py-1">Loading…</p>
+          ) : isError ? (
+            <p className="text-xs text-destructive px-2 py-1">Couldn't load activity — refresh to try again.</p>
           ) : !rows?.length ? (
             <p className="text-xs text-muted-foreground px-2 py-1" data-testid="text-activity-empty">
               No activity recorded yet.
@@ -317,11 +319,11 @@ export default function CrmTeamPage() {
   };
 
   const { data: me, isLoading, isError } = useQuery<MeResponse>({ queryKey: ["/api/crm/me"] });
-  const { data: teamData } = useQuery<{ members: Member[]; seats: Seats }>({
+  const { data: teamData, isError: teamError } = useQuery<{ members: Member[]; seats: Seats }>({
     queryKey: ["/api/crm/members"],
   });
   const canManageTeam = me?.permissions?.manageTeam === true;
-  const { data: invites } = useQuery<Invitation[]>({
+  const { data: invites, isError: invitesError } = useQuery<Invitation[]>({
     queryKey: ["/api/crm/invitations"],
     enabled: canManageTeam,
   });
@@ -761,6 +763,10 @@ export default function CrmTeamPage() {
             </Card>
           )}
 
+          {canManageTeam && invitesError && (
+            <p className="text-sm text-destructive">Couldn't load pending invitations — refresh to try again.</p>
+          )}
+
           {canManageTeam && invites && invites.length > 0 && (
             <Card>
               <CardHeader><SectionTitle title="Pending invitations" /></CardHeader>
@@ -915,7 +921,11 @@ export default function CrmTeamPage() {
                 );
               })}
               {members.length === 0 && (
-                <EmptyState compact icon={Users} title="No team members yet" description="Invite your crew above — they'll get an email with a link." />
+                teamError ? (
+                  <p className="text-sm text-destructive">Couldn't load team members — check your connection and refresh the page.</p>
+                ) : (
+                  <EmptyState compact icon={Users} title="No team members yet" description="Invite your crew above — they'll get an email with a link." />
+                )
               )}
             </CardContent>
           </Card>

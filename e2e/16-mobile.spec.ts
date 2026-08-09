@@ -27,7 +27,7 @@ test.describe("mobile ribbon", () => {
 
     await page.getByTestId("ribbon-tab-inbox").click();
     await expect(page).toHaveURL(/\/crm\/inbox/);
-    await expect(page.locator("h1")).toContainText("Inbox");
+    await expect(page.locator("h1")).toContainText("Messages");
 
     await page.getByTestId("ribbon-tab-customers").click();
     await expect(page).toHaveURL(/\/crm\/clients/);
@@ -121,8 +121,10 @@ test.describe("mobile inbox", () => {
   test("curated: the feed renders real estimate activity", async ({ page }) => {
     const guards = watchPage(page);
     await gotoCrm(page, "/crm/inbox");
-    await expect(page.locator("h1")).toContainText("Inbox");
+    await expect(page.locator("h1")).toContainText("Messages");
 
+    // The activity feed lives behind the Client activity tab.
+    await page.getByTestId("tab-inbox-activity").click();
     const feed = page.getByTestId("activity-feed");
     await expect(feed).toBeVisible();
     const rows = page.locator('[data-testid^="activity-est-"]');

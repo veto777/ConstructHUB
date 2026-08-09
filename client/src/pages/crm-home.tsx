@@ -58,26 +58,27 @@ function timeAgo(iso: string): string {
 /** HCP-style headline number: big count, dollar total underneath. */
 function HeadlineCard({ icon: Icon, label, stat, showMoney, href, testid }: {
   icon: any; label: string; stat?: { count: number; totalCents: number };
-  showMoney: boolean; href: string; testid: string;
+  showMoney: boolean; href?: string; testid: string;
 }) {
-  return (
-    <Link href={href}>
-      <Card className="hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full" data-testid={testid}>
-        <CardContent className="p-4 flex items-start gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-            <Icon className="h-4 w-4" strokeWidth={1.8} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-2xl font-semibold tabular-nums leading-none">{stat ? stat.count : "—"}</div>
-            <div className="text-sm text-muted-foreground mt-1">{label}</div>
-            {showMoney && (
-              <div className="text-xs font-medium tabular-nums mt-0.5">{stat ? money0(stat.totalCents) : ""}</div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+  const card = (
+    <Card className={href ? "hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full" : "h-full"} data-testid={testid}>
+      <CardContent className="p-4 flex items-start gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+          <Icon className="h-4 w-4" strokeWidth={1.8} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-2xl font-semibold tabular-nums leading-none">{stat ? stat.count : "—"}</div>
+          <div className="text-sm text-muted-foreground mt-1">{label}</div>
+          {showMoney && (
+            <div className="text-xs font-medium tabular-nums mt-0.5">{stat ? money0(stat.totalCents) : ""}</div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
+  // No href (e.g. a teammate without seePrices looking at Open invoices) —
+  // render the stat without linking to a page they can't use.
+  return href ? <Link href={href}>{card}</Link> : card;
 }
 
 const money0 = (c?: number | null) =>
@@ -92,9 +93,9 @@ export default function CrmHomePage() {
 
   // Dashboard metrics — read-only rollups over endpoints the app already has.
   const { data: clients } = useQuery<any[]>({ queryKey: ["/api/crm/customers"] });
-  const { data: pipeline } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
+  const { data: pipeline, isError: pipelineError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
   const { data: stats } = useQuery<any>({ queryKey: ["/api/crm/stats"] });
-  const { data: activityData } = useQuery<{ activity: ActivityItem[] }>({
+  const { data: activityData, isError: activityError } = useQuery<{ activity: ActivityItem[] }>({
     queryKey: ["/api/crm/team-activity"],
     refetchInterval: 60_000,
   });
@@ -130,8 +131,10 @@ export default function CrmHomePage() {
   const projects: any[] = pipeline?.projects ?? [];
   const stageOf = (key: string) => stages.find((s) => s.key === key);
   const firstGroup = stages[0]?.group;
-  // Leads = anything still sitting in the first swimlane (Prospect).
-  const leads = projects.filter((p) => stageOf(p.status)?.group === firstGroup);
+  // Leads = anything still sitting in the first swimlane (Prospect). Guard
+  // against an empty stage list — undefined === undefined would make EVERY
+  // project a lead.
+  const leads = projects.filter((p) => firstGroup != null && stageOf(p.status)?.group === firstGroup);
   const pipelineValue = projects.reduce((s, p) => s + (p.contractValueCents ?? 0), 0);
   const recent = [...projects]
     .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
@@ -176,7 +179,7 @@ export default function CrmHomePage() {
                   data-testid={`step-${s.key}`}
                 >
                   {s.done ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   ) : s.locked ? (
                     <Lock className="h-5 w-5 text-muted-foreground shrink-0" />
                   ) : (
@@ -228,7 +231,7 @@ export default function CrmHomePage() {
         <HeadlineCard icon={CalendarClock} label="Unscheduled jobs" stat={stats?.unscheduledJobs}
           showMoney={canSeePrices} href="/crm/pipeline" testid="card-stat-unscheduled" />
         <HeadlineCard icon={ReceiptText} label="Open invoices" stat={stats?.openInvoices}
-          showMoney={canSeePrices} href="/crm/invoices" testid="card-stat-open-invoices" />
+          showMoney={canSeePrices} href={canSeePrices ? "/crm/invoices" : undefined} testid="card-stat-open-invoices" />
       </div>
 
       {/* The numbers row */}
@@ -276,7 +279,9 @@ export default function CrmHomePage() {
             <CardDescription>Leads that haven't moved yet.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1.5">
-            {leads.length === 0 ? (
+            {pipelineError ? (
+              <p className="text-sm text-destructive">Couldn't load projects — check your connection and refresh the page.</p>
+            ) : leads.length === 0 ? (
               <EmptyState
                 compact
                 icon={CheckCircle2}
@@ -319,7 +324,9 @@ export default function CrmHomePage() {
                 <TabsTrigger value="projects" className="text-xs" data-testid="tab-recent-projects">Recent projects</TabsTrigger>
               </TabsList>
               <TabsContent value="team" className="space-y-0.5">
-                {(activityData?.activity ?? []).length === 0 && (
+                {activityError ? (
+                  <p className="text-sm text-destructive px-3 py-2">Couldn't load team activity — refresh to try again.</p>
+                ) : (activityData?.activity ?? []).length === 0 && (
                   <EmptyState
                     compact
                     icon={Activity}
@@ -343,7 +350,9 @@ export default function CrmHomePage() {
                 })}
               </TabsContent>
               <TabsContent value="projects" className="space-y-1.5">
-            {recent.length === 0 ? (
+            {pipelineError ? (
+              <p className="text-sm text-destructive px-3 py-2">Couldn't load projects — check your connection and refresh the page.</p>
+            ) : recent.length === 0 ? (
               <EmptyState
                 compact
                 icon={KanbanSquare}
