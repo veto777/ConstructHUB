@@ -25,6 +25,128 @@ import { CrmPage, CrmPageHeader, EmptyState, SectionTitle, crmTable } from "@/co
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
+/**
+ * Starter templates — HCP-depth scope verbiage for the trades this company
+ * actually sells. Picking one prefills the SKU dialog (price stays yours to
+ * set); the description rides onto every estimate line built from the SKU,
+ * which is what the client reads before deciding.
+ */
+const ITEM_TEMPLATES: {
+  name: string; unit: string; pricingMode: string; sqftMetric?: string; description: string;
+}[] = [
+  {
+    name: "HardiePlank lap siding — supply & install",
+    unit: "sf", pricingMode: "per_sqft", sqftMetric: "siding",
+    description:
+      "Furnish and install James Hardie HardiePlank® fiber-cement lap siding on the elevations listed.\n" +
+      "• Remove and dispose of existing siding where noted\n" +
+      "• Inspect wall sheathing; report any rot before covering\n" +
+      "• Install weather-resistive barrier and flash all openings\n" +
+      "• Install siding per manufacturer specs, blind-nailed\n" +
+      "• Caulk all joints and penetrations\n" +
+      "• Daily cleanup and magnetic nail sweep\n" +
+      "Backed by Hardie's 30-year product warranty and our workmanship warranty.",
+  },
+  {
+    name: "HardiePanel vertical siding — supply & install",
+    unit: "sf", pricingMode: "per_sqft", sqftMetric: "siding",
+    description:
+      "Furnish and install James Hardie HardiePanel® vertical fiber-cement panels with batten strips where shown.\n" +
+      "• Weather-resistive barrier and flashing included\n" +
+      "• Panels fastened per manufacturer spec\n" +
+      "• Color-matched caulk at all seams\n" +
+      "• 30-year Hardie product warranty included",
+  },
+  {
+    name: "HardieTrim boards — supply & install",
+    unit: "lf", pricingMode: "flat",
+    description:
+      "Furnish and install James Hardie HardieTrim® fiber-cement boards at corners, frieze, windows and doors.\n" +
+      "• Primed, ready for paint\n" +
+      "• All joints flashed and caulked\n" +
+      "• Fastened per manufacturer spec",
+  },
+  {
+    name: "Re-roof — architectural shingles",
+    unit: "sf", pricingMode: "per_sqft", sqftMetric: "roof",
+    description:
+      "Complete tear-off and re-roof with architectural laminated shingles.\n" +
+      "• Tear off existing roofing to the deck and dispose\n" +
+      "• Inspect decking; replace damaged sheets at the unit price noted\n" +
+      "• Ice & water shield at eaves, valleys and penetrations\n" +
+      "• Synthetic underlayment over the entire deck\n" +
+      "• New drip edge, pipe boots and step/counter flashing\n" +
+      "• Ridge vent installed where the design allows\n" +
+      "• Magnetic nail sweep and full site cleanup\n" +
+      "Manufacturer's limited lifetime shingle warranty; workmanship warranty in writing.",
+  },
+  {
+    name: "Standing-seam metal roof",
+    unit: "sf", pricingMode: "per_sqft", sqftMetric: "roof",
+    description:
+      "Furnish and install a standing-seam metal roof system over new underlayment.\n" +
+      "• Tear-off and disposal of existing roofing\n" +
+      "• High-temp ice & water shield over the full deck\n" +
+      "• 24-gauge panels, concealed fasteners, factory finish\n" +
+      "• All trim, ridge, and flashing in matching metal\n" +
+      "• 40-year finish warranty",
+  },
+  {
+    name: "Exterior repaint — two coats",
+    unit: "sf", pricingMode: "per_sqft", sqftMetric: "siding",
+    description:
+      "Prep and paint the exterior surfaces listed.\n" +
+      "• Pressure wash and allow full dry time\n" +
+      "• Scrape, sand and spot-prime failing areas\n" +
+      "• Caulk gaps at trim, windows and doors\n" +
+      "• Two finish coats of premium 100% acrylic exterior paint\n" +
+      "• Mask and protect windows, roofing and landscaping\n" +
+      "• Walkthrough and touch-up before final payment",
+  },
+  {
+    name: "Seamless gutters — 5K aluminum",
+    unit: "lf", pricingMode: "flat",
+    description:
+      "Furnish and install seamless 5\" K-style aluminum gutters with downspouts.\n" +
+      "• Formed on site to exact lengths — no leaky seams\n" +
+      "• Hidden hangers at 24\" on center\n" +
+      "• Downspouts placed to move water away from the foundation\n" +
+      "• Old gutters hauled away",
+  },
+  {
+    name: "Window replacement — vinyl, per opening",
+    unit: "ea", pricingMode: "flat",
+    description:
+      "Replace the window opening listed with a new insulated vinyl unit.\n" +
+      "• Remove the existing unit and inspect the rough opening\n" +
+      "• Flash and insulate the perimeter\n" +
+      "• Set, level and fasten the new unit\n" +
+      "• Interior/exterior seal and trim as noted\n" +
+      "• Haul away the old window",
+  },
+  {
+    name: "Soffit & fascia — supply & install",
+    unit: "lf", pricingMode: "flat",
+    description:
+      "Furnish and install new soffit and fascia along the runs listed.\n" +
+      "• Remove rotted material; sister in new framing where needed\n" +
+      "• Vented soffit panels for attic airflow\n" +
+      "• Color-matched aluminum or fiber-cement fascia wrap\n" +
+      "• Sealed at all joints and corners",
+  },
+  {
+    name: "Deck resurfacing — composite",
+    unit: "sf", pricingMode: "flat",
+    description:
+      "Resurface the deck with composite decking on the existing frame.\n" +
+      "• Inspect the frame and ledger; report any structural repairs before decking\n" +
+      "• Remove old deck boards and dispose\n" +
+      "• Install composite decking with hidden fasteners\n" +
+      "• New picture-frame border and fascia\n" +
+      "• 25-year manufacturer fade & stain warranty",
+  },
+];
+
 export default function CrmPriceBookPage() {
   const { toast } = useToast();
   const [tab, setTab] = useState("items");
@@ -144,6 +266,20 @@ export default function CrmPriceBookPage() {
     onError: (e: any) => toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  // ── template picker (prefills the SKU dialog) ──
+  const [tmplOpen, setTmplOpen] = useState(false);
+  const useTemplate = (t: (typeof ITEM_TEMPLATES)[number]) => {
+    setTmplOpen(false);
+    setDlg({
+      id: null,
+      form: {
+        ...emptyItemForm,
+        name: t.name, unit: t.unit, pricingMode: t.pricingMode,
+        sqftMetric: t.sqftMetric ?? "auto", description: t.description,
+      },
+    });
+  };
+
   // ── formula tester ──
   const [f, setF] = useState({ formula: "ceil([SQUARES] * (1 + [WASTE]/100))", squares: "32", waste: "10" });
   const [fres, setFres] = useState<string | null>(null);
@@ -199,7 +335,11 @@ export default function CrmPriceBookPage() {
 
         <TabsContent value="items" className="mt-4 space-y-3">
           {canManage && (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setTmplOpen(true)}
+                data-testid="button-from-template">
+                <Sparkles className="h-4 w-4 mr-1" /> From template
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setDlg({ id: null, form: { ...emptyItemForm } })}
                 data-testid="button-add-item">
                 <Plus className="h-4 w-4 mr-1" /> Add SKU
@@ -212,7 +352,7 @@ export default function CrmPriceBookPage() {
                 icon={Package}
                 title="No SKUs yet"
                 description={canManage
-                  ? "Add your first SKU above, or seed the starter roofing set."
+                  ? "Add your first SKU, start from a template with the scope text written for you, or seed the starter roofing set."
                   : "Each SKU bundles materials and labor into one priced unit."}
               />
             </Card>
@@ -267,6 +407,12 @@ export default function CrmPriceBookPage() {
                     )}
                   </div>
                 </div>
+                {i.description && (
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3"
+                    data-testid={`pb-item-desc-${i.id}`}>
+                    {i.description}
+                  </p>
+                )}
                 {i.formulaSymbols?.length > 0 && (
                   <div className="text-xs text-muted-foreground">
                     formula uses: {i.formulaSymbols.map((s: string) => `[${s}]`).join(" ")}
@@ -465,8 +611,39 @@ export default function CrmPriceBookPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Template picker — prewritten scope text for the trades we sell. */}
+      <Dialog open={tmplOpen} onOpenChange={setTmplOpen}>
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto" data-testid="dialog-templates">
+          <DialogHeader>
+            <DialogTitle>Start from a template</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            The scope text is written for you — set your price, tweak the words, save.
+          </p>
+          <div className="space-y-2">
+            {ITEM_TEMPLATES.map((t) => (
+              <button
+                key={t.name}
+                type="button"
+                onClick={() => useTemplate(t)}
+                className="w-full text-left rounded-lg border bg-card px-3.5 py-3 hover:bg-accent transition-colors"
+                data-testid={`template-${t.name.slice(0, 24).replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
+              >
+                <div className="font-medium text-sm">{t.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  per {t.unit} · {t.pricingMode}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">
+                  {t.description}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!dlg} onOpenChange={(open) => { if (!open) setDlg(null); }}>
-        <DialogContent data-testid="dialog-item">
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto" data-testid="dialog-item">
           <DialogHeader>
             <DialogTitle>{dlg?.id ? "Edit SKU" : "Add SKU"}</DialogTitle>
           </DialogHeader>
@@ -551,10 +728,14 @@ export default function CrmPriceBookPage() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Description</Label>
-                <Textarea rows={2} value={dlg.form.description}
+                <Label className="text-xs">Scope / description (shows on every estimate built from this SKU)</Label>
+                <Textarea rows={6} value={dlg.form.description}
                   onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, description: e.target.value } })}
+                  placeholder={"What's included, line by line. The client reads this before deciding.\n• Tear off and dispose\n• New underlayment\n• …"}
                   data-testid="input-item-description" />
+                <p className="text-[11px] text-muted-foreground">
+                  Multi-line bullets are preserved on the client-facing estimate.
+                </p>
               </div>
             </div>
           )}

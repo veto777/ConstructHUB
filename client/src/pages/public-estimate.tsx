@@ -737,6 +737,14 @@ export default function PublicEstimatePage() {
                   <img src={company.logoUrl} alt={company.name} className="h-12 object-contain mb-1" />
                 )}
                 <h1 className="text-xl font-semibold tracking-tight">{company.name}</h1>
+                {/* Division separation made unmistakable: an FL estimate never
+                    reads like it came from the WA arm. */}
+                {company.divisionCode && (
+                  <div className="inline-flex items-center rounded-md bg-primary/10 text-primary text-xs font-medium px-2 py-0.5"
+                    data-testid="badge-division">
+                    {company.divisionName ?? company.name} · {company.divisionCode} division
+                  </div>
+                )}
                 {(company.addressLine1 || company.city) && (
                   <div className="text-sm text-muted-foreground" data-testid="text-company-address">
                     {[
@@ -826,7 +834,7 @@ export default function PublicEstimatePage() {
                       <td className="block sm:table-cell sm:px-4 sm:py-3">
                         <div className="font-medium">{i.name}</div>
                         {/* Full scope of work — multi-line bullets preserved, HCP-style. */}
-                        {i.description && <div className="text-muted-foreground text-xs mt-0.5 whitespace-pre-wrap leading-relaxed">{i.description}</div>}
+                        {i.description && <div className="text-muted-foreground text-sm mt-1 whitespace-pre-wrap leading-relaxed">{i.description}</div>}
                       </td>
                       <td className="hidden sm:table-cell px-4 py-3 text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
                       <td className="block sm:table-cell mt-1 sm:mt-0 sm:px-4 sm:py-3 sm:text-right tabular-nums">
