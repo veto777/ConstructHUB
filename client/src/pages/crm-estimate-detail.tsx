@@ -184,7 +184,14 @@ export default function CrmEstimateDetailPage() {
   const del = useMutation({
     mutationFn: async () => (await apiRequest("DELETE", `/api/crm/estimates/${id}`)).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
+      // Only the list — invalidating the detail key would refetch a deleted
+      // estimate (404) before the navigation below lands.
+      queryClient.invalidateQueries({
+        predicate: (q) => {
+          const k = String(q.queryKey[0]);
+          return k === "/api/crm/estimates" || k.startsWith("/api/crm/estimates?");
+        },
+      });
       if (e?.customerId) queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${e.customerId}`] });
       toast({ title: "Estimate deleted" });
       setLocation("/crm/estimates");
