@@ -365,9 +365,14 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
 
     // Mark it sent even if SMTP failed — the link is live and copyable, so the
     // work is not lost. `emailed:false` tells the UI to offer the link instead.
+    // A re-send after a decline/expiry/cancel REVIVES the estimate: the owner
+    // edited it (PATCH) and is putting a fresh offer in front of the client,
+    // so the stale decline/expiry must not keep greeting them.
+    const revived = ["declined", "expired", "cancelled"].includes(est.status);
     const [row] = await db.update(crmEstimates).set({
-      status: est.status === "draft" ? "sent" : est.status,
+      status: est.status === "draft" || revived ? "sent" : est.status,
       sentAt, expiresAt, sentToEmail: to, updatedAt: new Date(),
+      ...(revived ? { declinedAt: null, declineReason: null } : {}),
     }).where(eq(crmEstimates.id, est.id)).returning();
 
     // Text the estimate link too, when the org (or this send) asked for it and
@@ -392,7 +397,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       }
     }
 
-    await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, { to, emailed, emailError, texted, smsTo, smsError });
+    await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, {
+      to, emailed, emailError, texted, smsTo, smsError,
+      resend: !!est.sentAt, revived: revived || undefined,
+    });
 
     // Owner's "bid sent" notice — fires even when the client copy failed to
     // send (the estimate is marked sent either way; the link is live).

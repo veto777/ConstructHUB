@@ -7,9 +7,10 @@
  *      to read — the team page needs the list to scope members).
  *   2. Branding resolution for client-facing documents. An estimate or invoice
  *      takes its letterhead from its division — never the WA HQ address on FL
- *      work. Resolution order (first hit wins): the document's project's
- *      division → the customer's most recent project with a division → the
- *      org. Division fields that are null fall back to the org per field.
+ *      work. Resolution order (first hit wins): the estimate's own division
+ *      pick → the document's project's division → the customer's most recent
+ *      project with a division → the org. Division fields that are null fall
+ *      back to the org per field.
  *   3. Division list-scoping — STRICT. A member pinned to a division
  *      (divisionId set) who is not the owner sees ONLY their division's rows
  *      in list endpoints. Unassigned (null division) rows are visible only to
@@ -121,10 +122,14 @@ async function latestCustomerProjectDivision(orgId: string, customerId: string):
   return getDivision(orgId, p?.divisionId);
 }
 
-/** Branding division for an estimate: its project's, else the customer's latest project's, else null (= org). */
+/** Branding division for an estimate: its explicit pick, else its project's, else the customer's latest project's, else null (= org). */
 export async function resolveEstimateDivision(
-  est: Pick<typeof crmEstimates.$inferSelect, "orgId" | "customerId" | "projectId">,
+  est: Pick<typeof crmEstimates.$inferSelect, "orgId" | "customerId" | "projectId" | "divisionId">,
 ): Promise<CrmDivision | null> {
+  // An explicit division on the estimate wins — that's how a projectless
+  // estimate still goes out under the right arm (FL vs WA).
+  const own = await getDivision(est.orgId, est.divisionId);
+  if (own) return own;
   if (est.projectId) {
     const [p] = await db.select({ divisionId: crmProjects.divisionId }).from(crmProjects)
       .where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId))).limit(1);
@@ -145,8 +150,12 @@ export async function resolveInvoiceDivision(
     if (d) return d;
   }
   if (inv.estimateId) {
-    const [e] = await db.select({ projectId: crmEstimates.projectId }).from(crmEstimates)
+    const [e] = await db.select({ projectId: crmEstimates.projectId, divisionId: crmEstimates.divisionId })
+      .from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, inv.orgId), eq(crmEstimates.id, inv.estimateId))).limit(1);
+    // The estimate's explicit division carries through to its invoice.
+    const ownDiv = await getDivision(inv.orgId, e?.divisionId);
+    if (ownDiv) return ownDiv;
     if (e?.projectId) {
       const [p] = await db.select({ divisionId: crmProjects.divisionId }).from(crmProjects)
         .where(and(eq(crmProjects.orgId, inv.orgId), eq(crmProjects.id, e.projectId))).limit(1);
@@ -173,6 +182,7 @@ export async function divisionMapsForOrg(orgId: string): Promise<DivisionMaps> {
   }).from(crmProjects).where(eq(crmProjects.orgId, orgId));
   const estimates = await db.select({
     id: crmEstimates.id, projectId: crmEstimates.projectId, customerId: crmEstimates.customerId,
+    divisionId: crmEstimates.divisionId,
   }).from(crmEstimates).where(eq(crmEstimates.orgId, orgId));
 
   const byProject = new Map(projects.map((p) => [p.id, p.divisionId]));
@@ -182,7 +192,9 @@ export async function divisionMapsForOrg(orgId: string): Promise<DivisionMaps> {
   }
   const byEstimate = new Map(estimates.map((e) => [
     e.id,
-    (e.projectId ? byProject.get(e.projectId) : undefined) ?? byCustomer.get(e.customerId) ?? null,
+    // The estimate's explicit division pick wins over project/customer inference.
+    e.divisionId ??
+      ((e.projectId ? byProject.get(e.projectId) : undefined) ?? byCustomer.get(e.customerId) ?? null),
   ]));
   return { byProject, byCustomer, byEstimate };
 }

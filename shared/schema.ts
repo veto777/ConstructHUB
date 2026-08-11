@@ -1615,6 +1615,10 @@ export const crmEstimates = pgTable("crm_estimates", {
   orgId: varchar("org_id").notNull(),
   customerId: varchar("customer_id").notNull(),
   projectId: varchar("project_id"),
+  // Explicit letterhead division. When set it wins over the project's division
+  // (divisions.ts resolveEstimateDivision) — this is how an estimate with no
+  // project still goes out under the FL arm instead of the WA HQ address.
+  divisionId: varchar("division_id"),
   number: text("number"),
   title: text("title").notNull().default("Estimate"),
   status: text("status").notNull().default("draft"),
