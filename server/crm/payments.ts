@@ -29,6 +29,7 @@ import {
 import { and, eq, isNull, desc, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { requireDocSession } from "./portal";
+import { logActivity } from "./activity";
 import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
 import { uploadToR2, getR2Url } from "../r2";
@@ -321,9 +322,169 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!ctx.permissions.seePrices) return res.status(403).json({ message: "Requires permission: seePrices" });
+    const where = [eq(crmPayments.orgId, ctx.org.id)];
+    // The client page's payment section asks for one client's history only.
+    if (req.query.customerId) where.push(eq(crmPayments.customerId, String(req.query.customerId)));
+    if (req.query.invoiceId) where.push(eq(crmPayments.invoiceId, String(req.query.invoiceId)));
     const rows = await db.select().from(crmPayments)
-      .where(eq(crmPayments.orgId, ctx.org.id)).orderBy(desc(crmPayments.createdAt)).limit(200);
+      .where(and(...where)).orderBy(desc(crmPayments.createdAt)).limit(200);
     res.json(rows);
+  });
+
+  // ── Contractor: take a payment — hosted checkout link ─────────────────────
+  // The owner's #1 confusion: "how do I actually take a payment?" These two
+  // endpoints let the CONTRACTOR generate the same hosted Stripe Checkout the
+  // client would reach through the public document page — a link to copy into
+  // a text/email or open on the spot. Session CREATION only: the charge is
+  // completed by the client on Stripe's hosted page, never captured here.
+
+  /** Shared tail: create the Checkout session on the connected account and
+   *  record the pending payment row. Returns false after responding on error. */
+  async function createCheckoutLink(opts: {
+    req: any; res: any;
+    org: typeof crmOrgs.$inferSelect;
+    customer: typeof crmCustomers.$inferSelect | undefined;
+    amountCents: number;
+    docName: string;
+    successPath: string;
+    metadata: Record<string, string>;
+    pendingRow: Record<string, unknown>;
+  }): Promise<boolean> {
+    const { req, res, org, customer, amountCents } = opts;
+    const acct = await activeAccount(org.id);
+    if (!acct || !acct.chargesEnabled || !stripe) {
+      res.status(503).json({
+        message: "Online payment isn't set up yet — connect Stripe on the Payments page, or record the payment manually instead.",
+      });
+      return false;
+    }
+    const rails = allowedRails(org, acct, amountCents);
+    if (!rails.ach && !rails.card) {
+      res.status(503).json({ message: "Online payment isn't available for this amount under your payment settings — record it manually instead." });
+      return false;
+    }
+    const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
+    // ACH first — 0.8% capped at $5 vs ~2.9% on card. With a card surcharge
+    // configured, an unpinned session must not offer card (the fee line only
+    // exists on explicit card checkouts, which only the client-facing flow pins).
+    if (rails.ach) methods.push("us_bank_account");
+    if (rails.card && !(cardFeeCents(org, amountCents) > 0 && rails.ach)) methods.push("card");
+
+    const base = getBaseUrl(req);
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment", payment_method_types: methods,
+        customer_email: customer?.email ?? undefined,
+        line_items: [{ quantity: 1, price_data: {
+          currency: acct.defaultCurrency || "usd", unit_amount: amountCents,
+          product_data: { name: opts.docName, description: org.name ? `Payable to ${org.name}` : undefined },
+        }}],
+        success_url: `${base}${opts.successPath}?paid=1`,
+        cancel_url: `${base}${opts.successPath}?paid=0`,
+        metadata: opts.metadata,
+      }, { stripeAccount: acct.externalAccountId }); // direct charge on THEIR account
+
+      await db.insert(crmPayments).values({
+        orgId: org.id,
+        provider: "stripe", externalId: session.id,
+        amountCents, currency: acct.defaultCurrency || "usd",
+        method: rails.ach ? "ach" : "card", status: "pending", applicationFeeCents: 0,
+        ...opts.pendingRow,
+      } as any);
+      res.json({ url: session.url, amountCents, rails });
+      return true;
+    } catch (e: any) {
+      console.error("[crm] payment-link checkout failed:", e?.message || e);
+      res.status(502).json({ message: String(e?.message || "Could not start checkout").slice(0, 200) });
+      return false;
+    }
+  }
+
+  /** Contractor: a hosted card+ACH checkout link for an open invoice. */
+  app.post("/api/crm/invoices/:id/payment-link", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "takePayment")) return;
+
+    const [inv] = await db.select().from(crmInvoices)
+      .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
+    if (!inv) return res.status(404).json({ message: "Invoice not found" });
+    if (inv.voidedAt) return res.status(409).json({ message: "This invoice has been voided." });
+    const amount = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
+    if (amount < 50) return res.status(400).json({ message: "Nothing left to pay on this invoice." });
+    // Same double-pay guard as the public flow: one open session at a time.
+    if (await hasOpenSession(eq(crmPayments.invoiceId, inv.id))) {
+      return res.status(409).json({
+        message: "A checkout session is already open for this invoice. Finish it (or wait 30 minutes) before starting another.",
+      });
+    }
+    const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
+    const ok = await createCheckoutLink({
+      req, res, org: ctx.org, customer: cust, amountCents: amount,
+      docName: `Invoice ${inv.number ?? ""} — ${inv.title}`,
+      successPath: `/i/${inv.publicToken}`,
+      metadata: { invoiceId: inv.id, orgId: inv.orgId, customerId: inv.customerId },
+      pendingRow: {
+        customerId: inv.customerId, invoiceId: inv.id,
+        projectId: inv.projectId ?? null, purpose: "progress",
+        note: "Link generated by the contractor from the CRM.",
+      },
+    });
+    if (ok) {
+      logActivity(ctx, "payment.link.created", {
+        entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+        meta: { number: inv.number, amountCents: amount },
+      });
+    }
+  });
+
+  /** Contractor: a hosted card+ACH checkout link for an approved estimate's
+   *  deposit (or full signed amount when no deposit is set). */
+  app.post("/api/crm/estimates/:id/payment-link", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "takePayment")) return;
+
+    const [est] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+    if (!est.approvedAt) return res.status(409).json({ message: "Only an approved estimate can be paid." });
+    // Charge the SIGNED amount, same as the public deposit flow.
+    const amount = est.depositCents && est.depositCents > 0
+      ? est.depositCents
+      : (est.approvedTotalCents ?? est.totalCents);
+    if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay on this estimate." });
+    const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
+      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+    if (settled.length) return res.status(409).json({ message: "This estimate has already been paid." });
+    if (await hasOpenSession(eq(crmPayments.estimateId, est.id))) {
+      return res.status(409).json({
+        message: "A checkout session is already open for this estimate. Finish it (or wait 30 minutes) before starting another.",
+      });
+    }
+    const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
+    const ok = await createCheckoutLink({
+      req, res, org: ctx.org, customer: cust, amountCents: amount,
+      docName: `${est.depositCents ? "Deposit" : "Payment"} — ${est.title}${est.number ? ` (${est.number})` : ""}`,
+      successPath: `/e/${est.publicToken}`,
+      metadata: { estimateId: est.id, orgId: est.orgId, customerId: est.customerId },
+      pendingRow: {
+        customerId: est.customerId, estimateId: est.id,
+        projectId: est.projectId ?? null,
+        purpose: est.depositCents ? "deposit" : "final",
+        note: "Link generated by the contractor from the CRM.",
+      },
+    });
+    if (ok) {
+      logActivity(ctx, "payment.link.created", {
+        entityType: "estimate", entityId: est.id, customerId: est.customerId,
+        meta: { number: est.number, amountCents: amount },
+      });
+    }
   });
 
   // ── Org payment settings + financing links ────────────────────────────────
