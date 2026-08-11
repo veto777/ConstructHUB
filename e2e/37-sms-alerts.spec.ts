@@ -85,6 +85,17 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
     const send = await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
     expect(send.ok()).toBeTruthy();
 
+    // The SMS leg honors the channel matrix (a bare boolean pref means sms
+    // OFF) — turn the clientReengaged sms channel ON for this run instead of
+    // inheriting whatever a previous suite left in the shared org. Restored
+    // in the finally below.
+    const orgBefore = await page.request.get("/api/crm/org").then((r) => r.json());
+    const priorPref = orgBefore.customFields?.notificationPrefs?.clientReengaged;
+    const prefOn = await page.request.patch("/api/crm/org", {
+      data: { notificationPrefs: { clientReengaged: { sms: true } } },
+    });
+    expect(prefOn.ok()).toBeTruthy();
+
     // The alert text goes to the estimate creator's member phone — set one on
     // the shared owner member and restore it afterwards.
     const prior = await q<{ phone: string | null }>(
@@ -137,6 +148,9 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
       await q(
         `update crm_members set phone = $2 where id = (select created_by_member_id from crm_estimates where id = $1)`,
         [estimateId, priorPhone]);
+      await page.request.patch("/api/crm/org", {
+        data: { notificationPrefs: { clientReengaged: priorPref ?? true } },
+      });
     }
   });
 });
