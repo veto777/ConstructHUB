@@ -112,6 +112,7 @@ export async function ensureCrmSchema(): Promise<void> {
       billing_line1 text, billing_city text, billing_state text, billing_postal_code text,
       lead_source_id varchar, owner_member_id varchar,
       notes text, tags text[], custom_fields jsonb,
+      follow_up_cadence_days integer, last_follow_up_at timestamp,
       portal_token text NOT NULL,
       portal_last_seen_at timestamp,
       archived_at timestamp,
@@ -485,6 +486,9 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_projects ADD COLUMN IF NOT EXISTS division_id varchar;
     ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS division_id varchar;
     ALTER TABLE crm_invitations ADD COLUMN IF NOT EXISTS division_id varchar;
+    -- Per-customer follow-up cadence (weekly/biweekly "who do I call" list).
+    ALTER TABLE crm_customers ADD COLUMN IF NOT EXISTS follow_up_cadence_days integer;
+    ALTER TABLE crm_customers ADD COLUMN IF NOT EXISTS last_follow_up_at timestamp;
     CREATE INDEX IF NOT EXISTS crm_members_division_idx ON crm_members (division_id);
     CREATE INDEX IF NOT EXISTS crm_projects_division_idx ON crm_projects (division_id);
   `);

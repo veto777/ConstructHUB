@@ -1546,6 +1546,11 @@ export const crmCustomers = pgTable("crm_customers", {
   // First-class custom fields on EVERY entity. HCP's own docs say "Housecall Pro
   // is not set up to allow for custom fields" — that is the opening.
   customFields: jsonb("custom_fields"),
+  // Follow-up cadence (owner's "who do I call this week"): 7 = weekly,
+  // 14 = biweekly, null = no reminder. Due when now ≥ lastFollowUpAt (or
+  // createdAt) + cadence. Surfaced by GET /api/crm/follow-ups.
+  followUpCadenceDays: integer("follow_up_cadence_days"),
+  lastFollowUpAt: timestamp("last_follow_up_at"),
   // The client portal is created with the customer, not later. Token is the
   // unguessable key in the estimate email link.
   portalToken: text("portal_token").notNull(),

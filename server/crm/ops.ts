@@ -16,16 +16,16 @@ import { z } from "zod";
 import { db } from "../db";
 import {
   crmInvoices, crmInvoiceItems, crmCostCodes, crmPhases, crmBudgetLines,
-  crmCommitments, crmCostEntries, crmAppointments, crmChangeOrders,
+  crmCommitments, crmCostEntries, crmChangeOrders,
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
   crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers,
   crmNotificationChannel, crmEngagementSessions, crmCustomerNotes,
-  CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES, CRM_APPOINTMENT_STATUSES,
+  CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
   CRM_LINE_ITEM_KINDS,
 } from "@shared/schema";
-import { and, eq, gte, lte, desc, asc, sql, ilike, isNull } from "drizzle-orm";
+import { and, eq, desc, asc, sql, ilike, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
@@ -662,91 +662,8 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   // ══ SCHEDULING ════════════════════════════════════════════════════════════
-
-  app.get("/api/crm/appointments", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
-    if (!ctx) return;
-    const from = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now() - 7 * 86400000);
-    const to = req.query.to ? new Date(String(req.query.to)) : new Date(Date.now() + 60 * 86400000);
-    const rows = await db.select().from(crmAppointments)
-      .where(and(eq(crmAppointments.orgId, ctx.org.id),
-        gte(crmAppointments.startsAt, from), lte(crmAppointments.startsAt, to)))
-      .orderBy(asc(crmAppointments.startsAt)).limit(1000);
-    // A crew member without viewAllJobs sees only visits they're dispatched to.
-    const visible = ctx.permissions.viewAllJobs
-      ? rows : rows.filter((a) => (a.dispatchedMemberIds || []).includes(ctx.member.id));
-    res.json({ appointments: visible, statuses: CRM_APPOINTMENT_STATUSES });
-  });
-
-  app.post("/api/crm/appointments", async (req: any, res) => {
-    const ctx = await ctxFor(req, res, "manageJobs");
-    if (!ctx) return;
-    const parsed = z.object({
-      projectId: z.string().nullable().optional(), jobId: z.string().nullable().optional(),
-      customerId: z.string().nullable().optional(),
-      title: z.string().min(1).max(200), notes: z.string().max(8000).nullable().optional(),
-      crewNotes: z.string().max(8000).nullable().optional(),
-      startsAt: z.string(), endsAt: z.string().nullable().optional(),
-      allDay: z.boolean().default(false),
-      arrivalWindowMinutes: z.number().int().min(0).max(480).nullable().optional(),
-      dispatchedMemberIds: z.array(z.string().max(64)).max(50).default([]),
-    }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid appointment", issues: parsed.error.issues });
-    const startsAt = new Date(parsed.data.startsAt);
-    if (isNaN(startsAt.getTime())) return res.status(400).json({ message: "Invalid start time" });
-    const endsAt = parsed.data.endsAt ? new Date(parsed.data.endsAt) : null;
-
-    // Double-booking detection — Leap admits on camera it has none.
-    const conflicts: any[] = [];
-    if (parsed.data.dispatchedMemberIds.length && endsAt) {
-      const sameDay = await db.select().from(crmAppointments)
-        .where(and(eq(crmAppointments.orgId, ctx.org.id),
-          gte(crmAppointments.startsAt, new Date(startsAt.getTime() - 86400000)),
-          lte(crmAppointments.startsAt, new Date(startsAt.getTime() + 86400000))));
-      for (const a of sameDay) {
-        if (a.status === "canceled" || !a.endsAt) continue;
-        const overlap = startsAt < a.endsAt && endsAt > a.startsAt;
-        if (!overlap) continue;
-        const clash = (a.dispatchedMemberIds || []).filter((m) => parsed.data.dispatchedMemberIds.includes(m));
-        if (clash.length) conflicts.push({ appointmentId: a.id, title: a.title, startsAt: a.startsAt, memberIds: clash });
-      }
-    }
-    const [row] = await db.insert(crmAppointments).values({
-      ...parsed.data, orgId: ctx.org.id, startsAt, endsAt,
-    } as any).returning();
-    res.status(201).json({ appointment: row, conflicts });
-  });
-
-  app.patch("/api/crm/appointments/:id", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
-    if (!ctx) return;
-    const [appt] = await db.select().from(crmAppointments)
-      .where(and(eq(crmAppointments.orgId, ctx.org.id), eq(crmAppointments.id, req.params.id))).limit(1);
-    if (!appt) return res.status(404).json({ message: "Appointment not found" });
-    const dispatched = (appt.dispatchedMemberIds || []).includes(ctx.member.id);
-    // A dispatched tech may progress their own visit without manageJobs.
-    if (!ctx.permissions.manageJobs && !dispatched) {
-      return res.status(403).json({ message: "Requires permission: manageJobs" });
-    }
-    const parsed = z.object({
-      status: z.enum(CRM_APPOINTMENT_STATUSES as unknown as [string, ...string[]]).optional(),
-      title: z.string().max(200).optional(), notes: z.string().max(8000).nullable().optional(),
-      crewNotes: z.string().max(8000).nullable().optional(),
-      startsAt: z.string().optional(), endsAt: z.string().nullable().optional(),
-      dispatchedMemberIds: z.array(z.string().max(64)).max(50).optional(),
-    }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid patch", issues: parsed.error.issues });
-    const patch: any = { ...parsed.data, updatedAt: new Date() };
-    if (parsed.data.startsAt) patch.startsAt = new Date(parsed.data.startsAt);
-    if (parsed.data.endsAt) patch.endsAt = new Date(parsed.data.endsAt);
-    if (parsed.data.status === "on_my_way") patch.onMyWayAt = new Date();
-    if (parsed.data.status === "started") patch.startedAt = new Date();
-    if (parsed.data.status === "complete") patch.completedAt = new Date();
-    if (!ctx.permissions.manageJobs) delete patch.dispatchedMemberIds; // techs can't re-crew
-    const [row] = await db.update(crmAppointments).set(patch)
-      .where(eq(crmAppointments.id, appt.id)).returning();
-    res.json(row);
-  });
+  // Appointment CRUD lives in schedule.ts (registerCrmScheduleRoutes) — the
+  // calendar page is its editor, and lane a1 owns the crm_appointments logic.
 
   // ══ CHANGE ORDERS ═════════════════════════════════════════════════════════
 
