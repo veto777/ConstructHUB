@@ -285,6 +285,10 @@ export default function CrmPipelinePage() {
   const stages: any[] = data.stages ?? [];
   const COLLAPSED_COUNT = 5;
   const projects: any[] = data.projects ?? [];
+  // Server-computed per-stage totals (never capped); the loaded `projects`
+  // array is bounded, so use these for the true column counts and header.
+  const stageCounts: Record<string, number> = data.stageCounts ?? {};
+  const totalProjects: number = data.totalProjects ?? projects.length;
   const groups = [...new Set(stages.map((s) => s.group))];
   const firstStage = stages[0]?.key ?? "lead";
 
@@ -294,7 +298,7 @@ export default function CrmPipelinePage() {
         icon={KanbanSquare}
         title="Pipeline"
         infoKey="pipeline"
-        subtitle={`${projects.length} project${projects.length === 1 ? "" : "s"} · drag a card to move it, or use the stage menu.`}
+        subtitle={`${totalProjects} project${totalProjects === 1 ? "" : "s"} · drag a card to move it, or use the stage menu.`}
         actions={canMove ? (
           <Button size="sm" onClick={() => setNewLeadOpen(true)} data-testid="button-new-lead">
             <Plus className="h-4 w-4 mr-1" /> New lead
@@ -314,9 +318,12 @@ export default function CrmPipelinePage() {
             <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-proximity">
               {groupStages.map((s) => {
                 const inStage = projects.filter((p) => p.status === s.key);
+                const stageTotal = stageCounts[s.key] ?? inStage.length;
                 const isOpen = expanded[s.key] === true;
                 const visible = isOpen ? inStage : inStage.slice(0, COLLAPSED_COUNT);
-                const hidden = inStage.length - visible.length;
+                // Loaded cards may be fewer than the true stage total (row cap);
+                // "+N more" reflects everything not shown, capped or collapsed.
+                const hidden = stageTotal - visible.length;
                 return (
                   <div key={s.key} className="min-w-[260px] w-[260px] shrink-0 snap-start"
                     onDragOver={(e) => canMove && e.preventDefault()}
@@ -329,7 +336,7 @@ export default function CrmPipelinePage() {
                     <div className="flex items-center justify-between px-1.5 pb-2">
                       <span className="text-sm font-medium">{s.label}</span>
                       <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
-                        {inStage.length}
+                        {stageTotal}
                       </span>
                     </div>
                     <div className="space-y-2 min-h-[80px] rounded-xl border border-border/50 bg-muted/40 p-2">

@@ -194,6 +194,7 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
     const from = req.query.from ? parseTime(String(req.query.from)) : new Date(Date.now() - 7 * 86400000);
     const to = req.query.to ? parseTime(String(req.query.to)) : new Date(Date.now() + 60 * 86400000);
     if (!from || !to) return res.status(400).json({ message: "Invalid from/to date" });
+    if (!from || !to) return res.status(400).json({ message: "Invalid from/to date" });
     if (to.getTime() - from.getTime() > 400 * 86400000) {
       return res.status(400).json({ message: "Date range too large (max 400 days)" });
     }

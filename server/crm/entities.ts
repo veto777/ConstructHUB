@@ -557,11 +557,23 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       where.push(eq(crmProjects.divisionId, divScope));
     }
 
+    // Accurate per-stage totals (a COUNT, never capped) so the board can show
+    // the true book even when the card list is bounded — a mature org must not
+    // see empty columns just because older projects fell past the row cap.
+    const countRows = await db.select({
+      status: crmProjects.status,
+      n: sql<number>`count(*)::int`,
+    }).from(crmProjects).where(and(...where)).groupBy(crmProjects.status);
+    const stageCounts: Record<string, number> = {};
+    for (const r of countRows) stageCounts[r.status] = r.n;
+
     const rows = await db.select().from(crmProjects).where(and(...where))
-      .orderBy(desc(crmProjects.createdAt)).limit(500);
+      .orderBy(desc(crmProjects.createdAt)).limit(2000);
     res.json({
       projects: rows.map((p) => presentProject(p, ctx)),
       stages: CRM_PROJECT_STATUSES.map((s) => ({ key: s, ...CRM_PROJECT_STAGE_META[s] })),
+      stageCounts,
+      totalProjects: Object.values(stageCounts).reduce((a, b) => a + b, 0),
     });
   });
 
