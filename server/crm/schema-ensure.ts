@@ -502,6 +502,7 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_divisions ADD COLUMN IF NOT EXISTS website text;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS approved_total_cents integer;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS selected_discounts jsonb;
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS division_id varchar;
     ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_pb_materials ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     -- per_sqft pricing mode (Quick Bid): rate per sq ft + which measurement

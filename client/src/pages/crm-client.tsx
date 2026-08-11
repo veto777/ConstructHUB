@@ -1094,7 +1094,7 @@ export default function CrmClientPage() {
                     <div key={idx} className="grid gap-2 sm:grid-cols-12 items-end border rounded-md p-2"
                       data-testid={`line-item-${idx}`}>
                       <div className="sm:col-span-5">
-                        <Label className="text-xs">Description</Label>
+                        <Label className="text-xs">Item</Label>
                         <Input value={it.name} placeholder="Tear off & dispose existing roof"
                           onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} />
                       </div>
@@ -1121,6 +1121,15 @@ export default function CrmClientPage() {
                           onClick={() => setItems(items.length > 1 ? items.filter((_, i) => i !== idx) : [{ ...BLANK }])}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                      </div>
+                      {/* The scope the client actually reads — persists to the
+                          line's description and renders on the estimate. */}
+                      <div className="sm:col-span-12">
+                        <Label className="text-xs">Scope &amp; details (shown to the client)</Label>
+                        <Textarea rows={2} value={it.description ?? ""}
+                          data-testid={`input-item-scope-${idx}`}
+                          placeholder="What's included — materials, prep, warranty, exclusions…"
+                          onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))} />
                       </div>
                     </div>
                   ))}
