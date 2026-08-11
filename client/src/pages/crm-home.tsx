@@ -1,15 +1,24 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle2, Circle, ArrowRight, Loader2, Users, Building2,
   UserCircle, Lock, Sparkles, KanbanSquare, DollarSign, Activity,
   AlertCircle, Inbox, FileText, Trophy, CalendarClock, ReceiptText,
+  PhoneCall, UserPlus, FileWarning,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -99,7 +108,28 @@ export default function CrmHomePage() {
     queryKey: ["/api/crm/team-activity"],
     refetchInterval: 60_000,
   });
+  // Needs-attention rollup: follow-ups due, brand-new leads, leads with no
+  // estimate yet — one server-side pass, names only.
+  const { data: attention, isError: attentionError } = useQuery<any>({ queryKey: ["/api/crm/attention"] });
+  const { data: followUpsData } = useQuery<any>({ queryKey: ["/api/crm/follow-ups"] });
   const canSeePrices = me?.permissions?.seePrices === true;
+  const canManageCustomers = me?.permissions?.manageCustomers === true;
+  const [followUpsOpen, setFollowUpsOpen] = useState(false);
+
+  const followUpMut = useMutation({
+    mutationFn: async ({ customerId, ...body }: { customerId: string; cadenceDays?: 7 | 14 | null; markDone?: boolean }) =>
+      (await apiRequest("PATCH", `/api/crm/customers/${customerId}/follow-up`, body)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/attention"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/team-activity"] });
+    },
+    onError: (e: any) => toast({
+      title: "Could not update the follow-up",
+      description: apiErrorMessage(e),
+      variant: "destructive",
+    }),
+  });
 
   const dismiss = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/onboarding/dismiss", {})).json(),
@@ -270,41 +300,104 @@ export default function CrmHomePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Needs attention */}
+        {/* Needs attention: follow-ups due, fresh leads, leads needing an estimate */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Inbox className="h-4 w-4 text-muted-foreground" /> Needs attention
-            </CardTitle>
-            <CardDescription>Leads that haven't moved yet.</CardDescription>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Inbox className="h-4 w-4 text-muted-foreground" /> Needs attention
+              </CardTitle>
+              {canManageCustomers && (
+                <Button variant="outline" size="sm" className="h-7 text-xs"
+                  data-testid="button-manage-follow-ups" onClick={() => setFollowUpsOpen(true)}>
+                  <PhoneCall className="h-3.5 w-3.5 mr-1" /> Follow-ups
+                </Button>
+              )}
+            </div>
+            <CardDescription>Follow-ups due, fresh leads, and leads still waiting on an estimate.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-1.5">
-            {pipelineError ? (
-              <p className="text-sm text-destructive">Couldn't load projects — check your connection and refresh the page.</p>
-            ) : leads.length === 0 ? (
+          <CardContent className="space-y-4">
+            {attentionError ? (
+              <p className="text-sm text-destructive">Couldn't load the follow-up list — check your connection and refresh the page.</p>
+            ) : (attention?.followUpsDue?.length ?? 0) + (attention?.newLeads?.length ?? 0) + (attention?.leadsNeedingEstimate?.length ?? 0) === 0 ? (
               <EmptyState
                 compact
                 icon={CheckCircle2}
                 title="All caught up"
-                description="New leads land here until they move down the pipeline."
+                description="Follow-ups due, new leads, and leads waiting on an estimate land here."
               />
             ) : (
-              leads.slice(0, 5).map((p) => (
-                <Link key={p.id} href={`/crm/projects/${p.id}`}>
-                  <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 hover:bg-accent transition-colors cursor-pointer">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.number}</div>
+              <>
+                {(attention?.followUpsDue?.length ?? 0) > 0 && (
+                  <section className="space-y-1.5" data-testid="section-follow-ups-due">
+                    <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <PhoneCall className="h-3 w-3" /> Due for follow-up
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {canSeePrices && p.contractValueCents != null && (
-                        <span className="text-sm font-medium tabular-nums">{money0(p.contractValueCents)}</span>
-                      )}
-                      <StatusPill tone={statusTone(p.status)}>{stageOf(p.status)?.label ?? p.status}</StatusPill>
+                    {attention.followUpsDue.map((f: any) => (
+                      <div key={f.customerId}
+                        className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+                        data-testid={`followup-due-${f.customerId}`}>
+                        <Link href={`/crm/clients/${f.customerId}`} className="min-w-0">
+                          <div className="text-sm font-medium truncate hover:underline">{f.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {f.overdueDays > 0 ? `${f.overdueDays}d overdue` : "Due today"}
+                            {" · "}{f.cadenceDays === 7 ? "weekly" : "biweekly"} rhythm
+                          </div>
+                        </Link>
+                        {canManageCustomers && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs shrink-0"
+                            data-testid={`button-followup-done-${f.customerId}`}
+                            disabled={followUpMut.isPending}
+                            onClick={() => followUpMut.mutate({ customerId: f.customerId, markDone: true })}>
+                            Done
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </section>
+                )}
+                {(attention?.newLeads?.length ?? 0) > 0 && (
+                  <section className="space-y-1.5" data-testid="section-new-leads">
+                    <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <UserPlus className="h-3 w-3" /> New leads
                     </div>
-                  </div>
-                </Link>
-              ))
+                    {attention.newLeads.map((p: any) => (
+                      <Link key={p.id} href={`/crm/projects/${p.id}`}>
+                        <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 hover:bg-accent transition-colors cursor-pointer"
+                          data-testid={`new-lead-${p.id}`}>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{p.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {p.customerName ?? p.number}
+                              {p.createdAt ? ` · ${new Date(p.createdAt).toLocaleDateString()}` : ""}
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="shrink-0 text-[10px]">New</Badge>
+                        </div>
+                      </Link>
+                    ))}
+                  </section>
+                )}
+                {(attention?.leadsNeedingEstimate?.length ?? 0) > 0 && (
+                  <section className="space-y-1.5" data-testid="section-needs-estimate">
+                    <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <FileWarning className="h-3 w-3" /> Needs an estimate
+                    </div>
+                    {attention.leadsNeedingEstimate.map((p: any) => (
+                      <Link key={p.id} href={`/crm/projects/${p.id}`}>
+                        <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 hover:bg-accent transition-colors cursor-pointer"
+                          data-testid={`needs-estimate-${p.id}`}>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{p.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">{p.customerName ?? p.number}</div>
+                          </div>
+                          <StatusPill tone={statusTone(p.status)} className="shrink-0">{p.stageLabel}</StatusPill>
+                        </div>
+                      </Link>
+                    ))}
+                  </section>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -423,6 +516,68 @@ export default function CrmHomePage() {
           </Card>
         </Link>
       </div>
+      {/* Follow-up cadences: who you want a weekly/biweekly nudge for. */}
+      <Dialog open={followUpsOpen} onOpenChange={setFollowUpsOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-follow-ups">
+          <DialogHeader><DialogTitle>Follow-up cadences</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Pick a weekly or biweekly rhythm per client. When one comes due it lands in
+            Needs attention so nobody goes cold.
+          </p>
+          <div className="space-y-2">
+            {(followUpsData?.followUps ?? []).map((f: any) => (
+              <div key={f.customerId} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                data-testid={`followup-row-${f.customerId}`}>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{f.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {f.due
+                      ? (f.overdueDays > 0 ? `${f.overdueDays}d overdue` : "Due today")
+                      : `Next due ${new Date(f.dueAt).toLocaleDateString()}`}
+                  </div>
+                </div>
+                <Select
+                  value={String(f.cadenceDays)}
+                  onValueChange={(v) => followUpMut.mutate({
+                    customerId: f.customerId,
+                    cadenceDays: v === "off" ? null : (Number(v) as 7 | 14),
+                  })}
+                >
+                  <SelectTrigger className="h-8 w-[130px] shrink-0" data-testid={`select-cadence-${f.customerId}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Weekly</SelectItem>
+                    <SelectItem value="14">Biweekly</SelectItem>
+                    <SelectItem value="off">Off</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+            {(followUpsData?.followUps ?? []).length === 0 && (
+              <p className="text-sm text-muted-foreground py-2">No follow-ups set yet — add your first client below.</p>
+            )}
+          </div>
+          <div className="space-y-1.5 pt-1">
+            <Label>Add a client (starts weekly)</Label>
+            <Select
+              value=""
+              onValueChange={(id) => id && followUpMut.mutate({ customerId: id, cadenceDays: 7 })}
+            >
+              <SelectTrigger data-testid="select-add-follow-up">
+                <SelectValue placeholder="Pick a client…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(clients ?? [])
+                  .filter((c: any) => !(followUpsData?.followUps ?? []).some((f: any) => f.customerId === c.id))
+                  .map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.displayName}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
     </CrmPage>
   );
 }

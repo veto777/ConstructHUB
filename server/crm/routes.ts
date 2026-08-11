@@ -35,6 +35,7 @@ import { registerCrmClientAuthRoutes, allow as rateAllow } from "./client-auth";
 import { sendSms, normalizePhone } from "./sms";
 import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
+import { registerCrmFollowUpRoutes } from "./follow-ups";
 import { registerCrmCalendarRoutes } from "./calendar";
 import { registerCrmDivisionRoutes, getDivision } from "./divisions";
 import { registerCrmAdminRoutes } from "./admin";
@@ -255,8 +256,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   // Client 360: notes, timeline, financing clicks, portal preview. BEFORE the
   // attachment routes so its read-only interceptors guard preview sessions.
   registerCrmClient360Routes(app, getDevUser);
-  // Read-only schedule + activity feeds for the mobile ribbon.
+  // Appointment CRUD + read-only schedule/activity feeds for the calendar.
   registerCrmScheduleRoutes(app, getDevUser);
+  // Follow-up cadences + the Home needs-attention rollup.
+  registerCrmFollowUpRoutes(app, getDevUser);
   // Calendar sync: tokenized iCal feed + Google Calendar push.
   registerCrmCalendarRoutes(app, getDevUser);
   // Divisions: WA HQ + FL style operating arms of one company.
