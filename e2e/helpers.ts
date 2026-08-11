@@ -34,6 +34,8 @@ const EXPECTED_4XX: RegExp[] = [
 const EXPECTED_503: RegExp[] = [
   /\/api\/public\/estimates\/[^/]+\/pay/,
   /\/api\/public\/invoices\/[^/]+\/pay/,
+  // Contractor-side checkout-link generation when no Stripe account is connected.
+  /\/api\/crm\/(invoices|estimates)\/[^/]+\/payment-link/,
 ];
 
 export function watchPage(page: Page): PageGuards {

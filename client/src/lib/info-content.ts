@@ -64,6 +64,16 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  "client-payments": {
+    title: "Taking a payment from this client",
+    body: [
+      "This is where money actually changes hands. The outstanding balance is everything this client still owes across their open invoices; collected to date is what's already landed.",
+      "Tap \"Take a payment\" and pick a rail: create a secure online link (the client pays by card or straight from their bank, and the money goes to your own Stripe account), or record a check, cash or wire you already have in hand.",
+      "Every payment — online or recorded by hand — shows up in the history below and on the client's receipt.",
+      "Example: the Millers hand you a $5,000 deposit check at the kitchen table. You open their page, tap \"Take a payment\", record the check, and they've got a receipt in their inbox before you reach your truck.",
+    ],
+  },
+
   "client-projects": {
     title: "Projects for this client",
     body: [
