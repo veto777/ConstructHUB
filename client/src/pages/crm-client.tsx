@@ -26,7 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
   FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
-  Pencil, Search,
+  Pencil, Search, Calendar, MessageSquare, CreditCard,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
@@ -35,6 +35,7 @@ import { EstimateEngagement } from "@/components/crm-engagement";
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "@/components/client-uploads";
 import { CustomerMeasurements } from "@/components/client-measurements";
+import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { QuickBid } from "@/components/crm-quick-bid";
@@ -439,10 +440,88 @@ export default function CrmClientPage() {
     enabled: !!id && canSeePrices,
   });
 
+  // ── The HUB: this page is the fast track for everything about the client ──
+  // Payments (history + outstanding), their appointments, and the message
+  // thread all mount right here alongside estimates/invoices/projects.
+
+  const { data: payments } = useQuery<any[]>({
+    queryKey: [`/api/crm/payments?customerId=${id}`],
+    enabled: !!id && canSeePrices,
+  });
+
+  const { data: apptData } = useQuery<any>({
+    queryKey: ["/api/crm/appointments", "client-hub"],
+    queryFn: async () => {
+      const from = new Date(Date.now() - 30 * 86400000).toISOString();
+      const to = new Date(Date.now() + 365 * 86400000).toISOString();
+      return (await apiRequest("GET", `/api/crm/appointments?from=${from}&to=${to}`, undefined)).json();
+    },
+    enabled: !!id,
+  });
+  const appointments = (apptData?.appointments ?? []).filter((a: any) => a.customerId === id);
+
+  const { data: thread } = useQuery<any>({
+    queryKey: [`/api/crm/inbox/${id}`],
+    enabled: !!id && canManageCustomers,
+    retry: false,
+  });
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
     queryClient.invalidateQueries({ queryKey: [`/api/crm/invoices?customerId=${id}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/crm/payments?customerId=${id}`] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/appointments"] });
+    queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
   };
+
+  // ── Schedule an appointment (lands on the calendar + this page) ──────────
+  const [apptOpen, setApptOpen] = useState(false);
+  const [apptTitle, setApptTitle] = useState("");
+  const [apptStart, setApptStart] = useState("");
+  const [apptEnd, setApptEnd] = useState("");
+  const [apptNotes, setApptNotes] = useState("");
+  const scheduleAppt = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", "/api/crm/appointments", {
+        customerId: id,
+        title: apptTitle.trim(),
+        startsAt: new Date(apptStart).toISOString(),
+        endsAt: apptEnd ? new Date(apptEnd).toISOString() : null,
+        notes: apptNotes.trim() || null,
+      })).json(),
+    onSuccess: (r: any) => {
+      setApptOpen(false); setApptTitle(""); setApptStart(""); setApptEnd(""); setApptNotes("");
+      refresh();
+      const clash = r?.conflicts?.length ? ` Heads up: overlaps ${r.conflicts.length} other visit(s).` : "";
+      toast({ title: "Appointment scheduled", description: `It's on the calendar.${clash}` });
+    },
+    onError: (e: any) => {
+      // Lane a1 owns the calendar; if the appointment API isn't deployed yet,
+      // say so plainly instead of dead-clicking.
+      const msg = apiErrorMessage(e);
+      toast({
+        title: "Could not schedule",
+        description: /not found|404/i.test(msg) ? "Scheduling isn't available on this server yet." : msg,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // ── Take a payment (online link or manual record) ─────────────────────────
+  const [takeOpen, setTakeOpen] = useState(false);
+
+  // ── Message thread (client portal comments) ───────────────────────────────
+  const [replyBody, setReplyBody] = useState("");
+  const sendReply = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", `/api/crm/inbox/${id}/reply`, { body: replyBody.trim() })).json(),
+    onSuccess: () => {
+      setReplyBody("");
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
+      toast({ title: "Message sent", description: "The client gets it by email and in their portal." });
+    },
+    onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
+  });
 
   // ── New project ───────────────────────────────────────────────────────────
   const [projOpen, setProjOpen] = useState(false);
@@ -814,6 +893,161 @@ export default function CrmClientPage() {
         </CardContent>
       </Card>
 
+      {/* Fast-track actions — this page is the HUB for the whole relationship:
+          schedule, estimate, pipeline, payment, all one tap from the client. */}
+      {(canManageJobs || canEstimate || canTakePayment) && (
+        <Card>
+          <CardContent className="p-4 flex flex-wrap items-center gap-2" data-testid="client-quick-actions">
+            <span className="text-sm font-medium text-muted-foreground mr-1">Quick actions</span>
+            {canManageJobs && (
+              <Button size="sm" variant="outline" data-testid="button-schedule-appointment"
+                onClick={() => {
+                  const start = new Date(Date.now() + 86400000);
+                  start.setMinutes(0, 0, 0);
+                  const toLocal = (d: Date) =>
+                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                  setApptTitle(`${c.displayName} — site visit`);
+                  setApptStart(toLocal(start));
+                  setApptEnd(toLocal(new Date(start.getTime() + 3600000)));
+                  setApptOpen(true);
+                }}>
+                <Calendar className="h-4 w-4 mr-2" /> Schedule appointment
+              </Button>
+            )}
+            {canEstimate && (
+              <Button size="sm" variant="outline" data-testid="button-quick-estimate" onClick={() => setOpen(true)}>
+                <FileText className="h-4 w-4 mr-2" /> New estimate
+              </Button>
+            )}
+            {canManageJobs && (
+              <Button size="sm" variant="outline" data-testid="button-quick-pipeline" onClick={() => setProjOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Add to pipeline
+              </Button>
+            )}
+            {canTakePayment && (
+              <Button size="sm" data-testid="button-take-payment" onClick={() => setTakeOpen(true)}>
+                <CreditCard className="h-4 w-4 mr-2" /> Take a payment
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payments — see what this client owes and what they've paid, and take
+          a payment (online link or manual record) without leaving the page. */}
+      {canSeePrices && (() => {
+        const outstanding = (invoices ?? []).reduce((s, i) => s + (i.voidedAt ? 0 : invoiceDueCents(i)), 0);
+        const history = (payments ?? []).filter((p) => p.status !== "pending" || p.provider === "stripe");
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+              <SectionTitle
+                icon={CreditCard}
+                title="Payments"
+                description="Take a payment online (card/ACH link) or record cash, check or wire."
+                infoKey="client-payments"
+              />
+              {canTakePayment && (
+                <Button size="sm" data-testid="button-take-payment-section" onClick={() => setTakeOpen(true)}>
+                  <CreditCard className="h-4 w-4 mr-2" /> Take a payment
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Outstanding balance</span>{" "}
+                  <span className="font-semibold tabular-nums" data-testid="text-outstanding-balance">{money(outstanding)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Collected to date</span>{" "}
+                  <span className="font-semibold tabular-nums" data-testid="text-collected">
+                    {money((payments ?? []).filter((p) => p.status === "succeeded").reduce((s, p) => s + (p.amountCents ?? 0), 0))}
+                  </span>
+                </div>
+              </div>
+              {!history.length ? (
+                <EmptyState
+                  compact
+                  icon={CreditCard}
+                  title="No payments yet"
+                  description="Take a payment above — send the client a secure card/ACH link, or record a check you already have."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {history.slice(0, 25).map((p) => (
+                    <div key={p.id} className="rounded-lg border px-4 py-2.5 flex flex-wrap items-center justify-between gap-2"
+                      data-testid={`client-payment-${p.id}`}>
+                      <div>
+                        <div className="font-medium tabular-nums">
+                          {money(p.amountCents)}
+                          <span className="text-muted-foreground font-normal text-sm">
+                            {" "}· {p.method ?? p.provider} · {p.purpose}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {when(p.paidAt ?? p.createdAt)}{p.note ? ` · ${p.note}` : ""}
+                        </div>
+                      </div>
+                      <StatusPill tone={statusTone(p.status)}>{p.status}</StatusPill>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Schedule — this client's appointments, straight from the calendar. */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <SectionTitle
+            icon={Calendar}
+            title="Schedule"
+            description="Appointments for this client — they also land on the calendar."
+          />
+          {canManageJobs && (
+            <Button size="sm" variant="outline" data-testid="button-schedule-appointment-section"
+              onClick={() => {
+                const start = new Date(Date.now() + 86400000);
+                start.setMinutes(0, 0, 0);
+                const toLocal = (d: Date) =>
+                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                setApptTitle(`${c.displayName} — site visit`);
+                setApptStart(toLocal(start));
+                setApptEnd(toLocal(new Date(start.getTime() + 3600000)));
+                setApptOpen(true);
+              }}>
+              <Calendar className="h-4 w-4 mr-2" /> Schedule appointment
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {!appointments.length ? (
+            <EmptyState
+              compact
+              icon={Calendar}
+              title="Nothing scheduled"
+              description="Schedule an appointment or project start — it lands on the calendar and here."
+            />
+          ) : (
+            appointments.slice(0, 15).map((a: any) => (
+              <div key={a.id} className="rounded-lg border px-4 py-2.5 flex flex-wrap items-center justify-between gap-2"
+                data-testid={`appointment-${a.id}`}>
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{a.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {when(a.startsAt)}{a.endsAt ? ` – ${new Date(a.endsAt).toLocaleTimeString()}` : ""}
+                  </div>
+                </div>
+                <StatusPill tone={statusTone(a.status)}>{a.status}</StatusPill>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <SectionTitle
@@ -1172,6 +1406,53 @@ export default function CrmClientPage() {
         </CardContent>
       </Card>
 
+      {/* Messages — the client's portal thread, right on their page. */}
+      {canManageCustomers && (
+        <Card>
+          <CardHeader>
+            <SectionTitle
+              icon={MessageSquare}
+              title="Messages"
+              description="The client's thread — replies land in their email and their portal."
+            />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!thread?.messages?.length ? (
+              <EmptyState
+                compact
+                icon={MessageSquare}
+                title="No messages yet"
+                description="When the client writes from their portal, the thread shows up here."
+              />
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto" data-testid="client-message-thread">
+                {thread.messages.map((m: any) => (
+                  <div key={m.id} className={`rounded-lg border px-3 py-2 text-sm ${m.fromClient ? "" : "bg-accent/50"}`}
+                    data-testid={`message-${m.id}`}>
+                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{m.authorName}{m.fromClient ? " (client)" : ""}</span>
+                      <span>{when(m.createdAt)}</span>
+                    </div>
+                    <div className="mt-1 whitespace-pre-wrap">{m.body}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 items-start">
+              <Textarea rows={2} value={replyBody} onChange={(e) => setReplyBody(e.target.value)}
+                placeholder={`Message ${c.displayName}…`} className="flex-1"
+                data-testid="input-client-reply" />
+              <Button size="sm" onClick={() => sendReply.mutate()}
+                disabled={!replyBody.trim() || sendReply.isPending}
+                data-testid="button-client-reply">
+                {sendReply.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                Send
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Client 360 — the behaviour log + internal notes (self-contained mounts). */}
       <CustomerTimeline customerId={id!} />
       <CustomerNotes
@@ -1194,6 +1475,56 @@ export default function CrmClientPage() {
         <EstimateOptionsDialog estimate={optsFor} open={!!optsFor}
           onOpenChange={(o) => !o && setOptsFor(null)} />
       )}
+
+      {/* Take a payment — online checkout link or manual record. */}
+      <TakePaymentDialog
+        customerName={c.displayName}
+        invoices={invoices}
+        open={takeOpen}
+        onOpenChange={setTakeOpen}
+        onChanged={refresh}
+      />
+
+      {/* Schedule an appointment — lands on the calendar and this page. */}
+      <Dialog open={apptOpen} onOpenChange={setApptOpen}>
+        <DialogContent data-testid="dialog-schedule-appointment">
+          <DialogHeader>
+            <DialogTitle>Schedule — {c.displayName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="appt-title">Title</Label>
+              <Input id="appt-title" value={apptTitle} onChange={(e) => setApptTitle(e.target.value)}
+                placeholder="Site visit, measure, project start…" data-testid="input-appointment-title" />
+            </div>
+            <div className="grid gap-3 grid-cols-2">
+              <div>
+                <Label htmlFor="appt-start">Starts</Label>
+                <Input id="appt-start" type="datetime-local" value={apptStart}
+                  onChange={(e) => setApptStart(e.target.value)} data-testid="input-appointment-start" />
+              </div>
+              <div>
+                <Label htmlFor="appt-end">Ends</Label>
+                <Input id="appt-end" type="datetime-local" value={apptEnd}
+                  onChange={(e) => setApptEnd(e.target.value)} data-testid="input-appointment-end" />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="appt-notes">Notes (optional)</Label>
+              <Textarea id="appt-notes" rows={2} value={apptNotes} onChange={(e) => setApptNotes(e.target.value)}
+                placeholder="Gate code, dogs, bring samples…" data-testid="input-appointment-notes" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => scheduleAppt.mutate()}
+              disabled={!apptTitle.trim() || !apptStart || scheduleAppt.isPending}
+              data-testid="button-save-appointment">
+              {scheduleAppt.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Record an offline payment against an open invoice. */}
       <Dialog open={!!payFor} onOpenChange={(o) => !o && setPayFor(null)}>

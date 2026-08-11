@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -10,16 +14,30 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle, statusTone,
 } from "@/components/crm-ui";
+import { TakePaymentDialog } from "@/components/crm-take-payment";
 
 export default function CrmPaymentsPage() {
   const { toast } = useToast();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const { data, isLoading, isError } = useQuery<any>({ queryKey: ["/api/crm/payments/status"] });
   const canSeePrices = me?.permissions?.seePrices === true;
+  const canTakePayment = me?.permissions?.takePayment === true;
   const { data: payments, isError: paymentsError } = useQuery<any[]>({
     queryKey: ["/api/crm/payments"], retry: false, enabled: canSeePrices,
   });
   const canManage = me?.permissions?.manageIntegrations === true;
+
+  // ── Take a payment: pick a client, then record manual or send a link ──────
+  const { data: customers } = useQuery<any[]>({
+    queryKey: ["/api/crm/customers"], enabled: canTakePayment,
+  });
+  const [takeClientId, setTakeClientId] = useState("");
+  const [takeOpen, setTakeOpen] = useState(false);
+  const takeClient = (customers ?? []).find((c) => c.id === takeClientId) ?? null;
+  const { data: takeInvoices } = useQuery<any[]>({
+    queryKey: [`/api/crm/invoices?customerId=${takeClientId}`],
+    enabled: canTakePayment && !!takeClientId,
+  });
 
   const connect = useMutation({
     mutationFn: async () => (await apiRequest("GET", "/api/crm/payments/connect/stripe", undefined)).json(),
@@ -177,6 +195,55 @@ export default function CrmPaymentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {canTakePayment && (
+        <Card>
+          <CardHeader>
+            <SectionTitle
+              icon={CreditCard}
+              title="Take a payment"
+              description="Pick a client — send them a secure card/ACH link, or record cash, check or wire you already have."
+            />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Select value={takeClientId} onValueChange={setTakeClientId}>
+                <SelectTrigger className="flex-1 min-w-56" data-testid="select-take-client">
+                  <SelectValue placeholder="Select a client…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(customers ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id} data-testid={`take-client-${c.id}`}>
+                      {c.displayName}{c.email ? ` — ${c.email}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={() => setTakeOpen(true)} disabled={!takeClient}
+                data-testid="button-open-take-payment">
+                <CreditCard className="h-4 w-4 mr-2" /> Take a payment
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You can also take a payment straight from the client's page — their balance and
+              history live there too.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {takeClient && (
+        <TakePaymentDialog
+          customerName={takeClient.displayName}
+          invoices={takeInvoices}
+          open={takeOpen}
+          onOpenChange={setTakeOpen}
+          onChanged={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/crm/payments"] });
+            queryClient.invalidateQueries({ queryKey: [`/api/crm/invoices?customerId=${takeClientId}`] });
+          }}
+        />
+      )}
 
       <Card>
         <CardHeader>
