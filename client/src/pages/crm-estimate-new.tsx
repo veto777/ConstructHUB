@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
@@ -42,6 +43,9 @@ interface CartLine {
   /** Price-book item id (an item can appear once — re-tapping bumps qty). */
   key: string;
   name: string;
+  /** Work-scope / description text — prefilled from the price book, editable.
+   *  This is what the client reads on the estimate (public-estimate.tsx). */
+  description: string;
   unit: string | null;
   taxable: boolean;
   /** Raw text keeps typing natural ("2." stays put); numbers are derived. */
@@ -55,6 +59,7 @@ const lineNumbers = (l: CartLine) => ({
 });
 
 interface DoneState {
+  id?: string;
   sent: boolean;
   emailed: boolean;
   sentToEmail?: string | null;
@@ -126,6 +131,8 @@ export default function CrmEstimateNewPage() {
   const [itemQ, setItemQ] = useState("");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [addingId, setAddingId] = useState<string | null>(null);
+  /** Lines with their scope editor open (auto-opens when text exists). */
+  const [scopeOpen, setScopeOpen] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const t = setTimeout(() => setItemQ(itemInput.trim()), 250);
@@ -159,6 +166,9 @@ export default function CrmEstimateNewPage() {
       }
       setLines((ls) => [...ls, {
         key: item.id, name: item.name, unit: item.unit ?? null, taxable: item.taxable ?? true,
+        // The price book's scope text rides onto the estimate line — the whole
+        // point of writing it once in the price book.
+        description: item.description ?? "",
         qtyText: "1", priceText: ((priceCents ?? 0) / 100).toString(),
       }]);
     } catch (e: any) {
@@ -173,7 +183,15 @@ export default function CrmEstimateNewPage() {
 
   // ── Step 3: review + send ─────────────────────────────────────────────────
   const [title, setTitle] = useState("");
+  const [intro, setIntro] = useState("");
+  const [divisionId, setDivisionId] = useState<string>("");
   const [sending, setSending] = useState(false);
+
+  // Letterhead pick — only surfaces when the org actually runs divisions.
+  const { data: divisions } = useQuery<any[]>({
+    queryKey: ["/api/crm/divisions"],
+    enabled: step === 3,
+  });
 
   const submit = async (sendEmail: boolean) => {
     if (!customer || !lines.length) return;
@@ -182,11 +200,13 @@ export default function CrmEstimateNewPage() {
       const created = await (await apiRequest("POST", "/api/crm/estimates", {
         customerId: customer.id,
         title: title.trim() || "Estimate",
+        introText: intro.trim() || null,
+        divisionId: divisionId || null,
         // No taxRateBps — the server resolves sales tax from the client's address.
         items: lines.map((l, idx) => ({
           kind: "labor",
           name: l.name,
-          description: null,
+          description: l.description.trim() || null,
           unit: l.unit,
           taxable: l.taxable,
           hiddenFromClient: false,
@@ -198,12 +218,13 @@ export default function CrmEstimateNewPage() {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customer.id}`] });
 
       if (!sendEmail) {
-        setDone({ sent: false, emailed: false, number: created.number, totalCents: created.totalCents });
+        setDone({ id: created.id, sent: false, emailed: false, number: created.number, totalCents: created.totalCents });
         return;
       }
       try {
         const r = await (await apiRequest("POST", `/api/crm/estimates/${created.id}/send`, {})).json();
         setDone({
+          id: created.id,
           sent: true, emailed: !!r.emailed,
           sentToEmail: r.estimate?.sentToEmail ?? customer.email ?? null,
           number: r.estimate?.number ?? created.number,
@@ -220,6 +241,7 @@ export default function CrmEstimateNewPage() {
           if (det.publicPath) link = window.location.origin + det.publicPath;
         } catch { /* link is a nicety, not a blocker */ }
         setDone({
+          id: created.id,
           sent: false, emailed: false, number: created.number, totalCents: created.totalCents,
           link, error: apiErrorMessage(e),
         });
@@ -242,7 +264,8 @@ export default function CrmEstimateNewPage() {
 
   const reset = () => {
     setDone(null); setStep(1); setCustomer(null); setLines([]);
-    setQInput(""); setItemInput(""); setTitle(""); setShowNew(false); setDupes([]);
+    setQInput(""); setItemInput(""); setTitle(""); setIntro(""); setDivisionId("");
+    setShowNew(false); setDupes([]);
     setNc({ name: "", email: "", phone: "" });
   };
 
@@ -282,6 +305,13 @@ export default function CrmEstimateNewPage() {
               </Button>
             )}
             <div className="grid gap-2">
+              {done.id && (
+                <Link href={`/crm/estimates/${done.id}`}>
+                  <Button variant="outline" className="w-full h-12" data-testid="link-open-estimate">
+                    <FileText className="h-4 w-4 mr-2" /> Open this estimate
+                  </Button>
+                </Link>
+              )}
               <Button className="w-full h-12" onClick={reset} data-testid="button-new-another">
                 <Plus className="h-4 w-4 mr-2" /> New estimate
               </Button>
@@ -492,6 +522,28 @@ export default function CrmEstimateNewPage() {
                             {money(lineTotalCents(nums))}
                           </div>
                         </div>
+                        {/* Work scope — what the client reads. Prefilled from the
+                            price book; multi-line bullets survive verbatim. */}
+                        {l.description || scopeOpen.has(l.key) ? (
+                          <Textarea
+                            value={l.description}
+                            rows={3}
+                            onChange={(e) => setLine(l.key, { description: e.target.value })}
+                            placeholder="Scope of work — what's included, materials, warranty…"
+                            className="text-sm"
+                            data-testid={`input-scope-${l.key}`}
+                            aria-label={`Scope of work for ${l.name}`}
+                          />
+                        ) : (
+                          <Button
+                            variant="ghost" size="sm"
+                            className="h-9 text-muted-foreground"
+                            onClick={() => setScopeOpen((s) => new Set(s).add(l.key))}
+                            data-testid={`button-scope-${l.key}`}
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Scope &amp; details
+                          </Button>
+                        )}
                       </div>
                     );
                   })}
@@ -609,6 +661,38 @@ export default function CrmEstimateNewPage() {
                   data-testid="input-title"
                 />
               </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Message to the client
+                </div>
+                <Textarea
+                  value={intro}
+                  onChange={(e) => setIntro(e.target.value)}
+                  rows={3}
+                  placeholder="Thanks for having us out — here's the scope we discussed, what's included, and what it costs."
+                  className="text-base mt-1"
+                  data-testid="textarea-intro"
+                />
+              </div>
+              {(divisions ?? []).length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Division (letterhead)
+                  </div>
+                  <select
+                    value={divisionId}
+                    onChange={(e) => setDivisionId(e.target.value)}
+                    className="mt-1 h-12 w-full rounded-md border border-input bg-background px-3 text-base shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-testid="select-division"
+                    aria-label="Division"
+                  >
+                    <option value="">Auto — from the project</option>
+                    {divisions!.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}{d.code ? ` (${d.code})` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="text-sm">
                 <span className="text-muted-foreground">For </span>
                 <span className="font-medium">{customer.displayName}</span>
@@ -628,6 +712,11 @@ export default function CrmEstimateNewPage() {
                         <span className="text-muted-foreground">
                           {" "}· {milliToQty(nums.quantityMilli)}{l.unit ? ` ${l.unit}` : ""} × {money(nums.unitPriceCents)}
                         </span>
+                        {l.description && (
+                          <span className="block text-xs text-muted-foreground whitespace-pre-wrap mt-0.5">
+                            {l.description}
+                          </span>
+                        )}
                       </span>
                       <span className="tabular-nums font-medium shrink-0">{money(lineTotalCents(nums))}</span>
                     </div>

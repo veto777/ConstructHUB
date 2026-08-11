@@ -9,7 +9,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import {
-  FileText, ReceiptText, Loader2, Search, Trash2, type LucideIcon,
+  FileText, ReceiptText, Loader2, Search, Trash2, Pencil, type LucideIcon,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable,
@@ -375,7 +375,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                   <th className={cn(crmTable.th, "hidden sm:table-cell")}>Due</th>
                 )}
                 {cfg.hasDueColumn && <th className={crmTable.th}></th>}
-                {isOwner && <th className={crmTable.thRight} aria-label="Actions" />}
+                {(isOwner || kind === "estimates") && <th className={crmTable.thRight} aria-label="Actions" />}
               </tr>
             </thead>
             <tbody>
@@ -423,17 +423,35 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                       )}
                     </td>
                   )}
-                  {isOwner && (
-                    <td className={crmTable.tdRight}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        data-testid={`button-delete-doc-${r.id}`}
-                        aria-label={`Delete ${r.number ?? "document"}`}
-                        onClick={(e) => { e.stopPropagation(); setDelFor(r); }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                  {(isOwner || kind === "estimates") && (
+                    <td className={crmTable.tdRight} onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Estimates open their detail/edit page — edit scope
+                            text, resend, or (owner) delete from there. */}
+                        {kind === "estimates" && (
+                          <Link href={`/crm/estimates/${r.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid={`button-open-doc-${r.id}`}
+                              aria-label={`Open estimate ${r.number ?? ""}`}
+                            >
+                              <Pencil className="h-4 w-4 mr-1" /> Open
+                            </Button>
+                          </Link>
+                        )}
+                        {isOwner && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            data-testid={`button-delete-doc-${r.id}`}
+                            aria-label={`Delete ${r.number ?? "document"}`}
+                            onClick={() => setDelFor(r)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>

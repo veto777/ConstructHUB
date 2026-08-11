@@ -118,6 +118,7 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
   const money = ctx.permissions.seePrices;
   return {
     id: e.id, customerId: e.customerId, projectId: e.projectId, number: e.number,
+    divisionId: e.divisionId,
     title: e.title, status: e.status, introText: e.introText, termsText: e.termsText,
     subtotalCents: money ? e.subtotalCents : undefined,
     discountCents: money ? e.discountCents : undefined,
@@ -280,7 +281,8 @@ const jobSchema = z.object({
 const itemSchema = z.object({
   kind: z.enum(CRM_LINE_ITEM_KINDS as unknown as [string, ...string[]]).default("labor"),
   name: z.string().min(1).max(300),
-  description: z.string().max(4000).nullable().optional(),
+  // Long-form scope text — HCP-depth per-line verbiage, multi-line bullets.
+  description: z.string().max(8000).nullable().optional(),
   quantityMilli: z.number().int().min(0).max(100_000_000).default(1000),
   unit: z.string().max(20).nullable().optional(),
   unitPriceCents: z.number().int().min(0).max(1_000_000_00).default(0),
@@ -854,6 +856,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const schema = z.object({
       customerId: z.string().min(1),
       projectId: z.string().nullable().optional(),
+      // Explicit letterhead division (FL/WA). Null → resolved from the project.
+      divisionId: z.string().max(64).nullable().optional(),
       title: z.string().max(200).default("Estimate"),
       introText: z.string().max(8000).nullable().optional(),
       termsText: z.string().max(20000).nullable().optional(),
@@ -868,6 +872,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const [cust] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, d.customerId))).limit(1);
     if (!cust) return res.status(400).json({ message: "Customer not found in this organization" });
+    if (d.divisionId) {
+      const div = await getDivision(ctx.org.id, d.divisionId);
+      if (!div) return res.status(400).json({ message: "Division not found in this organization" });
+    }
 
     // Price-floor lock: non-owners may price above the floor, never below.
     const floorMsg = await priceFloorViolation(ctx, d.items);
@@ -878,6 +886,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
     const [est] = await db.insert(crmEstimates).values({
       orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
+      divisionId: d.divisionId ?? null,
       number: `E-${1000 + n + 1}`, title: d.title, introText: d.introText ?? null,
       termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
       taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,
@@ -953,6 +962,83 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     logActivity(ctx, "estimate.updated", {
       entityType: "estimate", entityId: e.id, customerId: e.customerId,
       meta: { number: e.number, fields: ["items"] },
+    });
+    res.json(presentEstimate(fresh ?? e, ctx));
+  });
+
+  /**
+   * Edit an estimate — title, intro/scope verbiage, terms, tax, deposit,
+   * division, project, status, and (wholesale) line items. Works after the
+   * estimate has been SENT: the client link always renders the current rows,
+   * and a re-send (portal.ts) mints a fresh expiry window. The one hard wall
+   * is a signed approval — an approved estimate is a contract (409, same as
+   * the items PUT). Totals are always recomputed server-side; client-supplied
+   * totals are ignored.
+   */
+  app.patch("/api/crm/estimates/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageEstimates");
+    if (!ctx) return;
+    const parsed = z.object({
+      title: z.string().min(1).max(200).optional(),
+      introText: z.string().max(8000).nullable().optional(),
+      termsText: z.string().max(20000).nullable().optional(),
+      taxRateBps: z.number().int().min(0).max(3000).optional(),
+      depositCents: z.number().int().min(0).nullable().optional(),
+      projectId: z.string().max(64).nullable().optional(),
+      divisionId: z.string().max(64).nullable().optional(),
+      // "approved" is never set here — approval is the client's signature.
+      status: z.enum(["draft", "sent", "viewed", "declined", "expired", "cancelled"]).optional(),
+      items: z.array(itemSchema).max(300).optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid estimate", issues: parsed.error.issues });
+    const d = parsed.data;
+
+    const [e] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!e) return res.status(404).json({ message: "Estimate not found" });
+    if (e.approvedAt) return res.status(409).json({ message: "This estimate has been approved and can no longer be edited." });
+
+    if (d.projectId) {
+      const [proj] = await db.select({ id: crmProjects.id }).from(crmProjects)
+        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, d.projectId))).limit(1);
+      if (!proj) return res.status(400).json({ message: "Project not found in this organization" });
+    }
+    if (d.divisionId) {
+      const div = await getDivision(ctx.org.id, d.divisionId);
+      if (!div) return res.status(400).json({ message: "Division not found in this organization" });
+    }
+    if (d.items) {
+      // Price-floor lock: non-owners may price above the floor, never below.
+      const floorMsg = await priceFloorViolation(ctx, d.items);
+      if (floorMsg) return res.status(422).json({ message: floorMsg });
+    }
+
+    const { items, ...fields } = d;
+    const patch: any = { updatedAt: new Date() };
+    for (const k of ["title", "introText", "termsText", "taxRateBps", "depositCents", "projectId", "divisionId", "status"] as const) {
+      if (fields[k] !== undefined) patch[k] = fields[k];
+    }
+    await db.update(crmEstimates).set(patch)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, e.id)));
+
+    if (items) {
+      await db.delete(crmEstimateItems)
+        .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, e.id)));
+      if (items.length) {
+        await db.insert(crmEstimateItems).values(
+          items.map((it, idx) => ({ ...it, orgId: ctx.org.id, estimateId: e.id, sortOrder: it.sortOrder ?? idx })) as any,
+        );
+      }
+    }
+
+    const fresh = await recalcEstimate(ctx.org.id, e.id);
+    const changed = [...Object.keys(patch).filter((k) => k !== "updatedAt"), ...(items ? ["items"] : [])];
+    await logEvent(ctx.org.id, e.id, "updated", ctx.member.id, req, {
+      fields: changed, afterSend: !!e.sentAt,
+    });
+    logActivity(ctx, "estimate.updated", {
+      entityType: "estimate", entityId: e.id, customerId: e.customerId,
+      meta: { number: e.number, fields: changed },
     });
     res.json(presentEstimate(fresh ?? e, ctx));
   });

@@ -759,7 +759,15 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     const [asm] = await db.insert(crmPbItems).values({
       orgId: ctx.org.id, categoryId: cat.id, code: "RR-ARCH-1L",
       name: "Re-roof, architectural, 1 layer tear-off",
-      description: "Tear off one layer, dispose, dry in, install architectural shingles.",
+      description:
+        "Complete tear-off and re-roof with architectural laminated shingles.\n" +
+        "• Tear off one layer of existing roofing and dispose\n" +
+        "• Inspect decking; report any damaged sheets before covering\n" +
+        "• Synthetic underlayment over the entire deck\n" +
+        "• Ice & water shield at eaves, valleys and penetrations\n" +
+        "• New drip edge at eaves and rakes\n" +
+        "• Magnetic nail sweep and full site cleanup\n" +
+        "Manufacturer's limited lifetime shingle warranty; workmanship warranty in writing.",
       unit: "sq", pricingMode: "computed", taxable: true, markupBps: 0,
     } as any).returning();
 
