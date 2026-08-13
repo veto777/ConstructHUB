@@ -13,7 +13,7 @@ import {
   MapPin, Phone, Building2, CheckCircle2, Star, TrendingUp,
   Clock, Eye, FileText, Globe, LayoutDashboard, GraduationCap,
   Grid3X3, ShieldAlert, Crosshair, Link2, Monitor, Briefcase,
-  Megaphone, UserPlus, Package,
+  Megaphone, Package,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 
@@ -462,20 +462,6 @@ export default function LandingPage() {
                     <span className="text-xl font-extrabold text-[#4A6CF7]">$7,500</span>
                   </div>
                   <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">Local SEO, Google Ads, LSA setup, citation building</p>
-                </div>
-              </div>
-            </Card>
-            <Card className="group bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] hover:border-border dark:hover:border-white/[0.12] p-6 transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm" data-testid="card-dfy-recruiting">
-              <div className="flex items-start gap-4">
-                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-pink-500/20 to-rose-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <UserPlus className="h-5 w-5 text-foreground dark:text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-lg font-semibold">Recruiting Support</h3>
-                    <span className="text-xl font-extrabold text-[#4A6CF7]">$9,500</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">Help hire sales reps, PMs, or admin staff</p>
                 </div>
               </div>
             </Card>

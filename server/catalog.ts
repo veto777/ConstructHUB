@@ -17,7 +17,6 @@ export const DFY_CATALOG: Record<string, CatalogItem> = {
   dfy_formation:       { name: "Business Formation & Filing",                          priceCents: 550000 },
   dfy_gmb_website:     { name: "GMB & Website Setup",                                   priceCents: 1500000 },
   dfy_seo_ads:         { name: "SEO & Ad Campaigns",                                    priceCents: 750000 },
-  dfy_recruiting:      { name: "Recruiting Support",                                    priceCents: 950000 },
   dfy_seo_first_page:  { name: "First Page SEO — 1-2 Keywords (6-Month)",              priceCents: 1800000 },
   dfy_seo_growth:      { name: "SEO Growth — Top 3 for 1-2 Keywords (6-Month)",        priceCents: 3600000 },
   dfy_seo_domination:  { name: "SEO Domination — Top 3 for 3-5 Keywords (6-Month)",    priceCents: 6000000 },

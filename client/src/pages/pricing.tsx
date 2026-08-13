@@ -9,7 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import {
   Check, Crown, Zap, Shield, Star, Loader2, ExternalLink,
   Search, Camera, BarChart3, Building2, Clock, Users,
-  Wrench, Globe, Megaphone, UserPlus, ArrowRight, Briefcase,
+  Wrench, Globe, Megaphone, ArrowRight, Briefcase,
   ShoppingCart, CheckCircle2, TrendingUp, X,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
@@ -490,23 +490,6 @@ export default function PricingPage() {
                   "Google Search Console & Analytics setup",
                 ],
               },
-              {
-                icon: UserPlus,
-                cartId: "dfy_recruiting",
-                title: "Recruiting Support",
-                price: "$9,500",
-                priceCents: 950000,
-                color: "border-orange-500/30 hover:border-orange-500/60",
-                iconBg: "bg-orange-500/10 text-orange-500",
-                features: [
-                  "Help recruit commission-only sales reps",
-                  "Project Manager sourcing ($45-75k range)",
-                  "Administrative / secretary hiring support",
-                  "Job posting creation & candidate screening",
-                  "Interview process setup & guidance",
-                  "Compensation structure recommendations",
-                ],
-              },
             ].map((service, i) => {
               const inCart = isInCart(service.cartId);
               return (
@@ -797,8 +780,8 @@ export default function PricingPage() {
                 <h3 className="text-2xl font-extrabold" data-testid="text-dfy-bundle-title">Complete Business Build</h3>
               </div>
               <p className="text-muted-foreground max-w-xl mx-auto mb-4">
-                Everything above in one package. We handle your entire business setup from formation to marketing — 
-                all paperwork, online presence, SEO, advertising, and recruiting. You focus on getting licensed and learning your trade.
+                Everything above in one package. We handle your entire business setup from formation to marketing —
+                all paperwork, online presence, SEO, and advertising. You focus on getting licensed and learning your trade.
               </p>
               <div className="flex items-center justify-center gap-4 mb-3">
                 <span className="text-xl font-bold text-muted-foreground line-through">$38,000+</span>
@@ -816,9 +799,6 @@ export default function PricingPage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-green-500" /> SEO & Ads
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-green-500" /> Recruiting
                 </div>
               </div>
               {isInCart("dfy_bundle") ? (
@@ -841,7 +821,7 @@ export default function PricingPage() {
                       type: "dfy_bundle",
                       name: "Complete Business Build",
                       price: 2999900,
-                      description: "Formation, GMB & Website, SEO & Ads, Recruiting — everything in one package",
+                      description: "Formation, GMB & Website, SEO & Ads — everything in one package",
                     });
                     toast({ title: "Added to cart", description: "Complete Business Build bundle has been added to your cart." });
                   }}
