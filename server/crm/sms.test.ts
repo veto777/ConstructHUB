@@ -265,17 +265,18 @@ describe("reminders + reengagement alerts against the dev server", () => {
     expect(t.status).toBe(503);
   });
 
-  it("reminder emails + texts the client and records who/when/channel — merged, never clobbered", async () => {
+  it("reminder emails the client; the TEXT leg is refused on the shared platform number (client texting is BYO-only)", async () => {
     const { est } = await makeSentEstimate();
 
     const r1 = await api(`/api/crm/estimates/${est.id}/remind`, { method: "POST", body: "{}" }, cookie);
     expect(r1.status).toBe(200);
     expect(r1.body.emailed).toBe(true);
-    expect(r1.body.texted).toBe(true);
-    // No carrier configured on the dev server → the recording log provider.
-    expect(r1.body.smsProvider).toBe("log");
+    // The dev org is on the shared platform number → client texts are refused
+    // with a clear reason; the email leg is unaffected.
+    expect(r1.body.texted).toBe(false);
+    expect(r1.body.smsError).toContain("Client texting needs your own number");
     expect(r1.body.reminders).toHaveLength(1);
-    expect(r1.body.reminders[0].channel).toBe("email+sms");
+    expect(r1.body.reminders[0].channel).toBe("email");
     expect(r1.body.reminders[0].by).toBeTruthy();
     expect(r1.body.reminders[0].at).toBeTruthy();
 
