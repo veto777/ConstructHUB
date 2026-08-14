@@ -74,7 +74,7 @@ export async function notifyMembers(args: {
         if (fallback) numbers.add(fallback);
       }
       for (const to of numbers) {
-        await sendSms(to, `${org.name}: ${args.title}`.slice(0, 320), org.customFields)
+        await sendSms(to, `${org.name}: ${args.title}`.slice(0, 320), org.customFields, org.id)
           .catch((e: any) => console.error("[crm] notification sms failed:", e?.message || e));
       }
     }
