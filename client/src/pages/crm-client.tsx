@@ -1204,12 +1204,18 @@ export default function CrmClientPage() {
                   {canEstimate && !e.approvedAt && !e.declinedAt && (
                     <EstimateDiscounts estimate={e} />
                   )}
-                  {canEstimate && !e.approvedAt && !e.declinedAt && smsStatus?.configured && c.phone && (
+                  {canEstimate && !e.approvedAt && !e.declinedAt && smsStatus?.configured && c.phone && smsStatus?.canTextClients !== false && (
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
                       data-testid={`toggle-send-sms-${e.id}`}>
                       <Checkbox checked={alsoText} onCheckedChange={(v) => setAlsoText(v === true)} />
                       Also text it
                     </label>
+                  )}
+                  {canEstimate && !e.approvedAt && !e.declinedAt && smsStatus?.canTextClients === false && c.phone && (
+                    <span className="text-xs text-muted-foreground" title="Connect your own number to text clients — Settings → Text messaging. Client texting needs your own carrier registration."
+                      data-testid={`note-send-sms-byo-${e.id}`}>
+                      Texting clients needs your own number (Settings → Text messaging)
+                    </span>
                   )}
                   {canEstimate && !e.approvedAt && !e.declinedAt && (
                     <Button size="sm" variant={e.sentAt ? "outline" : "default"}

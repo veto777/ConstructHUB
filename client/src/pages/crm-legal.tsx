@@ -185,7 +185,7 @@ export function CrmPrivacyPage() {
       <H>1. The short version</H>
       <ul className="list-disc pl-6 space-y-1 mb-4">
         <LI><strong>We do not sell your data.</strong> Not to advertisers, not to data brokers, not to anyone. Ever.</LI>
-        <LI><strong>We only contact you by email</strong> — never by phone, text or social media.</LI>
+        <LI><strong>Account-notification texts go only to account holders who opted in</strong> — we never send marketing texts, and we never share or sell SMS consent or phone numbers (see §5).</LI>
         <LI>Client data is visible only to the Contractor the Client is working with — never to other contractors, and never used for advertising.</LI>
         <LI>Payment card and bank details go to Stripe, not to us — we never see or store them.</LI>
         <LI>Your documents travel encrypted and sit behind multiple protection layers, including Cloudflare's network.</LI>
@@ -230,7 +230,41 @@ export function CrmPrivacyPage() {
         the whole list.
       </P>
 
-      <H>5. Security</H>
+      <H>5. SMS / Text Messaging</H>
+      <P>
+        <strong>What we send:</strong> ConstructHUB sends account-notification text messages (for
+        example: "your client opened your estimate", "a bid was signed", "a payment landed") to the
+        Contractor account holder who opted in, at the phone number on their profile. These are
+        transactional account notifications, not marketing. When a Contractor connects their own
+        registered phone number, texts to their Clients (such as an estimate link) come from the
+        Contractor's own number under the Contractor's own carrier registration — not from
+        ConstructHUB's shared number.
+      </P>
+      <P>
+        <strong>Consent — and what we never do with it:</strong> SMS opt-in is collected per account
+        holder with an explicit checkbox in Settings (timestamped and stored with the phone number).
+        {" "}<strong>We do not share or sell SMS opt-in data, consent records, or phone numbers to
+        any third party or affiliate for marketing purposes.</strong> Phone numbers and consent are
+        used solely to deliver the notifications the account holder asked for, through the carrier
+        provider that transmits the message.
+      </P>
+      <P>
+        <strong>Message frequency varies</strong> with account activity. <strong>Message and data
+        rates may apply.</strong> Carriers are not liable for delayed or undelivered messages.
+      </P>
+      <P>
+        <strong>Opt out any time:</strong> reply <strong>STOP</strong> to any text to unsubscribe —
+        the number goes on a suppression list and receives no further texts. Reply{" "}
+        <strong>START</strong> to resubscribe, or <strong>HELP</strong> for help (or email
+        support@constructhub.us). Opting out never affects email notifications or account access.
+      </P>
+      <P>
+        <strong>Voice calls:</strong> if a Contractor enables it, a short automated "your estimate
+        is in your email" call may be placed to a Client when an estimate is sent. Clients can ask
+        their Contractor to turn this off, or email us.
+      </P>
+
+      <H>6. Security</H>
       <P>
         Your data is protected by multiple layers: all traffic is encrypted in transit (HTTPS/TLS),
         the service sits behind Cloudflare's network with its DDoS and threat protections, documents
@@ -247,13 +281,13 @@ export function CrmPrivacyPage() {
         your inbox can open what's addressed to you.
       </P>
 
-      <H>6. Cookies and tracking</H>
+      <H>7. Cookies and tracking</H>
       <P>
         We use essential cookies only — the session cookie that keeps you signed in. No advertising
         cookies, no third-party trackers, no analytics that follow you around the web.
       </P>
 
-      <H>7. Retention and your rights</H>
+      <H>8. Retention and your rights</H>
       <P>
         We keep data as long as it's needed to run the service and preserve the legal record of
         documents and approvals (signed contracts and their audit trails are retained as evidence
@@ -265,13 +299,13 @@ export function CrmPrivacyPage() {
         and we will honor them.
       </P>
 
-      <H>8. Children</H>
+      <H>9. Children</H>
       <P>
         The service is for business use and is not directed to anyone under 18. We do not knowingly
         collect data from children.
       </P>
 
-      <H>9. Changes</H>
+      <H>10. Changes</H>
       <P>
         If this policy changes, the effective date above changes with it, and material changes will
         be announced by email — the only way we ever contact you.

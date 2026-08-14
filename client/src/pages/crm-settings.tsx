@@ -318,6 +318,28 @@ export default function CrmSettingsPage() {
     onError: (e: any) => toast({ title: "Could not save text alerts", description: String(e.message ?? e), variant: "destructive" }),
   });
 
+  // Voice "check your email" nudge on estimate send — calls need no carrier
+  // campaign, so this works on any sender, including the shared number.
+  const saveVoiceNudge = useMutation({
+    mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { voiceNudge: on })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      toast({ title: "Voice nudge saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // Explicit SMS consent (carrier-required): the timestamp lands on MY member
+  // record. Enabling any Text channel also stamps it server-side.
+  const saveSmsConsent = useMutation({
+    mutationFn: async (agree: boolean) => (await apiRequest("POST", "/api/crm/me/sms-consent", { agree })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      toast({ title: "Text consent saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save consent", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
   // The main (band) colour the accent pairs with — black or white.
   const saveThemeBase = useMutation({
     mutationFn: async (base: "black" | "white") =>
@@ -1092,6 +1114,27 @@ export default function CrmSettingsPage() {
           <p className="text-xs text-muted-foreground pt-3">
             Text alerts also need a text sender set up in the Text messaging card above.
           </p>
+          <div className="flex items-start gap-2 border-t mt-3 pt-3" data-testid="section-sms-consent">
+            <Checkbox
+              id="sms-consent"
+              checked={!!me?.member?.smsConsentAt}
+              onCheckedChange={(v) => saveSmsConsent.mutate(v === true)}
+              disabled={saveSmsConsent.isPending}
+              data-testid="checkbox-sms-consent"
+            />
+            <label htmlFor="sms-consent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+              I agree to receive account-notification texts from ConstructHUB at the phone number on my profile.
+              Message frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help.
+              We do not share or sell your SMS consent or phone number.
+              See the <a href="/crm-privacy" className="text-primary hover:underline">Privacy Policy</a>.
+              {me?.member?.smsConsentAt && (
+                <span className="block mt-1" data-testid="text-sms-consent-stamp">
+                  Consented {new Date(me.member.smsConsentAt).toLocaleString()}
+                  {me.member.smsConsentPhone ? ` — ${me.member.smsConsentPhone}` : ""}.
+                </span>
+              )}
+            </label>
+          </div>
         </CardContent>
       </Card>
 
@@ -1191,6 +1234,14 @@ export default function CrmSettingsPage() {
                   <div className="text-xs text-muted-foreground">
                     Reminder texts and re-engagement alerts send as real SMS.
                   </div>
+                  {smsStatus.canTextClients === false && (
+                    <div className="text-xs text-amber-600 dark:text-amber-400 mt-1" data-testid="text-sms-client-note">
+                      The shared number texts YOUR team only (bids signed, money landed, client re-opens).
+                      Texting CLIENTS needs your own number — pick "My own number" below. That number needs
+                      your own carrier registration (10DLC); carriers no longer allow a shared number to text
+                      on behalf of many businesses.
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -1291,12 +1342,35 @@ export default function CrmSettingsPage() {
                 When you send a bid, also text the client a link. You can still flip this per send;
                 clients without a mobile just get the email.
               </p>
+              {smsStatus?.canTextClients === false && (
+                <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="note-sms-estimates-byo">
+                  Connect your own number to text clients — "Which number your texts come from" above.
+                  Client texting needs your own carrier registration.
+                </p>
+              )}
             </div>
             <Switch
-              checked={(org?.customFields as any)?.smsEstimates === true}
+              checked={(org?.customFields as any)?.smsEstimates === true && smsStatus?.canTextClients !== false}
               onCheckedChange={(v) => saveSmsEstimates.mutate(v)}
-              disabled={saveSmsEstimates.isPending || !smsStatus?.configured}
+              disabled={saveSmsEstimates.isPending || !smsStatus?.configured || smsStatus?.canTextClients === false}
               data-testid="switch-sms-estimates"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 border-t pt-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Call the client to check their email</div>
+              <p className="text-xs text-muted-foreground">
+                When you send a bid, also ring the client's phone with a short "your estimate is in your
+                inbox (or spam folder)" message. Calls need no carrier registration — this works on any
+                sender, including the shared number.
+              </p>
+            </div>
+            <Switch
+              checked={(org?.customFields as any)?.voiceNudge === true}
+              onCheckedChange={(v) => saveVoiceNudge.mutate(v)}
+              disabled={saveVoiceNudge.isPending}
+              data-testid="switch-voice-nudge"
             />
           </div>
 
