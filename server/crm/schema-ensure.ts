@@ -489,8 +489,28 @@ export async function ensureCrmSchema(): Promise<void> {
     -- Per-customer follow-up cadence (weekly/biweekly "who do I call" list).
     ALTER TABLE crm_customers ADD COLUMN IF NOT EXISTS follow_up_cadence_days integer;
     ALTER TABLE crm_customers ADD COLUMN IF NOT EXISTS last_follow_up_at timestamp;
+    -- SMS consent (carrier compliance): when the member first agreed to
+    -- account-notification texts, and on which phone.
+    ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS sms_consent_at timestamp;
+    ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS sms_consent_phone text;
     CREATE INDEX IF NOT EXISTS crm_members_division_idx ON crm_members (division_id);
     CREATE INDEX IF NOT EXISTS crm_projects_division_idx ON crm_projects (division_id);
+  `);
+
+  // ── SMS opt-out suppression (STOP/START) ─────────────────────────────────
+  // Carrier-required: a STOP to any of our numbers suppresses that phone until
+  // START clears it. org_id '*' = the shared platform number (a STOP there
+  // opts the phone out platform-wide — the carrier sees one sender).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_sms_optouts (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      phone text NOT NULL,
+      reason text,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_sms_optouts_org_phone_idx
+      ON crm_sms_optouts (org_id, phone);
   `);
 
   // ── Optional discounts + sales tax by city ───────────────────────────────

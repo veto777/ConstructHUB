@@ -34,7 +34,8 @@ import { logEvent, presentEstimate, recalcEstimate } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
 import { recordActivity } from "./activity";
-import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault } from "./sms";
+import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
+import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
@@ -376,24 +377,44 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }).where(eq(crmEstimates.id, est.id)).returning();
 
     // Text the estimate link too, when the org (or this send) asked for it and
-    // the client actually has a mobile. Best-effort: a carrier hiccup never
-    // undoes a send that already happened.
+    // the client actually has a mobile. CLIENT texts require the org's OWN
+    // registered number/account (BYO/dedicated) — carriers banned the shared
+    // platform number texting on behalf of many businesses, so a platform-mode
+    // org gets a clear refusal, never a silent platform-number send.
+    // Best-effort: a carrier hiccup never undoes a send that already happened.
     const wantSms = parsed.data.sms ?? smsEstimatesDefault(ctx.org.customFields);
     let texted = false;
     let smsTo: string | null = null;
     let smsError: string | null = null;
     if (wantSms) {
-      smsTo = normalizePhone(cust.phone);
-      if (smsTo) {
-        const r = await sendSms(
-          smsTo,
-          `${branding.name}: your estimate${est.number ? ` ${est.number}` : ""} for ${money(est.totalCents)} is ready — ${link}`,
-          ctx.org.customFields,
-        );
-        texted = r.ok && r.provider !== "log";
-        smsError = r.error ?? (r.provider === "log" ? "texting is not configured" : null);
+      if (!orgCanTextClients(ctx.org.customFields)) {
+        smsError = CLIENT_TEXT_NEEDS_OWN_NUMBER;
       } else {
-        smsError = "this client has no mobile number";
+        smsTo = normalizePhone(cust.phone);
+        if (smsTo) {
+          const r = await sendSms(
+            smsTo,
+            `${branding.name}: your estimate${est.number ? ` ${est.number}` : ""} for ${money(est.totalCents)} is ready — ${link}`,
+            ctx.org.customFields,
+            ctx.org.id,
+          );
+          texted = r.ok && r.provider !== "log";
+          smsError = r.error ?? (r.provider === "log" ? "texting is not configured" : null);
+        } else {
+          smsError = "this client has no mobile number";
+        }
+      }
+    }
+
+    // Optional voice nudge (no carrier campaign needed for calls): ring the
+    // client asking them to check their email. Fire-and-forget — a failed
+    // call must never hold up or undo the send.
+    if (voiceNudgeOnEstimate(ctx.org.customFields)) {
+      const nudgeTo = normalizePhone(cust.phone);
+      if (nudgeTo) {
+        void placeEmailNudgeCall(nudgeTo, ctx.org)
+          .then((r) => { if (!r.ok) console.warn("[voice] email-nudge call failed:", r.error); })
+          .catch((e: any) => console.warn("[voice] email-nudge call failed:", e?.message || e));
       }
     }
 

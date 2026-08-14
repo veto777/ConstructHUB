@@ -25,7 +25,7 @@ import { crmCustomerNotes, crmCustomers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { sendWithFallback } from "../email";
-import { normalizePhone, sendSms, smsMissingEnv, resolveSmsSender } from "./sms";
+import { normalizePhone, sendSms, smsMissingEnv, resolveSmsSender, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -66,8 +66,10 @@ export async function deliverQuickMessage(args: {
   replyTo?: string;
   /** The org's custom_fields — picks ITS sender (own number / own account). */
   orgCustomFields?: unknown;
+  /** Known org — enables the STOP opt-out suppression check. */
+  orgId?: string;
 }): Promise<{ ok: boolean; provider: "email" | "signalwire" | "log"; error?: string }> {
-  const { channel, to, body, orgName, replyTo, orgCustomFields } = args;
+  const { channel, to, body, orgName, replyTo, orgCustomFields, orgId } = args;
   if (channel === "email") {
     await sendWithFallback({
       to,
@@ -80,7 +82,7 @@ export async function deliverQuickMessage(args: {
     } as any);
     return { ok: true, provider: "email" };
   }
-  const r = await sendSms(to, `${orgName}: ${body}`, orgCustomFields);
+  const r = await sendSms(to, `${orgName}: ${body}`, orgCustomFields, orgId);
   return { ok: r.ok, provider: r.provider, error: r.error ?? undefined };
 }
 
@@ -113,6 +115,12 @@ export function registerCrmMessageRoutes(app: Express, getDevUser: GetUser): voi
       }
       to = cust.email;
     } else {
+      // Client texting needs the org's OWN registered number/account — the
+      // shared platform number only texts the contractors themselves. The
+      // composer greys out Text the same way.
+      if (resolveSmsSender(ctx.org.customFields) && !orgCanTextClients(ctx.org.customFields)) {
+        return res.status(409).json({ message: CLIENT_TEXT_NEEDS_OWN_NUMBER });
+      }
       // Honest refusal, mirroring the composer's grayed-out Text option —
       // never a silent log-provider pretend for a manual send.
       if (!resolveSmsSender(ctx.org.customFields)) {
@@ -132,7 +140,7 @@ export function registerCrmMessageRoutes(app: Express, getDevUser: GetUser): voi
     try {
       result = await deliverQuickMessage({
         channel, to, body, orgName: ctx.org.name, replyTo: ctx.org.email || undefined,
-        orgCustomFields: ctx.org.customFields,
+        orgCustomFields: ctx.org.customFields, orgId: ctx.org.id,
       });
     } catch (e: any) {
       console.error("[crm] quick message failed:", e?.message || e);

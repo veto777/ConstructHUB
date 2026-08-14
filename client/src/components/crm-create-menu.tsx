@@ -328,7 +328,9 @@ function MessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
   const [body, setBody] = useState("");
 
   const { data: smsStatus } = useQuery<any>({ queryKey: ["/api/crm/sms/status"] });
-  const textingOn = smsStatus?.configured === true;
+  // Client texting needs the org's OWN registered number — the shared
+  // platform number only texts the team (contractor notifications).
+  const textingOn = smsStatus?.configured === true && smsStatus?.canTextClients !== false;
 
   const send = useMutation({
     mutationFn: async () =>
@@ -382,11 +384,24 @@ function MessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
               </div>
               {!textingOn && (
                 <p className="text-xs text-muted-foreground" data-testid="text-texting-off-hint">
-                  Texting is off — enable it in{" "}
-                  <Link href="/crm/settings" data-testid="link-enable-texting"
-                    className="text-primary hover:underline font-medium">
-                    Settings → Integrations
-                  </Link>
+                  {smsStatus?.configured && smsStatus?.canTextClients === false ? (
+                    <>
+                      Texting clients needs your own number — connect one in{" "}
+                      <Link href="/crm/settings" data-testid="link-enable-texting"
+                        className="text-primary hover:underline font-medium">
+                        Settings → Text messaging
+                      </Link>{" "}
+                      (your own carrier registration).
+                    </>
+                  ) : (
+                    <>
+                      Texting is off — enable it in{" "}
+                      <Link href="/crm/settings" data-testid="link-enable-texting"
+                        className="text-primary hover:underline font-medium">
+                        Settings → Integrations
+                      </Link>
+                    </>
+                  )}
                 </p>
               )}
               {channel === "email" && noEmail && (

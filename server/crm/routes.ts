@@ -109,6 +109,8 @@ const orgPatchSchema = z.object({
   smsAlerts: z.boolean().optional(),
   // Default for texting the estimate link when a bid is sent.
   smsEstimates: z.boolean().optional(),
+  // Voice "check your email" nudge: ring the client when an estimate is sent.
+  voiceNudge: z.boolean().optional(),
   // Org-default bid discount offers — auto-applied to every estimate on send
   // (per-estimate Discounts dialog can still adjust). Merged into
   // custom_fields as discountDefaults.
@@ -203,6 +205,8 @@ function presentMember(m: typeof crmMembers.$inferSelect, canSeeCosts: boolean) 
     hourlyCostCents: canSeeCosts ? m.hourlyCostCents : undefined,
     permissions: m.permissions ?? null,
     effectivePermissions: crmEffectivePermissions(m.role, m.permissions),
+    smsConsentAt: m.smsConsentAt,
+    smsConsentPhone: m.smsConsentPhone,
     lastActiveAt: m.lastActiveAt,
     createdAt: m.createdAt,
   };
@@ -333,9 +337,16 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const parsed = profilePatchSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid profile", issues: parsed.error.issues });
 
+    // Providing an alert phone doubles as SMS consent (first time only): the
+    // profile form shows the disclosure next to the field.
+    const consentStamp =
+      parsed.data.phone && !ctx.member.smsConsentAt
+        ? { smsConsentAt: new Date(), smsConsentPhone: parsed.data.phone }
+        : {};
+
     const [row] = await db
       .update(crmMembers)
-      .set({ ...parsed.data, updatedAt: new Date() })
+      .set({ ...parsed.data, ...consentStamp, updatedAt: new Date() })
       .where(eq(crmMembers.id, ctx.member.id))
       .returning();
 
@@ -354,6 +365,42 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         meta: { fields: Object.keys(parsed.data), name: ctx.member.displayName || ctx.member.email },
       });
     }
+    res.json(presentMember(row, ctx.permissions.seeCosts));
+  });
+
+  /**
+   * Explicit SMS opt-in (carrier-required consent record). The Settings →
+   * Notifications disclosure checkbox calls this; enabling any Text channel
+   * without it also stamps consent (the toggle is the affirmative act).
+   * agree:false withdraws consent and turns the record off.
+   */
+  app.post("/api/crm/me/sms-consent", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+
+    const parsed = z.object({ agree: z.boolean() }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid consent", issues: parsed.error.issues });
+
+    const [row] = await db
+      .update(crmMembers)
+      .set(
+        parsed.data.agree
+          ? {
+              smsConsentAt: ctx.member.smsConsentAt ?? new Date(),
+              smsConsentPhone: ctx.member.phone ?? null,
+              updatedAt: new Date(),
+            }
+          : { smsConsentAt: null, smsConsentPhone: null, updatedAt: new Date() },
+      )
+      .where(eq(crmMembers.id, ctx.member.id))
+      .returning();
+
+    logActivity(ctx, "member.updated", {
+      entityType: "member", entityId: ctx.member.id,
+      meta: { fields: ["smsConsent"], name: ctx.member.displayName || ctx.member.email },
+    });
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 
@@ -487,9 +534,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, discountDefaults, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || discountDefaults !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -513,6 +560,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
             }
             if (smsAlerts !== undefined) base.smsAlerts = smsAlerts;
             if (smsEstimates !== undefined) base.smsEstimates = smsEstimates;
+            if (voiceNudge !== undefined) base.voiceNudge = voiceNudge;
             if (discountDefaults !== undefined) base.discountDefaults = discountDefaults;
             return base;
           })()
@@ -526,6 +574,21 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       })
       .where(eq(crmOrgs.id, ctx.org.id))
       .returning();
+
+    // SMS consent: flipping any notification's Text channel ON is the
+    // member's affirmative opt-in — stamp it (first time only) with the phone
+    // on their profile. The Settings UI also shows the explicit disclosure.
+    if (notificationPrefs && !ctx.member.smsConsentAt) {
+      const enablesSms = Object.values(notificationPrefs).some(
+        (v) => typeof v === "object" && v !== null && (v as Record<string, unknown>).sms === true,
+      );
+      if (enablesSms) {
+        await db.update(crmMembers)
+          .set({ smsConsentAt: new Date(), smsConsentPhone: ctx.member.phone ?? null, updatedAt: new Date() })
+          .where(eq(crmMembers.id, ctx.member.id));
+      }
+    }
+
     res.json(presentOrg(row));
   });
 
@@ -827,6 +890,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
           to,
           `${ctx.org.name} invited you to their team on ConstructHub CRM: ${link}`,
           ctx.org.customFields,
+          ctx.org.id,
         );
         texted = r.ok && r.provider !== "log";
         smsError = r.error ?? (r.provider === "log" ? "texting is not configured" : null);

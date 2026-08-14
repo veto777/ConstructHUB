@@ -17,16 +17,17 @@ import type { Express } from "express";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import {
   crmCustomers, crmEstimates, crmMembers, crmOrgs, crmProjects,
   crmEngagementSessions, crmNotificationEnabled,
   crmNotificationChannel,
   crmNotifications,
+  crmSmsOptouts,
   type CrmNotificationPref,
 } from "@shared/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
@@ -62,6 +63,11 @@ export function smsStatus(orgCustomFields?: unknown) {
     provider: sender ? "signalwire" : null,
     mode: sender?.mode ?? orgSmsConfig(orgCustomFields).mode,
     fromNumber: sender?.from ?? null,
+    /** False on the shared platform number: carriers banned one platform
+     *  texting on behalf of many businesses, so CLIENT-facing texts need the
+     *  org's own registered number/account. Contractor-facing notifications
+     *  (a brand texting its own users) stay allowed either way. */
+    canTextClients: orgCanTextClients(orgCustomFields),
   };
 }
 
@@ -168,6 +174,45 @@ export function resolveSmsSender(customFields: unknown): SmsSender | null {
   return platform ? { ...platform, mode: "platform" } : null;
 }
 
+/** Client/homeowner texting is only allowed when the org brought its OWN
+ *  registered number/account — never on the shared platform number. */
+export function orgCanTextClients(customFields: unknown): boolean {
+  const s = resolveSmsSender(customFields);
+  return !!s && s.mode !== "platform";
+}
+
+/** The refusal reason the API returns (and the UI shows) when a platform-mode
+ *  org tries to text a client. */
+export const CLIENT_TEXT_NEEDS_OWN_NUMBER =
+  "Client texting needs your own number — connect one in Settings → Text messaging";
+
+// ── Opt-out suppression (carrier-required STOP/START) ───────────────────────
+
+/** True while (orgId, phone) — or the platform-wide ('*', phone) — row exists. */
+export async function isSmsOptedOut(orgId: string, phone: string): Promise<boolean> {
+  const p = normalizePhone(phone);
+  if (!p) return false;
+  const [row] = await db.select({ id: crmSmsOptouts.id }).from(crmSmsOptouts)
+    .where(and(inArray(crmSmsOptouts.orgId, [orgId, "*"]), eq(crmSmsOptouts.phone, p)))
+    .limit(1);
+  return !!row;
+}
+
+/** Record an opt-out. Idempotent via the (org_id, phone) unique index. */
+export async function recordSmsOptout(orgId: string, phone: string, reason: string): Promise<void> {
+  const p = normalizePhone(phone);
+  if (!p) return;
+  await db.insert(crmSmsOptouts).values({ orgId, phone: p, reason })
+    .onConflictDoNothing({ target: [crmSmsOptouts.orgId, crmSmsOptouts.phone] });
+}
+
+/** START: every row for this phone comes off — the number may be texted again. */
+export async function clearSmsOptout(phone: string): Promise<void> {
+  const p = normalizePhone(phone);
+  if (!p) return;
+  await db.delete(crmSmsOptouts).where(eq(crmSmsOptouts.phone, p));
+}
+
 // ── The provider seam ───────────────────────────────────────────────────────
 
 export type SmsResult = {
@@ -228,13 +273,34 @@ async function signalwireSend(to: string, body: string, sender: SmsSender): Prom
  * when nothing can send — check `result.provider` before telling a user a
  * text "went out". Pass the org's customFields to use ITS sender (own number
  * or own account); omit them for platform-level sends.
+ *
+ * Pass orgId whenever the org is known: a number on the opt-out list (STOP)
+ * is SKIPPED and reported (`ok:false`, error names the opt-out) — never
+ * thrown, never sent. A DB hiccup during the check fails OPEN (logged) so a
+ * wobbly database can't take down notifications.
  */
 export async function sendSms(
   to: string,
   body: string,
   orgCustomFields?: unknown,
+  orgId?: string,
 ): Promise<SmsResult> {
   const sender = resolveSmsSender(orgCustomFields);
+  if (orgId) {
+    try {
+      if (await isSmsOptedOut(orgId, to)) {
+        console.log(`[sms] suppressed — ${to} opted out (STOP) for org ${orgId}`);
+        return {
+          ok: false,
+          provider: sender ? "signalwire" : "log",
+          sid: null,
+          error: "Recipient replied STOP — opted out of texts, not sent.",
+        };
+      }
+    } catch (e: any) {
+      console.error("[sms] opt-out check failed (sending anyway):", e?.message || e);
+    }
+  }
   if (!sender) return logProviderSend(to, body);
   return signalwireSend(to, body, sender);
 }
@@ -339,6 +405,7 @@ export async function maybeAlertReengagement(args: {
       smsTo,
       `${cust.displayName} is reviewing ${estLabel}${total ? ` (${total})` : ""} again — good time to call. ${clientLink}`,
       org.customFields,
+      org.id,
     );
   }
 
@@ -379,9 +446,90 @@ export async function priorEstimateSessionCount(estimateId: string): Promise<num
   return n;
 }
 
+// ── Inbound webhook (carrier-required STOP / HELP / START) ─────────────────
+
+const SMS_STOP_WORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
+const SMS_HELP_WORDS = new Set(["help", "info"]);
+const SMS_START_WORDS = new Set(["start", "unstop", "yes"]);
+
+/** LaML (Twilio-shaped) reply document. No message = an empty <Response/>. */
+export function smsLamlReply(message?: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${message ? `<Message>${esc(message)}</Message>` : ""}</Response>`;
+}
+
+/**
+ * Best-effort carrier-webhook verification. SignalWire signs like Twilio:
+ * HMAC-SHA1 of url + concatenated sorted POST params, base64, with the API
+ * token as the key. A signature that is PRESENT and wrong is rejected — but
+ * an unsigned request is still processed, because an inbound STOP must never
+ * be dropped (and dev has no token to verify against anyway).
+ */
+export function signalwireSignatureOk(req: any): boolean {
+  const sig = req.headers?.["x-signalwire-signature"] ?? req.headers?.["x-twilio-signature"];
+  if (!sig) return true;
+  const token = process.env.SIGNALWIRE_API_TOKEN;
+  if (!token) return true;
+  const body = (req.body ?? {}) as Record<string, string>;
+  const data = Object.keys(body).sort().map((k) => `${k}${body[k]}`).join("");
+  const expected = createHmac("sha1", token).update(`${getBaseUrl(req)}${req.originalUrl}${data}`).digest("base64");
+  try {
+    return timingSafeEqual(Buffer.from(String(sig)), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
 // ── Routes ──────────────────────────────────────────────────────────────────
 
 export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
+  /**
+   * PUBLIC carrier webhook — SignalWire/Twilio LaML shape (form-encoded
+   * From/To/Body). Handles the mandatory opt-out keywords and answers with
+   * LaML XML. No auth: the carrier calls this, not a signed-in user.
+   */
+  app.post("/api/crm/sms/inbound", async (req: any, res) => {
+    if (!signalwireSignatureOk(req)) return res.status(403).json({ message: "Bad webhook signature" });
+    res.type("text/xml");
+
+    const from = normalizePhone(req.body?.From);
+    if (!from) return res.send(smsLamlReply());
+    const keyword = String(req.body?.Body ?? "").trim().toLowerCase();
+
+    if (SMS_STOP_WORDS.has(keyword)) {
+      // Opt the phone out everywhere it is reachable: every org with a member
+      // (or org main line) on that number, plus the '*' platform-wide row —
+      // the shared number is ONE sender in the carriers' eyes, so a STOP to
+      // it suppresses the phone for every org. A persistence failure still
+      // gets the unsubscribe reply: the carrier contract is the reply.
+      const digits = from.replace(/\D/g, "").slice(-10);
+      try {
+        const orgIds = new Set<string>(["*"]);
+        const memberOrgs = await db.selectDistinct({ orgId: crmMembers.orgId }).from(crmMembers)
+          .where(sql`regexp_replace(coalesce(${crmMembers.phone}, ''), '[^0-9]', '', 'g') like ${"%" + digits}`);
+        memberOrgs.forEach((r) => orgIds.add(r.orgId));
+        const orgRows = await db.select({ id: crmOrgs.id }).from(crmOrgs)
+          .where(sql`regexp_replace(coalesce(${crmOrgs.phone}, ''), '[^0-9]', '', 'g') like ${"%" + digits}`);
+        orgRows.forEach((r) => orgIds.add(r.id));
+        for (const orgId of orgIds) await recordSmsOptout(orgId, from, keyword.toUpperCase());
+      } catch (e: any) {
+        console.error("[sms] inbound STOP persistence failed:", e?.message || e);
+      }
+      return res.send(smsLamlReply("You're unsubscribed and won't get more texts. Reply START to resume."));
+    }
+
+    if (SMS_START_WORDS.has(keyword)) {
+      await clearSmsOptout(from)
+        .catch((e: any) => console.error("[sms] inbound START failed:", e?.message || e));
+      return res.send(smsLamlReply("You're resubscribed."));
+    }
+
+    if (SMS_HELP_WORDS.has(keyword)) {
+      return res.send(smsLamlReply("ConstructHub alerts. Help: support@constructhub.us. Reply STOP to opt out."));
+    }
+
+    return res.send(smsLamlReply());
+  });
+
   /** Settings card: configured/not-configured, naming the missing env vars. */
   app.get("/api/crm/sms/status", async (req: any, res) => {
     const user = getDevUser(req, res);
@@ -472,7 +620,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     const to = normalizePhone(parsed.data.to);
     if (!to) return res.status(400).json({ message: "That doesn't look like a phone number." });
 
-    const result = await sendSms(to, parsed.data.body?.trim() || `Test text from ${ctx.org.name} — SMS is working.`, ctx.org.customFields);
+    const result = await sendSms(to, parsed.data.body?.trim() || `Test text from ${ctx.org.name} — SMS is working.`, ctx.org.customFields, ctx.org.id);
     if (!result.ok) return res.status(502).json({ message: `SignalWire rejected the text: ${result.error}` });
     res.json({ ok: true, provider: result.provider, sid: result.sid, to });
   });
@@ -539,20 +687,27 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
       }
     }
 
-    // Text — only when the client has a usable phone. `provider` says whether
-    // it really went out (signalwire) or was recorded (log, unconfigured dev).
+    // Text — only when the client has a usable phone AND the org may text
+    // clients at all (own registered number/account — never the shared
+    // platform number). `provider` says whether it really went out
+    // (signalwire) or was recorded (log, unconfigured dev).
     let texted = false;
     let smsProvider: SmsResult["provider"] | null = null;
     let smsError: string | null = null;
     if (phone) {
-      const r = await sendSms(
-        phone,
-        `${ctx.org.name}: reminder — ${estLabel}${total ? ` for ${total}` : ""} is waiting: ${link}`,
-        ctx.org.customFields,
-      );
-      texted = r.ok;
-      smsProvider = r.provider;
-      smsError = r.error ?? null;
+      if (!orgCanTextClients(ctx.org.customFields)) {
+        smsError = CLIENT_TEXT_NEEDS_OWN_NUMBER;
+      } else {
+        const r = await sendSms(
+          phone,
+          `${ctx.org.name}: reminder — ${estLabel}${total ? ` for ${total}` : ""} is waiting: ${link}`,
+          ctx.org.customFields,
+          ctx.org.id,
+        );
+        texted = r.ok;
+        smsProvider = r.provider;
+        smsError = r.error ?? null;
+      }
     }
 
     // Record who/when/channel — append into custom_fields->'reminders'.
@@ -626,7 +781,7 @@ export async function textOrgOwners(
     if (fallback) numbers.add(fallback);
   }
   for (const to of numbers) {
-    await sendSms(to, body, org.customFields).catch((e: any) =>
+    await sendSms(to, body, org.customFields, org.id).catch((e: any) =>
       console.error("[crm] owner text alert failed:", e?.message || e));
   }
 }

@@ -1059,6 +1059,11 @@ export const crmMembers = pgTable("crm_members", {
   divisionId: varchar("division_id"),
   // Sparse overrides on top of the role defaults; see CRM_PERMISSIONS.
   permissions: jsonb("permissions"),
+  // SMS consent (carrier compliance): when this member first agreed to receive
+  // account-notification texts, and the phone they consented on. Null = never
+  // consented — the SMS channel switches stay off until they do.
+  smsConsentAt: timestamp("sms_consent_at"),
+  smsConsentPhone: text("sms_consent_phone"),
   lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1434,6 +1439,22 @@ export const crmNotifications = pgTable("crm_notifications", {
   body: text("body"),
   link: text("link"),
   readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/**
+ * SMS opt-out suppression (carrier-required STOP handling). One row per
+ * (orgId, normalized phone): while it exists, no text is sent to that number
+ * for that org. org_id '*' is the platform-wide row — a STOP texted to the
+ * shared ConstructHUB number opts the phone out of the shared number for
+ * every org, because carriers treat the shared number as one sender.
+ * START removes the rows again.
+ */
+export const crmSmsOptouts = pgTable("crm_sms_optouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  phone: text("phone").notNull(),       // normalized E.164
+  reason: text("reason"),               // e.g. "STOP", "START (removed)" is a delete instead
   createdAt: timestamp("created_at").defaultNow(),
 });
 
