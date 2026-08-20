@@ -1185,6 +1185,16 @@ export default function CrmClientPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Edit verbiage / add work scopes — opens the full editor.
+                      Available on drafts AND sent estimates (the client link
+                      reflects edits immediately); hidden once signed/approved. */}
+                  {canEstimate && !e.approvedAt && (
+                    <Button size="sm" variant="ghost"
+                      onClick={() => setLocation(`/crm/estimates/${e.id}?edit=1`)}
+                      data-testid={`button-edit-estimate-${e.id}`}>
+                      <Pencil className="h-4 w-4 mr-2" /> Edit
+                    </Button>
+                  )}
                   {canEstimate && (
                     <Button size="sm" variant="ghost"
                       onClick={() => preview.mutate(e.id)} disabled={preview.isPending}

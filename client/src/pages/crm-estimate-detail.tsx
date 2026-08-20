@@ -205,9 +205,11 @@ export default function CrmEstimateDetailPage() {
   const setLine = (idx: number, patch: Partial<EditLine>) =>
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
 
-  // Auto-enter edit mode for a fresh draft (?edit=1 from the builder).
+  // Auto-enter edit mode on ?edit=1 — a fresh draft from the builder OR the
+  // "Edit" button on a client's page. Sent estimates are editable too (only a
+  // signed/approved estimate is locked), so this no longer excludes sent ones.
   useEffect(() => {
-    if (e && !editing && !e.sentAt && !locked && canEdit &&
+    if (e && !editing && !locked && canEdit &&
         new URLSearchParams(window.location.search).get("edit") === "1") {
       startEdit();
     }
