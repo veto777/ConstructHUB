@@ -1188,7 +1188,7 @@ export default function CrmClientPage() {
                   {/* Edit verbiage / add work scopes — opens the full editor.
                       Available on drafts AND sent estimates (the client link
                       reflects edits immediately); hidden once signed/approved. */}
-                  {canEstimate && !e.approvedAt && (
+                  {canEstimate && canSeePrices && !e.approvedAt && (
                     <Button size="sm" variant="ghost"
                       onClick={() => setLocation(`/crm/estimates/${e.id}?edit=1`)}
                       data-testid={`button-edit-estimate-${e.id}`}>
