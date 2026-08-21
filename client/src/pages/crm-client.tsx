@@ -472,6 +472,11 @@ export default function CrmClientPage() {
     queryClient.invalidateQueries({ queryKey: [`/api/crm/payments?customerId=${id}`] });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/appointments"] });
     queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
+    // Sibling surfaces the client page also writes to (staleTime is Infinity,
+    // so only explicit invalidation ever refreshes them): the schedule page's
+    // agenda view and the org-wide Payments page.
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/schedule"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/payments"] });
   };
 
   // ── Schedule an appointment (lands on the calendar + this page) ──────────
@@ -532,7 +537,12 @@ export default function CrmClientPage() {
     onSuccess: () => {
       setProjOpen(false); setProjName("");
       refresh();
-      toast({ title: "Project created" });
+      // staleTime is Infinity: without this the pipeline board (and the home
+      // page's pipeline rollup) keep showing the pre-create cache for the rest
+      // of the session — the exact "Add to pipeline did nothing" report.
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      toast({ title: "Project created", description: "It's in the Lead column on the pipeline." });
     },
     onError: (e: any) => toast({ title: "Could not create project", description: apiErrorMessage(e), variant: "destructive" }),
   });

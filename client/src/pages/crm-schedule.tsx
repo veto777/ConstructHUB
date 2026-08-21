@@ -77,7 +77,7 @@ function weekStart(d: Date): Date {
 // ── Appointment create/edit dialog ──────────────────────────────────────────
 
 function AppointmentForm({
-  initial, defaultDate, members, projects, customers, onClose,
+  initial, defaultDate, members, projects, customers, onClose, onCreated,
 }: {
   initial: Appointment | null;
   defaultDate: Date | null;
@@ -85,6 +85,9 @@ function AppointmentForm({
   projects: any[];
   customers: any[];
   onClose: () => void;
+  /** Fired after a successful CREATE with the new row, so the calendar can
+   *  make sure the visit is actually on screen. */
+  onCreated?: (a: Appointment) => void;
 }) {
   const { toast } = useToast();
   const start = initial ? new Date(initial.startsAt) : (defaultDate ?? new Date());
@@ -120,6 +123,7 @@ function AppointmentForm({
           : undefined,
         variant: conflicts ? "destructive" : "default",
       });
+      if (!initial && data?.appointment) onCreated?.(data.appointment);
       onClose();
     },
     onError: (e: any) => toast({
@@ -351,6 +355,20 @@ export default function CrmSchedulePage() {
     setEditing(a);
     setDefaultDate(null);
     setDialogOpen(true);
+  };
+
+  // After a CREATE the new visit must be on screen: bring the calendar to its
+  // date (the dialog accepts any date, even one outside the visible window),
+  // and when the day is crowded — a month cell shows only 3 chips + "+N more" —
+  // jump to the week, exactly what tapping "+N more" does. Without this a
+  // just-added visit on a busy day vanishes behind the collapse ("I added it
+  // and it just disappeared").
+  const onCreated = (a: Appointment) => {
+    const d = new Date(a.startsAt);
+    const items = [...(byDay.get(isoDay(d)) ?? []).filter((x) => x.id !== a.id), a]
+      .sort((x, y) => +new Date(x.startsAt) - +new Date(y.startsAt));
+    setCursor(d);
+    if (view === "month" && items.findIndex((x) => x.id === a.id) > 2) setView("week");
   };
 
   const shift = (dir: -1 | 1) => {
@@ -645,6 +663,7 @@ export default function CrmSchedulePage() {
             projects={projectsData?.projects ?? []}
             customers={customers ?? []}
             onClose={() => setDialogOpen(false)}
+            onCreated={onCreated}
           />
         </DialogContent>
       </Dialog>
