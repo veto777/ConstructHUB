@@ -1491,7 +1491,7 @@ export default function CrmClientPage() {
       <CustomerMeasurements customerId={id!} />
 
       {/* Client portal v2 — photos/comments from this client + the org pamphlet shelf. */}
-      <CustomerPhotos customerId={id!} />
+      <CustomerPhotos customerId={id!} canUpload={me?.permissions?.manageJobs === true || me?.permissions?.manageCustomers === true} />
       <CustomerComments customerId={id!} />
       <OrgPamphlets />
 

@@ -356,36 +356,122 @@ export function EstimateAttach({ estimateId, canManage }: { estimateId: string; 
 
 /* ── Contractor: photos the client shared (client detail strip) ──────────── */
 
-export function CustomerPhotos({ customerId }: { customerId: string }) {
-  const { data: photos } = useQuery<any[]>({
-    queryKey: [`/api/crm/attachments?kind=photo&refId=${customerId}`],
+/** Stage tag rides in the stored file name ("progress--x.jpg" / "finished--x.jpg"). */
+function photoStage(fileName: string): "progress" | "finished" | null {
+  if (fileName.startsWith("progress--")) return "progress";
+  if (fileName.startsWith("finished--")) return "finished";
+  return null;
+}
+
+export function CustomerPhotos({ customerId, canUpload = false }: { customerId: string; canUpload?: boolean }) {
+  const { toast } = useToast();
+  const qk = [`/api/crm/attachments?kind=photo&refId=${customerId}`];
+  const { data: photos } = useQuery<any[]>({ queryKey: qk });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [stage, setStage] = useState<"progress" | "finished">("progress");
+  const [busy, setBusy] = useState(false);
+
+  const uploadFiles = async (files: FileList) => {
+    setBusy(true);
+    let ok = 0, failed = 0;
+    for (const f of Array.from(files).slice(0, 20)) {
+      try {
+        const fd = new FormData();
+        fd.append("kind", "photo");
+        fd.append("refId", customerId);
+        fd.append("stage", stage);
+        fd.append("file", f);
+        const r = await fetch("/api/crm/attachments", { method: "POST", body: fd, credentials: "same-origin" });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || `Upload failed (${r.status})`);
+        ok++;
+      } catch { failed++; }
+    }
+    setBusy(false);
+    queryClient.invalidateQueries({ queryKey: qk });
+    toast(failed
+      ? { title: `${ok} uploaded, ${failed} failed`, variant: "destructive" }
+      : { title: `${ok} photo${ok === 1 ? "" : "s"} added`, description: "The client can see them in their portal too." });
+  };
+
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/crm/attachments/${id}`, { method: "DELETE", credentials: "same-origin" });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Failed");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onError: (e: any) => toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   return (
     <Card data-testid="section-customer-photos">
       <CardHeader>
-        <SectionTitle
-          icon={Camera}
-          title="Photos from the client"
-          description="Job photos this client shared from their portal."
-        />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <SectionTitle
+            icon={Camera}
+            title="Project Photos"
+            description="In-progress and finished shots from your crew, photos the client shared, and HOVER captures — all in one place. The client sees these in their portal."
+          />
+          {canUpload && (
+            <div className="flex items-center gap-2 shrink-0">
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={stage}
+                onChange={(e) => setStage(e.target.value as any)}
+                data-testid="select-photo-stage"
+              >
+                <option value="progress">In progress</option>
+                <option value="finished">Finished</option>
+              </select>
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                data-testid="input-project-photos"
+                onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ""; }} />
+              <Button size="sm" onClick={() => fileRef.current?.click()} disabled={busy}
+                data-testid="button-add-project-photos">
+                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
+                Add photos
+              </Button>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {!photos?.length ? (
           <EmptyState compact icon={Camera} title="No photos yet"
-            description="When the client shares photos from their portal, they land here." />
+            description={canUpload
+              ? "Add in-progress and finished shots — the client sees them in their portal."
+              : "When the client shares photos from their portal, they land here."} />
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2" data-testid="customer-photo-strip">
-            {photos.map((p: any) => (
-              <a key={p.id} href={p.downloadUrl} data-testid={`customer-photo-${p.id}`}
-                className="block rounded-lg border overflow-hidden bg-muted/30 hover:border-primary/40 transition-colors">
-                {String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? (
-                  <img src={`${p.url}?inline=1`} alt={p.fileName} className="h-20 w-full object-cover" />
-                ) : (
-                  <div className="h-20 flex items-center justify-center"><ImageIcon className="h-5 w-5 text-muted-foreground" /></div>
-                )}
-              </a>
-            ))}
+            {photos.map((p: any) => {
+              const st = photoStage(String(p.fileName ?? ""));
+              return (
+                <div key={p.id} className="relative group" data-testid={`customer-photo-${p.id}`}>
+                  <a href={p.downloadUrl}
+                    className="block rounded-lg border overflow-hidden bg-muted/30 hover:border-primary/40 transition-colors">
+                    {String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? (
+                      <img src={`${p.url}?inline=1`} alt={p.fileName} className="h-20 w-full object-cover" />
+                    ) : (
+                      <div className="h-20 flex items-center justify-center"><ImageIcon className="h-5 w-5 text-muted-foreground" /></div>
+                    )}
+                  </a>
+                  {st && (
+                    <span className={`absolute bottom-1 left-1 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white ${st === "finished" ? "bg-emerald-600/90" : "bg-amber-600/90"}`}>
+                      {st === "finished" ? "Finished" : "In progress"}
+                    </span>
+                  )}
+                  {canUpload && (
+                    <button
+                      className="absolute top-1 right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded bg-black/60 text-white"
+                      onClick={() => del.mutate(p.id)}
+                      data-testid={`button-delete-photo-${p.id}`}
+                      aria-label="Delete photo"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>

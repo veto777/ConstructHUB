@@ -329,13 +329,32 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    if (!requirePermission(res, ctx, "manageCustomers")) return;
 
     const kind = String(req.body?.kind || "");
-    if (kind !== "pamphlet" && kind !== "estimate") {
-      return res.status(400).json({ message: "kind must be pamphlet or estimate" });
+    if (kind !== "pamphlet" && kind !== "estimate" && kind !== "photo") {
+      return res.status(400).json({ message: "kind must be pamphlet, estimate or photo" });
     }
+    // Project photos are field work — a PM (manageJobs) uploads them without
+    // needing customer-management rights. Everything else stays manageCustomers.
+    if (kind === "photo") {
+      if (!ctx.permissions.manageJobs && !ctx.permissions.manageCustomers) {
+        return res.status(403).json({ message: "Requires permission: manageJobs" });
+      }
+    } else if (!requirePermission(res, ctx, "manageCustomers")) return;
+
     let refId: string | null = null;
+    if (kind === "photo") {
+      // Project photo onto a CLIENT's page: refId = customer id — the same
+      // shelf as client-shared and HOVER photos, so every photo of the job
+      // lives together (and the client sees progress in their portal too).
+      refId = String(req.body?.refId || "");
+      const [cust] = await db
+        .select({ id: crmCustomers.id })
+        .from(crmCustomers)
+        .where(and(eq(crmCustomers.id, refId), eq(crmCustomers.orgId, ctx.org.id)))
+        .limit(1);
+      if (!cust) return res.status(404).json({ message: "Client not found" });
+    }
     if (kind === "estimate") {
       refId = String(req.body?.refId || "");
       const [est] = await db
@@ -348,8 +367,20 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     const file = req.file as Express.Multer.File | undefined;
     if (!file) return res.status(400).json({ message: "No file uploaded" });
 
-    const values = await storeFile(file, DOC_MIMES, ctx.org.id, kind, refId);
-    if (!values) return res.status(415).json({ message: "PDF or image files only" });
+    const values = await storeFile(file, kind === "photo" ? PHOTO_MIMES : DOC_MIMES, ctx.org.id, kind, refId);
+    if (!values) {
+      return res.status(415).json({
+        message: kind === "photo" ? "JPEG, PNG or HEIC photos only" : "PDF or image files only",
+      });
+    }
+    // Stage tag ("progress" | "finished") rides in the stored name so the UI
+    // (and the client portal) can badge it without a schema change.
+    if (kind === "photo") {
+      const stage = String(req.body?.stage || "");
+      if (stage === "progress" || stage === "finished") {
+        values.fileName = `${stage}--${values.fileName}`;
+      }
+    }
 
     const [row] = await db.insert(crmAttachments).values(values).returning();
     res.status(201).json(present(row, "/api/crm/attachments"));
@@ -360,7 +391,15 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    if (!requirePermission(res, ctx, "manageCustomers")) return;
+    // PMs manage project photos; everything else needs manageCustomers.
+    if (!ctx.permissions.manageCustomers) {
+      const [att] = await db.select({ kind: crmAttachments.kind }).from(crmAttachments)
+        .where(and(eq(crmAttachments.id, req.params.id), eq(crmAttachments.orgId, ctx.org.id)))
+        .limit(1);
+      if (!(att?.kind === "photo" && ctx.permissions.manageJobs)) {
+        return res.status(403).json({ message: "Requires permission: manageCustomers" });
+      }
+    }
 
     const [row] = await db
       .delete(crmAttachments)
