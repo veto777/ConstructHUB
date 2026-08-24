@@ -514,17 +514,17 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
       } catch (e: any) {
         console.error("[sms] inbound STOP persistence failed:", e?.message || e);
       }
-      return res.send(smsLamlReply("You're unsubscribed and won't get more texts. Reply START to resume."));
+      return res.send(smsLamlReply("ConstructHub: you are unsubscribed and will receive no more texts from us. Reply START to resubscribe, HELP for help."));
     }
 
     if (SMS_START_WORDS.has(keyword)) {
       await clearSmsOptout(from)
         .catch((e: any) => console.error("[sms] inbound START failed:", e?.message || e));
-      return res.send(smsLamlReply("You're resubscribed."));
+      return res.send(smsLamlReply("ConstructHub: you are resubscribed to account-notification texts. Reply STOP to unsubscribe, HELP for help."));
     }
 
     if (SMS_HELP_WORDS.has(keyword)) {
-      return res.send(smsLamlReply("ConstructHub alerts. Help: support@constructhub.us. Reply STOP to opt out."));
+      return res.send(smsLamlReply("ConstructHub account alerts. Help: support@constructhub.us or portal.constructhub.us. Msg&data rates may apply. Reply STOP to opt out."));
     }
 
     return res.send(smsLamlReply());

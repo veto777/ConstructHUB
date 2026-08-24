@@ -383,6 +383,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const parsed = z.object({ agree: z.boolean() }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid consent", issues: parsed.error.issues });
 
+    // Carrier-standard opt-in confirmation: on a FIRST consent, text the
+    // member a confirmation with brand, frequency, rates and STOP/HELP.
+    const firstConsent = parsed.data.agree && !ctx.member.smsConsentAt;
+
     const [row] = await db
       .update(crmMembers)
       .set(
@@ -401,6 +405,18 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       entityType: "member", entityId: ctx.member.id,
       meta: { fields: ["smsConsent"], name: ctx.member.displayName || ctx.member.email },
     });
+
+    if (firstConsent && ctx.member.phone) {
+      const to = normalizePhone(ctx.member.phone);
+      if (to) {
+        void sendSms(
+          to,
+          "ConstructHub: you're opted in to account-notification texts (estimate opens, approvals, payments). Msg frequency varies. Msg&data rates may apply. Reply STOP to opt out, HELP for help.",
+          ctx.org.customFields,
+          ctx.org.id,
+        ).catch(() => {});
+      }
+    }
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 

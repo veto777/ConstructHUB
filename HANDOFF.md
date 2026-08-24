@@ -1,6 +1,6 @@
 # ConstructHUB — Handoff
 
-_Last updated 2026-07-10. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
+_Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
 ## TL;DR
 **LIVE at https://constructhub.us (+www) since 2026-07-10**, self-hosted on vb7 behind ConstructHUB's
@@ -78,6 +78,40 @@ appraisers, 319 permit rows with real portals), fabrication gone (permit phones 
   `npm run build`: **passes**. Tower pre-commit guard: clean on all commits.
 - DNS was cut over from the old Replit deployment (Google Frontend `34.111.179.208`) on 2026-07-10;
   the Replit app + its DB were left untouched and still exist for the user-data export.
+- **CRM (portal.constructhub.us): feature-complete per the owner's field notes and QA'd — see
+  "CRM state (2026-08-24)" below.** Last full run: 505/505 vitest, 190+ e2e green.
+
+## CRM state (2026-08-24)
+The CRM was built out and hardened across 2026-08-01 → 08-24 (~60 commits; three multi-agent Kimi
+sweeps whose reports live in `analysis/KIMI-*.md`). Shipped and live:
+
+- **Communication:** notification bell + per-type In-app/Email/Text matrix (Settings); Messages
+  center — two-way client threads with unread counts, waiting timers, assigned-member routing
+  (job PM → sales → estimate writer); client portal Messages + Contact-us tab (assigned team w/
+  direct lines) + contact footer; estimate "Ask a question" box.
+- **Workflow:** editable month/week calendar (appointment CRUD, conflict warnings, auto-navigates
+  to a new visit); pipeline with lead create/edit + true per-stage counts; Home stat cards,
+  Team Activity, follow-up cadences; client page = HUB (schedule/pipeline/estimate/payment quick
+  actions); Project Photos (PM uploads, progress/finished tags, visible in the client portal).
+- **Money/docs:** estimate detail/editor — per-line scope & verbiage that renders on the client
+  doc, **edit + delete after send** (client link updates, no re-send; signed = locked 409);
+  price-book templates; FL/WA division letterheads; take-a-payment (manual recording live;
+  online = Stripe checkout link, degrades 503 until the owner's Stripe is verified).
+- **Platform:** `/admin` standalone console behind a credential gate (`ADMIN_GATE_USER/PASS` in
+  vb7 `.env`); consent-gated first-party analytics + cookie banner; CRM gateway on the growth
+  sidebar (`/crm-app`, separate membership); HOVER auto-sync (6h default) — every job creates/
+  links a client + imports capture photos (9k+ photos imported).
+- **SMS/10DLC (the strategy — do not regress):** carriers ban platform-texting-for-others, so the
+  shared number texts ONLY ConstructHub's own users (contractor account notifications) — the model
+  SignalWire accepted 8/18. Client texting requires the org's OWN number (`orgCanTextClients`);
+  STOP/HELP/START webhook `POST /api/crm/sms/inbound` + `crm_sms_optouts` suppression; consent
+  stamps + Privacy §5; optional voice "check your email" nudge (no 10DLC needed). Registration
+  materials submitted 2026-08-22; approval pending.
+- **Kimi lane workflow:** worktrees `~/ConstructHUB-a{1,2,3}` (ports 8129/39/49, DBs
+  `constructhub_dev_aN`, sanitized `.env`); launch `kimi -p "$(cat KIMI-X.md)"` via setsid; check
+  `git log main..lane/aN` AND `git status` (Kimi sometimes leaves work uncommitted). New e2e specs
+  run in the lane harness (`E2E_PORT`/`E2E_DB`), not against a hand-started 8119. Beware stale tsx
+  processes on 8119 serving old code — verify `/proc/<pid>/cwd`, restart, clear `node_modules/.vite`.
 
 ## Replit user-data export (pending — the one migration left)
 The old Replit deployment HAD real users (their uploaded logos are in R2 bucket `constructhub`).
@@ -140,6 +174,18 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
   a tower loss. Needed for: A2P 10DLC brand registration, Stripe business verification, banking.
 
 ## Open items
+- [ ] **SignalWire 10DLC campaign approval** — materials submitted 2026-08-22 (samples, consent flow,
+      opt-in/out messages, all live in code). When approved, contractor texting works with no code change.
+- [ ] **Owner: set the SignalWire number's inbound-message webhook** to
+      `https://portal.constructhub.us/api/crm/sms/inbound` (carriers test that STOP works).
+- [ ] **Owner: Stripe payout verification** — unlocks live card/ACH capture for take-a-payment
+      (currently clean 503 + manual recording).
+- [ ] **Owner: HOVER measurement-file API access** — HOVER 401s all deliverable formats for API apps;
+      ask HOVER support to enable. Unlocks sqft + report PDFs for auto-estimates (code ready).
+- [ ] **Owner: attorney review** of CRM Terms/Privacy (incl. the new SMS §5).
+- [ ] Design decisions flagged by audits: multi-org homeowner portal binding (`accounts[0]`),
+      expired estimates not counted in client bid tabs, org-wide stats vs divisions,
+      adopt `eslint-plugin-react-hooks` (the pipeline blank-screen class).
 - [ ] **2026-09-08: reapply for GBP API access** (see "GBP API access timeline" above — cloud reminder armed).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").
 - [ ] Rotate secrets (Google, SMTP, R2 — provider dashboards; SESSION_SECRET + DB pw already fresh).
