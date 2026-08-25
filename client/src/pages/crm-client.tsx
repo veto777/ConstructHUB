@@ -39,6 +39,7 @@ import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-paymen
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { QuickBid } from "@/components/crm-quick-bid";
+import { AppointmentForm, type Appointment } from "@/components/crm-appointment-form";
 import { InfoTip } from "@/components/info-tip";
 
 const money = (c?: number | null) =>
@@ -459,6 +460,13 @@ export default function CrmClientPage() {
     enabled: !!id,
   });
   const appointments = (apptData?.appointments ?? []).filter((a: any) => a.customerId === id);
+
+  // Edit / reschedule / delete a visit right here (same dialog as the calendar
+  // page). Crew list only matters to editors, so only they fetch it.
+  const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
+  const { data: membersData } = useQuery<any>({
+    queryKey: ["/api/crm/members"], enabled: !!id && canManageJobs,
+  });
 
   const { data: thread } = useQuery<any>({
     queryKey: [`/api/crm/inbox/${id}`],
@@ -1043,15 +1051,30 @@ export default function CrmClientPage() {
             />
           ) : (
             appointments.slice(0, 15).map((a: any) => (
-              <div key={a.id} className="rounded-lg border px-4 py-2.5 flex flex-wrap items-center justify-between gap-2"
-                data-testid={`appointment-${a.id}`}>
+              <div key={a.id}
+                className={`rounded-lg border px-4 py-2.5 flex flex-wrap items-center justify-between gap-2${canManageJobs ? " cursor-pointer hover:bg-muted/50" : ""}`}
+                data-testid={`appointment-${a.id}`}
+                role={canManageJobs ? "button" : undefined}
+                tabIndex={canManageJobs ? 0 : undefined}
+                onClick={canManageJobs ? () => setEditingAppt(a) : undefined}
+                onKeyDown={canManageJobs ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAppt(a); } } : undefined}>
                 <div className="min-w-0">
                   <div className="font-medium truncate">{a.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {when(a.startsAt)}{a.endsAt ? ` – ${new Date(a.endsAt).toLocaleTimeString()}` : ""}
+                    {a.allDay ? `${new Date(a.startsAt).toLocaleDateString()} · All day`
+                      : <>{when(a.startsAt)}{a.endsAt ? ` – ${new Date(a.endsAt).toLocaleTimeString()}` : ""}</>}
                   </div>
                 </div>
-                <StatusPill tone={statusTone(a.status)}>{a.status}</StatusPill>
+                <div className="flex items-center gap-2">
+                  <StatusPill tone={statusTone(a.status)}>{a.status}</StatusPill>
+                  {canManageJobs && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2"
+                      data-testid={`button-edit-appointment-${a.id}`}
+                      onClick={(e) => { e.stopPropagation(); setEditingAppt(a); }}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -1558,6 +1581,24 @@ export default function CrmClientPage() {
               Schedule
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit / reschedule / delete one of this client's visits — the same
+          dialog the calendar page uses, so the two never drift. */}
+      <Dialog open={!!editingAppt} onOpenChange={(o) => !o && setEditingAppt(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-appointment">
+          {editingAppt && (
+            <AppointmentForm
+              key={editingAppt.id}
+              initial={editingAppt}
+              defaultDate={null}
+              members={membersData?.members ?? []}
+              projects={data.projects ?? []}
+              customers={[{ id: c.id, displayName: c.displayName }]}
+              onClose={() => { setEditingAppt(null); refresh(); }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
