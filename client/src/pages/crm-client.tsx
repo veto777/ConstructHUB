@@ -414,6 +414,13 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
   );
 }
 
+/** Strip formatting so `tel:`/`sms:` get digits (keeps a leading +). "(555) 123-4567" → "5551234567". */
+function telHref(phone: string): string {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/[^\d]/g, "");
+  return trimmed.startsWith("+") ? `+${digits}` : digits;
+}
+
 export default function CrmClientPage() {
   const [, params] = useRoute("/crm/clients/:id");
   const id = params?.id;
@@ -786,8 +793,36 @@ export default function CrmClientPage() {
                 </div>
                 {c.companyName && <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>}
                 <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
-                  {c.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{c.email}</span>}
-                  {c.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{c.phone}</span>}
+                  {c.email && (
+                    <span className="flex items-center gap-1.5">
+                      <a href={`mailto:${c.email}`} title="Send an email"
+                        className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline underline-offset-2 transition-colors"
+                        data-testid="link-client-email">
+                        <Mail className="h-3.5 w-3.5" />{c.email}
+                      </a>
+                    </span>
+                  )}
+                  {c.phone && (
+                    <span className="flex items-center gap-1.5">
+                      <a href={`tel:${telHref(c.phone)}`} title="Call"
+                        className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline underline-offset-2 transition-colors"
+                        data-testid="link-client-phone">
+                        <Phone className="h-3.5 w-3.5" />{c.phone}
+                      </a>
+                      <span className="inline-flex items-center gap-0.5 ml-0.5">
+                        <a href={`tel:${telHref(c.phone)}`} title="Call" aria-label="Call client"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md border bg-background text-foreground/70 hover:text-foreground hover:bg-accent transition-colors"
+                          data-testid="button-client-call">
+                          <Phone className="h-3 w-3" />
+                        </a>
+                        <a href={`sms:${telHref(c.phone)}`} title="Text" aria-label="Text client"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md border bg-background text-foreground/70 hover:text-foreground hover:bg-accent transition-colors"
+                          data-testid="button-client-text">
+                          <MessageSquare className="h-3 w-3" />
+                        </a>
+                      </span>
+                    </span>
+                  )}
                   {(c.addressLine1 || c.city) && (
                     <span className="flex items-center gap-1.5">
                       <MapPin className="h-3.5 w-3.5" />
