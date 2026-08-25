@@ -188,7 +188,10 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
       Braxton (admin, pinned to the small one) sees only 5 of 64 projects and none of the other arm's
       visits. Merge the divisions or unpin Braxton's `division_id` in /crm/team — a data decision, not code.
       (2026-08-24: the related "calendar isn't saving" report was a code bug, fixed + deployed — unlinked
-      appointments were hidden from scoped members; see `appointmentDivisionVisible`.)
+      appointments were hidden from scoped members; see `appointmentDivisionVisible`. Same day, second
+      report "scheduled from the client page, not on my schedule": customer-only appointments inherited
+      the customer's inferred division (null for Braxton's test client) and were hidden from the creator.
+      Rule now: project-linked = strict; customer-only + unlinked = every member. Fixed + deployed.)
 - [ ] Design decisions flagged by audits: multi-org homeowner portal binding (`accounts[0]`),
       expired estimates not counted in client bid tabs, org-wide stats vs divisions,
       adopt `eslint-plugin-react-hooks` (the pipeline blank-screen class).

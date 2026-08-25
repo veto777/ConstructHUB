@@ -135,7 +135,7 @@ describe("divisionScopeOf / divisionVisible", () => {
     expect(divisionVisible(null, null)).toBe(true);
     expect(divisionVisible(null, undefined)).toBe(true);
   });
-  it("appointments: linked visits follow the strict rule, UNLINKED visits are org calendar events every member sees", () => {
+  it("appointments: project-linked visits follow the strict rule; customer-only and UNLINKED visits are seen by every member", () => {
     const linked = { projectId: "p1", customerId: null };
     const byCustomer = { projectId: null, customerId: "c1" };
     const unlinked = { projectId: null, customerId: null };
@@ -143,7 +143,13 @@ describe("divisionScopeOf / divisionVisible", () => {
     expect(appointmentDivisionVisible("d-wa", linked, "d-wa")).toBe(true);
     expect(appointmentDivisionVisible("d-wa", linked, "d-fl")).toBe(false);
     expect(appointmentDivisionVisible("d-wa", linked, null)).toBe(false);
-    expect(appointmentDivisionVisible("d-wa", byCustomer, "d-fl")).toBe(false);
+    // Customer-only (booked from a client page): customers are not
+    // division-scoped, so the visit is visible whatever the customer's
+    // projects infer — the 2026-08-24 "scheduled from the client page, not on
+    // my schedule" report (inferred division was null → hidden from creator).
+    expect(appointmentDivisionVisible("d-wa", byCustomer, "d-fl")).toBe(true);
+    expect(appointmentDivisionVisible("d-wa", byCustomer, null)).toBe(true);
+    expect(appointmentDivisionVisible("d-wa", byCustomer, "d-wa")).toBe(true);
     // Unlinked (a sales meeting, a personal block): the scoped member who
     // created it must see it — the 2026-08-24 "calendar isn't saving" report.
     expect(appointmentDivisionVisible("d-wa", unlinked, null)).toBe(true);

@@ -101,14 +101,20 @@ export function divisionVisible(scope: string | null, rowDivisionId: string | nu
 }
 
 /**
- * The calendar's variant of the rule. An appointment linked to a project or
- * customer inherits that row's division and follows the STRICT rule above.
- * An UNLINKED appointment (no project, no customer — a sales meeting, a
- * supplier run, a personal block) has no division to belong to; hiding it
- * from the scoped member who just created it read as "my calendar isn't
- * saving" (Alpine Exteriors, 2026-08-24: POST 201, then the list came back
- * empty). Those are org calendar events, visible to every member who can see
- * the calendar at all.
+ * The calendar's variant of the rule. An appointment inherits the scoping of
+ * what it is LINKED to:
+ *   - linked to a PROJECT → the project's division, STRICT (as above);
+ *   - linked only to a CUSTOMER → customers are not division-scoped (every
+ *     member can open any client page), so neither is the visit booked from
+ *     it. Alpine Exteriors, 2026-08-24: a division-pinned admin booked a site
+ *     visit from a client page → POST 201 → the visit vanished from their
+ *     schedule AND the client page, because the customer's projects carried
+ *     no division (null !== scope). Same class as the unlinked case below.
+ *   - UNLINKED (no project, no customer — a sales meeting, a supplier run, a
+ *     personal block) → an org calendar event every member sees.
+ * `rowDivisionId` is the resolved division of the linked project (callers
+ * may still pass a customer-inferred one; it is ignored unless a project is
+ * linked).
  */
 export function appointmentDivisionVisible(
   scope: string | null,
@@ -116,7 +122,7 @@ export function appointmentDivisionVisible(
   rowDivisionId: string | null | undefined,
 ): boolean {
   if (!scope) return true;
-  if (!appt.projectId && !appt.customerId) return true;
+  if (!appt.projectId) return true;
   return rowDivisionId === scope;
 }
 
