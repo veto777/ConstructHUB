@@ -183,6 +183,12 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
 - [ ] **Owner: HOVER measurement-file API access** — HOVER 401s all deliverable formats for API apps;
       ask HOVER support to enable. Unlocks sqft + report PDFs for auto-estimates (code ready).
 - [ ] **Owner: attorney review** of CRM Terms/Privacy (incl. the new SMS §5).
+- [ ] **Owner: Alpine Exteriors has TWO divisions both named "Alpine Exteriors"** (`c3c712bb…` with
+      5 projects + Braxton; `5c48ea4c…` with 59 projects + Andrey/Mike). Division scoping is STRICT, so
+      Braxton (admin, pinned to the small one) sees only 5 of 64 projects and none of the other arm's
+      visits. Merge the divisions or unpin Braxton's `division_id` in /crm/team — a data decision, not code.
+      (2026-08-24: the related "calendar isn't saving" report was a code bug, fixed + deployed — unlinked
+      appointments were hidden from scoped members; see `appointmentDivisionVisible`.)
 - [ ] Design decisions flagged by audits: multi-org homeowner portal binding (`accounts[0]`),
       expired estimates not counted in client bid tabs, org-wide stats vs divisions,
       adopt `eslint-plugin-react-hooks` (the pipeline blank-screen class).
