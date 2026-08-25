@@ -421,6 +421,19 @@ function telHref(phone: string): string {
   return trimmed.startsWith("+") ? `+${digits}` : digits;
 }
 
+/**
+ * Open an address in the device's default maps app. Apple devices → Apple Maps (`maps://` is the
+ * native scheme; iOS/macOS also hand `maps.apple.com` to the app). Android → `geo:` opens the
+ * user's chosen maps app. Everything else → Google Maps in the browser.
+ */
+function mapsHref(address: string): string {
+  const q = encodeURIComponent(address);
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  if (/iPhone|iPad|iPod|Macintosh/i.test(ua)) return `https://maps.apple.com/?q=${q}`;
+  if (/Android/i.test(ua)) return `geo:0,0?q=${q}`;
+  return `https://www.google.com/maps/search/?api=1&query=${q}`;
+}
+
 export default function CrmClientPage() {
   const [, params] = useRoute("/crm/clients/:id");
   const id = params?.id;
@@ -823,12 +836,20 @@ export default function CrmClientPage() {
                       </span>
                     </span>
                   )}
-                  {(c.addressLine1 || c.city) && (
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5" />
-                      {[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}
-                    </span>
-                  )}
+                  {(c.addressLine1 || c.city) && (() => {
+                    const address = [c.addressLine1, [c.city, c.state].filter(Boolean).join(", "), c.postalCode]
+                      .filter(Boolean).join(" ").replace(/, +/g, ", ");
+                    const label = [c.addressLine1, c.city, c.state].filter(Boolean).join(", ");
+                    return (
+                      <span className="flex items-center gap-1.5">
+                        <a href={mapsHref(address)} target="_blank" rel="noopener noreferrer" title="Open in Maps"
+                          className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline underline-offset-2 transition-colors"
+                          data-testid="link-client-address">
+                          <MapPin className="h-3.5 w-3.5" />{label}
+                        </a>
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
