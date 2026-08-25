@@ -19,7 +19,7 @@ import {
 import { and, asc, desc, eq, gte, lt, lte, inArray, ne } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
-import { divisionScopeOf, divisionVisible, divisionMapsForOrg } from "./divisions";
+import { divisionScopeOf, appointmentDivisionVisible, divisionMapsForOrg } from "./divisions";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -149,8 +149,9 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
     const scope = divisionScopeOf(ctx.member);
     if (scope) {
       const maps = await divisionMapsForOrg(ctx.org.id);
-      out = out.filter((r) => divisionVisible(
+      out = out.filter((r) => appointmentDivisionVisible(
         scope,
+        r.appointment,
         (r.appointment.projectId ? maps.byProject.get(r.appointment.projectId) : undefined)
           ?? (r.appointment.customerId ? maps.byCustomer.get(r.appointment.customerId) : undefined)
           ?? null,

@@ -100,6 +100,26 @@ export function divisionVisible(scope: string | null, rowDivisionId: string | nu
   return rowDivisionId === scope;
 }
 
+/**
+ * The calendar's variant of the rule. An appointment linked to a project or
+ * customer inherits that row's division and follows the STRICT rule above.
+ * An UNLINKED appointment (no project, no customer — a sales meeting, a
+ * supplier run, a personal block) has no division to belong to; hiding it
+ * from the scoped member who just created it read as "my calendar isn't
+ * saving" (Alpine Exteriors, 2026-08-24: POST 201, then the list came back
+ * empty). Those are org calendar events, visible to every member who can see
+ * the calendar at all.
+ */
+export function appointmentDivisionVisible(
+  scope: string | null,
+  appt: { projectId: string | null; customerId: string | null },
+  rowDivisionId: string | null | undefined,
+): boolean {
+  if (!scope) return true;
+  if (!appt.projectId && !appt.customerId) return true;
+  return rowDivisionId === scope;
+}
+
 // ── DB-side resolution helpers ──────────────────────────────────────────────
 
 export async function getDivision(orgId: string, id: string | null | undefined): Promise<CrmDivision | null> {

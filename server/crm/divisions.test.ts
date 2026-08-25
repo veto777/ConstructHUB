@@ -26,10 +26,10 @@ const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
 const DATABASE_URL =
   process.env.DATABASE_URL ?? "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
 
-let companyBranding: any, divisionScopeOf: any, divisionVisible: any, docDivisionFromMaps: any;
+let companyBranding: any, divisionScopeOf: any, divisionVisible: any, appointmentDivisionVisible: any, docDivisionFromMaps: any;
 
 beforeAll(async () => {
-  ({ companyBranding, divisionScopeOf, divisionVisible, docDivisionFromMaps } = await import("./divisions"));
+  ({ companyBranding, divisionScopeOf, divisionVisible, appointmentDivisionVisible, docDivisionFromMaps } = await import("./divisions"));
 });
 
 // ── Pure: branding resolution ───────────────────────────────────────────────
@@ -134,6 +134,23 @@ describe("divisionScopeOf / divisionVisible", () => {
     expect(divisionVisible(null, "d-fl")).toBe(true);
     expect(divisionVisible(null, null)).toBe(true);
     expect(divisionVisible(null, undefined)).toBe(true);
+  });
+  it("appointments: linked visits follow the strict rule, UNLINKED visits are org calendar events every member sees", () => {
+    const linked = { projectId: "p1", customerId: null };
+    const byCustomer = { projectId: null, customerId: "c1" };
+    const unlinked = { projectId: null, customerId: null };
+    // Linked: strict, same as divisionVisible.
+    expect(appointmentDivisionVisible("d-wa", linked, "d-wa")).toBe(true);
+    expect(appointmentDivisionVisible("d-wa", linked, "d-fl")).toBe(false);
+    expect(appointmentDivisionVisible("d-wa", linked, null)).toBe(false);
+    expect(appointmentDivisionVisible("d-wa", byCustomer, "d-fl")).toBe(false);
+    // Unlinked (a sales meeting, a personal block): the scoped member who
+    // created it must see it — the 2026-08-24 "calendar isn't saving" report.
+    expect(appointmentDivisionVisible("d-wa", unlinked, null)).toBe(true);
+    expect(appointmentDivisionVisible("d-wa", unlinked, undefined)).toBe(true);
+    // Unscoped: everything.
+    expect(appointmentDivisionVisible(null, linked, "d-fl")).toBe(true);
+    expect(appointmentDivisionVisible(null, unlinked, null)).toBe(true);
   });
   it("docDivisionFromMaps resolves project → estimate → customer", () => {
     const maps = {
