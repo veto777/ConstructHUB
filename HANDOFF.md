@@ -181,6 +181,12 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
       Test send to the owner's phone returned `delivered`. Opt-in screenshots: `private/signalwire-10dlc/`.
 - [x] **Inbound STOP/HELP webhook** `https://portal.constructhub.us/api/crm/sms/inbound` set on all
       three campaign numbers via `PUT /api/relay/rest/phone_numbers/{id}` (2026-08-27); HELP reply verified.
+- [ ] **Owner: install the SignalWire signing key.** SignalWire signs inbound webhooks with the
+      project *signing key* (Dashboard → API Credentials → Signing Key → Show), not the API token — the
+      app was 403'ing real carrier STOPs until 2026-08-27 (fixed: accepts + warns when the key is unset).
+      Add `SIGNALWIRE_SIGNING_KEY=…` to vb7 `~/ConstructHUB/.env`, `systemctl --user restart constructhub`,
+      then text STOP/START to +13605857553 from any campaign number and confirm 200s in the journal.
+      Real STOP → suppression → START round-trip verified end to end on 2026-08-27.
 - [ ] **Owner: Stripe payout verification** — unlocks live card/ACH capture for take-a-payment
       (currently clean 503 + manual recording).
 - [ ] **Owner: HOVER measurement-file API access** — HOVER 401s all deliverable formats for API apps;
