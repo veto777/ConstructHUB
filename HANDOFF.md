@@ -174,10 +174,13 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
   a tower loss. Needed for: A2P 10DLC brand registration, Stripe business verification, banking.
 
 ## Open items
-- [ ] **SignalWire 10DLC campaign approval** — materials submitted 2026-08-22 (samples, consent flow,
-      opt-in/out messages, all live in code). When approved, contractor texting works with no code change.
-- [ ] **Owner: set the SignalWire number's inbound-message webhook** to
-      `https://portal.constructhub.us/api/crm/sms/inbound` (carriers test that STOP works).
+- [x] **SignalWire 10DLC campaign APPROVED 2026-08-26 — SMS LIVE 2026-08-27.** Campaign
+      `ConstructHUB CRM Notifications` (`e51c79fa-…`) is active with +13605857553, +17278705005 and
+      +12078862206 attached. Prod `SIGNALWIRE_FROM_NUMBER` switched to **+13605857553** — the old
+      +13605858200 is a `messaging_integration_test` number SignalWire will not attach to a campaign.
+      Test send to the owner's phone returned `delivered`. Opt-in screenshots: `private/signalwire-10dlc/`.
+- [x] **Inbound STOP/HELP webhook** `https://portal.constructhub.us/api/crm/sms/inbound` set on all
+      three campaign numbers via `PUT /api/relay/rest/phone_numbers/{id}` (2026-08-27); HELP reply verified.
 - [ ] **Owner: Stripe payout verification** — unlocks live card/ACH capture for take-a-payment
       (currently clean 503 + manual recording).
 - [ ] **Owner: HOVER measurement-file API access** — HOVER 401s all deliverable formats for API apps;
