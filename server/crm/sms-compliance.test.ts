@@ -53,7 +53,7 @@ beforeAll(async () => {
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
-const SW_KEYS = ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"] as const;
+const SW_KEYS = ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER", "SIGNALWIRE_SIGNING_KEY"] as const;
 const SW_ENV = {
   SIGNALWIRE_SPACE_URL: "x.signalwire.com",
   SIGNALWIRE_PROJECT_ID: "proj-1",
@@ -229,14 +229,30 @@ describe("inbound webhook helpers (pure)", () => {
     expect(smsLamlReply("You're <unsubscribed>")).toContain("<Message>You&#39;re &lt;unsubscribed&gt;</Message>");
   });
 
-  it("unsigned requests pass (a STOP must never be dropped); a wrong present signature fails", async () => {
+  it("unsigned requests pass (a STOP must never be dropped); without a signing key a mismatch is accepted", async () => {
     await withSwEnv(SW_ENV, () => {
       expect(signalwireSignatureOk({ headers: {}, body: {}, originalUrl: "/api/crm/sms/inbound" })).toBe(true);
+      // SignalWire signs with the project signing key, not the API token — until
+      // SIGNALWIRE_SIGNING_KEY is installed we cannot verify, so we must not 403
+      // real carrier STOPs (2026-08-27 incident).
       expect(signalwireSignatureOk({
         headers: { "x-signalwire-signature": "definitely-wrong" },
         body: { From: "+15551234567" },
         originalUrl: "/api/crm/sms/inbound",
-      })).toBe(false);
+      })).toBe(true);
+    });
+  });
+
+  it("with SIGNALWIRE_SIGNING_KEY set, a correct signature passes and a wrong one is rejected", async () => {
+    const { createHmac } = await import("crypto");
+    const { getBaseUrl } = await import("../auth");
+    await withSwEnv({ ...SW_ENV, SIGNALWIRE_SIGNING_KEY: "signing-key-1" }, () => {
+      const req: any = { headers: { host: "portal.constructhub.us" }, body: { Body: "STOP", From: "+15551234567" }, originalUrl: "/api/crm/sms/inbound" };
+      const signed = `${getBaseUrl(req)}${req.originalUrl}Body${"STOP"}From${"+15551234567"}`;
+      req.headers["x-signalwire-signature"] = createHmac("sha1", "signing-key-1").update(signed).digest("base64");
+      expect(signalwireSignatureOk(req)).toBe(true);
+      req.headers["x-signalwire-signature"] = createHmac("sha1", "some-other-key").update(signed).digest("base64");
+      expect(signalwireSignatureOk(req)).toBe(false);
     });
   });
 });

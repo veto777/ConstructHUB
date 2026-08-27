@@ -458,25 +458,45 @@ export function smsLamlReply(message?: string): string {
 }
 
 /**
- * Best-effort carrier-webhook verification. SignalWire signs like Twilio:
- * HMAC-SHA1 of url + concatenated sorted POST params, base64, with the API
- * token as the key. A signature that is PRESENT and wrong is rejected — but
- * an unsigned request is still processed, because an inbound STOP must never
- * be dropped (and dev has no token to verify against anyway).
+ * Carrier-webhook verification. SignalWire signs like Twilio — HMAC-SHA1 of
+ * url + concatenated sorted POST params, base64 — but the key is the
+ * project's SIGNING KEY (Dashboard → API Credentials → Signing Key), NOT the
+ * API token. Verified 2026-08-27: a real inbound signed by SignalWire did not
+ * match the token, and every carrier STOP was being 403'd.
+ *
+ *  - SIGNALWIRE_SIGNING_KEY set → a present signature must match it (the API
+ *    token is also accepted, for Twilio-shaped senders); wrong → rejected.
+ *  - not set → we cannot verify, so a mismatch is logged (once) and ACCEPTED:
+ *    an inbound STOP must never be dropped.
+ *  - no signature header → accepted (dev/tests have nothing to verify).
  */
+let warnedNoSigningKey = false;
 export function signalwireSignatureOk(req: any): boolean {
   const sig = req.headers?.["x-signalwire-signature"] ?? req.headers?.["x-twilio-signature"];
   if (!sig) return true;
-  const token = process.env.SIGNALWIRE_API_TOKEN;
-  if (!token) return true;
+  const signingKey = process.env.SIGNALWIRE_SIGNING_KEY;
+  const keys = [signingKey, process.env.SIGNALWIRE_API_TOKEN].filter((k): k is string => !!k);
+  if (!keys.length) return true;
   const body = (req.body ?? {}) as Record<string, string>;
   const data = Object.keys(body).sort().map((k) => `${k}${body[k]}`).join("");
-  const expected = createHmac("sha1", token).update(`${getBaseUrl(req)}${req.originalUrl}${data}`).digest("base64");
-  try {
-    return timingSafeEqual(Buffer.from(String(sig)), Buffer.from(expected));
-  } catch {
-    return false;
+  const signed = `${getBaseUrl(req)}${req.originalUrl}${data}`;
+  const matches = keys.some((k) => {
+    const expected = createHmac("sha1", k).update(signed).digest("base64");
+    try {
+      return timingSafeEqual(Buffer.from(String(sig)), Buffer.from(expected));
+    } catch {
+      return false;
+    }
+  });
+  if (matches) return true;
+  if (!signingKey) {
+    if (!warnedNoSigningKey) {
+      warnedNoSigningKey = true;
+      console.warn("[sms] inbound webhook signature did not match SIGNALWIRE_API_TOKEN — SignalWire signs with the project SIGNING KEY. Set SIGNALWIRE_SIGNING_KEY (Dashboard → API Credentials) to enforce verification; accepting unverified inbound until then.");
+    }
+    return true;
   }
+  return false;
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
