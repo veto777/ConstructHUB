@@ -2137,7 +2137,7 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3">
                         <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                           <Lightbulb className="h-3 w-3 text-[#4A6CF7] shrink-0 mt-0.5" />
-                          Use the BS Meter in Competitor Intelligence to analyze any company's Google reviews for fake patterns, AI-generated content, and suspicious review velocity.
+                          When vetting a contractor, read their Google reviews critically — repetitive phrasing, AI-generated text, and a sudden burst of 5-star reviews in a short window are classic signs of fakes.
                         </p>
                       </div>
                     </div>

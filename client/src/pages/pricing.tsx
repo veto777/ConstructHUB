@@ -13,6 +13,7 @@ import {
   ShoppingCart, CheckCircle2, TrendingUp, X,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
+import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 
 const PLAN_ICONS: Record<string, any> = {
   standard: Zap,
@@ -360,8 +361,10 @@ export default function PricingPage() {
                     { name: "Fraud Detection Dashboard", values: [false, false, true, true, true, true] },
                   ]},
                   { category: "Intelligence & Education", features: [
-                    { name: "Competitor Intelligence", values: [false, false, false, false, "1 site", "10 sites"] },
-                    { name: "BS Meter (Fake Review Detection)", values: [false, false, false, false, true, true] },
+                    ...(SHOW_COMPETITOR_INTEL ? [
+                      { name: "Competitor Intelligence", values: [false, false, false, false, "1 site", "10 sites"] as (string | boolean)[] },
+                      { name: "BS Meter (Fake Review Detection)", values: [false, false, false, false, true, true] as (string | boolean)[] },
+                    ] : []),
                     { name: "Master Class Access", values: [false, false, true, true, true, true] },
                     { name: "Google Ads Master Class", values: [false, false, true, true, true, true] },
                     { name: "LSA Setup Guide", values: [false, false, false, true, true, true] },

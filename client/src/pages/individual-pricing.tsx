@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import {
   Check, X, Fingerprint, ShieldOff, Shield, BarChart3, Camera, Search,
   Crosshair, ArrowRight, Zap, Star, Crown, Building2, Eye, Bot,
@@ -240,7 +241,7 @@ const TOOLS: ToolCategory[] = [
     ringColor: "ring-red-500/40",
     badgeColor: "bg-red-500/10 text-red-500 border-red-500/20",
     tagline: "Block anonymous visitors polluting your data",
-    description: "Detect and block VPN, proxy, and datacenter traffic from your websites. Protects analytics accuracy and exposes competitors trying to anonymously spy on your site.",
+    description: "Detect and block VPN, proxy, and datacenter traffic from your websites. Protects analytics accuracy by filtering out anonymous non-customer visits that distort your data.",
     tiers: [
       {
         name: "Basic",
@@ -332,8 +333,8 @@ const TOOLS: ToolCategory[] = [
     buttonColor: "bg-yellow-500 hover:bg-yellow-600 text-black",
     ringColor: "ring-yellow-500/40",
     badgeColor: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-    tagline: "See everything your competitors are doing",
-    description: "Track competitor Google Business profiles, analyze reviews with our BS Meter for fake review detection, monitor their ad activity, and uncover their strategies.",
+    tagline: "Understand your local market",
+    description: "Research public Google Business profiles in your market, analyze review authenticity with our BS Meter, and benchmark your own presence against public market data.",
     tiers: [
       {
         name: "Scout",
@@ -353,7 +354,7 @@ const TOOLS: ToolCategory[] = [
           "Competitor Reports": "Basic",
           "Review Analysis": false,
           "BS Meter (Fake Reviews)": false,
-          "Ad Spy Monitoring": false,
+          "Public Ad Activity": false,
           "Scheduled Scans": false,
           "Rating Monitoring": true,
         },
@@ -369,7 +370,7 @@ const TOOLS: ToolCategory[] = [
           "Full competitor reports",
           "Review sentiment analysis",
           "BS Meter fake review detection",
-          "Ad spy monitoring",
+          "Public ad activity tracking",
         ],
         limits: {
           "Users": "1",
@@ -378,7 +379,7 @@ const TOOLS: ToolCategory[] = [
           "Competitor Reports": "Full",
           "Review Analysis": true,
           "BS Meter (Fake Reviews)": true,
-          "Ad Spy Monitoring": true,
+          "Public Ad Activity": true,
           "Scheduled Scans": false,
           "Rating Monitoring": true,
         },
@@ -392,7 +393,7 @@ const TOOLS: ToolCategory[] = [
           "Unlimited market scans",
           "Full competitor reports",
           "BS Meter + review analysis",
-          "Ad spy monitoring",
+          "Public ad activity tracking",
           "Scheduled automatic scans",
         ],
         limits: {
@@ -402,7 +403,7 @@ const TOOLS: ToolCategory[] = [
           "Competitor Reports": "Full",
           "Review Analysis": true,
           "BS Meter (Fake Reviews)": true,
-          "Ad Spy Monitoring": true,
+          "Public Ad Activity": true,
           "Scheduled Scans": true,
           "Rating Monitoring": true,
         },
@@ -410,7 +411,7 @@ const TOOLS: ToolCategory[] = [
     ],
     comparisonFeatures: [
       "Users", "Competitor Tracking", "Market Scans/mo", "Competitor Reports",
-      "Review Analysis", "BS Meter (Fake Reviews)", "Ad Spy Monitoring",
+      "Review Analysis", "BS Meter (Fake Reviews)", "Public Ad Activity",
       "Scheduled Scans", "Rating Monitoring",
     ],
   },
@@ -692,7 +693,7 @@ export default function IndividualPricingPage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-        {TOOLS.map((tool) => (
+        {TOOLS.filter((t) => SHOW_COMPETITOR_INTEL || t.id !== "competitor-intel").map((tool) => (
           <button
             key={tool.id}
             onClick={() => {
@@ -711,7 +712,7 @@ export default function IndividualPricingPage() {
         ))}
       </div>
 
-      {TOOLS.map((tool) => {
+      {TOOLS.filter((t) => SHOW_COMPETITOR_INTEL || t.id !== "competitor-intel").map((tool) => {
         const isExpanded = expandedTool === tool.id;
         return (
           <section key={tool.id} id={`tool-${tool.id}`} className="scroll-mt-8" data-testid={`section-tool-${tool.id}`}>

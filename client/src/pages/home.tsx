@@ -149,9 +149,9 @@ const TOOLS: ToolShowcase[] = [
   },
   {
     title: "Competitor Intelligence",
-    tagline: "See everything your competitors are doing",
-    description: "Track competitor Google Business profiles, analyze their reviews with our BS Meter for fake review detection, monitor their ad activity, and run market scans to uncover their strategies.",
-    whyItMatters: "Your competitors are watching you — but are you watching them? Know when they get new reviews, change their services, or start running ads. The BS Meter catches fake 5-star review campaigns so you can report them and level the playing field.",
+    tagline: "Understand your local market",
+    description: "Research public Google Business profiles in your market, analyze review authenticity with our BS Meter, and run market scans to benchmark your own presence.",
+    whyItMatters: "Knowing where you stand in your market helps you invest in the right things. Review trends, service offerings, and ad activity are all public signals — and the BS Meter helps you spot fake 5-star review campaigns so you can report them through Google's official channels.",
     icon: Crosshair,
     url: "/competitors",
   },

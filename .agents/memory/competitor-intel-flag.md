@@ -18,6 +18,13 @@ cause of an earlier rejection. The competitor tools themselves use public Google
 Maps/Places data (not the GBP API), so they are not an actual policy violation — the
 problem is the messaging.
 
+**2026-09-04 sweep (pre-application #3):** the flag had NOT covered everything — public
+pricing pages still sold the surveillance features. Fixed and deployed: `individual-pricing.tsx`
+(Competitor Intelligence product now flag-gated; "Ad Spy" → "Public Ad Activity"; VPN Shield
+"spy on your site" copy neutralized), `pricing.tsx` (Competitor Intelligence + BS Meter
+comparison rows flag-gated), `vpn-shield.tsx` + `master-class.tsx` + `home.tsx` (spy/surveillance
+wording permanently neutralized). Live bundle verified clean of "spy/snooping/ad spy" copy.
+
 **How to apply:**
 - Keep the flag `false` while under GBP review / until access is granted and stable.
 - Google re-audits sensitive-scope apps after approval. When re-enabling, set the flag

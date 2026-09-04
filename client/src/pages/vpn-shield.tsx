@@ -132,8 +132,8 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
                 <Eye className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-snooping">Expose Competitor Snooping</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Competitors anonymously spy on your site, steal ideas and pricing. VPN Shield identifies them.</p>
+                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-snooping">Filter Anonymous Traffic</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Anonymous VPN and proxy visits distort your visitor data. VPN Shield identifies and filters them.</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -634,7 +634,7 @@ export default function VpnShieldPage() {
                 <span className="bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent">Shield</span>
               </h1>
               <p className="mt-2 text-muted-foreground max-w-xl text-sm" data-testid="text-vpn-subtitle">
-                Detect and block VPN, proxy, and anonymous visitors. Protect your analytics data and expose competitor snooping.
+                Detect and block VPN, proxy, and anonymous visitors. Protect your analytics data and keep your reports accurate.
               </p>
             </div>
 
