@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   CalendarDays, Loader2, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -58,9 +61,20 @@ export default function CrmSchedulePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [defaultDate, setDefaultDate] = useState<Date | null>(null);
+  // Whose visits to show: "mine" (default — calendars are per user unless you
+  // widen them), "all" (the org board), or one member's id. Remembered per browser.
+  const SCOPE_KEY = "crm.schedule.scope";
+  const [scope, setScopeState] = useState<string>(() => {
+    try { return localStorage.getItem(SCOPE_KEY) || "mine"; } catch { return "mine"; }
+  });
+  const setScope = (v: string) => {
+    setScopeState(v);
+    try { localStorage.setItem(SCOPE_KEY, v); } catch { /* private mode etc. */ }
+  };
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canManage = me?.permissions?.manageJobs === true;
+  const myMemberId: string | undefined = me?.member?.id;
 
   // The visible window the calendar must cover.
   const range = useMemo(() => {
@@ -99,9 +113,9 @@ export default function CrmSchedulePage() {
     enabled: view === "agenda",
   });
 
-  const { data: membersData } = useQuery<any>({
-    queryKey: ["/api/crm/members"], enabled: canManage,
-  });
+  // Everyone can list members (org-scoped, read-only) — the crew filter needs
+  // the names even for roles that can't book.
+  const { data: membersData } = useQuery<any>({ queryKey: ["/api/crm/members"] });
   const { data: projectsData } = useQuery<any>({
     queryKey: ["/api/crm/projects"], enabled: canManage,
   });
@@ -109,7 +123,31 @@ export default function CrmSchedulePage() {
     queryKey: ["/api/crm/customers"], enabled: canManage,
   });
 
-  const appointments = calData?.appointments ?? [];
+  const members: { id: string; displayName?: string | null; email?: string | null }[] =
+    membersData?.members ?? [];
+
+  /**
+   * The calendar filter. A visit belongs to a member when they BOOKED it
+   * (createdByMemberId) or are on its crew (dispatchedMemberIds). "My calendar"
+   * is my visits by that rule; a member id is that person's; "all" is the org
+   * board. Visits booked before the creator column existed have no booker and
+   * only show under "Everyone's calendar" unless someone is on the crew.
+   */
+  const belongsTo = (a: Appointment, memberId: string): boolean =>
+    a.createdByMemberId === memberId || (a.dispatchedMemberIds ?? []).includes(memberId);
+  const matchesScope = (a: Appointment): boolean => {
+    if (scope === "all") return true;
+    if (scope === "mine") return myMemberId ? belongsTo(a, myMemberId) : false;
+    return belongsTo(a, scope);
+  };
+
+  // A remembered member filter whose member left the org falls back to "mine".
+  useEffect(() => {
+    if (scope !== "all" && scope !== "mine" && members.length && !members.some((m) => m.id === scope)) setScope("mine");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members.length, scope]);
+
+  const appointments = (calData?.appointments ?? []).filter(matchesScope);
   const byDay = useMemo(() => {
     const m = new Map<string, Appointment[]>();
     for (const a of appointments) {
@@ -160,7 +198,7 @@ export default function CrmSchedulePage() {
 
   // ── Agenda data shaping (unchanged from the original list) ──────────────
   const groups: { key: string; label: string; items: Appointment[] }[] = [];
-  for (const a of agendaData?.appointments ?? []) {
+  for (const a of (agendaData?.appointments ?? []).filter(matchesScope)) {
     const key = dayStart(new Date(a.startsAt)).toISOString();
     const last = groups[groups.length - 1];
     if (last && last.key === key) last.items.push(a);
@@ -198,7 +236,23 @@ export default function CrmSchedulePage() {
         infoKey="schedule"
         subtitle="Scroll the calendar, click a day to book, click a visit to move it."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={scope} onValueChange={setScope}>
+              <SelectTrigger className="h-8 w-[180px] text-xs" data-testid="select-calendar-scope">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="scope-all">Everyone's calendar</SelectItem>
+                <SelectItem value="mine" data-testid="scope-mine">My calendar</SelectItem>
+                {members
+                  .filter((m) => m.id !== myMemberId)
+                  .map((m) => (
+                    <SelectItem key={m.id} value={m.id} data-testid={`scope-member-${m.id}`}>
+                      {m.displayName || m.email}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
             <div className="flex items-center gap-1 rounded-full border bg-muted/40 p-1" data-testid="schedule-view-switch">
               {(["month", "week", "agenda"] as View[]).map((v) => (
                 <button
@@ -359,7 +413,9 @@ export default function CrmSchedulePage() {
             <div className="rounded-xl border bg-card">
               <EmptyState
                 icon={CalendarDays}
-                title={`Nothing scheduled in the next ${days} days`}
+                title={scope === "all"
+                  ? `Nothing scheduled in the next ${days} days`
+                  : `No visits for this filter in the next ${days} days`}
                 description={canManage
                   ? "Click a day on the calendar (or the Add button) to book your first visit."
                   : "Visits booked on your projects will show up here, grouped by day."}

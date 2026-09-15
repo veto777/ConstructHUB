@@ -2,6 +2,17 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 2026-09-15 — per-user calendars (Braxton's request)
+- `crm_appointments.created_by_member_id` (stamped on POST; `schema-ensure` adds the column and best-effort
+  backfills from `crm_team_activity` "scheduled <title>" rows ±2 min). Prod after deploy: Alpine Exteriors 33
+  visits, 13 backfilled to Braxton; the 20 unmatched (mostly the 2026-07-31 import batch) stay unowned and show
+  only under "Everyone's calendar".
+- Schedule page filter (next to month/week/agenda): **My calendar** (default, remembered per browser) /
+  **Everyone's calendar** / one entry per member. "Mine" = visits I booked OR am dispatched to.
+- Visibility for members without `viewAllJobs` now includes visits they booked, not just dispatched ones;
+  the booker may also progress their own visit without `manageJobs`.
+- Tests: `server/crm/appointments.test.ts` (+2). Deployed to vb7 via `script/deploy-vb7.sh`; vb11 DEV tree synced.
+
 ## TL;DR
 **LIVE at https://constructhub.us (+www) since 2026-07-10**, self-hosted on vb7 behind ConstructHUB's
 own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and had its (~100% fabricated)

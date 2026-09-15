@@ -1986,6 +1986,9 @@ export const crmAppointments = pgTable("crm_appointments", {
   projectId: varchar("project_id"),
   jobId: varchar("job_id"),
   customerId: varchar("customer_id"),
+  // Who booked it. "My calendar" = visits I created OR am dispatched to; the
+  // Schedule page filters on this (owner request 2026-09-15: per-user calendars).
+  createdByMemberId: varchar("created_by_member_id"),
   title: text("title").notNull(),
   notes: text("notes"),
   crewNotes: text("crew_notes"),

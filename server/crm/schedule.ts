@@ -6,7 +6,8 @@
  * The CRUD lives here (moved out of ops.ts) because the schedule page is the
  * primary editor: month/week calendar, crew assignment, project/customer
  * links. Same two rules as everywhere: org-scoped through requireOrg(), and
- * a crew member without viewAllJobs sees only visits they're dispatched to.
+ * a crew member without viewAllJobs sees only visits they're dispatched to or
+ * booked themselves (created_by_member_id, stamped on POST).
  */
 import type { Express } from "express";
 import { z } from "zod";
@@ -126,6 +127,10 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
         projectName,
         projectNumber,
         customerName,
+        // The schedule page's crew filter ("my calendar" / one member) needs
+        // the ids, not just the rendered names.
+        dispatchedMemberIds: a.dispatchedMemberIds || [],
+        createdByMemberId: a.createdByMemberId ?? null,
         crew: (a.dispatchedMemberIds || [])
           .map((id) => nameOf.get(id))
           .filter(Boolean),
@@ -143,9 +148,13 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
   async function visibleAppointments<T extends { appointment: typeof crmAppointments.$inferSelect }>(
     ctx: OrgContext, rows: T[],
   ): Promise<T[]> {
+    // A restricted member sees visits they're dispatched to AND visits they
+    // booked themselves (a booker without viewAllJobs must still see their own).
     let out = ctx.permissions.viewAllJobs
       ? rows
-      : rows.filter((r) => (r.appointment.dispatchedMemberIds || []).includes(ctx.member.id));
+      : rows.filter((r) =>
+          (r.appointment.dispatchedMemberIds || []).includes(ctx.member.id)
+          || r.appointment.createdByMemberId === ctx.member.id);
     const scope = divisionScopeOf(ctx.member);
     if (scope) {
       const maps = await divisionMapsForOrg(ctx.org.id);
@@ -271,6 +280,7 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
     }
     const [row] = await db.insert(crmAppointments).values({
       ...parsed.data, orgId: ctx.org.id, startsAt, endsAt,
+      createdByMemberId: ctx.member.id,
     } as any).returning();
     await logTeamActivity({
       orgId: ctx.org.id, memberId: ctx.member.id,
@@ -287,8 +297,9 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
     const [appt] = await db.select().from(crmAppointments)
       .where(and(eq(crmAppointments.orgId, ctx.org.id), eq(crmAppointments.id, req.params.id))).limit(1);
     if (!appt) return res.status(404).json({ message: "Appointment not found" });
-    const dispatched = (appt.dispatchedMemberIds || []).includes(ctx.member.id);
-    // A dispatched tech may progress their own visit without manageJobs.
+    const dispatched = (appt.dispatchedMemberIds || []).includes(ctx.member.id)
+      || appt.createdByMemberId === ctx.member.id;
+    // A dispatched tech (or the member who booked it) may progress the visit without manageJobs.
     if (!ctx.permissions.manageJobs && !dispatched) {
       return res.status(403).json({ message: "Requires permission: manageJobs" });
     }

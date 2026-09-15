@@ -311,7 +311,7 @@ export async function ensureCrmSchema(): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS crm_appointments (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(), org_id varchar NOT NULL,
-      project_id varchar, job_id varchar, customer_id varchar,
+      project_id varchar, job_id varchar, customer_id varchar, created_by_member_id varchar,
       title text NOT NULL, notes text, crew_notes text,
       status text NOT NULL DEFAULT 'scheduled',
       starts_at timestamp NOT NULL, ends_at timestamp,
@@ -478,6 +478,7 @@ export async function ensureCrmSchema(): Promise<void> {
   await pool.query(`
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS onboarding_dismissed_at timestamp;
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS custom_fields jsonb;
+    ALTER TABLE crm_appointments ADD COLUMN IF NOT EXISTS created_by_member_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS invoice_id varchar;
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS author_member_id varchar;
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS estimate_id varchar;
@@ -495,6 +496,28 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS sms_consent_phone text;
     CREATE INDEX IF NOT EXISTS crm_members_division_idx ON crm_members (division_id);
     CREATE INDEX IF NOT EXISTS crm_projects_division_idx ON crm_projects (division_id);
+  `);
+
+  // Backfill created_by_member_id for visits booked before the column existed.
+  // The team activity feed logged "scheduled <title>" with the booking member at
+  // the moment of creation, so match on org + title + a 2-minute window around
+  // created_at. Best effort and idempotent: rows with no match stay NULL (they
+  // appear on "Everyone's calendar" only).
+  await pool.query(`
+    UPDATE crm_appointments a SET created_by_member_id = t.member_id
+    FROM (
+      SELECT DISTINCT ON (a2.id) a2.id, act.member_id
+      FROM crm_appointments a2
+      JOIN crm_team_activity act
+        ON act.org_id = a2.org_id
+       AND act.type = 'appointmentScheduled'
+       AND act.title = 'scheduled ' || a2.title
+       AND act.member_id IS NOT NULL
+       AND act.created_at BETWEEN a2.created_at - interval '2 minutes' AND a2.created_at + interval '2 minutes'
+      WHERE a2.created_by_member_id IS NULL
+      ORDER BY a2.id, abs(extract(epoch from (act.created_at - a2.created_at)))
+    ) t
+    WHERE a.id = t.id AND a.created_by_member_id IS NULL;
   `);
 
   // ── SMS opt-out suppression (STOP/START) ─────────────────────────────────

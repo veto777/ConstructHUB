@@ -32,6 +32,8 @@ export interface Appointment {
   projectId: string | null;
   customerId: string | null;
   dispatchedMemberIds: string[] | null;
+  /** Member who booked the visit (null on rows older than 2026-09-15). */
+  createdByMemberId?: string | null;
   projectName: string | null;
   projectNumber: string | null;
   customerName: string | null;

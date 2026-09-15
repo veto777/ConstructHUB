@@ -145,6 +145,34 @@ describe("crm appointments CRUD (dev server)", () => {
     expect(row.projectName).toContain("Vitest Appt Proj");
     expect(row.crew).toEqual(["Appt Owner"]);
     expect(row.dispatchedMemberIds).toEqual([memberA]);
+    // The booker is stamped on create — "My calendar" filters on it.
+    expect(row.createdByMemberId).toBe(memberA);
+  });
+
+  it("a restricted member still sees a visit they booked but are not dispatched to", async () => {
+    // Booked by memberA (owner at this point) with NO crew.
+    const c = await post("/api/crm/appointments", {
+      title: "Vitest solo booking", startsAt: iso(T + 3 * 86400000), endsAt: iso(T + 3 * 86400000 + 3600_000),
+    }, cookieA);
+    expect(c.status).toBe(201);
+    const soloId = c.body.appointment.id;
+    const list = () => api(
+      `/api/crm/appointments?from=${encodeURIComponent(iso(T + 2 * 86400000))}&to=${encodeURIComponent(iso(T + 4 * 86400000))}`,
+      {}, cookieA);
+    // Field role = no viewAllJobs: dispatched-or-booked visits only.
+    await q(`update crm_members set role = 'field' where id = $1`, [memberA]);
+    try {
+      const seen = await list();
+      expect(seen.status).toBe(200);
+      expect(seen.body.appointments.some((a: any) => a.id === soloId)).toBe(true);
+      // Strip the booker (as on pre-2026-09-15 rows) — now it's invisible to them.
+      await q(`update crm_appointments set created_by_member_id = null where id = $1`, [soloId]);
+      const hidden = await list();
+      expect(hidden.body.appointments.some((a: any) => a.id === soloId)).toBe(false);
+    } finally {
+      await q(`update crm_members set role = 'owner' where id = $1`, [memberA]);
+      await q(`delete from crm_appointments where id = $1`, [soloId]);
+    }
   });
 
   it("logs the scheduling to team activity", async () => {
