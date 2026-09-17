@@ -28,6 +28,8 @@ const MORE_LINKS: {
   platformAdmin?: boolean;
   active: (l: string) => boolean;
 }[] = [
+  { title: "Today", url: "/crm/today", icon: Sun, testid: "ribbon-more-today",
+    active: (l) => l.startsWith("/crm/today") },
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "ribbon-more-estimates",

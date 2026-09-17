@@ -22,6 +22,7 @@ import {
 import { and, eq, desc, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage } from "./tenancy";
 import { registerCrmEntityRoutes } from "./entities";
+import { registerCrmTodayRoutes } from "./today";
 import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./portal";
 import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
@@ -141,6 +142,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   // Tax hooks MUST precede the entity routes: they fill in taxRateBps on
   // estimate creation only when the caller left it unset (server/crm/tax.ts).
   registerCrmTaxHooks(app, getDevUser);
+  registerCrmTodayRoutes(app, getDevUser);
   registerCrmEntityRoutes(app, getDevUser);
   registerCrmPortalRoutes(app, getDevUser);
   registerCrmInvoicePortalRoutes(app, getDevUser);
