@@ -161,8 +161,14 @@ Local dev only: `DEV_AUTH_BYPASS_USER1=true` (never in prod).
 
 ## GBP API access timeline (Google Business Profile / "GMB" API)
 The GMB features (GBP analytics, review management, competitor intel) need Google to grant GBP API
-access. **Twice rejected; earliest reapply date: 2026-09-08.** A one-time cloud reminder routine
-fires that morning (`trig_015TqJmLWrrjh2Ujm7cwJek3`, claude.ai/code/routines).
+access. **✅ APPROVED 2026-09-23** (application #3, case `1-4033000042334`) — project `90021415768`
+(`construction-hub-489119`) granted the default 300 QPM quota. Remaining activation step: enable the
+Business Profile APIs in that project's API Library (owner console click — no gcloud/service-account
+creds exist on any box). ⚠️ Google policy rider from the approval email: **no public statements or
+press releases suggesting partnership/sponsorship/endorsement by Google** without prior written
+approval. Keep `SHOW_COMPETITOR_INTEL` and `SHOW_GOOGLE_REVIEWS` **off** until the integration is
+built AND the review-gating flow is fixed (see `.agents/memory/review-gating-flag.md`) — Google
+re-audits sensitive-scope apps after approval.
 
 | Date | Event |
 |---|---|
@@ -170,7 +176,9 @@ fires that morning (`trig_015TqJmLWrrjh2Ujm7cwJek3`, claude.ai/code/routines).
 | 2026-03-09 23:07 | **Rejected** — "did not pass our internal quality checks"; likely cause per Replit-agent notes: competitor-surveillance marketing on the site |
 | 2026-06-20 ~01:00 ET | Application #2 submitted (Replit era): consent-screen branding verified 12:47 AM (project `gmb-profile-500003`), official form filled ~1:02 AM; sensitive scope `business.manage`; Competitor Intel + review-gating hidden behind flags for the reviewer |
 | 2026-07-09 | **Rejected again** (Alpine-account application). Google's stated criteria: requester email must be Owner/Manager of a Business Profile **verified ≥60 days**; website URL on the application must **match** the profile's listed website (official own-domain site) |
-| **2026-09-08** | **Reapply window opens** (60 days from the 2026-07-09 rejection). Checklist: profile verified ≥60 days + lists constructhub.us as its website; apply from the Owner/Manager email of THAT profile; zero competitor-surveillance marketing visible on the site; site is live (done 2026-07-10) |
+| **2026-09-08** | ~~Reapply window opens~~ (prior-session interpretation of "60 days from the 7/09 rejection"; Google's only documented 60-day rule is profile-verification age, already met — so we applied early). Note: the reminder routine id once recorded here (`trig_015TqJmLWrrjh2Ujm7cwJek3`) never existed — 404 verified 9/04 |
+| 2026-09-04 | **Application #3 submitted** — case `1-4033000042334`, as `support@constructhub.us` (Primary owner of the "Construct HUB" GBP, ~80 days old, website constructhub.us), project number `90021415768` (`construction-hub-489119` — the same project serving the live site's Google OAuth). Same day, pre-submission: public pricing/vpn-shield/master-class pages scrubbed of "Ad Spy / BS Meter / spy on your site" marketing (ported to this repo as `fb9245d`) |
+| **2026-09-23 06:48 ET** | **✅ APPROVED** — "your project (90021415768) has been approved to use the Google Business Profile API", default quota 300 QPM. Next steps per email: activate the API in the Cloud Console API Library. Policy rider: no public statements implying Google partnership/endorsement |
 
 ⚠️ The 60-day clock is on the **Business Profile's verification date**, not the rejection: if the GBP
 profile that will back the application was verified after 2026-07-10, wait until *its* verification
@@ -215,7 +223,10 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
 - [ ] Design decisions flagged by audits: multi-org homeowner portal binding (`accounts[0]`),
       expired estimates not counted in client bid tabs, org-wide stats vs divisions,
       adopt `eslint-plugin-react-hooks` (the pipeline blank-screen class).
-- [ ] **2026-09-08: reapply for GBP API access** (see "GBP API access timeline" above — cloud reminder armed).
+- [x] **GBP API access — APPROVED 2026-09-23** (application #3, case `1-4033000042334`; timeline above).
+- [ ] **Enable the Business Profile APIs** in project `construction-hub-489119` (owner console click,
+      links in the timeline section) — then build the GBP integration (OAuth scope `business.manage`,
+      account/location listing, info edits, review display + owner replies, performance metrics).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").
 - [ ] Rotate secrets (Google, SMTP, R2 — provider dashboards; SESSION_SECRET + DB pw already fresh).
       **Stripe: superseded by the cross-wire item below — the leaked key was GGG's, rotate it on the
