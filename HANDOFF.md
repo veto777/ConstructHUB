@@ -19,7 +19,20 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
-## Live deployment (2026-07-10)
+## 🟢 Production host: vb11 (moved from vb7 2026-09-26 22:52 UTC, 194s downtime)
+- **LIVE = vb11 `~/ConstructHUB-live`** — NOT vb11 `~/ConstructHUB` (that is a dev tree; never deploy prod there).
+- Units (vb11 `systemctl --user`): `constructhub.service` (:8110), `constructhub-demo.service` (:8111,
+  `~/ConstructHUB-demo`, its `node_modules` symlinks to the live tree), `constructhub-tunnel.service`
+  (d8436ec8, `~/.cloudflared/config-constructhub.yml`), `constructhub-db.service` (dedicated PG16 cluster
+  `~/ConstructHUB-live/pgdata`, **port 5433**, dbs `constructhub` + `constructhub_demo`). Node `/usr/bin/node`.
+  `.env` at `~/ConstructHUB-live/.env`.
+- **Deploy:** `script/deploy-vb11.sh` (replaces `deploy-vb7.sh`). SSH via the tower's `vb11` alias (key auth).
+- **vb7 = fallback only:** its units are disabled and guarded (`AssertPathExists`), so restarting them fails
+  on purpose. vb11 mirrors DB dumps + `tmp/` to vb7 every 15 min. Failover runbook: vb7 `~/ConstructHUB/FAILOVER.md`.
+- Migration done by the infra session; full card: `~/HUB/projects/constructhub.md`. The "Live deployment"
+  section below is the **vb7-era history** (2026-07-10 → 09-26).
+
+## Live deployment (2026-07-10) — vb7 era, superseded 2026-09-26 (see above)
 - **Host:** vb7 (`voiceban@50.125.203.201 -p 2252`, password auth via `~/.ssh/.vb_askpass` on the tower).
 - **App:** `~/ConstructHUB` on vb7, port **8110**, systemd `--user` **`constructhub.service`**
   (`node --env-file=.env dist/index.cjs`, Restart=always, enabled; linger on).
@@ -38,7 +51,7 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
 - **Secrets:** `.env` on vb7 (600) from `Construct_hub_secrets.txt` + **fresh** `SESSION_SECRET` and DB
   password (the Replit-leaked ones were NOT reused). R2 verified live (bucket `constructhub`, has user
   logo uploads). `R2_ENDPOINT`/`R2_BUCKET_NAME` set.
-- **Deploy update flow:** `script/deploy-vb7.sh` — builds on the tower, rsyncs `dist/` (`-azc`
+- **Deploy update flow:** `script/deploy-vb7.sh` (now `script/deploy-vb11.sh`, retargeted 2026-09-26) — builds on the tower, rsyncs `dist/` (`-azc`
   checksums; a plain `-az` once shipped a partial `dist/data/` and the appraiser seed silently
   skipped), **syncs `package.json`/`package-lock.json` and runs `npm ci --omit=dev` on vb7 whenever
   they differ** (2026-08-01: a deploy shipped `dist/` needing `pdfkit` without installing it — static
