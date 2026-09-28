@@ -3,6 +3,9 @@ import { pool } from "./db";
 // Additive migration: legacy rows deliberately remain unowned.
 export async function ensureGrowthSchema() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS review_referral_settings (
+      user_id integer PRIMARY KEY, enabled boolean NOT NULL DEFAULT false, offer text NOT NULL DEFAULT ''
+    );
     CREATE TABLE IF NOT EXISTS review_recipient_preferences (
       user_id integer NOT NULL, email text NOT NULL, unsubscribed boolean NOT NULL DEFAULT true,
       updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(user_id,email)

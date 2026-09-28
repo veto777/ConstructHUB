@@ -132,7 +132,7 @@ export default function ReviewFeedbackPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isHighRating, isCompleted]);
 
-  const positiveSteps: Step[] = ["referral", "referral_feedback", "describe", "review"];
+  const positiveSteps: Step[] = ["describe", "review"];
   const getStepProgress = () => {
     if (!isHighRating) return null;
     const idx = positiveSteps.indexOf(step);
@@ -167,7 +167,7 @@ export default function ReviewFeedbackPage() {
     },
     onSuccess: () => {
       if (isHighRating) {
-        setStep("referral");
+        setStep(reviewData?.referralOffer ? "referral" : "describe");
       } else {
         setStep("improvement");
       }
@@ -571,7 +571,7 @@ export default function ReviewFeedbackPage() {
           );
         })()}
 
-        {step === "referral" && (
+        {step === "referral" && reviewData.referralOffer && (
           <Card className="border shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="text-center space-y-3">
@@ -594,10 +594,10 @@ export default function ReviewFeedbackPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-extrabold text-lg">3% Referral Fee</p>
+                        <p className="font-extrabold text-lg">Referral Offer</p>
                         <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wider">Earn Cash</span>
                       </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">Know someone who needs work done? Refer them to {companyName} and earn <strong>3% of their project value</strong> as a thank-you payment.</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{reviewData.referralOffer}</p>
                     </div>
                   </div>
                 </div>
@@ -637,7 +637,7 @@ export default function ReviewFeedbackPage() {
           </Card>
         )}
 
-        {step === "referral_feedback" && (
+        {step === "referral_feedback" && reviewData.referralOffer && (
           <Card className="border shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="text-center space-y-3">

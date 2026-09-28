@@ -1,3 +1,4 @@
+import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
 import { reserveMonthlyQuota } from "./growth-quotas";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
@@ -5178,6 +5179,7 @@ function main() {
         status: request.status,
         feedbackRating: request.feedbackRating,
         reviewSubmitted: request.reviewSubmitted,
+        referralOffer: await getReferralSettings(request.userId).then(s => s.enabled ? s.offer : null),
       });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to load review" });
@@ -5225,11 +5227,12 @@ function main() {
         return res.status(409).json({ message: "Submit a rating first" });
       }
 
+      const referral = await getReferralSettings(request.userId);
       await storage.updateReviewRequest(request.id, {
         lastStep: "done",
         nextReminderAt: null,
-        referralOptIn: req.body.referralOptIn || false,
-        referralFeedback: req.body.referralFeedback || null,
+        referralOptIn: referral.enabled && req.body.referralOptIn === true,
+        referralFeedback: referral.enabled && ["up", "down"].includes(req.body.referralFeedback) ? req.body.referralFeedback : null,
       });
       res.json({ success: true });
     } catch (err: any) {
@@ -5475,6 +5478,17 @@ function main() {
   });
 
   // Review Reminder Settings
+  app.get("/api/review-referral-settings", async (req, res) => {
+    const user = getDevUser(req, res); if (!user) return;
+    res.json(await getReferralSettings(user.id));
+  });
+  app.put("/api/review-referral-settings", async (req, res) => {
+    const user = getDevUser(req, res); if (!user) return;
+    const parsed = referralSettingsInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Enabled offers need terms of 1–500 characters" });
+    res.json(await saveReferralSettings(user.id, parsed.data));
+  });
+
   app.get("/api/review-reminder-settings", async (req, res) => {
     try {
       const user = (req as any).user;

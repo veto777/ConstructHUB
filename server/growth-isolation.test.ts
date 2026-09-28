@@ -56,6 +56,7 @@ afterAll(async () => {
   await pool.query("delete from click_visits where domain_id=any($1::int[])", [domainIds]);
   await pool.query("delete from tracked_domains where id=any($1::int[])", [domainIds]);
   await pool.query("delete from review_requests where token=any($1::text[])", [reviewTokens]);
+  await pool.query("delete from review_referral_settings where user_id=any($1::int[])", [users]);
   await pool.query("delete from review_recipient_preferences where user_id=any($1::int[])", [users]);
   await pool.query("delete from users where id=any($1::int[])", [users]);
   await pool.query("delete from session where sid=any($1::text[])", [sids]);
@@ -160,5 +161,20 @@ describe("tracking embeds and cross-IP signals", () => {
     expect(response.status).toBe(204);
     const { rows: [visit] } = await pool.query("select suspicion_reasons from click_visits where domain_id=$1 and ip_address='192.0.2.2'", [domain.id]);
     expect(visit.suspicion_reasons).toContain("Same device fingerprint seen from different IPs");
+  });
+});
+
+describe("contractor referral settings", () => {
+  it("defaults off, isolates offers, validates terms and hides disabled offers", async () => {
+    expect(await (await api("/api/review-referral-settings", a)).json()).toEqual({ enabled: false, offer: "" });
+    expect((await api("/api/review-referral-settings", "", "PUT", { enabled: true, offer: "x" })).status).toBe(401);
+    expect((await api("/api/review-referral-settings", a, "PUT", { enabled: true, offer: "" })).status).toBe(400);
+    expect((await api("/api/review-referral-settings", a, "PUT", { enabled: true, offer: "Fixture referral terms, independent of reviews." })).status).toBe(200);
+    expect((await (await api("/api/review-referral-settings", b)).json()).enabled).toBe(false);
+    const token = randomUUID(); reviewTokens.push(token);
+    await pool.query("insert into review_requests(user_id,client_name,client_email,google_profile_url,token) values($1,'Fixture','referral@example.invalid','https://www.google.com/',$2)", [users[0], token]);
+    expect((await (await api(`/api/review/${token}`)).json()).referralOffer).toContain("Fixture referral");
+    await api("/api/review-referral-settings", a, "PUT", { enabled: false, offer: "Saved terms" });
+    expect((await (await api(`/api/review/${token}`)).json()).referralOffer).toBeNull();
   });
 });

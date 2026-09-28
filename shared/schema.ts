@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, numeric } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2365,3 +2365,22 @@ export const crmMeasurements = pgTable("crm_measurements", {
 });
 
 export type CrmMeasurement = typeof crmMeasurements.$inferSelect;
+
+// Growth controls use additive migrations in server/growth-schema.ts.
+export const growthBudgets = pgTable("growth_budgets", {
+  key: text("key").notNull(),
+  period: text("period").notNull(),
+  used: integer("used").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.key, t.period] })]);
+export const reviewRecipientPreferences = pgTable("review_recipient_preferences", {
+  userId: integer("user_id").notNull(),
+  email: text("email").notNull(),
+  unsubscribed: boolean("unsubscribed").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.email] })]);
+export const reviewReferralSettings = pgTable("review_referral_settings", {
+  userId: integer("user_id").primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  offer: text("offer").notNull().default(""),
+});
