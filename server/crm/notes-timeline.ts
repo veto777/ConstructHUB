@@ -1,4 +1,4 @@
-import { objectPolicy } from "./object-access";
+import { objectPolicy, canShareWholeClientPortal } from "./object-access";
 /**
  * Client 360 — the per-customer behaviour log the owner asked for.
  *
@@ -517,6 +517,8 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     if (!process.env.SESSION_SECRET) {
       return res.status(503).json({ message: "Preview is not configured on this server." });
     }
+
+    if (!canShareWholeClientPortal(ctx)) return res.status(403).json({ message: "Whole-client preview requires organization-wide document access. Preview an individual estimate instead." });
 
     const grant = mintPortalPreviewGrant(req.params.id);
     // Dev renders the client face query-forced; production has a client host.

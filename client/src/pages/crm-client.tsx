@@ -854,7 +854,7 @@ export default function CrmClientPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {canManageCustomers && <ViewAsClientButton customerId={id!} />}
+              {canManageCustomers && data.portalPath && <ViewAsClientButton customerId={id!} />}
               {canManageCustomers && (
                 <>
                   <Button variant="outline" size="sm" data-testid="button-edit-client" onClick={openEdit}>

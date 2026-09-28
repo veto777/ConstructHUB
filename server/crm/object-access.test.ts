@@ -87,6 +87,14 @@ describe('shared CRM object access — every registered direct-ID route', () => 
     expect(stats.body.unscheduledJobs).toEqual({ count: 1, totalCents: 1000 });
     expect((await request('/api/crm/customers')).body.map((c: any) => c.id)).toEqual([fixtures[0].ids.customers]);
   });
+  it('does not hand scoped seats a whole-client bearer grant', async () => {
+    const id = fixtures[0].ids.customers;
+    const detail = await request(`/api/crm/customers/${id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.portalPath).toBeUndefined();
+    expect(detail.body.portalToken).toBeUndefined();
+    expect((await request(`/api/crm/customers/${id}/portal-preview`, 'POST')).status).toBe(403);
+  });
   it('guards query IDs, upload references and message targets', async () => {
     const hidden = fixtures[1].ids;
     expect((await request(`/api/crm/invoices?customerId=${hidden.customers}`)).status).toBe(404);

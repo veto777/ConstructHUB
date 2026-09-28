@@ -19,6 +19,12 @@ export const objectTables = {
 } as const;
 export type ObjectKind = keyof typeof objectTables;
 
+/** Whole-client bearer grants expose every client document, so only seats
+ * with organization-wide document access may mint or receive one. */
+export function canShareWholeClientPortal(ctx: OrgContext): boolean {
+  return !divisionScopeOf(ctx.member) && ctx.permissions.viewAllJobs && ctx.permissions.seePrices && ctx.permissions.manageCustomers;
+}
+
 export function objectPolicy(ctx: OrgContext) {
   const cached = new Map<string, Promise<any>>();
   let maps: ReturnType<typeof divisionMapsForOrg> | undefined;

@@ -1,5 +1,5 @@
 import { invoiceRefundTotals } from "./refund-summary";
-import { objectPolicy } from "./object-access";
+import { objectPolicy, canShareWholeClientPortal } from "./object-access";
 import { csvCell } from "./csv";
 /**
  * CRM entities — customers, projects, jobs, estimates, plus the org-wide
@@ -383,7 +383,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       entityType: "customer", entityId: row.id, customerId: row.id,
       meta: { name: row.displayName },
     });
-    res.status(201).json({ ...row, portalToken: undefined, portalPath: `/portal/${row.portalToken}` });
+    res.status(201).json({ ...row, portalToken: undefined, portalPath: canShareWholeClientPortal(ctx) ? `/portal/${row.portalToken}` : undefined });
   });
 
   /**
@@ -434,7 +434,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.json({
       customer: { ...c, portalToken: undefined },
       // Only someone who can manage customers gets the shareable portal link.
-      portalPath: ctx.permissions.manageCustomers ? `/portal/${c.portalToken}` : undefined,
+      portalPath: canShareWholeClientPortal(ctx) ? `/portal/${c.portalToken}` : undefined,
       projects: (await objectPolicy(ctx).filter("projects", projects)).map((p) => presentProject(p, ctx)),
       estimates: (await objectPolicy(ctx).filter("estimates", estimates)).map((e) => presentEstimate(e, ctx)),
     });
