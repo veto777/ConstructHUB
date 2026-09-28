@@ -90,23 +90,12 @@ export function isBackupDue(cfg: BackupConfig, now: Date = new Date()): boolean 
 
 // ── CSV (RFC 4180, by hand) ───────────────────────────────────────────────────
 
-export type CellValue = string | number | null;
+import { toCsv, type CellValue } from "./csv";
+export { csvCell, toCsv } from "./csv";
 export interface BackupSection {
   name: string;
   headers: string[];
   rows: CellValue[][];
-}
-
-export function csvCell(v: CellValue): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-export function toCsv(headers: string[], rows: CellValue[][]): string {
-  const lines = [headers.map(csvCell).join(",")];
-  for (const r of rows) lines.push(r.map(csvCell).join(","));
-  return lines.join("\r\n") + "\r\n";
 }
 
 // ── SpreadsheetML 2003 ("Excel" without a dependency) ────────────────────────

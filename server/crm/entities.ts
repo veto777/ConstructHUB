@@ -1,3 +1,4 @@
+import { csvCell } from "./csv";
 /**
  * CRM entities — customers, projects, jobs, estimates, plus the org-wide
  * Documents Center lists (filtered estimates/invoices for /crm/estimates and
@@ -397,15 +398,11 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmCustomers.orgId, ctx.org.id), isNull(crmCustomers.archivedAt)))
       .orderBy(asc(crmCustomers.displayName)).limit(10000);
 
-    const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
     const header = ["id", "name", "email", "phone", "address", "city", "state", "postal_code", "created_at"];
     const lines = rows.map((c) => [
       c.id, c.displayName, c.email, c.phone, c.addressLine1, c.city, c.state, c.postalCode,
       c.createdAt ? new Date(c.createdAt).toISOString() : "",
-    ].map(esc).join(","));
+    ].map(csvCell).join(","));
     const csv = [header.join(","), ...lines].join("\n") + "\n";
 
     logActivity(ctx, "data.exported", {
