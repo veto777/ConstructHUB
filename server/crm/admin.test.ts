@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createHash } from "crypto";
-import { spawn, execSync, type ChildProcess } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import { createWriteStream } from "fs";
 import pg from "pg";
 import { ADMIN_EMAILS } from "../admin";
@@ -235,7 +235,7 @@ describe("beta accounts are unlimited", () => {
  * (gate off), so this suite spawns its own server on :8199 with the gate
  * configured and kills it in afterAll. Never touches 8119/8129/8139.
  */
-const GATE_PORT = 8199;
+const GATE_PORT = Number(process.env.CRM_TEST_GATE_PORT || 8199);
 const GBASE = `http://127.0.0.1:${GATE_PORT}`;
 const GATE_USER = "vt-gate-admin";
 const GATE_PASS = "vt-gate-pass-123";
@@ -288,7 +288,7 @@ describe("gate brute-force limiter (unit)", () => {
   });
 });
 
-describe("configured admin gate (:8199 child server)", () => {
+describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("configured admin gate (auxiliary child server)", () => {
   let child: ChildProcess | null = null;
 
   beforeAll(async () => {
@@ -340,9 +340,7 @@ describe("configured admin gate (:8199 child server)", () => {
     try {
       if (child?.pid) process.kill(-child.pid, "SIGKILL");
     } catch { /* already dead */ }
-    try {
-      execSync("fuser -k 8199/tcp 2>/dev/null || true");
-    } catch { /* best effort */ }
+    // Never kill by port: another lane may own a process listening there.
   });
 
   it("reports configured, 403s admin APIs until the gate is passed, then 200s", async () => {

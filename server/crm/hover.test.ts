@@ -27,7 +27,7 @@ process.env.DATABASE_URL ??=
 process.env.STRIPE_SECRET_KEY ??= "sk_test_vitest_stub";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
-const STUB_PORT = 8465;
+const STUB_PORT = Number(process.env.CRM_TEST_HOVER_PORT || 8465);
 const STUB = `http://127.0.0.1:${STUB_PORT}`;
 const STUB_FILE = path.join(process.cwd(), "tmp", "hover-stub.json");
 const RECEIVER_PATH = "/api/crm/integrations/hover/webhook";
@@ -306,7 +306,7 @@ function startStub(): Promise<void> {
 
 // ── The suite ───────────────────────────────────────────────────────────────
 
-describe("HOVER integration (dev server + stub HOVER)", () => {
+describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration (dev server + auxiliary stub HOVER)", () => {
   let orgId: string;
   let savedCustomFields: any;
   let hover: typeof import("./hover");
