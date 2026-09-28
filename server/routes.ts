@@ -5308,6 +5308,8 @@ function main() {
       const request = requests.find(r => r.id === id);
       if (!request) return res.status(404).json({ message: "Not found" });
 
+      if (request.unsubscribed) return res.status(409).json({ message: "This customer unsubscribed from this review request." });
+
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       const companyLogoUrl = fullUser?.companyLogoUrl || null;
 
@@ -5319,7 +5321,6 @@ function main() {
       await storage.updateReviewRequest(id, {
         status: "sent",
         remindersSent: 0,
-        unsubscribed: false,
         nextReminderAt: nextTime,
       });
 
@@ -5849,12 +5850,7 @@ Requirements:
 
   async function processScheduledReviews() {
     try {
-      const now = new Date();
-      const scheduled = await db.select().from(reviewRequests)
-        .where(and(
-          eq(reviewRequests.status, "scheduled"),
-          lte(reviewRequests.scheduledFor, now)
-        ));
+      const scheduled = await storage.getScheduledReviews();
 
       for (const request of scheduled) {
         try {

@@ -140,6 +140,7 @@ export interface IStorage {
   getReminderSettings(userId: number): Promise<ReviewReminderSettings | undefined>;
   upsertReminderSettings(userId: number, data: Partial<InsertReminderSettings>): Promise<ReviewReminderSettings>;
   getPendingReminders(): Promise<ReviewRequest[]>;
+  getScheduledReviews(): Promise<ReviewRequest[]>;
 
   createBetaAccessCode(data: InsertBetaAccessCode): Promise<BetaAccessCode>;
   getBetaAccessCodeByCode(code: string): Promise<BetaAccessCode | undefined>;
@@ -764,10 +765,20 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(reviewRequests).where(
       and(
         eq(reviewRequests.status, "sent"),
+        isNull(reviewRequests.deletedAt),
         eq(reviewRequests.unsubscribed, false),
         lte(reviewRequests.nextReminderAt, new Date()),
       )
     );
+  }
+
+  async getScheduledReviews(): Promise<ReviewRequest[]> {
+    return db.select().from(reviewRequests).where(and(
+      eq(reviewRequests.status, "scheduled"),
+      isNull(reviewRequests.deletedAt),
+      eq(reviewRequests.unsubscribed, false),
+      lte(reviewRequests.scheduledFor, new Date()),
+    ));
   }
 
   async createBetaAccessCode(data: InsertBetaAccessCode): Promise<BetaAccessCode> {
