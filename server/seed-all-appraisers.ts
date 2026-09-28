@@ -1,3 +1,4 @@
+import { preserveNewerGovernmentCheck } from "./government-seed-status";
 import { db } from "./db";
 import { counties, propertyAppraisers } from "@shared/schema";
 import { sql, eq } from "drizzle-orm";
@@ -77,7 +78,7 @@ export async function syncAppraiserRecords(records: AppraiserRecord[]) {
       phone: r.phone,
       address: null, // never fabricated; NETR county pages carry no street address
       searchableFields: SEARCHABLE_FIELDS,
-      isActive: !!r.portalUrl && !["dead", "unverified"].includes(r.linkStatus || ""),
+      isActive: !!r.portalUrl && r.linkStatus === "live",
       linkStatus: r.portalUrl ? (r.linkStatus || "unchecked") : "none",
       lastVerifiedAt: r.lastVerifiedAt ? new Date(r.lastVerifiedAt) : null,
       notes: `Sourced from NETR Online. Contact for property records in ${r.county} County.`,
@@ -85,7 +86,7 @@ export async function syncAppraiserRecords(records: AppraiserRecord[]) {
     const matches = existing.filter(e => e.countyId === countyId && e.notes?.startsWith(REAL_DATA_MARKER));
     if (matches.length) {
       const { notes, address, searchableFields, ...sourceFields } = values;
-      for (const row of matches) await tx.update(propertyAppraisers).set(sourceFields).where(eq(propertyAppraisers.id, row.id));
+      for (const row of matches) await tx.update(propertyAppraisers).set({ ...sourceFields, ...preserveNewerGovernmentCheck(row, sourceFields) }).where(eq(propertyAppraisers.id, row.id));
     } else if (!existing.some(e => e.countyId === countyId)) {
       toInsert.push(values);
     }

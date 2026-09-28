@@ -1,3 +1,4 @@
+import { preserveNewerGovernmentCheck } from "./government-seed-status";
 import { db } from "./db";
 import { permitDatabases } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
@@ -29,18 +30,19 @@ export async function syncPermitPortals(portals: PermitPortal[]) {
   for (const p of portals) {
     // permit_databases.jurisdiction is "City, ST" for cities and "Name County, ST"
     // for counties — the string alone identifies the row, so match on it directly.
-    const res = await tx
-      .update(permitDatabases)
-      .set({
-        portalUrl: p.url,
-        searchUrl: p.url,
-        platform: p.platform,
-        isActive: !!p.url && !["dead", "unverified"].includes(p.linkStatus || ""),
-        linkStatus: p.url ? (p.linkStatus || "unchecked") : "none",
-        lastVerifiedAt: p.lastVerifiedAt ? new Date(p.lastVerifiedAt) : null,
-      })
-      .where(eq(permitDatabases.jurisdiction, p.jurisdiction))
-      .returning({ id: permitDatabases.id });
+    const matches = await tx.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, p.jurisdiction));
+    const values = {
+      portalUrl: p.url,
+      searchUrl: p.url,
+      platform: p.platform,
+      isActive: !!p.url && p.linkStatus === "live",
+      linkStatus: p.url ? (p.linkStatus || "unchecked") : "none",
+      lastVerifiedAt: p.lastVerifiedAt ? new Date(p.lastVerifiedAt) : null,
+    };
+    for (const row of matches) {
+      await tx.update(permitDatabases).set({ ...values, ...preserveNewerGovernmentCheck(row, values) }).where(eq(permitDatabases.id, row.id));
+    }
+    const res = matches;
     if (res.length) updated += res.length;
     else { unmatched++; console.warn(`  permit-portal: no matching row for "${p.jurisdiction}"`); }
   }
