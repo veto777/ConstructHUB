@@ -212,7 +212,7 @@ export default function ReviewUnsubscribePage() {
               <MessageSquare className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">100% private</p>
-                <p className="text-sm text-muted-foreground">Ratings below 8 stay private and are only used internally to improve our service.</p>
+                <p className="text-sm text-muted-foreground">Private feedback is shared with the company. Every customer can also choose to leave a public Google review, regardless of rating.</p>
               </div>
             </div>
           </div>
