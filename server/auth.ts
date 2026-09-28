@@ -150,9 +150,7 @@ export async function setupAuth(app: Express) {
           const betaToken = req.session?.betaToken;
 
           const tokenData: any = { emailVerified: true };
-          if (accessToken) tokenData.googleAccessToken = accessToken;
-          if (refreshToken) tokenData.googleRefreshToken = refreshToken;
-          if (accessToken) tokenData.googleTokenExpiry = new Date(Date.now() + 3600 * 1000);
+          // Login credentials must never create or replace a GBP grant.
 
           const existingByGoogle = await db.select().from(users).where(eq(users.googleId, googleId));
           if (existingByGoogle.length > 0) {
@@ -215,7 +213,8 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/auth/google", (req, res, next) => {
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
-    const gbp = req.query.gbp === "1";
+    if (req.query.gbp === "1") return res.redirect("/api/gbp/connect");
+    const gbp = false;
     // A CRM beta invite survives the OAuth round-trip in the session.
     if (typeof req.query.beta === "string" && req.query.beta) {
       req.session.betaToken = req.query.beta;
@@ -561,7 +560,7 @@ export async function setupAuth(app: Express) {
           companyLogoUrl: fresh.companyLogoUrl,
           googleProfileUrl: fresh.googleProfileUrl,
           totpEnabled: fresh.totpEnabled,
-          hasGbpAccess: !!(fresh.googleAccessToken || fresh.googleRefreshToken),
+          hasGbpAccess: (await (await import("./gbp/grants")).grantStatus(fresh.id)).connected,
           createdAt: fresh.createdAt,
         });
       } catch {
