@@ -213,7 +213,7 @@ const tools = [
 
 const pipeline = [
   { step: "01", title: "Scan Your Market", desc: "Select your industry (roofing, HVAC, plumbing, etc.) and enter your location. Our system queries Google to find every competitor within your specified radius — 10, 25, 50, or 100 miles.", icon: Search, color: "from-[#EAB308] to-[#CA8A04]" },
-  { step: "02", title: "Analyze the Competition", desc: "We pull full profiles for every competitor — ratings, reviews, photos, website, hours, categories. Our BS Meter scores their reviews to detect fakes. Ad Spy captures their live Google Ads campaigns.", icon: Eye, color: "from-[#4A6CF7] to-[#3B5DE7]" },
+  { step: "02", title: "Analyze the Competition", desc: "We pull full profiles for every competitor — ratings, reviews, photos, website, hours, categories. Our BS Meter scores their reviews to detect fakes. Public Ad Activity shows the Google Ads anyone searching your keywords can see.", icon: Eye, color: "from-[#4A6CF7] to-[#3B5DE7]" },
   { step: "03", title: "Outmaneuver Everyone", desc: "Use competitor insights to craft better ads, target underserved areas, improve your reviews strategy, and position your business where the competition is weakest. Knowledge is the ultimate competitive advantage.", icon: Target, color: "from-[#EF4444] to-[#DC2626]" },
 ];
 
