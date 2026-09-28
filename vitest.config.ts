@@ -38,6 +38,7 @@ export default defineConfig({
   },
   test: {
     include: ["server/**/*.test.ts"],
+    globalSetup: ["./server/test-budget-setup.ts"],
     testTimeout: 20000,
     fileParallelism: false,
   },
