@@ -1,3 +1,4 @@
+import { isReviewSuppressed, normalizeRecipient } from "./review-suppression";
 import { ownedBy, type OwnerScope } from "./ownership";
 import {
   type County, type InsertCounty,
@@ -691,6 +692,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReviewRequest(data: InsertReviewRequest): Promise<ReviewRequest> {
+    data = { ...data, clientEmail: normalizeRecipient(data.clientEmail) };
+    if (await isReviewSuppressed(data.userId, data.clientEmail)) data = { ...data, unsubscribed: true, nextReminderAt: null, status: "suppressed" };
     const [request] = await db.insert(reviewRequests).values(data).returning();
     return request;
   }
@@ -770,6 +773,7 @@ export class DatabaseStorage implements IStorage {
         eq(reviewRequests.status, "sent"),
         isNull(reviewRequests.deletedAt),
         eq(reviewRequests.unsubscribed, false),
+        sql`NOT EXISTS (SELECT 1 FROM review_recipient_preferences p WHERE p.user_id=${reviewRequests.userId} AND p.email=lower(trim(${reviewRequests.clientEmail})) AND p.unsubscribed=true)`,
         lte(reviewRequests.nextReminderAt, new Date()),
       )
     );
@@ -780,6 +784,7 @@ export class DatabaseStorage implements IStorage {
       eq(reviewRequests.status, "scheduled"),
       isNull(reviewRequests.deletedAt),
       eq(reviewRequests.unsubscribed, false),
+      sql`NOT EXISTS (SELECT 1 FROM review_recipient_preferences p WHERE p.user_id=${reviewRequests.userId} AND p.email=lower(trim(${reviewRequests.clientEmail})) AND p.unsubscribed=true)`,
       lte(reviewRequests.scheduledFor, new Date()),
     ));
   }

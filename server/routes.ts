@@ -1,3 +1,4 @@
+import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
 import { competitorPlaces, placesResponse } from "./competitor-provider";
@@ -4704,6 +4705,9 @@ function main() {
         return res.status(400).json({ message: "Client name and email are required" });
       }
 
+      if (typeof clientEmail !== "string" || !z.string().email().safeParse(clientEmail.trim()).success) return res.status(400).json({ message: "Valid client email required" });
+      if (await isReviewSuppressed(user.id, clientEmail)) return res.status(409).json({ message: "This recipient has unsubscribed from your review requests. Only the customer can resubscribe." });
+
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       let googleProfileUrl = fullUser.googleProfileUrl || "";
       let templateDesc = "";
@@ -4746,6 +4750,7 @@ function main() {
         scheduledFor: scheduledDate,
       });
 
+      if (request.unsubscribed || await isReviewSuppressed(request.userId, request.clientEmail)) return res.status(409).json({ message: "Recipient has unsubscribed" });
       if (!isScheduled) {
         const baseUrl = getBaseUrl(req);
         await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
@@ -5062,7 +5067,7 @@ function main() {
       const request = requests.find(r => r.id === id);
       if (!request) return res.status(404).json({ message: "Not found" });
 
-      if (request.unsubscribed) return res.status(409).json({ message: "This customer unsubscribed from this review request." });
+      if (request.unsubscribed || await isReviewSuppressed(request.userId, request.clientEmail)) return res.status(409).json({ message: "This customer unsubscribed from this review request." });
 
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       const companyLogoUrl = fullUser?.companyLogoUrl || null;
@@ -5492,7 +5497,7 @@ function main() {
       res.json({
         clientName: request.clientName,
         companyName: request.companyName,
-        unsubscribed: request.unsubscribed,
+        unsubscribed: await isReviewSuppressed(request.userId, request.clientEmail),
         hasSubmitted: request.status !== "sent",
       });
     } catch (err: any) {
@@ -5507,6 +5512,7 @@ function main() {
       if (!request) return res.status(404).json({ message: "Not found" });
 
       const { feedback } = req.body;
+      await unsubscribeRecipient(request.userId, request.clientEmail);
       const updateData: any = { unsubscribed: true, nextReminderAt: null };
       if (feedback) {
         updateData.feedbackComments = (request.feedbackComments || "") + (request.feedbackComments ? "\n[Unsubscribe feedback]: " : "[Unsubscribe feedback]: ") + feedback;
@@ -5516,6 +5522,15 @@ function main() {
     } catch (err: any) {
       res.status(500).json({ message: "Failed to unsubscribe" });
     }
+  });
+
+  app.post("/api/review/:token/resubscribe", async (req, res) => {
+    if (req.body.confirm !== true) return res.status(400).json({ message: "Explicit confirmation is required" });
+    const request = await storage.getReviewRequestByToken(String(req.params.token));
+    if (!request) return res.status(404).json({ message: "Not found" });
+    if (req.user?.id === request.userId) return res.status(403).json({ message: "Only the customer can resubscribe from their email link" });
+    await resubscribeRecipient(request.userId, request.clientEmail);
+    res.json({ success: true });
   });
 
   // Reminder scheduler — runs every 5 minutes
@@ -5546,6 +5561,7 @@ function main() {
             if (owner?.companyLogoUrl) reminderLogoUrl = owner.companyLogoUrl;
           }
 
+          if (await isReviewSuppressed(request.userId, request.clientEmail)) continue;
           await sendReviewReminderEmail(
             request.clientEmail,
             request.clientName,
@@ -5590,6 +5606,7 @@ function main() {
 
           const baseUrl = canonicalAppOrigin();
 
+          if (await isReviewSuppressed(request.userId, request.clientEmail)) continue;
           await sendReviewRequestEmail(
             request.clientEmail,
             request.clientName,

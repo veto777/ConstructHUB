@@ -52,6 +52,7 @@ afterAll(async () => {
   await pool.query("delete from search_results where query_id=any($1::int[])", [queries]);
   await pool.query("delete from search_queries where id=any($1::int[])", [queries]);
   await pool.query("delete from review_requests where token=any($1::text[])", [reviewTokens]);
+  await pool.query("delete from review_recipient_preferences where user_id=any($1::int[])", [users]);
   await pool.query("delete from users where id=any($1::int[])", [users]);
   await pool.query("delete from session where sid=any($1::text[])", [sids]);
   await pool.end();
@@ -100,5 +101,22 @@ describe("review funnel provenance", () => {
     expect(row.google_link_opened).toBe(true);
     expect(row.review_submitted).toBe(false);
     expect(row.status).toBe("negative_feedback");
+  });
+});
+
+describe("recipient-wide opt-out", () => {
+  it("suppresses future requests for that contractor and requires explicit customer resubscribe", async () => {
+    const tokens = [randomUUID(), randomUUID(), randomUUID()]; reviewTokens.push(...tokens);
+    for (let i = 0; i < 3; i++) await pool.query("insert into review_requests(user_id,client_name,client_email,google_profile_url,token) values($1,'Fixture',$2,'https://www.google.com/',$3)", [users[i === 2 ? 1 : 0], i === 1 ? " SUPPRESS@example.invalid " : "suppress@example.invalid", tokens[i]]);
+    expect((await api(`/api/review/${tokens[0]}/unsubscribe`, "", "POST", {})).status).toBe(200);
+    const { rows } = await pool.query("select token,unsubscribed from review_requests where token=any($1::text[])", [tokens]);
+    expect(rows.find(r => r.token === tokens[1]).unsubscribed).toBe(true);
+    expect(rows.find(r => r.token === tokens[2]).unsubscribed).toBe(false);
+    expect((await api("/api/reviews/create", a, "POST", { clientName: "Fixture", clientEmail: "suppress@example.invalid" })).status).toBe(409);
+    expect((await api(`/api/review/${tokens[0]}/resubscribe`, "", "POST", {})).status).toBe(400);
+    expect((await api(`/api/review/${tokens[0]}/resubscribe`, a, "POST", { confirm: true })).status).toBe(403);
+    expect((await api(`/api/review/${tokens[0]}/resubscribe`, "", "POST", { confirm: true })).status).toBe(200);
+    expect((await (await api(`/api/review/${tokens[0]}/unsubscribe-info`)).json()).unsubscribed).toBe(false);
+    expect((await pool.query("select unsubscribed from review_requests where token=$1", [tokens[1]])).rows[0].unsubscribed).toBe(true);
   });
 });
