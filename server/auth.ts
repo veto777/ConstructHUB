@@ -529,11 +529,11 @@ export async function setupAuth(app: Express) {
           await connection.query("ROLLBACK");
           return res.status(400).json({ message: "Invalid or expired reset link" });
         }
-        await connection.query(`DELETE FROM session WHERE sess->'passport'->>'user'=$1`, [String(user.id)]);
+        await connection.query(`DELETE FROM session WHERE sess->'passport'->>'user'=$1 OR sess->>'pending2FAUserId'=$1`, [String(user.id)]);
         await connection.query("COMMIT");
       } catch (error) { await connection.query("ROLLBACK"); throw error; }
       finally { connection.release(); }
-      if (req.user?.id === user.id) {
+      if (req.user?.id === user.id || req.session.pending2FAUserId === user.id) {
         await new Promise<void>((resolve, reject) => req.session.destroy(error => error ? reject(error) : resolve()));
         res.clearCookie("connect.sid");
       }

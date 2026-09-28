@@ -130,9 +130,12 @@ describe("password reset session revocation and auth budgets", () => {
   it("revokes an existing authenticated session and rejects token replay", async () => {
     const cookie = await account(), userId = users[users.length - 1], token = randomUUID();
     await pool.query("update users set reset_token=$1, reset_expiry=$3 where id=$2", [token, userId, new Date(Date.now()+3600000).toISOString()]);
+    const pendingSid = randomUUID(); sids.push(pendingSid);
+    await pool.query("insert into session(sid,sess,expire) values($1,$2,now()+interval '1 hour')", [pendingSid, JSON.stringify({ cookie: { maxAge: 3600000 }, pending2FAUserId: userId })]);
     expect((await (await api("/api/auth/me", cookie)).json()).id).toBe(userId);
     expect((await api("/api/auth/reset-password", "", "POST", { token, password: "Fixture-password-123" })).status).toBe(200);
     expect(await (await api("/api/auth/me", cookie)).json()).toBeNull();
+    expect((await pool.query("select sid from session where sid=$1", [pendingSid])).rowCount).toBe(0);
     expect((await api("/api/auth/reset-password", "", "POST", { token, password: "Fixture-password-456" })).status).toBe(400);
   });
   it("rate limits repeated account attempts across signup/login/forgot-password", async () => {

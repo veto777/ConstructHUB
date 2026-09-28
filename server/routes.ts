@@ -1980,14 +1980,10 @@ Rules:
     }
   });
 
-  // Competitor Intelligence Routes (Platinum only)
+  // Competitor Intelligence Routes (Gold and Platinum)
   async function requirePlatinum(req: any, res: any): Promise<boolean> {
     const user = req.user;
     if (!user) {
-      if (DEV_AUTH_BYPASS) {
-        req.user = { id: 1 };
-        return true;
-      }
       res.status(401).json({ message: "Login required" }); return false;
     }
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
@@ -2267,10 +2263,6 @@ Rules:
   async function requirePremiumPlus(req: any, res: any): Promise<boolean> {
     const user = req.user;
     if (!user) {
-      if (DEV_AUTH_BYPASS) {
-        req.user = { id: 1 };
-        return true;
-      }
       res.status(401).json({ message: "Login required" }); return false;
     }
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
