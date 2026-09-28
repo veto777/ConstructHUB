@@ -416,7 +416,7 @@ describe("SMS compliance against the dev server", () => {
       expect(stop.status).toBe(200);
       expect(stop.headers.get("content-type")).toContain("text/xml");
       expect(stop.body).toContain("unsubscribed");
-      expect(stop.body).toContain("Reply START to resume");
+      expect(stop.body).toContain("Reply START to resubscribe");
 
       // Recorded: the platform-wide row AND this org's row (the member's phone).
       const rows = await poll(

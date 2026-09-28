@@ -324,12 +324,11 @@ function AppContent() {
     );
   }
 
-  const isDev = import.meta.env.DEV;
   const showAdsChat = location.startsWith("/google-ads") || location.startsWith("/google-ad-fraud");
 
   const showSiteChat = location === "/" || location === "/landing";
 
-  if (!user && !isDev) {
+  if (!user) {
     // On the portal, an anonymous visitor gets the sign-in screen. Never the
     // marketing site — the two are deliberately separate products.
     if (portal) return <PortalPublicRouter />;

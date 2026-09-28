@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { reviewDraftPrompt } from "./review-draft";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
 import { randomUUID } from "crypto";
 import multer from "multer";
@@ -5308,6 +5309,8 @@ function main() {
       const request = requests.find(r => r.id === id);
       if (!request) return res.status(404).json({ message: "Not found" });
 
+      if (request.unsubscribed) return res.status(409).json({ message: "This customer unsubscribed from this review request." });
+
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       const companyLogoUrl = fullUser?.companyLogoUrl || null;
 
@@ -5319,7 +5322,6 @@ function main() {
       await storage.updateReviewRequest(id, {
         status: "sent",
         remindersSent: 0,
-        unsubscribed: false,
         nextReminderAt: nextTime,
       });
 
@@ -5414,7 +5416,7 @@ function main() {
       if (!request) return res.status(404).json({ message: "Review request not found" });
 
       const { rating, categories, comments } = req.body;
-      if (!rating || rating < 1 || rating > 10) {
+      if (!Number.isInteger(rating) || rating < 1 || rating > 10) {
         return res.status(400).json({ message: "Rating must be between 1 and 10" });
       }
 
@@ -5457,24 +5459,14 @@ function main() {
     try {
       const request = await storage.getReviewRequestByToken(req.params.token);
       if (!request) return res.status(404).json({ message: "Not found" });
-      if (!request.feedbackRating || request.feedbackRating < 9) {
-        return res.status(403).json({ message: "Review generation not available for this feedback" });
+      if (!request.feedbackRating) {
+        return res.status(409).json({ message: "Submit a rating first" });
       }
-
-      const { projectType, highlights } = req.body;
-
-      const prompt = `Write a genuine, enthusiastic Google review for a construction/home improvement company called "${request.companyName}". The reviewer's name is ${request.clientName}. The project was: ${request.projectDescription || projectType || "a home improvement project"}. ${highlights ? `Key highlights the client mentioned: ${highlights}.` : ""} 
-
-Requirements:
-- Write in first person as the client
-- Sound natural and authentic, not overly formal
-- Include specific details about quality of work, professionalism, communication, and results
-- Include relevant keywords naturally (construction, contractor, remodel, renovation, home improvement, etc.)
-- Keep it between 80-150 words
-- Make it 5-star worthy
-- End with a recommendation to others
-- Do NOT use quotation marks around the entire review
-- Do NOT include star ratings in the text`;
+      const { highlights } = req.body;
+      if (typeof highlights !== "string" || !highlights.trim()) {
+        return res.status(400).json({ message: "Describe your own experience before creating a draft." });
+      }
+      const prompt = reviewDraftPrompt(request.companyName || "the company", request.feedbackRating, highlights.trim());
 
       const response = await photoOpenai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -5849,12 +5841,7 @@ Requirements:
 
   async function processScheduledReviews() {
     try {
-      const now = new Date();
-      const scheduled = await db.select().from(reviewRequests)
-        .where(and(
-          eq(reviewRequests.status, "scheduled"),
-          lte(reviewRequests.scheduledFor, now)
-        ));
+      const scheduled = await storage.getScheduledReviews();
 
       for (const request of scheduled) {
         try {

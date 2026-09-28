@@ -145,6 +145,7 @@ export default function ReviewFeedbackPage() {
     queryFn: async () => {
       const res = await fetch(`/api/review/${token}`);
       if (!res.ok) throw new Error("Review request not found");
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     enabled: !!token,
@@ -161,6 +162,7 @@ export default function ReviewFeedbackPage() {
           comments: comments || undefined,
         }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     onSuccess: () => {
@@ -183,6 +185,7 @@ export default function ReviewFeedbackPage() {
           comments: comments || undefined,
         }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     onSuccess: () => {
@@ -200,6 +203,7 @@ export default function ReviewFeedbackPage() {
           highlights: highlights || undefined,
         }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     onSuccess: (data) => {
@@ -214,6 +218,7 @@ export default function ReviewFeedbackPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ referralOptIn, referralFeedback }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     onSuccess: () => {
@@ -324,6 +329,7 @@ export default function ReviewFeedbackPage() {
             </div>
             <h2 className="text-2xl font-bold">Thank You!</h2>
             <p className="text-muted-foreground leading-relaxed">Your feedback has already been submitted. We truly appreciate you taking the time.</p>
+            {reviewData.googleProfileUrl && <a className="underline" href={reviewData.googleProfileUrl} target="_blank" rel="noopener noreferrer">Leave a Google Review</a>}
           </CardContent>
         </Card>
       </div>
@@ -361,6 +367,20 @@ export default function ReviewFeedbackPage() {
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Customer Feedback</span>
           </div>
         </div>
+
+        {reviewData.googleProfileUrl && (
+          <div className="mb-6 space-y-2 text-center">
+            <Button asChild className="w-full h-12">
+              <a href={reviewData.googleProfileUrl} target="_blank" rel="noopener noreferrer" data-testid="link-google-review-always">
+                <ExternalLink className="w-4 h-4 mr-2" /> Leave a Google Review
+              </a>
+            </Button>
+            <p className="text-xs text-muted-foreground">Everyone is welcome to review. No private feedback or referral participation is required, and no reward is offered for a review.</p>
+          </div>
+        )}
+        {[feedbackMutation.error, improvementMutation.error, generateMutation.error, markReviewedMutation.error].some(Boolean) && (
+          <p role="alert" className="mb-4 text-sm text-destructive">Unable to save your request. Please try again.</p>
+        )}
 
         {step === "rating" && (
           <Card className="border shadow-lg overflow-hidden">
@@ -515,6 +535,10 @@ export default function ReviewFeedbackPage() {
                 <Lock className="w-3 h-3" />
                 Your feedback is completely confidential
               </p>
+
+              <Button variant="outline" className="w-full" onClick={() => setStep("describe")} data-testid="button-improvement-draft">
+                Help me draft my honest review
+              </Button>
 
               {reviewData?.googleProfileUrl && (
                 <div className="pt-2 border-t space-y-3 text-center" data-testid="section-improvement-google-review">
@@ -717,7 +741,7 @@ export default function ReviewFeedbackPage() {
                   Tell Us About Your Project
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
-                  A few words is all it takes. Our system will craft a polished, keyword-rich Google review for you — perfect if you're short on time or not sure what to write.
+                  Describe your own experience, positive or negative. We can help edit your words into a draft for you to check before posting.
                 </p>
               </div>
 
