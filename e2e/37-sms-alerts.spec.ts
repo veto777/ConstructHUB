@@ -98,7 +98,7 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
     const prior = await q<{ phone: string | null }>(
       `select phone from crm_members where id = (select created_by_member_id from crm_estimates where id = $1)`, [estimateId]);
     const priorPhone = prior[0]?.phone ?? null;
-    const [orgBefore] = await q<{ custom_fields: any }>("select custom_fields from crm_orgs where id=$1", [ORGS.alpine]);
+    const [orgRowBefore] = await q<{ custom_fields: any }>("select custom_fields from crm_orgs where id=$1", [ORGS.alpine]);
     // Explicitly opt in to owner alerts; do not rely on shared seed settings.
     await q("update crm_orgs set custom_fields=jsonb_set(coalesce(custom_fields,'{}'::jsonb),'{smsAlerts}','true'::jsonb) where id=$1", [ORGS.alpine]);
     await q(
@@ -145,7 +145,7 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
 
       guards.assertClean("reengagement alert");
     } finally {
-      await q("update crm_orgs set custom_fields=$2 where id=$1", [ORGS.alpine, orgBefore.custom_fields]);
+      await q("update crm_orgs set custom_fields=$2 where id=$1", [ORGS.alpine, orgRowBefore.custom_fields]);
       await q(
         `update crm_members set phone = $2 where id = (select created_by_member_id from crm_estimates where id = $1)`,
         [estimateId, priorPhone]);
