@@ -95,6 +95,7 @@ test.describe("mobile schedule", () => {
 
     await gotoCrm(page, "/crm/schedule");
     await expect(page.locator("h1")).toContainText("Schedule");
+    await page.getByTestId("button-view-agenda").click();
     await expect(page.getByTestId("schedule-list")).toBeVisible();
     await expect(page.locator('[data-testid^="schedule-day-"]').first()).toBeVisible();
     await expect(page.locator('[data-testid^="appt-"]').first()).toBeVisible();
