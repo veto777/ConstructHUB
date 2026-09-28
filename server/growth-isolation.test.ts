@@ -8,6 +8,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const port = Number(new URL(process.env.CRM_TEST_BASE_URL!).port) + 3;
 const base = `http://127.0.0.1:${port}`;
 let child: ChildProcess;
+const reviewTokens: string[] = [];
 const users: number[] = [], scans: number[] = [], queries: number[] = [], sids: string[] = [];
 let a: string, b: string;
 const secret = "growth-isolation-session-secret";
@@ -50,6 +51,7 @@ afterAll(async () => {
   await pool.query("delete from ranking_grid_scans where id=any($1::int[])", [scans]);
   await pool.query("delete from search_results where query_id=any($1::int[])", [queries]);
   await pool.query("delete from search_queries where id=any($1::int[])", [queries]);
+  await pool.query("delete from review_requests where token=any($1::text[])", [reviewTokens]);
   await pool.query("delete from users where id=any($1::int[])", [users]);
   await pool.query("delete from session where sid=any($1::text[])", [sids]);
   await pool.end();
@@ -84,5 +86,19 @@ describe("ranking and permit owner isolation", () => {
     }
     expect((await api("/api/search-queries", a, "DELETE")).status).toBe(200);
     expect((await (await api("/api/search-queries", b)).json()).map((r: any) => r.id)).toEqual([queries[1]]);
+  });
+});
+
+describe("review funnel provenance", () => {
+  it("separates Google link opens, private feedback and flow completion", async () => {
+    const token = randomUUID(); reviewTokens.push(token);
+    await pool.query("insert into review_requests(user_id,client_name,client_email,google_profile_url,token) values($1,'Fixture','fixture@example.invalid','https://www.google.com/',$2)", [users[0], token]);
+    expect((await api(`/api/review/${token}/google-link-opened`, "", "POST", {})).status).toBe(200);
+    expect((await api(`/api/review/${token}/feedback`, "", "POST", { rating: 2 })).status).toBe(200);
+    expect((await api(`/api/review/${token}/mark-reviewed`, "", "POST", {})).status).toBe(200);
+    const { rows: [row] } = await pool.query("select * from review_requests where token=$1", [token]);
+    expect(row.google_link_opened).toBe(true);
+    expect(row.review_submitted).toBe(false);
+    expect(row.status).toBe("negative_feedback");
   });
 });

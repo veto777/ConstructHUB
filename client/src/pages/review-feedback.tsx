@@ -211,9 +211,9 @@ export default function ReviewFeedbackPage() {
     },
   });
 
-  const markReviewedMutation = useMutation({
+  const completeFlowMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/review/${token}/mark-reviewed`, {
+      const res = await fetch(`/api/review/${token}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ referralOptIn, referralFeedback }),
@@ -229,6 +229,10 @@ export default function ReviewFeedbackPage() {
       }
     },
   });
+
+  const trackGoogleOpen = () => {
+    void fetch(`/api/review/${token}/google-link-opened`, { method: "POST", keepalive: true });
+  };
 
   const handleCopyReview = () => {
     if (hasPhotos && !photosDownloaded) {
@@ -249,8 +253,9 @@ export default function ReviewFeedbackPage() {
       setShowCopyWarning(true);
       return;
     }
-    window.open(reviewData.googleProfileUrl, "_blank");
-    markReviewedMutation.mutate();
+    window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+    completeFlowMutation.mutate();
   };
 
   const handleCopyAndGo = () => {
@@ -258,15 +263,17 @@ export default function ReviewFeedbackPage() {
     setCopied(true);
     setShowCopyWarning(false);
     setTimeout(() => {
-      window.open(reviewData.googleProfileUrl, "_blank");
-      markReviewedMutation.mutate();
+      window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+      completeFlowMutation.mutate();
     }, 300);
   };
 
   const handleSkipAndGo = () => {
     setShowCopyWarning(false);
-    window.open(reviewData.googleProfileUrl, "_blank");
-    markReviewedMutation.mutate();
+    window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+    completeFlowMutation.mutate();
   };
 
   const toggleCategory = (cat: string) => {
@@ -318,24 +325,6 @@ export default function ReviewFeedbackPage() {
     );
   }
 
-  if (reviewData.reviewSubmitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950 px-4">
-        <FloatingParticles color={THEME_COLOR} />
-        <Card className="max-w-md mx-auto border shadow-lg relative z-10">
-          <CardContent className="p-8 text-center space-y-4">
-            <div className="w-20 h-20 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-10 h-10 text-green-500" />
-            </div>
-            <h2 className="text-2xl font-bold">Thank You!</h2>
-            <p className="text-muted-foreground leading-relaxed">Your feedback has already been submitted. We truly appreciate you taking the time.</p>
-            {reviewData.googleProfileUrl && <a className="underline" href={reviewData.googleProfileUrl} target="_blank" rel="noopener noreferrer">Leave a Google Review</a>}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const companyName = reviewData.companyName || "Our Team";
   const companyLogoUrl = reviewData.companyLogoUrl;
 
@@ -371,14 +360,14 @@ export default function ReviewFeedbackPage() {
         {reviewData.googleProfileUrl && (
           <div className="mb-6 space-y-2 text-center">
             <Button asChild className="w-full h-12">
-              <a href={reviewData.googleProfileUrl} target="_blank" rel="noopener noreferrer" data-testid="link-google-review-always">
+              <a href={reviewData.googleProfileUrl} target="_blank" rel="noopener noreferrer" onClick={trackGoogleOpen} data-testid="link-google-review-always">
                 <ExternalLink className="w-4 h-4 mr-2" /> Leave a Google Review
               </a>
             </Button>
             <p className="text-xs text-muted-foreground">Everyone is welcome to review. No private feedback or referral participation is required, and no reward is offered for a review.</p>
           </div>
         )}
-        {[feedbackMutation.error, improvementMutation.error, generateMutation.error, markReviewedMutation.error].some(Boolean) && (
+        {[feedbackMutation.error, improvementMutation.error, generateMutation.error, completeFlowMutation.error].some(Boolean) && (
           <p role="alert" className="mb-4 text-sm text-destructive">Unable to save your request. Please try again.</p>
         )}
 
@@ -549,8 +538,9 @@ export default function ReviewFeedbackPage() {
                     variant="outline"
                     className="w-full h-12 text-base font-bold border-2"
                     onClick={() => {
-                      window.open(reviewData.googleProfileUrl, "_blank");
-                      markReviewedMutation.mutate();
+                      window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+                      completeFlowMutation.mutate();
                     }}
                     data-testid="button-improvement-google-review"
                   >
@@ -718,12 +708,12 @@ export default function ReviewFeedbackPage() {
                 variant="ghost"
                 className="w-full text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  markReviewedMutation.mutate();
+                  completeFlowMutation.mutate();
                 }}
-                disabled={markReviewedMutation.isPending}
+                disabled={completeFlowMutation.isPending}
                 data-testid="button-skip-all"
               >
-                {markReviewedMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {completeFlowMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Skip — I don't want to leave a review
               </Button>
             </CardContent>
@@ -1055,10 +1045,10 @@ export default function ReviewFeedbackPage() {
                     <Button
                       className={`w-full h-12 font-bold ${copied ? "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white" : "bg-gray-200 dark:bg-gray-700 text-muted-foreground cursor-not-allowed"}`}
                       onClick={handleGoogleClick}
-                      disabled={markReviewedMutation.isPending}
+                      disabled={completeFlowMutation.isPending}
                       data-testid="button-open-google-review"
                     >
-                      {markReviewedMutation.isPending ? (
+                      {completeFlowMutation.isPending ? (
                         <Loader2 className="w-5 h-5 animate-spin mr-2" />
                       ) : (
                         <ExternalLink className="w-5 h-5 mr-2" />

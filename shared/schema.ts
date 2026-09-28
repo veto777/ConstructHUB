@@ -613,6 +613,8 @@ export const reviewRequests = pgTable("review_requests", {
   feedbackRating: integer("feedback_rating"),
   feedbackCategories: jsonb("feedback_categories"),
   feedbackComments: text("feedback_comments"),
+  googleLinkOpened: boolean("google_link_opened").notNull().default(false),
+  googleLinkOpenedAt: timestamp("google_link_opened_at"),
   reviewSubmitted: boolean("review_submitted").notNull().default(false),
   referralOptIn: boolean("referral_opt_in").notNull().default(false),
   referralFeedback: text("referral_feedback"),

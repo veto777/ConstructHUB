@@ -5085,7 +5085,7 @@ function main() {
 
   app.get("/api/review/:token/pixel.png", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (request && !request.emailOpened) {
         await storage.updateReviewRequest(request.id, {
           emailOpened: true,
@@ -5100,7 +5100,7 @@ function main() {
 
   app.get("/api/review/:token/click", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (request) {
         const updates: any = {
           linkClicked: true,
@@ -5122,7 +5122,7 @@ function main() {
 
   app.get("/api/review/:token", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Review request not found" });
 
       if (!request.linkClicked) {
@@ -5164,7 +5164,7 @@ function main() {
 
   app.post("/api/review/:token/feedback", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Review request not found" });
 
       const { rating, categories, comments } = req.body;
@@ -5187,17 +5187,25 @@ function main() {
     }
   });
 
-  app.post("/api/review/:token/mark-reviewed", async (req, res) => {
+  app.post("/api/review/:token/google-link-opened", async (req, res) => {
+    const request = await storage.getReviewRequestByToken(String(req.params.token));
+    if (!request) return res.status(404).json({ message: "Not found" });
+    await storage.updateReviewRequest(request.id, { googleLinkOpened: true, googleLinkOpenedAt: request.googleLinkOpenedAt || new Date() });
+    res.json({ success: true });
+  });
+
+  // Backward-compatible completion endpoint. A client cannot verify Google publication.
+  app.post(["/api/review/:token/complete", "/api/review/:token/mark-reviewed"], async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       if (!request.feedbackRating) {
         return res.status(409).json({ message: "Submit a rating first" });
       }
 
       await storage.updateReviewRequest(request.id, {
-        reviewSubmitted: true,
-        status: "reviewed",
+        lastStep: "done",
+        nextReminderAt: null,
         referralOptIn: req.body.referralOptIn || false,
         referralFeedback: req.body.referralFeedback || null,
       });
@@ -5209,7 +5217,7 @@ function main() {
 
   app.post("/api/review/:token/generate-review", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       if (!request.feedbackRating) {
         return res.status(409).json({ message: "Submit a rating first" });
@@ -5238,7 +5246,7 @@ function main() {
 
   app.post("/api/review/:token/track-photos", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       if (!request.photosDownloaded) {
         await storage.updateReviewRequest(request.id, {
@@ -5254,7 +5262,7 @@ function main() {
 
   app.post("/api/review/:token/track-review-method", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       const { method } = req.body;
       if (method === "own" || method === "ai") {
@@ -5268,7 +5276,7 @@ function main() {
 
   app.post("/api/review/:token/track-step", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       const { step } = req.body;
       if (step && typeof step === "string") {
@@ -5483,7 +5491,7 @@ function main() {
   // Unsubscribe page data
   app.get("/api/review/:token/unsubscribe-info", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       res.json({
         clientName: request.clientName,
@@ -5499,7 +5507,7 @@ function main() {
   // Unsubscribe + optional feedback
   app.post("/api/review/:token/unsubscribe", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
 
       const { feedback } = req.body;

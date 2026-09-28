@@ -425,7 +425,7 @@ export default function GoogleReviewsPage() {
   };
 
   const getStatusBadge = (review: any) => {
-    if (review.reviewSubmitted) return <Badge className="bg-green-600 text-white" data-testid={`badge-status-${review.id}`}><CheckCircle2 className="w-3 h-3 mr-1" />Reviewed</Badge>;
+    if (review.googleLinkOpened) return <Badge className="bg-green-600 text-white" data-testid={`badge-status-${review.id}`}><CheckCircle2 className="w-3 h-3 mr-1" />Google link opened</Badge>;
     if (review.status === "positive_feedback") return <Badge className="bg-blue-600 text-white" data-testid={`badge-status-${review.id}`}><Star className="w-3 h-3 mr-1" />Positive</Badge>;
     if (review.status === "negative_feedback") return <Badge variant="secondary" data-testid={`badge-status-${review.id}`}><MessageSquare className="w-3 h-3 mr-1" />Feedback</Badge>;
     if (review.status === "scheduled") return <Badge className="bg-amber-500/80 text-white" data-testid={`badge-status-${review.id}`}><CalendarDays className="w-3 h-3 mr-1" />Scheduled{review.scheduledFor ? ` · ${new Date(review.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</Badge>;
@@ -1103,13 +1103,13 @@ export default function GoogleReviewsPage() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-green-600" data-testid="stat-reviews-received">{reviews.filter((r: any) => r.reviewSubmitted).length}</p>
-            <p className="text-xs text-muted-foreground">Reviews Received</p>
+            <p className="text-2xl font-bold text-green-600" data-testid="stat-google-links-opened">{reviews.filter((r: any) => r.googleLinkOpened).length}</p>
+            <p className="text-xs text-muted-foreground">Google Links Opened</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600" data-testid="stat-positive">{reviews.filter((r: any) => r.status === "positive_feedback" || r.reviewSubmitted).length}</p>
+            <p className="text-2xl font-bold text-blue-600" data-testid="stat-positive">{reviews.filter((r: any) => r.feedbackRating >= 9).length}</p>
             <p className="text-xs text-muted-foreground">Positive Feedback</p>
           </CardContent>
         </Card>
