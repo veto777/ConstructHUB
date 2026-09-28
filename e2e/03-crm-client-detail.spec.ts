@@ -1,17 +1,23 @@
-import { expect, test } from "@playwright/test";
-import { gotoCrm, ORGS, sweepPage, switchOrg, watchPage } from "./helpers";
+import { expect } from "@playwright/test";
+import { test } from "./crm-isolated-fixture";
+import { gotoCrm, sweepPage, watchPage } from "./helpers";
 
-// Seeded client in the Alpine org.
-const CLIENT_ID = "2c25304d-e441-4df7-8e45-27282d4c2c74"; // Joe & Mary Kane
-const URL = `/crm/clients/${CLIENT_ID}`;
-
-test.beforeEach(async ({ page }) => switchOrg(page, ORGS.alpine));
+let clientId: string;
+let clientName: string;
+let url: string;
+test.beforeEach(async ({ page, crmOrgId }) => {
+  clientName = `E2E detail ${crmOrgId}`;
+  const response = await page.request.post("/api/crm/customers", { data: { displayName: clientName } });
+  expect(response.status()).toBe(201);
+  clientId = (await response.json()).id;
+  url = `/crm/clients/${clientId}`;
+});
 
 test.describe("/crm/clients/:id", () => {
   test("curated: estimate builder — lines, create, options dialog", async ({ page }) => {
     const guards = watchPage(page);
-    await gotoCrm(page, URL);
-    await expect(page.locator("h1")).toContainText("Joe & Mary Kane");
+    await gotoCrm(page, url);
+    await expect(page.locator("h1")).toContainText(clientName);
 
     // Portal link copy works (clipboard permission granted in config).
     await page.getByTestId("button-copy-portal").click();
@@ -64,7 +70,7 @@ test.describe("/crm/clients/:id", () => {
 
     // The accountability feed folds into the client timeline: the estimate
     // this test just created shows up as a "who did what" audit entry.
-    await gotoCrm(page, URL);
+    await gotoCrm(page, url);
     await expect(page.getByTestId("section-timeline")).toContainText("created estimate");
 
     guards.assertClean("client detail curated");
@@ -75,8 +81,12 @@ test.describe("/crm/clients/:id", () => {
     // closes) to what was already the suite's slowest sweep — it now needs
     // more than the default 240s at 4 workers.
     test.slow();
-    const { clicked, labels } = await sweepPage(page, URL, {
-      ready: "h1",
+    const { clicked, labels } = await sweepPage(page, url, {
+      ready: `[data-testid="button-new-estimate"]`,
+      beforeEach: async (page) => {
+        await expect(page.locator("h1")).toHaveText(clientName);
+        await expect(page.getByTestId("section-timeline")).toBeVisible();
+      },
     });
     console.log(`client detail sweep clicked ${clicked}: ${labels.join(" | ")}`);
     expect(clicked).toBeGreaterThanOrEqual(15);
