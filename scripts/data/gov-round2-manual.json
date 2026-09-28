@@ -1,0 +1,13 @@
+[
+  {
+    "url": "https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx",
+    "finalUrl": "https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx",
+    "state": "MD",
+    "status": "live",
+    "title": "SDAT: Real Property Data Search",
+    "excerpt": "Maryland Department of Assessments and Taxation",
+    "reason": "State agency and statewide property search identified by web.open content extraction; NETR lists this URL for each county",
+    "method": "web.open; successfully extracted current landing page; no property search submitted",
+    "checkedAt": "2026-09-28T23:20:08.552890+00:00"
+  }
+]

@@ -108,3 +108,12 @@ test('unconfirmed link status and check date survive all property APIs @serial',
   expect(row.portalUrl).toBe(original.portal_url);expect(row.linkStatus).toBe('unconfirmed');expect(row.lastVerifiedAt).toContain('2026-09-28');
  }finally{await q('update property_appraisers set link_status=$1,is_active=$2,last_verified_at=$3 where id=$4',[original.link_status,original.is_active,original.last_verified_at,original.id]);}
 });
+
+test('seeded unconfirmed offices render real source links and check dates',async({request,page})=>{
+ const offices=await (await request.get('/api/property-appraisers')).json();
+ const office=offices.find((r:any)=>r.linkStatus==='unconfirmed'&&r.portalUrl&&r.lastVerifiedAt);
+ test.skip(!office,'Run the round-2 data reconciliation before this real-data proof');
+ await page.goto(`/property?countyId=${office.countyId}`);
+ await expect(page.getByTestId(`button-visit-appraiser-${office.id}`)).toHaveAttribute('href',office.portalUrl);
+ await expect(page.getByText(`Official site · not auto-verified · Last checked ${office.lastVerifiedAt.slice(0,10)}`).first()).toBeVisible();
+});
