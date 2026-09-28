@@ -46,17 +46,6 @@ import {
 } from "lucide-react";
 import type { PermitDatabase, County } from "@shared/schema";
 
-const propertyAppraiserUrls: Record<number, string> = {
-  5: "https://www.pcpao.gov/quick-search",
-  6: "https://gis.hcpafl.org/propertysearch/#/nav/Basic%20Search",
-  7: "https://www.manateepao.gov/search/",
-  8: "https://www.sc-pa.com/propertysearch",
-};
-
-function getPropertyLookupUrl(countyId: number, address: string): string {
-  return propertyAppraiserUrls[countyId] || "#";
-}
-
 function normalizeStatus(status: string | null | undefined): string {
   if (!status) return "Unknown";
   const s = status.toLowerCase().trim();
@@ -936,9 +925,9 @@ export default function SearchPage() {
                                 <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
-                            {result.countyId && [5, 6, 7, 8].includes(result.countyId) && result.address && (
+                            {result.countyId && (
                               <a
-                                href={getPropertyLookupUrl(result.countyId, result.address)}
+                                href={`/property?countyId=${result.countyId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"

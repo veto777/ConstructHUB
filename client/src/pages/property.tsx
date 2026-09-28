@@ -45,7 +45,7 @@ export default function PropertyPage() {
   });
 
   const [stateFilter, setStateFilter] = useState<string>("all");
-  const [countyFilter, setCountyFilter] = useState<string>("all");
+  const [countyFilter, setCountyFilter] = useState<string>(() => new URLSearchParams(window.location.search).get("countyId") || "all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const states = useMemo(() => {
