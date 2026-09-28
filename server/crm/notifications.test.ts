@@ -87,12 +87,15 @@ describe("notificationPrefs API (dev server)", () => {
       expect(second.body.customFields[k]).toEqual(priorCustomFields[k]);
     }
 
-    // Restore exactly what was there before (usually nothing).
+    // Restore exactly what was there before (usually nothing). Preserve the
+    // prior value VERBATIM — a granular { inApp/email/sms } object must not be
+    // flattened to a bare boolean (that silently switches its sms channel off
+    // and poisons later suites that expect the channel they set).
     const restore = await api("/api/crm/org", {
       method: "PATCH",
       body: JSON.stringify({
         notificationPrefs: Object.fromEntries(
-          CRM_NOTIFICATION_PREFS.map((p) => [p, (priorCustomFields as any).notificationPrefs?.[p] !== false]),
+          CRM_NOTIFICATION_PREFS.map((p) => [p, (priorCustomFields as any).notificationPrefs?.[p] ?? true]),
         ),
       }),
     }, cookie);

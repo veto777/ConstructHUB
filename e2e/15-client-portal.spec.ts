@@ -139,7 +139,11 @@ test.describe("client portal — dashboard", () => {
     const guards = watchPage(page);
     await signInAsKane(page);
 
-    const inv = await q<{ id: string }>(`select id from crm_invoices where number = 'INV-2002' limit 1`);
+    // Invoice numbers are tenant-local; another org can also own INV-2002.
+    const inv = await q<{ id: string }>(
+      `select id from crm_invoices where customer_id = $1 and number = 'INV-2002' limit 1`,
+      [await kaneId()],
+    );
     await page.getByTestId("portal-nav-invoices").click();
     await page.getByTestId(`client-invoice-${inv[0].id}`).click();
     await expect(page).toHaveURL(/\/i\//);

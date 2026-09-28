@@ -142,7 +142,7 @@ const TOOLS: ToolCategory[] = [
     ringColor: "ring-emerald-500/40",
     badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
     tagline: "Stop competitors from draining your ad budget",
-    description: "Detect and block click fraud on your Google Ads campaigns. Automatic IP exclusions, device fingerprinting, VPN detection, and real-time fraud analytics dashboard.",
+    description: "Review script-observed traffic signals and maintain IP exclusions. Google Ads enforcement requires installing the separate Ads script; fraud detection is not guaranteed.",
     tiers: [
       {
         name: "Starter",
@@ -179,7 +179,7 @@ const TOOLS: ToolCategory[] = [
           "5 protected websites",
           "25,000 tracked visits/mo",
           "Click fraud detection",
-          "VPN & bot detection",
+          "Heuristic traffic signals",
           "Auto Google Ads IP exclusion",
           "Full fraud analytics dashboard",
           "Traffic sources breakdown",
@@ -240,8 +240,8 @@ const TOOLS: ToolCategory[] = [
     buttonColor: "bg-red-500 hover:bg-red-600 text-white",
     ringColor: "ring-red-500/40",
     badgeColor: "bg-red-500/10 text-red-500 border-red-500/20",
-    tagline: "Block anonymous visitors polluting your data",
-    description: "Detect and block VPN, proxy, and datacenter traffic from your websites. Protects analytics accuracy by filtering out anonymous non-customer visits that distort your data.",
+    tagline: "Review possible proxy traffic",
+    description: "Review possible proxy signals from browser reports and a limited IP-prefix list. Optional overlays or redirects run after page load and can be bypassed; legitimate VPN users may be flagged.",
     tiers: [
       {
         name: "Basic",
@@ -334,7 +334,7 @@ const TOOLS: ToolCategory[] = [
     ringColor: "ring-yellow-500/40",
     badgeColor: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
     tagline: "Understand your local market",
-    description: "Research public Google Business profiles in your market, analyze review authenticity with our BS Meter, and benchmark your own presence against public market data.",
+    description: "Research public Google Business profiles in your market, find signals worth a closer look in sampled reviews with our BS Meter, and benchmark your own presence against public market data.",
     tiers: [
       {
         name: "Scout",
@@ -353,8 +353,7 @@ const TOOLS: ToolCategory[] = [
           "Market Scans/mo": "5",
           "Competitor Reports": "Basic",
           "Review Analysis": false,
-          "BS Meter (Fake Reviews)": false,
-          "Public Ad Activity": false,
+          "BS Meter (Heuristic Signals)": false,
           "Scheduled Scans": false,
           "Rating Monitoring": true,
         },
@@ -369,8 +368,7 @@ const TOOLS: ToolCategory[] = [
           "20 market scans/mo",
           "Full competitor reports",
           "Review sentiment analysis",
-          "BS Meter fake review detection",
-          "Public ad activity tracking",
+          "BS Meter: signals worth a closer look",
         ],
         limits: {
           "Users": "1",
@@ -378,8 +376,7 @@ const TOOLS: ToolCategory[] = [
           "Market Scans/mo": "20",
           "Competitor Reports": "Full",
           "Review Analysis": true,
-          "BS Meter (Fake Reviews)": true,
-          "Public Ad Activity": true,
+          "BS Meter (Heuristic Signals)": true,
           "Scheduled Scans": false,
           "Rating Monitoring": true,
         },
@@ -393,7 +390,6 @@ const TOOLS: ToolCategory[] = [
           "Unlimited market scans",
           "Full competitor reports",
           "BS Meter + review analysis",
-          "Public ad activity tracking",
           "Scheduled automatic scans",
         ],
         limits: {
@@ -402,8 +398,7 @@ const TOOLS: ToolCategory[] = [
           "Market Scans/mo": "Unlimited",
           "Competitor Reports": "Full",
           "Review Analysis": true,
-          "BS Meter (Fake Reviews)": true,
-          "Public Ad Activity": true,
+          "BS Meter (Heuristic Signals)": true,
           "Scheduled Scans": true,
           "Rating Monitoring": true,
         },
@@ -411,7 +406,7 @@ const TOOLS: ToolCategory[] = [
     ],
     comparisonFeatures: [
       "Users", "Competitor Tracking", "Market Scans/mo", "Competitor Reports",
-      "Review Analysis", "BS Meter (Fake Reviews)", "Public Ad Activity",
+      "Review Analysis", "BS Meter (Heuristic Signals)",
       "Scheduled Scans", "Rating Monitoring",
     ],
   },

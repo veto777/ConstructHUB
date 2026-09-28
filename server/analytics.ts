@@ -11,6 +11,7 @@
  */
 import type { Express } from "express";
 import { randomUUID } from "crypto";
+import { analyticsPath } from "@shared/analytics-path";
 import { z } from "zod";
 import { db } from "./db";
 import { chAnalyticsEvents, users } from "@shared/schema";
@@ -57,7 +58,7 @@ export function isMintedVisitorId(vid: string): boolean {
 /** Drop the query string / fragment — invite tokens etc. must never land in
  *  the admin rollup. */
 export function stripQuery(s: string): string {
-  return s.split("?")[0].split("#")[0];
+  return analyticsPath(s);
 }
 
 /** Neighborhood-level location only: /24 for IPv4, /48 for IPv6. */

@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
-import { isClientPortal } from "@/lib/site";
+import { analyticsPath } from "@shared/analytics-path";
 
 function readCookie(name: string): string | null {
   for (const part of document.cookie.split(";")) {
@@ -23,7 +23,7 @@ function readCookie(name: string): string | null {
 
 function sendPageview(path: string) {
   const body = JSON.stringify({
-    events: [{ type: "pageview", path, referrer: document.referrer || null }],
+    events: [{ type: "pageview", path, referrer: analyticsPath(document.referrer) || null }],
   });
   // sendBeacon survives navigation; fetch is the fallback.
   try {
@@ -51,7 +51,7 @@ export function CookieConsent() {
   // in the analytics tables or the /admin Top-pages list.
   useEffect(() => {
     if (consent !== "granted") return;
-    const path = location.replace(/^\/(e|i|co|portal|lead-form)\/[^/?]+/, "/$1/:token");
+    const path = analyticsPath(location);
     sendPageview(path);
   }, [location, consent]);
 
@@ -71,23 +71,10 @@ export function CookieConsent() {
     setSaving(false);
   };
 
-  // Placement: never sit on top of the page's primary action. Document and
-  // portal pages have a sticky bottom bar (Approve, portal ribbon); the CRM
-  // has the mobile ribbon below sm. Float above those; otherwise bottom.
-  // Desktop anchors the card to the corner so it covers less content.
-  // The homeowner client portal lives at "/" behind ?client=1 — check
-  // isClientPortal(), not the pathname.
-  const aboveActionBar = /^\/(e|i|co|portal)\//.test(location) || isClientPortal();
-  const inCrm = location.startsWith("/crm");
-
+  // In normal document flow: consent must never cover an action or a footer.
   return (
-    // pointer-events-none on the wrapper: the full-width strip must not
-    // swallow clicks meant for content behind it (it blanketed the e2e
-    // suite's clicks when it shipped).
     <div
-      className={`fixed inset-x-0 z-[100] p-3 sm:p-4 pointer-events-none flex justify-center sm:justify-end ${
-        aboveActionBar ? "bottom-[76px]" : inCrm ? "bottom-[76px] sm:bottom-0" : "bottom-0"
-      }`}
+      className="relative p-3 sm:p-4 flex justify-center border-b bg-background"
       data-testid="cookie-consent-banner"
     >
       <div className="pointer-events-auto w-full max-w-2xl sm:max-w-lg rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">

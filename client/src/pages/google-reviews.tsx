@@ -1,3 +1,4 @@
+import { GbpConnection } from "@/components/gbp-connection";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -425,7 +426,7 @@ export default function GoogleReviewsPage() {
   };
 
   const getStatusBadge = (review: any) => {
-    if (review.reviewSubmitted) return <Badge className="bg-green-600 text-white" data-testid={`badge-status-${review.id}`}><CheckCircle2 className="w-3 h-3 mr-1" />Reviewed</Badge>;
+    if (review.googleLinkOpened) return <Badge className="bg-green-600 text-white" data-testid={`badge-status-${review.id}`}><CheckCircle2 className="w-3 h-3 mr-1" />Google link opened</Badge>;
     if (review.status === "positive_feedback") return <Badge className="bg-blue-600 text-white" data-testid={`badge-status-${review.id}`}><Star className="w-3 h-3 mr-1" />Positive</Badge>;
     if (review.status === "negative_feedback") return <Badge variant="secondary" data-testid={`badge-status-${review.id}`}><MessageSquare className="w-3 h-3 mr-1" />Feedback</Badge>;
     if (review.status === "scheduled") return <Badge className="bg-amber-500/80 text-white" data-testid={`badge-status-${review.id}`}><CalendarDays className="w-3 h-3 mr-1" />Scheduled{review.scheduledFor ? ` · ${new Date(review.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</Badge>;
@@ -910,7 +911,7 @@ export default function GoogleReviewsPage() {
 
               <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg">
                 <p className="text-xs text-amber-800 dark:text-amber-300">
-                  <strong>How it works:</strong> The client will receive an email from <strong>your company</strong> asking them to rate their experience (1-10). If they rate 8 or above, they'll be guided through leaving a Google review with AI-generated review text. Ratings below 8 are kept private for your improvement.
+                  <strong>How it works:</strong> The client will receive an email from <strong>your company</strong> asking them to rate their experience (1-10). Every client, whatever their rating, is invited to leave a Google review — Google's policy prohibits only asking happy customers. They can also send you private improvement notes.
                 </p>
               </div>
 
@@ -1103,13 +1104,13 @@ export default function GoogleReviewsPage() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-green-600" data-testid="stat-reviews-received">{reviews.filter((r: any) => r.reviewSubmitted).length}</p>
-            <p className="text-xs text-muted-foreground">Reviews Received</p>
+            <p className="text-2xl font-bold text-green-600" data-testid="stat-google-links-opened">{reviews.filter((r: any) => r.googleLinkOpened).length}</p>
+            <p className="text-xs text-muted-foreground">Google Links Opened</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600" data-testid="stat-positive">{reviews.filter((r: any) => r.status === "positive_feedback" || r.reviewSubmitted).length}</p>
+            <p className="text-2xl font-bold text-blue-600" data-testid="stat-positive">{reviews.filter((r: any) => r.feedbackRating >= 9).length}</p>
             <p className="text-xs text-muted-foreground">Positive Feedback</p>
           </CardContent>
         </Card>
@@ -1612,8 +1613,8 @@ export default function GoogleReviewsPage() {
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div className="text-left">
-                <h3 className="font-bold text-lg">Why This Is the Best Review System on the Planet</h3>
-                <p className="text-sm text-muted-foreground">The smartest way to build a 5-star reputation while avoiding bad reviews entirely</p>
+                <h3 className="font-bold text-lg">How Review Requests Work</h3>
+                <p className="text-sm text-muted-foreground">Ask every client the same way, learn from every rating, and stay inside Google's review policy</p>
               </div>
             </div>
             {showHowItWorks ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
@@ -1625,112 +1626,34 @@ export default function GoogleReviewsPage() {
 
               <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
                 <p className="text-sm font-medium leading-relaxed">
-                  Most contractors ask every client for a Google review and hope for the best. That's a gamble. One bad review from an unhappy client can tank your rating, push you down in search results, and cost you thousands in lost jobs. This system eliminates that risk completely.
+                  Happy clients forget to leave reviews; this system makes it easy for every client to do it while the job is fresh. It asks everyone the same way — Google prohibits "review gating" (only sending happy customers to Google) and incentivized reviews, and profiles caught doing either can have reviews removed or be suspended.
                 </p>
               </div>
 
               <div>
                 <h4 className="font-bold text-base mb-4 flex items-center gap-2">
                   <Target className="w-4 h-4 text-gray-500" />
-                  How the Feedback Funnel Works
+                  The Flow
                 </h4>
                 <div className="space-y-4">
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">1</div>
-                      <div className="w-0.5 flex-1 bg-gray-200 dark:bg-gray-700 mt-2"></div>
-                    </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Filter className="w-4 h-4 text-gray-500" />
-                        <p className="font-bold text-sm">The Feedback Gate (Rating 1-10)</p>
+                  {[
+                    { n: "1", Icon: Filter, title: "A quick private rating (1-10)", body: "The client rates the project. The score comes only to you, so you can track satisfaction across jobs. It never decides whether they are allowed to review you." },
+                    { n: "2", Icon: ExternalLink, title: "Every client is invited to Google", body: "Whatever the score, the client gets the same button to open your Google Business Profile and leave a review. Low scores are a signal to reach out and make it right, not a reason to hide the link." },
+                    { n: "3", Icon: ShieldCheck, title: "Optional private improvement notes", body: "Anyone can also tell you privately what to improve — communication, timeliness, quality, cleanup. It's in addition to a public review, never instead of the option." },
+                    { n: "4", Icon: DollarSign, title: "Your referral program, kept separate", body: "Clients can opt in to your referral program. Referral rewards are paid for referred customers only — never for leaving a review or for its star rating." },
+                    { n: "5", Icon: Sparkles, title: "Optional writing help", body: "If a client wants help getting started, AI can draft a starting point from the highlights they type. They edit it into their own words and choose their own star rating — the review must reflect their real experience." },
+                  ].map(({ n, Icon, title, body }) => (
+                    <div key={n} className="flex gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">{n}</div>
+                      <div className="pb-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon className="w-4 h-4 text-gray-500" />
+                          <p className="font-bold text-sm">{title}</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Instead of sending clients directly to Google, you send them a private feedback link first. They rate their experience on a scale of 1 to 10. This is the magic — <strong className="text-foreground">you're filtering before the review ever happens.</strong>
-                      </p>
                     </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">2a</div>
-                      <div className="w-0.5 flex-1 bg-gray-200 dark:bg-gray-700 mt-2"></div>
-                    </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <ShieldCheck className="w-4 h-4 text-gray-500" />
-                        <p className="font-bold text-sm">Below 8 = Private Feedback Only</p>
-                        <Badge variant="outline" className="text-xs">Bad Review Blocked</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        If the client rates below 8, they <strong className="text-foreground">never see a Google review link.</strong> Instead, they get a private improvement form — what areas could you improve? Communication? Timeliness? Quality? This feedback goes only to you. The unhappy client feels heard, and their frustration stays private. <strong className="text-foreground">No bad review. No damage to your reputation. Just actionable feedback to help you get better.</strong>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">2b</div>
-                      <div className="w-0.5 flex-1 bg-gray-200 dark:bg-gray-700 mt-2"></div>
-                    </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <ThumbsUp className="w-4 h-4 text-gray-500" />
-                        <p className="font-bold text-sm">8 or Above = Review Path Unlocked</p>
-                        <Badge variant="outline" className="text-xs">Guaranteed Positive</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Happy clients (8, 9, or 10) are guided to the next step — leaving a real Google review. <strong className="text-foreground">Since you already know they're happy, every review that makes it to Google is guaranteed to be positive.</strong> No more rolling the dice.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">3</div>
-                      <div className="w-0.5 flex-1 bg-gray-200 dark:bg-gray-700 mt-2"></div>
-                    </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <DollarSign className="w-4 h-4 text-gray-500" />
-                        <p className="font-bold text-sm">The Referral Cash Incentive</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Before the review page, clients see your referral program: <strong className="text-foreground">3% referral fee</strong> when they send you a new customer, plus an extra <strong className="text-foreground">1% bonus</strong> for leaving an impactful Google review. This does two powerful things — it motivates them to leave a thoughtful, detailed review (not a lazy "great job"), and it turns happy clients into active promoters who tell friends, family, and neighbors about your business <strong className="text-foreground">because there's real money on the line.</strong>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">4</div>
-                      <div className="w-0.5 flex-1 bg-gray-200 dark:bg-gray-700 mt-2"></div>
-                    </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Sparkles className="w-4 h-4 text-gray-500" />
-                        <p className="font-bold text-sm">AI Writes Their Review For Them</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Most people want to leave a review but don't know what to write. So they either write something short and generic, or they don't bother at all. Our AI generates a <strong className="text-foreground">detailed, keyword-rich, authentic-sounding review</strong> based on the actual project. The client just copies, pastes, and hits submit. It takes 30 seconds. The review reads like they spent 10 minutes writing it — and it's loaded with SEO-friendly keywords that help your Google listing rank higher.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">5</div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <ExternalLink className="w-4 h-4 text-gray-500" />
-                        <p className="font-bold text-sm">One-Click Google Review Submission</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        The client clicks one button, Google opens with your profile ready to go, they paste the AI-written review, select 5 stars, and submit. Done. <strong className="text-foreground">Maximum friction removed, maximum review quality guaranteed.</strong>
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -1739,51 +1662,23 @@ export default function GoogleReviewsPage() {
               <div>
                 <h4 className="font-bold text-base mb-4 flex items-center gap-2">
                   <BadgeCheck className="w-4 h-4 text-gray-500" />
-                  Why This Beats Every Other Method
+                  Why It Works
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
-                    <ShieldCheck className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Zero Bad Reviews</p>
-                      <p className="text-xs text-muted-foreground">Unhappy clients never see a Google link. Their frustration stays private. Your public rating stays perfect.</p>
+                  {[
+                    { Icon: TrendingUp, title: "More reviews, steadily", body: "Automatic requests and reminders mean more of your satisfied clients actually follow through — review volume and recency both help your profile." },
+                    { Icon: Heart, title: "Catch problems early", body: "A low private score alerts you to call the client while there's still time to fix the issue." },
+                    { Icon: Megaphone, title: "Clients become promoters", body: "The opt-in referral program rewards clients who send you new customers." },
+                    { Icon: ThumbsUp, title: "Reviews you can trust", body: "Reviews earned by asking everyone hold up to Google's filters and to homeowners reading them." },
+                  ].map(({ Icon, title, body }) => (
+                    <div key={title} className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
+                      <Icon className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">{title}</p>
+                        <p className="text-xs text-muted-foreground">{body}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
-                    <TrendingUp className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Higher Ranking on Google</p>
-                      <p className="text-xs text-muted-foreground">AI-generated reviews are packed with industry keywords. More detailed reviews = higher search ranking for your Google Business Profile.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
-                    <Megaphone className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Clients Become Promoters</p>
-                      <p className="text-xs text-muted-foreground">The 3% referral fee turns every happy client into a salesperson for your business. They actively tell people about you because there's money in it.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
-                    <Heart className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Real Improvement Feedback</p>
-                      <p className="text-xs text-muted-foreground">Low ratings come with specific improvement categories. You learn exactly what to fix — without the public embarrassment of a 1-star review.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
-                    <DollarSign className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Higher Quality Reviews</p>
-                      <p className="text-xs text-muted-foreground">The 1% review bonus motivates clients to write detailed, thoughtful reviews instead of "good job." Better reviews convert more leads.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
-                    <Target className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Completely Automated</p>
-                      <p className="text-xs text-muted-foreground">Send a request, the system handles the rest. Feedback gate, referral pitch, AI review, Google link — all automatic. You just collect 5-star reviews.</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -1791,9 +1686,9 @@ export default function GoogleReviewsPage() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-sm mb-1">What Most Contractors Do Wrong</p>
+                    <p className="font-bold text-sm mb-1">Rules that protect your profile</p>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      They finish a job, hand the client a card that says "Leave us a Google review!" and hope for the best. The problem? Happy clients forget. Unhappy clients remember. The result is a review profile skewed toward complaints. With this system, you control the narrative. Happy clients are guided to Google with a pre-written review. Unhappy clients are intercepted before they ever reach your profile. <strong className="text-foreground">It's not manipulation — it's smart business.</strong> You're simply making it easy for happy clients and creating a private channel for unhappy ones.
+                      Ask every client, not just happy ones. Never offer discounts, gifts, drawings, or referral bonuses in exchange for a review. Never write a review for a client or tell them what rating to give. Breaking these can get reviews removed or your Business Profile suspended, and paying for positive reviews violates the FTC's consumer-review rule.
                     </p>
                   </div>
                 </div>
@@ -1901,6 +1796,7 @@ export default function GoogleReviewsPage() {
 }
 
 function GoogleProfileReviewsTab() {
+  const { data: gbp } = useQuery<any>({ queryKey: ["/api/gbp/status"] });
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
@@ -1939,16 +1835,17 @@ function GoogleProfileReviewsTab() {
   });
 
   const replyMutation = useMutation({
-    mutationFn: async ({ id, replyComment }: { id: number; replyComment: string }) => {
-      const res = await apiRequest("PATCH", `/api/google-profile-reviews/${id}/reply`, { replyComment });
+    mutationFn: async ({ id, replyComment, action = "draft" }: { id: number; replyComment: string; action?: "draft" | "publish" | "delete" }) => {
+      const res = await apiRequest(action === "delete" ? "DELETE" : "PATCH", `/api/google-profile-reviews/${id}/reply`, { replyComment, action });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/google-profile-reviews"] });
-      toast({ title: "Reply saved" });
+      toast({ title: "Reply action confirmed" });
       setReplyingToId(null);
       setReplyText("");
     },
+    onError: (e: Error) => { queryClient.invalidateQueries({queryKey:["/api/gbp/status"]}); queryClient.invalidateQueries({queryKey:["/api/google-profile-reviews"]}); toast({title:"Reply failed",description:e.message,variant:"destructive"}); },
   });
 
   const noteMutation = useMutation({
@@ -2020,6 +1917,7 @@ function GoogleProfileReviewsTab() {
 
   return (
     <div className="space-y-6 relative z-10">
+      <GbpConnection />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Search</Label>
@@ -2178,7 +2076,7 @@ function GoogleProfileReviewsTab() {
             <Star className="w-10 h-10 text-muted-foreground mx-auto" />
             <p className="font-medium">No Google profile reviews yet</p>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Reviews from your Google Business Profiles will appear here once synced. Currently awaiting Google API access approval.
+              Reviews from your Google Business Profiles will appear here once synced. Connect your Google account, import a location, then choose Sync now.
             </p>
           </CardContent>
         </Card>
@@ -2309,7 +2207,7 @@ function GoogleProfileReviewsTab() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => { setReplyingToId(review.id); setReplyText(""); }}
+                            onClick={() => { setReplyingToId(review.id); setReplyText(review.replyDraft || ""); }}
                             title="Reply"
                             data-testid={`button-reply-${review.id}`}
                           >
@@ -2321,7 +2219,7 @@ function GoogleProfileReviewsTab() {
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={() => deleteMutation.mutate(review.id)}
-                          title="Delete"
+                          title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
                           data-testid={`button-delete-review-${review.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2343,22 +2241,26 @@ function GoogleProfileReviewsTab() {
                           <Button
                             size="sm"
                             className="bg-amber-500 hover:bg-amber-600 text-white"
-                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText })}
+                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText, action: gbp?.connected && review.googleReviewId ? "publish" : "draft" })}
                             disabled={!replyText.trim() || replyMutation.isPending}
                             data-testid={`button-submit-reply-${review.id}`}
                           >
                             {replyMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
-                            Post Reply
+                            {gbp?.connected && review.googleReviewId ? "Publish reply to Google" : "Save draft in ConstructHUB"}
                           </Button>
+                          {gbp?.connected && review.googleReviewId && <Button size="sm" variant="outline" disabled={replyMutation.isPending} onClick={() => replyMutation.mutate({id:review.id,replyComment:replyText})}>Save draft</Button>}
                           <Button size="sm" variant="ghost" onClick={() => setReplyingToId(null)}>Cancel</Button>
                         </div>
                       </div>
                     )}
 
+                    {!review.googleReviewId && <p className="text-xs text-muted-foreground">Manually entered record — not synced from Google.</p>}
+                    {review.replyDraft && <p className="p-3 text-sm">Draft saved in ConstructHUB: {review.replyDraft}</p>}
+                    {review.replyError && <p role="alert" className="text-destructive">{review.replyError}</p>}
                     {review.replyComment && (
                       <div className="mt-4 ml-4 sm:ml-13 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">Reply:</span>
+                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">{review.replyStatus === "posted" ? "Posted on Google:" : "Local draft (not posted):"}</span>
                           <div className="flex items-center gap-2">
                             {review.replyDate && (
                               <span className="text-xs text-muted-foreground">
@@ -2371,7 +2273,7 @@ function GoogleProfileReviewsTab() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={() => replyMutation.mutate({ id: review.id, replyComment: "" })}
+                              onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "delete" })}
                               title="Delete reply"
                               data-testid={`button-delete-reply-${review.id}`}
                             >

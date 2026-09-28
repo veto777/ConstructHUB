@@ -1,3 +1,5 @@
+import { isReviewSuppressed, normalizeRecipient } from "./review-suppression";
+import { ownedBy, type OwnerScope } from "./ownership";
 import {
   type County, type InsertCounty,
   type PermitDatabase, type InsertPermitDatabase,
@@ -52,14 +54,14 @@ export interface IStorage {
   createDatabase(data: InsertPermitDatabase): Promise<PermitDatabase>;
   updateDatabase(id: number, data: Partial<InsertPermitDatabase>): Promise<PermitDatabase | undefined>;
 
-  getSearchQueries(): Promise<SearchQuery[]>;
+  getSearchQueries(owner: OwnerScope): Promise<SearchQuery[]>;
   createSearchQuery(data: InsertSearchQuery): Promise<SearchQuery>;
   deleteSearchQuery(id: number): Promise<void>;
-  deleteAllSearchQueries(): Promise<void>;
+  deleteAllSearchQueries(owner: OwnerScope): Promise<void>;
 
   getSearchResults(queryId: number): Promise<SearchResult[]>;
   getSearchResultById(id: number): Promise<SearchResult | undefined>;
-  getRecentSearchResults(): Promise<SearchResult[]>;
+  getRecentSearchResults(owner: OwnerScope): Promise<SearchResult[]>;
   createSearchResult(data: InsertSearchResult): Promise<SearchResult>;
   updateSearchResult(id: number, data: Partial<InsertSearchResult>): Promise<void>;
   findExistingResult(databaseId: number, permitNumber: string | null): Promise<SearchResult | undefined>;
@@ -88,8 +90,8 @@ export interface IStorage {
   getGmbEditHistory(listingId: number): Promise<GmbEditHistory[]>;
   createGmbEditHistory(data: InsertGmbEditHistory): Promise<GmbEditHistory>;
 
-  getRankingGridScans(): Promise<RankingGridScan[]>;
-  getRankingGridScanById(id: number): Promise<RankingGridScan | undefined>;
+  getRankingGridScans(owner: OwnerScope): Promise<RankingGridScan[]>;
+  getRankingGridScanById(id: number, owner: OwnerScope): Promise<RankingGridScan | undefined>;
   createRankingGridScan(data: InsertRankingGridScan): Promise<RankingGridScan>;
   updateRankingGridScan(id: number, data: Partial<InsertRankingGridScan>): Promise<RankingGridScan | undefined>;
   deleteRankingGridScan(id: number): Promise<void>;
@@ -140,6 +142,7 @@ export interface IStorage {
   getReminderSettings(userId: number): Promise<ReviewReminderSettings | undefined>;
   upsertReminderSettings(userId: number, data: Partial<InsertReminderSettings>): Promise<ReviewReminderSettings>;
   getPendingReminders(): Promise<ReviewRequest[]>;
+  getScheduledReviews(): Promise<ReviewRequest[]>;
 
   createBetaAccessCode(data: InsertBetaAccessCode): Promise<BetaAccessCode>;
   getBetaAccessCodeByCode(code: string): Promise<BetaAccessCode | undefined>;
@@ -281,8 +284,8 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getSearchQueries(): Promise<SearchQuery[]> {
-    return db.select().from(searchQueries).orderBy(desc(searchQueries.createdAt)).limit(50);
+  async getSearchQueries(owner: OwnerScope): Promise<SearchQuery[]> {
+    return db.select().from(searchQueries).where(ownedBy(searchQueries.userId, owner)).orderBy(desc(searchQueries.createdAt)).limit(50);
   }
 
   async createSearchQuery(data: InsertSearchQuery): Promise<SearchQuery> {
@@ -295,12 +298,12 @@ export class DatabaseStorage implements IStorage {
     await db.delete(searchQueries).where(eq(searchQueries.id, id));
   }
 
-  async deleteAllSearchQueries(): Promise<void> {
-    const allQueries = await db.select({ id: searchQueries.id }).from(searchQueries);
+  async deleteAllSearchQueries(owner: OwnerScope): Promise<void> {
+    const allQueries = await db.select({ id: searchQueries.id }).from(searchQueries).where(ownedBy(searchQueries.userId, owner));
     for (const q of allQueries) {
       await db.delete(searchResults).where(eq(searchResults.queryId, q.id));
     }
-    await db.delete(searchQueries);
+    await db.delete(searchQueries).where(ownedBy(searchQueries.userId, owner));
   }
 
   async getSearchResults(queryId: number): Promise<SearchResult[]> {
@@ -312,8 +315,10 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getRecentSearchResults(): Promise<SearchResult[]> {
-    return db.select().from(searchResults).orderBy(desc(searchResults.createdAt)).limit(100);
+  async getRecentSearchResults(owner: OwnerScope): Promise<SearchResult[]> {
+    return db.select().from(searchResults).where(inArray(searchResults.queryId,
+      db.select({ id: searchQueries.id }).from(searchQueries).where(ownedBy(searchQueries.userId, owner))
+    )).orderBy(desc(searchResults.createdAt)).limit(100);
   }
 
   async createSearchResult(data: InsertSearchResult): Promise<SearchResult> {
@@ -550,12 +555,12 @@ export class DatabaseStorage implements IStorage {
     return edit;
   }
 
-  async getRankingGridScans(): Promise<RankingGridScan[]> {
-    return db.select().from(rankingGridScans).orderBy(desc(rankingGridScans.createdAt));
+  async getRankingGridScans(owner: OwnerScope): Promise<RankingGridScan[]> {
+    return db.select().from(rankingGridScans).where(ownedBy(rankingGridScans.userId, owner)).orderBy(desc(rankingGridScans.createdAt));
   }
 
-  async getRankingGridScanById(id: number): Promise<RankingGridScan | undefined> {
-    const [scan] = await db.select().from(rankingGridScans).where(eq(rankingGridScans.id, id));
+  async getRankingGridScanById(id: number, owner: OwnerScope): Promise<RankingGridScan | undefined> {
+    const [scan] = await db.select().from(rankingGridScans).where(and(eq(rankingGridScans.id, id), ownedBy(rankingGridScans.userId, owner)));
     return scan;
   }
 
@@ -687,6 +692,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReviewRequest(data: InsertReviewRequest): Promise<ReviewRequest> {
+    data = { ...data, clientEmail: normalizeRecipient(data.clientEmail) };
+    if (await isReviewSuppressed(data.userId, data.clientEmail)) data = { ...data, unsubscribed: true, nextReminderAt: null, status: "suppressed" };
     const [request] = await db.insert(reviewRequests).values(data).returning();
     return request;
   }
@@ -764,10 +771,22 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(reviewRequests).where(
       and(
         eq(reviewRequests.status, "sent"),
+        isNull(reviewRequests.deletedAt),
         eq(reviewRequests.unsubscribed, false),
+        sql`NOT EXISTS (SELECT 1 FROM review_recipient_preferences p WHERE p.user_id=${reviewRequests.userId} AND p.email=lower(trim(${reviewRequests.clientEmail})) AND p.unsubscribed=true)`,
         lte(reviewRequests.nextReminderAt, new Date()),
       )
     );
+  }
+
+  async getScheduledReviews(): Promise<ReviewRequest[]> {
+    return db.select().from(reviewRequests).where(and(
+      eq(reviewRequests.status, "scheduled"),
+      isNull(reviewRequests.deletedAt),
+      eq(reviewRequests.unsubscribed, false),
+      sql`NOT EXISTS (SELECT 1 FROM review_recipient_preferences p WHERE p.user_id=${reviewRequests.userId} AND p.email=lower(trim(${reviewRequests.clientEmail})) AND p.unsubscribed=true)`,
+      lte(reviewRequests.scheduledFor, new Date()),
+    ));
   }
 
   async createBetaAccessCode(data: InsertBetaAccessCode): Promise<BetaAccessCode> {

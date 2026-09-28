@@ -8,7 +8,6 @@ import {
   KanbanSquare, ArrowRight,
 } from "lucide-react";
 import permitsLogo from "@assets/Permits_1772157993497.png";
-import spyLogo from "@assets/Spy_logo_1772157993496.png";
 import masterclassLogo from "@assets/Masterclass_1772158106209.png";
 import priceLogo from "@assets/Price_1772158106209.png";
 import ipTrackerLogo from "@assets/IP_tracker_1772159260377.png";
@@ -155,7 +154,7 @@ const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", ico
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
-  ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, logo: spyLogo, landingUrl: "/competitors-landing" }] : []),
+  ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/competitors-landing" }] : []),
   { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/master-class-landing" },
 ];
 

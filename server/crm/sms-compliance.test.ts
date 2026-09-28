@@ -248,6 +248,7 @@ describe("inbound webhook helpers (pure)", () => {
     const { getBaseUrl } = await import("../auth");
     await withSwEnv({ ...SW_ENV, SIGNALWIRE_SIGNING_KEY: "signing-key-1" }, () => {
       const req: any = { headers: { host: "portal.constructhub.us" }, body: { Body: "STOP", From: "+15551234567" }, originalUrl: "/api/crm/sms/inbound" };
+      expect(signalwireSignatureOk(req)).toBe(false);
       const signed = `${getBaseUrl(req)}${req.originalUrl}Body${"STOP"}From${"+15551234567"}`;
       req.headers["x-signalwire-signature"] = createHmac("sha1", "signing-key-1").update(signed).digest("base64");
       expect(signalwireSignatureOk(req)).toBe(true);

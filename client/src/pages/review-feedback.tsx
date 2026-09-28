@@ -132,7 +132,7 @@ export default function ReviewFeedbackPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isHighRating, isCompleted]);
 
-  const positiveSteps: Step[] = ["referral", "referral_feedback", "describe", "review"];
+  const positiveSteps: Step[] = ["describe", "review"];
   const getStepProgress = () => {
     if (!isHighRating) return null;
     const idx = positiveSteps.indexOf(step);
@@ -145,6 +145,7 @@ export default function ReviewFeedbackPage() {
     queryFn: async () => {
       const res = await fetch(`/api/review/${token}`);
       if (!res.ok) throw new Error("Review request not found");
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     enabled: !!token,
@@ -161,11 +162,12 @@ export default function ReviewFeedbackPage() {
           comments: comments || undefined,
         }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
-    onSuccess: (data) => {
-      if (data.showReview) {
-        setStep("referral");
+    onSuccess: () => {
+      if (isHighRating) {
+        setStep(reviewData?.referralOffer ? "referral" : "describe");
       } else {
         setStep("improvement");
       }
@@ -183,6 +185,7 @@ export default function ReviewFeedbackPage() {
           comments: comments || undefined,
         }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     onSuccess: () => {
@@ -200,6 +203,7 @@ export default function ReviewFeedbackPage() {
           highlights: highlights || undefined,
         }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     onSuccess: (data) => {
@@ -207,13 +211,14 @@ export default function ReviewFeedbackPage() {
     },
   });
 
-  const markReviewedMutation = useMutation({
+  const completeFlowMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/review/${token}/mark-reviewed`, {
+      const res = await fetch(`/api/review/${token}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ referralOptIn, referralFeedback }),
       });
+      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
       return res.json();
     },
     onSuccess: () => {
@@ -224,6 +229,10 @@ export default function ReviewFeedbackPage() {
       }
     },
   });
+
+  const trackGoogleOpen = () => {
+    void fetch(`/api/review/${token}/google-link-opened`, { method: "POST", keepalive: true });
+  };
 
   const handleCopyReview = () => {
     if (hasPhotos && !photosDownloaded) {
@@ -244,8 +253,9 @@ export default function ReviewFeedbackPage() {
       setShowCopyWarning(true);
       return;
     }
-    window.open(reviewData.googleProfileUrl, "_blank");
-    markReviewedMutation.mutate();
+    window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+    completeFlowMutation.mutate();
   };
 
   const handleCopyAndGo = () => {
@@ -253,15 +263,17 @@ export default function ReviewFeedbackPage() {
     setCopied(true);
     setShowCopyWarning(false);
     setTimeout(() => {
-      window.open(reviewData.googleProfileUrl, "_blank");
-      markReviewedMutation.mutate();
+      window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+      completeFlowMutation.mutate();
     }, 300);
   };
 
   const handleSkipAndGo = () => {
     setShowCopyWarning(false);
-    window.open(reviewData.googleProfileUrl, "_blank");
-    markReviewedMutation.mutate();
+    window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+    completeFlowMutation.mutate();
   };
 
   const toggleCategory = (cat: string) => {
@@ -313,23 +325,6 @@ export default function ReviewFeedbackPage() {
     );
   }
 
-  if (reviewData.reviewSubmitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950 px-4">
-        <FloatingParticles color={THEME_COLOR} />
-        <Card className="max-w-md mx-auto border shadow-lg relative z-10">
-          <CardContent className="p-8 text-center space-y-4">
-            <div className="w-20 h-20 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-10 h-10 text-green-500" />
-            </div>
-            <h2 className="text-2xl font-bold">Thank You!</h2>
-            <p className="text-muted-foreground leading-relaxed">Your feedback has already been submitted. We truly appreciate you taking the time.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const companyName = reviewData.companyName || "Our Team";
   const companyLogoUrl = reviewData.companyLogoUrl;
 
@@ -361,6 +356,20 @@ export default function ReviewFeedbackPage() {
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Customer Feedback</span>
           </div>
         </div>
+
+        {reviewData.googleProfileUrl && (
+          <div className="mb-6 space-y-2 text-center">
+            <Button asChild className="w-full h-12">
+              <a href={reviewData.googleProfileUrl} target="_blank" rel="noopener noreferrer" onClick={trackGoogleOpen} data-testid="link-google-review-always">
+                <ExternalLink className="w-4 h-4 mr-2" /> Leave a Google Review
+              </a>
+            </Button>
+            <p className="text-xs text-muted-foreground">Everyone is welcome to review. No private feedback or referral participation is required, and no reward is offered for a review.</p>
+          </div>
+        )}
+        {[feedbackMutation.error, improvementMutation.error, generateMutation.error, completeFlowMutation.error].some(Boolean) && (
+          <p role="alert" className="mb-4 text-sm text-destructive">Unable to save your request. Please try again.</p>
+        )}
 
         {step === "rating" && (
           <Card className="border shadow-lg overflow-hidden">
@@ -515,6 +524,30 @@ export default function ReviewFeedbackPage() {
                 <Lock className="w-3 h-3" />
                 Your feedback is completely confidential
               </p>
+
+              <Button variant="outline" className="w-full" onClick={() => setStep("describe")} data-testid="button-improvement-draft">
+                Help me draft my honest review
+              </Button>
+
+              {reviewData?.googleProfileUrl && (
+                <div className="pt-2 border-t space-y-3 text-center" data-testid="section-improvement-google-review">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    You're also welcome to share your experience publicly on Google. Every review helps other homeowners — and helps us improve.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 text-base font-bold border-2"
+                    onClick={() => {
+                      window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    trackGoogleOpen();
+                      completeFlowMutation.mutate();
+                    }}
+                    data-testid="button-improvement-google-review"
+                  >
+                    <ExternalLink className="w-5 h-5 mr-2" /> Leave a Google Review
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -538,7 +571,7 @@ export default function ReviewFeedbackPage() {
           );
         })()}
 
-        {step === "referral" && (
+        {step === "referral" && reviewData.referralOffer && (
           <Card className="border shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="text-center space-y-3">
@@ -549,7 +582,7 @@ export default function ReviewFeedbackPage() {
                   We Appreciate You!
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
-                  Your positive experience means everything to us. We'd love for you to share it with a Google review — and we have a way to say thank you:
+                  Your positive experience means everything to us. We'd love for you to share it in a Google review. Separately, if you know someone who needs work done, our referral program rewards referrals:
                 </p>
               </div>
 
@@ -561,40 +594,10 @@ export default function ReviewFeedbackPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-extrabold text-lg">3% Referral Fee</p>
+                        <p className="font-extrabold text-lg">Referral Offer</p>
                         <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wider">Earn Cash</span>
                       </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">Know someone who needs work done? Refer them to {companyName} and earn <strong>3% of their project value</strong> as a thank-you payment.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
-                      <Star className="w-7 h-7 text-white dark:text-gray-900 fill-current" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-extrabold text-lg">+1% Review Bonus</p>
-                        <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wider">Bonus</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">If someone you refer mentions your review when they contact us, you qualify for an <strong>additional 1% bonus</strong> on top of your referral fee.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20 border-2 border-amber-300 dark:border-amber-700" data-testid="card-yearly-drawing">
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center shrink-0">
-                      <Award className="w-7 h-7 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-extrabold text-lg">$5,000 Year-End Drawing</p>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 text-[10px] font-bold uppercase tracking-wider">Grand Prize</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">Every client who leaves a review is automatically entered into our <strong>annual $5,000 prize drawing</strong> at the end of the year. Share your experience and you could win big — it's our way of saying thank you!</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{reviewData.referralOffer}</p>
                     </div>
                   </div>
                 </div>
@@ -627,15 +630,14 @@ export default function ReviewFeedbackPage() {
                   onClick={() => setStep("referral_feedback")}
                   data-testid="button-leave-review"
                 >
-                  <Star className="w-5 h-5 mr-2 fill-current" />
-                  Leave a Review
+                  Continue
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {step === "referral_feedback" && (
+        {step === "referral_feedback" && reviewData.referralOffer && (
           <Card className="border shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="text-center space-y-3">
@@ -706,12 +708,12 @@ export default function ReviewFeedbackPage() {
                 variant="ghost"
                 className="w-full text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  markReviewedMutation.mutate();
+                  completeFlowMutation.mutate();
                 }}
-                disabled={markReviewedMutation.isPending}
+                disabled={completeFlowMutation.isPending}
                 data-testid="button-skip-all"
               >
-                {markReviewedMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {completeFlowMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Skip — I don't want to leave a review
               </Button>
             </CardContent>
@@ -729,7 +731,7 @@ export default function ReviewFeedbackPage() {
                   Tell Us About Your Project
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
-                  A few words is all it takes. Our system will craft a polished, keyword-rich Google review for you — perfect if you're short on time or not sure what to write.
+                  Describe your own experience, positive or negative. We can help edit your words into a draft for you to check before posting.
                 </p>
               </div>
 
@@ -1043,10 +1045,10 @@ export default function ReviewFeedbackPage() {
                     <Button
                       className={`w-full h-12 font-bold ${copied ? "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white" : "bg-gray-200 dark:bg-gray-700 text-muted-foreground cursor-not-allowed"}`}
                       onClick={handleGoogleClick}
-                      disabled={markReviewedMutation.isPending}
+                      disabled={completeFlowMutation.isPending}
                       data-testid="button-open-google-review"
                     >
-                      {markReviewedMutation.isPending ? (
+                      {completeFlowMutation.isPending ? (
                         <Loader2 className="w-5 h-5 animate-spin mr-2" />
                       ) : (
                         <ExternalLink className="w-5 h-5 mr-2" />
@@ -1088,27 +1090,11 @@ export default function ReviewFeedbackPage() {
                   </div>
                   <div className="flex-1">
                     <p className="font-bold text-base">Better Business Bureau</p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">BBB reviews carry serious credibility. A positive review here signals trust and professionalism.</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">BBB reviews carry serious credibility with homeowners researching contractors.</p>
                   </div>
                   <ExternalLink className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
                 </a>
 
-                <a
-                  href="https://www.yelp.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
-                  data-testid="link-yelp-review"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
-                    <span className="text-white dark:text-gray-900 font-black text-lg">Y!</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-base">Yelp</p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Yelp is one of the most-visited review sites. Help other homeowners find quality contractors.</p>
-                  </div>
-                  <ExternalLink className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                </a>
               </div>
 
               <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
@@ -1117,7 +1103,7 @@ export default function ReviewFeedbackPage() {
                   <div>
                     <p className="text-sm font-bold">Multi-Platform Reviews Make a Huge Difference</p>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Having consistent positive reviews across Google, BBB, and Yelp makes {companyName} stand out as a trusted professional and boosts search rankings!
+                      Having reviews on both Google and BBB makes {companyName} stand out as a trusted professional and boosts search rankings!
                     </p>
                   </div>
                 </div>

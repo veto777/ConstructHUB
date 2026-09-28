@@ -35,12 +35,13 @@ export default function SchedulesPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { data: schedules, isLoading } = useQuery<ScrapeSchedule[]>({
+  const { data: schedules, isLoading, error } = useQuery<ScrapeSchedule[]>({
     queryKey: ["/api/scrape-schedules"],
   });
 
   const { data: databases } = useQuery<PermitDatabase[]>({
     queryKey: ["/api/databases"],
+    enabled: !!schedules,
   });
 
   const toggleMutation = useMutation({
@@ -64,6 +65,11 @@ export default function SchedulesPage() {
 
   const getDatabaseName = (dbId: number) =>
     databases?.find((d) => d.id === dbId)?.name ?? `Database #${dbId}`;
+
+  if (error) return <div className="p-6"><Card className="p-6" role="alert">
+    <h1 className="text-xl font-semibold">System permit-refresh schedules</h1>
+    <p className="mt-2 text-muted-foreground">{String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}</p>
+  </Card></div>;
 
   if (isLoading) {
     return (
@@ -93,7 +99,7 @@ export default function SchedulesPage() {
             </h1>
             <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
             <p className="text-sm text-muted-foreground max-w-lg">
-              Set up automated daily searches across any permit database. Get fresh permit data delivered without lifting a finger — never miss a new project in your area.
+              Manage system-wide permit-refresh schedule settings. Administrator access is required.
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

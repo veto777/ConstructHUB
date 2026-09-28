@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SHOW_AD_ACTIVITY } from "@/lib/features";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,9 +50,9 @@ function getBsColor(score: number) {
 }
 
 function getBsBadge(score: number) {
-  if (score >= 60) return { label: "High Risk", variant: "destructive" as const, color: "bg-red-500/10 text-red-500 border-red-500/20" };
-  if (score >= 30) return { label: "Moderate", variant: "outline" as const, color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" };
-  return { label: "Organic", variant: "outline" as const, color: "bg-green-500/10 text-green-500 border-green-500/20" };
+  if (score >= 60) return { label: "More signals", variant: "destructive" as const, color: "bg-red-500/10 text-red-500 border-red-500/20" };
+  if (score >= 30) return { label: "Some signals", variant: "outline" as const, color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" };
+  return { label: "Few signals", variant: "outline" as const, color: "bg-green-500/10 text-green-500 border-green-500/20" };
 }
 
 function BsMeter({ score }: { score: number }) {
@@ -59,7 +60,7 @@ function BsMeter({ score }: { score: number }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">BS Meter</span>
+        <span className="text-muted-foreground">BS Meter: signals worth a closer look</span>
         <span className={`font-bold ${getBsColor(score)}`}>{score}/100</span>
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -80,12 +81,13 @@ export default function CompetitorsPage() {
     queryKey: ["/api/stripe/subscription"],
   });
 
-  const isPlatinum = subscription?.plan === "platinum" && (subscription?.status === "active" || subscription?.status === "trialing");
+  const isPlatinum = ["gold", "platinum"].includes(subscription?.plan || "") && (subscription?.status === "active" || subscription?.status === "trialing");
   const isDev = import.meta.env.DEV;
 
   const { data: scans, isLoading: scansLoading } = useQuery<any[]>({
     queryKey: ["/api/competitors/scans"],
     enabled: isPlatinum || isDev,
+    refetchInterval: query => query.state.data?.some(scan => scan.status === "running") ? 1500 : false,
   });
 
   const scanMutation = useMutation({
@@ -128,10 +130,10 @@ export default function CompetitorsPage() {
           </div>
           <h1 className="text-3xl font-extrabold" data-testid="text-locked-title">Competitor Intelligence</h1>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            Index every competitor in your market, track their rankings, and see who's playing fair with our BS Meter.
+            Index every competitor in your market, track their rankings, and use our heuristic BS Meter to find signals worth a closer look.
           </p>
           <p className="text-muted-foreground">
-            This feature is exclusively available for <span className="text-yellow-500 font-bold">Platinum</span> members.
+            This feature is available for <span className="text-yellow-500 font-bold">Gold and Platinum</span> members.
           </p>
           <Button
             className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-8"
@@ -139,7 +141,7 @@ export default function CompetitorsPage() {
             data-testid="button-upgrade-platinum"
           >
             <Shield className="w-4 h-4 mr-2" />
-            Upgrade to Platinum — $995/mo
+            View Gold and Platinum plans
           </Button>
         </div>
       </div>
@@ -156,7 +158,7 @@ export default function CompetitorsPage() {
           </h1>
           <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
           <p className="text-muted-foreground text-sm max-w-lg">
-            Know exactly who you're competing against. Index every competitor in your market, track their rankings and reviews, and spy on their Google Ads.
+            Know exactly who you're competing against. Index every competitor in your market, and track their rankings and reviews.
           </p>
         </div>
 
@@ -166,10 +168,12 @@ export default function CompetitorsPage() {
               <Search className="w-4 h-4" />
               Market Scan
             </TabsTrigger>
-            <TabsTrigger value="ad-spy" className="flex items-center gap-1.5" data-testid="tab-ad-spy">
-              <Megaphone className="w-4 h-4" />
-              Ad Spy
-            </TabsTrigger>
+            {SHOW_AD_ACTIVITY && (
+              <TabsTrigger value="ad-spy" className="flex items-center gap-1.5" data-testid="tab-ad-spy">
+                <Megaphone className="w-4 h-4" />
+                Ad Activity
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="market-scan" className="space-y-6">
@@ -260,9 +264,11 @@ export default function CompetitorsPage() {
             ))}
           </TabsContent>
 
-          <TabsContent value="ad-spy" className="space-y-6">
-            <AdSpyTab />
-          </TabsContent>
+          {SHOW_AD_ACTIVITY && (
+            <TabsContent value="ad-spy" className="space-y-6">
+              <AdSpyTab />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
@@ -332,7 +338,7 @@ function AdSpyTab() {
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Megaphone className="w-5 h-5 text-orange-500" />
-            AdSpy
+            Public Ad Activity
           </h2>
           <p className="text-sm text-muted-foreground">Track who's advertising on Google for your target keywords.</p>
         </div>
@@ -402,7 +408,7 @@ function AdSpyTab() {
       {keywords && keywords.length === 0 && !isLoading && (
         <div className="text-center py-12 text-muted-foreground">
           <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>No keywords tracked yet. Add a keyword above to start spying on competitor ads.</p>
+          <p>No keywords tracked yet. Add a keyword above to see who's advertising for it.</p>
         </div>
       )}
 
@@ -622,9 +628,10 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
   return (
     <div className="mt-3 space-y-3">
       <p className="text-xs font-semibold flex items-center gap-1.5">
-        <Eye className="w-3.5 h-3.5 text-yellow-500" /> Review Deep Analysis ({total} reviews sampled)
+        <Eye className="w-3.5 h-3.5 text-yellow-500" /> Signals worth a closer look ({total} reviews sampled)
       </p>
 
+      <p className="text-xs text-muted-foreground">Heuristic signals from a selected sample are not proof of authorship, purchase, or authenticity. Scores are not probabilities.</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="p-2 rounded border border-green-500/20 bg-green-500/5 text-center">
           <div className="flex items-center justify-center gap-1">
@@ -645,7 +652,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
             <Bot className="w-3 h-3 text-purple-500" />
             <span className="text-sm font-bold text-purple-500">{analysis.reviewsLookingAi}</span>
           </div>
-          <p className="text-[10px] text-muted-foreground">AI-Looking ({aiPct}%)</p>
+          <p className="text-[10px] text-muted-foreground">Common phrases ({aiPct}%)</p>
         </div>
         <div className="p-2 rounded border border-amber-500/20 bg-amber-500/5 text-center">
           <div className="flex items-center justify-center gap-1">
@@ -663,19 +670,19 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
         </div>
         <div className="flex items-center gap-1.5 p-1.5 rounded border border-border/30">
           <UserCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-          <span className="text-muted-foreground">Real Names: <strong className="text-foreground">{realNamePct}%</strong></span>
+          <span className="text-muted-foreground">Name pattern: <strong className="text-foreground">{realNamePct}%</strong></span>
         </div>
         <div className="flex items-center gap-1.5 p-1.5 rounded border border-border/30">
           <UserX className="w-3 h-3 text-red-400 shrink-0" />
-          <span className="text-muted-foreground">Blocked: <strong className="text-foreground">{analysis.blockedProfiles}</strong></span>
+          <span className="text-muted-foreground">Missing links: <strong className="text-foreground">{analysis.blockedProfiles}</strong></span>
         </div>
         <div className="flex items-center gap-1.5 p-1.5 rounded border border-border/30">
           <Clock className="w-3 h-3 text-orange-400 shrink-0" />
-          <span className="text-muted-foreground">Oldest: <strong className="text-foreground">{analysis.oldestReviewAge || "N/A"}</strong></span>
+          <span className="text-muted-foreground">Oldest sampled: <strong className="text-foreground">{analysis.oldestReviewAge || "N/A"}</strong></span>
         </div>
       </div>
 
-      {analysis.reviewVelocityFlag && analysis.reviewVelocityNote && (
+      {analysis.reviewVelocityNote && (
         <div className="p-2 rounded border border-red-500/30 bg-red-500/5">
           <p className="text-xs flex items-start gap-1.5">
             <AlertTriangle className="w-3 h-3 text-red-500 shrink-0 mt-0.5" />
@@ -687,7 +694,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
       {analysis.aiSuspectReviews && analysis.aiSuspectReviews.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[10px] font-semibold text-purple-500 uppercase tracking-wide flex items-center gap-1">
-            <Bot className="w-3 h-3" /> AI-Suspected Reviews
+            <Bot className="w-3 h-3" /> Repeated common phrases
           </p>
           {analysis.aiSuspectReviews.map((r: any, i: number) => (
             <div key={i} className="p-2 rounded border border-purple-500/10 bg-purple-500/5 text-xs">
@@ -770,7 +777,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
               </Badge>
             )}
             {scan.status === "failed" && (
-              <Badge variant="destructive">Failed</Badge>
+              <span className="text-sm text-destructive" role="alert">{scan.errorMessage || "Scan failed. Please try again."}</span>
             )}
             <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={deleting} data-testid={`button-delete-scan-${scan.id}`}>
               <Trash2 className="w-4 h-4" />
@@ -804,15 +811,15 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
                 </div>
                 <div className="p-3 rounded-lg border border-green-500/20 text-center">
                   <p className="text-2xl font-bold text-green-500">{organic}</p>
-                  <p className="text-xs text-muted-foreground">Organic</p>
+                  <p className="text-xs text-muted-foreground">Few signals</p>
                 </div>
                 <div className="p-3 rounded-lg border border-yellow-500/20 text-center">
                   <p className="text-2xl font-bold text-yellow-500">{moderate}</p>
-                  <p className="text-xs text-muted-foreground">Moderate Risk</p>
+                  <p className="text-xs text-muted-foreground">Some signals Risk</p>
                 </div>
                 <div className="p-3 rounded-lg border border-red-500/20 text-center">
                   <p className="text-2xl font-bold text-red-500">{highRisk}</p>
-                  <p className="text-xs text-muted-foreground">High Risk</p>
+                  <p className="text-xs text-muted-foreground">More signals</p>
                 </div>
               </div>
 
@@ -904,7 +911,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
             </>
           )}
 
-          {!isLoading && !isRunning && listings.length === 0 && (
+          {!isLoading && scan.status === "completed" && listings.length === 0 && (
             <p className="text-center text-muted-foreground py-4">No competitors found in this scan.</p>
           )}
         </CardContent>
