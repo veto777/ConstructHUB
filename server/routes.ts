@@ -1,3 +1,4 @@
+import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
 import { competitorPlaces, placesResponse } from "./competitor-provider";
 import { rateLimit, actorKey } from "./growth-limits";
@@ -5474,14 +5475,9 @@ function main() {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
-      const { enabled, maxReminders, intervalHours, timeWindows, timezone } = req.body;
-      const settings = await storage.upsertReminderSettings(user.id, {
-        enabled: enabled !== undefined ? enabled : true,
-        maxReminders: maxReminders || 3,
-        intervalHours: intervalHours || 48,
-        timeWindows: timeWindows || [{ start: 9, end: 12 }, { start: 15, end: 18 }, { start: 18, end: 21 }],
-        timezone: timezone || "America/New_York",
-      });
+      const parsed = reminderSettingsInput.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid reminder settings", errors: parsed.error.flatten() });
+      const settings = await storage.upsertReminderSettings(user.id, parsed.data);
       res.json(settings);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to save settings" });
@@ -5523,32 +5519,13 @@ function main() {
   });
 
   // Reminder scheduler — runs every 5 minutes
-  function calculateNextReminderTime(settings: any, reminderNumber: number): Date {
-    const now = new Date();
-    const intervalMs = (settings?.intervalHours || 48) * 60 * 60 * 1000;
-    const nextDate = new Date(now.getTime() + intervalMs);
-
-    const windows = settings?.timeWindows || [
-      { start: 9, end: 12 }, { start: 15, end: 18 }, { start: 18, end: 21 }
-    ];
-    const windowIndex = reminderNumber % windows.length;
-    const window = windows[windowIndex];
-
-    const randomHour = window.start + Math.random() * (window.end - window.start);
-    const hours = Math.floor(randomHour);
-    const minutes = Math.floor((randomHour - hours) * 60);
-
-    nextDate.setUTCHours(hours + 5, minutes, 0, 0);
-    return nextDate;
-  }
-
   async function processReminders() {
     try {
       const pending = await storage.getPendingReminders();
       for (const request of pending) {
         try {
           const settings = await storage.getReminderSettings(request.userId);
-          const maxReminders = settings?.maxReminders || 3;
+          const maxReminders = settings?.maxReminders ?? 3;
           const enabled = settings?.enabled !== false;
 
           if (!enabled || request.remindersSent >= maxReminders) {
@@ -5556,9 +5533,12 @@ function main() {
             continue;
           }
 
-          const baseUrl = (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT)
-            ? "https://constructhub.us"
-            : (process.env.REPLIT_DEPLOYMENT_URL ? `https://${process.env.REPLIT_DEPLOYMENT_URL}` : "https://constructhub.us");
+          const baseUrl = canonicalAppOrigin();
+
+          if (!inReminderWindow(settings)) {
+            await storage.updateReviewRequest(request.id, { nextReminderAt: calculateNextReminderTime(settings, request.remindersSent) });
+            continue;
+          }
 
           let reminderLogoUrl: string | null = null;
           if (request.userId) {
@@ -5608,9 +5588,7 @@ function main() {
           const [owner] = await db.select().from(users).where(eq(users.id, request.userId)).limit(1);
           const companyLogoUrl = owner?.companyLogoUrl || null;
 
-          const baseUrl = (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT)
-            ? "https://constructhub.us"
-            : (process.env.REPLIT_DEPLOYMENT_URL ? `https://${process.env.REPLIT_DEPLOYMENT_URL}` : "https://constructhub.us");
+          const baseUrl = canonicalAppOrigin();
 
           await sendReviewRequestEmail(
             request.clientEmail,
