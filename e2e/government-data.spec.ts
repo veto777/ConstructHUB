@@ -35,3 +35,23 @@ test('real lane directory APIs and pages load', async ({ page, request }) => {
     await expect(page.locator('h1').first()).toBeVisible();
   }
 });
+
+test('property lookup APIs suppress dead links while retaining the office @serial', async ({ request }) => {
+  const { q } = await import('./db');
+  const [original] = await q('select id, county_id, link_status, is_active from property_appraisers where portal_url is not null limit 1');
+  expect(original).toBeTruthy();
+  try {
+    await q("update property_appraisers set link_status='dead', is_active=false where id=$1", [original.id]);
+    const county = await request.get(`/api/property-appraisers/county/${original.county_id}`);
+    expect(county.ok()).toBeTruthy();
+    const office = (await county.json()).find((r: any) => r.id === original.id);
+    expect(office.portalUrl).toBeNull(); expect(office.searchUrl).toBeNull();
+    const lookup = await request.post('/api/property-lookup', { data: { countyId: original.county_id, address: 'Unmatched audit fixture' } });
+    expect(lookup.ok()).toBeTruthy();
+    const result = await lookup.json();
+    expect(result.lookupLinks.find((r: any) => r.name === office.name).portalUrl).toBeNull();
+  } finally {
+    await q('update property_appraisers set link_status=$1, is_active=$2 where id=$3', [original.link_status, original.is_active, original.id]);
+  }
+});
+

@@ -1,3 +1,4 @@
+import { governmentLinksForDisplay } from "@shared/government-links";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -170,10 +171,10 @@ export async function registerRoutes(
         limit: req.query.limit ? parseInt(req.query.limit as string) : 25,
       };
       const result = await storage.getDatabasesFiltered(params);
-      res.json(result);
+      res.json({ ...result, databases: result.databases.map(governmentLinksForDisplay) });
     } else {
       const databases = await storage.getDatabases();
-      res.json(databases);
+      res.json(databases.map(governmentLinksForDisplay));
     }
   });
 
@@ -185,7 +186,7 @@ export async function registerRoutes(
   app.get("/api/databases/county/:countyId", async (req, res) => {
     const countyId = parseInt(req.params.countyId);
     const databases = await storage.getDatabasesByCounty(countyId);
-    res.json(databases);
+    res.json(databases.map(governmentLinksForDisplay));
   });
 
   app.post("/api/search", async (req, res) => {
@@ -422,7 +423,7 @@ export async function registerRoutes(
     const counties = await storage.getCounties();
     const countyMap = new Map(counties.map(c => [c.id, c]));
     const enriched = appraisers.map(a => ({
-      ...a,
+      ...governmentLinksForDisplay(a),
       county: countyMap.get(a.countyId),
     }));
     res.json(enriched);
@@ -431,7 +432,7 @@ export async function registerRoutes(
   app.get("/api/property-appraisers/county/:countyId", async (req, res) => {
     const countyId = parseInt(req.params.countyId);
     const appraisers = await storage.getPropertyAppraisersByCounty(countyId);
-    res.json(appraisers);
+    res.json(appraisers.map(governmentLinksForDisplay));
   });
 
   app.post("/api/property-lookup", async (req, res) => {
@@ -453,7 +454,7 @@ export async function registerRoutes(
       const counties = await storage.getCounties();
       const county = counties.find(c => c.id === countyId);
 
-      const lookupLinks = appraisers.map(a => ({
+      const lookupLinks = appraisers.map(governmentLinksForDisplay).map(a => ({
         name: a.name,
         portalUrl: a.portalUrl,
         searchUrl: a.searchUrl,
