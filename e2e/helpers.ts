@@ -153,47 +153,30 @@ export async function sweepPage(
     if (opts.beforeEach) await opts.beforeEach(page);
 
     const els = page.locator(SWEEP_SELECTOR);
-    const n = await els.count();
+    // Snapshot attributes in one browser round trip. Large document lists
+    // otherwise spend minutes re-reading every previously visited row over
+    // the Playwright protocol on each iteration.
+    const controls = await els.evaluateAll((nodes) => nodes.map((node) => ({
+      testid: node.getAttribute("data-testid") ?? "",
+      text: ((node as HTMLElement).innerText ?? "").trim().replace(/\s+/g, " ").slice(0, 60),
+      href: node.getAttribute("href") ?? "",
+    })));
     let target = -1;
     let info = { testid: "", text: "", href: "" };
-    for (let i = 0; i < n; i++) {
-      const el = els.nth(i);
-      const testid = (await el.getAttribute("data-testid")) ?? "";
-      const text = ((await el.innerText().catch(() => "")) ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
-      const href = (await el.getAttribute("href")) ?? "";
+    for (const [i, control] of controls.entries()) {
+      const { testid, text, href } = control;
       const key = testid || (text || href ? `${text}|${href}` : `anon#${i}`);
       if (seen.has(key)) continue;
       seen.add(key);
-      info = { testid, text, href };
-      // Logout is verified curated in 14-crm-settings — clicking it mid-sweep
-      // destroys the shared dev session (and the org pin with it), breaking
-      // every later iteration. The client portal's own sign-out (curated in
-      // 15-client-portal) gets the same treatment.
-      if (testid === "button-logout" || testid === "button-client-logout") { target = -1; continue; }
-      // tel:/mailto: links don't navigate to a page — clicking one in headless
-      // chrome lands on an empty body and fails the render check below.
-      if (/^(tel|mailto):/.test(href)) { target = -1; continue; }
-      if (opts.skip?.(info)) { target = -1; continue; }
+      info = control;
+      // Sign-out is covered by curated tests; it destroys the pinned org.
+      if (testid === "button-logout" || testid === "button-client-logout") continue;
+      if (/^(tel|mailto):/.test(href)) continue;
+      if (opts.skip?.(info)) continue;
       target = i;
       break;
     }
-    if (target === -1) {
-      // Either everything was clicked or the rest were skipped. If the last
-      // unseen item was skipped, keep scanning; otherwise we're done.
-      const anyUnseenLeft = await (async () => {
-        for (let i = 0; i < n; i++) {
-          const el = els.nth(i);
-          const testid = (await el.getAttribute("data-testid")) ?? "";
-          const text = ((await el.innerText().catch(() => "")) ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
-          const href = (await el.getAttribute("href")) ?? "";
-          const key = testid || (text || href ? `${text}|${href}` : `anon#${i}`);
-          if (!seen.has(key)) return true;
-        }
-        return false;
-      })();
-      if (!anyUnseenLeft) break;
-      continue;
-    }
+    if (target === -1) break;
 
     const el = els.nth(target);
     try {

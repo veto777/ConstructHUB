@@ -9,8 +9,8 @@ import { q } from "./db";
  *
  * No carrier credentials exist in dev — the whole point is that the feature is
  * honest about that: the Settings card names the missing env vars, the
- * reminder still emails (and RECORDS the text via the log provider), and the
- * "client is reviewing their bid again" alert fires email + a recorded text.
+ * reminder still emails without using the shared number for clients, and the
+ * opted-in "client is reviewing their bid again" alert records an owner text.
  *
  * @serial: temporarily sets the shared owner member's phone (restored after)
  * and asserts outbox files the parallel lanes also append to.
@@ -47,8 +47,8 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
   test("remind button emails the client and records the reminder (merge, never clobber)", async ({ page }) => {
     const guards = watchPage(page);
     const { customerId, estimateId } = await makeEstimate(page);
-    // Give the client a mobile so the SMS leg runs (recorded by the log
-    // provider — no carrier is configured in dev).
+    // A client phone is not authorization to text from the shared sender.
+    const smsBefore = fs.existsSync(SMS_OUTBOX) ? fs.readFileSync(SMS_OUTBOX, "utf8").length : 0;
     await q(`update crm_customers set phone = '+15550119988' where id = $1`, [customerId]);
 
     const send = await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
@@ -66,15 +66,12 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
       return rows[0]?.r?.length ?? 0;
     }, { timeout: 10_000 }).toBe(1);
     const rows = await q<{ r: any[] }>(`select custom_fields->'reminders' as r from crm_estimates where id = $1`, [estimateId]);
-    expect(rows[0].r[0].channel).toBe("email+sms");
+    expect(rows[0].r[0].channel).toBe("email");
     expect(rows[0].r[0].by).toBeTruthy();
     expect(rows[0].r[0].at).toBeTruthy();
 
-    // The text went to the log provider (no carrier configured) — not to SignalWire.
-    const smsLog = fs.readFileSync(SMS_OUTBOX, "utf8");
-    expect(smsLog).toContain('"provider":"log"');
-    expect(smsLog).toContain("+15550119988");
-    expect(smsLog).toContain("is waiting");
+    const newSms = fs.existsSync(SMS_OUTBOX) ? fs.readFileSync(SMS_OUTBOX, "utf8").slice(smsBefore) : "";
+    expect(newSms).not.toContain("+15550119988");
 
     guards.assertClean("reminder");
   });
@@ -101,6 +98,9 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
     const prior = await q<{ phone: string | null }>(
       `select phone from crm_members where id = (select created_by_member_id from crm_estimates where id = $1)`, [estimateId]);
     const priorPhone = prior[0]?.phone ?? null;
+    const [orgBefore] = await q<{ custom_fields: any }>("select custom_fields from crm_orgs where id=$1", [ORGS.alpine]);
+    // Explicitly opt in to owner alerts; do not rely on shared seed settings.
+    await q("update crm_orgs set custom_fields=jsonb_set(coalesce(custom_fields,'{}'::jsonb),'{smsAlerts}','true'::jsonb) where id=$1", [ORGS.alpine]);
     await q(
       `update crm_members set phone = '+15550100001' where id = (select created_by_member_id from crm_estimates where id = $1)`,
       [estimateId]);
@@ -145,6 +145,7 @@ test.describe("sms + engagement alerts", { tag: "@serial" }, () => {
 
       guards.assertClean("reengagement alert");
     } finally {
+      await q("update crm_orgs set custom_fields=$2 where id=$1", [ORGS.alpine, orgBefore.custom_fields]);
       await q(
         `update crm_members set phone = $2 where id = (select created_by_member_id from crm_estimates where id = $1)`,
         [estimateId, priorPhone]);

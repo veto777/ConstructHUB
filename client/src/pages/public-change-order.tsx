@@ -70,7 +70,7 @@ export default function PublicChangeOrderPage() {
                 <div className="font-semibold">
                   {settled === "approved" ? "Change order approved — thank you!" : "Change order declined"}
                 </div>
-                <p className="text-sm text-muted-foreground mt-0.5">{company.name} has been notified.</p>
+                <p className="text-sm text-muted-foreground mt-0.5">Your response has been recorded.</p>
               </div>
             </CardContent>
           </Card>

@@ -35,6 +35,8 @@ import { sendWithFallback } from "../email";
 import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
 import { getBaseUrl } from "../auth";
+import { computeApprovalTotals } from "./discounts";
+import { progressInvoiceItems } from "./invoice-math";
 
 type GetUser = (req: any, res: any) => any;
 const tok = () => randomBytes(24).toString("hex");
@@ -197,6 +199,18 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid invoice", issues: parsed.error.issues });
     const d = parsed.data;
+    // A document's own org_id does not authorize its foreign-key targets.
+    const [customer] = await db.select({ id: crmCustomers.id }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, d.customerId))).limit(1);
+    if (!customer) return res.status(400).json({ message: "Customer not found in this organization" });
+    if (d.projectId && !(await ownProject(ctx.org.id, d.projectId))) {
+      return res.status(400).json({ message: "Project not found in this organization" });
+    }
+    if (d.estimateId) {
+      const [estimate] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
+        .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, d.estimateId))).limit(1);
+      if (!estimate) return res.status(400).json({ message: "Estimate not found in this organization" });
+    }
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmInvoices)
       .where(eq(crmInvoices.orgId, ctx.org.id));
     const [inv] = await db.insert(crmInvoices).values({
@@ -224,8 +238,12 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
     if (!est) return res.status(404).json({ message: "Estimate not found" });
     if (!est.approvedAt) return res.status(409).json({ message: "Only an approved estimate can be invoiced." });
-    const pct = Math.min(10000, Math.max(0, Number(req.body?.percentBps ?? 10000)));
-    const retainageBps = Math.min(2000, Math.max(0, Number(req.body?.retainageBps ?? 0)));
+    const draw = z.object({
+      percentBps: z.number().int().min(1).max(10000).default(10000),
+      retainageBps: z.number().int().min(0).max(2000).default(0),
+    }).safeParse(req.body ?? {});
+    if (!draw.success) return res.status(400).json({ message: "Invalid progress billing", issues: draw.error.issues });
+    const { percentBps: pct, retainageBps } = draw.data;
     const items = await db.select().from(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, est.id)))
       .orderBy(asc(crmEstimateItems.sortOrder));
@@ -238,11 +256,17 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       taxRateBps: est.taxRateBps, retainageBps, publicToken: tok(),
       dueAt: new Date(Date.now() + 30 * 86400000),
     } as any).returning();
-    // Progress billing scales quantities, so line detail survives on every draw.
-    await db.insert(crmInvoiceItems).values(items.map((i, idx) => ({
+    // Use the immutable selections accepted with the signature, not today's
+    // editable offer definitions. The full invoice must honor that concession.
+    const selected = Array.isArray(est.selectedDiscounts)
+      ? est.selectedDiscounts.filter((s: any) => typeof s?.percentBps === "number") as { percentBps: number }[]
+      : [];
+    const approval = computeApprovalTotals(items, est.taxRateBps ?? 0, selected);
+    const lines = progressInvoiceItems(items, pct, approval.optionalDiscountCents);
+    if (lines.length) await db.insert(crmInvoiceItems).values(lines.map((i, idx) => ({
       orgId: ctx.org.id, invoiceId: inv.id, sortOrder: idx, kind: i.kind, name: i.name,
       description: i.description, unit: i.unit, unitPriceCents: i.unitPriceCents,
-      quantityMilli: Math.round((i.quantityMilli * pct) / 10000), taxable: i.taxable,
+      quantityMilli: i.quantityMilli, taxable: i.taxable,
     })) as any);
     logActivity(ctx, "invoice.created", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
@@ -268,37 +292,46 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid payment", issues: parsed.error.issues });
 
-    const [inv] = await db.select().from(crmInvoices)
-      .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
-    if (!inv) return res.status(404).json({ message: "Invoice not found" });
-    if (inv.voidedAt) return res.status(409).json({ message: "This invoice has been voided." });
+    // Serialize balance checks and ledger writes for this invoice. Without
+    // the row lock two valid-looking requests can both spend the same balance.
+    const result = await db.transaction(async (tx) => {
+      const [inv] = await tx.select().from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id)))
+        .limit(1).for("update");
+      if (!inv) return { error: { status: 404, message: "Invoice not found" } };
+      if (inv.voidedAt) return { error: { status: 409, message: "This invoice has been voided." } };
 
-    const outstanding = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
-    if (outstanding <= 0) return res.status(409).json({ message: "This invoice is already paid in full." });
-    // Overpayment would silently inflate paidCents past the contract; refuse it.
-    if (parsed.data.amountCents > outstanding) {
-      return res.status(400).json({
-        message: `Only $${(outstanding / 100).toFixed(2)} is outstanding on this invoice.`,
-        outstandingCents: outstanding,
-      });
+      const outstanding = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
+      if (outstanding <= 0) return { error: { status: 409, message: "This invoice is already paid in full." } };
+      if (parsed.data.amountCents > outstanding) {
+        return { error: {
+          status: 400,
+          message: `Only $${(outstanding / 100).toFixed(2)} is outstanding on this invoice.`,
+          outstandingCents: outstanding,
+        } };
+      }
+
+      const [pay] = await tx.insert(crmPayments).values({
+        orgId: ctx.org.id, customerId: inv.customerId, invoiceId: inv.id,
+        projectId: inv.projectId ?? null, provider: "manual", purpose: "progress",
+        amountCents: parsed.data.amountCents, currency: "usd",
+        method: parsed.data.method, status: "succeeded",
+        note: parsed.data.note ?? null, paidAt: new Date(),
+      } as any).returning();
+
+      const paid = (inv.paidCents ?? 0) + parsed.data.amountCents;
+      const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0));
+      const [row] = await tx.update(crmInvoices).set({
+        paidCents: paid, status: paid >= due ? "paid" : "partial",
+        paidAt: paid >= due ? new Date() : null, updatedAt: new Date(),
+      }).where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id))).returning();
+      return { inv, pay, paid, due, row };
+    });
+    if (result.error) {
+      const { status, ...body } = result.error;
+      return res.status(status).json(body);
     }
-
-    const [pay] = await db.insert(crmPayments).values({
-      orgId: ctx.org.id, customerId: inv.customerId, invoiceId: inv.id,
-      projectId: inv.projectId ?? null, provider: "manual", purpose: "progress",
-      amountCents: parsed.data.amountCents, currency: "usd",
-      method: parsed.data.method, status: "succeeded",
-      note: parsed.data.note ?? null, paidAt: new Date(),
-    } as any).returning();
-
-    const paid = (inv.paidCents ?? 0) + parsed.data.amountCents;
-    const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0));
-    const [row] = await db.update(crmInvoices).set({
-      paidCents: paid,
-      status: paid >= due ? "paid" : "partial",
-      paidAt: paid >= due ? new Date() : null,
-      updatedAt: new Date(),
-    }).where(eq(crmInvoices.id, inv.id)).returning();
+    const { inv, pay, paid, due, row } = result;
 
     if (paid >= due) await emitCrmEvent(ctx.org.id, "invoice.paid", { invoiceId: inv.id, paidCents: paid });
     await emitCrmEvent(ctx.org.id, "payment.succeeded", {
@@ -331,7 +364,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     }
     const [row] = await db.update(crmInvoices).set({
       voidedAt: new Date(), status: "void", updatedAt: new Date(),
-    }).where(eq(crmInvoices.id, inv.id)).returning();
+    }).where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id),
+      isNull(crmInvoices.voidedAt), sql`coalesce(${crmInvoices.paidCents}, 0) = 0`)).returning();
+    if (!row) return res.status(409).json({ message: "The invoice changed; reload before voiding it." });
     logActivity(ctx, "invoice.updated", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number, change: "voided" },
@@ -350,17 +385,16 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
     if (!requireOwnerRole(res, ctx)) return;
-    const [inv] = await db.select().from(crmInvoices)
-      .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
-    if (!inv) return res.status(404).json({ message: "Invoice not found" });
-
-    const [{ n: paymentCount }] = await db.select({ n: sql<number>`count(*)::int` })
-      .from(crmPayments)
-      .where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.invoiceId, inv.id)));
-    const refusal = invoiceDeleteRefusal(inv, paymentCount);
-    if (refusal) return res.status(409).json({ message: refusal });
-
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
+      const [inv] = await tx.select().from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id)))
+        .limit(1).for("update");
+      if (!inv) return { error: { status: 404, message: "Invoice not found" } };
+      const [{ n: paymentCount }] = await tx.select({ n: sql<number>`count(*)::int` })
+        .from(crmPayments)
+        .where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.invoiceId, inv.id)));
+      const refusal = invoiceDeleteRefusal(inv, paymentCount);
+      if (refusal) return { error: { status: 409, message: refusal } };
       await tx.delete(crmInvoiceItems)
         .where(and(eq(crmInvoiceItems.orgId, ctx.org.id), eq(crmInvoiceItems.invoiceId, inv.id)));
       await tx.delete(crmEngagementSessions)
@@ -368,7 +402,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
           eq(crmEngagementSessions.docType, "invoice"), eq(crmEngagementSessions.docId, inv.id)));
       await tx.delete(crmInvoices)
         .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id)));
+      return { inv };
     });
+    if (result.error) return res.status(result.error.status).json({ message: result.error.message });
+    const { inv } = result;
 
     console.log(`[crm] owner ${ctx.member.id} deleted invoice ${inv.number ?? inv.id} (${inv.id}) in org ${ctx.org.id}`);
     await db.insert(crmCustomerNotes).values({
