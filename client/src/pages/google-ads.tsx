@@ -1,3 +1,4 @@
+import { useAppOrigin } from "@/lib/app-origin";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,7 @@ type BlockedIp = {
 const FRAUD_TABS = ["Blocked IPs", "Countries", "Multi-Clicks", "Devices", "Browsers", "OS"];
 
 export default function ClickGuardPage() {
+  const appOrigin = useAppOrigin();
   const { toast } = useToast();
   const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "traffic" | "fraud" | "tools" | "settings" | "link-ads">("dashboard");
@@ -189,7 +191,7 @@ export default function ClickGuardPage() {
   });
 
   const scriptSnippet = selectedDomain
-    ? `<script src="https://constructhub.us/api/click-guard/script/${selectedDomain.trackingId}" async></script>`
+    ? `<script src="${appOrigin}/api/click-guard/script/${selectedDomain.trackingId}" async></script>`
     : "";
 
   const copyScript = () => {
@@ -222,7 +224,7 @@ export default function ClickGuardPage() {
                 <span className="bg-gradient-to-r from-[#4285F4] to-[#34A853] bg-clip-text text-transparent">Protection</span>
               </h1>
               <p className="mt-2 text-muted-foreground max-w-xl text-sm" data-testid="text-subtitle">
-                Track every visitor across your websites. Detect click fraud, block bad IPs, and protect your ad spend.
+                Track visits that run your script, flag unusual patterns, and build an IP exclusion list. Signals do not prove fraud; Google Ads exclusions require the separate Ads script.
               </p>
             </div>
 
@@ -298,7 +300,7 @@ export default function ClickGuardPage() {
               const labels: Record<string, string> = {
                 dashboard: "Dashboard",
                 traffic: "Traffic Sources",
-                fraud: "Fraud Analytics",
+                fraud: "Traffic Signals",
                 tools: "Tools",
                 settings: "Domain Settings",
                 "link-ads": "Link Google Ads",
@@ -348,7 +350,7 @@ export default function ClickGuardPage() {
                   <CardContent className="p-12 text-center">
                     <Shield className="h-16 w-16 text-blue-500/40 mx-auto mb-4" />
                     <h2 className="text-xl font-bold text-foreground mb-2" data-testid="text-no-domains">No Domains Added Yet</h2>
-                    <p className="text-muted-foreground mb-6">Add your first website domain to start tracking visitors and detecting click fraud.</p>
+                    <p className="text-muted-foreground mb-6">Add your first website domain to start tracking visitors and reviewing unusual traffic patterns.</p>
                     <Button
                       className="bg-[#4285F4] text-white"
                       onClick={() => setShowAddDomain(true)}
@@ -365,7 +367,7 @@ export default function ClickGuardPage() {
                       <Globe className="h-4 w-4 text-blue-500 ml-2" />
                       <span className="text-foreground font-medium text-sm">{selectedDomain.domain}</span>
                       <Badge className={`${selectedDomain.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-card text-muted-foreground border-border"} text-xs ml-1`}>
-                        {selectedDomain.isActive ? "PROTECTED" : "INACTIVE"}
+                        {selectedDomain.isActive ? "TRACKING" : "INACTIVE"}
                       </Badge>
                     </div>
                   </div>
@@ -436,6 +438,7 @@ export default function ClickGuardPage() {
 }
 
 function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; trackingId?: string }) {
+  const appOrigin = useAppOrigin();
   const { toast } = useToast();
   const [scriptCopied, setScriptCopied] = useState(false);
   const [trackingCopied, setTrackingCopied] = useState(false);
@@ -455,7 +458,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
   const activeBlockedCount = blockedIps.filter(b => b.isActive).length;
 
   const trackingSnippet = trackingId
-    ? `<!-- Click Guard by ConstructHUB -->\n<script src="https://constructhub.us/api/click-guard/script/${trackingId}" async></script>`
+    ? `<!-- Click Guard by ConstructHUB -->\n<script src="${appOrigin}/api/click-guard/script/${trackingId}" async></script>`
     : "";
 
   const copyScript = () => {
@@ -1535,6 +1538,7 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
   scriptSnippet: string;
   copyScript: () => void;
 }) {
+  const appOrigin = useAppOrigin();
   const { toast } = useToast();
 
   const conversionScript = `<!-- Click Guard Conversion tracking-->
@@ -1543,18 +1547,16 @@ ccConVal = 0;
 var script = document.createElement("script");
 script.async = true;
 script.type = "text/javascript";
-var target = 'https://constructhub.us/api/click-guard/script/${domain.trackingId}';
+var target = '${appOrigin}/api/click-guard/script/${domain.trackingId}';
 script.src = target; var elem = document.head; elem.appendChild(script);
 </script>
-<noscript>
-<a href="https://constructhub.us"><img src="https://constructhub.us/api/click-guard/pixel/${domain.trackingId}" alt="Click Guard"/></a>
-</noscript>
+
 <!-- Click Guard Conversion tracking-->`;
 
   const eventScript = `function initCGConversion(val) {
   window.ccConVal = val || 0;
   var script = document.createElement('script');
-  var target = 'https://constructhub.us/api/click-guard/script/${domain.trackingId}';
+  var target = '${appOrigin}/api/click-guard/script/${domain.trackingId}';
   var elem = document.head;
   script.type = 'text/javascript';
   script.src = target;
@@ -1576,7 +1578,7 @@ script.src = target; var elem = document.head; elem.appendChild(script);
         </CardHeader>
         <CardContent className="p-4 pt-0">
           <p className="text-sm text-muted-foreground mb-3">
-            Add this script to the <code className="text-blue-500">&lt;head&gt;</code> of every page on <strong className="text-foreground">{domain.domain}</strong> to start tracking visitors and detecting click fraud.
+            Add this script to the <code className="text-blue-500">&lt;head&gt;</code> of every page on <strong className="text-foreground">{domain.domain}</strong> to start tracking visitors and reviewing unusual traffic patterns.
           </p>
           <div className="relative">
             <pre className="bg-muted border border-border rounded-lg p-4 text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre-wrap break-all">

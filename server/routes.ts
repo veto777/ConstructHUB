@@ -3266,7 +3266,10 @@ Rules:
       }
 
       if (fingerprint) {
-        const fpVisits = dailyVisits.filter(v => v.fingerprint === fingerprint && v.ipAddress !== ip);
+        const fpVisits = await db.select({ id: clickVisits.id }).from(clickVisits).where(and(
+          eq(clickVisits.domainId, domain.id), eq(clickVisits.fingerprint, String(fingerprint)),
+          gte(clickVisits.visitedAt, oneDayAgo), sql`${clickVisits.ipAddress} <> ${ip}`,
+        )).limit(1);
         if (fpVisits.length > 0) {
           suspicionReasons.push("Same device fingerprint seen from different IPs");
         }
@@ -4327,7 +4330,7 @@ function main() {
       const domain = await storage.getTrackedDomainById(id);
       if (!domain || domain.userId !== user.id) return res.status(404).json({ message: "Domain not found" });
 
-      const apiUrl = "https://constructhub.us";
+      const apiUrl = canonicalAppOrigin();
 
       const scriptTag = `<!-- VPN Shield by ConstructHUB -->\n<script src="${apiUrl}/api/vpn-shield/script/${domain.trackingId}" async><\/script>`;
 
@@ -4344,12 +4347,12 @@ function main() {
 
   app.get("/api/vpn-shield/script/:trackingId", (req, res) => {
     const { trackingId } = req.params;
-    const apiUrl = "https://constructhub.us";
+    const apiUrl = canonicalAppOrigin();
 
     const script = `(function(){
   if(window.__chVpnShieldLoaded)return;
   window.__chVpnShieldLoaded=true;
-  var tid="${trackingId}";
+  var tid=${JSON.stringify(trackingId)};
   var api="${apiUrl}/api/vpn-shield/track";
   var crawlers=/Googlebot|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebookexternalhit|Twitterbot|LinkedInBot|Applebot|AdsBot-Google|Mediapartners-Google|msnbot/i;
   if(crawlers.test(navigator.userAgent))return;

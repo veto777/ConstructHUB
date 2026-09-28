@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomUUID, randomInt } from "node:crypto";
 import pg from "pg";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -9,9 +9,11 @@ const port = Number(new URL(process.env.CRM_TEST_BASE_URL!).port) + 3;
 const base = `http://127.0.0.1:${port}`;
 let child: ChildProcess;
 const reviewTokens: string[] = [];
+const domainIds: number[] = [];
 const users: number[] = [], scans: number[] = [], queries: number[] = [], sids: string[] = [];
 let a: string, b: string;
 const secret = "growth-isolation-session-secret";
+const testIp = `198.18.${randomInt(256)}.${randomInt(1, 255)}`;
 async function account() {
   const { rows: [user] } = await pool.query("insert into users(email,display_name,email_verified) values($1,'Audit isolation',true) returning id", [`${randomUUID()}@example.invalid`]);
   users.push(user.id);
@@ -21,7 +23,7 @@ async function account() {
   return `connect.sid=${encodeURIComponent(`s:${sid}.${sig}`)}`;
 }
 async function api(path: string, cookie = "", method = "GET", body?: any) {
-  return fetch(base + path, { method, headers: { cookie, "content-type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  return fetch(base + path, { method, headers: { cookie, "content-type": "application/json", "x-forwarded-for": testIp }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
 beforeAll(async () => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a3") throw new Error("Requires lane a3 DB");
@@ -51,6 +53,8 @@ afterAll(async () => {
   await pool.query("delete from ranking_grid_scans where id=any($1::int[])", [scans]);
   await pool.query("delete from search_results where query_id=any($1::int[])", [queries]);
   await pool.query("delete from search_queries where id=any($1::int[])", [queries]);
+  await pool.query("delete from click_visits where domain_id=any($1::int[])", [domainIds]);
+  await pool.query("delete from tracked_domains where id=any($1::int[])", [domainIds]);
   await pool.query("delete from review_requests where token=any($1::text[])", [reviewTokens]);
   await pool.query("delete from review_recipient_preferences where user_id=any($1::int[])", [users]);
   await pool.query("delete from users where id=any($1::int[])", [users]);
@@ -135,5 +139,26 @@ describe("password reset session revocation and auth budgets", () => {
     for (let i=0;i<10;i++) expect((await api("/api/auth/login", "", "POST", { email, password: "incorrect" })).status).toBe(401);
     expect((await api("/api/auth/forgot-password", "", "POST", { email })).status).toBe(429);
     expect((await api("/api/auth/signup", "", "POST", { email, password: "Fixture-password-123" })).status).toBe(429);
+  });
+});
+
+describe("tracking embeds and cross-IP signals", () => {
+  it("uses configured origin and safely quotes tracking IDs", async () => {
+    const config = await (await api("/api/public-config")).json();
+    for (const kind of ["click-guard", "vpn-shield"]) {
+      const script = await (await api(`/api/${kind}/script/${encodeURIComponent('fixture"id')}`)).text();
+      expect(script).toContain(config.appOrigin + `/api/${kind}/track`);
+      expect(() => new Function(script)).not.toThrow();
+    }
+  });
+  it("finds a matching fingerprint on another IP within the same domain", async () => {
+    const tid = randomUUID();
+    const { rows: [domain] } = await pool.query("insert into tracked_domains(user_id,domain,name,tracking_id) values($1,'example.invalid','Tracking fixture',$2) returning id", [users[0], tid]);
+    domainIds.push(domain.id);
+    await pool.query("insert into click_visits(domain_id,ip_address,fingerprint) values($1,'192.0.2.1','fixture-fp')", [domain.id]);
+    const response = await fetch(base + "/api/click-guard/track", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": "192.0.2.2" }, body: JSON.stringify({ trackingId: tid, fingerprint: "fixture-fp", userAgent: "Fixture browser user agent" }) });
+    expect(response.status).toBe(204);
+    const { rows: [visit] } = await pool.query("select suspicion_reasons from click_visits where domain_id=$1 and ip_address='192.0.2.2'", [domain.id]);
+    expect(visit.suspicion_reasons).toContain("Same device fingerprint seen from different IPs");
   });
 });

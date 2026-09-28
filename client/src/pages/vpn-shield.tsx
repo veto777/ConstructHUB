@@ -1,3 +1,4 @@
+import { useAppOrigin } from "@/lib/app-origin";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -112,10 +113,10 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
       <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-yellow-500/5">
         <CardContent className="p-4 sm:p-6">
           <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1" data-testid="text-hero-title">
-            Protect Your Data From Invisible Threats
+            Review Possible Proxy Traffic
           </h2>
           <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
-            VPN Shield detects and blocks anonymous visitors who hide behind VPNs and proxies, keeping your analytics clean and your business safe.
+            VPN Shield flags possible VPN or proxy signals using IP ranges and browser reports. Its optional browser overlay or redirect runs after page load and can be bypassed; it is not network access control.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex gap-3">
@@ -123,8 +124,8 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
                 <BarChart3 className="h-5 w-5 text-orange-500" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-analytics">Stop Fake Analytics</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">VPNs pollute your data. Marketing decisions based on fiction cost real money.</p>
+                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-analytics">Review Traffic Signals</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">VPN usage can be legitimate. Review patterns in context before acting.</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -133,7 +134,7 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-snooping">Filter Anonymous Traffic</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Anonymous VPN and proxy visits distort your visitor data. VPN Shield identifies and filters them.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Browser and IP signals may suggest proxy use, but can produce false positives.</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -141,7 +142,7 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
                 <Bot className="h-5 w-5 text-orange-500" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-bots">Block Proxy Bot Traffic</h3>
+                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-bots">Flag Possible Proxy Traffic</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">Proxy networks are used for scraping, click fraud, and fake leads.</p>
               </div>
             </div>
@@ -150,8 +151,8 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
                 <Building className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-enterprise">Enterprise-Grade Protection</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">The most advanced internet companies use VPN blockers. Now available for construction.</p>
+                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-enterprise">Browser-Based Controls</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Optional overlays and redirects affect only visitors who execute the script.</p>
               </div>
             </div>
           </div>
@@ -162,7 +163,7 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
         <CardContent className="p-3 sm:p-4 flex items-start sm:items-center gap-3">
           <CheckCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-xs sm:text-sm text-foreground" data-testid="text-crawler-notice">
-            <span className="font-semibold">Search engine crawlers</span> (Google, Bing, Yahoo) are <span className="font-semibold">NEVER</span> blocked. Only VPNs and proxies are detected.
+            <span className="font-semibold">Search engine crawlers</span> (Google, Bing, Yahoo) are exempted by user-agent matching, which can be spoofed. VPN detection is heuristic.
           </p>
         </CardContent>
       </Card>
@@ -369,11 +370,12 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
   selectedDomainId: number | null;
   setSelectedDomainId: (id: number) => void;
 }) {
+  const appOrigin = useAppOrigin();
   const { toast } = useToast();
   const selectedDomain = domains.find(d => d.id === selectedDomainId);
 
   const scriptSnippet = selectedDomain
-    ? `<!-- VPN Shield by ConstructHUB -->\n<script src="https://constructhub.us/api/vpn-shield/script/${selectedDomain.trackingId}" async></script>`
+    ? `<!-- VPN Shield by ConstructHUB -->\n<script src="${appOrigin}/api/vpn-shield/script/${selectedDomain.trackingId}" async></script>`
     : "";
 
   const copyScript = () => {
@@ -443,7 +445,7 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-webrtc">WebRTC IP Leak Detection</h4>
-                <p className="text-xs text-muted-foreground">Compares the visitor's public IP with their WebRTC-revealed IP. A mismatch indicates VPN usage.</p>
+                <p className="text-xs text-muted-foreground">Uses browser-reported WebRTC differences as one possible signal. Network configuration can also cause differences.</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -452,7 +454,7 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-timezone">Timezone / Geo Mismatch</h4>
-                <p className="text-xs text-muted-foreground">Checks if the browser's timezone matches the geographic location of the IP address. Mismatches reveal VPN tunnels.</p>
+                <p className="text-xs text-muted-foreground">Uses browser-reported timezone differences as a heuristic; travel and device settings can also cause mismatches.</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -461,7 +463,7 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-datacenter">Datacenter IP Range Detection</h4>
-                <p className="text-xs text-muted-foreground">Cross-references visitor IPs against known datacenter and VPN provider IP ranges (AWS, Azure, DigitalOcean, etc.).</p>
+                <p className="text-xs text-muted-foreground">Checks a limited built-in set of IP prefixes. This list may be incomplete or outdated and cannot establish VPN usage.</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -470,7 +472,7 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-extensions">VPN Extension Detection</h4>
-                <p className="text-xs text-muted-foreground">Detects common VPN browser extensions that inject themselves into pages. Identifies popular VPN tools.</p>
+                <p className="text-xs text-muted-foreground">Uses browser-reported extension indicators when available; it cannot reliably identify installed VPN tools.</p>
               </div>
             </div>
           </div>
