@@ -31,7 +31,7 @@ it('rejects a vendor marketing homepage even with assessor campaign parameters',
 });
 
 it('rejects browser-breaking TLS, DNS and refused connections', () => {
-  for (const error of ['ENOTFOUND','ECONNREFUSED','CERT_HAS_EXPIRED','ERR_TLS_CERT_ALTNAME_INVALID']) {
+  for (const error of ['ENOTFOUND','EAI_AGAIN','ECONNREFUSED','CERT_HAS_EXPIRED','ERR_TLS_CERT_ALTNAME_INVALID']) {
     expect(classifyGovernmentPage({html:'',httpStatus:null,error},'appraiser').status).toBe('dead');
   }
 });
@@ -44,4 +44,13 @@ it('recognizes an official department subdomain as the department portal', () =>
   const html=page('Home - CIVICS','<main>Frederick County building permits</main>',200,'https://planningandpermitting.frederickcountymd.gov/');
   expect(classifyGovernmentPage(html,'permit').status).toBe('live');
   expect(classifyGovernmentPage({...html,finalUrl:'https://frederickcountymd.gov/'},'permit').status).toBe('dead');
+});
+
+it('does not reject a source-evidenced assessment office because its title is Home', () => {
+  expect(classifyGovernmentPage(page('Home','<main>RED RIVER APPRAISAL DISTRICT</main>',200,'https://rrcad.org/'),'appraiser').status).toBe('live');
+  expect(classifyGovernmentPage(page('Home','<main>County news and events</main>',200,'https://county.gov/'),'appraiser').status).toBe('dead');
+});
+
+it('keeps an empty Home-titled JavaScript shell inconclusive', () => {
+  expect(classifyGovernmentPage(page('Home','<div id="root"></div>',200,'https://portal.county.gov/'),'permit').status).toBe('unverified');
 });

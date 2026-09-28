@@ -33,8 +33,11 @@ export function classifyGovernmentPage(r: any, kind: string) {
   const main = $('main,article,[role="main"],#main,#content').first();
   const content = (main.length ? main.text() : $('body').text()).replace(/\s+/g, ' ').trim();
   const topic = kind === 'appraiser' ? /assess(?:or|ing|ment)|apprais|property (search|records|assessment|valuation|lister|owner services)|parcel|real estate|tax (search|records)|revenue commission(?:er)?|myproperty|tax administration|board of taxation|commissioner of revenue|real property tax/i : /permits?|building inspection|development services|planning and building/i;
-  if (final && !isDedicatedGovernmentPortal(final.href) && /^\/(?:home\/?|default\.aspx)?$/i.test(final.pathname) && /^(home|welcome|official website)(\s*[|–—-]|$)/i.test(title) && !topic.test(title)) return { status: 'dead', reason: 'generic homepage; department URL required', ...evidence };
-  if (!topic.test(content + title)) return { status: 'unverified', reason: 'no on-topic page content (manual/browser review required)', ...evidence };
+
+  if (!topic.test(content + title)) {
+    if (final && final.pathname === '/' && /community news|county news|town news|upcoming events|welcome to (?:the )?(?:city|town|county)/i.test(content)) return { status: 'dead', reason: 'generic homepage; department URL required', ...evidence };
+    return { status: 'unverified', reason: 'no on-topic page content (manual/browser review required)', ...evidence };
+  }
   if (/^(www\.)?(civicplus.com|accela.com|tylertech.com|opengov.com|schneidergis.com)$/.test(new URL(r.finalUrl).hostname)) return { status: 'dead', reason: 'generic vendor homepage', ...evidence };
   if (final && !isDedicatedGovernmentPortal(final.href) && /^\/(?:home\/?|default\.aspx)?$/i.test(final.pathname) && /^(home|welcome|official website)(\s*[|–—-]|$)/i.test(title) && !topic.test(title)) return { status: 'dead', reason: 'generic homepage; department URL required', ...evidence };
   return { status: 'live', reason: 'GET succeeded with on-topic content; jurisdiction review still required', ...evidence };
@@ -43,17 +46,24 @@ export function classifyGovernmentPage(r: any, kind: string) {
 export function isGenericGovernmentVendorUrl(url: string): boolean {
   const final = new URL(url);
   const trackingOnly = [...final.searchParams.keys()].every(k => /^(utm_|gclid$|fbclid$)/i.test(k));
-  return final.pathname === '/' && trackingOnly && /^(www\.)?(parcelquest\.com|qpublic\.net|qpublic\.schneidercorp\.com|citizenserve\.com|mygov\.us|smartgovcommunity\.com|schneidercorp\.com|beacon\.schneidercorp\.com|gworks\.com|gis\.vgsi\.com|vgsi\.com|patriotproperties\.com|devnet\.com|civicplus\.com|accela\.com|tylertech\.com|opengov\.com)$/.test(final.hostname);
+  return final.pathname === '/' && trackingOnly && /^(www\.)?(publicaccessnow\.com|parcelquest\.com|qpublic\.net|qpublic\.schneidercorp\.com|citizenserve\.com|mygov\.us|smartgovcommunity\.com|schneidercorp\.com|beacon\.schneidercorp\.com|gworks\.com|gis\.vgsi\.com|vgsi\.com|patriotproperties\.com|devnet\.com|civicplus\.com|accela\.com|tylertech\.com|opengov\.com)$/.test(final.hostname);
 }
 
 /** Transport failures that make a browser link unusable, rather than just inconclusive. */
 export function governmentFailureIsDead(reason: string): boolean {
-  return /ENOTFOUND|EAI_NONAME|ECONNREFUSED|ERR_NAME_NOT_RESOLVED|ERR_CONNECTION_REFUSED|CERT_|CERTIFICATE|ERR_TLS|DEPTH_ZERO_SELF_SIGNED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|SELF_SIGNED_CERT_IN_CHAIN/i.test(reason);
+  return /ENOTFOUND|EAI_NONAME|EAI_AGAIN|ENODATA|ECONNREFUSED|ERR_NAME_NOT_RESOLVED|ERR_CONNECTION_REFUSED|CERT_|CERTIFICATE|ERR_TLS|DEPTH_ZERO_SELF_SIGNED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|SELF_SIGNED_CERT_IN_CHAIN/i.test(reason);
 }
 
 /** A jurisdiction's self-service tenant is not the vendor's marketing homepage. */
 export function isDedicatedGovernmentPortal(url: string): boolean {
   const host = new URL(url).hostname;
-  return /^[a-z0-9-]+\.portal\.opengov\.com$/.test(host) ||
+  // These dedicated office domains are present in the NETR source and rendered
+  // department evidence archived by the a4 audit; this list never generates URLs.
+  const assessmentHosts = ['dalecountyrevenue.com', 'leecountyrevenuecommissioner.com',
+    'randolphcountyrevenue.com', 'tallapoosapropertytax.com', 'harrisoncountypva.com',
+    'grantassessor.org', 'ptcoupeeassessor.com', 'websterassessor.org',
+    'gasconadecountyassessor.com', 'mcintosh.northdakotaassessors.com',
+    'corson.southdakotadirectors.com', 'polkcad.org', 'rrcad.org'];
+  return assessmentHosts.includes(host.replace(/^www\./, '')) || /^[a-z0-9-]+\.publicaccessnow\.com$/.test(host) || /^[a-z0-9-]+\.portal\.opengov\.com$/.test(host) ||
     (/\.(gov|us)$/.test(host) && /^(permits?|permitslicenses|planningandpermitting|assessor|assessment|propertysearch)\./.test(host));
 }
