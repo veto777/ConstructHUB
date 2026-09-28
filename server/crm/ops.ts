@@ -35,6 +35,8 @@ import { sendWithFallback } from "../email";
 import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
 import { getBaseUrl } from "../auth";
+import { computeApprovalTotals } from "./discounts";
+import { progressInvoiceItems } from "./invoice-math";
 
 type GetUser = (req: any, res: any) => any;
 const tok = () => randomBytes(24).toString("hex");
@@ -236,8 +238,12 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
     if (!est) return res.status(404).json({ message: "Estimate not found" });
     if (!est.approvedAt) return res.status(409).json({ message: "Only an approved estimate can be invoiced." });
-    const pct = Math.min(10000, Math.max(0, Number(req.body?.percentBps ?? 10000)));
-    const retainageBps = Math.min(2000, Math.max(0, Number(req.body?.retainageBps ?? 0)));
+    const draw = z.object({
+      percentBps: z.number().int().min(1).max(10000).default(10000),
+      retainageBps: z.number().int().min(0).max(2000).default(0),
+    }).safeParse(req.body ?? {});
+    if (!draw.success) return res.status(400).json({ message: "Invalid progress billing", issues: draw.error.issues });
+    const { percentBps: pct, retainageBps } = draw.data;
     const items = await db.select().from(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, est.id)))
       .orderBy(asc(crmEstimateItems.sortOrder));
@@ -250,11 +256,17 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       taxRateBps: est.taxRateBps, retainageBps, publicToken: tok(),
       dueAt: new Date(Date.now() + 30 * 86400000),
     } as any).returning();
-    // Progress billing scales quantities, so line detail survives on every draw.
-    await db.insert(crmInvoiceItems).values(items.map((i, idx) => ({
+    // Use the immutable selections accepted with the signature, not today's
+    // editable offer definitions. The full invoice must honor that concession.
+    const selected = Array.isArray(est.selectedDiscounts)
+      ? est.selectedDiscounts.filter((s: any) => typeof s?.percentBps === "number") as { percentBps: number }[]
+      : [];
+    const approval = computeApprovalTotals(items, est.taxRateBps ?? 0, selected);
+    const lines = progressInvoiceItems(items, pct, approval.optionalDiscountCents);
+    if (lines.length) await db.insert(crmInvoiceItems).values(lines.map((i, idx) => ({
       orgId: ctx.org.id, invoiceId: inv.id, sortOrder: idx, kind: i.kind, name: i.name,
       description: i.description, unit: i.unit, unitPriceCents: i.unitPriceCents,
-      quantityMilli: Math.round((i.quantityMilli * pct) / 10000), taxable: i.taxable,
+      quantityMilli: i.quantityMilli, taxable: i.taxable,
     })) as any);
     logActivity(ctx, "invoice.created", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
