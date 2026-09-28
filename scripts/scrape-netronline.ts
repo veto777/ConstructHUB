@@ -20,6 +20,7 @@
  *       npx tsx scripts/scrape-netronline.ts FL GA   (subset of states)
  */
 import * as cheerio from "cheerio";
+import { isAssessmentOffice } from "../server/netr-office";
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -37,11 +38,6 @@ const STATES = [
   "NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA",
   "WV","WI","WY",
 ];
-
-// Office names that denote the assessment / property-appraiser office.
-const APPRAISER_RE = /property appraiser|assessor|apprais(?:er|al)|auditor|equalization|assessment|tax commissioner|revenue commission(?:er)?/i;
-// Names to always skip (not assessment offices).
-const SKIP_RE = /historic aerials|netr mapping|mapping and gis|\bgis\b|tax collector|treasurer|clerk|recorder|register of deeds|sheriff/i;
 
 // Map an online-portal host to a human platform label.
 function platformFor(url: string | null): string | null {
@@ -116,7 +112,7 @@ function parseAppraiser(html: string, stateCode: string, county: string): Apprai
   const candidates: Appraiser[] = [];
   $(".div-table-row").each((_i, row) => {
     const name = $(row).find('[col-name="Name"]').first().text().trim();
-    if (!name || SKIP_RE.test(name) || !APPRAISER_RE.test(name)) return;
+    if (!name || !isAssessmentOffice(name)) return;
     const phone = $(row).find('[col-name="Phone"]').first().text().trim() || null;
     const portalUrl = $(row).find('[col-name="Online"] a').first().attr("href")?.trim() || null;
     candidates.push({
