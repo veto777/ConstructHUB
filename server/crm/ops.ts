@@ -19,7 +19,7 @@ import {
   crmCommitments, crmCostEntries, crmChangeOrders,
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
-  crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers,
+  crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers, counties,
   crmNotificationChannel, crmEngagementSessions, crmCustomerNotes,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
@@ -880,17 +880,19 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (!proj) return res.status(404).json({ message: "Project not found" });
     const city = (proj.city || "").trim();
     const state = (proj.state || "").trim();
-    if (!city && !state) {
-      return res.json({ portals: [], appraisers: [], message: "Add a city and state to the project first." });
+    if (!state) {
+      return res.json({ portals: [], appraisers: [], message: "Add a state to the project first so offices can be matched safely." });
     }
     // HARD RULE: only real, verified, liveness-checked rows. Never synthesise.
     const portals = await db.select({
       id: permitDatabases.id, name: permitDatabases.name,
       jurisdiction: permitDatabases.jurisdiction, portalUrl: permitDatabases.portalUrl,
-      searchUrl: permitDatabases.searchUrl, phone: permitDatabases.phone,
+      searchUrl: permitDatabases.searchUrl, phone: sql<string | null>`null`, // legacy contacts have no current source evidence
       linkStatus: permitDatabases.linkStatus,
     }).from(permitDatabases)
+      .innerJoin(counties, eq(permitDatabases.countyId, counties.id))
       .where(and(
+        sql`(lower(${counties.stateCode}) = lower(${state}) or lower(${counties.state}) = lower(${state}))`,
         eq(permitDatabases.isActive, true),
         eq(permitDatabases.linkStatus, "live"),
         city ? ilike(permitDatabases.jurisdiction, `%${city}%`) : sql`true`,
@@ -899,7 +901,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       id: propertyAppraisers.id, name: propertyAppraisers.name,
       portalUrl: propertyAppraisers.portalUrl, searchUrl: propertyAppraisers.searchUrl,
     }).from(propertyAppraisers)
+      .innerJoin(counties, eq(propertyAppraisers.countyId, counties.id))
       .where(and(eq(propertyAppraisers.isActive, true),
+        eq(propertyAppraisers.linkStatus, "live"),
+        sql`(lower(${counties.stateCode}) = lower(${state}) or lower(${counties.state}) = lower(${state}))`,
         city ? ilike(propertyAppraisers.name, `%${city}%`) : sql`true`)).limit(10);
     res.json({ portals, appraisers, jurisdiction: [city, state].filter(Boolean).join(", ") });
   });
