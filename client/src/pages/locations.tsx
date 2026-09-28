@@ -1,3 +1,4 @@
+import { GbpConnection } from "@/components/gbp-connection";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -81,6 +82,7 @@ export default function LocationsPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        <GbpConnection />
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-locations-title">
@@ -89,7 +91,7 @@ export default function LocationsPage() {
             </h1>
             <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
             <p className="text-muted-foreground text-sm mt-1 max-w-lg">
-              Manage all your business locations with Semrush-style analytics — track views, calls, direction requests, and run citation campaigns. Know exactly how every listing performs.
+              Manage business locations, sync Google reviews and performance, and run citation campaigns.
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -150,9 +152,9 @@ export default function LocationsPage() {
                   <TableHead>Location</TableHead>
                   <TableHead className="text-center">Listings</TableHead>
                   <TableHead className="text-center">Reviews</TableHead>
-                  <TableHead className="text-center">Monthly Views</TableHead>
+                  <TableHead className="text-center">Performance</TableHead>
                   <TableHead className="text-center">Avg. Rank</TableHead>
-                  <TableHead>GBP Management</TableHead>
+                  <TableHead>Google resource</TableHead>
                   <TableHead>Date Added</TableHead>
                 </TableRow>
               </TableHeader>
@@ -179,48 +181,32 @@ export default function LocationsPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       <span className="text-sm font-medium" data-testid={`text-listings-${loc.id}`}>
-                        {loc.listingsCount || 0}
+                        Unavailable
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1.5 flex-wrap">
                         <span className="text-sm font-medium" data-testid={`text-reviews-${loc.id}`}>
-                          {loc.reviewCount || 0}
+                          See reviews
                         </span>
-                        {(loc.newReviewCount || 0) > 0 && (
-                          <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-600 border-green-500/20" data-testid={`badge-new-reviews-${loc.id}`}>
-                            {loc.newReviewCount} new
-                          </Badge>
-                        )}
+
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <span className="text-sm font-medium" data-testid={`text-monthly-views-${loc.id}`}>
-                        {loc.monthlyViews ? loc.monthlyViews.toLocaleString() : "0"}
+                        Open insights
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
-                      {loc.avgRank ? (
-                        <span className="text-sm font-medium" data-testid={`text-avg-rank-${loc.id}`}>
-                          {loc.avgRank.toFixed(1)}
-                        </span>
-                      ) : (
-                        <button
-                          className="text-xs text-blue-500 underline"
-                          onClick={e => { e.stopPropagation(); setSelectedLocationId(loc.id); }}
-                          data-testid={`link-setup-rank-${loc.id}`}
-                        >
-                          Set up
-                        </button>
-                      )}
+                      <span className="text-sm">Unavailable</span>
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={loc.gbpManagementEnabled ? "default" : "outline"}
+                        variant={loc.gbpLocationName ? "default" : "outline"}
                         className="text-[10px]"
                         data-testid={`badge-gbp-${loc.id}`}
                       >
-                        {loc.gbpManagementEnabled ? "ON" : "OFF"}
+                        {loc.gbpLocationName ? "Imported" : "Local only"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -247,6 +233,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
   const [isSearching, setIsSearching] = useState(false);
   const [gbpLocations, setGbpLocations] = useState<any[]>([]);
   const [gbpLoading, setGbpLoading] = useState(false);
+  const [gbpWarnings, setGbpWarnings] = useState<string[]>([]);
   const [gbpError, setGbpError] = useState<string | null>(null);
   const [selectedGbp, setSelectedGbp] = useState<Set<number>>(new Set());
 
@@ -300,6 +287,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
     try {
       const res = await apiRequest("GET", "/api/gbp/locations");
       const data = await res.json();
+      setGbpWarnings((data.errors || []).map((e: any) => `${e.account}: ${e.message}`));
       if (data.locations) {
         setGbpLocations(data.locations);
         if (data.locations.length === 0) {
@@ -388,6 +376,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
         )}
       </TabsContent>
       <TabsContent value="gbp" className="space-y-3 mt-4">
+        {gbpWarnings.map(w => <p role="alert" key={w} className="text-destructive">{w}</p>)}
         {gbpLoading && (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -398,7 +387,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
           <div className="flex flex-col items-center justify-center py-8 gap-3">
             <Building2 className="w-10 h-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground text-center">Connect your Google account to import your business locations automatically.</p>
-            <a href="/api/auth/google?gbp=1" data-testid="button-connect-gbp">
+            <a href="/api/gbp/connect" data-testid="button-connect-gbp">
               <Button className="gap-2">
                 <Globe className="w-4 h-4" />
                 Connect Google Business
@@ -457,7 +446,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
           <div className="flex flex-col items-center justify-center py-8 gap-3">
             <Building2 className="w-10 h-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground text-center">Connect your Google account to import your business locations automatically.</p>
-            <a href="/api/auth/google?gbp=1" data-testid="button-connect-gbp-initial">
+            <a href="/api/gbp/connect" data-testid="button-connect-gbp-initial">
               <Button className="gap-2">
                 <Globe className="w-4 h-4" />
                 Connect Google Business
@@ -556,330 +545,14 @@ function ChangeBadge({ value }: { value: number }) {
 }
 
 function InsightsTab({ location }: { location: BusinessLocation }) {
-  const { toast } = useToast();
-  const [interactionTab, setInteractionTab] = useState("total");
-
-  const { data: analytics, isLoading } = useQuery<{
-    summary: Record<string, number>;
-    current: any[];
-    previous: any[];
-    phoneCallsByDay: { day: string; calls: number }[];
-    dateRange: { start: string; end: string };
-    location: Record<string, number | null>;
-  }>({
-    queryKey: ["/api/locations", location.id, "analytics"],
-  });
-
-  const seedMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/locations/${location.id}/analytics/seed`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations", location.id, "analytics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      toast({ title: "Demo data seeded successfully" });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Seed failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const formatDate = (d: string) => {
-    const date = new Date(d + "T00:00:00");
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const formatDateRange = (start: string, end: string) => {
-    const s = new Date(start + "T00:00:00");
-    const e = new Date(end + "T00:00:00");
-    return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${e.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  const s = analytics?.summary;
-  const current = analytics?.current || [];
-  const previous = analytics?.previous || [];
-
-  const chartData = current.map((c, i) => ({
-    date: formatDate(c.date),
-    searchViews: c.searchViews || 0,
-    mapsViews: c.mapsViews || 0,
-    totalViews: c.totalViews || 0,
-    totalInteractions: c.totalInteractions || 0,
-    siteVisits: c.siteVisits || 0,
-    directionRequests: c.directionRequests || 0,
-    phoneCalls: c.phoneCalls || 0,
-    messaging: c.messaging || 0,
-    prevSearchViews: previous[i]?.searchViews || 0,
-    prevMapsViews: previous[i]?.mapsViews || 0,
-    prevTotalViews: previous[i]?.totalViews || 0,
-    prevTotalInteractions: previous[i]?.totalInteractions || 0,
-    prevSiteVisits: previous[i]?.siteVisits || 0,
-    prevDirectionRequests: previous[i]?.directionRequests || 0,
-    prevPhoneCalls: previous[i]?.phoneCalls || 0,
-    prevMessaging: previous[i]?.messaging || 0,
-  }));
-
-  const interactionKey = interactionTab === "total" ? "totalInteractions"
-    : interactionTab === "site" ? "siteVisits"
-    : interactionTab === "directions" ? "directionRequests"
-    : interactionTab === "calls" ? "phoneCalls"
-    : "messaging";
-  const prevInteractionKey = `prev${interactionKey.charAt(0).toUpperCase() + interactionKey.slice(1)}` as string;
-
-  const totalViewsDist = (s?.searchMobile || 0) + (s?.searchDesktop || 0) + (s?.mapsMobile || 0) + (s?.mapsDesktop || 0);
-
-  const distSegments = [
-    { label: "Search Mobile", value: s?.searchMobile || 0, change: s?.searchMobileChange || 0, color: "hsl(30, 90%, 55%)" },
-    { label: "Search Desktop", value: s?.searchDesktop || 0, change: s?.searchDesktopChange || 0, color: "hsl(10, 80%, 60%)" },
-    { label: "Maps Mobile", value: s?.mapsMobile || 0, change: s?.mapsMobileChange || 0, color: "hsl(170, 60%, 45%)" },
-    { label: "Maps Desktop", value: s?.mapsDesktop || 0, change: s?.mapsDesktopChange || 0, color: "hsl(270, 60%, 55%)" },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          {analytics?.dateRange && (
-            <p className="text-sm text-muted-foreground" data-testid="text-date-range">
-              {formatDateRange(analytics.dateRange.start, analytics.dateRange.end)}
-            </p>
-          )}
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <span className="text-xs text-muted-foreground">Compare to: Previous period</span>
-            <span className="text-xs text-muted-foreground">Daily</span>
-          </div>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => seedMutation.mutate()}
-          disabled={seedMutation.isPending}
-          data-testid="button-seed-demo"
-        >
-          {seedMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-          Seed Demo Data
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <Eye className="w-4 h-4" />
-              <span className="text-xs font-medium">Views</span>
-            </div>
-            <p className="text-2xl font-bold" data-testid="text-total-views">{(s?.totalViews || 0).toLocaleString()}</p>
-            <ChangeBadge value={s?.viewsChange || 0} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <MousePointerClick className="w-4 h-4" />
-              <span className="text-xs font-medium">Interactions</span>
-            </div>
-            <p className="text-2xl font-bold" data-testid="text-total-interactions">{(s?.totalInteractions || 0).toLocaleString()}</p>
-            <ChangeBadge value={s?.interactionsChange || 0} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <Star className="w-4 h-4" />
-              <span className="text-xs font-medium">Average Rating</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-              <p className="text-2xl font-bold" data-testid="text-avg-rating">{(s?.avgRating || 0).toFixed(1)}</p>
-            </div>
-            <ChangeBadge value={s?.ratingChange || 0} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Views</h3>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between gap-2">
-              Google Search Views
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-lg font-bold" data-testid="text-search-views">{(s?.searchViews || 0).toLocaleString()}</span>
-                <ChangeBadge value={s?.searchViewsChange || 0} />
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="prevSearchViews" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} dot={false} strokeDasharray="4 4" name="Previous" />
-                  <Line type="monotone" dataKey="searchViews" stroke="hsl(220, 90%, 56%)" strokeWidth={2} dot={false} name="Current" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between gap-2">
-              Google Maps Views
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-lg font-bold" data-testid="text-maps-views">{(s?.mapsViews || 0).toLocaleString()}</span>
-                <ChangeBadge value={s?.mapsViewsChange || 0} />
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="prevMapsViews" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} dot={false} strokeDasharray="4 4" name="Previous" />
-                  <Line type="monotone" dataKey="mapsViews" stroke="hsl(220, 90%, 56%)" strokeWidth={2} dot={false} name="Current" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center justify-between gap-2">
-            Views Distribution
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-lg font-bold" data-testid="text-total-views-dist">{totalViewsDist.toLocaleString()}</span>
-              <ChangeBadge value={s?.viewsChange || 0} />
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="h-6 flex rounded-md overflow-hidden">
-            {distSegments.map(seg => {
-              const pct = totalViewsDist > 0 ? (seg.value / totalViewsDist) * 100 : 25;
-              return (
-                <div
-                  key={seg.label}
-                  style={{ width: `${pct}%`, backgroundColor: seg.color }}
-                  className="min-w-[2px]"
-                  title={`${seg.label}: ${seg.value}`}
-                  data-testid={`bar-segment-${seg.label.toLowerCase().replace(/\s+/g, "-")}`}
-                />
-              );
-            })}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {distSegments.map(seg => (
-              <div key={seg.label} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: seg.color }} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium">{seg.value.toLocaleString()}</span>
-                    <ChangeBadge value={seg.change} />
-                  </div>
-                  <p className="text-xs text-muted-foreground">{seg.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Interactions</h3>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Overview</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-1 flex-wrap">
-            {[
-              { key: "total", label: "Total", val: s?.totalInteractions || 0 },
-              { key: "site", label: "Site Visits", val: s?.siteVisits || 0 },
-              { key: "directions", label: "Direction Requests", val: s?.directionRequests || 0 },
-              { key: "calls", label: "Phone Calls", val: s?.phoneCalls || 0 },
-              { key: "messaging", label: "Messaging", val: s?.messaging || 0 },
-            ].map(item => (
-              <Button
-                key={item.key}
-                size="sm"
-                variant={interactionTab === item.key ? "secondary" : "ghost"}
-                className="text-xs gap-1"
-                onClick={() => setInteractionTab(item.key)}
-                data-testid={`button-interaction-${item.key}`}
-              >
-                {item.label}
-                <Badge variant="outline" className="text-[10px] ml-0.5">{item.val}</Badge>
-              </Button>
-            ))}
-          </div>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="text-muted-foreground" />
-                <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Line type="monotone" dataKey={prevInteractionKey} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} dot={false} strokeDasharray="4 4" name="Previous" />
-                <Line type="monotone" dataKey={interactionKey} stroke="hsl(220, 90%, 56%)" strokeWidth={2} dot={false} name="Current" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Phone Calls</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="day-of-week">
-            <TabsList className="mb-3">
-              <TabsTrigger value="day-of-week" className="text-xs" data-testid="tab-day-of-week">Day of Week</TabsTrigger>
-              <TabsTrigger value="time-of-day" className="text-xs" data-testid="tab-time-of-day">Time of Day</TabsTrigger>
-            </TabsList>
-            <TabsContent value="day-of-week">
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics?.phoneCallsByDay || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                    <XAxis dataKey="day" tick={{ fontSize: 11 }} className="text-muted-foreground" />
-                    <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" allowDecimals={false} />
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    <Bar dataKey="calls" fill="hsl(220, 90%, 56%)" radius={[4, 4, 0, 0]} name="Calls" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </TabsContent>
-            <TabsContent value="time-of-day">
-              <div className="py-8 text-center text-muted-foreground text-sm">
-                Time of day data not available yet.
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  const {data,error,isLoading}=useQuery<{available:boolean;source:string;metrics:string[];rows:{date:string;metric:string;value:string}[]}>({queryKey:['/api/gbp/locations',location.id,'performance']});
+  const dates=[...new Set(data?.rows.map(r=>r.date)||[])].reverse();
+  const labels:Record<string,string>={BUSINESS_IMPRESSIONS_DESKTOP_MAPS:'Maps desktop',BUSINESS_IMPRESSIONS_DESKTOP_SEARCH:'Search desktop',BUSINESS_IMPRESSIONS_MOBILE_MAPS:'Maps mobile',BUSINESS_IMPRESSIONS_MOBILE_SEARCH:'Search mobile',WEBSITE_CLICKS:'Website clicks',CALL_CLICKS:'Call clicks',BUSINESS_DIRECTION_REQUESTS:'Directions'};
+  return <div className="space-y-4"><GbpConnection locationId={location.id} />
+    <h3 className="font-semibold">Google performance — last 90 days</h3>
+    <p className="text-sm text-muted-foreground">Daily values reported by Google. Missing metrics are unavailable; zero means Google reported zero. Recent days may be delayed.</p>
+    {isLoading?<p>Loading performance…</p>:error?<p role="alert">Unable to load performance.</p>:!data?.available?<p>Performance unavailable. Import a Google location and sync to retrieve real metrics.</p>:<div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th className="p-2 text-left">Date</th>{data.metrics.map(m=><th className="p-2" key={m}>{labels[m]||m}</th>)}</tr></thead><tbody>{dates.map(date=><tr key={date}><td className="p-2">{date}</td>{data.metrics.map(metric=><td className="p-2 text-center" key={metric}>{data.rows.find(r=>r.date===date&&r.metric===metric)?.value??'Unavailable'}</td>)}</tr>)}</tbody></table></div>}
+  </div>;
 }
 
 function GoogleIcon() {
@@ -1148,7 +821,8 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">GBP Management Notifications</CardTitle>
+          <CardTitle className="text-base">Local management preferences</CardTitle>
+          <p className="text-sm text-muted-foreground">These preferences are saved in ConstructHUB. Notification delivery and Google profile edits are not enabled here. Imported Google locations sync automatically every six hours while connected.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">

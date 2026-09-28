@@ -132,6 +132,13 @@ export async function registerRoutes(
     return null;
   }
 
+  const { ensureGbpSchema } = await import("./gbp/schema");
+  await ensureGbpSchema();
+  const { registerGbpRoutes } = await import("./gbp/routes");
+  registerGbpRoutes(app, getDevUser);
+  const { startGbpWorker } = await import("./gbp/service");
+  startGbpWorker();
+
   // CRM tenancy layer (orgs, crews, roles, invitations).
   try {
     const { ensureCrmSchema } = await import("./crm/schema-ensure");
@@ -2540,7 +2547,7 @@ Rules:
     if (!(await requirePlatinum(req, res))) return;
     try {
       const user = (req as any).user;
-      const parsed = insertBusinessLocationSchema.parse({ ...req.body, userId: user.id });
+      const parsed = insertBusinessLocationSchema.omit({ gbpAccountName: true, gbpLocationName: true }).parse({ ...req.body, userId: user.id });
       const [location] = await db.insert(businessLocations).values(parsed as any).returning();
       res.json(location);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
@@ -2553,7 +2560,7 @@ Rules:
       const id = parseInt(req.params.id);
       const [existing] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
       if (!existing) return res.status(404).json({ message: "Location not found" });
-      const { id: _id, userId: _userId, createdAt: _createdAt, ...updateFields } = req.body;
+      const { id: _id, userId: _userId, createdAt: _createdAt, gbpAccountName: _gbpAccount, gbpLocationName: _gbpLocation, ...updateFields } = req.body;
       const [updated] = await db.update(businessLocations).set({ ...updateFields, updatedAt: new Date() }).where(eq(businessLocations.id, id)).returning();
       res.json(updated);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
@@ -2570,180 +2577,6 @@ Rules:
       await db.delete(businessLocations).where(eq(businessLocations.id, id));
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
-  async function getGbpAccessToken(userId: number): Promise<string | null> {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (!user) return null;
-
-    if (user.googleAccessToken && user.googleTokenExpiry && new Date(user.googleTokenExpiry) > new Date()) {
-      return user.googleAccessToken;
-    }
-
-    if (user.googleRefreshToken) {
-      try {
-        const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID!,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-            refresh_token: user.googleRefreshToken,
-            grant_type: "refresh_token",
-          }),
-        });
-        const tokenData = await tokenRes.json() as any;
-        if (tokenData.access_token) {
-          await db.update(users).set({
-            googleAccessToken: tokenData.access_token,
-            googleTokenExpiry: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000),
-          }).where(eq(users.id, userId));
-          return tokenData.access_token;
-        }
-      } catch (err) {
-        console.error("Failed to refresh Google token:", err);
-      }
-    }
-
-    return null;
-  }
-
-  app.get("/api/gbp/accounts", async (req, res) => {
-    const user = getDevUser(req, res);
-    if (!user) return;
-    try {
-      const accessToken = await getGbpAccessToken(user.id);
-      if (!accessToken) {
-        return res.status(401).json({ message: "Google Business Profile not connected. Please connect your Google account.", needsAuth: true });
-      }
-
-      const accountsRes = await fetch("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const accountsData = await accountsRes.json() as any;
-
-      if (accountsData.error) {
-        if (accountsData.error.code === 401 || accountsData.error.code === 403) {
-          return res.status(401).json({ message: "Google access expired. Please reconnect your Google account.", needsAuth: true });
-        }
-        return res.status(accountsData.error.code || 500).json({ message: accountsData.error.message || "Failed to fetch GBP accounts" });
-      }
-
-      const accounts = (accountsData.accounts || []).map((a: any) => ({
-        name: a.name,
-        accountName: a.accountName,
-        type: a.type,
-        role: a.role,
-      }));
-
-      res.json({ accounts });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get("/api/gbp/locations", async (req, res) => {
-    const user = getDevUser(req, res);
-    if (!user) return;
-    try {
-      const accessToken = await getGbpAccessToken(user.id);
-      if (!accessToken) {
-        return res.status(401).json({ message: "Google Business Profile not connected.", needsAuth: true });
-      }
-
-      const accountsRes = await fetch("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const accountsData = await accountsRes.json() as any;
-
-      if (accountsData.error) {
-        if (accountsData.error.code === 401 || accountsData.error.code === 403) {
-          return res.status(401).json({ message: "Google access expired. Please reconnect.", needsAuth: true });
-        }
-        return res.status(500).json({ message: accountsData.error.message || "Failed to fetch accounts" });
-      }
-
-      const allLocations: any[] = [];
-      for (const account of (accountsData.accounts || [])) {
-        try {
-          const locRes = await fetch(
-            `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title,storefrontAddress,websiteUri,phoneNumbers,metadata`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          const locData = await locRes.json() as any;
-          if (locData.locations) {
-            for (const loc of locData.locations) {
-              const addr = loc.storefrontAddress || {};
-              const lines = addr.addressLines || [];
-              const city = addr.locality || "";
-              const state = addr.administrativeArea || "";
-              const zip = addr.postalCode || "";
-              const fullAddr = [lines.join(", "), city, state, zip].filter(Boolean).join(", ");
-
-              allLocations.push({
-                gbpName: loc.name,
-                businessName: loc.title || "",
-                address: fullAddr,
-                phone: loc.phoneNumbers?.primaryPhone || "",
-                website: loc.websiteUri || "",
-                city,
-                state,
-                zipCode: zip,
-                placeId: loc.metadata?.placeId || "",
-                mapsUri: loc.metadata?.mapsUri || "",
-                accountName: account.accountName,
-              });
-            }
-          }
-        } catch (locErr) {
-          console.error(`Failed to fetch locations for ${account.name}:`, locErr);
-        }
-      }
-
-      res.json({ locations: allLocations });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/gbp/import", async (req, res) => {
-    const user = getDevUser(req, res);
-    if (!user) return;
-    try {
-      const { locations } = req.body;
-      if (!locations || !Array.isArray(locations) || locations.length === 0) {
-        return res.status(400).json({ message: "No locations provided" });
-      }
-
-      const imported: any[] = [];
-      for (const loc of locations) {
-        const existing = await db.select().from(businessLocations)
-          .where(and(
-            eq(businessLocations.userId, user.id),
-            eq(businessLocations.businessName, loc.businessName)
-          ));
-
-        if (existing.length > 0) continue;
-
-        const [created] = await db.insert(businessLocations).values({
-          userId: user.id,
-          businessName: loc.businessName,
-          placeId: loc.placeId || null,
-          address: loc.address || null,
-          phone: loc.phone || null,
-          website: loc.website || null,
-          city: loc.city || null,
-          state: loc.state || null,
-          zipCode: loc.zipCode || null,
-          categories: [],
-        } as any).returning();
-        imported.push(created);
-      }
-
-      res.json({ imported: imported.length, locations: imported });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
   });
 
   app.post("/api/locations/search-google", async (req, res) => {
@@ -3007,169 +2840,19 @@ Rules:
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
+  app.post("/api/locations/:id/analytics/seed", (_req, res) => {
+    res.status(410).json({message:"Demo metric seeding has been removed. Sync Google Business Profile for real metrics."});
+  });
+
+  // Legacy analytics rows have no provider provenance and may contain demo data.
+  // Keep the old URL honest; the UI consumes the canonical GBP metrics endpoint.
   app.get("/api/locations/:id/analytics", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
-    try {
-      const id = parseInt(req.params.id);
-      const [location] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
-      if (!location) return res.status(404).json({ message: "Location not found" });
-
-      const days = parseInt(req.query.days as string) || 30;
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      const prevStartDate = new Date(startDate);
-      prevStartDate.setDate(prevStartDate.getDate() - days);
-
-      const startStr = startDate.toISOString().split("T")[0];
-      const prevStartStr = prevStartDate.toISOString().split("T")[0];
-      const endStr = endDate.toISOString().split("T")[0];
-
-      const allData = await db.select().from(locationAnalytics)
-        .where(eq(locationAnalytics.locationId, id))
-        .orderBy(locationAnalytics.date);
-
-      const current = allData.filter(d => d.date >= startStr && d.date <= endStr);
-      const previous = allData.filter(d => d.date >= prevStartStr && d.date < startStr);
-
-      const sum = (arr: typeof allData, key: keyof typeof allData[0]) => arr.reduce((s, r) => s + (Number(r[key]) || 0), 0);
-      const pctChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
-
-      const totalViews = sum(current, "searchViews") + sum(current, "mapsViews");
-      const prevTotalViews = sum(previous, "searchViews") + sum(previous, "mapsViews");
-      const totalInteractions = sum(current, "siteVisits") + sum(current, "directionRequests") + sum(current, "phoneCalls") + sum(current, "messaging");
-      const prevTotalInteractions = sum(previous, "siteVisits") + sum(previous, "directionRequests") + sum(previous, "phoneCalls") + sum(previous, "messaging");
-
-      const dayOfWeekCalls = [0, 0, 0, 0, 0, 0, 0];
-      current.forEach(d => {
-        const day = new Date(d.date).getDay();
-        dayOfWeekCalls[day] += d.phoneCalls || 0;
-      });
-
-      res.json({
-        summary: {
-          totalViews,
-          viewsChange: pctChange(totalViews, prevTotalViews),
-          totalInteractions,
-          interactionsChange: pctChange(totalInteractions, prevTotalInteractions),
-          avgRating: location.avgRating || 0,
-          ratingChange: 0,
-          searchViews: sum(current, "searchViews"),
-          prevSearchViews: sum(previous, "searchViews"),
-          searchViewsChange: pctChange(sum(current, "searchViews"), sum(previous, "searchViews")),
-          mapsViews: sum(current, "mapsViews"),
-          prevMapsViews: sum(previous, "mapsViews"),
-          mapsViewsChange: pctChange(sum(current, "mapsViews"), sum(previous, "mapsViews")),
-          searchMobile: sum(current, "searchMobileViews"),
-          searchMobileChange: pctChange(sum(current, "searchMobileViews"), sum(previous, "searchMobileViews")),
-          searchDesktop: sum(current, "searchDesktopViews"),
-          searchDesktopChange: pctChange(sum(current, "searchDesktopViews"), sum(previous, "searchDesktopViews")),
-          mapsMobile: sum(current, "mapsMobileViews"),
-          mapsMobileChange: pctChange(sum(current, "mapsMobileViews"), sum(previous, "mapsMobileViews")),
-          mapsDesktop: sum(current, "mapsDesktopViews"),
-          mapsDesktopChange: pctChange(sum(current, "mapsDesktopViews"), sum(previous, "mapsDesktopViews")),
-          siteVisits: sum(current, "siteVisits"),
-          siteVisitsChange: pctChange(sum(current, "siteVisits"), sum(previous, "siteVisits")),
-          directionRequests: sum(current, "directionRequests"),
-          directionRequestsChange: pctChange(sum(current, "directionRequests"), sum(previous, "directionRequests")),
-          phoneCalls: sum(current, "phoneCalls"),
-          phoneCallsChange: pctChange(sum(current, "phoneCalls"), sum(previous, "phoneCalls")),
-          messaging: sum(current, "messaging"),
-          messagingChange: pctChange(sum(current, "messaging"), sum(previous, "messaging")),
-        },
-        current: current.map(d => ({
-          date: d.date,
-          searchViews: d.searchViews,
-          mapsViews: d.mapsViews,
-          siteVisits: d.siteVisits,
-          directionRequests: d.directionRequests,
-          phoneCalls: d.phoneCalls,
-          messaging: d.messaging,
-          totalViews: (d.searchViews || 0) + (d.mapsViews || 0),
-          totalInteractions: (d.siteVisits || 0) + (d.directionRequests || 0) + (d.phoneCalls || 0) + (d.messaging || 0),
-        })),
-        previous: previous.map(d => ({
-          date: d.date,
-          searchViews: d.searchViews,
-          mapsViews: d.mapsViews,
-          siteVisits: d.siteVisits,
-          directionRequests: d.directionRequests,
-          phoneCalls: d.phoneCalls,
-          messaging: d.messaging,
-          totalViews: (d.searchViews || 0) + (d.mapsViews || 0),
-          totalInteractions: (d.siteVisits || 0) + (d.directionRequests || 0) + (d.phoneCalls || 0) + (d.messaging || 0),
-        })),
-        phoneCallsByDay: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => ({
-          day,
-          calls: dayOfWeekCalls[i],
-        })),
-        dateRange: { start: startStr, end: endStr },
-        location: {
-          listingsCount: location.listingsCount,
-          reviewCount: location.reviewCount,
-          newReviewCount: location.newReviewCount,
-          monthlyViews: location.monthlyViews,
-          avgRank: location.avgRank,
-          avgRating: location.avgRating,
-        },
-      });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
-  app.post("/api/locations/:id/analytics/seed", async (req, res) => {
-    const user = getDevUser(req, res);
-    if (!user) return;
-    try {
-      const id = parseInt(req.params.id);
-      const [location] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
-      if (!location) return res.status(404).json({ message: "Location not found" });
-
-      await db.delete(locationAnalytics).where(eq(locationAnalytics.locationId, id));
-
-      const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-      const rows: any[] = [];
-      for (let i = 59; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0];
-        const searchViews = rand(5, 40);
-        const mapsViews = rand(2, 15);
-        const searchMobile = Math.floor(searchViews * (0.3 + Math.random() * 0.3));
-        const searchDesktop = searchViews - searchMobile;
-        const mapsMobile = Math.floor(mapsViews * (0.5 + Math.random() * 0.3));
-        const mapsDesktop = mapsViews - mapsMobile;
-        rows.push({
-          locationId: id,
-          date: dateStr,
-          searchViews,
-          mapsViews,
-          searchMobileViews: searchMobile,
-          searchDesktopViews: searchDesktop,
-          mapsMobileViews: mapsMobile,
-          mapsDesktopViews: mapsDesktop,
-          siteVisits: rand(0, 8),
-          directionRequests: rand(0, 6),
-          phoneCalls: rand(0, 3),
-          messaging: rand(0, 1),
-        });
-      }
-      await db.insert(locationAnalytics).values(rows);
-
-      const last30 = rows.slice(30);
-      const totalViews = last30.reduce((s, r) => s + r.searchViews + r.mapsViews, 0);
-      await db.update(businessLocations).set({
-        listingsCount: rand(40, 80),
-        reviewCount: rand(10, 150),
-        newReviewCount: rand(3, 30),
-        monthlyViews: totalViews,
-        avgRank: parseFloat((rand(5, 30) + Math.random()).toFixed(1)),
-        avgRating: parseFloat((3.5 + Math.random() * 1.5).toFixed(1)),
-        updatedAt: new Date(),
-      }).where(eq(businessLocations.id, id));
-
-      res.json({ success: true, message: "60 days of demo analytics data seeded" });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    const id = Number(req.params.id);
+    const [location] = await db.select().from(businessLocations).where(and(eq(businessLocations.id,id),eq(businessLocations.userId,user.id)));
+    if (!location) return res.status(404).json({message:"Location not found"});
+    res.json({available:false,source:null,message:"Use Google Business Profile performance for verified daily metrics.",performanceUrl:`/api/gbp/locations/${id}/performance`});
   });
 
   app.get("/api/citations/campaigns", async (req, res) => {
@@ -5194,8 +4877,8 @@ function main() {
 
   app.get("/api/google-profile-reviews", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) return res.status(401).json({ message: "Login required" });
+      const user = getDevUser(req, res);
+      if (!user) return;
       const locationId = req.query.locationId ? parseInt(req.query.locationId as string) : undefined;
       const rating = req.query.rating ? parseInt(req.query.rating as string) : undefined;
       const response = req.query.response as string | undefined;
@@ -5204,7 +4887,7 @@ function main() {
       let reviews = await db
         .select()
         .from(googleProfileReviews)
-        .where(eq(googleProfileReviews.userId, user.id))
+        .where(and(eq(googleProfileReviews.userId, user.id), eq(googleProfileReviews.googleDeleted, false)))
         .orderBy(desc(googleProfileReviews.reviewDate));
 
       if (locationId) {
@@ -5235,11 +4918,15 @@ function main() {
 
   app.post("/api/google-profile-reviews", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) return res.status(401).json({ message: "Login required" });
+      const user = getDevUser(req, res);
+      if (!user) return;
       const { reviewerName, rating, comment, reviewDate, locationId, templateId, replyComment, replyDate } = req.body;
-      if (!reviewerName || !rating || !reviewDate) {
+      if (typeof reviewerName !== "string" || !reviewerName.trim() || !Number.isInteger(rating) || rating < 1 || rating > 5 || !Number.isFinite(Date.parse(reviewDate))) {
         return res.status(400).json({ message: "reviewerName, rating, and reviewDate are required" });
+      }
+      if (locationId) {
+        const [owned] = await db.select({id:businessLocations.id}).from(businessLocations).where(and(eq(businessLocations.id, Number(locationId)),eq(businessLocations.userId,user.id)));
+        if (!owned) return res.status(404).json({message:"Location not found"});
       }
       const [review] = await db.insert(googleProfileReviews).values({
         userId: user.id,
@@ -5249,8 +4936,8 @@ function main() {
         rating,
         comment: comment || null,
         reviewDate: new Date(reviewDate),
-        replyComment: replyComment || null,
-        replyDate: replyDate ? new Date(replyDate) : null,
+        replyDraft: replyComment || null,
+        replyStatus: "draft",
       }).returning();
       res.json(review);
     } catch (err: any) {
@@ -5258,28 +4945,10 @@ function main() {
     }
   });
 
-  app.patch("/api/google-profile-reviews/:id/reply", async (req, res) => {
-    try {
-      const user = (req as any).user;
-      if (!user) return res.status(401).json({ message: "Login required" });
-      const id = parseInt(req.params.id);
-      const { replyComment } = req.body;
-      const [updated] = await db
-        .update(googleProfileReviews)
-        .set({ replyComment, replyDate: new Date(), updatedAt: new Date() })
-        .where(and(eq(googleProfileReviews.id, id), eq(googleProfileReviews.userId, user.id)))
-        .returning();
-      if (!updated) return res.status(404).json({ message: "Not found" });
-      res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
   app.patch("/api/google-profile-reviews/:id/note", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) return res.status(401).json({ message: "Login required" });
+      const user = getDevUser(req, res);
+      if (!user) return;
       const id = parseInt(req.params.id);
       const { internalNote } = req.body;
       const [updated] = await db
@@ -5296,8 +4965,8 @@ function main() {
 
   app.delete("/api/google-profile-reviews/:id", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) return res.status(401).json({ message: "Login required" });
+      const user = getDevUser(req, res);
+      if (!user) return;
       const id = parseInt(req.params.id);
       await db.delete(googleProfileReviews)
         .where(and(eq(googleProfileReviews.id, id), eq(googleProfileReviews.userId, user.id)));

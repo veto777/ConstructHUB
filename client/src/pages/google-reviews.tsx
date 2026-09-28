@@ -1,3 +1,4 @@
+import { GbpConnection } from "@/components/gbp-connection";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1795,6 +1796,7 @@ export default function GoogleReviewsPage() {
 }
 
 function GoogleProfileReviewsTab() {
+  const { data: gbp } = useQuery<any>({ queryKey: ["/api/gbp/status"] });
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
@@ -1833,16 +1835,17 @@ function GoogleProfileReviewsTab() {
   });
 
   const replyMutation = useMutation({
-    mutationFn: async ({ id, replyComment }: { id: number; replyComment: string }) => {
-      const res = await apiRequest("PATCH", `/api/google-profile-reviews/${id}/reply`, { replyComment });
+    mutationFn: async ({ id, replyComment, action = "draft" }: { id: number; replyComment: string; action?: "draft" | "publish" | "delete" }) => {
+      const res = await apiRequest(action === "delete" ? "DELETE" : "PATCH", `/api/google-profile-reviews/${id}/reply`, { replyComment, action });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/google-profile-reviews"] });
-      toast({ title: "Reply saved" });
+      toast({ title: "Reply action confirmed" });
       setReplyingToId(null);
       setReplyText("");
     },
+    onError: (e: Error) => { queryClient.invalidateQueries({queryKey:["/api/gbp/status"]}); queryClient.invalidateQueries({queryKey:["/api/google-profile-reviews"]}); toast({title:"Reply failed",description:e.message,variant:"destructive"}); },
   });
 
   const noteMutation = useMutation({
@@ -1914,6 +1917,7 @@ function GoogleProfileReviewsTab() {
 
   return (
     <div className="space-y-6 relative z-10">
+      <GbpConnection />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Search</Label>
@@ -2072,7 +2076,7 @@ function GoogleProfileReviewsTab() {
             <Star className="w-10 h-10 text-muted-foreground mx-auto" />
             <p className="font-medium">No Google profile reviews yet</p>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Reviews from your Google Business Profiles will appear here once synced. Currently awaiting Google API access approval.
+              Reviews from your Google Business Profiles will appear here once synced. Connect your Google account, import a location, then choose Sync now.
             </p>
           </CardContent>
         </Card>
@@ -2203,7 +2207,7 @@ function GoogleProfileReviewsTab() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => { setReplyingToId(review.id); setReplyText(""); }}
+                            onClick={() => { setReplyingToId(review.id); setReplyText(review.replyDraft || ""); }}
                             title="Reply"
                             data-testid={`button-reply-${review.id}`}
                           >
@@ -2215,7 +2219,7 @@ function GoogleProfileReviewsTab() {
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={() => deleteMutation.mutate(review.id)}
-                          title="Delete"
+                          title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
                           data-testid={`button-delete-review-${review.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2237,22 +2241,26 @@ function GoogleProfileReviewsTab() {
                           <Button
                             size="sm"
                             className="bg-amber-500 hover:bg-amber-600 text-white"
-                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText })}
+                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText, action: gbp?.connected && review.googleReviewId ? "publish" : "draft" })}
                             disabled={!replyText.trim() || replyMutation.isPending}
                             data-testid={`button-submit-reply-${review.id}`}
                           >
                             {replyMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
-                            Post Reply
+                            {gbp?.connected && review.googleReviewId ? "Publish reply to Google" : "Save draft in ConstructHUB"}
                           </Button>
+                          {gbp?.connected && review.googleReviewId && <Button size="sm" variant="outline" disabled={replyMutation.isPending} onClick={() => replyMutation.mutate({id:review.id,replyComment:replyText})}>Save draft</Button>}
                           <Button size="sm" variant="ghost" onClick={() => setReplyingToId(null)}>Cancel</Button>
                         </div>
                       </div>
                     )}
 
+                    {!review.googleReviewId && <p className="text-xs text-muted-foreground">Manually entered record — not synced from Google.</p>}
+                    {review.replyDraft && <p className="p-3 text-sm">Draft saved in ConstructHUB: {review.replyDraft}</p>}
+                    {review.replyError && <p role="alert" className="text-destructive">{review.replyError}</p>}
                     {review.replyComment && (
                       <div className="mt-4 ml-4 sm:ml-13 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">Reply:</span>
+                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">{review.replyStatus === "posted" ? "Posted on Google:" : "Local draft (not posted):"}</span>
                           <div className="flex items-center gap-2">
                             {review.replyDate && (
                               <span className="text-xs text-muted-foreground">
@@ -2265,7 +2273,7 @@ function GoogleProfileReviewsTab() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={() => replyMutation.mutate({ id: review.id, replyComment: "" })}
+                              onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "delete" })}
                               title="Delete reply"
                               data-testid={`button-delete-reply-${review.id}`}
                             >
