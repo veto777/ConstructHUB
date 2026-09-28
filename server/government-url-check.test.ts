@@ -39,3 +39,9 @@ it('accepts an on-topic tenant self-service home page', () => {
   expect(classifyGovernmentPage(page('Home - City of Bedford', '<main>Building permits and inspections</main>',200,'https://bedfordtx.portal.opengov.com/'),'permit').status).toBe('live');
   expect(classifyGovernmentPage(page('Home - City of Bedford', '<main>Building permits and community news</main>',200,'https://bedford.gov/'),'permit').status).toBe('dead');
 });
+
+it('recognizes an official department subdomain as the department portal', () => {
+  const html=page('Home - CIVICS','<main>Frederick County building permits</main>',200,'https://planningandpermitting.frederickcountymd.gov/');
+  expect(classifyGovernmentPage(html,'permit').status).toBe('live');
+  expect(classifyGovernmentPage({...html,finalUrl:'https://frederickcountymd.gov/'},'permit').status).toBe('dead');
+});

@@ -53,5 +53,7 @@ export function governmentFailureIsDead(reason: string): boolean {
 
 /** A jurisdiction's self-service tenant is not the vendor's marketing homepage. */
 export function isDedicatedGovernmentPortal(url: string): boolean {
-  return /^[a-z0-9-]+\.portal\.opengov\.com$/.test(new URL(url).hostname);
+  const host = new URL(url).hostname;
+  return /^[a-z0-9-]+\.portal\.opengov\.com$/.test(host) ||
+    (/\.(gov|us)$/.test(host) && /^(permits?|permitslicenses|planningandpermitting|assessor|assessment|propertysearch)\./.test(host));
 }
