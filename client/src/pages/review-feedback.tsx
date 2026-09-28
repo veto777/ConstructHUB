@@ -163,8 +163,8 @@ export default function ReviewFeedbackPage() {
       });
       return res.json();
     },
-    onSuccess: (data) => {
-      if (data.showReview) {
+    onSuccess: () => {
+      if (isHighRating) {
         setStep("referral");
       } else {
         setStep("improvement");
