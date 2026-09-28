@@ -87,6 +87,7 @@ export default function CompetitorsPage() {
   const { data: scans, isLoading: scansLoading } = useQuery<any[]>({
     queryKey: ["/api/competitors/scans"],
     enabled: isPlatinum || isDev,
+    refetchInterval: query => query.state.data?.some(scan => scan.status === "running") ? 1500 : false,
   });
 
   const scanMutation = useMutation({
@@ -910,7 +911,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
             </>
           )}
 
-          {!isLoading && !isRunning && listings.length === 0 && (
+          {!isLoading && scan.status === "completed" && listings.length === 0 && (
             <p className="text-center text-muted-foreground py-4">No competitors found in this scan.</p>
           )}
         </CardContent>
