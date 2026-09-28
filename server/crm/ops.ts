@@ -280,37 +280,46 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid payment", issues: parsed.error.issues });
 
-    const [inv] = await db.select().from(crmInvoices)
-      .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
-    if (!inv) return res.status(404).json({ message: "Invoice not found" });
-    if (inv.voidedAt) return res.status(409).json({ message: "This invoice has been voided." });
+    // Serialize balance checks and ledger writes for this invoice. Without
+    // the row lock two valid-looking requests can both spend the same balance.
+    const result = await db.transaction(async (tx) => {
+      const [inv] = await tx.select().from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id)))
+        .limit(1).for("update");
+      if (!inv) return { error: { status: 404, message: "Invoice not found" } };
+      if (inv.voidedAt) return { error: { status: 409, message: "This invoice has been voided." } };
 
-    const outstanding = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
-    if (outstanding <= 0) return res.status(409).json({ message: "This invoice is already paid in full." });
-    // Overpayment would silently inflate paidCents past the contract; refuse it.
-    if (parsed.data.amountCents > outstanding) {
-      return res.status(400).json({
-        message: `Only $${(outstanding / 100).toFixed(2)} is outstanding on this invoice.`,
-        outstandingCents: outstanding,
-      });
+      const outstanding = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
+      if (outstanding <= 0) return { error: { status: 409, message: "This invoice is already paid in full." } };
+      if (parsed.data.amountCents > outstanding) {
+        return { error: {
+          status: 400,
+          message: `Only $${(outstanding / 100).toFixed(2)} is outstanding on this invoice.`,
+          outstandingCents: outstanding,
+        } };
+      }
+
+      const [pay] = await tx.insert(crmPayments).values({
+        orgId: ctx.org.id, customerId: inv.customerId, invoiceId: inv.id,
+        projectId: inv.projectId ?? null, provider: "manual", purpose: "progress",
+        amountCents: parsed.data.amountCents, currency: "usd",
+        method: parsed.data.method, status: "succeeded",
+        note: parsed.data.note ?? null, paidAt: new Date(),
+      } as any).returning();
+
+      const paid = (inv.paidCents ?? 0) + parsed.data.amountCents;
+      const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0));
+      const [row] = await tx.update(crmInvoices).set({
+        paidCents: paid, status: paid >= due ? "paid" : "partial",
+        paidAt: paid >= due ? new Date() : null, updatedAt: new Date(),
+      }).where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id))).returning();
+      return { inv, pay, paid, due, row };
+    });
+    if (result.error) {
+      const { status, ...body } = result.error;
+      return res.status(status).json(body);
     }
-
-    const [pay] = await db.insert(crmPayments).values({
-      orgId: ctx.org.id, customerId: inv.customerId, invoiceId: inv.id,
-      projectId: inv.projectId ?? null, provider: "manual", purpose: "progress",
-      amountCents: parsed.data.amountCents, currency: "usd",
-      method: parsed.data.method, status: "succeeded",
-      note: parsed.data.note ?? null, paidAt: new Date(),
-    } as any).returning();
-
-    const paid = (inv.paidCents ?? 0) + parsed.data.amountCents;
-    const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0));
-    const [row] = await db.update(crmInvoices).set({
-      paidCents: paid,
-      status: paid >= due ? "paid" : "partial",
-      paidAt: paid >= due ? new Date() : null,
-      updatedAt: new Date(),
-    }).where(eq(crmInvoices.id, inv.id)).returning();
+    const { inv, pay, paid, due, row } = result;
 
     if (paid >= due) await emitCrmEvent(ctx.org.id, "invoice.paid", { invoiceId: inv.id, paidCents: paid });
     await emitCrmEvent(ctx.org.id, "payment.succeeded", {
@@ -343,7 +352,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     }
     const [row] = await db.update(crmInvoices).set({
       voidedAt: new Date(), status: "void", updatedAt: new Date(),
-    }).where(eq(crmInvoices.id, inv.id)).returning();
+    }).where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id),
+      isNull(crmInvoices.voidedAt), sql`coalesce(${crmInvoices.paidCents}, 0) = 0`)).returning();
+    if (!row) return res.status(409).json({ message: "The invoice changed; reload before voiding it." });
     logActivity(ctx, "invoice.updated", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number, change: "voided" },
@@ -362,17 +373,16 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
     if (!requireOwnerRole(res, ctx)) return;
-    const [inv] = await db.select().from(crmInvoices)
-      .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
-    if (!inv) return res.status(404).json({ message: "Invoice not found" });
-
-    const [{ n: paymentCount }] = await db.select({ n: sql<number>`count(*)::int` })
-      .from(crmPayments)
-      .where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.invoiceId, inv.id)));
-    const refusal = invoiceDeleteRefusal(inv, paymentCount);
-    if (refusal) return res.status(409).json({ message: refusal });
-
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
+      const [inv] = await tx.select().from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id)))
+        .limit(1).for("update");
+      if (!inv) return { error: { status: 404, message: "Invoice not found" } };
+      const [{ n: paymentCount }] = await tx.select({ n: sql<number>`count(*)::int` })
+        .from(crmPayments)
+        .where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.invoiceId, inv.id)));
+      const refusal = invoiceDeleteRefusal(inv, paymentCount);
+      if (refusal) return { error: { status: 409, message: refusal } };
       await tx.delete(crmInvoiceItems)
         .where(and(eq(crmInvoiceItems.orgId, ctx.org.id), eq(crmInvoiceItems.invoiceId, inv.id)));
       await tx.delete(crmEngagementSessions)
@@ -380,7 +390,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
           eq(crmEngagementSessions.docType, "invoice"), eq(crmEngagementSessions.docId, inv.id)));
       await tx.delete(crmInvoices)
         .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id)));
+      return { inv };
     });
+    if (result.error) return res.status(result.error.status).json({ message: result.error.message });
+    const { inv } = result;
 
     console.log(`[crm] owner ${ctx.member.id} deleted invoice ${inv.number ?? inv.id} (${inv.id}) in org ${ctx.org.id}`);
     await db.insert(crmCustomerNotes).values({
