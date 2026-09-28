@@ -1596,7 +1596,7 @@ script.src = target; var elem = document.head; elem.appendChild(script);
           </div>
           <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg">
             <p className="text-xs text-blue-400">
-              <strong>How it works:</strong> The script runs on page load, captures the visitor's device fingerprint, IP (server-side), browser, screen size, and sends it to Click Guard. Suspicious patterns (bots, multi-click, VPN hopping) are automatically flagged and IPs are blocked.
+              <strong>How it works:</strong> The script runs on page load, captures the visitor's device fingerprint, IP (server-side), browser, screen size, and sends it to Click Guard. Repeated visits and matching device signals are flagged. Repeatedly flagged IPs can enter a local exclusion list; applying it in Google Ads requires the separate Ads script.
             </p>
           </div>
         </CardContent>
@@ -1966,7 +1966,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 <MapPin className="h-4 w-4 text-blue-500" /> Block IPs By Country
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Block or allow clicks coming from IPs from the following countries.
+                Saved preference only: country-based enforcement is not implemented in this tracker.
               </p>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center gap-3">
@@ -2005,7 +2005,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 <Bot className="h-4 w-4 text-blue-500" /> Block JavaScript Disabled Browsers
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Enabling this feature allows Click Guard to block IPs once a browser with a disabled Javascript clicks your ads (usually a bot).
+                Not enforced: the tracking script cannot observe browsers that do not execute JavaScript.
               </p>
             </div>
             <Switch
@@ -2025,7 +2025,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 <ShieldBan className="h-4 w-4 text-blue-500" /> VPN Blocking
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                By enabling this feature, Click Guard will block any IP that uses a VPN (Virtual Private Network) to click your ads.
+                Saved preference only: this toggle does not enforce VPN blocking. VPN Shield offers separate, heuristic browser controls.
               </p>
               <p className="text-xs text-emerald-400/80 mt-1">Recommended: Enabled</p>
             </div>
@@ -2046,7 +2046,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 <Activity className="h-4 w-4 text-blue-500" /> Behavior Analysis
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                By enabling this feature, Click Guard will record user activity on your site which you can use to determine whether the click was made by a human or a bot. The Tracking Code must be installed on your site for this feature to work.
+                The installed tracking script records page visits and device signals. These cannot reliably distinguish a person from a bot; this saved preference does not change collection.
               </p>
               <p className="text-xs text-emerald-400/80 mt-1">Recommended: Enabled</p>
             </div>

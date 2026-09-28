@@ -363,7 +363,7 @@ export default function PricingPage() {
                   { category: "Intelligence & Education", features: [
                     ...(SHOW_COMPETITOR_INTEL ? [
                       { name: "Competitor Intelligence", values: [false, false, false, false, "1 site", "10 sites"] as (string | boolean)[] },
-                      { name: "BS Meter (Fake Review Detection)", values: [false, false, false, false, true, true] as (string | boolean)[] },
+                      { name: "BS Meter (Heuristic Signals)", values: [false, false, false, false, true, true] as (string | boolean)[] },
                     ] : []),
                     { name: "Master Class Access", values: [false, false, true, true, true, true] },
                     { name: "Google Ads Master Class", values: [false, false, true, true, true, true] },

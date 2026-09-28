@@ -608,8 +608,8 @@ export default function CompetitorsLandingPage() {
             </span>
           </h2>
           <p className="text-muted-foreground dark:text-white/40 mb-8 max-w-lg mx-auto">
-            Competitor Intelligence is available exclusively to Platinum members.
-            Get the unfair advantage that separates market leaders from everyone else.
+            Competitor Intelligence is available to Gold and Platinum members.
+            Explore public market information alongside your own business results.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href={user ? "/competitors" : "/pricing"} data-testid="link-final-scan">

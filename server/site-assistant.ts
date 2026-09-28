@@ -97,16 +97,16 @@ An 8-section expert guide covering everything contractors need to know about Goo
 ## Google Ads Tools
 
 ### Google Click Guard (Click Fraud Protection)
-Protects your Google Ads budget from fraudulent clicks:
+Helps investigate unusual traffic to your landing pages:
 - Embeddable tracking script for your website
 - Fraud analytics dashboard showing threat levels
 - Traffic Sources tab showing referrer breakdown by domain/vendor with percentage, page loads, and unique visitors
 - Tracks visitors with canvas fingerprinting, device detection, browser/OS identification
-- Detects fraud patterns: repeated visits, bot user agents, same fingerprint from different IPs
-- Auto-blocks suspicious IPs and pushes exclusions to Google Ads campaigns hourly
+- Flags heuristic traffic patterns: repeated visits, bot user agents, same fingerprint from different IPs
+- Adds repeatedly flagged IPs to a local exclusion list; a separately installed Google Ads script can apply that list on its configured schedule
 - Google Ads IP exclusion integration
 - Configurable detection thresholds and settings
-- At $40 CPC, blocking just 5 fraudulent clicks/day saves $72,000/year
+- No fraud-detection accuracy or advertising savings are guaranteed. Google Ads IP exclusions require the separate Ads script.
 
 ### Google Ad Fraud (Exposé Page)
 Educational content revealing the truth about click fraud in Google Ads:
@@ -146,23 +146,23 @@ A full visitor tracking dashboard (modern TraceMyIP replacement):
 - Purple/violet accent color scheme
 
 ## VPN Shield
-A standalone VPN/proxy blocker:
-- Generates an embeddable script that detects VPN/proxy visitors
+A browser-based tool for reviewing possible proxy traffic:
+- Generates an embeddable script that reports possible VPN/proxy signals
 - Detection methods: WebRTC IP leak detection, timezone/geolocation mismatch, datacenter IP range matching, VPN browser extension detection
-- Identifies major VPN providers (NordVPN, ExpressVPN, Surfshark, etc.)
+- Checks a limited built-in IP-prefix list; it cannot reliably identify a provider
 - Detects datacenter IPs (AWS, Digital Ocean, Linode, etc.)
-- Blocks or redirects VPN users while automatically whitelisting search engine crawlers (Google, Bing, Yahoo are NEVER blocked)
+- Can show a browser overlay or redirect after page load; can be bypassed. Crawler user-agent exemptions can be spoofed. VPN signals are not proof of misuse.
 - Features: Overview with educational content, Blocked Visitors log, Install Script, Settings (block/log/redirect modes, whitelisted IPs)
-- Protects analytics data from being polluted by VPN users
-- Identifies competitors who try to anonymously snoop on your site
+- Helps review traffic context; legitimate visitors may also use VPNs
+- Does not identify visitors as competitors or establish their intent
 - Red/orange accent color scheme
 
-## Competitor Intelligence (Platinum Plan)
+## Competitor Intelligence (Gold and Platinum Plans)
 - Market scans to track competitor activity
-- Ad spy functionality to monitor competitor Google advertising
+- Public ad activity is unavailable; competitor scans use public business listings only
 - Detailed review analysis of competitor businesses
-- Google advertising monitoring and competitive insights
-- Available exclusively to Platinum tier subscribers
+- Heuristic review signals worth a closer look, with sample-size limitations
+- Available to Gold and Platinum subscribers
 
 ## Master Class — State-by-State Business Guide
 A comprehensive guide for starting and running a construction business, covering:

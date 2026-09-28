@@ -513,10 +513,10 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
           <CardTitle className="text-sm font-semibold">Block Mode</CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0 space-y-3">
-          <p className="text-xs text-muted-foreground">Choose how to handle detected VPN/proxy visitors.</p>
+          <p className="text-xs text-muted-foreground">Choose how the browser script responds to possible proxy signals after page load.</p>
           <div className="space-y-2">
             {[
-              { value: "block", label: "Block", desc: "Show a blocked page to VPN visitors" },
+              { value: "block", label: "Block", desc: "Show an overlay to flagged browsers" },
               { value: "log", label: "Log Only", desc: "Record VPN visits but don't block them" },
               { value: "redirect", label: "Redirect", desc: "Redirect VPN visitors to a custom URL" },
             ].map(opt => (
@@ -584,7 +584,7 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
         <CardContent className="p-4 flex items-center gap-3">
           <Info className="h-5 w-5 text-muted-foreground shrink-0" />
           <p className="text-sm text-foreground" data-testid="text-settings-crawler-whitelist">
-            <span className="font-semibold">Crawler Whitelist:</span> Googlebot, Bingbot, Yahoo Slurp, DuckDuckBot, Baiduspider, and other search engine crawlers are automatically whitelisted and will never be blocked.
+            <span className="font-semibold">Crawler Whitelist:</span> Googlebot, Bingbot, Yahoo Slurp, DuckDuckBot, Baiduspider, and other crawler user-agent strings are exempted. User-agent strings can be spoofed.
           </p>
         </CardContent>
       </Card>
@@ -636,7 +636,7 @@ export default function VpnShieldPage() {
                 <span className="bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent">Shield</span>
               </h1>
               <p className="mt-2 text-muted-foreground max-w-xl text-sm" data-testid="text-vpn-subtitle">
-                Detect and block VPN, proxy, and anonymous visitors. Protect your analytics data and keep your reports accurate.
+                Review possible proxy traffic signals. Optional browser overlays and redirects are bypassable and may affect legitimate visitors.
               </p>
             </div>
 
