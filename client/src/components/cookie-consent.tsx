@@ -74,7 +74,7 @@ export function CookieConsent() {
   // In normal document flow: consent must never cover an action or a footer.
   return (
     <div
-      className="relative z-[100] p-3 sm:p-4 flex justify-center border-b bg-background"
+      className="relative p-3 sm:p-4 flex justify-center border-b bg-background"
       data-testid="cookie-consent-banner"
     >
       <div className="pointer-events-auto w-full max-w-2xl sm:max-w-lg rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
