@@ -19,6 +19,15 @@ test.describe("/crm/clients/:id", () => {
     await gotoCrm(page, url);
     await expect(page.locator("h1")).toContainText(clientName);
 
+    // A preview opens another tab asynchronously. Verify and close it here;
+    // the generic single-page sweep must not race that navigation.
+    const popupPromise = page.waitForEvent("popup");
+    await page.getByTestId("button-view-as-client").click();
+    const popup = await popupPromise;
+    await expect(popup.getByText("Contractor preview", { exact: false })).toBeVisible();
+    await popup.close();
+    await expect(page).toHaveURL(new RegExp(`/crm/clients/${clientId}$`));
+
     // Portal link copy works (clipboard permission granted in config).
     await page.getByTestId("button-copy-portal").click();
     await expect(page.getByText("Client portal link copied", { exact: true })).toBeVisible();
@@ -83,6 +92,7 @@ test.describe("/crm/clients/:id", () => {
     test.slow();
     const { clicked, labels } = await sweepPage(page, url, {
       ready: `[data-testid="button-new-estimate"]`,
+      skip: ({ testid }) => testid === "button-view-as-client" || testid.startsWith("button-preview-"),
       beforeEach: async (page) => {
         await expect(page.locator("h1")).toHaveText(clientName);
         await expect(page.getByTestId("section-timeline")).toBeVisible();

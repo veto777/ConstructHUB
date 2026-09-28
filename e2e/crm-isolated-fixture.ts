@@ -1,7 +1,7 @@
 import { test as base, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { q } from "./db";
-import { switchOrg } from "./helpers";
+import { gotoCrm, switchOrg } from "./helpers";
 
 /** A separate org per test means sweeps cannot grow with another test's data
  * or inherit its role changes. Only rows in this org are cleaned up. */
@@ -13,6 +13,9 @@ export const test = base.extend<{ crmOrgId: string }>({
     try {
       await switchOrg(page, orgId);
       expect((await (await page.request.get('/api/crm/me')).json()).org.id).toBe(orgId);
+      // Wait for the actual CRM shell to mount, including a cold Vite start.
+      await gotoCrm(page, "/crm");
+      await expect(page.getByTestId("link-portal-nav-clients")).toBeVisible({ timeout: 60_000 });
       await use(orgId);
     } finally {
       await page.close();
