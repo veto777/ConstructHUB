@@ -6,15 +6,11 @@
 // matching card on the marketing landing page, the sidebar nav item, and the
 // /competitors and /competitors-landing routes.
 //
-// It is intentionally hidden while ConstructHUB is under Google Business Profile
-// API review, because competitor-monitoring messaging reads like surveillance to
-// a reviewer (even though these tools only use public Google Maps/Places data).
-//
-// TO BRING THESE FEATURES BACK AFTER APPROVAL: set this to `true`.
-// When you do, keep the wording honest ("public market research"), NOT
-// "spy on competitors / see everything they're doing" — Google re-audits
-// sensitive-scope apps and surveillance language can cost you the access.
-export const SHOW_COMPETITOR_INTEL = false;
+// Hidden during the Google Business Profile API review; restored 2026-09-28
+// after approval. Google re-audits sensitive-scope apps: keep the wording about
+// PUBLIC market research ("public ad activity", "benchmark your presence"),
+// never "spy on competitors / see everything they're doing".
+export const SHOW_COMPETITOR_INTEL = true;
 
 // ---------------------------------------------------------------------------
 // SHOW_GOOGLE_REVIEWS controls the entire Google Reviews feature surface: the
@@ -22,13 +18,9 @@ export const SHOW_COMPETITOR_INTEL = false;
 // the customer-facing /review/:token feedback form, the
 // /review/:token/unsubscribe page, and the "Google Reviews" sidebar nav item.
 //
-// It is intentionally hidden while ConstructHUB is under Google Business Profile
-// API review. The review-request flow routes customers by sentiment (high
-// ratings to Google, low ratings to a private form), which Google's policies
-// prohibit as "review gating" — a reviewer who sees it will reject the app, and
-// it can put the underlying Business Profile at risk of suspension.
-//
-// TO BRING THIS BACK AFTER APPROVAL: set this to `true`, but FIRST remove the
-// sentiment gating so EVERY customer gets the Google review option, and delete
-// any "keeps negative reviews off Google" / "trade work for reviews" wording.
-export const SHOW_GOOGLE_REVIEWS = false;
+// Restored 2026-09-28 after the review-gating funnel was removed: every client,
+// whatever their rating, is offered the Google review option, and no reward is
+// tied to leaving a review. Keep it that way — Google prohibits review gating
+// and incentivized reviews, and the FTC's consumer-review rule (16 CFR 465)
+// prohibits buying positive reviews.
+export const SHOW_GOOGLE_REVIEWS = true;

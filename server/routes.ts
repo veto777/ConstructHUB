@@ -5427,7 +5427,7 @@ function main() {
         nextReminderAt: null,
       });
 
-      res.json({ success: true, showReview: rating >= 9 });
+      res.json({ success: true, showReview: true });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to submit feedback" });
     }
@@ -5437,8 +5437,8 @@ function main() {
     try {
       const request = await storage.getReviewRequestByToken(req.params.token);
       if (!request) return res.status(404).json({ message: "Not found" });
-      if (!request.feedbackRating || request.feedbackRating < 9) {
-        return res.status(403).json({ message: "Review not available for this feedback" });
+      if (!request.feedbackRating) {
+        return res.status(409).json({ message: "Submit a rating first" });
       }
 
       await storage.updateReviewRequest(request.id, {

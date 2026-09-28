@@ -156,7 +156,7 @@ export default function CompetitorsPage() {
           </h1>
           <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
           <p className="text-muted-foreground text-sm max-w-lg">
-            Know exactly who you're competing against. Index every competitor in your market, track their rankings and reviews, and spy on their Google Ads.
+            Know exactly who you're competing against. Index every competitor in your market, track their rankings and reviews, and see who's advertising on Google for your keywords.
           </p>
         </div>
 
@@ -168,7 +168,7 @@ export default function CompetitorsPage() {
             </TabsTrigger>
             <TabsTrigger value="ad-spy" className="flex items-center gap-1.5" data-testid="tab-ad-spy">
               <Megaphone className="w-4 h-4" />
-              Ad Spy
+              Ad Activity
             </TabsTrigger>
           </TabsList>
 
@@ -332,7 +332,7 @@ function AdSpyTab() {
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Megaphone className="w-5 h-5 text-orange-500" />
-            AdSpy
+            Public Ad Activity
           </h2>
           <p className="text-sm text-muted-foreground">Track who's advertising on Google for your target keywords.</p>
         </div>
@@ -402,7 +402,7 @@ function AdSpyTab() {
       {keywords && keywords.length === 0 && !isLoading && (
         <div className="text-center py-12 text-muted-foreground">
           <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>No keywords tracked yet. Add a keyword above to start spying on competitor ads.</p>
+          <p>No keywords tracked yet. Add a keyword above to see who's advertising for it.</p>
         </div>
       )}
 

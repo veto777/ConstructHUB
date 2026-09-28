@@ -515,6 +515,25 @@ export default function ReviewFeedbackPage() {
                 <Lock className="w-3 h-3" />
                 Your feedback is completely confidential
               </p>
+
+              {reviewData?.googleProfileUrl && (
+                <div className="pt-2 border-t space-y-3 text-center" data-testid="section-improvement-google-review">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    You're also welcome to share your experience publicly on Google. Every review helps other homeowners — and helps us improve.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 text-base font-bold border-2"
+                    onClick={() => {
+                      window.open(reviewData.googleProfileUrl, "_blank");
+                      markReviewedMutation.mutate();
+                    }}
+                    data-testid="button-improvement-google-review"
+                  >
+                    <ExternalLink className="w-5 h-5 mr-2" /> Leave a Google Review
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -549,7 +568,7 @@ export default function ReviewFeedbackPage() {
                   We Appreciate You!
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
-                  Your positive experience means everything to us. We'd love for you to share it with a Google review — and we have a way to say thank you:
+                  Your positive experience means everything to us. We'd love for you to share it in a Google review. Separately, if you know someone who needs work done, our referral program rewards referrals:
                 </p>
               </div>
 
@@ -565,36 +584,6 @@ export default function ReviewFeedbackPage() {
                         <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wider">Earn Cash</span>
                       </div>
                       <p className="text-sm text-muted-foreground leading-relaxed">Know someone who needs work done? Refer them to {companyName} and earn <strong>3% of their project value</strong> as a thank-you payment.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
-                      <Star className="w-7 h-7 text-white dark:text-gray-900 fill-current" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-extrabold text-lg">+1% Review Bonus</p>
-                        <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wider">Bonus</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">If someone you refer mentions your review when they contact us, you qualify for an <strong>additional 1% bonus</strong> on top of your referral fee.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20 border-2 border-amber-300 dark:border-amber-700" data-testid="card-yearly-drawing">
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center shrink-0">
-                      <Award className="w-7 h-7 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-extrabold text-lg">$5,000 Year-End Drawing</p>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 text-[10px] font-bold uppercase tracking-wider">Grand Prize</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">Every client who leaves a review is automatically entered into our <strong>annual $5,000 prize drawing</strong> at the end of the year. Share your experience and you could win big — it's our way of saying thank you!</p>
                     </div>
                   </div>
                 </div>
@@ -627,8 +616,7 @@ export default function ReviewFeedbackPage() {
                   onClick={() => setStep("referral_feedback")}
                   data-testid="button-leave-review"
                 >
-                  <Star className="w-5 h-5 mr-2 fill-current" />
-                  Leave a Review
+                  Continue
                 </Button>
               </div>
             </CardContent>
@@ -1088,27 +1076,11 @@ export default function ReviewFeedbackPage() {
                   </div>
                   <div className="flex-1">
                     <p className="font-bold text-base">Better Business Bureau</p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">BBB reviews carry serious credibility. A positive review here signals trust and professionalism.</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">BBB reviews carry serious credibility with homeowners researching contractors.</p>
                   </div>
                   <ExternalLink className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
                 </a>
 
-                <a
-                  href="https://www.yelp.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
-                  data-testid="link-yelp-review"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
-                    <span className="text-white dark:text-gray-900 font-black text-lg">Y!</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-base">Yelp</p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Yelp is one of the most-visited review sites. Help other homeowners find quality contractors.</p>
-                  </div>
-                  <ExternalLink className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                </a>
               </div>
 
               <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
@@ -1117,7 +1089,7 @@ export default function ReviewFeedbackPage() {
                   <div>
                     <p className="text-sm font-bold">Multi-Platform Reviews Make a Huge Difference</p>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Having consistent positive reviews across Google, BBB, and Yelp makes {companyName} stand out as a trusted professional and boosts search rankings!
+                      Having reviews on both Google and BBB makes {companyName} stand out as a trusted professional and boosts search rankings!
                     </p>
                   </div>
                 </div>

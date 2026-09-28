@@ -1060,13 +1060,13 @@ export default function MasterClassPage() {
 
                           <h4 className="font-semibold text-sm mt-3">The $1,000 Rule: Reviews Over Revenue</h4>
                           <p className="text-sm text-muted-foreground">
-                            It is never worth arguing with a client over unfinished work. Nobody likes doing free work — but a glowing 5-star review is worth far more than $1,000 of disputed punch-list items. If you have a client who's unhappy about minor remaining work, don't dig your heels in. Finish it, do it right, and leverage that effort into a contractual agreement for a detailed, positive review.
+                            It is never worth arguing with a client over unfinished work. Nobody likes doing free work — but a glowing 5-star review is worth far more than $1,000 of disputed punch-list items. If you have a client who's unhappy about minor remaining work, don't dig your heels in. Finish it, do it right, and then ask for an honest review — the same way you ask every client.
                           </p>
                           <div className="space-y-2 mt-2">
                             <div className="flex items-start gap-2 p-2.5 rounded-md bg-green-500/5 border border-green-500/10">
                               <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
-                                <strong className="text-foreground">Trade work for reviews.</strong> If a client has a remaining $500-1,000 complaint, offer to resolve it in exchange for a written, detailed 5-star review. Frame it as a goodwill gesture — "We want to make this right, and if you're happy with the result, we'd love an honest review." Put this in writing. They're now contractually incentivized to follow through, and you've turned a potential disaster into a marketing win.
+                                <strong className="text-foreground">Fix it first, then ask — with no strings attached.</strong> If a client has a remaining $500-1,000 complaint, resolve it because it's the right call, not as payment for a review. Afterward, ask for an honest review exactly as you would any client. Never make the fix, a discount, or any reward conditional on a review or its star rating — Google removes incentivized reviews, and the FTC's consumer-review rule (16 CFR Part 465) carries civil penalties for buying positive reviews. A client whose problem you solved often writes the best review you'll get anyway.
                               </p>
                             </div>
                             <div className="flex items-start gap-2 p-2.5 rounded-md bg-red-500/5 border border-red-500/10">

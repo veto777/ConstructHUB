@@ -181,8 +181,8 @@ const tools = [
   },
   {
     icon: Megaphone,
-    title: "Ad Spy",
-    description: "Monitor what Google Ads your competitors are running. See their actual ad headlines, descriptions, and the keywords they're bidding on. Track their campaigns across desktop, mobile, and tablet.",
+    title: "Public Ad Activity",
+    description: "See which businesses are running public Google Ads for your keywords, with the ad headlines and descriptions anyone searching can see. Track their campaigns across desktop, mobile, and tablet.",
     gradient: "from-blue-500/20 to-indigo-500/20",
     border: "border-blue-500/20",
     badge: "Intelligence",
@@ -221,7 +221,7 @@ const insights = [
   { icon: ThumbsDown, color: "text-red-400", title: "Competitors Buying Reviews", desc: "Our BS Meter detects sudden review spikes, generic language patterns, and suspicious reviewer profiles that indicate fake reviews." },
   { icon: Megaphone, color: "text-blue-400", title: "What Ads They're Running", desc: "See the exact headlines, descriptions, and keywords your competitors bid on. Know their strategy before they know yours." },
   { icon: MapPin, color: "text-emerald-400", title: "Underserved Areas", desc: "Identify neighborhoods and zip codes where competitors have low density — the easiest markets to dominate." },
-  { icon: Star, color: "text-yellow-400", title: "Reputation Gaps", desc: "Find competitors with low ratings or few reviews. These are the businesses you can easily outrank and steal customers from." },
+  { icon: Star, color: "text-yellow-400", title: "Reputation Gaps", desc: "Find competitors with low ratings or few reviews. These are markets where strong service and honest reviews can win you more customers." },
   { icon: DollarSign, color: "text-violet-400", title: "Pricing Intelligence", desc: "Compare competitor positioning, service offerings, and how they present themselves. Spot pricing gaps you can exploit." },
   { icon: Camera, color: "text-pink-400", title: "Profile Weaknesses", desc: "Competitors with no photos, incomplete profiles, or outdated hours are vulnerable. See exactly where they're dropping the ball." },
 ];
@@ -322,7 +322,7 @@ export default function CompetitorsLandingPage() {
           </h1>
           <p className="mt-6 text-lg sm:text-xl text-muted-foreground dark:text-white/50 max-w-2xl mx-auto leading-relaxed animate-in-delay-3">
             Stop guessing what your competitors are doing. Scan your entire market, analyze every
-            competitor's reviews with our BS Meter, spy on their Google Ads, and find the gaps
+            competitor's reviews with our BS Meter, see who's advertising for your keywords, and find the gaps
             in your market that nobody else sees.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
@@ -345,7 +345,7 @@ export default function CompetitorsLandingPage() {
               <CheckCircle2 className="h-4 w-4 text-yellow-400" /> BS Meter fake review detection
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-yellow-400" /> Live Google Ads spy
+              <CheckCircle2 className="h-4 w-4 text-yellow-400" /> Public Google Ads activity
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-red-400" /> Platinum exclusive
@@ -390,7 +390,7 @@ export default function CompetitorsLandingPage() {
                   <span className="text-[#EAB308]"> Lose to the Competition</span>
                 </h2>
                 <p className="text-muted-foreground dark:text-white/50 max-w-2xl mx-auto text-sm leading-relaxed">
-                  Your competitors know more about you than you know about them. They're watching your ads, studying your reviews, and targeting your customers. Without intelligence, you're fighting blind.
+                  Every review, rating and ad in your market is public information. Contractors who study it invest in the right services and areas; those who don't are guessing.
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
