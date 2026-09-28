@@ -208,6 +208,9 @@ export function registerCrmIntegrationRoutes(app: Express): void {
 
     try {
       const settled = await reconcileStripeEvent(event, stripe);
+      if (settled && settled.refundDelta > 0) {
+        await emitCrmEvent(settled.orgId, "payment.refunded", { paymentId: settled.paymentId, amountCents: settled.refundDelta });
+      }
       if (settled && ["failed", "canceled"].includes(settled.status)) {
         await emitCrmEvent(settled.orgId, "payment.failed", { paymentId: settled.paymentId, status: settled.status });
       }

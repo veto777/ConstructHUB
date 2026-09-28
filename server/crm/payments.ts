@@ -1,3 +1,4 @@
+import { paymentRefundTotals } from "./refund-summary";
 import { recordCheckoutPayment } from "./payment-ledger";
 import { objectPolicy } from "./object-access";
 /**
@@ -330,7 +331,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (req.query.invoiceId) where.push(eq(crmPayments.invoiceId, String(req.query.invoiceId)));
     const rows = await db.select().from(crmPayments)
       .where(and(...where)).orderBy(desc(crmPayments.createdAt)).limit(200);
-    res.json(await objectPolicy(ctx).filter("payments", rows));
+    res.json(await paymentRefundTotals(ctx.org.id, await objectPolicy(ctx).filter("payments", rows)));
   });
 
   // ── Contractor: take a payment — hosted checkout link ─────────────────────

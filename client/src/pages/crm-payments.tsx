@@ -278,6 +278,7 @@ export default function CrmPaymentsPage() {
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground">
+                  {p.refundedCents > 0 && <span>${(p.refundedCents / 100).toFixed(2)} refunded · </span>}
                   {new Date(p.createdAt).toLocaleString()}
                   {p.note ? ` · ${p.note}` : ""}
                 </div>

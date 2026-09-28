@@ -40,6 +40,7 @@ export interface DocRow {
   sentAt?: string | null;
   dueAt?: string | null;
   paidCents?: number;
+  refundedCents?: number;
   overdue?: boolean;
   customerName: string | null;
 }
@@ -407,7 +408,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                       <StatusPill tone={statusTone(r.status)}>{r.status}</StatusPill>
                     )}
                   </td>
-                  <td className={crmTable.tdRight}>{money(r.totalCents)}</td>
+                  <td className={crmTable.tdRight}>{money(r.totalCents)}{(r.refundedCents ?? 0) > 0 && <div className="text-xs text-muted-foreground">{money(r.refundedCents)} refunded</div>}</td>
                   <td className={cn(crmTable.td, "hidden sm:table-cell text-muted-foreground")}>
                     {day(dateField === "sent" ? r.sentAt : r.createdAt)}
                   </td>
@@ -418,7 +419,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                   )}
                   {cfg.hasDueColumn && (
                     <td className={cn(crmTable.td, "text-right")} onClick={(e) => e.stopPropagation()}>
-                      {canReceipt && (r.paidCents ?? 0) > 0 && (
+                      {canReceipt && ((r.paidCents ?? 0) > 0 || (r.refundedCents ?? 0) > 0) && (
                         <InvoiceReceiptButton invoiceId={r.id} invoiceNumber={r.number} />
                       )}
                     </td>

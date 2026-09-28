@@ -1,3 +1,4 @@
+import { invoiceRefundTotals } from "./refund-summary";
 import { objectPolicy } from "./object-access";
 import { csvCell } from "./csv";
 /**
@@ -793,7 +794,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         rows = rows.filter((i) => divisionVisible(divScope, docDivisionFromMaps(maps, i)));
       }
       rows = await objectPolicy(ctx).filter("invoices", rows);
-      return res.json(rows);
+      return res.json(await invoiceRefundTotals(ctx.org.id, rows));
     }
 
     // ── Documents Center mode. "overdue" is derived, never stored: an open
@@ -858,7 +859,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       total = t;
     }
     res.json({
-      rows: rows.map((r) => ({ ...r.doc, customerName: r.customerName ?? null, overdue: isOverdue(r.doc) })),
+      rows: await invoiceRefundTotals(ctx.org.id, rows.map((r) => ({ ...r.doc, customerName: r.customerName ?? null, overdue: isOverdue(r.doc) }))),
       total,
       filtered,
     });

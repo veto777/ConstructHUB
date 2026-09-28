@@ -10,6 +10,7 @@ export async function ensurePaymentLedgerSchema() {
     alter table crm_payments add column if not exists charge_id text;
     alter table crm_payments add column if not exists stripe_account_id text;
     alter table crm_payments add column if not exists settled_cents integer not null default 0;
+    alter table crm_payments add column if not exists refunded_cents integer not null default 0;
     update crm_payments set checkout_session_id=external_id
       where provider='stripe' and checkout_session_id is null and external_id ~ '^cs_';
     update crm_payments set payment_intent_id=external_id
@@ -25,6 +26,16 @@ export async function ensurePaymentLedgerSchema() {
     create index if not exists crm_payments_checkout_session_idx on crm_payments(stripe_account_id,checkout_session_id);
     create index if not exists crm_payments_payment_intent_idx on crm_payments(stripe_account_id,payment_intent_id);
     create index if not exists crm_payments_charge_idx on crm_payments(stripe_account_id,charge_id);
+    create table if not exists crm_payment_refunds (
+      id varchar primary key default gen_random_uuid(), org_id varchar not null,
+      payment_id varchar not null, invoice_id varchar, account_id text not null,
+      event_id text not null, charge_id text not null, amount_cents integer not null check(amount_cents>0),
+      invoice_credit_cents integer not null check(invoice_credit_cents>=0),
+      cumulative_refunded_cents integer not null, created_at timestamp not null default now(),
+      unique(account_id,event_id)
+    );
+    create index if not exists crm_refunds_invoice_idx on crm_payment_refunds(org_id,invoice_id);
+    create index if not exists crm_refunds_payment_idx on crm_payment_refunds(org_id,payment_id);
     create table if not exists crm_stripe_events (
       account_id text not null, event_id text not null, org_id varchar not null,
       payment_id varchar not null, event_type text not null,
