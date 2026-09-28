@@ -1,13 +1,13 @@
 import { db } from "./db";
 import { permitDatabases } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { readFileSync } from "fs";
 import { join } from "path";
 
 // Verified real municipal permit portals for major jurisdictions
 // (built by scripts/build-permit-portals.ts — every URL liveness-checked and
 // confirmed permit-specific). Applied on top of the city permit rows.
-interface PermitPortal { jurisdiction: string; url: string; platform: string; }
+export interface PermitPortal { jurisdiction: string; url: string | null; platform: string | null; linkStatus?: string; lastVerifiedAt?: string | null; }
 
 export async function seedPermitPortals() {
   let portals: PermitPortal[];
@@ -19,19 +19,25 @@ export async function seedPermitPortals() {
     return;
   }
 
+  await syncPermitPortals(portals);
+}
+
+export async function syncPermitPortals(portals: PermitPortal[]) {
+ await db.transaction(async tx => {
+  await tx.execute(sql`select pg_advisory_xact_lock(8159002)`);
   let updated = 0, unmatched = 0;
   for (const p of portals) {
     // permit_databases.jurisdiction is "City, ST" for cities and "Name County, ST"
     // for counties — the string alone identifies the row, so match on it directly.
-    const res = await db
+    const res = await tx
       .update(permitDatabases)
       .set({
         portalUrl: p.url,
         searchUrl: p.url,
         platform: p.platform,
-        isActive: true,
-        linkStatus: "live", // verified live at build time; re-checked by verify-links.ts
-        lastVerifiedAt: new Date(),
+        isActive: !!p.url && !["dead", "unverified"].includes(p.linkStatus || ""),
+        linkStatus: p.url ? (p.linkStatus || "unchecked") : "none",
+        lastVerifiedAt: p.lastVerifiedAt ? new Date(p.lastVerifiedAt) : null,
       })
       .where(eq(permitDatabases.jurisdiction, p.jurisdiction))
       .returning({ id: permitDatabases.id });
@@ -40,4 +46,5 @@ export async function seedPermitPortals() {
   }
   if (unmatched) console.log(`  (${unmatched} portals had no matching permit row — jurisdiction naming mismatch)`);
   console.log(`Permit portals: applied ${updated} verified real portals to major jurisdictions.`);
+ });
 }
