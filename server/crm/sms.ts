@@ -464,17 +464,17 @@ export function smsLamlReply(message?: string): string {
  * API token. Verified 2026-08-27: a real inbound signed by SignalWire did not
  * match the token, and every carrier STOP was being 403'd.
  *
- *  - SIGNALWIRE_SIGNING_KEY set → a present signature must match it (the API
+ *  - SIGNALWIRE_SIGNING_KEY set → a signature is required and must match it (the API
  *    token is also accepted, for Twilio-shaped senders); wrong → rejected.
  *  - not set → we cannot verify, so a mismatch is logged (once) and ACCEPTED:
  *    an inbound STOP must never be dropped.
- *  - no signature header → accepted (dev/tests have nothing to verify).
+ *  - no signing key and no signature header → accepted for the legacy setup.
  */
 let warnedNoSigningKey = false;
 export function signalwireSignatureOk(req: any): boolean {
   const sig = req.headers?.["x-signalwire-signature"] ?? req.headers?.["x-twilio-signature"];
-  if (!sig) return true;
   const signingKey = process.env.SIGNALWIRE_SIGNING_KEY;
+  if (!sig) return !signingKey;
   const keys = [signingKey, process.env.SIGNALWIRE_API_TOKEN].filter((k): k is string => !!k);
   if (!keys.length) return true;
   const body = (req.body ?? {}) as Record<string, string>;

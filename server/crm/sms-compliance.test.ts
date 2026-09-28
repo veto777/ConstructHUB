@@ -248,6 +248,7 @@ describe("inbound webhook helpers (pure)", () => {
     const { getBaseUrl } = await import("../auth");
     await withSwEnv({ ...SW_ENV, SIGNALWIRE_SIGNING_KEY: "signing-key-1" }, () => {
       const req: any = { headers: { host: "portal.constructhub.us" }, body: { Body: "STOP", From: "+15551234567" }, originalUrl: "/api/crm/sms/inbound" };
+      expect(signalwireSignatureOk(req)).toBe(false);
       const signed = `${getBaseUrl(req)}${req.originalUrl}Body${"STOP"}From${"+15551234567"}`;
       req.headers["x-signalwire-signature"] = createHmac("sha1", "signing-key-1").update(signed).digest("base64");
       expect(signalwireSignatureOk(req)).toBe(true);
@@ -416,7 +417,7 @@ describe("SMS compliance against the dev server", () => {
       expect(stop.status).toBe(200);
       expect(stop.headers.get("content-type")).toContain("text/xml");
       expect(stop.body).toContain("unsubscribed");
-      expect(stop.body).toContain("Reply START to resume");
+      expect(stop.body).toContain("Reply START to resubscribe");
 
       // Recorded: the platform-wide row AND this org's row (the member's phone).
       const rows = await poll(
