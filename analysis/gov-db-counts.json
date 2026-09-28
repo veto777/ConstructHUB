@@ -1,0 +1,14 @@
+{
+  "property_appraisers": {
+    "total": 3040,
+    "with_url": 1637,
+    "live": 1637,
+    "with_phone": 2876
+  },
+  "permit_databases": {
+    "total": 32992,
+    "with_url": 549,
+    "live": 494,
+    "with_phone": 275
+  }
+}

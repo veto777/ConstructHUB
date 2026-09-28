@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-09-28T23:01:44.243Z",
+  "records": 5117,
+  "netrRecords": 4485,
+  "states": 51,
+  "verifiedUrls": 2634,
+  "sourceVerifiedPhones": 4194,
+  "assertions": [
+    "every published URL has successful jurisdiction/source evidence",
+    "no generic vendor homepages retained",
+    "every published appraiser phone matches the current NETR office row",
+    "all record indices are unique and covered",
+    "null URLs have none status"
+  ]
+}

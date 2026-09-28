@@ -1,0 +1,28 @@
+{
+  "database": "constructhub_dev_a4",
+  "checkedAt": "2026-09-28T22:53:26.543Z",
+  "tables": {
+    "appraisers": {
+      "before": 3040,
+      "after": 3040,
+      "afterRepeat": 3040,
+      "urlsChanged": 2051,
+      "phonesChanged": 696,
+      "statusChanged": 2635,
+      "allPriorIdsRetained": true,
+      "allPriorNotesRetained": true,
+      "repeatChangedRows": 0
+    },
+    "permits": {
+      "before": 32992,
+      "after": 32992,
+      "afterRepeat": 32992,
+      "urlsChanged": 422,
+      "phonesChanged": 0,
+      "statusChanged": 744,
+      "allPriorIdsRetained": true,
+      "allPriorNotesRetained": true,
+      "repeatChangedRows": 0
+    }
+  }
+}

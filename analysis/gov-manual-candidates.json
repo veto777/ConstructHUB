@@ -1,0 +1,44 @@
+[
+  {
+    "kind": "appraiser",
+    "key": "AK/Anchorage",
+    "url": "https://property.muni.org/search/CommonSearch.aspx?mode=REALPROP&sIndex=0",
+    "sourceUrl": "https://property.muni.org/search/CommonSearch.aspx?mode=REALPROP&sIndex=0"
+  },
+  {
+    "kind": "appraiser",
+    "key": "AK/Sitka (City and Borough)",
+    "url": "https://www.cityofsitka.com/Government/City-Departments/Assessing-Department",
+    "sourceUrl": "https://www.cityofsitka.com/Government/City-Departments/Assessing-Department"
+  },
+  {
+    "kind": "appraiser",
+    "key": "CA/Trinity",
+    "url": "https://www.trinitycounty.org/167/Parcel-Search",
+    "sourceUrl": "https://www.trinitycounty.org/167/Parcel-Search"
+  },
+  {
+    "kind": "appraiser",
+    "key": "CA/Mono",
+    "url": "https://monocounty.ca.gov/1653/Value-Notices",
+    "sourceUrl": "https://monocounty.ca.gov/1653/Value-Notices"
+  },
+  {
+    "kind": "permit",
+    "key": "Morgantown, WV",
+    "url": "https://www.morgantownwv.gov/747/Permitting-Licensing-Registration",
+    "sourceUrl": "https://www.morgantownwv.gov/747/Permitting-Licensing-Registration"
+  },
+  {
+    "kind": "permit",
+    "key": "San Ramon, CA",
+    "url": "https://www.sanramon.ca.gov/cms/one.aspx?objectId=11583510",
+    "sourceUrl": "https://www.sanramon.ca.gov/cms/one.aspx?objectId=11583510"
+  },
+  {
+    "kind": "appraiser",
+    "key": "DE/New Castle",
+    "url": "https://www.newcastlede.gov/247/Property-Owner-Services",
+    "sourceUrl": "https://www.newcastlede.gov/247/Property-Owner-Services"
+  }
+]

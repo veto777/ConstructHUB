@@ -1,0 +1,7261 @@
+{
+  "checkedAt": "2026-09-28T22:54:38.912Z",
+  "database": "constructhub_dev_a4",
+  "appraiserRows": 3040,
+  "permitRows": 32992,
+  "unmatchedAppraisers": [
+    {
+      "state": "AK",
+      "jurisdiction": "Aleutian",
+      "name": "Aleutian property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Barrow",
+      "name": "Barrow property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Cape Nome",
+      "name": "Cape Nome property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Chitina",
+      "name": "Chitina property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Cordova",
+      "name": "Cordova Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Craig (City of)",
+      "name": "Craig (City of) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Dillingham (City of)",
+      "name": "Dillingham (City of) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Eagle (City of)",
+      "name": "Eagle (City of) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Fairbanks District",
+      "name": "Fairbanks District property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Fort Gibbon",
+      "name": "Fort Gibbon property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Homer",
+      "name": "Homer property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Iliamna",
+      "name": "Iliamna property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Juneau",
+      "name": "Juneau  Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Kake",
+      "name": "Kake Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Kenai",
+      "name": "Kenai  Appraisal District"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Ketchikan District",
+      "name": "Ketchikan District property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Kodiak District",
+      "name": "Kodiak District property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Kotzebue",
+      "name": "Kotzebue property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Kuskokwim",
+      "name": "Kuskokwim property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Kvichak",
+      "name": "Kvichak property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Manley Hot Springs",
+      "name": "Manley Hot Springs property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Mount McKinley",
+      "name": "Mount McKinley property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Nenana",
+      "name": "Nenana Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Nome (City of)",
+      "name": "Nome (City of) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Northwest Arc",
+      "name": "Northwest Arc property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Nulato",
+      "name": "Nulato property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Palmer",
+      "name": "Palmer property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Pelican (City of)",
+      "name": "Pelican (City of) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Petersburg (City of)",
+      "name": "Petersburg (City of) property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Rampart",
+      "name": "Rampart property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Seldovia",
+      "name": "Seldovia property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Seward",
+      "name": "Seward property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Sitka (City and Borough)",
+      "name": "Sitka (City and Borough) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Talkeetna",
+      "name": "Talkeetna property records"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Unalaska (City of)",
+      "name": "Unalaska (City of) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Valdez",
+      "name": "Valdez Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Whittier (City of)",
+      "name": "Whittier (City of) Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Wrangell",
+      "name": "Wrangell Assessor"
+    },
+    {
+      "state": "AK",
+      "jurisdiction": "Yakutat (City of)",
+      "name": "Yakutat (City of) Assessor"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "Barbour (Clayton)",
+      "name": "Barbour (Clayton) Revenue Commission"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "Barbour (Eufaula)",
+      "name": "Barbour (Eufaula) Revenue Commission"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "Coffee (Elba)",
+      "name": "Coffee (Elba) Revenue Commission"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "Coffee (Enterprise)",
+      "name": "Coffee (Enterprise) Revenue Commission"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "Jefferson (Bessemer)",
+      "name": "Jefferson (Bessemer) Assessor"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "Jefferson (Birmingham)",
+      "name": "Jefferson (Birmingham) Assessor"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "St Clair (N. Congressional District)",
+      "name": "St Clair (N. Congressional District) Revenue Commission"
+    },
+    {
+      "state": "AL",
+      "jurisdiction": "St Clair (S. Congressional District)",
+      "name": "St Clair (S. Congressional District) Revenue Commission"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Arkansas (Northern District)",
+      "name": "Arkansas (Northern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Arkansas (Southern District)",
+      "name": "Arkansas (Southern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Carroll (Eastern District)",
+      "name": "Carroll (Eastern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Carroll (Western District)",
+      "name": "Carroll (Western District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Clay (Eastern District)",
+      "name": "Clay (Eastern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Clay (Western District)",
+      "name": "Clay (Western District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Franklin (Charleston District)",
+      "name": "Franklin (Charleston District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Franklin (Ozark District)",
+      "name": "Franklin (Ozark District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Logan (Northern District)",
+      "name": "Logan (Northern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Logan (Southern District)",
+      "name": "Logan (Southern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Mississippi (Chickasawba District)",
+      "name": "Mississippi (Chickasawba District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Mississippi (Osceola District)",
+      "name": "Mississippi (Osceola District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Prairie (Northern District)",
+      "name": "Prairie (Northern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Prairie (Southern District)",
+      "name": "Prairie (Southern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Sebastian (Fort Smith District)",
+      "name": "Sebastian (Fort Smith District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Sebastian (Southern District)",
+      "name": "Sebastian (Southern District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Yell (Danville District)",
+      "name": "Yell (Danville District) Assessor"
+    },
+    {
+      "state": "AR",
+      "jurisdiction": "Yell (Dardanelle District)",
+      "name": "Yell (Dardanelle District) Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Ansonia",
+      "name": "Ansonia Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Ashford",
+      "name": "Ashford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Avon",
+      "name": "Avon Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Barkhamsted",
+      "name": "Barkhamsted Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Beacon Falls",
+      "name": "Beacon Falls Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Berlin",
+      "name": "Berlin Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bethany",
+      "name": "Bethany Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bethel",
+      "name": "Bethel Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bethlehem",
+      "name": "Bethlehem Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bloomfield",
+      "name": "Bloomfield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bolton",
+      "name": "Bolton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bozrah",
+      "name": "Bozrah Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Branford",
+      "name": "Branford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bridgeport",
+      "name": "Bridgeport Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bridgewater",
+      "name": "Bridgewater Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Bristol",
+      "name": "Bristol Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Brookfield",
+      "name": "Brookfield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Brooklyn",
+      "name": "Brooklyn Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Burlington",
+      "name": "Burlington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Canaan",
+      "name": "Canaan Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Canterbury",
+      "name": "Canterbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Canton",
+      "name": "Canton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Chaplin",
+      "name": "Chaplin Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Cheshire",
+      "name": "Cheshire Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Chester",
+      "name": "Chester Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Clinton",
+      "name": "Clinton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Colchester",
+      "name": "Colchester Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Colebrook",
+      "name": "Colebrook Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Columbia",
+      "name": "Columbia Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Cornwall",
+      "name": "Cornwall Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Coventry",
+      "name": "Coventry Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Cromwell",
+      "name": "Cromwell Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Danbury",
+      "name": "Danbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Darien",
+      "name": "Darien Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Dayville",
+      "name": "Dayville property records"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Deep River",
+      "name": "Deep River Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Derby",
+      "name": "Derby Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Durham",
+      "name": "Durham Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "East Granby",
+      "name": "East Granby Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "East Haddam",
+      "name": "East Haddam Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "East Hampton",
+      "name": "East Hampton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "East Hartford",
+      "name": "East Hartford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "East Haven",
+      "name": "East Haven Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "East Lyme",
+      "name": "East Lyme Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "East Windsor",
+      "name": "East Windsor Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Eastford",
+      "name": "Eastford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Easton",
+      "name": "Easton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Ellington",
+      "name": "Ellington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Enfield",
+      "name": "Enfield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Essex",
+      "name": "Essex Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Farmington",
+      "name": "Farmington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Franklin",
+      "name": "Franklin Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Gales Ferry",
+      "name": "Gales Ferry Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Glastonbury",
+      "name": "Glastonbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Goshen",
+      "name": "Goshen Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Granby",
+      "name": "Granby Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Greenwich",
+      "name": "Greenwich Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Griswold",
+      "name": "Griswold Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Groton",
+      "name": "Groton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Guilford",
+      "name": "Guilford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Haddam",
+      "name": "Haddam Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Hamden",
+      "name": "Hamden Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Hampton",
+      "name": "Hampton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Hartland",
+      "name": "Hartland Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Harwinton",
+      "name": "Harwinton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Hebron",
+      "name": "Hebron Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Kent",
+      "name": "Kent Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Killingly",
+      "name": "Killingly Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Killingworth",
+      "name": "Killingworth Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Lebanon",
+      "name": "Lebanon Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Ledyard",
+      "name": "Ledyard Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Lisbon",
+      "name": "Lisbon Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Lyme",
+      "name": "Lyme Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Madison",
+      "name": "Madison Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Manchester",
+      "name": "Manchester Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Mansfield",
+      "name": "Mansfield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Marlborough",
+      "name": "Marlborough Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Meriden",
+      "name": "Meriden Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Middlebury",
+      "name": "Middlebury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Middlefield",
+      "name": "Middlefield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Middletown",
+      "name": "Middletown Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Milford",
+      "name": "Milford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Monroe",
+      "name": "Monroe Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Montville",
+      "name": "Montville Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Morris",
+      "name": "Morris Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Naugatuck",
+      "name": "Naugatuck Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "New Britain",
+      "name": "New Britain Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "New Canaan",
+      "name": "New Canaan Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "New Fairfield",
+      "name": "New Fairfield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "New Hartford",
+      "name": "New Hartford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "New Milford",
+      "name": "New Milford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Newington",
+      "name": "Newington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Newtown",
+      "name": "Newtown Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Norfolk",
+      "name": "Norfolk Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "North Branford",
+      "name": "North Branford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "North Canaan",
+      "name": "North Canaan Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "North Haven",
+      "name": "North Haven Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "North Stonington",
+      "name": "North Stonington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Norwalk",
+      "name": "Norwalk Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Norwich",
+      "name": "Norwich Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Old Lyme",
+      "name": "Old Lyme Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Old Saybrook",
+      "name": "Old Saybrook Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Orange",
+      "name": "Orange Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Oxford",
+      "name": "Oxford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Plainfield",
+      "name": "Plainfield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Plainville",
+      "name": "Plainville Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Plymouth",
+      "name": "Plymouth Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Pomfret",
+      "name": "Pomfret Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Portland",
+      "name": "Portland Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Preston",
+      "name": "Preston Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Prospect",
+      "name": "Prospect Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Putnam",
+      "name": "Putnam Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Redding",
+      "name": "Redding Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Ridgefield",
+      "name": "Ridgefield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Rocky Hill",
+      "name": "Rocky Hill Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Roxbury",
+      "name": "Roxbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Salem",
+      "name": "Salem Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Salisbury",
+      "name": "Salisbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Sandy Hook",
+      "name": "Sandy Hook Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Scotland",
+      "name": "Scotland Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Seymour",
+      "name": "Seymour Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Sharon",
+      "name": "Sharon Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Shelton",
+      "name": "Shelton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Sherman",
+      "name": "Sherman Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Simsbury",
+      "name": "Simsbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Somers",
+      "name": "Somers Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "South Windsor",
+      "name": "South Windsor Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Southbury",
+      "name": "Southbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Southington",
+      "name": "Southington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Sprague",
+      "name": "Sprague Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Stafford",
+      "name": "Stafford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Stamford",
+      "name": "Stamford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Sterling",
+      "name": "Sterling Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Stonington",
+      "name": "Stonington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Stratford",
+      "name": "Stratford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Suffield",
+      "name": "Suffield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Thomaston",
+      "name": "Thomaston Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Thompson",
+      "name": "Thompson Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Torrington",
+      "name": "Torrington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Trumbull",
+      "name": "Trumbull Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Union",
+      "name": "Union Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Vernon",
+      "name": "Vernon Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Voluntown",
+      "name": "Voluntown Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Wallingford",
+      "name": "Wallingford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Warren",
+      "name": "Warren Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Washington",
+      "name": "Washington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Waterbury",
+      "name": "Waterbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Waterford",
+      "name": "Waterford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Watertown",
+      "name": "Watertown Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "West Hartford",
+      "name": "West Hartford Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "West Haven",
+      "name": "West Haven Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Westbrook",
+      "name": "Westbrook Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Weston",
+      "name": "Weston Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Westport",
+      "name": "Westport Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Wethersfield",
+      "name": "Wethersfield Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Willington",
+      "name": "Willington Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Wilton",
+      "name": "Wilton Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Winchester",
+      "name": "Winchester Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Windsor",
+      "name": "Windsor Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Windsor Locks",
+      "name": "Windsor Locks Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Winsted",
+      "name": "Winsted property records"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Wolcott",
+      "name": "Wolcott Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Woodbridge",
+      "name": "Woodbridge Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Woodbury",
+      "name": "Woodbury Assessor"
+    },
+    {
+      "state": "CT",
+      "jurisdiction": "Woodstock",
+      "name": "Woodstock Assessor"
+    },
+    {
+      "state": "DC",
+      "jurisdiction": "Washington",
+      "name": "Washington Real Property Assessment"
+    },
+    {
+      "state": "HI",
+      "jurisdiction": "Honolulu/Oahu (City/County)",
+      "name": "Honolulu/Oahu (City/County) Real Property Tax Assessment"
+    },
+    {
+      "state": "HI",
+      "jurisdiction": "Maui (Lanai/Molokai/Kahoolaw)",
+      "name": "Maui (Lanai/Molokai/Kahoolaw) Real Property Tax Assessment"
+    },
+    {
+      "state": "IA",
+      "jurisdiction": "Lee (Fort Madison) Northern District",
+      "name": "Lee (Fort Madison) Northern District Assessor"
+    },
+    {
+      "state": "IA",
+      "jurisdiction": "Lee (Keokuk) Southern District",
+      "name": "Lee (Keokuk) Southern District Assessor"
+    },
+    {
+      "state": "KY",
+      "jurisdiction": "Kenton (Covington)",
+      "name": "Kenton (Covington) Property Valuation"
+    },
+    {
+      "state": "KY",
+      "jurisdiction": "Kenton (Independence)",
+      "name": "Kenton (Independence) Property Valuation"
+    },
+    {
+      "state": "LA",
+      "jurisdiction": "St Tammany (Covington)",
+      "name": "St Tammany (Covington) Assessor"
+    },
+    {
+      "state": "LA",
+      "jurisdiction": "St Tammany (Slidell)",
+      "name": "St Tammany (Slidell) Assessor"
+    },
+    {
+      "state": "LA",
+      "jurisdiction": "West Felician",
+      "name": "West Felician Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Abington",
+      "name": "Abington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Acton",
+      "name": "Acton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Acushnet",
+      "name": "Acushnet Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Adams",
+      "name": "Adams Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Agawam",
+      "name": "Agawam Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Alford",
+      "name": "Alford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Amesbury",
+      "name": "Amesbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Amherst",
+      "name": "Amherst Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Andover",
+      "name": "Andover Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Aquinnah",
+      "name": "Aquinnah Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Arlington",
+      "name": "Arlington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ashburnham",
+      "name": "Ashburnham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ashby",
+      "name": "Ashby Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ashfield",
+      "name": "Ashfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ashland",
+      "name": "Ashland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Athol",
+      "name": "Athol Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Attleboro",
+      "name": "Attleboro Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Auburn",
+      "name": "Auburn Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Avon",
+      "name": "Avon Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ayer",
+      "name": "Ayer Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Barre",
+      "name": "Barre Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Becket",
+      "name": "Becket Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bedford",
+      "name": "Bedford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Belchertown",
+      "name": "Belchertown Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bellingham",
+      "name": "Bellingham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Belmont",
+      "name": "Belmont Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Berkley",
+      "name": "Berkley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Berkshire (Middle)",
+      "name": "Berkshire (Middle) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Berkshire (Northern)",
+      "name": "Berkshire (Northern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Berkshire (Southern)",
+      "name": "Berkshire (Southern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Berlin",
+      "name": "Berlin Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bernardston",
+      "name": "Bernardston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Beverly",
+      "name": "Beverly Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Billerica",
+      "name": "Billerica Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Blackstone",
+      "name": "Blackstone Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Blandford",
+      "name": "Blandford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bolton",
+      "name": "Bolton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Boston",
+      "name": "Boston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bourne",
+      "name": "Bourne Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Boxborough",
+      "name": "Boxborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Boxford",
+      "name": "Boxford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Boylston",
+      "name": "Boylston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Braintree",
+      "name": "Braintree Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Brewster",
+      "name": "Brewster Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bridgewater",
+      "name": "Bridgewater Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Brimfield",
+      "name": "Brimfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bristol (Fall River)",
+      "name": "Bristol (Fall River) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bristol (Northern)",
+      "name": "Bristol (Northern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Bristol (Southern)",
+      "name": "Bristol (Southern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Brockton",
+      "name": "Brockton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Brookfield",
+      "name": "Brookfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Brookline",
+      "name": "Brookline Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Buckland",
+      "name": "Buckland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Burlington",
+      "name": "Burlington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Cambridge",
+      "name": "Cambridge Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Canton",
+      "name": "Canton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Carlisle",
+      "name": "Carlisle Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Carver",
+      "name": "Carver Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Charlemont",
+      "name": "Charlemont Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Charlton",
+      "name": "Charlton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Chatham",
+      "name": "Chatham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Chelmsford",
+      "name": "Chelmsford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Chelsea",
+      "name": "Chelsea Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Cheshire",
+      "name": "Cheshire Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Chester",
+      "name": "Chester Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Chesterfield",
+      "name": "Chesterfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Chicopee",
+      "name": "Chicopee Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Chilmark",
+      "name": "Chilmark Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Clarksburg",
+      "name": "Clarksburg Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Clinton",
+      "name": "Clinton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Cohasset",
+      "name": "Cohasset Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Colrain",
+      "name": "Colrain Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Concord",
+      "name": "Concord Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Conway",
+      "name": "Conway Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Cummington",
+      "name": "Cummington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dalton",
+      "name": "Dalton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Danvers",
+      "name": "Danvers Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dartmouth",
+      "name": "Dartmouth Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dedham",
+      "name": "Dedham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Deerfield",
+      "name": "Deerfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dennis",
+      "name": "Dennis Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dighton",
+      "name": "Dighton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Douglas",
+      "name": "Douglas Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dover",
+      "name": "Dover Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dracut",
+      "name": "Dracut Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dudley",
+      "name": "Dudley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Dunstable",
+      "name": "Dunstable Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Duxbury",
+      "name": "Duxbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "East Bridgewater",
+      "name": "East Bridgewater Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "East Brookfield",
+      "name": "East Brookfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "East Longmeadow",
+      "name": "East Longmeadow Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Eastham",
+      "name": "Eastham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Easthampton",
+      "name": "Easthampton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Easton",
+      "name": "Easton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Edgartown",
+      "name": "Edgartown Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Egremont",
+      "name": "Egremont Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Erving",
+      "name": "Erving Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Essex (Northern)",
+      "name": "Essex (Northern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Essex (Southern)",
+      "name": "Essex (Southern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Everett",
+      "name": "Everett Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Fairhaven",
+      "name": "Fairhaven Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Fall River",
+      "name": "Fall River Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Falmouth",
+      "name": "Falmouth Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Fitchburg",
+      "name": "Fitchburg Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Florida",
+      "name": "Florida Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Foxborough",
+      "name": "Foxborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Framingham",
+      "name": "Framingham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Freetown",
+      "name": "Freetown Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Gardner",
+      "name": "Gardner Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Gay Head",
+      "name": "Gay Head Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Georgetown",
+      "name": "Georgetown Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Gill",
+      "name": "Gill Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Gloucester",
+      "name": "Gloucester Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Goshen",
+      "name": "Goshen Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Gosnold",
+      "name": "Gosnold Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Grafton",
+      "name": "Grafton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Granby",
+      "name": "Granby Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Granville",
+      "name": "Granville Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Great Barrington",
+      "name": "Great Barrington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Greenfield",
+      "name": "Greenfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Groton",
+      "name": "Groton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Groveland",
+      "name": "Groveland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hadley",
+      "name": "Hadley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Halifax",
+      "name": "Halifax Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hamilton",
+      "name": "Hamilton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hancock",
+      "name": "Hancock Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hanover",
+      "name": "Hanover Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hanson",
+      "name": "Hanson Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hardwick",
+      "name": "Hardwick Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Harvard",
+      "name": "Harvard Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Harwich",
+      "name": "Harwich Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hatfield",
+      "name": "Hatfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Haverhill",
+      "name": "Haverhill Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hawley",
+      "name": "Hawley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Heath",
+      "name": "Heath Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hingham",
+      "name": "Hingham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hinsdale",
+      "name": "Hinsdale Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Holbrook",
+      "name": "Holbrook Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Holden",
+      "name": "Holden Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Holland",
+      "name": "Holland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Holliston",
+      "name": "Holliston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Holyoke",
+      "name": "Holyoke Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hopedale",
+      "name": "Hopedale Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hopkington",
+      "name": "Hopkington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hubbardston",
+      "name": "Hubbardston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hudson",
+      "name": "Hudson Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Hull",
+      "name": "Hull Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Huntington",
+      "name": "Huntington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ipswitch",
+      "name": "Ipswitch Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Kingston",
+      "name": "Kingston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lakeville",
+      "name": "Lakeville Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lancaster",
+      "name": "Lancaster Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lanesborough",
+      "name": "Lanesborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lawrence",
+      "name": "Lawrence Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lee",
+      "name": "Lee Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Leicester",
+      "name": "Leicester Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lenox",
+      "name": "Lenox Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Leominster",
+      "name": "Leominster Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Leverett",
+      "name": "Leverett Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lexington",
+      "name": "Lexington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Leyden",
+      "name": "Leyden Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lincoln",
+      "name": "Lincoln property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Littleton",
+      "name": "Littleton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Longmeadow",
+      "name": "Longmeadow Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lowell",
+      "name": "Lowell Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ludlow",
+      "name": "Ludlow Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lunenburg",
+      "name": "Lunenburg Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lynn",
+      "name": "Lynn Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Lynnfield",
+      "name": "Lynnfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Malden",
+      "name": "Malden Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Manchester",
+      "name": "Manchester Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Mansfield",
+      "name": "Mansfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Marblehead",
+      "name": "Marblehead Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Marion",
+      "name": "Marion Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Marlborough",
+      "name": "Marlborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Marshfield",
+      "name": "Marshfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Mashpee",
+      "name": "Mashpee Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Mattapoisett",
+      "name": "Mattapoisett Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Maynard",
+      "name": "Maynard Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Medfield",
+      "name": "Medfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Medford",
+      "name": "Medford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Medway",
+      "name": "Medway Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Melrose",
+      "name": "Melrose Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Mendon",
+      "name": "Mendon Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Merrimac",
+      "name": "Merrimac Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Methuen",
+      "name": "Methuen Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Middleboro",
+      "name": "Middleboro Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Middlefield",
+      "name": "Middlefield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Middlesex (Northern)",
+      "name": "Middlesex (Northern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Middlesex (Southern)",
+      "name": "Middlesex (Southern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Middleton",
+      "name": "Middleton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Milford",
+      "name": "Milford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Millbury",
+      "name": "Millbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Millis",
+      "name": "Millis Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Millville",
+      "name": "Millville Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Milton",
+      "name": "Milton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Monroe",
+      "name": "Monroe Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Monson",
+      "name": "Monson Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Montague",
+      "name": "Montague Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Monterey",
+      "name": "Monterey Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Montgomery",
+      "name": "Montgomery Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Mount Washington",
+      "name": "Mount Washington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Nahant",
+      "name": "Nahant Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Natick",
+      "name": "Natick Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Needham",
+      "name": "Needham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "New Ashford",
+      "name": "New Ashford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "New Bedford",
+      "name": "New Bedford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "New Braintree",
+      "name": "New Braintree Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "New Marlborough",
+      "name": "New Marlborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "New Salem",
+      "name": "New Salem Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Newbury",
+      "name": "Newbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Newburyport",
+      "name": "Newburyport Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Newton",
+      "name": "Newton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "North Adams",
+      "name": "North Adams Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "North Andover",
+      "name": "North Andover Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "North Attleboro",
+      "name": "North Attleboro Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "North Brookfield",
+      "name": "North Brookfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "North Reading",
+      "name": "North Reading Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Northampton",
+      "name": "Northampton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Northborough",
+      "name": "Northborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Northbridge",
+      "name": "Northbridge Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Northfield",
+      "name": "Northfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Norton",
+      "name": "Norton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Norwell",
+      "name": "Norwell Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Norwood",
+      "name": "Norwood Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Oak Bluffs",
+      "name": "Oak Bluffs Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Oakham",
+      "name": "Oakham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Orange",
+      "name": "Orange Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Orleans",
+      "name": "Orleans Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Otis",
+      "name": "Otis Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Oxford",
+      "name": "Oxford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Palmer",
+      "name": "Palmer Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Paxton",
+      "name": "Paxton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Peabody",
+      "name": "Peabody Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Pelham",
+      "name": "Pelham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Pembroke",
+      "name": "Pembroke Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Pepperell",
+      "name": "Pepperell Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Peru",
+      "name": "Peru Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Petersham",
+      "name": "Petersham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Phillipston",
+      "name": "Phillipston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Pittsfield",
+      "name": "Pittsfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Plainfield",
+      "name": "Plainfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Plainville",
+      "name": "Plainville Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Plympton",
+      "name": "Plympton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Princeton",
+      "name": "Princeton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Provincetown",
+      "name": "Provincetown Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Quincy",
+      "name": "Quincy Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Randolph",
+      "name": "Randolph Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Raynham",
+      "name": "Raynham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Reading",
+      "name": "Reading Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Rehoboth",
+      "name": "Rehoboth Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Revere",
+      "name": "Revere Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Richmond",
+      "name": "Richmond Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Rochester",
+      "name": "Rochester Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Rockland",
+      "name": "Rockland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Rockport",
+      "name": "Rockport Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Rowe",
+      "name": "Rowe Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Rowley",
+      "name": "Rowley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Royalston",
+      "name": "Royalston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Russell",
+      "name": "Russell Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Rutland",
+      "name": "Rutland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Salem",
+      "name": "Salem Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Salisbury",
+      "name": "Salisbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sandisfield",
+      "name": "Sandisfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sandwich",
+      "name": "Sandwich Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Saugus",
+      "name": "Saugus Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Savoy",
+      "name": "Savoy Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Scituate",
+      "name": "Scituate Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Seekonk",
+      "name": "Seekonk Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sharon",
+      "name": "Sharon Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sheffield",
+      "name": "Sheffield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Shelburne",
+      "name": "Shelburne Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sherborn",
+      "name": "Sherborn Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Shirley",
+      "name": "Shirley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Shrewsbury",
+      "name": "Shrewsbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Shutesbury",
+      "name": "Shutesbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Somerset",
+      "name": "Somerset Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Somerville",
+      "name": "Somerville Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "South Hadley",
+      "name": "South Hadley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Southborough",
+      "name": "Southborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Southbridge",
+      "name": "Southbridge Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Southhampton",
+      "name": "Southhampton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Southwick",
+      "name": "Southwick Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Spencer",
+      "name": "Spencer Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Springfield",
+      "name": "Springfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sterling",
+      "name": "Sterling Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Stockbridge",
+      "name": "Stockbridge Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Stoneham",
+      "name": "Stoneham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Stoughton",
+      "name": "Stoughton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Stow",
+      "name": "Stow Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sturbridge",
+      "name": "Sturbridge Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sudbury",
+      "name": "Sudbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sunderland",
+      "name": "Sunderland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Sutton",
+      "name": "Sutton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Swampscott",
+      "name": "Swampscott Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Swansea",
+      "name": "Swansea Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Taunton",
+      "name": "Taunton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Templeton",
+      "name": "Templeton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Tewksbury",
+      "name": "Tewksbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Tisbury",
+      "name": "Tisbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Tolland",
+      "name": "Tolland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Topsfield",
+      "name": "Topsfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Townsend",
+      "name": "Townsend Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Truro",
+      "name": "Truro Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Tyngsborough",
+      "name": "Tyngsborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Tyringham",
+      "name": "Tyringham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Upton",
+      "name": "Upton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Uxbridge",
+      "name": "Uxbridge Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wakefield",
+      "name": "Wakefield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wales",
+      "name": "Wales Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Walpole",
+      "name": "Walpole Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Waltham",
+      "name": "Waltham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Ware",
+      "name": "Ware Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wareham",
+      "name": "Wareham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Warren",
+      "name": "Warren Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Warwick",
+      "name": "Warwick Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Washington",
+      "name": "Washington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Watertown",
+      "name": "Watertown Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wayland",
+      "name": "Wayland Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Webster",
+      "name": "Webster Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wellesley",
+      "name": "Wellesley Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wellfleet",
+      "name": "Wellfleet Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wendell",
+      "name": "Wendell Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wenham",
+      "name": "Wenham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "West Boylston",
+      "name": "West Boylston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "West Bridgewater",
+      "name": "West Bridgewater Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "West Brookfield",
+      "name": "West Brookfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "West Newbury",
+      "name": "West Newbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "West Springfield",
+      "name": "West Springfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "West Stockbridge",
+      "name": "West Stockbridge Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "West Tisbury",
+      "name": "West Tisbury Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Westborough",
+      "name": "Westborough Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Westfield",
+      "name": "Westfield Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Westford",
+      "name": "Westford Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Westhampton",
+      "name": "Westhampton Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Westminster",
+      "name": "Westminster Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Weston",
+      "name": "Weston Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Westport",
+      "name": "Westport Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Westwood",
+      "name": "Westwood Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Weymouth",
+      "name": "Weymouth Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Whately",
+      "name": "Whately Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Whitman",
+      "name": "Whitman Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wilbraham",
+      "name": "Wilbraham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Williamsburg",
+      "name": "Williamsburg Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Williamstown",
+      "name": "Williamstown Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wilmington",
+      "name": "Wilmington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Winchendon",
+      "name": "Winchendon Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Winchester",
+      "name": "Winchester Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Windsor",
+      "name": "Windsor Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Winthrop",
+      "name": "Winthrop Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Woburn",
+      "name": "Woburn Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Worcester (Northern)",
+      "name": "Worcester (Northern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Worcester (Southern)",
+      "name": "Worcester (Southern) property records"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Worthington",
+      "name": "Worthington Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Wrentham",
+      "name": "Wrentham Township Assessor"
+    },
+    {
+      "state": "MA",
+      "jurisdiction": "Yarmouth",
+      "name": "Yarmouth Township Assessor"
+    },
+    {
+      "state": "MD",
+      "jurisdiction": "Baltimore City",
+      "name": "Baltimore City Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Abbot",
+      "name": "Abbot Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Acton",
+      "name": "Acton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Addison",
+      "name": "Addison Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Albion",
+      "name": "Albion Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Alexander",
+      "name": "Alexander Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Alfred",
+      "name": "Alfred Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Allagash",
+      "name": "Allagash Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Alton",
+      "name": "Alton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Amherst",
+      "name": "Amherst Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Andover",
+      "name": "Andover Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Anson",
+      "name": "Anson Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Appleton",
+      "name": "Appleton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Aroostook (Northern District)",
+      "name": "Aroostook (Northern District) property records"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Aroostook (Southern District)",
+      "name": "Aroostook (Southern District) property records"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Arundel",
+      "name": "Arundel Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Athens",
+      "name": "Athens Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Atkinson",
+      "name": "Atkinson Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Auburn",
+      "name": "Auburn Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Augusta",
+      "name": "Augusta Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bangor",
+      "name": "Bangor Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bar Harbor",
+      "name": "Bar Harbor Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bath",
+      "name": "Bath Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Belfast",
+      "name": "Belfast Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Belgrade",
+      "name": "Belgrade Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Belmont",
+      "name": "Belmont Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Benton",
+      "name": "Benton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Berwick",
+      "name": "Berwick Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bethel",
+      "name": "Bethel Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Biddeford",
+      "name": "Biddeford Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bingham",
+      "name": "Bingham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Boothbay",
+      "name": "Boothbay Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Boothbay Harbor",
+      "name": "Boothbay Harbor Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bowdoinham",
+      "name": "Bowdoinham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Brewer",
+      "name": "Brewer Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bridgton",
+      "name": "Bridgton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bristol",
+      "name": "Bristol Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Brownville",
+      "name": "Brownville Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Brunswick",
+      "name": "Brunswick Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Bucksport",
+      "name": "Bucksport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Burlington",
+      "name": "Burlington Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Burnham",
+      "name": "Burnham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Buxton",
+      "name": "Buxton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Byron",
+      "name": "Byron Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Calais",
+      "name": "Calais Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cambridge",
+      "name": "Cambridge Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Camden",
+      "name": "Camden Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Canaan",
+      "name": "Canaan Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Canton",
+      "name": "Canton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cape Elizabeth",
+      "name": "Cape Elizabeth Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Caratunck",
+      "name": "Caratunck Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Caribou",
+      "name": "Caribou Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Carmel",
+      "name": "Carmel Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Carrabasset Valley",
+      "name": "Carrabasset Valley Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Caswell",
+      "name": "Caswell Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Charlotte",
+      "name": "Charlotte Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Chebeague Island",
+      "name": "Chebeague Island Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Chelsea",
+      "name": "Chelsea Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cherryfield",
+      "name": "Cherryfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "China",
+      "name": "China Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cliff Island",
+      "name": "Cliff Island Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Clinton",
+      "name": "Clinton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Columbia Falls",
+      "name": "Columbia Falls Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cooper",
+      "name": "Cooper Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Corinna",
+      "name": "Corinna Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cornish",
+      "name": "Cornish Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cornville",
+      "name": "Cornville Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cranberry Island",
+      "name": "Cranberry Island Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Cutler",
+      "name": "Cutler Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dayton",
+      "name": "Dayton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dedham",
+      "name": "Dedham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Deer Isle",
+      "name": "Deer Isle Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Denmark",
+      "name": "Denmark Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dennysville",
+      "name": "Dennysville Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Detroit",
+      "name": "Detroit Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dexter",
+      "name": "Dexter Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dixfield",
+      "name": "Dixfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dixmont",
+      "name": "Dixmont Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dover-Foxcroft",
+      "name": "Dover-Foxcroft Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Dresden",
+      "name": "Dresden Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Durham",
+      "name": "Durham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Eagle Lake",
+      "name": "Eagle Lake Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "East Boothbay",
+      "name": "East Boothbay Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "East Machias",
+      "name": "East Machias Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Easton",
+      "name": "Easton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Eastport",
+      "name": "Eastport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Edgecomb",
+      "name": "Edgecomb Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Edmunds",
+      "name": "Edmunds Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Elliot",
+      "name": "Elliot Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Ellsworth",
+      "name": "Ellsworth Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Embden",
+      "name": "Embden Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Etna",
+      "name": "Etna Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Eustis",
+      "name": "Eustis Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Fairfield",
+      "name": "Fairfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Falmouth",
+      "name": "Falmouth Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Farmingdale",
+      "name": "Farmingdale Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Fayette",
+      "name": "Fayette Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Fort Fairfield",
+      "name": "Fort Fairfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Fort Kent",
+      "name": "Fort Kent Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Freedom",
+      "name": "Freedom Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Freeport",
+      "name": "Freeport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Frye Island",
+      "name": "Frye Island Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Fryeburg",
+      "name": "Fryeburg Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Gardiner",
+      "name": "Gardiner Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Garland",
+      "name": "Garland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Georgetown",
+      "name": "Georgetown Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Gorham",
+      "name": "Gorham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Gray",
+      "name": "Gray Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Greenbush",
+      "name": "Greenbush Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Greene",
+      "name": "Greene Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Greenville",
+      "name": "Greenville Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Guilford",
+      "name": "Guilford Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Hallowell",
+      "name": "Hallowell Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Hampden",
+      "name": "Hampden Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Hanover",
+      "name": "Hanover Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Harmony",
+      "name": "Harmony Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Harpswell",
+      "name": "Harpswell Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Harrison",
+      "name": "Harrison Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Hartland",
+      "name": "Hartland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Hermon",
+      "name": "Hermon Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Holden",
+      "name": "Holden Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Hollis",
+      "name": "Hollis Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Hope",
+      "name": "Hope Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Houlton",
+      "name": "Houlton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Ilesboro",
+      "name": "Ilesboro Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Jackman",
+      "name": "Jackman Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Jay",
+      "name": "Jay Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Kennebunk",
+      "name": "Kennebunk Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Kennebunkport",
+      "name": "Kennebunkport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Kingfield",
+      "name": "Kingfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Kittery",
+      "name": "Kittery Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "LaGrange",
+      "name": "LaGrange Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lake View Plantation",
+      "name": "Lake View Plantation Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lamoine",
+      "name": "Lamoine Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lebanon",
+      "name": "Lebanon Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Leeds",
+      "name": "Leeds Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lewiston",
+      "name": "Lewiston Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Liberty",
+      "name": "Liberty Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Limerick",
+      "name": "Limerick Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Limington",
+      "name": "Limington Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lincolnville",
+      "name": "Lincolnville Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lisbon",
+      "name": "Lisbon Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Litchfield",
+      "name": "Litchfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Livermore",
+      "name": "Livermore Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Livermore Falls",
+      "name": "Livermore Falls Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Long Island",
+      "name": "Long Island property records"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lubec",
+      "name": "Lubec Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Lyman",
+      "name": "Lyman Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Machias",
+      "name": "Machias Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Machiasport",
+      "name": "Machiasport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Madawaska",
+      "name": "Madawaska Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Madison",
+      "name": "Madison Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Manchester",
+      "name": "Manchester Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Mars Hill",
+      "name": "Mars Hill Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Mechanic Falls",
+      "name": "Mechanic Falls Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Medford",
+      "name": "Medford Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Medway",
+      "name": "Medway Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Mercer",
+      "name": "Mercer Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Mexico",
+      "name": "Mexico Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Milbridge",
+      "name": "Milbridge Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Millinocket",
+      "name": "Millinocket Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Milo",
+      "name": "Milo Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Minot",
+      "name": "Minot Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Monhegan",
+      "name": "Monhegan Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Monmouth",
+      "name": "Monmouth Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Monroe",
+      "name": "Monroe Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Monson",
+      "name": "Monson Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Moose River",
+      "name": "Moose River property records"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Morrill",
+      "name": "Morrill Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Moscow",
+      "name": "Moscow Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Mount Vernon",
+      "name": "Mount Vernon Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Naples",
+      "name": "Naples Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "New Castle",
+      "name": "Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "New Gloucester",
+      "name": "New Gloucester Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "New Portland",
+      "name": "New Portland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Newfield",
+      "name": "Newfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Newport",
+      "name": "Newport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Norridgewock",
+      "name": "Norridgewock Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "North Berwick",
+      "name": "North Berwick Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "North Haven Island",
+      "name": "North Haven Island Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "North Yarmouth",
+      "name": "North Yarmouth Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Northport",
+      "name": "Northport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Norway",
+      "name": "Norway Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Oakland",
+      "name": "Oakland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Ogunquit",
+      "name": "Ogunquit Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Old Orchard Beach",
+      "name": "Old Orchard Beach Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Old Town",
+      "name": "Old Town Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Orland",
+      "name": "Orland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Orono",
+      "name": "Orono Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Orrington",
+      "name": "Orrington Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Owls Head",
+      "name": "Owls Head Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Oxford (Eastern)",
+      "name": "Oxford (Eastern) property records"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Oxford (Western)",
+      "name": "Oxford (Western) property records"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Palermo",
+      "name": "Palermo Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Palmyra",
+      "name": "Palmyra Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Parsonfield",
+      "name": "Parsonfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Pawnal",
+      "name": "Pawnal Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Pembroke",
+      "name": "Pembroke property records"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Perry",
+      "name": "Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Peru",
+      "name": "Peru Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Pittsfield",
+      "name": "Pittsfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Pittston",
+      "name": "Pittston Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Poland",
+      "name": "Poland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Portage Lake",
+      "name": "Portage Lake Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Portland",
+      "name": "Portland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Presque Isle",
+      "name": "Presque Isle Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Randolph",
+      "name": "Randolph Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Rangeley",
+      "name": "Rangeley Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Raymond",
+      "name": "Raymond Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Readfield",
+      "name": "Readfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Richmond",
+      "name": "Richmond Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Ripley",
+      "name": "Ripley Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Robbinston",
+      "name": "Robbinston Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Rockland",
+      "name": "Rockland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Rockport",
+      "name": "Rockport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Rome",
+      "name": "Rome Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Roxbury",
+      "name": "Roxbury Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Rumford",
+      "name": "Rumford Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Sabattus",
+      "name": "Sabattus Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Saco",
+      "name": "Saco Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Saint Agatha",
+      "name": "Saint Agatha Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Saint Albans",
+      "name": "Saint Albans Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Saint George",
+      "name": "Saint George Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Sanford",
+      "name": "Sanford Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Scarborough",
+      "name": "Scarborough Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Seaport",
+      "name": "Seaport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Searsmont",
+      "name": "Searsmont Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Sebago",
+      "name": "Sebago Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Shapleigh",
+      "name": "Shapleigh Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Sidney",
+      "name": "Sidney Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Skowhegan",
+      "name": "Skowhegan Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Smithfield",
+      "name": "Smithfield Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Solon",
+      "name": "Solon Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "South Berwick",
+      "name": "South Berwick Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "South Bristol",
+      "name": "South Bristol Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "South Portland",
+      "name": "South Portland Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "South Thomaston",
+      "name": "South Thomaston Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Southport",
+      "name": "Southport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Standish",
+      "name": "Standish Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Starks",
+      "name": "Starks Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Stockton Springs",
+      "name": "Stockton Springs Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Stonington",
+      "name": "Stonington Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Stratton",
+      "name": "Stratton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Thomaston",
+      "name": "Thomaston Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Thorndike",
+      "name": "Thorndike Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Topsham",
+      "name": "Topsham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Tremont",
+      "name": "Tremont Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Trescott",
+      "name": "Trescott Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Turner",
+      "name": "Turner Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Unity",
+      "name": "Unity Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Van Buren",
+      "name": "Van Buren Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Vassalboro",
+      "name": "Vassalboro Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Veazie",
+      "name": "Veazie Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Verona Island",
+      "name": "Verona Island Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Vienna",
+      "name": "Vienna Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Vinalhaven Island",
+      "name": "Vinalhaven Island Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Waldoboro",
+      "name": "Waldoboro Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Wales",
+      "name": "Wales Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Warren",
+      "name": "Warren Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Washburn",
+      "name": "Washburn Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Waterboro",
+      "name": "Waterboro Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Waterville",
+      "name": "Waterville Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Wayne",
+      "name": "Wayne Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Wells",
+      "name": "Wells Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "West Bath",
+      "name": "West Bath Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "West Gardiner",
+      "name": "West Gardiner Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "West Paris",
+      "name": "West Paris Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Westbrook",
+      "name": "Westbrook Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Whiting",
+      "name": "Whiting Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Wilton",
+      "name": "Wilton Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Windham",
+      "name": "Windham Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Windsor",
+      "name": "Windsor Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Winn",
+      "name": "Winn Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Winslow",
+      "name": "Winslow Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Winter Harbor",
+      "name": "Winter Harbor Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Winterport",
+      "name": "Winterport Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Winthrop",
+      "name": "Winthrop Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Wiscasset",
+      "name": "Wiscasset Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Woodstock",
+      "name": "Woodstock Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Woolwich",
+      "name": "Woolwich Assessor"
+    },
+    {
+      "state": "ME",
+      "jurisdiction": "Yarmouth",
+      "name": "Yarmouth Assessor"
+    },
+    {
+      "state": "MO",
+      "jurisdiction": "St. Genevieve",
+      "name": "St. Genevieve Assessor"
+    },
+    {
+      "state": "MO",
+      "jurisdiction": "St. Louis City",
+      "name": "St. Louis City Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Bolivar (1st District) Rosedale",
+      "name": "Bolivar (1st District) Rosedale Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Bolivar (2nd District) Cleveland",
+      "name": "Bolivar (2nd District) Cleveland Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Carroll (1st District) Carrollton",
+      "name": "Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Carroll (2nd District) Vaiden",
+      "name": "Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Chickasaw (1st District) Houston",
+      "name": "Chickasaw (1st District) Houston Tax Assessor/Collector"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Chicksaw (2nd District) Okolona",
+      "name": "Chicksaw (2nd District) Okolona Tax Assessor/Collector"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Harrison (1st District) Gulfport",
+      "name": "Harrison (1st District) Gulfport Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Harrison (2nd District) Biloxi",
+      "name": "Harrison (2nd District) Biloxi Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Hinds (1st District) Jackson",
+      "name": "Hinds (1st District) Jackson Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Hinds (2nd District) Raymond",
+      "name": "Hinds (2nd District) Raymond Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Jasper (1st District) Paulding",
+      "name": "Jasper (1st District) Paulding Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Jasper (2nd District) Bay Springs",
+      "name": "Jasper (2nd District) Bay Springs Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Jones (1st District) Ellisville",
+      "name": "Jones (1st District) Ellisville Assessor/Collector"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Jones (2nd District) Laurel",
+      "name": "Jones (2nd District) Laurel Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Panola (1st District) Sardis",
+      "name": "Panola (1st District) Sardis Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Panola (2nd District) Batesville",
+      "name": "Panola (2nd District) Batesville Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Tallahatchie (1st District) Charleston",
+      "name": "Tallahatchie (1st District) Charleston Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Tallahatchie (2nd District) Sumner",
+      "name": "Tallahatchie (2nd District) Sumner Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Yalobusha (1st District) Coffeeville",
+      "name": "Yalobusha (1st District) Coffeeville Assessor"
+    },
+    {
+      "state": "MS",
+      "jurisdiction": "Yalobusha (2nd District) Water Valley",
+      "name": "Yalobusha (2nd District) Water Valley Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Acworth",
+      "name": "Acworth property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Albany",
+      "name": "Albany Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Alexandria",
+      "name": "Alexandria Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Allenstown",
+      "name": "Allenstown property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Alstead",
+      "name": "Alstead Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Alton",
+      "name": "Alton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Amherst",
+      "name": "Amherst Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Andover",
+      "name": "Andover Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Antrim",
+      "name": "Antrim Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Ashland",
+      "name": "Ashland Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Atkinson",
+      "name": "Atkinson Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Auburn",
+      "name": "Auburn Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Barnstead",
+      "name": "Barnstead Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Barrington",
+      "name": "Barrington Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bartlett",
+      "name": "Bartlett Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bath",
+      "name": "Bath Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bedford",
+      "name": "Bedford Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Belmont",
+      "name": "Belmont Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bennington",
+      "name": "Bennington Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Benton",
+      "name": "Benton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Berlin",
+      "name": "Berlin Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bethlehem",
+      "name": "Bethlehem Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Boscawen",
+      "name": "Boscawen Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bow",
+      "name": "Bow Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bradford",
+      "name": "Bradford Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Brentwood",
+      "name": "Brentwood Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bridgewater",
+      "name": "Bridgewater Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Bristol",
+      "name": "Bristol Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Brookfield",
+      "name": "Brookfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Brookline",
+      "name": "Brookline Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Campton",
+      "name": "Campton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Canaan",
+      "name": "Canaan Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Candia",
+      "name": "Candia Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Canterbury",
+      "name": "Canterbury Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Center Harbor",
+      "name": "Center Harbor property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Charlestown",
+      "name": "Charlestown Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Chatham",
+      "name": "Chatham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Chester",
+      "name": "Chester Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Chesterfield",
+      "name": "Chesterfield Assessor / Selectman"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Chichester",
+      "name": "Chichester Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Claremont",
+      "name": "Claremont Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Clarksville",
+      "name": "Clarksville Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Colebrook",
+      "name": "Colebrook Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Columbia",
+      "name": "Columbia Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Concord",
+      "name": "Concord Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Conway",
+      "name": "Conway Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Cornish",
+      "name": "Cornish Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Croydon",
+      "name": "Croydon Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Dalton",
+      "name": "Dalton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Danbury",
+      "name": "Danbury Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Danville",
+      "name": "Danville Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Deerfield",
+      "name": "Deerfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Deering",
+      "name": "Deering Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Derry",
+      "name": "Derry Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Dorchester",
+      "name": "Dorchester Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Dover",
+      "name": "Dover Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Dublin",
+      "name": "Dublin Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Dummer",
+      "name": "Dummer Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Dunbarton",
+      "name": "Dunbarton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Durham",
+      "name": "Durham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "East Kingston",
+      "name": "East Kingston Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Easton",
+      "name": "Easton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Eaton",
+      "name": "Eaton property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Effingham",
+      "name": "Effingham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Ellsworth",
+      "name": "Ellsworth Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Enfield",
+      "name": "Enfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Epping",
+      "name": "Epping Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Epsom",
+      "name": "Epsom Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Errol",
+      "name": "Errol Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Exeter",
+      "name": "Exeter Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Farmington",
+      "name": "Farmington Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Fitzwilliam",
+      "name": "Fitzwilliam property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Francestown",
+      "name": "Francestown Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Franconia",
+      "name": "Franconia Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Franklin",
+      "name": "Franklin Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Freedom",
+      "name": "Freedom Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Fremont",
+      "name": "Fremont Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Gilford",
+      "name": "Gilford Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Gilmanton",
+      "name": "Gilmanton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Gilsum",
+      "name": "Gilsum Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Goffstown",
+      "name": "Goffstown Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Gorham",
+      "name": "Gorham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Goshen",
+      "name": "Goshen Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Grantham",
+      "name": "Grantham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Greenfield",
+      "name": "Greenfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Greenland",
+      "name": "Greenland Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Greenville",
+      "name": "Greenville Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Groton",
+      "name": "Groton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hampstead",
+      "name": "Hampstead Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hampton",
+      "name": "Hampton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hampton Falls",
+      "name": "Hampton Falls Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hancock",
+      "name": "Hancock Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hanover",
+      "name": "Hanover Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Harrisville",
+      "name": "Harrisville Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Harts Location",
+      "name": "Harts Location Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Haverhill",
+      "name": "Haverhill Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hebron",
+      "name": "Hebron Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Henniker",
+      "name": "Henniker Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hill",
+      "name": "Hill Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hinsdale",
+      "name": "Hinsdale Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Holderness",
+      "name": "Holderness Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hollis",
+      "name": "Hollis Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hooksett",
+      "name": "Hooksett Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hopkinton",
+      "name": "Hopkinton property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Hudson",
+      "name": "Hudson Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Jackson",
+      "name": "Jackson Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Jaffrey",
+      "name": "Jaffrey Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Jefferson",
+      "name": "Jefferson Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Keene",
+      "name": "Keene Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Kensington",
+      "name": "Kensington Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Kingston",
+      "name": "Kingston Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Laconia",
+      "name": "Laconia Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lancaster",
+      "name": "Lancaster Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Landaff",
+      "name": "Landaff Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Langdon",
+      "name": "Langdon Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lebanon",
+      "name": "Lebanon Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lee",
+      "name": "Lee Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lempster",
+      "name": "Lempster Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lincoln",
+      "name": "Lincoln Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lisbon",
+      "name": "Lisbon Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Litchfield",
+      "name": "Litchfield property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Littleton",
+      "name": "Littleton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Londonderry",
+      "name": "Londonderry Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Loudon",
+      "name": "Loudon Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lyman",
+      "name": "Lyman Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lyme",
+      "name": "Lyme Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Lyndeborough",
+      "name": "Lyndeborough Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Madbury",
+      "name": "Madbury Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Madison",
+      "name": "Madison Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Manchester",
+      "name": "Manchester Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Marlborough",
+      "name": "Marlborough Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Marlow",
+      "name": "Marlow Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Mason",
+      "name": "Mason Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Meredith",
+      "name": "Meredith Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Middleton",
+      "name": "Middleton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Milan",
+      "name": "Milan Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Milford",
+      "name": "Milford Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Milton",
+      "name": "Milton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Monroe",
+      "name": "Monroe Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Mont Vernon",
+      "name": "Mont Vernon Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Moultonborough",
+      "name": "Moultonborough Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Nashua",
+      "name": "Nashua Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Nelson",
+      "name": "Nelson Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "New Boston",
+      "name": "New Boston Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "New Castle",
+      "name": "New Castle Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "New Durham",
+      "name": "New Durham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "New Hampton",
+      "name": "New Hampton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "New Ipswich",
+      "name": "New Ipswich Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "New London",
+      "name": "New London Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Newbury",
+      "name": "Newbury Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Newfields",
+      "name": "Newfields Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Newington",
+      "name": "Newington Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Newmarket",
+      "name": "Newmarket Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Newport",
+      "name": "Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Newton",
+      "name": "Newton Selectman (Assessor)"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "North Hampton",
+      "name": "North Hampton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Northfield",
+      "name": "Northfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Northumberland",
+      "name": "Northumberland Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Northwood",
+      "name": "Northwood Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Nottingham",
+      "name": "Nottingham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Orange",
+      "name": "Orange Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Orford",
+      "name": "Orford Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Ossipee",
+      "name": "Ossipee Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Pelham",
+      "name": "Pelham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Pembroke",
+      "name": "Pembroke property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Peterborough",
+      "name": "Peterborough Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Piermont",
+      "name": "Piermont Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Pittsburg",
+      "name": "Pittsburg Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Pittsfield",
+      "name": "Pittsfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Plainfield",
+      "name": "Plainfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Plaistow",
+      "name": "Plaistow Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Plymouth",
+      "name": "Plymouth Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Portsmouth",
+      "name": "Portsmouth Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Randolph",
+      "name": "Randolph Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Raymond",
+      "name": "Raymond Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Richmond",
+      "name": "Richmond Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Rindge",
+      "name": "Rindge Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Rochester",
+      "name": "Rochester Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Rollinsford",
+      "name": "Rollinsford Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Roxbury",
+      "name": "Roxbury Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Rumney",
+      "name": "Rumney Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Rye",
+      "name": "Rye Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Salem",
+      "name": "Salem Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Salisbury",
+      "name": "Salisbury Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Sanbornton",
+      "name": "Sanbornton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Sandown",
+      "name": "Sandown Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Sandwich",
+      "name": "Sandwich Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Seabrook",
+      "name": "Seabrook Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Sharon",
+      "name": "Sharon Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Shelburne",
+      "name": "Shelburne Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Somersworth",
+      "name": "Somersworth Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "South Hampton",
+      "name": "South Hampton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Springfield",
+      "name": "Springfield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Stark",
+      "name": "Stark Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Stewartston",
+      "name": "Stewartston Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Stoddard",
+      "name": "Stoddard Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Stratford",
+      "name": "Stratford Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Stratham",
+      "name": "Stratham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Sugar Hill",
+      "name": "Sugar Hill Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Sunapee",
+      "name": "Sunapee Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Surry",
+      "name": "Surry Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Sutton",
+      "name": "Sutton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Swanzey",
+      "name": "Swanzey Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Tamworth",
+      "name": "Tamworth Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Temple",
+      "name": "Temple Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Thornton",
+      "name": "Thornton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Tilton",
+      "name": "Tilton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Troy",
+      "name": "Troy Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Tuftonboro",
+      "name": "Tuftonboro Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Unity",
+      "name": "Unity Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Wakefield",
+      "name": "Wakefield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Walpole",
+      "name": "Walpole Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Warner",
+      "name": "Warner Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Warren",
+      "name": "Warren Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Washington",
+      "name": "Washington Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Waterville Valley",
+      "name": "Waterville Valley Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Weare",
+      "name": "Weare Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Webster",
+      "name": "Webster Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Wentworth",
+      "name": "Wentworth Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Westmoreland",
+      "name": "Westmoreland Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Whitefield",
+      "name": "Whitefield Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Wilmot",
+      "name": "Wilmot Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Wilton",
+      "name": "Wilton Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Winchester",
+      "name": "Winchester Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Windham",
+      "name": "Windham Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Windsor",
+      "name": "Windsor property records"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Wolfeboro",
+      "name": "Wolfeboro Assessor"
+    },
+    {
+      "state": "NH",
+      "jurisdiction": "Woodstock",
+      "name": "Woodstock Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Barrington",
+      "name": "Barrington Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Burrillville",
+      "name": "Burrillville Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Central Falls",
+      "name": "Central Falls Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Charlestown",
+      "name": "Charlestown Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Coventry",
+      "name": "Coventry Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Cranston",
+      "name": "Cranston Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Cumberland",
+      "name": "Cumberland Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "East Greenwich",
+      "name": "East Greenwich Assessments"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "East Providence",
+      "name": "East Providence Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Exeter",
+      "name": "Exeter Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Foster",
+      "name": "Foster Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Glocester",
+      "name": "Glocester Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Hopkinton",
+      "name": "Hopkinton Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Jamestown",
+      "name": "Jamestown Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Johnston",
+      "name": "Johnston Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Lincoln",
+      "name": "Lincoln Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Little Compton",
+      "name": "Little Compton Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Middletown",
+      "name": "Middletown Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Narragansett",
+      "name": "Narragansett Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "New Shoreham",
+      "name": "New Shoreham Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "North Kingstown",
+      "name": "North Kingstown Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "North Providence",
+      "name": "North Providence Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "North Smithfield",
+      "name": "North Smithfield Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Pawtucket",
+      "name": "Pawtucket Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Portsmouth",
+      "name": "Portsmouth Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Richmond",
+      "name": "Richmond Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Scituate",
+      "name": "Scituate Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Smithfield",
+      "name": "Smithfield Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "South Kingston / Wakefield",
+      "name": "South Kingston / Wakefield property records"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Tiverton",
+      "name": "Tiverton Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Warren",
+      "name": "Warren Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Warwick",
+      "name": "Warwick Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "West Greenwich",
+      "name": "West Greenwich Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "West Warwick",
+      "name": "West Warwick Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Westerly",
+      "name": "Westerly Assessor"
+    },
+    {
+      "state": "RI",
+      "jurisdiction": "Woonsocket",
+      "name": "Woonsocket Assessor"
+    },
+    {
+      "state": "TN",
+      "jurisdiction": "Sullivan (1st District) Blountville",
+      "name": "Sullivan (1st District) Blountville Assessor"
+    },
+    {
+      "state": "TN",
+      "jurisdiction": "Sullivan (2nd District) Bristol",
+      "name": "Sullivan (2nd District) Bristol Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Alexandria City",
+      "name": "Alexandria City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Bristol City",
+      "name": "Bristol City Commissioner of Revenue (Assessor)"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Buena Vista City",
+      "name": "Buena Vista City Commissioner of Revenue (Assessor)"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Charles City",
+      "name": "Charles City Commissioner of Revenue (Assessor)"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Charlottesville City",
+      "name": "Charlottesville City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Chesapeake City",
+      "name": "Chesapeake City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Clifton Forge City",
+      "name": "Alleghany County Commissioner of Revenue (Assessment)"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Colonial Heights City",
+      "name": "Colonial Heights City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Covington City",
+      "name": "Covington City Commissioner of Revenue (Assessor)"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Danville City",
+      "name": "Danville City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Emporia City",
+      "name": "Emporia City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Fairfax City",
+      "name": "Fairfax City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Falls Church City",
+      "name": "Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Franklin City",
+      "name": "Franklin City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Fredericksburg City",
+      "name": "Fredericksburg City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Hampton City",
+      "name": "Hampton City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "James City",
+      "name": "James City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Lexington City",
+      "name": "Lexington City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Lynchburg City",
+      "name": "Lynchburg City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Manassas City",
+      "name": "Manassas City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Martinsville City",
+      "name": "Martinsville City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Newport News City",
+      "name": "Newport News City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Norfolk City",
+      "name": "Norfolk City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Norton City",
+      "name": "Norton City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Petersburg City",
+      "name": "Petersburg City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Poquoson City",
+      "name": "Poquoson City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Portsmouth City",
+      "name": "Portsmouth City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Radford City",
+      "name": "Radford City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Richmond City",
+      "name": "Richmond City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Roanoke City",
+      "name": "Roanoke City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Salem City",
+      "name": "Salem City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Staunton City",
+      "name": "Staunton City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Suffolk City",
+      "name": "Suffolk City Commissioner of Revenue"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Virginia Beach City",
+      "name": "Virginia Beach City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Waynesboro City",
+      "name": "Waynesboro City Assessor"
+    },
+    {
+      "state": "VA",
+      "jurisdiction": "Winchester City",
+      "name": "Winchester City Commissioner of Revenue"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Albany",
+      "name": "Albany Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Alburg",
+      "name": "Alburg Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Andover",
+      "name": "Andover Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Arlington",
+      "name": "Arlington Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Athens",
+      "name": "Athens property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bakersfield",
+      "name": "Bakersfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Baltimore",
+      "name": "Baltimore Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Barnard",
+      "name": "Barnard Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Barnet",
+      "name": "Barnet Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Barre City",
+      "name": "Barre City Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Barre Town",
+      "name": "Barre Town Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Barton",
+      "name": "Barton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Belvidere",
+      "name": "Belvidere Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Benson",
+      "name": "Benson Listers"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Berkshire",
+      "name": "Berkshire Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Berlin",
+      "name": "Berlin property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bethel",
+      "name": "Bethel Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bloomfield",
+      "name": "Bloomfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bolton",
+      "name": "Bolton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bradford",
+      "name": "Bradford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Braintree",
+      "name": "Braintree Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Brandon",
+      "name": "Brandon Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Brattleboro",
+      "name": "Brattleboro Assessor (Lister)"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bridgewater",
+      "name": "Bridgewater Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bridport",
+      "name": "Bridport Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Brighton",
+      "name": "Brighton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Bristol",
+      "name": "Bristol Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Brookfield",
+      "name": "Brookfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Brookline",
+      "name": "Brookline Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Brownington",
+      "name": "Brownington Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Brunswick",
+      "name": "Brunswick Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Burke",
+      "name": "Burke property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Burlington",
+      "name": "Burlington Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Cabot",
+      "name": "Cabot Assessor/Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Calais",
+      "name": "Calais Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Cambridge",
+      "name": "Cambridge Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Canaan",
+      "name": "Canaan Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Castleton",
+      "name": "Castleton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Cavendish",
+      "name": "Cavendish Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Charleston",
+      "name": "Charleston property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Charlotte",
+      "name": "Charlotte Appraiser"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Chelsea",
+      "name": "Chelsea property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Chester",
+      "name": "Chester Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Clarendon",
+      "name": "Clarendon Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Colchester",
+      "name": "Colchester Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Concord",
+      "name": "Concord Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Corinth",
+      "name": "Corinth Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Cornwall",
+      "name": "Cornwall Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Coventry",
+      "name": "Coventry Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Craftsbury",
+      "name": "Craftsbury property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Danby",
+      "name": "Danby Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Danville",
+      "name": "Danville property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Derby",
+      "name": "Derby Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Dorset",
+      "name": "Dorset Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Dover",
+      "name": "Dover Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Dummerston",
+      "name": "Dummerston Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Duxbury",
+      "name": "Duxbury property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "East Haven",
+      "name": "East Haven Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "East Montpelier",
+      "name": "East Montpelier Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Eden",
+      "name": "Eden Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Elmore",
+      "name": "Elmore Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Enosburg",
+      "name": "Enosburg Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Essex Junction",
+      "name": "Essex Junction Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Fair Haven",
+      "name": "Fair Haven Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Fairfax",
+      "name": "Fairfax Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Fairfield",
+      "name": "Fairfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Fairlee",
+      "name": "Fairlee Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Fayston",
+      "name": "Fayston Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Ferrisburgh",
+      "name": "Ferrisburgh Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Fletcher",
+      "name": "Fletcher Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Georgia",
+      "name": "Georgia Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Glover",
+      "name": "Glover Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Goshen",
+      "name": "Goshen Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Grafton",
+      "name": "Grafton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Granby",
+      "name": "Granby Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Granville",
+      "name": "Granville Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Greensboro",
+      "name": "Greensboro Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Groton",
+      "name": "Groton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Guildhall",
+      "name": "Guildhall Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Guilford",
+      "name": "Guilford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Halifax",
+      "name": "Halifax Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Hancock",
+      "name": "Hancock Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Hardwick",
+      "name": "Hardwick Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Hartford",
+      "name": "Hartford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Hartland",
+      "name": "Hartland Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Highgate",
+      "name": "Highgate Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Hinesburg",
+      "name": "Hinesburg Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Holland",
+      "name": "Holland Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Hubbardton",
+      "name": "Hubbardton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Huntington",
+      "name": "Huntington Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Hyde Park",
+      "name": "Hyde Park Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Ira",
+      "name": "Ira Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Irasburg",
+      "name": "Irasburg Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Island Pond",
+      "name": "Island Pond Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Isle La Motte",
+      "name": "Isle La Motte Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Jamaica",
+      "name": "Jamaica Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Jay",
+      "name": "Jay Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Jericho",
+      "name": "Jericho Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Johnson",
+      "name": "Johnson Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Killington",
+      "name": "Killington Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Kirby",
+      "name": "Kirby Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Landgrove",
+      "name": "Landgrove property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Leicester",
+      "name": "Leicester Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Lemington",
+      "name": "Lemington Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Lincoln",
+      "name": "Lincoln Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Londonderry",
+      "name": "Londonderry Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Lowell",
+      "name": "Lowell Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Ludlow",
+      "name": "Ludlow Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Lunenburg",
+      "name": "Lunenburg Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Lyndon",
+      "name": "Lyndon Lister (Assessor)"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Maidstone",
+      "name": "Maidstone Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Manchester (Town of)",
+      "name": "Manchester (Town of) Lister (Assessor)"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Manchester (Village of)",
+      "name": "Manchester (Village of) property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Marlboro",
+      "name": "Marlboro Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Marshfield",
+      "name": "Marshfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Mendon",
+      "name": "Mendon Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Middlebury",
+      "name": "Middlebury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Middlesex",
+      "name": "Middlesex Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Middletown Springs",
+      "name": "Middletown Springs Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Milton",
+      "name": "Milton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Monkton",
+      "name": "Monkton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Montgomery",
+      "name": "Montgomery property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Montpelier",
+      "name": "Montpelier Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Moretown",
+      "name": "Moretown Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Morgan",
+      "name": "Morgan Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Morristown",
+      "name": "Morristown Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Morrisville (Village Of)",
+      "name": "Morrisville (Village Of)  Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Mount Holly",
+      "name": "Mount Holly Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Mount Tabor",
+      "name": "Mount Tabor Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "New Haven",
+      "name": "New Haven Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Newark",
+      "name": "Newark Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Newbury",
+      "name": "Newbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Newfane",
+      "name": "Newfane property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Newport City",
+      "name": "Newport City Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Newport Town",
+      "name": "Newport Town Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "North Hero",
+      "name": "North Hero Board of Listers"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Northfield",
+      "name": "Northfield Assessor/Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Norton",
+      "name": "Norton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Norwich",
+      "name": "Norwich Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Orwell",
+      "name": "Orwell Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Panton",
+      "name": "Panton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Pawlet",
+      "name": "Pawlet Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Peacham",
+      "name": "Peacham Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Peru",
+      "name": "Peru Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Pittsfield",
+      "name": "Pittsfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Pittsford",
+      "name": "Pittsford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Plainfield",
+      "name": "Plainfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Plymouth",
+      "name": "Plymouth Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Pomfret",
+      "name": "Pomfret Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Poultney",
+      "name": "Poultney Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Pownal",
+      "name": "Pownal Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Proctor",
+      "name": "Proctor Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Putney",
+      "name": "Putney Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Randolph",
+      "name": "Randolph Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Reading",
+      "name": "Reading Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Readsboro",
+      "name": "Readsboro Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Richford",
+      "name": "Richford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Richmond",
+      "name": "Richmond Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Ripton",
+      "name": "Ripton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Rochester",
+      "name": "Rochester Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Rockingham",
+      "name": "Rockingham Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Roxbury",
+      "name": "Roxbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Royalton",
+      "name": "Royalton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Rupert",
+      "name": "Rupert Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Rutland City",
+      "name": "Rutland City Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Rutland Town",
+      "name": "Rutland Town Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Ryegate",
+      "name": "Ryegate Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Saint Albans City",
+      "name": "Saint Albans City Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Saint Albans Town",
+      "name": "Saint Albans Town Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Saint George",
+      "name": "Saint George Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Saint Johnsbury",
+      "name": "Saint Johnsbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Salisbury",
+      "name": "Salisbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sandgate",
+      "name": "Sandgate Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Searsburg",
+      "name": "Searsburg Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Shaftsbury",
+      "name": "Shaftsbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sharon",
+      "name": "Sharon Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sheffield",
+      "name": "Sheffield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Shelburne",
+      "name": "Shelburne Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sheldon",
+      "name": "Sheldon Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sherburne",
+      "name": "Sherburne Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Shoreham",
+      "name": "Shoreham Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Shrewsbury",
+      "name": "Shrewsbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "South Burlington",
+      "name": "South Burlington Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "South Hero",
+      "name": "South Hero Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Springfield",
+      "name": "Springfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Stamford",
+      "name": "Stamford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Stannard",
+      "name": "Stannard Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Starksboro",
+      "name": "Starksboro Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Stockbridge",
+      "name": "Stockbridge Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Stowe",
+      "name": "Stowe Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Strafford",
+      "name": "Strafford Assessor/Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Stratton",
+      "name": "Stratton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sudbury",
+      "name": "Sudbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sunderland",
+      "name": "Sunderland Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Sutton",
+      "name": "Sutton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Swanton",
+      "name": "Swanton Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Thetford",
+      "name": "Thetford Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Tinmouth",
+      "name": "Tinmouth Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Topsham",
+      "name": "Topsham Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Townshend",
+      "name": "Townshend Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Troy",
+      "name": "Troy Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Tunbridge",
+      "name": "Tunbridge Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Underhill",
+      "name": "Underhill Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Vergennes",
+      "name": "Vergennes property records"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Vernon",
+      "name": "Vernon Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Vershire",
+      "name": "Vershire Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Victory",
+      "name": "Victory Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Waitsfield",
+      "name": "Waitsfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Walden",
+      "name": "Walden Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Wallingford",
+      "name": "Wallingford Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Waltham",
+      "name": "Waltham Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Wardsboro",
+      "name": "Wardsboro Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Warren",
+      "name": "Warren Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Waterbury",
+      "name": "Waterbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Waterford",
+      "name": "Waterford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Waterville",
+      "name": "Waterville Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Weathersfield",
+      "name": "Weathersfield Assessor/Property Lister"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Wells",
+      "name": "Wells Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "West Fairlee",
+      "name": "West Fairlee Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "West Haven",
+      "name": "West Haven Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "West Rutland",
+      "name": "West Rutland Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "West Windsor",
+      "name": "West Windsor Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Westfield",
+      "name": "Westfield Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Westford",
+      "name": "Westford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Westminster",
+      "name": "Westminster Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Westmore",
+      "name": "Westmore Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Weston",
+      "name": "Weston Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Weybridge",
+      "name": "Weybridge Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Wheelock",
+      "name": "Wheelock Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "White River Junction",
+      "name": "White River Junction Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Whiting",
+      "name": "Whiting Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Whitingham",
+      "name": "Whitingham Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Williamstown",
+      "name": "Williamstown Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Williston",
+      "name": "Williston Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Wilmington",
+      "name": "Wilmington Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Windsor (Town of)",
+      "name": "Windsor (Town of) Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Winhall",
+      "name": "Winhall Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Winooski",
+      "name": "Winooski Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Wolcott",
+      "name": "Wolcott Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Woodbury",
+      "name": "Woodbury Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Woodford",
+      "name": "Woodford Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Woodstock",
+      "name": "Woodstock Assessor"
+    },
+    {
+      "state": "VT",
+      "jurisdiction": "Worcester",
+      "name": "Worcester Assessor"
+    }
+  ],
+  "unmatchedPermitPortals": [
+    "Apple Valley, MN",
+    "Bloomington, MN",
+    "Brookhaven, GA",
+    "Brooklyn Park, MN",
+    "Cleveland Heights, OH",
+    "Coeur d'Alene, ID",
+    "Davie, FL",
+    "DeSoto, TX",
+    "Doral, FL",
+    "Eastvale, CA",
+    "Edina, MN",
+    "Johns Creek, GA",
+    "Kettering, OH",
+    "Lakewood, CO",
+    "Lee's Summit, MO",
+    "Maple Grove, MN",
+    "McAllen, TX",
+    "McKinney, TX",
+    "Midwest City, OK",
+    "Millcreek, UT",
+    "O'Fallon, MO",
+    "Parma, OH",
+    "Sandy Springs, GA",
+    "Shoreline, WA",
+    "St. Charles, MO",
+    "St. Louis Park, MN",
+    "Sunrise, FL",
+    "Tigard, OR",
+    "Wauwatosa, WI",
+    "Weston, FL",
+    "Woodbury, MN"
+  ]
+}

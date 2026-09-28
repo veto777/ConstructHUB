@@ -1,0 +1,73 @@
+{
+  "checkedAt": "2026-09-28T23:00:56.974Z",
+  "base": "http://127.0.0.1:8159",
+  "emptySearchCountyId": 2,
+  "results": [
+    {
+      "path": "/api/counties",
+      "method": "GET",
+      "status": 200,
+      "records": 3139
+    },
+    {
+      "path": "/api/databases/counts",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/databases",
+      "method": "GET",
+      "status": 200,
+      "records": 32992
+    },
+    {
+      "path": "/api/databases?filtered=true&stateCode=WA&limit=25",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/property-appraisers",
+      "method": "GET",
+      "status": 200,
+      "records": 3040
+    },
+    {
+      "path": "/api/property-appraisers/county/276",
+      "method": "GET",
+      "status": 200,
+      "records": 1
+    },
+    {
+      "path": "/api/databases/county/276",
+      "method": "GET",
+      "status": 200,
+      "records": 1
+    },
+    {
+      "path": "/api/property-records/276",
+      "method": "GET",
+      "status": 200,
+      "records": 0
+    },
+    {
+      "path": "/api/property-lookup",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/search",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/search/live/91382abf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/search-queries/2",
+      "method": "DELETE",
+      "status": 200
+    }
+  ]
+}
