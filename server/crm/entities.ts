@@ -604,6 +604,11 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (!ctx) return;
     const parsed = projectSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid project", issues: parsed.error.issues });
+    if (parsed.data.customerId) {
+      const [customer] = await db.select({ id: crmCustomers.id }).from(crmCustomers)
+        .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, parsed.data.customerId))).limit(1);
+      if (!customer) return res.status(400).json({ message: "Customer not found in this organization" });
+    }
     // budget is cost-side data
     if (parsed.data.budgetCents !== undefined && !ctx.permissions.seeCosts) {
       return res.status(403).json({ message: "Requires permission: seeCosts" });
@@ -667,6 +672,11 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (!ctx) return;
     const parsed = jobSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid job", issues: parsed.error.issues });
+    if (parsed.data.projectId) {
+      const [project] = await db.select({ id: crmProjects.id }).from(crmProjects)
+        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, parsed.data.projectId))).limit(1);
+      if (!project) return res.status(400).json({ message: "Project not found in this organization" });
+    }
     const [beforeJob] = await db.select({ status: crmJobs.status }).from(crmJobs)
       .where(and(eq(crmJobs.orgId, ctx.org.id), eq(crmJobs.id, req.params.id))).limit(1);
     const [row] = await db.update(crmJobs).set({ ...parsed.data, updatedAt: new Date() } as any)
@@ -884,6 +894,11 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const [cust] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, d.customerId))).limit(1);
     if (!cust) return res.status(400).json({ message: "Customer not found in this organization" });
+    if (d.projectId) {
+      const [project] = await db.select({ id: crmProjects.id }).from(crmProjects)
+        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, d.projectId))).limit(1);
+      if (!project) return res.status(400).json({ message: "Project not found in this organization" });
+    }
     if (d.divisionId) {
       const div = await getDivision(ctx.org.id, d.divisionId);
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });

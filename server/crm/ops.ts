@@ -197,6 +197,18 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid invoice", issues: parsed.error.issues });
     const d = parsed.data;
+    // A document's own org_id does not authorize its foreign-key targets.
+    const [customer] = await db.select({ id: crmCustomers.id }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, d.customerId))).limit(1);
+    if (!customer) return res.status(400).json({ message: "Customer not found in this organization" });
+    if (d.projectId && !(await ownProject(ctx.org.id, d.projectId))) {
+      return res.status(400).json({ message: "Project not found in this organization" });
+    }
+    if (d.estimateId) {
+      const [estimate] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
+        .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, d.estimateId))).limit(1);
+      if (!estimate) return res.status(400).json({ message: "Estimate not found in this organization" });
+    }
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmInvoices)
       .where(eq(crmInvoices.orgId, ctx.org.id));
     const [inv] = await db.insert(crmInvoices).values({
