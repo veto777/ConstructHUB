@@ -53,7 +53,9 @@ export const permitDatabases = pgTable("permit_databases", {
   isActive: boolean("is_active").notNull().default(true),
   lastScrapedAt: timestamp("last_scraped_at"),
   // Link-verifier status: 'live' | 'dead' | 'unchecked' (see scripts/verify-links.ts).
+  // Government tiers: verified, unconfirmed, dead; none = no source URL. Legacy live remains readable.
   linkStatus: text("link_status").default("unchecked"),
+  // Actual last check (including inconclusive checks), never the seeding time.
   lastVerifiedAt: timestamp("last_verified_at"),
   notes: text("notes"),
 });
@@ -105,7 +107,9 @@ export const propertyAppraisers = pgTable("property_appraisers", {
   parcelSearchPattern: text("parcel_search_pattern"),
   isActive: boolean("is_active").notNull().default(true),
   // Link-verifier status: 'live' | 'dead' | 'unchecked' (see scripts/verify-links.ts).
+  // Government tiers: verified, unconfirmed, dead; none = no source URL. Legacy live remains readable.
   linkStatus: text("link_status").default("unchecked"),
+  // Actual last check (including inconclusive checks), never the seeding time.
   lastVerifiedAt: timestamp("last_verified_at"),
   notes: text("notes"),
 });

@@ -25,6 +25,7 @@ async function account() {
 async function api(path: string, cookie = "", method = "GET", body?: any) {
   return fetch(base + path, { method, headers: { cookie, "content-type": "application/json", "x-forwarded-for": testIp }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
+describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("growth isolation (auxiliary child server)", () => {
 beforeAll(async () => {
   if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
   child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
@@ -201,4 +202,6 @@ describe("settings validation and photo plan caps", () => {
     expect(rejected.status).toBe(403); expect((await rejected.json()).limit).toBe(5);
     expect((await api("/api/photos/process", a, "POST", { fileIds: Array(11).fill(files[0].id) })).status).toBe(400);
   });
+});
+
 });

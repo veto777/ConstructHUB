@@ -1,3 +1,4 @@
+import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmentPortal, governmentPermitForDisplay } from "@shared/government-links";
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
 import { reserveMonthlyQuota, refundQuota } from "./growth-quotas";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
@@ -194,10 +195,10 @@ export async function registerRoutes(
         limit: req.query.limit ? parseInt(req.query.limit as string) : 25,
       };
       const result = await storage.getDatabasesFiltered(params);
-      res.json(result);
+      res.json({ ...result, databases: result.databases.map(governmentPermitForDisplay) });
     } else {
       const databases = await storage.getDatabases();
-      res.json(databases);
+      res.json(databases.map(governmentPermitForDisplay));
     }
   });
 
@@ -209,7 +210,7 @@ export async function registerRoutes(
   app.get("/api/databases/county/:countyId", async (req, res) => {
     const countyId = parseInt(req.params.countyId);
     const databases = await storage.getDatabasesByCounty(countyId);
-    res.json(databases);
+    res.json(databases.map(governmentPermitForDisplay));
   });
 
   const ownerScope = (req: any) => ({ id: req.user.id, admin: isAdmin(req.user) });
@@ -271,7 +272,7 @@ export async function registerRoutes(
       }));
 
       const searchId = randomUUID().slice(0, 8);
-      startLiveSearch(searchId, query.id, searchType, searchValue, databases as any)
+      startLiveSearch(searchId, query.id, searchType, searchValue, databases.map(governmentLinksForDisplay) as any)
         .catch((err) => console.error("Live search init error:", err));
 
       res.json({
@@ -329,8 +330,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Database not found" });
       }
 
+      if (!governmentLinksAvailable(db)) {
+        return res.status(400).json({ message: "This portal has not been verified as live" });
+      }
+
       if (!db.searchUrl && !db.portalUrl) {
         return res.status(400).json({ message: "This database has no portal URL configured" });
+      }
+
+      if (!canScrapeGovernmentPortal(db)) {
+        return res.status(400).json({ message: "Automated search is not supported for this portal. Open the official portal to search." });
       }
 
       if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
@@ -344,7 +353,7 @@ export async function registerRoutes(
       const jobId = randomUUID().slice(0, 8);
       scrapeOwners.set(jobId, req.user!.id);
       const url = db.searchUrl || db.portalUrl!;
-      const platform = db.platform || "SmartGov";
+      const platform = db.platform!;
 
       scrapeByPlatform(platform, url, searchTerm, searchType || "address", db.id, db.name, query.id, jobId)
         .catch((err) => console.error("Scrape error:", err));
@@ -471,7 +480,7 @@ export async function registerRoutes(
     const counties = await storage.getCounties();
     const countyMap = new Map(counties.map(c => [c.id, c]));
     const enriched = appraisers.map(a => ({
-      ...a,
+      ...governmentLinksForDisplay(a),
       county: countyMap.get(a.countyId),
     }));
     res.json(enriched);
@@ -480,7 +489,7 @@ export async function registerRoutes(
   app.get("/api/property-appraisers/county/:countyId", async (req, res) => {
     const countyId = parseInt(req.params.countyId);
     const appraisers = await storage.getPropertyAppraisersByCounty(countyId);
-    res.json(appraisers);
+    res.json(appraisers.map(governmentLinksForDisplay));
   });
 
   app.post("/api/property-lookup", async (req, res) => {
@@ -502,11 +511,13 @@ export async function registerRoutes(
       const counties = await storage.getCounties();
       const county = counties.find(c => c.id === countyId);
 
-      const lookupLinks = appraisers.map(a => ({
+      const lookupLinks = appraisers.map(governmentLinksForDisplay).map(a => ({
         name: a.name,
         portalUrl: a.portalUrl,
         searchUrl: a.searchUrl,
         platform: a.platform,
+        linkStatus: a.linkStatus,
+        lastVerifiedAt: a.lastVerifiedAt,
       }));
 
       res.json({

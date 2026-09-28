@@ -4,7 +4,7 @@
  * server/seed-permit-portals.ts).
  *
  * Integrity rules (no fabrication, no live-but-wrong URLs):
- *   1. Each candidate URL must respond live (2xx/3xx or an auth/blocked status).
+ *   1. Each candidate URL must respond live (successful GET with permit-specific page content).
  *   2. Each URL must look permit-specific (path/host matches PERMIT_HINT) — a
  *      plain city homepage is rejected even if it's live.
  * Only candidates passing BOTH are written out. Dead/ambiguous ones are dropped
@@ -14,9 +14,10 @@
  */
 import { writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
+import * as cheerio from "cheerio";
 
 // jurisdiction key must match permit_databases.jurisdiction = "City, ST".
-interface Candidate { jurisdiction: string; url: string; platform: string; }
+interface Candidate { jurisdiction: string; url: string; platform: string; sourceUrl?: string; }
 
 // Optional merge source: candidates discovered by the expand-permit-portals
 // workflow (already WebFetch-confirmed by agents). They still pass through the
@@ -28,7 +29,7 @@ function loadWorkflowCandidates(): Candidate[] {
     const raw = JSON.parse(readFileSync(p, "utf8"));
     const arr = Array.isArray(raw) ? raw : raw.candidates || [];
     return arr.filter((c: any) => c && c.jurisdiction && c.url)
-      .map((c: any) => ({ jurisdiction: String(c.jurisdiction).trim(), url: String(c.url).trim(), platform: String(c.platform || "County Portal") }));
+      .map((c: any) => ({ jurisdiction: String(c.jurisdiction).trim(), url: String(c.url).trim(), platform: String(c.platform || "County Portal"), sourceUrl: c.sourceUrl ? String(c.sourceUrl) : undefined }));
   } catch { return []; }
 }
 
@@ -112,56 +113,53 @@ const CANDIDATES: Candidate[] = [
 // (Workflow candidates are already WebFetch-confirmed by agents; this is the
 // deterministic second gate. A path like "/" with no hint is rejected.)
 const PERMIT_HINT = /permit|accela|energov|etrakit|epermit|eplan|dobnow|bisweb|\bdbi\b|\bpli\b|posse|inspection|building|develop|\bdpp\b|dcra|\bdsi\b|\bdns\b|\bpdd\b|ladbs|onestop|compass|tdc-online|buildingrecords|eclipse|selfservice|dppweb|citizenaccess|\baca[-.]|cityworks|mygov|viewpoint|smartgov|opengov|civicplus|projectdox|avolve|camino|clariti|epath|citizenserve|onlinepermit|land-?management|lms|\bpds\b|codeenforcement/i;
-const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
-const ALIVE = new Set([401, 403, 405, 406, 429, 999]);
-const CONCURRENCY = 8;
-
-async function isLive(url: string): Promise<boolean> {
-  for (const method of ["HEAD", "GET"] as const) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 15000);
-      const res = await fetch(url, { method, redirect: "follow", headers: { "User-Agent": UA }, signal: ctrl.signal });
-      clearTimeout(t);
-      if (res.status < 400 || ALIVE.has(res.status)) return true;
-      if (res.status === 404 || res.status === 410) return false;
-      if (method === "HEAD") continue;
-      return true; // other 4xx/5xx: host responded
-    } catch { if (method === "HEAD") continue; return false; }
-  }
-  return false;
-}
+const CONCURRENCY = 4;
+import { classifySourceListedLink } from "../server/government-link-policy";
+import { fetchGovernmentPage, classifyGovernmentPage } from "../server/government-url-check";
 
 async function main() {
-  // Merge the hand-curated inline list with workflow-discovered candidates,
-  // dedupe by jurisdiction (inline list wins on conflict).
-  const merged: Candidate[] = [];
-  const byJur = new Set<string>();
-  for (const c of CANDIDATES) { if (!byJur.has(c.jurisdiction)) { byJur.add(c.jurisdiction); merged.push(c); } }
-  let fromWorkflow = 0;
-  for (const c of loadWorkflowCandidates()) { if (!byJur.has(c.jurisdiction)) { byJur.add(c.jurisdiction); merged.push(c); fromWorkflow++; } }
-  console.log(`Candidates: ${CANDIDATES.length} inline + ${fromWorkflow} new from workflow = ${merged.length} to verify.`);
-
-  const verified: Candidate[] = [];
-  const rejected: { c: Candidate; reason: string }[] = [];
+  const output = join(process.cwd(), "server", "data", "permit-portals.json");
+  const existing: any[] = existsSync(output) ? JSON.parse(readFileSync(output, "utf8")) : [];
+  const byJur = new Set(existing.map(c => c.jurisdiction));
+  const merged = [...existing];
+  // Existing data wins over old inline discovery URLs, including null tombstones.
+  // New discoveries need an explicit authoritative source linking to the URL.
+  for (const c of [...CANDIDATES, ...loadWorkflowCandidates()]) {
+    if (!byJur.has(c.jurisdiction) && c.sourceUrl) { merged.push(c); byJur.add(c.jurisdiction); }
+  }
+  const results: any[] = new Array(merged.length);
   let idx = 0;
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     while (idx < merged.length) {
-      const c = merged[idx++];
-      if (!PERMIT_HINT.test(c.url)) { rejected.push({ c, reason: "not permit-specific" }); continue; }
-      const live = await isLive(c.url);
-      if (live) verified.push(c);
-      else rejected.push({ c, reason: "dead/unreachable" });
+      const index = idx++; const c = merged[index];
+      const candidateUrl = c.url || c.candidateUrl;
+      if (!candidateUrl) { results[index] = c; continue; }
+      let sourceVerified = existing.some(e => e.jurisdiction === c.jurisdiction);
+      if (!sourceVerified && c.sourceUrl) {
+        const source = await fetchGovernmentPage(c.sourceUrl);
+        const $ = cheerio.load(source.html);
+        sourceVerified = source.httpStatus >= 200 && source.httpStatus < 300 &&
+          $('a[href]').toArray().some(el => {
+            try { return new URL($(el).attr('href')!, source.finalUrl).href === candidateUrl; } catch { return false; }
+          });
+      }
+      const response = await fetchGovernmentPage(candidateUrl);
+      const check = classifyGovernmentPage(response, "permit");
+      const $ = cheerio.load(response.html); $('script,style').remove();
+      const norm = (s: string) => s.toLowerCase().replace(/\bsaint\b/g, 'st').replace(/[^a-z0-9]/g, '');
+      const name = c.jurisdiction.split(',')[0].replace(/\b(county|parish|borough)\b/gi, '').trim();
+      const identity = norm($('body').text() + $('title').text()).includes(norm(name));
+      const status = sourceVerified ? classifySourceListedLink(candidateUrl,
+        { ...check, httpStatus: response.httpStatus, finalUrl: response.finalUrl, jurisdictionMatched: identity },
+        { state: c.jurisdiction.slice(-2), jurisdiction: name, sourceListed: true }) : "none";
+      const available = status === "verified" || status === "unconfirmed";
+      results[index] = { ...c, url: available ? (status === "verified" ? response.finalUrl : candidateUrl) : null,
+        candidateUrl, platform: available ? c.platform : null, linkStatus: status, lastVerifiedAt: new Date().toISOString() };
     }
   }));
-  verified.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction));
-  writeFileSync(join(process.cwd(), "server", "data", "permit-portals.json"), JSON.stringify(verified, null, 2));
-  console.log(`\nVerified ${verified.length}/${merged.length} permit portals -> server/data/permit-portals.json`);
-  if (rejected.length) {
-    console.log(`Dropped ${rejected.length} (kept honest search-fallback):`);
-    for (const r of rejected.slice(0, 40)) console.log(`  ✗ ${r.c.jurisdiction} (${r.reason}) ${r.c.url}`);
-    if (rejected.length > 40) console.log(`  ... and ${rejected.length - 40} more`);
-  }
+  results.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction));
+  writeFileSync(output, JSON.stringify(results, null, 2) + "\n");
+  console.log(`Verified ${results.filter(r => r.url).length} permit URLs; ${results.filter(r => !r.url).length} null fallbacks retained for DB reconciliation.`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -13,8 +13,13 @@ removed. **Never reintroduce it.**
   verified source** — never generated, guessed, or hash-derived.
 - Unknown value → **`null`**, and the UI shows an honest fallback (e.g. "Find permit portal" web
   search), never a fake link.
-- Every portal URL that ships is **liveness-checked** (see the pipelines below). A wrong or dead link
-  is worse than none.
+- Every published portal URL is **checked** (see the pipelines below). Owner-approved link policy
+  (audit a4 round 2): `verified` is live/on-topic; `unconfirmed` is a source-listed URL whose check
+  was blocked or inconclusive, and stays visible with its status and last-checked date. `dead`
+  (DNS/refused connection, 404/410, soft 404, parking, invalid browser TLS or a generic homepage)
+  becomes null after replacement research. An absent source URL is `none`, never guessed.
+- A statewide portal can be verified through its state-agency identity plus a county-specific
+  source listing; it need not name each county. See `analysis/AUDIT-a4.md` → Round 2.
 
 ## 🚫 Tower boundary
 Self-contained. Never pull in another tower project's infra, domains, or accounts — see

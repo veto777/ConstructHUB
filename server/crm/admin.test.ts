@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createHash } from "crypto";
-import { spawn, execSync, type ChildProcess } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import { createWriteStream } from "fs";
 import pg from "pg";
 import { ADMIN_EMAILS } from "../admin";
@@ -288,7 +288,7 @@ describe("gate brute-force limiter (unit)", () => {
   });
 });
 
-describe("configured admin gate (lane child server)", () => {
+describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("configured admin gate (auxiliary child server)", () => {
   let child: ChildProcess | null = null;
 
   beforeAll(async () => {
@@ -340,6 +340,7 @@ describe("configured admin gate (lane child server)", () => {
     try {
       if (child?.pid) process.kill(-child.pid, "SIGKILL");
     } catch { /* already dead */ }
+    // Never kill by port: another lane may own a process listening there.
   });
 
   it("reports configured, 403s admin APIs until the gate is passed, then 200s", async () => {

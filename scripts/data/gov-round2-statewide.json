@@ -1,0 +1,16 @@
+{
+  "url": "https://assessment.cot.tn.gov/TPAD",
+  "finalUrl": "https://assessment.cot.tn.gov/TPAD",
+  "state": "TN",
+  "sourceUrl": "https://comptroller.tn.gov/news/2022/12/15/comptroller-s-office-launches-redesigned-property-assessment-data-webpage.html",
+  "sourceStatus": 200,
+  "linkedFromSource": true,
+  "httpStatus": 403,
+  "status": "unverified",
+  "reason": "HTTP 403 (blocked/transient)",
+  "title": "403 Forbidden",
+  "excerpt": "403 Forbidden Microsoft-Azure-Application-Gateway/v2",
+  "text": "403 Forbidden\nMicrosoft-Azure-Application-Gateway/v2",
+  "checkedAt": "2026-09-28T23:33:34.319Z",
+  "method": "Official source link + Chromium without TLS bypass"
+}

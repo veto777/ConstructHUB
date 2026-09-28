@@ -1,3 +1,4 @@
+import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -45,17 +46,6 @@ import {
   Globe,
 } from "lucide-react";
 import type { PermitDatabase, County } from "@shared/schema";
-
-const propertyAppraiserUrls: Record<number, string> = {
-  5: "https://www.pcpao.gov/quick-search",
-  6: "https://gis.hcpafl.org/propertysearch/#/nav/Basic%20Search",
-  7: "https://www.manateepao.gov/search/",
-  8: "https://www.sc-pa.com/propertysearch",
-};
-
-function getPropertyLookupUrl(countyId: number, address: string): string {
-  return propertyAppraiserUrls[countyId] || "#";
-}
 
 function normalizeStatus(status: string | null | undefined): string {
   if (!status) return "Unknown";
@@ -240,7 +230,7 @@ export default function SearchPage() {
 
   const scopedDbCount = useMemo(() => {
     if (!databases) return 0;
-    const active = databases.filter(d => d.isActive);
+    const active = databases.filter(d => governmentLinksAvailable(d) && canScrapeGovernmentPortal(d));
     if (scopeLocation === "all" && scopeState === "all") return active.length;
     if (scopeLocation === "all" && scopeState !== "all") {
       const stateCountyIds = new Set(counties?.filter(c => c.stateCode === scopeState).map(c => c.id) ?? []);
@@ -462,7 +452,7 @@ export default function SearchPage() {
           </h1>
           <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
           <p className="text-sm text-muted-foreground max-w-lg">
-            Search 32,864+ permit databases across all 50 states in real time. Find who's pulling permits in your area, track competitor activity, and discover new leads — all from government portals scraped live.
+            Search available permit records and find official portals by jurisdiction. Live search coverage varies by portal.
           </p>
         </div>
 
@@ -936,9 +926,9 @@ export default function SearchPage() {
                                 <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
-                            {result.countyId && [5, 6, 7, 8].includes(result.countyId) && result.address && (
+                            {result.countyId && (
                               <a
-                                href={getPropertyLookupUrl(result.countyId, result.address)}
+                                href={`/property?countyId=${result.countyId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"

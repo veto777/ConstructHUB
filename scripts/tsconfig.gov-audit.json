@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["./*gov*.ts", "./build-permit-portals.ts", "./scrape-netronline.ts", "./verify-links.ts"],
+  "exclude": [],
+  "compilerOptions": { "incremental": false }
+}

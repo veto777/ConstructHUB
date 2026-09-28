@@ -1,3 +1,4 @@
+import { governmentLinkNotice, governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -397,7 +398,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
               {database.platform && <span className="ml-1.5">{database.platform}</span>}
             </p>
           </div>
-          {database.isActive && (database.portalUrl || database.searchUrl) && (
+          {governmentLinksAvailable(database) && canScrapeGovernmentPortal(database) && (
             <Button
               size="sm"
               variant="outline"
@@ -410,8 +411,9 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
           )}
         </div>
 
+        {governmentLinksAvailable(database) && governmentLinkNotice(database) && <p className="text-xs text-muted-foreground">{governmentLinkNotice(database)}</p>}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {database.portalUrl && (
+          {governmentLinksAvailable(database) && database.portalUrl && (
             <a
               href={database.portalUrl}
               target="_blank"
@@ -423,7 +425,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
               Portal
             </a>
           )}
-          {database.searchUrl && (
+          {governmentLinksAvailable(database) && database.searchUrl && (
             <a
               href={database.searchUrl}
               target="_blank"
@@ -437,7 +439,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
           )}
           {/* No official portal on record: offer an honest web search rather than a
               fabricated link. Clearly labeled and styled as a "find", not a portal. */}
-          {!database.portalUrl && !database.searchUrl && (
+          {(!governmentLinksAvailable(database) || (!database.portalUrl && !database.searchUrl)) && (
             <a
               href={`https://www.google.com/search?q=${encodeURIComponent(`${database.jurisdiction} building permit search portal`)}`}
               target="_blank"

@@ -306,7 +306,7 @@ function startStub(): Promise<void> {
 
 // ── The suite ───────────────────────────────────────────────────────────────
 
-describe("HOVER integration (dev server + stub HOVER)", () => {
+describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration (dev server + auxiliary stub HOVER)", () => {
   let orgId: string;
   let savedCustomFields: any;
   let hover: typeof import("./hover");

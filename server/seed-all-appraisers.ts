@@ -1,6 +1,7 @@
+import { preserveNewerGovernmentCheck } from "./government-seed-status";
 import { db } from "./db";
 import { counties, propertyAppraisers } from "@shared/schema";
-import { sql, like } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -9,7 +10,7 @@ const REAL_DATA_MARKER = "Sourced from NETR Online.";
 // Real assessor / property-appraiser office data scraped from NETR Online
 // (see scripts/scrape-netronline.ts). No fabrication: an office with no online
 // portal on record is stored with portalUrl: null.
-interface AppraiserRecord {
+export interface AppraiserRecord {
   stateCode: string;
   county: string;
   name: string;
@@ -17,6 +18,8 @@ interface AppraiserRecord {
   portalUrl: string | null;
   platform: string | null;
   source: string;
+  linkStatus?: string;
+  lastVerifiedAt?: string | null;
 }
 
 // Normalize a county name for matching NETR display names against the counties
@@ -45,25 +48,16 @@ export async function seedAllAppraisers() {
   }
   console.log(`Loaded ${records.length} real appraiser records.`);
 
-  // Idempotency + one-time migration off the fabricated data. The previous
-  // seeder populated the ENTIRE table with fabricated rows (guessed URLs, hashed
-  // phones), so once real data is present we skip; otherwise we wipe the table
-  // wholesale and reinsert from NETR. A full replace avoids fragile URL-pattern
-  // matching that could clip real portals whose path contains "/assessor".
-  const [already] = await db
-    .select({ id: propertyAppraisers.id })
-    .from(propertyAppraisers)
-    .where(like(propertyAppraisers.notes, `${REAL_DATA_MARKER}%`))
-    .limit(1);
-  if (already) {
-    console.log("Real appraiser data already seeded; skipping.");
-    return;
-  }
-  const wiped = await db.delete(propertyAppraisers).returning({ id: propertyAppraisers.id });
-  if (wiped.length) console.log(`Cleared ${wiped.length} fabricated appraiser rows for replacement.`);
+  await syncAppraiserRecords(records);
+}
 
+// Update only source-owned fields. Keep IDs, notes, custom offices and related records.
+export async function syncAppraiserRecords(records: AppraiserRecord[]) {
+ await db.transaction(async tx => {
+  await tx.execute(sql`select pg_advisory_xact_lock(8159001)`);
+  const existing = await tx.select().from(propertyAppraisers);
   // Build county lookup: `${stateCode}|${normName}` -> countyId.
-  const allCounties = await db.select().from(counties);
+  const allCounties = await tx.select().from(counties);
   const countyMap = new Map<string, number>();
   for (const c of allCounties) countyMap.set(`${c.stateCode}|${normCounty(c.name)}`, c.id);
 
@@ -75,7 +69,7 @@ export async function seedAllAppraisers() {
     if (!countyId) { unmatched++; continue; }
     if (covered.has(countyId)) continue;
     covered.add(countyId);
-    toInsert.push({
+    const values = {
       name: r.name,
       countyId,
       portalUrl: r.portalUrl,
@@ -84,19 +78,28 @@ export async function seedAllAppraisers() {
       phone: r.phone,
       address: null, // never fabricated; NETR county pages carry no street address
       searchableFields: SEARCHABLE_FIELDS,
-      isActive: true,
-      linkStatus: r.portalUrl ? "unchecked" : "none",
+      isActive: !!r.portalUrl && ["live", "verified", "unconfirmed"].includes(r.linkStatus || ""),
+      linkStatus: r.portalUrl ? (r.linkStatus || "unchecked") : (r.linkStatus === "dead" ? "dead" : "none"),
+      lastVerifiedAt: r.lastVerifiedAt ? new Date(r.lastVerifiedAt) : null,
       notes: `Sourced from NETR Online. Contact for property records in ${r.county} County.`,
-    });
+    };
+    const matches = existing.filter(e => e.countyId === countyId && e.notes?.startsWith(REAL_DATA_MARKER));
+    if (matches.length) {
+      const { notes, address, searchableFields, ...sourceFields } = values;
+      for (const row of matches) await tx.update(propertyAppraisers).set({ ...sourceFields, ...preserveNewerGovernmentCheck(row, sourceFields) }).where(eq(propertyAppraisers.id, row.id));
+    } else if (!existing.some(e => e.countyId === countyId)) {
+      toInsert.push(values);
+    }
   }
 
   const BATCH = 500;
   let inserted = 0;
   for (let i = 0; i < toInsert.length; i += BATCH) {
-    await db.insert(propertyAppraisers).values(toInsert.slice(i, i + BATCH));
+    await tx.insert(propertyAppraisers).values(toInsert.slice(i, i + BATCH));
     inserted += Math.min(BATCH, toInsert.length - i);
   }
 
-  const finalCount = await db.select({ count: sql<number>`count(*)` }).from(propertyAppraisers);
+  const finalCount = await tx.select({ count: sql<number>`count(*)` }).from(propertyAppraisers);
   console.log(`Appraisers: inserted ${inserted} real rows (${unmatched} unmatched counties). Total: ${Number(finalCount[0].count)}.`);
+ });
 }

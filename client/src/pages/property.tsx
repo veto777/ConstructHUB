@@ -1,3 +1,4 @@
+import { governmentLinkNotice, governmentLinksAvailable } from "@shared/government-links";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -26,9 +27,11 @@ interface PropertyAppraiser {
   id: number;
   name: string;
   countyId: number;
-  portalUrl: string;
-  searchUrl: string;
-  platform: string;
+  portalUrl: string | null;
+  searchUrl: string | null;
+  platform: string | null;
+  linkStatus: string | null;
+  lastVerifiedAt?: string | null;
   phone: string | null;
   address: string | null;
   searchableFields: string[] | null;
@@ -43,7 +46,7 @@ export default function PropertyPage() {
   });
 
   const [stateFilter, setStateFilter] = useState<string>("all");
-  const [countyFilter, setCountyFilter] = useState<string>("all");
+  const [countyFilter, setCountyFilter] = useState<string>(() => new URLSearchParams(window.location.search).get("countyId") || "all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const states = useMemo(() => {
@@ -263,7 +266,7 @@ export default function PropertyPage() {
                           {appraiser.phone}
                         </a>
                       )}
-                      {appraiser.portalUrl && (
+                      {governmentLinksAvailable(appraiser) && appraiser.portalUrl && (
                         <a
                           href={appraiser.portalUrl}
                           target="_blank"
@@ -276,6 +279,8 @@ export default function PropertyPage() {
                         </a>
                       )}
                     </div>
+
+                    {governmentLinksAvailable(appraiser) && governmentLinkNotice(appraiser) && <p className="text-xs text-muted-foreground mt-2">{governmentLinkNotice(appraiser)}</p>}
 
                     {appraiser.searchableFields && appraiser.searchableFields.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-3">
@@ -296,7 +301,7 @@ export default function PropertyPage() {
                     <Badge variant="outline" className="text-[10px] h-5 px-1.5">
                       {appraiser.county?.stateCode}
                     </Badge>
-                    <Button
+                    {governmentLinksAvailable(appraiser) && appraiser.searchUrl && <Button
                       size="sm"
                       variant="outline"
                       asChild
@@ -306,8 +311,8 @@ export default function PropertyPage() {
                         <Search className="h-3.5 w-3.5 mr-1.5" />
                         Search
                       </a>
-                    </Button>
-                    <Button
+                    </Button>}
+                    {governmentLinksAvailable(appraiser) && appraiser.portalUrl && <Button
                       size="sm"
                       asChild
                       data-testid={`button-visit-appraiser-${appraiser.id}`}
@@ -316,7 +321,14 @@ export default function PropertyPage() {
                         Visit
                         <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
                       </a>
-                    </Button>
+                    </Button>}
+                    {(!governmentLinksAvailable(appraiser) || (!appraiser.portalUrl && !appraiser.searchUrl)) && (
+                      <a className="text-xs text-muted-foreground hover:underline" target="_blank" rel="noopener noreferrer"
+                        data-testid={`link-appraiser-fallback-${appraiser.id}`}
+                        href={`https://www.google.com/search?q=${encodeURIComponent(`${appraiser.county?.name || appraiser.name} ${appraiser.county?.stateCode || ""} assessor property records`)}`}>
+                        Find property records
+                      </a>
+                    )}
                   </div>
                 </div>
               </Card>
