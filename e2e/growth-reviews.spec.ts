@@ -11,10 +11,11 @@ const tokens: string[] = [];
 async function review() {
   const token = randomUUID(); tokens.push(token);
   await pool.query(`insert into review_requests(user_id,client_name,client_email,company_name,google_profile_url,token)
-    values(1,'Audit customer','customer@example.invalid','Local test company','https://www.google.com/', $1)`, [token]);
+    values(1,'Audit customer',$2,'Local test company','https://www.google.com/', $1)`, [token, `${token}@example.invalid`]);
   return token;
 }
 test.afterAll(async () => {
+  await pool.query("delete from review_recipient_preferences where user_id=1 and email=any($1::text[])", [tokens.map(t => `${t}@example.invalid`)]);
   await pool.query("delete from review_requests where token = any($1::text[])", [tokens]);
   await pool.end();
 });
@@ -30,7 +31,8 @@ for (const width of [1440, 375]) {
       await expect(google).toHaveAttribute("href", "https://www.google.com/");
       await page.getByTestId(`button-rating-${rating}`).click();
       await page.getByTestId("button-submit-rating").click();
-      await expect(page.getByTestId(rating < 9 ? "text-improvement-heading" : "text-referral-heading")).toBeVisible();
+      if (rating < 9) await expect(page.getByTestId("text-improvement-heading")).toBeVisible();
+      else { await expect(page.getByTestId("input-review-highlights")).toBeVisible(); await expect(page.getByTestId("text-referral-heading")).toHaveCount(0); }
       await expect(google).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       if (rating < 9) {
@@ -45,7 +47,7 @@ for (const width of [1440, 375]) {
     const token = await review();
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`/review/${token}/unsubscribe`);
-    await page.getByRole("button", { name: "Decline", exact: true }).click();
+    await expect(page.getByTestId("cookie-consent-banner")).toBeVisible();
     await expect(page.getByRole("button", { name: /unsubscribe/i })).toBeVisible();
     await page.getByRole("button", { name: /unsubscribe/i }).click();
     await page.getByTestId("button-submit-feedback-unsubscribe").click();

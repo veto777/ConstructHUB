@@ -14,6 +14,8 @@ declare module "http" {
   }
 }
 
+// Bound public AI/photo JSON before the general parser; Stripe raw-body stays intact.
+app.use(["/api/site-assistant", "/api/ads-consultant", "/api/review", "/api/photos", "/api/gmb/review-response"], express.json({ limit: "32kb" }));
 app.use(
   express.json({
     limit: "50mb",
@@ -74,11 +76,13 @@ process.on("unhandledRejection", (reason) => {
   try {
     const { seedDatabase } = await import("./seed");
     await seedDatabase();
+    const { ensureGrowthSchema } = await import("./growth-schema");
+    await ensureGrowthSchema();
     await setupAuth(app);
     await registerRoutes(httpServer, app);
 
     app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
+      const status = typeof err.code === "string" && err.code.startsWith("LIMIT_") ? 413 : (err.status || err.statusCode || 500);
       const message = err.message || "Internal Server Error";
 
       console.error("Internal Server Error:", err);

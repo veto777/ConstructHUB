@@ -1,3 +1,11 @@
+import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
+import { reserveMonthlyQuota, refundQuota } from "./growth-quotas";
+import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
+import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
+import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
+import { competitorPlaces, placesResponse } from "./competitor-provider";
+import { rateLimit, actorKey, takeBudget } from "./growth-limits";
+import { ownedBy } from "./ownership";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -19,7 +27,7 @@ import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, e
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { db } from "./db";
-import { subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
+import { searchQueries, subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
@@ -48,6 +56,8 @@ if (DEMO_AUTOLOGIN) {
   console.warn("⚠️  CRM_DEMO_AUTOLOGIN is enabled — public demo instance, all requests authenticate as user 1.");
 }
 
+const growthCostLimit = rateLimit("growth-processing", 30, 60);
+
 const photoOpenai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -60,14 +70,14 @@ fs.mkdirSync(processedDir, { recursive: true });
 
 const upload = multer({
   dest: uploadDir,
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 10, fields: 20, fieldSize: 32 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
     cb(null, allowed.includes(file.mimetype) || file.mimetype.startsWith("image/"));
   },
 });
 
-const uploadedFiles = new Map<string, { originalName: string; path: string; mimetype: string }>();
+const uploadedFiles = new Map<string, { createdAt: number; originalName: string; path: string; mimetype: string }>();
 const processedFiles = new Map<string, { originalName: string; path: string; newName: string }>();
 
 const processedIndexPath = path.join(process.cwd(), "tmp", "photo-processed", "_index.json");
@@ -95,6 +105,7 @@ function saveProcessedIndex() {
 loadProcessedIndex();
 
 type ProcessingJob = {
+  owner: string;
   status: "running" | "done" | "error";
   total: number;
   processed: number;
@@ -107,6 +118,11 @@ type ProcessingJob = {
 const processingJobs = new Map<string, ProcessingJob>();
 setInterval(() => {
   const cutoff = Date.now() - 60 * 60 * 1000;
+  if (![...processingJobs.values()].some(job => job.status === "running")) {
+    for (const [id, file] of uploadedFiles) if (file.createdAt < cutoff) {
+      fs.rmSync(file.path, { force: true }); uploadedFiles.delete(id);
+    }
+  }
   for (const [id, job] of processingJobs.entries()) {
     if (job.finishedAt && job.finishedAt < cutoff) processingJobs.delete(id);
   }
@@ -116,6 +132,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.use(["/api/photos", "/api/gmb/review-response", "/api/review/:token/generate-review"], (req, res, next) => {
+    if (req.method !== "POST") return next();
+    return growthCostLimit(req, res, next);
+  });
   registerStripeRoutes(app);
   registerTrackingRoutes(app);
   registerAdsConsultantRoutes(app);
@@ -124,10 +144,6 @@ export async function registerRoutes(
   function getDevUser(req: any, res: any): any {
     const user = req.user;
     if (user) return user;
-    if (DEV_AUTH_BYPASS || DEMO_AUTOLOGIN) {
-      req.user = { id: 1 };
-      return req.user;
-    }
     res.status(401).json({ message: "Not authenticated" });
     return null;
   }
@@ -189,6 +205,24 @@ export async function registerRoutes(
     res.json(databases);
   });
 
+  const ownerScope = (req: any) => ({ id: req.user.id, admin: isAdmin(req.user) });
+  const canReadQuery = async (req: any, id: number) => {
+    const [row] = await db.select({ id: searchQueries.id }).from(searchQueries)
+      .where(and(eq(searchQueries.id, id), ownedBy(searchQueries.userId, ownerScope(req))));
+    return !!row;
+  };
+  const scrapeOwners = new Map<string, number>();
+  app.use(["/api/search", "/api/search-queries", "/api/search-results", "/api/scrape",
+    "/api/scrape-schedules", "/api/permit-details", "/api/ranking-grid"], (req, res, next) => {
+    if (!getDevUser(req, res)) return;
+    next();
+  });
+  // These schedules refresh the shared permit directory, not personal searches.
+  app.use("/api/scrape-schedules", (req, res, next) => {
+    if (!isAdmin(req.user)) return res.status(403).json({ message: "Administrator access required" });
+    next();
+  });
+
   app.post("/api/search", async (req, res) => {
     try {
       const { searchType, searchValue, scopeCountyId, scopeState } = req.body;
@@ -198,7 +232,9 @@ export async function registerRoutes(
 
       const parsedCountyId = scopeCountyId ? parseInt(scopeCountyId) : null;
 
+      if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
       const query = await storage.createSearchQuery({
+        userId: req.user!.id,
         searchType,
         searchValue,
         countyId: parsedCountyId,
@@ -245,7 +281,7 @@ export async function registerRoutes(
 
   app.get("/api/search/live/:searchId", async (req, res) => {
     const job = getLiveSearchJob(req.params.searchId);
-    if (!job) {
+    if (!job || !(await canReadQuery(req, job.queryId))) {
       return res.status(404).json({ message: "Search job not found" });
     }
 
@@ -290,13 +326,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This database has no portal URL configured" });
       }
 
+      if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
       const query = await storage.createSearchQuery({
+        userId: req.user!.id,
         searchType: searchType || "address",
         searchValue: searchTerm,
         countyId: db.countyId,
       });
 
       const jobId = randomUUID().slice(0, 8);
+      scrapeOwners.set(jobId, req.user!.id);
       const url = db.searchUrl || db.portalUrl!;
       const platform = db.platform || "SmartGov";
 
@@ -311,16 +350,16 @@ export async function registerRoutes(
 
   app.get("/api/scrape/status/:jobId", async (req, res) => {
     const progress = getScrapeProgress(req.params.jobId);
-    if (!progress) {
+    if (!progress || scrapeOwners.get(req.params.jobId) !== req.user!.id) {
       return res.status(404).json({ message: "Job not found" });
     }
     res.json(progress);
   });
 
-  app.get("/api/scrape/jobs", async (_req, res) => {
+  app.get("/api/scrape/jobs", async (req, res) => {
     const jobs = getAllScrapeJobs();
     const arr: any[] = [];
-    jobs.forEach((val, key) => arr.push({ jobId: key, ...val }));
+    jobs.forEach((val, key) => { if (scrapeOwners.get(key) === req.user!.id) arr.push({ jobId: key, ...val }); });
     res.json(arr);
   });
 
@@ -361,30 +400,32 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/search-queries", async (_req, res) => {
-    const queries = await storage.getSearchQueries();
+  app.get("/api/search-queries", async (req, res) => {
+    const queries = await storage.getSearchQueries(ownerScope(req));
     res.json(queries);
   });
 
   app.delete("/api/search-queries/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    if (!(await canReadQuery(req, id))) return res.status(404).json({ message: "Search not found" });
     await storage.deleteSearchQuery(id);
     res.json({ success: true });
   });
 
-  app.delete("/api/search-queries", async (_req, res) => {
-    await storage.deleteAllSearchQueries();
+  app.delete("/api/search-queries", async (req, res) => {
+    await storage.deleteAllSearchQueries(ownerScope(req));
     res.json({ success: true });
   });
 
-  app.get("/api/search-results/recent", async (_req, res) => {
-    const results = await storage.getRecentSearchResults();
+  app.get("/api/search-results/recent", async (req, res) => {
+    const results = await storage.getRecentSearchResults(ownerScope(req));
     res.json(results);
   });
 
   app.get("/api/search-results/:queryId", async (req, res) => {
     const queryId = parseInt(req.params.queryId);
+    if (!(await canReadQuery(req, queryId))) return res.status(404).json({ message: "Search not found" });
     const results = await storage.getSearchResults(queryId);
     res.json(results);
   });
@@ -477,7 +518,10 @@ export async function registerRoutes(
     res.json(records);
   });
 
-  app.post("/api/photos/upload", upload.array("photos", 50), (req, res) => {
+  app.post("/api/photos/upload", (req, res, next) => {
+    if (uploadedFiles.size >= 200) return res.status(429).json({ message: "Upload storage is busy. Try again later." });
+    next();
+  }, upload.array("photos", 10), (req, res) => {
     try {
       const files = req.files as Express.Multer.File[];
       if (!files || files.length === 0) {
@@ -488,6 +532,7 @@ export async function registerRoutes(
       for (const file of files) {
         const fileId = randomUUID().slice(0, 12);
         uploadedFiles.set(fileId, {
+          createdAt: Date.now(),
           originalName: file.originalname,
           path: file.path,
           mimetype: file.mimetype,
@@ -912,14 +957,27 @@ The description should naturally incorporate the service keyword and location. I
         mirrorPhotos,
       } = req.body;
 
-      if (!fileIds || !Array.isArray(fileIds) || fileIds.length === 0) {
+      if (!fileIds || !Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 10 || fileIds.some((id: unknown) => typeof id !== "string")) {
         return res.status(400).json({ message: "fileIds array is required" });
       }
 
+      if (fileIds.some((id: string) => !uploadedFiles.has(id))) return res.status(404).json({ message: "Upload every photo before processing." });
+      const active = [...processingJobs.values()].filter(job => job.status === "running");
+      if (active.length >= 4 || active.some(job => job.owner === actorKey(req))) {
+        return res.status(429).json({ message: "Photo processing is busy. Wait for your current job to finish." });
+      }
+      if (!(await reserveMonthlyQuota(req, res, "photos", fileIds.length))) return;
+      // Recheck after the async atomic quota reservation before admitting work.
+      const running = [...processingJobs.values()].filter(job => job.status === "running");
+      if (running.length >= 4 || running.some(job => job.owner === actorKey(req))) {
+        await refundQuota(res, fileIds.length);
+        return res.status(429).json({ message: "Photo processing is busy." });
+      }
       const jobId = randomUUID().slice(0, 12);
       const results: { fileId: string; processedId: string; newName: string }[] = [];
       const errors: { fileId: string; error: string }[] = [];
       processingJobs.set(jobId, {
+        owner: actorKey(req),
         status: "running",
         total: fileIds.length,
         processed: 0,
@@ -1048,6 +1106,8 @@ The description should naturally incorporate the service keyword and location. I
            jobState.error = bgErr?.message || "Processing failed";
            jobState.finishedAt = Date.now();
          }
+       } finally {
+         await refundQuota(res, fileIds.length - results.length).catch(error => console.error("Photo quota refund failed", error));
        }
       })();
     } catch (err: any) {
@@ -1057,7 +1117,7 @@ The description should naturally incorporate the service keyword and location. I
 
   app.get("/api/photos/process/:jobId", (req, res) => {
     const job = processingJobs.get(req.params.jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (!job || job.owner !== actorKey(req)) return res.status(404).json({ message: "Job not found" });
     res.json({
       status: job.status,
       total: job.total,
@@ -1409,7 +1469,7 @@ The description should naturally incorporate the service keyword and location. I
     }
   });
 
-  app.post("/api/media/upload", upload.array("photos", 50), async (req, res) => {
+  app.post("/api/media/upload", upload.array("photos", 10), async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
     try {
@@ -1680,7 +1740,7 @@ Rules:
 
   app.get("/api/ranking-grid/map/:scanId", async (req, res) => {
     try {
-      const scan = await storage.getRankingGridScanById(parseInt(req.params.scanId));
+      const scan = await storage.getRankingGridScanById(parseInt(req.params.scanId), ownerScope(req));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
 
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
@@ -1715,7 +1775,7 @@ Rules:
       }
 
       res.setHeader("Content-Type", mapRes.headers.get("content-type") || "image/png");
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Cache-Control", "private, max-age=3600");
       const buffer = await mapRes.arrayBuffer();
       res.send(Buffer.from(buffer));
     } catch (err: any) {
@@ -1724,13 +1784,10 @@ Rules:
   });
 
   // Ranking Grid Routes
-  // NOTE: ranking_grid_scans has no user_id column yet, so these are scoped to
-  // authenticated users as a group rather than per-owner. Add a user_id column +
-  // per-user filtering to fully isolate one contractor's scans from another's.
   app.get("/api/ranking-grid/scans", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      const scans = await storage.getRankingGridScans();
+      const scans = await storage.getRankingGridScans(ownerScope(req));
       res.json(scans);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1740,7 +1797,7 @@ Rules:
   app.get("/api/ranking-grid/scans/:id", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      const scan = await storage.getRankingGridScanById(parseInt(req.params.id));
+      const scan = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
       const results = await storage.getRankingGridResults(scan.id);
       res.json({ scan, results });
@@ -1758,6 +1815,10 @@ Rules:
         return res.status(400).json({ message: "businessName, placeId, lat, lon, and keyword are required" });
       }
 
+      if (![3, 5, 7, 9, 11, 13, 15].includes(Number(gridSize || 3)) || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon)) || Math.abs(Number(lat)) > 90 || Math.abs(Number(lon)) > 180 || !(Number(gridDistance || 1) > 0 && Number(gridDistance || 1) <= 20)) {
+        return res.status(400).json({ message: "Invalid grid size, coordinates or spacing" });
+      }
+
       {
         const [sub] = await db
           .select()
@@ -1766,14 +1827,16 @@ Rules:
           .limit(1);
 
         if (sub && sub.status === "trialing") {
-          const existingScans = await storage.getRankingGridScans();
+          const existingScans = await storage.getRankingGridScans({ id: user.id, admin: false });
           if (existingScans.length >= 1) {
             return res.status(403).json({ message: "Free trial is limited to 1 GMB Ranking Grid report. Upgrade your plan for unlimited scans." });
           }
         }
       }
 
+      if (!(await reserveMonthlyQuota(req, res, "rankings"))) return;
       const scan = await storage.createRankingGridScan({
+        userId: user.id,
         businessName,
         placeId,
         address: address || null,
@@ -1798,7 +1861,9 @@ Rules:
   app.delete("/api/ranking-grid/scans/:id", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      await storage.deleteRankingGridScan(parseInt(req.params.id));
+      const scan = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
+      if (!scan) return res.status(404).json({ message: "Scan not found" });
+      await storage.deleteRankingGridScan(scan.id);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1915,14 +1980,10 @@ Rules:
     }
   });
 
-  // Competitor Intelligence Routes (Platinum only)
+  // Competitor Intelligence Routes (Gold and Platinum)
   async function requirePlatinum(req: any, res: any): Promise<boolean> {
     const user = req.user;
     if (!user) {
-      if (DEV_AUTH_BYPASS) {
-        req.user = { id: 1 };
-        return true;
-      }
       res.status(401).json({ message: "Login required" }); return false;
     }
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
@@ -1951,7 +2012,7 @@ Rules:
       const [scan] = await db.select().from(competitorScans).where(and(eq(competitorScans.id, scanId), eq(competitorScans.userId, userId)));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
       const listings = await db.select().from(competitorListings).where(eq(competitorListings.scanId, scanId)).orderBy(desc(competitorListings.rating));
-      res.json({ scan, listings });
+      res.json({ scan, listings: listings.map(presentListing) });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
@@ -1959,8 +2020,10 @@ Rules:
     if (!(await requirePlatinum(req, res))) return;
     try {
       const userId = (req as any).user.id;
-      const { industry, location, lat, lon, radius } = req.body;
-      if (!industry || !location) return res.status(400).json({ message: "industry and location are required" });
+      const parsed = z.object({ industry: z.string().trim().min(1).max(120), location: z.string().trim().min(1).max(250), radius: z.number().int().min(1).max(100).default(25) }).safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Provide industry, location and a radius from 1 to 100 miles." });
+      const { industry, location, radius } = parsed.data;
+      const lat = null, lon = null;
 
       const [scan] = await db.insert(competitorScans).values({
         userId,
@@ -2142,28 +2205,14 @@ Rules:
   async function runCompetitorScan(scanId: number, userId: number, industry: string, location: string, lat: string | null, lon: string | null, radius: number) {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
-      await db.update(competitorScans).set({ status: "failed" }).where(eq(competitorScans.id, scanId));
+      await db.update(competitorScans).set({ status: "failed", errorMessage: "Google Places is not configured." }).where(eq(competitorScans.id, scanId));
       return;
     }
 
     try {
-      const query = `${industry} in ${location}`;
-      let allPlaces: any[] = [];
-      let nextPageToken: string | null = null;
-
-      for (let page = 0; page < 3; page++) {
-        let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`;
-        if (lat && lon) url += `&location=${lat},${lon}&radius=${radius * 1609}`;
-        if (nextPageToken) url = `https://maps.googleapis.com/maps/api/place/textsearch/json?pagetoken=${encodeURIComponent(nextPageToken)}&key=${apiKey}`;
-
-        const searchRes = await fetch(url);
-        const data = await searchRes.json() as any;
-
-        if (data.results) allPlaces = allPlaces.concat(data.results);
-        nextPageToken = data.next_page_token || null;
-        if (!nextPageToken) break;
-        await new Promise(r => setTimeout(r, 2000));
-      }
+      const found = await competitorPlaces(industry, location, radius, apiKey);
+      const allPlaces = found.places;
+      await db.update(competitorScans).set({ lat: String(found.center.lat), lon: String(found.center.lng), errorMessage: null }).where(eq(competitorScans.id, scanId));
 
       for (const place of allPlaces) {
         let detailReviews: any[] = [];
@@ -2172,15 +2221,14 @@ Rules:
 
         try {
           const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=reviews,formatted_phone_number,website&key=${apiKey}`;
-          const detailRes = await fetch(detailUrl);
-          const detailData = await detailRes.json() as any;
+          const detailData = await placesResponse(detailUrl, "Competitor details");
           if (detailData.result) {
             detailReviews = detailData.result.reviews || [];
             phone = detailData.result.formatted_phone_number || null;
             website = detailData.result.website || null;
           }
           await new Promise(r => setTimeout(r, 200));
-        } catch (e) {}
+        } catch (e) { throw e; }
 
         const reviewAnalysis = analyzeReviews(detailReviews, place, industry);
         const bsAnalysis = analyzeBsScore(place, reviewAnalysis);
@@ -2205,306 +2253,16 @@ Rules:
       }
 
       await db.update(competitorScans).set({ status: "completed", totalFound: allPlaces.length }).where(eq(competitorScans.id, scanId));
-    } catch (err) {
+    } catch (err: any) {
       console.error("Competitor scan failed:", err);
-      await db.update(competitorScans).set({ status: "failed" }).where(eq(competitorScans.id, scanId));
+      await db.delete(competitorListings).where(eq(competitorListings.scanId, scanId));
+      await db.update(competitorScans).set({ status: "failed", totalFound: 0, errorMessage: err.message || "Provider request failed." }).where(eq(competitorScans.id, scanId));
     }
-  }
-
-  function analyzeReviews(reviews: any[], place: any, industry: string): any {
-    if (!reviews || reviews.length === 0) {
-      return {
-        totalAnalyzed: 0,
-        goodReviews: 0,
-        badReviews: 0,
-        neutralReviews: 0,
-        reviewsWithPhotos: 0,
-        reviewsWithRealNames: 0,
-        reviewsLookingAi: 0,
-        reviewsGeneric: 0,
-        reviewsSpecific: 0,
-        blockedProfiles: 0,
-        reviewersSharingLocations: 0,
-        oldestReviewAge: null,
-        reviewVelocityFlag: false,
-        reviewVelocityNote: null,
-        aiSuspectReviews: [],
-        genericReviews: [],
-        flaggedReviewers: [],
-        reviews: [],
-      };
-    }
-
-    let goodReviews = 0, badReviews = 0, neutralReviews = 0;
-    let reviewsWithPhotos = 0, reviewsWithRealNames = 0;
-    let reviewsLookingAi = 0, reviewsGeneric = 0, reviewsSpecific = 0;
-    let blockedProfiles = 0;
-    const aiSuspectReviews: any[] = [];
-    const genericReviews: any[] = [];
-    const flaggedReviewers: any[] = [];
-    const reviewDetails: any[] = [];
-    const authorLocations: Record<string, number> = {};
-
-    const aiPatterns = [
-      /highly recommend/i, /exceeded expectations/i, /couldn't be happier/i,
-      /top-notch/i, /above and beyond/i, /look no further/i,
-      /professional and courteous/i, /from start to finish/i,
-      /a pleasure to work with/i, /will definitely be using/i,
-      /5 stars? ?(isn't|is not) enough/i, /second to none/i,
-      /exceptional service/i, /outstanding work/i, /truly exceptional/i,
-    ];
-
-    const specificIndicators = [
-      /\b(John|Mike|Dave|Steve|Tom|Chris|Brian|Mark|Jeff|Dan|James|Bob|Jim|Joe|Bill|Rick|Scott|Tim|Larry|Matt|Rob|Paul|Josh|Kevin|Adam|Eric|Ben|Ryan|Nick|Jake|Sam|Gary|Doug|Tony|Greg|Andy|Phil|Craig|Wayne|Bruce|Carl|Ray|Ron|Ken|Frank|Ed|Earl|Roy|Lee|Jack|Kyle|Brad|Sean|Derek|Chad|Kirk|Troy|Seth|Todd|Curt|Norm|Hank|Neil|Wade|Vince|Stan)\b/i,
-      /\b(replaced|installed|repaired|fixed|built|painted|cleaned|removed|demolished|renovated)\b.*\b(roof|siding|deck|window|door|bathroom|kitchen|drywall|concrete|gutter|fence|floor|tile|cabinet|pipe|drain|AC|furnace|heater)\b/i,
-      /\$\d+/,
-      /\d+ (days?|weeks?|months?|hours?)/,
-      /\b(sq\s?ft|square feet|linear feet)\b/i,
-    ];
-
-    const genericPhrases = [
-      "great job", "great work", "great service", "great company", "highly recommend",
-      "very professional", "excellent work", "excellent service", "amazing work",
-      "wonderful experience", "fantastic job", "top notch", "best company",
-      "would definitely recommend", "thank you so much",
-    ];
-
-    for (const review of reviews) {
-      const text = review.text || "";
-      const rating = review.rating || 0;
-      const authorName = review.author_name || "";
-      const profileUrl = review.author_url || "";
-      const relativeTime = review.relative_time_description || "";
-
-      if (rating >= 4) goodReviews++;
-      else if (rating <= 2) badReviews++;
-      else neutralReviews++;
-
-      const hasPhoto = !!(review.profile_photo_url && !review.profile_photo_url.includes("default"));
-      if (hasPhoto) reviewsWithPhotos++;
-
-      const looksRealName = /^[A-Z][a-z]+ [A-Z]/.test(authorName) && !authorName.includes("Google") && authorName.length > 3;
-      if (looksRealName) reviewsWithRealNames++;
-
-      const isBlocked = !profileUrl || profileUrl.includes("/reviews") === false;
-
-      let aiScore = 0;
-      aiPatterns.forEach(pattern => { if (pattern.test(text)) aiScore++; });
-      if (text.length > 200 && text.length < 500 && aiScore >= 2) aiScore++;
-      if (text.split(".").length >= 4 && text.split(".").every((s: string) => s.trim().length > 20)) aiScore++;
-      const looksAi = aiScore >= 3;
-      if (looksAi) {
-        reviewsLookingAi++;
-        aiSuspectReviews.push({ author: authorName, text: text.substring(0, 150) + "...", rating, aiScore });
-      }
-
-      let isGeneric = false;
-      const textLower = text.toLowerCase();
-      const genericCount = genericPhrases.filter(p => textLower.includes(p)).length;
-      const specificCount = specificIndicators.filter(p => p.test(text)).length;
-      if (specificCount > 0) {
-        reviewsSpecific++;
-      } else if (genericCount >= 2 || (text.length < 80 && genericCount >= 1)) {
-        isGeneric = true;
-        reviewsGeneric++;
-        genericReviews.push({ author: authorName, text: text.substring(0, 120) + "...", rating });
-      } else if (text.length > 0) {
-        reviewsSpecific++;
-      }
-
-      if (isBlocked) {
-        blockedProfiles++;
-        flaggedReviewers.push({ author: authorName, reason: "Profile may be hidden or restricted", profileUrl });
-      }
-
-      const locationMatch = authorName.match(/Local Guide/i);
-      if (review.author_url) {
-        const urlKey = review.author_url.replace(/\/reviews$/, "");
-        authorLocations[urlKey] = (authorLocations[urlKey] || 0) + 1;
-      }
-
-      reviewDetails.push({
-        author: authorName,
-        rating,
-        text: text.substring(0, 200),
-        relativeTime,
-        hasPhoto,
-        looksRealName,
-        looksAi,
-        isGeneric,
-        isBlocked,
-        isLocalGuide: !!locationMatch,
-      });
-    }
-
-    const duplicateLocations = Object.values(authorLocations).filter(c => c > 1).length;
-
-    let oldestReviewAge: string | null = null;
-    const timeDescriptions = reviews.map(r => r.relative_time_description || "").filter(Boolean);
-    const yearMatches = timeDescriptions.filter(t => /year/i.test(t));
-    const monthMatches = timeDescriptions.filter(t => /month/i.test(t));
-    if (yearMatches.length > 0) {
-      const years = yearMatches.map(t => { const m = t.match(/(\d+)/); return m ? parseInt(m[1]) : 1; });
-      oldestReviewAge = `${Math.max(...years)} year(s)`;
-    } else if (monthMatches.length > 0) {
-      const months = monthMatches.map(t => { const m = t.match(/(\d+)/); return m ? parseInt(m[1]) : 1; });
-      oldestReviewAge = `${Math.max(...months)} month(s)`;
-    } else if (timeDescriptions.length > 0) {
-      oldestReviewAge = "Less than a month";
-    }
-
-    const totalReviewCount = place.user_ratings_total || reviews.length;
-    const industryLower = industry.toLowerCase();
-    let reviewVelocityFlag = false;
-    let reviewVelocityNote: string | null = null;
-
-    const oldestMonths = yearMatches.length > 0
-      ? Math.max(...yearMatches.map(t => { const m = t.match(/(\d+)/); return m ? parseInt(m[1]) * 12 : 12; }))
-      : monthMatches.length > 0
-        ? Math.max(...monthMatches.map(t => { const m = t.match(/(\d+)/); return m ? parseInt(m[1]) : 1; }))
-        : 1;
-
-    if (oldestMonths > 0 && totalReviewCount > 0) {
-      const reviewsPerMonth = totalReviewCount / oldestMonths;
-
-      if ((industryLower.includes("siding") || industryLower.includes("general contractor") || industryLower.includes("roofing") || industryLower.includes("remodel")) && reviewsPerMonth > 8) {
-        reviewVelocityFlag = true;
-        reviewVelocityNote = `${totalReviewCount} reviews in ~${oldestMonths} months (${reviewsPerMonth.toFixed(1)}/mo). ${industry} jobs take 2-12 weeks each — this review velocity is suspicious.`;
-      } else if ((industryLower.includes("pressure") || industryLower.includes("cleaning") || industryLower.includes("pest")) && reviewsPerMonth > 30) {
-        reviewVelocityFlag = true;
-        reviewVelocityNote = `${totalReviewCount} reviews in ~${oldestMonths} months (${reviewsPerMonth.toFixed(1)}/mo) — even for a high-volume service, this rate seems inflated.`;
-      }
-
-      if (oldestMonths <= 10 && totalReviewCount > 100) {
-        reviewVelocityFlag = true;
-        reviewVelocityNote = `${totalReviewCount} reviews in only ~${oldestMonths} months — extremely suspicious. Most legitimate businesses cannot accumulate reviews this fast.`;
-      }
-    }
-
-    return {
-      totalAnalyzed: reviews.length,
-      goodReviews,
-      badReviews,
-      neutralReviews,
-      reviewsWithPhotos,
-      reviewsWithRealNames,
-      reviewsLookingAi,
-      reviewsGeneric,
-      reviewsSpecific,
-      blockedProfiles,
-      reviewersSharingLocations: duplicateLocations,
-      oldestReviewAge,
-      reviewVelocityFlag,
-      reviewVelocityNote,
-      aiSuspectReviews: aiSuspectReviews.slice(0, 5),
-      genericReviews: genericReviews.slice(0, 5),
-      flaggedReviewers: flaggedReviewers.slice(0, 5),
-      reviews: reviewDetails,
-    };
-  }
-
-  function analyzeBsScore(place: any, reviewAnalysis?: any): { score: number; reasons: string[] } {
-    const reasons: string[] = [];
-    let score = 0;
-
-    const name = (place.name || "").toLowerCase();
-    const keywordStuffWords = ["best", "top", "cheap", "#1", "number one", "near me", "affordable", "guaranteed"];
-    const stuffedCount = keywordStuffWords.filter(kw => name.includes(kw)).length;
-    if (stuffedCount >= 2) {
-      score += 25;
-      reasons.push("Business name appears keyword-stuffed");
-    } else if (stuffedCount === 1) {
-      score += 8;
-      reasons.push("Business name contains a ranking keyword");
-    }
-
-    const rating = place.rating || 0;
-    const reviewCount = place.user_ratings_total || 0;
-    if (rating === 5.0 && reviewCount > 20) {
-      score += 20;
-      reasons.push("Perfect 5.0 rating is statistically unlikely — possible review manipulation");
-    } else if (rating >= 4.9 && reviewCount > 50) {
-      score += 12;
-      reasons.push("Suspiciously high rating with many reviews");
-    }
-    if (reviewCount > 200 && rating >= 4.8) {
-      score += 10;
-      reasons.push("Very high review count with near-perfect rating");
-    }
-
-    if (!place.formatted_address || place.formatted_address.includes("PO Box")) {
-      score += 12;
-      reasons.push("No physical address or uses PO Box — possible virtual office listing");
-    }
-
-    if (name.length > 60) {
-      score += 10;
-      reasons.push("Extremely long business name — likely stuffed with keywords for SEO");
-    }
-
-    if (reviewAnalysis && reviewAnalysis.totalAnalyzed > 0) {
-      const total = reviewAnalysis.totalAnalyzed;
-      const aiPct = (reviewAnalysis.reviewsLookingAi / total) * 100;
-      const genericPct = (reviewAnalysis.reviewsGeneric / total) * 100;
-      const blockedPct = (reviewAnalysis.blockedProfiles / total) * 100;
-      const photoPct = (reviewAnalysis.reviewsWithPhotos / total) * 100;
-
-      if (aiPct > 50) {
-        score += 20;
-        reasons.push(`${reviewAnalysis.reviewsLookingAi}/${total} reviews appear AI-generated (${Math.round(aiPct)}%)`);
-      } else if (aiPct > 25) {
-        score += 10;
-        reasons.push(`${reviewAnalysis.reviewsLookingAi}/${total} reviews show AI patterns (${Math.round(aiPct)}%)`);
-      }
-
-      if (genericPct > 60) {
-        score += 12;
-        reasons.push(`${Math.round(genericPct)}% of reviews are generic with no specific details`);
-      } else if (genericPct > 40) {
-        score += 6;
-        reasons.push(`${Math.round(genericPct)}% of reviews are generic`);
-      }
-
-      if (blockedPct > 50) {
-        score += 15;
-        reasons.push(`${reviewAnalysis.blockedProfiles}/${total} reviewers have blocked/hidden profiles — likely hired reviewers`);
-      } else if (blockedPct > 30) {
-        score += 8;
-        reasons.push(`${Math.round(blockedPct)}% of reviewer profiles appear restricted`);
-      }
-
-      if (photoPct < 10 && total > 5) {
-        score += 5;
-        reasons.push("Almost no reviewers have profile photos");
-      }
-
-      if (reviewAnalysis.reviewVelocityFlag) {
-        score += 15;
-        reasons.push(reviewAnalysis.reviewVelocityNote || "Review velocity is suspiciously high for this industry");
-      }
-
-      if (reviewAnalysis.badReviews === 0 && total > 10) {
-        score += 8;
-        reasons.push("Zero negative reviews across all sampled reviews — statistically unusual");
-      }
-    }
-
-    score = Math.min(score, 100);
-
-    if (score === 0) {
-      reasons.push("No suspicious signals detected — appears organic");
-    }
-
-    return { score, reasons };
   }
 
   async function requirePremiumPlus(req: any, res: any): Promise<boolean> {
     const user = req.user;
     if (!user) {
-      if (DEV_AUTH_BYPASS) {
-        req.user = { id: 1 };
-        return true;
-      }
       res.status(401).json({ message: "Login required" }); return false;
     }
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
@@ -3519,7 +3277,10 @@ Rules:
       }
 
       if (fingerprint) {
-        const fpVisits = dailyVisits.filter(v => v.fingerprint === fingerprint && v.ipAddress !== ip);
+        const fpVisits = await db.select({ id: clickVisits.id }).from(clickVisits).where(and(
+          eq(clickVisits.domainId, domain.id), eq(clickVisits.fingerprint, String(fingerprint)),
+          gte(clickVisits.visitedAt, oneDayAgo), sql`${clickVisits.ipAddress} <> ${ip}`,
+        )).limit(1);
         if (fpVisits.length > 0) {
           suspicionReasons.push("Same device fingerprint seen from different IPs");
         }
@@ -4580,7 +4341,7 @@ function main() {
       const domain = await storage.getTrackedDomainById(id);
       if (!domain || domain.userId !== user.id) return res.status(404).json({ message: "Domain not found" });
 
-      const apiUrl = "https://constructhub.us";
+      const apiUrl = canonicalAppOrigin();
 
       const scriptTag = `<!-- VPN Shield by ConstructHUB -->\n<script src="${apiUrl}/api/vpn-shield/script/${domain.trackingId}" async><\/script>`;
 
@@ -4597,12 +4358,12 @@ function main() {
 
   app.get("/api/vpn-shield/script/:trackingId", (req, res) => {
     const { trackingId } = req.params;
-    const apiUrl = "https://constructhub.us";
+    const apiUrl = canonicalAppOrigin();
 
     const script = `(function(){
   if(window.__chVpnShieldLoaded)return;
   window.__chVpnShieldLoaded=true;
-  var tid="${trackingId}";
+  var tid=${JSON.stringify(trackingId)};
   var api="${apiUrl}/api/vpn-shield/track";
   var crawlers=/Googlebot|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|facebookexternalhit|Twitterbot|LinkedInBot|Applebot|AdsBot-Google|Mediapartners-Google|msnbot/i;
   if(crawlers.test(navigator.userAgent))return;
@@ -4710,7 +4471,7 @@ function main() {
 })();`;
 
     res.setHeader("Content-Type", "application/javascript");
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Cache-Control", "private, max-age=3600");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.send(script);
   });
@@ -4958,6 +4719,9 @@ function main() {
         return res.status(400).json({ message: "Client name and email are required" });
       }
 
+      if (typeof clientEmail !== "string" || !z.string().email().safeParse(clientEmail.trim()).success) return res.status(400).json({ message: "Valid client email required" });
+      if (await isReviewSuppressed(user.id, clientEmail)) return res.status(409).json({ message: "This recipient has unsubscribed from your review requests. Only the customer can resubscribe." });
+
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       let googleProfileUrl = fullUser.googleProfileUrl || "";
       let templateDesc = "";
@@ -5000,6 +4764,7 @@ function main() {
         scheduledFor: scheduledDate,
       });
 
+      if (request.unsubscribed || await isReviewSuppressed(request.userId, request.clientEmail)) return res.status(409).json({ message: "Recipient has unsubscribed" });
       if (!isScheduled) {
         const baseUrl = getBaseUrl(req);
         await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
@@ -5316,7 +5081,7 @@ function main() {
       const request = requests.find(r => r.id === id);
       if (!request) return res.status(404).json({ message: "Not found" });
 
-      if (request.unsubscribed) return res.status(409).json({ message: "This customer unsubscribed from this review request." });
+      if (request.unsubscribed || await isReviewSuppressed(request.userId, request.clientEmail)) return res.status(409).json({ message: "This customer unsubscribed from this review request." });
 
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       const companyLogoUrl = fullUser?.companyLogoUrl || null;
@@ -5340,7 +5105,7 @@ function main() {
 
   app.get("/api/review/:token/pixel.png", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (request && !request.emailOpened) {
         await storage.updateReviewRequest(request.id, {
           emailOpened: true,
@@ -5355,7 +5120,7 @@ function main() {
 
   app.get("/api/review/:token/click", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (request) {
         const updates: any = {
           linkClicked: true,
@@ -5377,7 +5142,7 @@ function main() {
 
   app.get("/api/review/:token", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Review request not found" });
 
       if (!request.linkClicked) {
@@ -5411,6 +5176,7 @@ function main() {
         status: request.status,
         feedbackRating: request.feedbackRating,
         reviewSubmitted: request.reviewSubmitted,
+        referralOffer: await getReferralSettings(request.userId).then(s => s.enabled ? s.offer : null),
       });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to load review" });
@@ -5419,7 +5185,7 @@ function main() {
 
   app.post("/api/review/:token/feedback", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Review request not found" });
 
       const { rating, categories, comments } = req.body;
@@ -5442,19 +5208,28 @@ function main() {
     }
   });
 
-  app.post("/api/review/:token/mark-reviewed", async (req, res) => {
+  app.post("/api/review/:token/google-link-opened", async (req, res) => {
+    const request = await storage.getReviewRequestByToken(String(req.params.token));
+    if (!request) return res.status(404).json({ message: "Not found" });
+    await storage.updateReviewRequest(request.id, { googleLinkOpened: true, googleLinkOpenedAt: request.googleLinkOpenedAt || new Date() });
+    res.json({ success: true });
+  });
+
+  // Backward-compatible completion endpoint. A client cannot verify Google publication.
+  app.post(["/api/review/:token/complete", "/api/review/:token/mark-reviewed"], async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       if (!request.feedbackRating) {
         return res.status(409).json({ message: "Submit a rating first" });
       }
 
+      const referral = await getReferralSettings(request.userId);
       await storage.updateReviewRequest(request.id, {
-        reviewSubmitted: true,
-        status: "reviewed",
-        referralOptIn: req.body.referralOptIn || false,
-        referralFeedback: req.body.referralFeedback || null,
+        lastStep: "done",
+        nextReminderAt: null,
+        referralOptIn: referral.enabled && req.body.referralOptIn === true,
+        referralFeedback: referral.enabled && ["up", "down"].includes(req.body.referralFeedback) ? req.body.referralFeedback : null,
       });
       res.json({ success: true });
     } catch (err: any) {
@@ -5464,14 +5239,17 @@ function main() {
 
   app.post("/api/review/:token/generate-review", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       if (!request.feedbackRating) {
         return res.status(409).json({ message: "Submit a rating first" });
       }
       const { highlights } = req.body;
-      if (typeof highlights !== "string" || !highlights.trim()) {
+      if (typeof highlights !== "string" || !highlights.trim() || highlights.length > 4000) {
         return res.status(400).json({ message: "Describe your own experience before creating a draft." });
+      }
+      if (!(await takeBudget(`review-draft:owner:${request.userId}`, 50)) || !(await takeBudget(`review-draft:request:${request.id}`, 5, 1, 86400_000))) {
+        return res.status(429).json({ message: "Draft limit reached. You can still write your own review directly on Google." });
       }
       const prompt = reviewDraftPrompt(request.companyName || "the company", request.feedbackRating, highlights.trim());
 
@@ -5493,7 +5271,7 @@ function main() {
 
   app.post("/api/review/:token/track-photos", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       if (!request.photosDownloaded) {
         await storage.updateReviewRequest(request.id, {
@@ -5509,7 +5287,7 @@ function main() {
 
   app.post("/api/review/:token/track-review-method", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       const { method } = req.body;
       if (method === "own" || method === "ai") {
@@ -5523,7 +5301,7 @@ function main() {
 
   app.post("/api/review/:token/track-step", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       const { step } = req.body;
       if (step && typeof step === "string") {
@@ -5700,6 +5478,17 @@ function main() {
   });
 
   // Review Reminder Settings
+  app.get("/api/review-referral-settings", async (req, res) => {
+    const user = getDevUser(req, res); if (!user) return;
+    res.json(await getReferralSettings(user.id));
+  });
+  app.put("/api/review-referral-settings", async (req, res) => {
+    const user = getDevUser(req, res); if (!user) return;
+    const parsed = referralSettingsInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Enabled offers need terms of 1–500 characters" });
+    res.json(await saveReferralSettings(user.id, parsed.data));
+  });
+
   app.get("/api/review-reminder-settings", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5721,14 +5510,9 @@ function main() {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
-      const { enabled, maxReminders, intervalHours, timeWindows, timezone } = req.body;
-      const settings = await storage.upsertReminderSettings(user.id, {
-        enabled: enabled !== undefined ? enabled : true,
-        maxReminders: maxReminders || 3,
-        intervalHours: intervalHours || 48,
-        timeWindows: timeWindows || [{ start: 9, end: 12 }, { start: 15, end: 18 }, { start: 18, end: 21 }],
-        timezone: timezone || "America/New_York",
-      });
+      const parsed = reminderSettingsInput.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid reminder settings", errors: parsed.error.flatten() });
+      const settings = await storage.upsertReminderSettings(user.id, parsed.data);
       res.json(settings);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to save settings" });
@@ -5738,12 +5522,12 @@ function main() {
   // Unsubscribe page data
   app.get("/api/review/:token/unsubscribe-info", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
       res.json({
         clientName: request.clientName,
         companyName: request.companyName,
-        unsubscribed: request.unsubscribed,
+        unsubscribed: await isReviewSuppressed(request.userId, request.clientEmail),
         hasSubmitted: request.status !== "sent",
       });
     } catch (err: any) {
@@ -5754,10 +5538,11 @@ function main() {
   // Unsubscribe + optional feedback
   app.post("/api/review/:token/unsubscribe", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(req.params.token);
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
 
       const { feedback } = req.body;
+      await unsubscribeRecipient(request.userId, request.clientEmail);
       const updateData: any = { unsubscribed: true, nextReminderAt: null };
       if (feedback) {
         updateData.feedbackComments = (request.feedbackComments || "") + (request.feedbackComments ? "\n[Unsubscribe feedback]: " : "[Unsubscribe feedback]: ") + feedback;
@@ -5769,33 +5554,23 @@ function main() {
     }
   });
 
+  app.post("/api/review/:token/resubscribe", async (req, res) => {
+    if (req.body.confirm !== true) return res.status(400).json({ message: "Explicit confirmation is required" });
+    const request = await storage.getReviewRequestByToken(String(req.params.token));
+    if (!request) return res.status(404).json({ message: "Not found" });
+    if (req.user?.id === request.userId) return res.status(403).json({ message: "Only the customer can resubscribe from their email link" });
+    await resubscribeRecipient(request.userId, request.clientEmail);
+    res.json({ success: true });
+  });
+
   // Reminder scheduler — runs every 5 minutes
-  function calculateNextReminderTime(settings: any, reminderNumber: number): Date {
-    const now = new Date();
-    const intervalMs = (settings?.intervalHours || 48) * 60 * 60 * 1000;
-    const nextDate = new Date(now.getTime() + intervalMs);
-
-    const windows = settings?.timeWindows || [
-      { start: 9, end: 12 }, { start: 15, end: 18 }, { start: 18, end: 21 }
-    ];
-    const windowIndex = reminderNumber % windows.length;
-    const window = windows[windowIndex];
-
-    const randomHour = window.start + Math.random() * (window.end - window.start);
-    const hours = Math.floor(randomHour);
-    const minutes = Math.floor((randomHour - hours) * 60);
-
-    nextDate.setUTCHours(hours + 5, minutes, 0, 0);
-    return nextDate;
-  }
-
   async function processReminders() {
     try {
       const pending = await storage.getPendingReminders();
       for (const request of pending) {
         try {
           const settings = await storage.getReminderSettings(request.userId);
-          const maxReminders = settings?.maxReminders || 3;
+          const maxReminders = settings?.maxReminders ?? 3;
           const enabled = settings?.enabled !== false;
 
           if (!enabled || request.remindersSent >= maxReminders) {
@@ -5803,9 +5578,12 @@ function main() {
             continue;
           }
 
-          const baseUrl = (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT)
-            ? "https://constructhub.us"
-            : (process.env.REPLIT_DEPLOYMENT_URL ? `https://${process.env.REPLIT_DEPLOYMENT_URL}` : "https://constructhub.us");
+          const baseUrl = canonicalAppOrigin();
+
+          if (!inReminderWindow(settings)) {
+            await storage.updateReviewRequest(request.id, { nextReminderAt: calculateNextReminderTime(settings, request.remindersSent) });
+            continue;
+          }
 
           let reminderLogoUrl: string | null = null;
           if (request.userId) {
@@ -5813,6 +5591,7 @@ function main() {
             if (owner?.companyLogoUrl) reminderLogoUrl = owner.companyLogoUrl;
           }
 
+          if (await isReviewSuppressed(request.userId, request.clientEmail)) continue;
           await sendReviewReminderEmail(
             request.clientEmail,
             request.clientName,
@@ -5855,10 +5634,9 @@ function main() {
           const [owner] = await db.select().from(users).where(eq(users.id, request.userId)).limit(1);
           const companyLogoUrl = owner?.companyLogoUrl || null;
 
-          const baseUrl = (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT)
-            ? "https://constructhub.us"
-            : (process.env.REPLIT_DEPLOYMENT_URL ? `https://${process.env.REPLIT_DEPLOYMENT_URL}` : "https://constructhub.us");
+          const baseUrl = canonicalAppOrigin();
 
+          if (await isReviewSuppressed(request.userId, request.clientEmail)) continue;
           await sendReviewRequestEmail(
             request.clientEmail,
             request.clientName,

@@ -1,14 +1,16 @@
+import { canonicalAppOrigin } from "./review-reminders";
 import type { Express } from "express";
 
 export function registerTrackingRoutes(app: Express) {
+  app.get("/api/public-config", (_req, res) => res.json({ appOrigin: canonicalAppOrigin() }));
   app.get("/api/click-guard/script/:trackingId", (req, res) => {
     const { trackingId } = req.params;
-    const apiUrl = "https://constructhub.us";
+    const apiUrl = canonicalAppOrigin();
 
     const script = `(function(){
   if(window.__chClickGuardLoaded)return;
   window.__chClickGuardLoaded=true;
-  var tid="${trackingId}";
+  var tid=${JSON.stringify(trackingId)};
   var api="${apiUrl}/api/click-guard/track";
   function fp(){
     try{

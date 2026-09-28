@@ -1,3 +1,6 @@
+import { rateLimit, takeBudget } from "./growth-limits";
+import { createHash } from "node:crypto";
+import { testAuthAdapter } from "./test-auth";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import session from "express-session";
@@ -115,6 +118,10 @@ export async function setupAuth(app: Express) {
 
   app.use(passport.initialize());
   app.use(passport.session());
+  app.use(testAuthAdapter(async () => {
+    const [user] = await db.select().from(users).where(eq(users.id, 1));
+    return user;
+  }));
 
   passport.use(
     new GoogleStrategy(
@@ -196,6 +203,15 @@ export async function setupAuth(app: Express) {
       done(err);
     }
   });
+
+  app.use(["/api/auth/signup", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/2fa/login"],
+    rateLimit("growth-auth", 30, 60, 15 * 60_000), async (req, res, next) => {
+      if (typeof req.body?.email === "string") {
+        const account = createHash("sha256").update(req.body.email.trim().toLowerCase()).digest("hex");
+        if (!(await takeBudget(`growth-auth:account:${account}`, 10, 1, 15 * 60_000))) return res.status(429).json({ message: "Too many attempts. Please try again later." });
+      }
+      next();
+    });
 
   app.get("/api/auth/google", (req, res, next) => {
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
@@ -504,10 +520,23 @@ export async function setupAuth(app: Express) {
       }
 
       const passwordHash = await bcrypt.hash(password, 12);
-      await db
-        .update(users)
-        .set({ passwordHash, resetToken: null, resetExpiry: null, emailVerified: true })
-        .where(eq(users.id, user.id));
+      const connection = await pool.connect();
+      try {
+        await connection.query("BEGIN");
+        const changed = await connection.query(`UPDATE users SET password_hash=$1,reset_token=null,reset_expiry=null,email_verified=true
+          WHERE id=$2 AND reset_token=$3 AND reset_expiry>timezone('UTC',now()) RETURNING id`, [passwordHash, user.id, token]);
+        if (!changed.rowCount) {
+          await connection.query("ROLLBACK");
+          return res.status(400).json({ message: "Invalid or expired reset link" });
+        }
+        await connection.query(`DELETE FROM session WHERE sess->'passport'->>'user'=$1 OR sess->>'pending2FAUserId'=$1`, [String(user.id)]);
+        await connection.query("COMMIT");
+      } catch (error) { await connection.query("ROLLBACK"); throw error; }
+      finally { connection.release(); }
+      if (req.user?.id === user.id || req.session.pending2FAUserId === user.id) {
+        await new Promise<void>((resolve, reject) => req.session.destroy(error => error ? reject(error) : resolve()));
+        res.clearCookie("connect.sid");
+      }
 
       res.json({ message: "Password reset successfully. You can now log in." });
     } catch (err: any) {
@@ -516,16 +545,6 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/auth/me", async (req, res) => {
-    // Demo/dev autologin: the SPA boots off this endpoint, so it must honor the
-    // same flags as getDevUser (routes.ts) or the demo instance shows a login
-    // wall while every API call actually works. Demo = isolated throwaway DB.
-    const demoOrBypass =
-      process.env.CRM_DEMO_AUTOLOGIN === "true" ||
-      (process.env.DEV_AUTH_BYPASS_USER1 === "true" && process.env.NODE_ENV !== "production");
-    if ((!req.isAuthenticated() || !req.user) && demoOrBypass) {
-      req.user = { id: 1 } as any;
-      (req as any).isAuthenticated = () => true;
-    }
     if (req.isAuthenticated() && req.user) {
       try {
         const [fresh] = await db.select().from(users).where(eq(users.id, req.user.id));

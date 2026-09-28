@@ -69,6 +69,8 @@ export default function ReviewUnsubscribePage() {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<"convince" | "feedback" | "done">("convince");
   const [feedback, setFeedback] = useState("");
+  const [resubscribed, setResubscribed] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function ReviewUnsubscribePage() {
       await apiRequest("POST", `/api/review/${token}/unsubscribe`, { feedback: feedback || undefined });
       setStep("done");
     } catch {
+      setActionError("Unable to save. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -111,18 +114,25 @@ export default function ReviewUnsubscribePage() {
     );
   }
 
-  if (info.unsubscribed || step === "done") {
+  if (info.unsubscribed || step === "done" || resubscribed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
         <FloatingParticles />
         <Card className="max-w-md w-full mx-4 relative z-10">
           <CardContent className="p-8 text-center space-y-4">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
-            <h2 className="text-2xl font-bold" data-testid="text-unsubscribed">You've been unsubscribed</h2>
+            <h2 className="text-2xl font-bold" data-testid="text-unsubscribed">{resubscribed ? "You have resubscribed" : "You’ve been unsubscribed"}</h2>
             <p className="text-muted-foreground">
-              You won't receive any more reminder emails from {info.companyName}.
+              {resubscribed ? `You can receive future review requests from ${info.companyName}. Previous requests will stay stopped.` : `You won’t receive future review requests or reminders from ${info.companyName}.`}
               {feedback && " Thank you for sharing your feedback — it truly helps us improve."}
             </p>
+            {!resubscribed && <Button variant="outline" disabled={submitting} onClick={async () => {
+              setSubmitting(true); setActionError("");
+              try { await apiRequest("POST", `/api/review/${token}/resubscribe`, { confirm: true }); setResubscribed(true); }
+              catch { setActionError("Unable to resubscribe. Open your email link while signed out and try again."); }
+              finally { setSubmitting(false); }
+            }}>Resubscribe to future review requests</Button>}
+            {actionError && <p role="alert">{actionError}</p>}
           </CardContent>
         </Card>
       </div>

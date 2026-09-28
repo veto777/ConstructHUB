@@ -1,3 +1,4 @@
+import { ReviewReferralSettings } from "@/components/review-referral-settings";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -372,6 +373,7 @@ function ProfileSection({ user }: { user: any }) {
         </CardContent>
       </Card>
 
+      <ReviewReferralSettings />
       <GmbProfilesSection />
     </div>
   );

@@ -1058,9 +1058,9 @@ export default function MasterClassPage() {
                             </p>
                           </div>
 
-                          <h4 className="font-semibold text-sm mt-3">The $1,000 Rule: Reviews Over Revenue</h4>
+                          <h4 className="font-semibold text-sm mt-3">Resolve Disputes on Their Merits</h4>
                           <p className="text-sm text-muted-foreground">
-                            It is never worth arguing with a client over unfinished work. Nobody likes doing free work — but a glowing 5-star review is worth far more than $1,000 of disputed punch-list items. If you have a client who's unhappy about minor remaining work, don't dig your heels in. Finish it, do it right, and then ask for an honest review — the same way you ask every client.
+                            Resolve unfinished work and disputes according to the contract and the customer's concerns. Keep that process separate from review requests. Ask every client for honest feedback, with no reward or preferred rating.
                           </p>
                           <div className="space-y-2 mt-2">
                             <div className="flex items-start gap-2 p-2.5 rounded-md bg-green-500/5 border border-green-500/10">
@@ -1102,7 +1102,7 @@ export default function MasterClassPage() {
                             <div>
                               <p className="text-sm font-medium mb-1">The Math That Should Change How You Handle Every Client</p>
                               <p className="text-xs text-muted-foreground">
-                                If your business does $500K/year and a single bad review costs you 10-15%, that's $50,000-$75,000 in lost revenue — every year it sits there. A devastating "scam" or "abandoned job" review at 20-50% impact is $100,000-$250,000 per year. Now compare that to the $500-1,000 of disputed work you're arguing about. The math is not even close. Protect your reputation at all costs. Eat the small loss, get the review, and move on to the next job.
+                                If your business does $500K/year and a single bad review costs you 10-15%, that's $50,000-$75,000 in lost revenue — every year it sits there. A devastating "scam" or "abandoned job" review at 20-50% impact is $100,000-$250,000 per year. Now compare that to the $500-1,000 of disputed work you're arguing about. The math is not even close. Resolve the dispute fairly, document the agreed outcome, and keep any request for an honest review separate.
                               </p>
                             </div>
                           </div>
@@ -2137,7 +2137,7 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3">
                         <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                           <Lightbulb className="h-3 w-3 text-[#4A6CF7] shrink-0 mt-0.5" />
-                          When vetting a contractor, read their Google reviews critically — repetitive phrasing, AI-generated text, and a sudden burst of 5-star reviews in a short window are classic signs of fakes.
+                          When vetting a contractor, read their Google reviews critically — repeated phrasing and clustered review dates can be signals worth a closer look, but do not establish authorship or authenticity.
                         </p>
                       </div>
                     </div>

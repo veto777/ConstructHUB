@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, numeric } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -59,6 +59,7 @@ export const permitDatabases = pgTable("permit_databases", {
 });
 
 export const searchQueries = pgTable("search_queries", {
+  userId: integer("user_id"),
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   searchType: text("search_type").notNull(),
   searchValue: text("search_value").notNull(),
@@ -190,6 +191,7 @@ export const gmbEditHistory = pgTable("gmb_edit_history", {
 });
 
 export const rankingGridScans = pgTable("ranking_grid_scans", {
+  userId: integer("user_id"),
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   businessName: text("business_name").notNull(),
   placeId: text("place_id").notNull(),
@@ -248,6 +250,7 @@ export type RankingGridResult = typeof rankingGridResults.$inferSelect;
 export type InsertRankingGridResult = z.infer<typeof insertRankingGridResultSchema>;
 
 export const competitorScans = pgTable("competitor_scans", {
+  errorMessage: text("error_message"),
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull(),
   industry: text("industry").notNull(),
@@ -610,6 +613,8 @@ export const reviewRequests = pgTable("review_requests", {
   feedbackRating: integer("feedback_rating"),
   feedbackCategories: jsonb("feedback_categories"),
   feedbackComments: text("feedback_comments"),
+  googleLinkOpened: boolean("google_link_opened").notNull().default(false),
+  googleLinkOpenedAt: timestamp("google_link_opened_at"),
   reviewSubmitted: boolean("review_submitted").notNull().default(false),
   referralOptIn: boolean("referral_opt_in").notNull().default(false),
   referralFeedback: text("referral_feedback"),
@@ -2360,3 +2365,22 @@ export const crmMeasurements = pgTable("crm_measurements", {
 });
 
 export type CrmMeasurement = typeof crmMeasurements.$inferSelect;
+
+// Growth controls use additive migrations in server/growth-schema.ts.
+export const growthBudgets = pgTable("growth_budgets", {
+  key: text("key").notNull(),
+  period: text("period").notNull(),
+  used: integer("used").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.key, t.period] })]);
+export const reviewRecipientPreferences = pgTable("review_recipient_preferences", {
+  userId: integer("user_id").notNull(),
+  email: text("email").notNull(),
+  unsubscribed: boolean("unsubscribed").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.email] })]);
+export const reviewReferralSettings = pgTable("review_referral_settings", {
+  userId: integer("user_id").primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  offer: text("offer").notNull().default(""),
+});

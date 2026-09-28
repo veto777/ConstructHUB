@@ -232,10 +232,10 @@ describe("beta accounts are unlimited", () => {
 
 /**
  * Configured-gate coverage. The dev server runs WITHOUT ADMIN_GATE_USER/PASS
- * (gate off), so this suite spawns its own server on :8199 with the gate
+ * (gate off), so this suite spawns its own server on the lane child port with the gate
  * configured and kills it in afterAll. Never touches 8119/8129/8139.
  */
-const GATE_PORT = 8199;
+const GATE_PORT = Number(process.env.TEST_GATE_PORT);
 const GBASE = `http://127.0.0.1:${GATE_PORT}`;
 const GATE_USER = "vt-gate-admin";
 const GATE_PASS = "vt-gate-pass-123";
@@ -288,7 +288,7 @@ describe("gate brute-force limiter (unit)", () => {
   });
 });
 
-describe("configured admin gate (:8199 child server)", () => {
+describe("configured admin gate (lane child server)", () => {
   let child: ChildProcess | null = null;
 
   beforeAll(async () => {
@@ -317,7 +317,7 @@ describe("configured admin gate (:8199 child server)", () => {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true, // own process group, so afterAll can kill npx AND tsx
     });
-    const log = createWriteStream("/tmp/gate-server-8199.log");
+    const log = createWriteStream(`tmp/gate-server-${GATE_PORT}.log`);
     child.stdout?.pipe(log);
     child.stderr?.pipe(log);
 
@@ -333,16 +333,13 @@ describe("configured admin gate (:8199 child server)", () => {
       } catch { /* not listening yet */ }
       await new Promise((r) => setTimeout(r, 750));
     }
-    if (!up) throw new Error("gate child server never came up on :8199 — see /tmp/gate-server-8199.log");
+    if (!up) throw new Error(`gate child server never came up on ${GATE_PORT} — see tmp/gate-server-${GATE_PORT}.log`);
   }, 150_000);
 
   afterAll(async () => {
     try {
       if (child?.pid) process.kill(-child.pid, "SIGKILL");
     } catch { /* already dead */ }
-    try {
-      execSync("fuser -k 8199/tcp 2>/dev/null || true");
-    } catch { /* best effort */ }
   });
 
   it("reports configured, 403s admin APIs until the gate is passed, then 200s", async () => {

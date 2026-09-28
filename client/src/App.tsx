@@ -498,8 +498,8 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <CartProvider>
           <TooltipProvider>
-            <AppContent />
             <CookieConsent />
+            <AppContent />
             <Toaster />
           </TooltipProvider>
         </CartProvider>
