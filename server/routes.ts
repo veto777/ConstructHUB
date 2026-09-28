@@ -1,10 +1,10 @@
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
-import { reserveMonthlyQuota } from "./growth-quotas";
+import { reserveMonthlyQuota, refundQuota } from "./growth-quotas";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
 import { competitorPlaces, placesResponse } from "./competitor-provider";
-import { rateLimit, actorKey } from "./growth-limits";
+import { rateLimit, actorKey, takeBudget } from "./growth-limits";
 import { ownedBy } from "./ownership";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
@@ -969,7 +969,10 @@ The description should naturally incorporate the service keyword and location. I
       if (!(await reserveMonthlyQuota(req, res, "photos", fileIds.length))) return;
       // Recheck after the async atomic quota reservation before admitting work.
       const running = [...processingJobs.values()].filter(job => job.status === "running");
-      if (running.length >= 4 || running.some(job => job.owner === actorKey(req))) return res.status(429).json({ message: "Photo processing is busy." });
+      if (running.length >= 4 || running.some(job => job.owner === actorKey(req))) {
+        await refundQuota(res, fileIds.length);
+        return res.status(429).json({ message: "Photo processing is busy." });
+      }
       const jobId = randomUUID().slice(0, 12);
       const results: { fileId: string; processedId: string; newName: string }[] = [];
       const errors: { fileId: string; error: string }[] = [];
@@ -1103,6 +1106,8 @@ The description should naturally incorporate the service keyword and location. I
            jobState.error = bgErr?.message || "Processing failed";
            jobState.finishedAt = Date.now();
          }
+       } finally {
+         await refundQuota(res, fileIds.length - results.length).catch(error => console.error("Photo quota refund failed", error));
        }
       })();
     } catch (err: any) {
@@ -5250,6 +5255,9 @@ function main() {
       const { highlights } = req.body;
       if (typeof highlights !== "string" || !highlights.trim() || highlights.length > 4000) {
         return res.status(400).json({ message: "Describe your own experience before creating a draft." });
+      }
+      if (!(await takeBudget(`review-draft:owner:${request.userId}`, 50)) || !(await takeBudget(`review-draft:request:${request.id}`, 5, 1, 86400_000))) {
+        return res.status(429).json({ message: "Draft limit reached. You can still write your own review directly on Google." });
       }
       const prompt = reviewDraftPrompt(request.companyName || "the company", request.feedbackRating, highlights.trim());
 

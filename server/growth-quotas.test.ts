@@ -3,7 +3,7 @@ const mocks = vi.hoisted(() => ({ query: vi.fn(), take: vi.fn() }));
 vi.mock("./db", () => ({ pool: { query: mocks.query }, db: {} }));
 vi.mock("./auth", () => ({ getBaseUrl: () => "http://localhost" }));
 vi.mock("./growth-limits", () => ({ actorKey: (req: any) => `user:${req.user?.id}`, takeBudget: mocks.take }));
-import { planLimit, reserveMonthlyQuota } from "./growth-quotas";
+import { planLimit, reserveMonthlyQuota, refundQuota } from "./growth-quotas";
 describe("documented growth quotas", () => {
   it("uses the catalog photo/search/ranking limits, including unlimited plans", () => {
     expect(planLimit("standard", "photos")).toBe(5);
@@ -22,5 +22,10 @@ describe("documented growth quotas", () => {
     expect(res.status).toHaveBeenCalledWith(403);
     mocks.take.mockResolvedValue(true);
     expect(await reserveMonthlyQuota({ user: { id: 42 } } as any, res, "photos", 1)).toBe(true);
+    await refundQuota(res, 1);
+    expect(mocks.query.mock.calls.at(-1)?.[1][1]).toBe(1);
+    const count = mocks.query.mock.calls.length;
+    await refundQuota(res, 1);
+    expect(mocks.query.mock.calls).toHaveLength(count);
   });
 });

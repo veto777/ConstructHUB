@@ -82,7 +82,7 @@ process.on("unhandledRejection", (reason) => {
     await registerRoutes(httpServer, app);
 
     app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
+      const status = typeof err.code === "string" && err.code.startsWith("LIMIT_") ? 413 : (err.status || err.statusCode || 500);
       const message = err.message || "Internal Server Error";
 
       console.error("Internal Server Error:", err);
