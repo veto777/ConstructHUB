@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-28T22:04:30.778Z",
+  "checkedAt": "2026-09-28T22:30:32.366Z",
   "database": "constructhub_dev_a4",
   "before": {
     "a": "3040",
@@ -7,13 +7,15 @@
   },
   "after": {
     "a": "3040",
-    "p": "32965"
+    "p": "32966"
   },
+  "countyPortalInserted": true,
   "assertions": [
     "changed and nulled URLs/phones propagated",
     "inactive status propagated",
     "restored URL and phone propagated",
     "IDs and custom notes preserved",
-    "repeat seed added no duplicates"
+    "repeat seed added no duplicates",
+    "missing county portal inserted by exact county/state key and stable on repeat"
   ]
 }

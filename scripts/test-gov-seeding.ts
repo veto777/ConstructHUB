@@ -33,7 +33,15 @@ try {
   const [restored] = await db.select().from(propertyAppraisers).where(eq(propertyAppraisers.id, oldApp.id));
   assert.equal(restored.portalUrl, app.portalUrl); assert.equal(restored.phone, app.phone); assert.equal(restored.isActive, true);
   assert.equal(restored.notes, note); assert.deepEqual(await count(), before);
-  writeFileSync('analysis/gov-seeding-test.json', JSON.stringify({ checkedAt: new Date().toISOString(), database: 'constructhub_dev_a4', before, after: await count(), assertions: ['changed and nulled URLs/phones propagated', 'inactive status propagated', 'restored URL and phone propagated', 'IDs and custom notes preserved', 'repeat seed added no duplicates'] }, null, 2) + '\n');
+  const missingCounty = portals.find((r: any) => r.jurisdiction === 'Allen County, IN');
+  const countyBefore = await db.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, missingCounty.jurisdiction));
+  await syncPermitPortals([missingCounty]);
+  const countyOnce = await db.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, missingCounty.jurisdiction));
+  await syncPermitPortals([missingCounty]);
+  const countyTwice = await db.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, missingCounty.jurisdiction));
+  assert.equal(countyOnce.length, 1); assert.equal(countyTwice.length, 1);
+  assert.equal(countyOnce[0].id, countyTwice[0].id);
+  writeFileSync('analysis/gov-seeding-test.json', JSON.stringify({ checkedAt: new Date().toISOString(), database: 'constructhub_dev_a4', before, after: await count(), countyPortalInserted: countyBefore.length === 0, assertions: ['changed and nulled URLs/phones propagated', 'inactive status propagated', 'restored URL and phone propagated', 'IDs and custom notes preserved', 'repeat seed added no duplicates', 'missing county portal inserted by exact county/state key and stable on repeat'] }, null, 2) + '\n');
 } finally {
   const { id: aid, ...a } = oldApp; const { id: pid, ...p } = oldPortal;
   await db.update(propertyAppraisers).set(a).where(eq(propertyAppraisers.id, aid));

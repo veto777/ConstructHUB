@@ -1,7 +1,7 @@
 import { preserveNewerGovernmentCheck } from "./government-seed-status";
 import { db } from "./db";
-import { permitDatabases } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { permitDatabases, counties } from "@shared/schema";
+import { eq, sql, and } from "drizzle-orm";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -26,7 +26,7 @@ export async function seedPermitPortals() {
 export async function syncPermitPortals(portals: PermitPortal[]) {
  await db.transaction(async tx => {
   await tx.execute(sql`select pg_advisory_xact_lock(8159002)`);
-  let updated = 0, unmatched = 0;
+  let updated = 0, unmatched = 0, inserted = 0;
   for (const p of portals) {
     // permit_databases.jurisdiction is "City, ST" for cities and "Name County, ST"
     // for counties — the string alone identifies the row, so match on it directly.
@@ -42,11 +42,21 @@ export async function syncPermitPortals(portals: PermitPortal[]) {
     for (const row of matches) {
       await tx.update(permitDatabases).set({ ...values, ...preserveNewerGovernmentCheck(row, values) }).where(eq(permitDatabases.id, row.id));
     }
-    const res = matches;
-    if (res.length) updated += res.length;
-    else { unmatched++; console.warn(`  permit-portal: no matching row for "${p.jurisdiction}"`); }
+    if (matches.length) updated += matches.length;
+    else {
+      // County identity is explicit in the source natural key. Never guess the
+      // parent county of an unmatched city or overwrite another jurisdiction.
+      const key = p.jurisdiction.match(/^(.+) County, ([A-Z]{2})$/);
+      const found = key ? await tx.select().from(counties).where(and(eq(counties.name, key[1]), eq(counties.stateCode, key[2]))) : [];
+      if (found.length === 1) {
+        await tx.insert(permitDatabases).values({ ...values, name: p.jurisdiction, jurisdiction: p.jurisdiction, jurisdictionType: "county", countyId: found[0].id });
+        inserted++;
+      } else {
+        unmatched++; console.warn(`  permit-portal: no matching row for "${p.jurisdiction}"`);
+      }
+    }
   }
   if (unmatched) console.log(`  (${unmatched} portals had no matching permit row — jurisdiction naming mismatch)`);
-  console.log(`Permit portals: applied ${updated} verified real portals to major jurisdictions.`);
+  console.log(`Permit portals: updated ${updated} reference rows, inserted ${inserted} county portals to major jurisdictions.`);
  });
 }
