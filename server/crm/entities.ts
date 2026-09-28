@@ -957,6 +957,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       // redaction the engagement endpoint applies (portal.ts redactIpPrefix).
       events: events.map((ev) => ({
         ...ev,
+        // Event payloads can contain totalCents even when the document's
+        // monetary fields are hidden from this role.
+        meta: ctx.permissions.seePrices ? ev.meta : null,
         ip: ev.ip ? ev.ip.replace(/^((?:\d{1,3}\.){2}\d{1,3})\.\d{1,3}$/, "$1.x") : ev.ip,
       })),
       customer: cust ? { id: cust.id, displayName: cust.displayName, email: cust.email, phone: cust.phone } : null,
