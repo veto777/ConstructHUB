@@ -149,18 +149,27 @@ export async function sweepPage(
 
   for (let iter = 0; iter < (opts.maxClicks ?? 80); iter++) {
     await gotoCrm(page, url);
-    await expect(page.locator(opts.ready).first()).toBeVisible({ timeout: 15_000 });
+    try {
+      await expect(page.locator(opts.ready).first()).toBeVisible({ timeout: 15_000 });
+    } catch (error) {
+      console.error("Sweep readiness diagnostic", JSON.stringify({ url: page.url(), last: labels.slice(-3), errors: guards.pageErrors, console: guards.consoleErrors, responses: guards.badResponses, body: (await page.locator("body").innerText().catch(() => "<no body>")).slice(0, 1500) }));
+      throw error;
+    }
     if (opts.beforeEach) await opts.beforeEach(page);
 
     const els = page.locator(SWEEP_SELECTOR);
     // Snapshot attributes in one browser round trip. Large document lists
     // otherwise spend minutes re-reading every previously visited row over
     // the Playwright protocol on each iteration.
-    const controls = await els.evaluateAll((nodes) => nodes.map((node) => ({
+    const controls = await els.evaluateAll((nodes) => nodes.map((node, index) => {
+      // Pin DOM identity: async panels can insert controls between snapshot
+      // and click. A positional nth() would then click a different button.
+      node.setAttribute("data-e2e-sweep-index", String(index));
+      return ({
       testid: node.getAttribute("data-testid") ?? "",
       text: ((node as HTMLElement).innerText ?? "").trim().replace(/\s+/g, " ").slice(0, 60),
       href: node.getAttribute("href") ?? "",
-    })));
+    }); }));
     let target = -1;
     let info = { testid: "", text: "", href: "" };
     for (const [i, control] of controls.entries()) {
@@ -178,7 +187,7 @@ export async function sweepPage(
     }
     if (target === -1) break;
 
-    const el = els.nth(target);
+    const el = page.locator(`[data-e2e-sweep-index="${target}"]`);
     try {
       await el.click({ timeout: 5_000 });
     } catch {

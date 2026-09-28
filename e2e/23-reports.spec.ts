@@ -1,6 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { q } from "./db";
-import { gotoCrm, grantClientSession, ORGS, sweepPage, switchOrg, watchPage } from "./helpers";
+import { test } from "./crm-isolated-fixture";
+import { gotoCrm, grantClientSession, sweepPage, watchPage } from "./helpers";
 
 /**
  * Measurement report imports: paste a HOVER-style report, review the parse,
@@ -32,7 +33,7 @@ const uniquePhone = () => {
   return `(941) 5${n.slice(0, 2)}-${n.slice(2)}`;
 };
 
-test.beforeEach(async ({ page }) => switchOrg(page, ORGS.alpine));
+
 
 test.describe("/crm/reports", () => {
   test("curated: paste → preview → confirm → client created → client portal shows the report", async ({ page }) => {
@@ -110,7 +111,11 @@ test.describe("/crm/reports", () => {
 
   test("sweep: every button and link", async ({ page }) => {
     const { clicked, labels } = await sweepPage(page, "/crm/reports", {
-      ready: 'h1:has-text("Measurement reports")',
+      ready: '[data-testid="textarea-report-text"]',
+      beforeEach: async (page) => {
+        await expect(page.getByTestId("section-report-list")).toBeVisible();
+        await expect(page.getByTestId("section-report-list")).not.toContainText("Loading");
+      },
       // Download links are Content-Disposition attachments, not pages.
       skip: ({ testid }) => testid.startsWith("report-download-"),
     });

@@ -1,3 +1,4 @@
+import { invoiceRefundRows } from "./refund-summary";
 /**
  * Receipt-to-date: what the client has paid on an invoice so far and what's
  * still owing. One click previews it, a second click emails it — and every
@@ -13,7 +14,7 @@ import {
   crmInvoices, crmInvoiceItems, crmPayments, crmCustomers, crmOrgs,
   crmNotificationEnabled,
 } from "@shared/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { companyBranding, resolveInvoiceDivision, type CompanyBranding } from "./divisions";
 import { sendWithFallback } from "../email";
@@ -49,6 +50,7 @@ export interface ReceiptData {
   retainageCents: number;
   payments: { id: string; amountCents: number; method: string | null; note: string | null; paidAt: Date | null }[];
   totalPaidCents: number;
+  refundedCents?: number;
   balanceCents: number;
   paidInFull: boolean;
   company: CompanyBranding;
@@ -65,8 +67,10 @@ export async function buildReceiptData(
   const items = await db.select().from(crmInvoiceItems)
     .where(eq(crmInvoiceItems.invoiceId, inv.id)).orderBy(asc(crmInvoiceItems.sortOrder));
   const payments = await db.select().from(crmPayments)
-    .where(and(eq(crmPayments.orgId, inv.orgId), eq(crmPayments.invoiceId, inv.id), eq(crmPayments.status, "succeeded")))
+    .where(and(eq(crmPayments.orgId, inv.orgId), eq(crmPayments.invoiceId, inv.id), sql`${crmPayments.status} in ('succeeded', 'partially_refunded', 'refunded')`))
     .orderBy(asc(crmPayments.paidAt));
+
+  const refunds = await invoiceRefundRows(inv.orgId, inv.id);
 
   // Retainage is withheld until closeout, so "owing" is the due amount less
   // what's been paid — the same math the pay page and webhook use.
@@ -91,9 +95,12 @@ export async function buildReceiptData(
     subtotalCents: inv.subtotalCents, discountCents: inv.discountCents,
     taxCents: inv.taxCents, totalCents: inv.totalCents,
     retainageCents: inv.retainageCents ?? 0,
-    payments: payments.map((p) => ({
-      id: p.id, amountCents: p.amountCents, method: p.method, note: p.note, paidAt: p.paidAt,
-    })),
+    payments: [
+      ...payments.map((p) => ({ id: p.id, amountCents: p.amountCents, method: p.method, note: p.note, paidAt: p.paidAt })),
+      ...refunds.map((r) => ({ id: r.id, amountCents: -r.invoiceCreditCents, method: "Refund", paidAt: r.createdAt,
+        note: r.amountCents === r.invoiceCreditCents ? "Returned to original payment method" : `${money(r.amountCents)} returned, including processing fees` })),
+    ],
+    refundedCents: refunds.reduce((n, r) => n + r.invoiceCreditCents, 0),
     totalPaidCents,
     balanceCents,
     paidInFull: totalPaidCents >= dueCents,
@@ -121,6 +128,7 @@ export function receiptHtml(r: ReceiptData): string {
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px">
     <h2 style="margin:0 0 4px">Receipt — ${esc(r.invoice.number ?? "invoice")}</h2>
     <p style="margin:0 0 16px;color:#666;font-size:13px">${esc(b.name)} · payments to date</p>
+    ${(r.refundedCents ?? 0) > 0 ? `<p>Refunded: ${money(r.refundedCents)}</p>` : ""}
     ${r.paidInFull ? `<p style="display:inline-block;background:#16a34a;color:#fff;font-weight:700;
         padding:6px 14px;border-radius:6px;margin:0 0 16px">PAID IN FULL</p>` : ""}
     <p style="font-size:14px"><strong>Bill to:</strong> ${esc(r.customer.displayName)}</p>
@@ -245,7 +253,7 @@ export function registerCrmReceiptRoutes(app: Express, getDevUser: GetUser): voi
       .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     if (inv.voidedAt) return res.status(409).json({ message: "This invoice has been voided." });
-    if ((inv.paidCents ?? 0) <= 0) {
+    if ((inv.paidCents ?? 0) <= 0 && !(await invoiceRefundRows(inv.orgId, inv.id)).length) {
       return res.status(409).json({
         message: "No payments have been recorded on this invoice yet — a receipt would show $0 paid.",
       });

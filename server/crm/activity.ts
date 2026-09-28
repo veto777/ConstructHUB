@@ -1,3 +1,5 @@
+import { objectPolicy, type ObjectKind } from "./object-access";
+import { divisionScopeOf } from "./divisions";
 /**
  * Accountability log — HCP-style "who did what, when" for everything that
  * happens in the org. Writes are fire-and-forget one-liners at the real
@@ -158,6 +160,13 @@ export function registerCrmActivityRoutes(app: Express, getDevUser: GetUser): vo
     const rows = await db.select().from(crmActivityLog)
       .where(and(eq(crmActivityLog.orgId, ctx.org.id), eq(crmActivityLog.customerId, cust.id)))
       .orderBy(desc(crmActivityLog.createdAt)).limit(100);
+    if (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) {
+      const access = objectPolicy(ctx);
+      const types: Record<string, ObjectKind> = { customer: "customers", project: "projects", estimate: "estimates", invoice: "invoices", payment: "payments" };
+      const visible = [];
+      for (const r of rows) if (r.entityId && types[r.entityType ?? ""] && await access.visible(types[r.entityType!], r.entityId)) visible.push(r);
+      return res.json(visible.map(present));
+    }
     res.json(rows.map(present));
   });
 

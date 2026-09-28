@@ -13,6 +13,7 @@ import { db } from "../db";
 import { crmOrgs, crmMembers, subscriptions, users, crmEffectivePermissions } from "@shared/schema";
 import type { CrmPermission } from "@shared/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
+import { authorizeObjectRequest } from "./object-access";
 import { PLANS } from "../stripe";
 
 export type OrgContext = {
@@ -102,6 +103,12 @@ export async function listOrgsForUser(userId: number) {
  * org. Responds 401/403 and returns null when it cannot.
  */
 export async function requireOrg(req: any, res: any, userId: number): Promise<OrgContext | null> {
+  const ctx = await resolveOrg(req, res, userId);
+  if (!ctx || !await authorizeObjectRequest(req, res, ctx)) return null;
+  return ctx;
+}
+
+async function resolveOrg(req: any, res: any, userId: number): Promise<OrgContext | null> {
   const pinned: string | undefined = req.session?.activeOrgId;
 
   if (pinned) {

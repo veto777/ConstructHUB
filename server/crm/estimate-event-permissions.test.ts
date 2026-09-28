@@ -37,6 +37,7 @@ afterAll(async () => {
 it("does not leak estimate money through event metadata to a field member", async () => {
   await pool.query("insert into crm_estimate_events(org_id,estimate_id,type,actor,meta) values($1,$2,'created','audit',$3)", [own, estimates[0], JSON.stringify({ totalCents: 98765 })]);
   await pool.query("update crm_members set role='field' where org_id=$1 and user_id=1", [own]);
+  await pool.query("update crm_projects set project_manager_member_id=(select id from crm_members where org_id=$1 and user_id=1) where id=$2", [own, projects[0]]);
   const r = await fetch(base + `/api/crm/estimates/${estimates[0]}`, { headers: { cookie } });
   expect(r.status).toBe(200);
   const detail = await r.json();

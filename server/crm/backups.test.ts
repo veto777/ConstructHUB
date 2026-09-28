@@ -156,7 +156,7 @@ describe("backup SpreadsheetML workbook", () => {
 
     const xlsFiles = buildAttachments(sections, "xlsx", "2026-08-02");
     expect(xlsFiles.length).toBe(1);
-    expect(xlsFiles[0].filename).toBe("constructhub-backup-2026-08-02.xls");
+    expect(xlsFiles[0].filename).toBe("constructhub-export-2026-08-02.xls");
     expect(xlsFiles[0].content).toBe(xml);
   });
 });
@@ -299,7 +299,7 @@ describe("backup routes (dev server)", () => {
     let mail: OutboxMail | undefined;
     while (Date.now() < deadline) {
       mail = outbox().find((m) =>
-        m.at >= since && (m.to ?? []).includes(recipient) && (m.subject ?? "").includes("CRM backup"));
+        m.at >= since && (m.to ?? []).includes(recipient) && (m.subject ?? "").includes("CRM export"));
       if (mail) break;
       await new Promise((r) => setTimeout(r, 150));
     }
@@ -330,13 +330,13 @@ describe("backup routes (dev server)", () => {
     const since = new Date().toISOString();
     const send = await api("/api/crm/backups/send-now", { method: "POST", body: "{}" }, cookie);
     expect(send.status).toBe(200);
-    expect(send.body.files).toEqual([expect.stringMatching(/^constructhub-backup-.*\.xls$/)]);
+    expect(send.body.files).toEqual([expect.stringMatching(/^constructhub-export-.*\.xls$/)]);
 
     const deadline = Date.now() + 8000;
     let mail: OutboxMail | undefined;
     while (Date.now() < deadline) {
       mail = outbox().find((m) =>
-        m.at >= since && (m.to ?? []).includes(recipient) && (m.subject ?? "").includes("CRM backup"));
+        m.at >= since && (m.to ?? []).includes(recipient) && (m.subject ?? "").includes("CRM export"));
       if (mail) break;
       await new Promise((r) => setTimeout(r, 150));
     }

@@ -1,3 +1,4 @@
+import { objectPolicy } from "./object-access";
 /**
  * Measurement report import — HOVER today, CladAI over the wire tomorrow.
  *
@@ -534,7 +535,7 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
       for (const c of custs) live.add(c.id);
     }
     res.json(
-      rows.map((r) => ({
+      (await objectPolicy(ctx).filter("reports", rows)).map((r) => ({
         ...presentReport(r, "/api/crm/reports"),
         customerId: r.customerId && live.has(r.customerId) ? r.customerId : null,
       })),

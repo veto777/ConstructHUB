@@ -1,3 +1,4 @@
+import { objectPolicy, canShareWholeClientPortal } from "./object-access";
 /**
  * Client 360 — the per-customer behaviour log the owner asked for.
  *
@@ -295,14 +296,17 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     const orgId = ctx.org.id;
     const customerId = req.params.id;
 
-    const estimates = await db
+    let estimates = await db
       .select({ id: crmEstimates.id, number: crmEstimates.number, title: crmEstimates.title })
       .from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.customerId, customerId)));
-    const invoices = await db
+    let invoices = await db
       .select({ id: crmInvoices.id, number: crmInvoices.number, title: crmInvoices.title })
       .from(crmInvoices)
       .where(and(eq(crmInvoices.orgId, orgId), eq(crmInvoices.customerId, customerId)));
+    const access = objectPolicy(ctx);
+    estimates = await access.filter("estimates", estimates);
+    invoices = await access.filter("invoices", invoices);
     const estById = new Map(estimates.map((e) => [e.id, e]));
     const invById = new Map(invoices.map((i) => [i.id, i]));
     const estIds = estimates.map((e) => e.id);
@@ -396,7 +400,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       });
     }
 
-    for (const p of payments) {
+    for (const p of await access.filter("payments", payments)) {
       const ref = (p.invoiceId ? invById.get(p.invoiceId)?.number : null)
         ?? (p.estimateId ? refOf(estById.get(p.estimateId)) : null);
       entries.push({
@@ -408,7 +412,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       });
     }
 
-    for (const c of comments) {
+    for (const c of await access.filter("client-comments", comments)) {
       entries.push({
         id: `com-${c.id}`, kind: "comment", verb: "comment",
         text: `Sent a message from the portal — “${c.body.length > 80 ? `${c.body.slice(0, 80)}…` : c.body}”`,
@@ -513,6 +517,8 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     if (!process.env.SESSION_SECRET) {
       return res.status(503).json({ message: "Preview is not configured on this server." });
     }
+
+    if (!canShareWholeClientPortal(ctx)) return res.status(403).json({ message: "Whole-client preview requires organization-wide document access. Preview an individual estimate instead." });
 
     const grant = mintPortalPreviewGrant(req.params.id);
     // Dev renders the client face query-forced; production has a client host.

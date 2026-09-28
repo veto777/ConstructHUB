@@ -1,3 +1,4 @@
+import { objectPolicy } from "./object-access";
 /**
  * Client portal v2 — file exchange and homeowner comments.
  *
@@ -321,7 +322,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       .where(and(...conds))
       .orderBy(desc(crmAttachments.createdAt))
       .limit(500);
-    res.json(rows.map((a) => present(a, "/api/crm/attachments")));
+    res.json((await objectPolicy(ctx).filter("attachments", rows)).map((a) => present(a, "/api/crm/attachments")));
   });
 
   app.post("/api/crm/attachments", singleFile("file"), async (req: any, res) => {

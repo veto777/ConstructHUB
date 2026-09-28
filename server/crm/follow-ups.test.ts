@@ -184,6 +184,7 @@ describe("crm follow-ups + attention (dev server)", () => {
   });
 
   it("a field (view-only) member cannot set cadences", async () => {
+    await q(`update crm_customers set owner_member_id = $2 where id = $1`, [custDue, memberA]);
     await q(`update crm_members set role = 'field' where id = $1`, [memberA]);
     try {
       const r = await patch(`/api/crm/customers/${custDue}/follow-up`, { cadenceDays: 7 }, cookieA);

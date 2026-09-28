@@ -1,3 +1,4 @@
+import { objectPolicy } from "./object-access";
 /**
  * The org schedule: appointment CRUD plus the read-only feeds for the mobile
  * ribbon (day-grouped appointments with their project/customer context) and
@@ -148,25 +149,8 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
   async function visibleAppointments<T extends { appointment: typeof crmAppointments.$inferSelect }>(
     ctx: OrgContext, rows: T[],
   ): Promise<T[]> {
-    // A restricted member sees visits they're dispatched to AND visits they
-    // booked themselves (a booker without viewAllJobs must still see their own).
-    let out = ctx.permissions.viewAllJobs
-      ? rows
-      : rows.filter((r) =>
-          (r.appointment.dispatchedMemberIds || []).includes(ctx.member.id)
-          || r.appointment.createdByMemberId === ctx.member.id);
-    const scope = divisionScopeOf(ctx.member);
-    if (scope) {
-      const maps = await divisionMapsForOrg(ctx.org.id);
-      out = out.filter((r) => appointmentDivisionVisible(
-        scope,
-        r.appointment,
-        (r.appointment.projectId ? maps.byProject.get(r.appointment.projectId) : undefined)
-          ?? (r.appointment.customerId ? maps.byCustomer.get(r.appointment.customerId) : undefined)
-          ?? null,
-      ));
-    }
-    return out;
+    const ids = new Set((await objectPolicy(ctx).filter("appointments", rows.map(r => r.appointment))).map(r => r.id));
+    return rows.filter(r => ids.has(r.appointment.id));
   }
 
   /** Confirm every linked id belongs to the caller's org (never trust the body). */
@@ -427,7 +411,7 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
       : [];
 
     const feed = [
-      ...events.map((e) => ({
+      ...(await Promise.all(events.map(async e => await objectPolicy(ctx).visible("estimates", e.estimateId) ? e : null))).filter((e): e is typeof events[number] => e !== null).map((e) => ({
         id: `est-${e.id}`,
         kind: "estimate" as const,
         type: e.type,
@@ -437,7 +421,7 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
         estimateNumber: e.estimateNumber,
         estimateTitle: e.estimateTitle,
       })),
-      ...payments.map((p) => ({
+      ...(await objectPolicy(ctx).filter("payments", payments)).map((p) => ({
         id: `pay-${p.id}`,
         kind: "payment" as const,
         type: p.status,
