@@ -81,7 +81,7 @@ export default function CompetitorsPage() {
     queryKey: ["/api/stripe/subscription"],
   });
 
-  const isPlatinum = subscription?.plan === "platinum" && (subscription?.status === "active" || subscription?.status === "trialing");
+  const isPlatinum = ["gold", "platinum"].includes(subscription?.plan || "") && (subscription?.status === "active" || subscription?.status === "trialing");
   const isDev = import.meta.env.DEV;
 
   const { data: scans, isLoading: scansLoading } = useQuery<any[]>({
@@ -132,7 +132,7 @@ export default function CompetitorsPage() {
             Index every competitor in your market, track their rankings, and use our heuristic BS Meter to find signals worth a closer look.
           </p>
           <p className="text-muted-foreground">
-            This feature is exclusively available for <span className="text-yellow-500 font-bold">Platinum</span> members.
+            This feature is available for <span className="text-yellow-500 font-bold">Gold and Platinum</span> members.
           </p>
           <Button
             className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-8"
@@ -140,7 +140,7 @@ export default function CompetitorsPage() {
             data-testid="button-upgrade-platinum"
           >
             <Shield className="w-4 h-4 mr-2" />
-            Upgrade to Platinum — $995/mo
+            View Gold and Platinum plans
           </Button>
         </div>
       </div>

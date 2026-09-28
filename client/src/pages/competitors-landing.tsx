@@ -311,7 +311,7 @@ export default function CompetitorsLandingPage() {
           </div>
           <div className="animate-in-delay-1">
             <Badge className="mb-6 bg-[#EAB308]/10 text-[#EAB308] border-[#EAB308]/20 px-4 py-1.5 text-sm" data-testid="badge-hero">
-              <Shield className="h-3.5 w-3.5 mr-1.5" /> Platinum-Tier Competitive Intelligence
+              <Shield className="h-3.5 w-3.5 mr-1.5" /> Gold & Platinum Competitive Intelligence
             </Badge>
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] animate-in-delay-2" data-testid="text-hero-title">

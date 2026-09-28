@@ -1,3 +1,4 @@
+import { reserveMonthlyQuota } from "./growth-quotas";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
@@ -230,6 +231,7 @@ export async function registerRoutes(
 
       const parsedCountyId = scopeCountyId ? parseInt(scopeCountyId) : null;
 
+      if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
       const query = await storage.createSearchQuery({
         userId: req.user!.id,
         searchType,
@@ -323,6 +325,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This database has no portal URL configured" });
       }
 
+      if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
       const query = await storage.createSearchQuery({
         userId: req.user!.id,
         searchType: searchType || "address",
@@ -957,10 +960,15 @@ The description should naturally incorporate the service keyword and location. I
         return res.status(400).json({ message: "fileIds array is required" });
       }
 
+      if (fileIds.some((id: string) => !uploadedFiles.has(id))) return res.status(404).json({ message: "Upload every photo before processing." });
       const active = [...processingJobs.values()].filter(job => job.status === "running");
       if (active.length >= 4 || active.some(job => job.owner === actorKey(req))) {
         return res.status(429).json({ message: "Photo processing is busy. Wait for your current job to finish." });
       }
+      if (!(await reserveMonthlyQuota(req, res, "photos", fileIds.length))) return;
+      // Recheck after the async atomic quota reservation before admitting work.
+      const running = [...processingJobs.values()].filter(job => job.status === "running");
+      if (running.length >= 4 || running.some(job => job.owner === actorKey(req))) return res.status(429).json({ message: "Photo processing is busy." });
       const jobId = randomUUID().slice(0, 12);
       const results: { fileId: string; processedId: string; newName: string }[] = [];
       const errors: { fileId: string; error: string }[] = [];
@@ -1801,6 +1809,10 @@ Rules:
         return res.status(400).json({ message: "businessName, placeId, lat, lon, and keyword are required" });
       }
 
+      if (![3, 5, 7, 9, 11, 13, 15].includes(Number(gridSize || 3)) || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon)) || Math.abs(Number(lat)) > 90 || Math.abs(Number(lon)) > 180 || !(Number(gridDistance || 1) > 0 && Number(gridDistance || 1) <= 20)) {
+        return res.status(400).json({ message: "Invalid grid size, coordinates or spacing" });
+      }
+
       {
         const [sub] = await db
           .select()
@@ -1816,6 +1828,7 @@ Rules:
         }
       }
 
+      if (!(await reserveMonthlyQuota(req, res, "rankings"))) return;
       const scan = await storage.createRankingGridScan({
         userId: user.id,
         businessName,
