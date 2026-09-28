@@ -78,8 +78,8 @@ export async function syncAppraiserRecords(records: AppraiserRecord[]) {
       phone: r.phone,
       address: null, // never fabricated; NETR county pages carry no street address
       searchableFields: SEARCHABLE_FIELDS,
-      isActive: !!r.portalUrl && r.linkStatus === "live",
-      linkStatus: r.portalUrl ? (r.linkStatus || "unchecked") : "none",
+      isActive: !!r.portalUrl && ["live", "verified", "unconfirmed"].includes(r.linkStatus || ""),
+      linkStatus: r.portalUrl ? (r.linkStatus || "unchecked") : (r.linkStatus === "dead" ? "dead" : "none"),
       lastVerifiedAt: r.lastVerifiedAt ? new Date(r.lastVerifiedAt) : null,
       notes: `Sourced from NETR Online. Contact for property records in ${r.county} County.`,
     };

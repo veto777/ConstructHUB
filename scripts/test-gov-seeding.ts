@@ -33,6 +33,15 @@ try {
   const [restored] = await db.select().from(propertyAppraisers).where(eq(propertyAppraisers.id, oldApp.id));
   assert.equal(restored.portalUrl, app.portalUrl); assert.equal(restored.phone, app.phone); assert.equal(restored.isActive, true);
   assert.equal(restored.notes, note); assert.deepEqual(await count(), before);
+  for (const linkStatus of ['unconfirmed', 'verified', 'dead']) {
+    const available = linkStatus !== 'dead';
+    const lastVerifiedAt = new Date(Date.now() + 60000).toISOString();
+    await syncAppraiserRecords([{...app, portalUrl: available ? app.portalUrl : null, linkStatus, lastVerifiedAt}]);
+    await syncPermitPortals([{...portal, url: available ? portal.url : null, linkStatus, lastVerifiedAt}]);
+    const [a] = await db.select().from(propertyAppraisers).where(eq(propertyAppraisers.id, oldApp.id));
+    const [p] = await db.select().from(permitDatabases).where(eq(permitDatabases.id, oldPortal.id));
+    for (const row of [a,p]) { assert.equal(row.linkStatus,linkStatus); assert.equal(row.isActive,available); }
+  }
   const missingCounty = portals.find((r: any) => r.jurisdiction === 'Allen County, IN');
   const countyBefore = await db.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, missingCounty.jurisdiction));
   await syncPermitPortals([missingCounty]);

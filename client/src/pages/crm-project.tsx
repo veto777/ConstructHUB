@@ -1,3 +1,4 @@
+import { governmentLinkNotice } from "@shared/government-links";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
@@ -376,6 +377,7 @@ export default function CrmProjectPage() {
                 <div key={p.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{p.name}</div>
+                    {governmentLinkNotice(p) && <p className="text-xs text-muted-foreground">{governmentLinkNotice(p)}</p>}
                     <div className="text-sm text-muted-foreground">{p.jurisdiction}{p.phone ? ` · ${p.phone}` : ""}</div>
                   </div>
                   {(p.searchUrl || p.portalUrl) && (
@@ -389,7 +391,7 @@ export default function CrmProjectPage() {
                 <EmptyState
                   compact
                   icon={FileBadge}
-                  title="No verified portal on file for this jurisdiction"
+                  title="No official portal on file for this jurisdiction"
                   description="We won't invent one — search manually."
                 />
               )}

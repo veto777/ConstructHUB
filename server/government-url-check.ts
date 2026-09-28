@@ -23,6 +23,7 @@ export function classifyGovernmentPage(r: any, kind: string) {
   const evidence = { title, excerpt: text.slice(0, 300) };
   if (genericVendor && r.httpStatus >= 200 && r.httpStatus < 400) return { status: 'dead', reason: 'generic vendor homepage', ...evidence };
   if ([404,410].includes(r.httpStatus)) return { status: 'dead', reason: `HTTP ${r.httpStatus}`, ...evidence };
+  if (governmentFailureIsDead(r.error || '')) return { status: 'dead', reason: r.error, ...evidence };
   if (!r.httpStatus || r.httpStatus >= 400) return { status: 'unverified', reason: r.error || `HTTP ${r.httpStatus} (blocked/transient)`, ...evidence };
   if (/domain (is )?(for sale|parked)|buy this domain|sedo domain|website is for sale/i.test(text + title)) return { status: 'dead', reason: 'parked/for-sale domain', ...evidence };
   if (/^(404|page not found|not found|error|website unavailable)|page (you requested |was )?not found/i.test(title) || (text.length < 1800 && /page (you requested |was )?not found|404 -|site not found/i.test(text))) return { status: 'dead', reason: 'soft 404', ...evidence };
@@ -32,9 +33,10 @@ export function classifyGovernmentPage(r: any, kind: string) {
   const main = $('main,article,[role="main"],#main,#content').first();
   const content = (main.length ? main.text() : $('body').text()).replace(/\s+/g, ' ').trim();
   const topic = kind === 'appraiser' ? /assess(?:or|ing|ment)|apprais|property (search|records|assessment|valuation|lister|owner services)|parcel|real estate|tax (search|records)|revenue commission(?:er)?|myproperty|tax administration|board of taxation|commissioner of revenue|real property tax/i : /permits?|building inspection|development services|planning and building/i;
+  if (final && !isDedicatedGovernmentPortal(final.href) && /^\/(?:home\/?|default\.aspx)?$/i.test(final.pathname) && /^(home|welcome|official website)(\s*[|–—-]|$)/i.test(title) && !topic.test(title)) return { status: 'dead', reason: 'generic homepage; department URL required', ...evidence };
   if (!topic.test(content + title)) return { status: 'unverified', reason: 'no on-topic page content (manual/browser review required)', ...evidence };
   if (/^(www\.)?(civicplus.com|accela.com|tylertech.com|opengov.com|schneidergis.com)$/.test(new URL(r.finalUrl).hostname)) return { status: 'dead', reason: 'generic vendor homepage', ...evidence };
-  if (final && /^\/(?:home\/?|default\.aspx)?$/i.test(final.pathname) && /^(home|welcome|official website)(\s*[|–—-]|$)/i.test(title) && !topic.test(title)) return { status: 'unverified', reason: 'generic homepage; department URL required', ...evidence };
+  if (final && !isDedicatedGovernmentPortal(final.href) && /^\/(?:home\/?|default\.aspx)?$/i.test(final.pathname) && /^(home|welcome|official website)(\s*[|–—-]|$)/i.test(title) && !topic.test(title)) return { status: 'dead', reason: 'generic homepage; department URL required', ...evidence };
   return { status: 'live', reason: 'GET succeeded with on-topic content; jurisdiction review still required', ...evidence };
 }
 
@@ -42,4 +44,14 @@ export function isGenericGovernmentVendorUrl(url: string): boolean {
   const final = new URL(url);
   const trackingOnly = [...final.searchParams.keys()].every(k => /^(utm_|gclid$|fbclid$)/i.test(k));
   return final.pathname === '/' && trackingOnly && /^(www\.)?(parcelquest\.com|qpublic\.net|qpublic\.schneidercorp\.com|citizenserve\.com|mygov\.us|smartgovcommunity\.com|schneidercorp\.com|beacon\.schneidercorp\.com|gworks\.com|gis\.vgsi\.com|vgsi\.com|patriotproperties\.com|devnet\.com|civicplus\.com|accela\.com|tylertech\.com|opengov\.com)$/.test(final.hostname);
+}
+
+/** Transport failures that make a browser link unusable, rather than just inconclusive. */
+export function governmentFailureIsDead(reason: string): boolean {
+  return /ENOTFOUND|EAI_NONAME|ECONNREFUSED|ERR_NAME_NOT_RESOLVED|ERR_CONNECTION_REFUSED|CERT_|CERTIFICATE|ERR_TLS|DEPTH_ZERO_SELF_SIGNED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|SELF_SIGNED_CERT_IN_CHAIN/i.test(reason);
+}
+
+/** A jurisdiction's self-service tenant is not the vendor's marketing homepage. */
+export function isDedicatedGovernmentPortal(url: string): boolean {
+  return /^[a-z0-9-]+\.portal\.opengov\.com$/.test(new URL(url).hostname);
 }

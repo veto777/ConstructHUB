@@ -1,4 +1,4 @@
-import { governmentLinksAvailable } from "@shared/government-links";
+import { governmentLinkNotice, governmentLinksAvailable } from "@shared/government-links";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -31,6 +31,7 @@ interface PropertyAppraiser {
   searchUrl: string | null;
   platform: string | null;
   linkStatus: string | null;
+  lastVerifiedAt?: string | null;
   phone: string | null;
   address: string | null;
   searchableFields: string[] | null;
@@ -278,6 +279,8 @@ export default function PropertyPage() {
                         </a>
                       )}
                     </div>
+
+                    {governmentLinksAvailable(appraiser) && governmentLinkNotice(appraiser) && <p className="text-xs text-muted-foreground mt-2">{governmentLinkNotice(appraiser)}</p>}
 
                     {appraiser.searchableFields && appraiser.searchableFields.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-3">

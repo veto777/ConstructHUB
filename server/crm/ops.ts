@@ -889,21 +889,23 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       jurisdiction: permitDatabases.jurisdiction, portalUrl: permitDatabases.portalUrl,
       searchUrl: permitDatabases.searchUrl, phone: sql<string | null>`null`, // legacy contacts have no current source evidence
       linkStatus: permitDatabases.linkStatus,
+      lastVerifiedAt: permitDatabases.lastVerifiedAt,
     }).from(permitDatabases)
       .innerJoin(counties, eq(permitDatabases.countyId, counties.id))
       .where(and(
         sql`(lower(${counties.stateCode}) = lower(${state}) or lower(${counties.state}) = lower(${state}))`,
         eq(permitDatabases.isActive, true),
-        eq(permitDatabases.linkStatus, "live"),
+        sql`${permitDatabases.linkStatus} in ('live', 'verified', 'unconfirmed')`,
         city ? ilike(permitDatabases.jurisdiction, `%${city}%`) : sql`true`,
       )).limit(15);
     const appraisers = await db.select({
       id: propertyAppraisers.id, name: propertyAppraisers.name,
       portalUrl: propertyAppraisers.portalUrl, searchUrl: propertyAppraisers.searchUrl,
+      linkStatus: propertyAppraisers.linkStatus, lastVerifiedAt: propertyAppraisers.lastVerifiedAt,
     }).from(propertyAppraisers)
       .innerJoin(counties, eq(propertyAppraisers.countyId, counties.id))
       .where(and(eq(propertyAppraisers.isActive, true),
-        eq(propertyAppraisers.linkStatus, "live"),
+        sql`${propertyAppraisers.linkStatus} in ('live', 'verified', 'unconfirmed')`,
         sql`(lower(${counties.stateCode}) = lower(${state}) or lower(${counties.state}) = lower(${state}))`,
         city ? ilike(propertyAppraisers.name, `%${city}%`) : sql`true`)).limit(10);
     res.json({ portals, appraisers, jurisdiction: [city, state].filter(Boolean).join(", ") });

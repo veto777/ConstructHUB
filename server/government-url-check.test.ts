@@ -29,3 +29,13 @@ describe('government page verification', () => {
 it('rejects a vendor marketing homepage even with assessor campaign parameters', () => {
   expect(classifyGovernmentPage(page('ParcelQuest | California Property Data', 'Property records software', 200, 'https://www.parcelquest.com/?utm_campaign=assessor'), 'appraiser').status).toBe('dead');
 });
+
+it('rejects browser-breaking TLS, DNS and refused connections', () => {
+  for (const error of ['ENOTFOUND','ECONNREFUSED','CERT_HAS_EXPIRED','ERR_TLS_CERT_ALTNAME_INVALID']) {
+    expect(classifyGovernmentPage({html:'',httpStatus:null,error},'appraiser').status).toBe('dead');
+  }
+});
+it('accepts an on-topic tenant self-service home page', () => {
+  expect(classifyGovernmentPage(page('Home - City of Bedford', '<main>Building permits and inspections</main>',200,'https://bedfordtx.portal.opengov.com/'),'permit').status).toBe('live');
+  expect(classifyGovernmentPage(page('Home - City of Bedford', '<main>Building permits and community news</main>',200,'https://bedford.gov/'),'permit').status).toBe('dead');
+});

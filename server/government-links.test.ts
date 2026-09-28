@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { governmentLinksAvailable, governmentLinksForDisplay, canScrapeGovernmentPortal, governmentPermitForDisplay } from '../shared/government-links';
+import { governmentLinkNotice, governmentLinksAvailable, governmentLinksForDisplay, canScrapeGovernmentPortal, governmentPermitForDisplay } from '../shared/government-links';
 describe('government link visibility', () => {
   it('requires a verified, active link', () => {
     expect(governmentLinksAvailable({isActive: true, linkStatus: 'live'})).toBe(true);
@@ -29,4 +29,14 @@ it('retains verified permit links while withholding unsourced legacy contact fie
  const row={portalUrl:'https://fixture.invalid',searchUrl:null,isActive:true,linkStatus:'live',phone:'555-555-5555',email:'fixture@example.invalid',address:'Fixture address'};
  expect(governmentPermitForDisplay(row)).toEqual({...row,phone:null,email:null,address:null});
  expect(row.phone).toBe('555-555-5555');
+});
+
+it('keeps source-listed unconfirmed links visible with an honest dated label', () => {
+  const row = {isActive:true, linkStatus:'unconfirmed', portalUrl:'https://fixture.invalid', searchUrl:null, lastVerifiedAt:'2026-09-28T12:00:00Z'};
+  expect(governmentLinksAvailable(row)).toBe(true);
+  expect(governmentLinksForDisplay(row).portalUrl).toBe(row.portalUrl);
+  expect(governmentLinkNotice(row)).toBe('Official site · not auto-verified · Last checked 2026-09-28');
+  expect(governmentLinkNotice({...row, lastVerifiedAt:null})).toContain('Check date unavailable');
+  expect(governmentLinksAvailable({...row,linkStatus:'verified'})).toBe(true);
+  expect(governmentLinksAvailable({...row,isActive:false})).toBe(false);
 });

@@ -78,3 +78,33 @@ test('permit API withholds legacy contacts without deleting their stored values'
  expect(shown.phone).toBeNull();expect(shown.email).toBeNull();expect(shown.address).toBeNull();
  const [after]=await q('select phone from permit_databases where id=$1',[stored.id]);expect(after.phone).toBe(stored.phone);
 });
+
+test('unconfirmed source-listed office and permit links remain clickable and dated',async({page})=>{
+ const common={id:99301,countyId:1,isActive:true,linkStatus:'unconfirmed',lastVerifiedAt:'2026-09-28T12:00:00Z',portalUrl:'https://source-listed.invalid/records',searchUrl:null};
+ await page.route('**/api/property-appraisers',route=>route.fulfill({json:[{...common,name:'Source-listed assessment office',county:{id:1,name:'Fixture',state:'Washington',stateCode:'WA'}}]}));
+ await page.goto('/property');
+ await expect(page.getByTestId('button-visit-appraiser-99301')).toHaveAttribute('href',common.portalUrl);
+ await expect(page.getByText('Official site · not auto-verified · Last checked 2026-09-28')).toBeVisible();
+ await expect(page.getByTestId('link-appraiser-fallback-99301')).toHaveCount(0);
+ await page.route('**/api/databases?*',route=>route.fulfill({json:{total:1,databases:[{...common,name:'Source-listed permit office',jurisdiction:'Fixture, WA',jurisdictionType:'city'}]}}));
+ await page.goto('/databases');
+ await expect(page.getByTestId('link-portal-url-99301')).toHaveAttribute('href',common.portalUrl);
+ await expect(page.getByText('Official site · not auto-verified · Last checked 2026-09-28')).toBeVisible();
+ await expect(page.getByTestId('link-search-fallback-99301')).toHaveCount(0);
+});
+
+test('unconfirmed link status and check date survive all property APIs @serial',async({request})=>{
+ const {q}=await import('./db');
+ const [original]=await q('select id,county_id,name,portal_url,link_status,is_active,last_verified_at from property_appraisers where portal_url is not null limit 1');
+ try{
+  await q("update property_appraisers set link_status='unconfirmed',is_active=true,last_verified_at='2026-09-28T12:00:00Z' where id=$1",[original.id]);
+  for(const path of ['/api/property-appraisers',`/api/property-appraisers/county/${original.county_id}`]){
+   const response=await request.get(path);expect(response.ok()).toBeTruthy();
+   const row=(await response.json()).find((r:any)=>r.id===original.id);
+   expect(row.portalUrl).toBe(original.portal_url);expect(row.linkStatus).toBe('unconfirmed');expect(row.lastVerifiedAt).toContain('2026-09-28');
+  }
+  const result=await request.post('/api/property-lookup',{data:{countyId:original.county_id,address:'No matching audit fixture'}});
+  const row=(await result.json()).lookupLinks.find((r:any)=>r.name===original.name);
+  expect(row.portalUrl).toBe(original.portal_url);expect(row.linkStatus).toBe('unconfirmed');expect(row.lastVerifiedAt).toContain('2026-09-28');
+ }finally{await q('update property_appraisers set link_status=$1,is_active=$2,last_verified_at=$3 where id=$4',[original.link_status,original.is_active,original.last_verified_at,original.id]);}
+});

@@ -35,8 +35,8 @@ export async function syncPermitPortals(portals: PermitPortal[]) {
       portalUrl: p.url,
       searchUrl: p.url,
       platform: p.platform,
-      isActive: !!p.url && p.linkStatus === "live",
-      linkStatus: p.url ? (p.linkStatus || "unchecked") : "none",
+      isActive: !!p.url && ["live", "verified", "unconfirmed"].includes(p.linkStatus || ""),
+      linkStatus: p.url ? (p.linkStatus || "unchecked") : (p.linkStatus === "dead" ? "dead" : "none"),
       lastVerifiedAt: p.lastVerifiedAt ? new Date(p.lastVerifiedAt) : null,
     };
     for (const row of matches) {

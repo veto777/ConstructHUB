@@ -467,6 +467,8 @@ export async function registerRoutes(
         portalUrl: a.portalUrl,
         searchUrl: a.searchUrl,
         platform: a.platform,
+        linkStatus: a.linkStatus,
+        lastVerifiedAt: a.lastVerifiedAt,
       }));
 
       res.json({

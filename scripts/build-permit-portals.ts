@@ -114,6 +114,7 @@ const CANDIDATES: Candidate[] = [
 // deterministic second gate. A path like "/" with no hint is rejected.)
 const PERMIT_HINT = /permit|accela|energov|etrakit|epermit|eplan|dobnow|bisweb|\bdbi\b|\bpli\b|posse|inspection|building|develop|\bdpp\b|dcra|\bdsi\b|\bdns\b|\bpdd\b|ladbs|onestop|compass|tdc-online|buildingrecords|eclipse|selfservice|dppweb|citizenaccess|\baca[-.]|cityworks|mygov|viewpoint|smartgov|opengov|civicplus|projectdox|avolve|camino|clariti|epath|citizenserve|onlinepermit|land-?management|lms|\bpds\b|codeenforcement/i;
 const CONCURRENCY = 4;
+import { classifySourceListedLink } from "../server/government-link-policy";
 import { fetchGovernmentPage, classifyGovernmentPage } from "../server/government-url-check";
 
 async function main() {
@@ -148,9 +149,12 @@ async function main() {
       const norm = (s: string) => s.toLowerCase().replace(/\bsaint\b/g, 'st').replace(/[^a-z0-9]/g, '');
       const name = c.jurisdiction.split(',')[0].replace(/\b(county|parish|borough)\b/gi, '').trim();
       const identity = norm($('body').text() + $('title').text()).includes(norm(name));
-      const live = sourceVerified && PERMIT_HINT.test(candidateUrl) && check.status === "live" && identity;
-      results[index] = { ...c, url: live ? response.finalUrl : null, candidateUrl, platform: live ? c.platform : null,
-        linkStatus: live ? "live" : "none", lastVerifiedAt: new Date().toISOString() };
+      const status = sourceVerified ? classifySourceListedLink(candidateUrl,
+        { ...check, httpStatus: response.httpStatus, finalUrl: response.finalUrl, jurisdictionMatched: identity },
+        { state: c.jurisdiction.slice(-2), jurisdiction: name, sourceListed: true }) : "none";
+      const available = status === "verified" || status === "unconfirmed";
+      results[index] = { ...c, url: available ? (status === "verified" ? response.finalUrl : candidateUrl) : null,
+        candidateUrl, platform: available ? c.platform : null, linkStatus: status, lastVerifiedAt: new Date().toISOString() };
     }
   }));
   results.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction));

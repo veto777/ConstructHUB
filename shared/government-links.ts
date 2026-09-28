@@ -1,6 +1,6 @@
-/** Only a verified, active office may expose an outbound records link. */
+/** Source-listed links remain usable when automated verification is inconclusive. */
 export function governmentLinksAvailable(row: { isActive: boolean; linkStatus?: string | null }): boolean {
-  return row.isActive && row.linkStatus === 'live';
+  return row.isActive && ['live', 'verified', 'unconfirmed'].includes(row.linkStatus || '');
 }
 
 export function governmentLinksForDisplay<T extends { isActive: boolean; linkStatus?: string | null; portalUrl: string | null; searchUrl: string | null }>(row: T): T {
@@ -33,4 +33,11 @@ export function governmentPermitForDisplay<T extends {
   phone: string | null; email: string | null; address: string | null;
 }>(row: T): T {
   return { ...governmentLinksForDisplay(row), phone: null, email: null, address: null };
+}
+
+/** Dates describe actual checks, never the boot/seed time. */
+export function governmentLinkNotice(row: { linkStatus?: string | null; lastVerifiedAt?: string | Date | null }): string | null {
+  if (row.linkStatus !== 'unconfirmed') return null;
+  const date = row.lastVerifiedAt ? new Date(row.lastVerifiedAt) : null;
+  return `Official site · not auto-verified · ${date && !Number.isNaN(date.getTime()) ? `Last checked ${date.toISOString().slice(0, 10)}` : 'Check date unavailable'}`;
 }
