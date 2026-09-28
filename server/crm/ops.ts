@@ -1,3 +1,4 @@
+import { invoiceRefundTotals } from "./refund-summary";
 /**
  * The construction half: invoices + progress billing + retainage, the cost-code
  * budget ledger, scheduling with per-visit crews, change orders, punch lists,
@@ -180,7 +181,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const maps = await divisionMapsForOrg(ctx.org.id);
       rows = rows.filter((i) => divisionVisible(divScope, docDivisionFromMaps(maps, i)));
     }
-    res.json(rows);
+    res.json(await invoiceRefundTotals(ctx.org.id, rows));
   });
 
   app.post("/api/crm/invoices", async (req: any, res) => {

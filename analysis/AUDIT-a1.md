@@ -415,3 +415,50 @@ Shared dialogs, sidebar, bell and payment/attachment components add the API fami
 | `client/src/pages/crm-invoices.tsx` |  |
 | `client/src/pages/client-portal.tsx` | `/api/client/auth/logout`; `/api/client/auth/request-link`; `/api/client/contracts`; `/api/client/documents`; `/api/client/photos`; `/api/public/estimates/${tok` |
 | `client/src/pages/crm-reports.tsx` | `/api/crm/customers`; `/api/crm/me`; `/api/crm/reports`; `/api/crm/reports/${draft!.id`; `/api/crm/reports/upload` |
+
+## Round 2 — CRM isolation, payment ledger, exports and deterministic browsers
+
+Date: 2026-09-28. This section supersedes round-1 open issues **1, 2, 3, 7, 8 and 9** for the scenarios below. Scope stayed in CRM server code, CRM pages and CRM e2e, on lane/a1, port 8129 and constructhub_dev_a1. No production access, push, external messages or live Stripe calls. The source inventory above remains the broad feature inventory; the new source-scanned access matrix automatically covers direct-ID routes in the protected families, including nested history, PDFs and downloads.
+
+### Round 2 feature matrix
+
+| Feature | Page/route | API | How verified | Status |
+|---|---|---|---|---|
+| Client, estimate, invoice, project/job, change-order, document/attachment and appointment isolation | CRM clients, documents, projects, calendar | Direct-ID GET/POST/PATCH/PUT/DELETE routes, nested item/history/PDF/file routes | Shared object policy plus source-derived route matrix: division A receives 404 for B and unassigned fixtures even when assigned to the caller; actual file fixtures; assignment/price permissions, relink attempts, owner and unscoped admin checks | FIXED f033ec7 |
+| Division-scoped lists and aggregates | CRM home, clients, documents, reports, calendar | stats, customer details/activity/timeline, projects/jobs, estimates/invoices/payments, attachments/reports/appointments | Real HTTP/DB assertions for scoped counts, totals and visible rows; code path review | FIXED f033ec7 |
+| Whole-client portal grants | Client detail | customers GET/POST, customers/:id/portal-preview | Scoped seats receive no whole-client bearer link and cannot mint a broad preview; individual estimate access remains object-scoped; owner preview covered by browser | FIXED a2a2ad6 |
+| Checkout/intent/charge reconciliation | Payments and public invoices | Connect webhook; invoice/estimate checkout creation | Separate durable IDs/account, prefix-only backfill; mocked Stripe + real Postgres transactions, ACH delayed success, intent-first order, stale failures, concurrent duplicates/two payments, crash rollback and retry | FIXED 18157d4 |
+| Partial/full refund accounting | Payments, client, invoice and receipt | charge.refunded, payments, invoice lists/public invoice, receipt | Cumulative delta ledger, account/event idempotency, refund-before-success, stale/duplicate events, charge-only lookup, fees, crash rollback; browser partial/full invoice and receipt assertions | FIXED 7cad394 |
+| Actual Stripe API checkout/onboarding/ACH/refund delivery | Public invoice/estimate, Payments | Stripe API and Connect webhook | Provider mocked; lane key intentionally blank | NOT-TESTABLE: needs sk_test and test connected account |
+| CSV export safety | Client export and scheduled exports | customers/export.csv, export generation | Shared cell encoder; round-trip tests for = + - @ tab/CR, delimiters, quotes/newlines and benign cells | FIXED 5ea2fcf |
+| Limited scheduled-export wording | Settings, export email | backup settings/send endpoints | UI/email explicitly name clients, estimates and invoices, exclusions and no restore; local sink and browser | FIXED c6066bc |
+| Client-detail/report browser readiness | e2e 03 and 23 | Real fixture creation, report import/preview/confirm | Separate org per test, fixture cleanup, CRM shell readiness, explicit preview popup check; stable DOM markers prevent asynchronous control insertion from shifting click targets; 15 executions passed across three repetitions without retries | FIXED 7c96b80 + 9326390 |
+
+### Round 2 validation
+
+- `npm run check`: zero TypeScript errors.
+- `npm test -- --testNamePattern='^(?!.*configured admin gate)'`: **722 passed, 3 skipped, 67 files passed**. The three excluded tests start port 8199 and violate this lane's port restriction. No expected-failure Stripe regressions remain; their replacements exercise actual database transactions with a mocked Stripe client.
+- Financial regression file: 17 passing tests. Invoice/payment/event/refund writes roll back together when a trigger injects a failure between steps, and retry applies the credit or reversal once.
+- The two formerly flaky specs passed **15/15** executions with two workers, three repetitions and zero retries after the final control-selection correction. Earlier failures led to the correction and are not counted as clean passes.
+- Final targeted browser suite (client detail, reports, receipts, scheduled exports and refunds): **9 passed**, no retries. Earlier targeted division/PM/document checks also passed. This round did not repeat the entire round-1 199-scenario suite.
+- One intermediate access test reached a server still running the previous code and failed on the exposed portal link; after restarting the owned lane process, the final suite validates the new restriction.
+- CSV import retains the protective apostrophe as literal text; stripping it automatically would recreate formula risk on re-export.
+- Local detailed evidence is in ignored `analysis/a1-evidence/`; it is not committed because runtime logs can include fixture bearer links. No environment secrets are in this report.
+
+### Remaining open issues, ranked, with reproduction
+
+1. **High, configuration-dependent — owner-deferred SMS no-key fallback (round-1 issue 4).** `server/crm/sms.ts:476`: without a signing key, post unsigned form data `From=<fixture number>&Body=START` to `/api/crm/sms/inbound`; the legacy path can clear suppression. Unchanged by explicit owner instruction. Provider credentials/carrier validation remain required.
+2. **High for affected historical payments — ambiguous legacy account/refund history requires reconciliation.** `server/crm/payment-ledger-schema.ts:24` and `server/crm/payment-ledger.ts:67`: create a legacy payment with externalId but an org that has used two connected accounts; schema ensure deliberately leaves its account null. A status-only historical refunded row with no known settled balance is rejected rather than reverse an invented amount. Repro is pinned in payment-ledger tests. Owner must reconcile these records against authoritative Stripe history before replay; no automatic repair is safe from the stored fields alone.
+3. **Medium — owner-deferred legal wording (round-1 issue 5).** `client/src/pages/crm-legal.tsx:92` and `:188`: compare the Terms “never text” claim with Privacy's opted-in account-notification texts and Settings. Unchanged by instruction; needs approved wording.
+4. **Medium — owner-deferred entitlement policy (round-1 issue 6).** `server/crm/tenancy.ts:33`, `client/src/pages/crm-gateway.tsx:35`: a fresh authenticated growth user requests `/api/crm/me`, receives a new CRM org, then sees an active CRM gateway without a separate subscription check. Unchanged by instruction.
+5. **Medium — postcommit notifications have no durable outbox.** `server/crm/integrations.ts:212`: terminate the process after settlement commits but before notification/receipt dispatch, then replay the event; the money remains correct but event deduplication prevents retrying that notification. Financial atomicity is fixed; reliable external delivery needs a separate durable dispatch design.
+
+### Recommended improvements (ranked impact / effort)
+
+1. **High / medium:** an owner-operated historical Stripe reconciliation tool, including ambiguous accounts, legacy status-only refunds and uncredited old settlements; compare against provider records and show an auditable proposed repair before applying it.
+2. **High / medium:** a durable notification outbox with retry and delivery status, separate from the atomic accounting ledger.
+3. **High / high:** complete export plus tested restore, including signed PDFs, attachments, jobs, notes, settings and payments. Current scheduled exports remain explicitly limited; no restore was built in this round.
+4. **High / medium:** resolve the three owner-deferred SMS, legal and entitlement decisions with provider/product/legal evidence.
+5. **Medium / medium:** push policy filters into indexed SQL and paginate lists/aggregates. The shared policy establishes one authorization definition, but per-object checks and pre-existing list caps merit load testing for larger contractors.
+6. **Medium / medium:** extend isolated fixtures and explicit readiness to the remaining browser suite; enforce zero-retry runs in CI while preserving failure diagnostics.
+7. **Medium / medium:** add an authorized refund/credit-note workflow, provider reconciliation status and retainage/closeout tools; current refund ingestion handles provider events but does not initiate refunds.

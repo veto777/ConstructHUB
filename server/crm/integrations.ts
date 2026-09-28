@@ -1,3 +1,4 @@
+import { reconcileStripeEvent } from "./payment-ledger";
 /**
  * The plumbing that makes the money path and the public API real:
  *   1. A Stripe **Connect** webhook that reconciles crm_payments. Connected-
@@ -206,38 +207,27 @@ export function registerCrmIntegrationRoutes(app: Express): void {
     }
 
     try {
-      switch (event.type) {
-        case "checkout.session.completed":
-        case "checkout.session.async_payment_succeeded": {
-          const s = event.data.object as Stripe.Checkout.Session;
-          // ACH settles asynchronously: `completed` can fire while the debit is
-          // still processing, so only "paid" counts as money received.
-          const settled = s.payment_status === "paid";
-          await settlePayment(s.id, settled ? "succeeded" : "processing",
-            typeof s.payment_intent === "string" ? s.payment_intent : undefined);
-          break;
-        }
-        case "checkout.session.async_payment_failed":
-        case "checkout.session.expired": {
-          const s = event.data.object as Stripe.Checkout.Session;
-          await settlePayment(s.id, event.type.endsWith("failed") ? "failed" : "canceled");
-          break;
-        }
-        case "payment_intent.succeeded": {
-          const pi = event.data.object as Stripe.PaymentIntent;
-          await settleByIntent(pi.id, "succeeded");
-          break;
-        }
-        case "payment_intent.payment_failed": {
-          const pi = event.data.object as Stripe.PaymentIntent;
-          await settleByIntent(pi.id, "failed",
-            pi.last_payment_error?.message ?? null);
-          break;
-        }
-        case "charge.refunded": {
-          const ch = event.data.object as Stripe.Charge;
-          if (typeof ch.payment_intent === "string") await settleByIntent(ch.payment_intent, "refunded");
-          break;
+      const settled = await reconcileStripeEvent(event, stripe);
+      if (settled && settled.refundDelta > 0) {
+        await emitCrmEvent(settled.orgId, "payment.refunded", { paymentId: settled.paymentId, amountCents: settled.refundDelta });
+      }
+      if (settled && ["failed", "canceled"].includes(settled.status)) {
+        await emitCrmEvent(settled.orgId, "payment.failed", { paymentId: settled.paymentId, status: settled.status });
+      }
+      if (settled?.newlySettled) {
+        // Financial state and the event claim have committed together. These
+        // best-effort notifications can never roll back or repeat the credit.
+        const [pay] = await db.select().from(crmPayments).where(eq(crmPayments.id, settled.paymentId)).limit(1);
+        if (pay) {
+          const actual = await resolveStripeMethod(settled.paymentIntentId, pay.orgId);
+          if (actual?.method) await db.update(crmPayments).set({ method: actual.method }).where(eq(crmPayments.id, pay.id));
+          if (settled.invoicePaid) await emitCrmEvent(pay.orgId, "invoice.paid", { invoiceId: pay.invoiceId });
+          if (pay.invoiceId) autoSendPaymentReceipt(pay.orgId, pay.invoiceId).catch(() => {});
+          await emitCrmEvent(pay.orgId, "payment.succeeded", {
+            paymentId: pay.id, amountCents: pay.amountCents, method: actual?.method ?? pay.method,
+            estimateId: pay.estimateId, invoiceId: pay.invoiceId, projectId: pay.projectId,
+          });
+          await notifyPaid(pay, actual?.detail ?? null).catch(() => {});
         }
       }
     } catch (e: any) {
@@ -332,86 +322,6 @@ export function registerCrmIntegrationRoutes(app: Express): void {
       },
     });
   });
-}
-
-/** Mark a payment settled by Checkout Session id, and cascade to the invoice. */
-async function settlePayment(sessionId: string, status: string, intentId?: string) {
-  const [pay] = await db.select().from(crmPayments)
-    .where(eq(crmPayments.externalId, sessionId)).limit(1);
-  if (!pay) {
-    console.warn("[crm] connect webhook for unknown session", sessionId);
-    return;
-  }
-  await applySettlement(pay, status, intentId);
-}
-
-async function settleByIntent(intentId: string, status: string, failure?: string | null) {
-  const [pay] = await db.select().from(crmPayments)
-    .where(eq(crmPayments.externalId, intentId)).limit(1);
-  if (!pay) return; // the session-id row is the canonical one; nothing to do
-  await applySettlement(pay, status, undefined, failure);
-}
-
-async function applySettlement(
-  pay: typeof crmPayments.$inferSelect, status: string, intentId?: string, failure?: string | null,
-) {
-  // Idempotent: Stripe retries, and a succeeded payment must never regress.
-  if (pay.status === "succeeded" && status !== "refunded") return;
-
-  // The checkout record guessed the rail (ACH-first); the charge is the truth.
-  // Resolve the actual method so the ledger and the "payment received" email
-  // name what the client really paid with (Visa •••• 4242, bank ACH…).
-  const actual = status === "succeeded"
-    ? await resolveStripeMethod(intentId ?? pay.externalId, pay.orgId)
-    : null;
-
-  const [row] = await db.update(crmPayments).set({
-    status,
-    externalId: intentId ?? pay.externalId,
-    failureReason: failure ?? null,
-    paidAt: status === "succeeded" ? new Date() : null,
-    ...(actual?.method ? { method: actual.method } : {}),
-    updatedAt: new Date(),
-  }).where(eq(crmPayments.id, pay.id)).returning();
-
-  if (status !== "succeeded") {
-    await emitCrmEvent(pay.orgId, "payment.failed", { paymentId: row.id, status, failure });
-    return;
-  }
-
-  // Credit the invoice, if this payment was against one.
-  if (pay.invoiceId) {
-    const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, pay.invoiceId)).limit(1);
-    if (inv) {
-      const paid = (inv.paidCents ?? 0) + pay.amountCents;
-      // Retainage is withheld, so "paid in full" means the due amount less retainage.
-      const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0));
-      await db.update(crmInvoices).set({
-        paidCents: paid,
-        status: paid >= due ? "paid" : "partial",
-        paidAt: paid >= due ? new Date() : null,
-        updatedAt: new Date(),
-      }).where(eq(crmInvoices.id, inv.id));
-      if (paid >= due) await emitCrmEvent(pay.orgId, "invoice.paid", { invoiceId: inv.id, paidCents: paid });
-      // Email the client their receipt-to-date (honors paymentReceipt).
-      autoSendPaymentReceipt(pay.orgId, inv.id)
-        .catch((e: any) => console.error("[crm] auto-receipt failed:", e?.message || e));
-    }
-  }
-
-  if (pay.estimateId) {
-    await db.insert(crmEstimateEvents).values({
-      orgId: pay.orgId, estimateId: pay.estimateId, type: "paid", actor: "client",
-      meta: { amountCents: pay.amountCents, method: pay.method },
-    }).catch(() => {});
-  }
-
-  await emitCrmEvent(pay.orgId, "payment.succeeded", {
-    paymentId: row.id, amountCents: row.amountCents, method: row.method,
-    estimateId: row.estimateId, invoiceId: row.invoiceId, projectId: row.projectId,
-  });
-
-  await notifyPaid(pay, actual?.detail ?? null).catch(() => {});
 }
 
 /**

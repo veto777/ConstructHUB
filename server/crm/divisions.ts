@@ -21,7 +21,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import { db } from "../db";
 import {
-  crmDivisions, crmMembers, crmProjects, crmEstimates, crmInvoices,
+  crmDivisions, crmMembers, crmCustomers, crmProjects, crmEstimates, crmInvoices,
   type CrmOrg, type CrmDivision,
 } from "@shared/schema";
 import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
@@ -216,6 +216,10 @@ export async function divisionMapsForOrg(orgId: string): Promise<DivisionMaps> {
   for (const p of [...projects].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))) {
     if (!byCustomer.has(p.customerId)) byCustomer.set(p.customerId, p.divisionId);
   }
+  const assignedCustomers = await db.select({ id: crmCustomers.id, divisionId: crmMembers.divisionId })
+    .from(crmCustomers).innerJoin(crmMembers, and(eq(crmMembers.id, crmCustomers.ownerMemberId), eq(crmMembers.orgId, orgId)))
+    .where(eq(crmCustomers.orgId, orgId));
+  for (const c of assignedCustomers) if (!byCustomer.has(c.id)) byCustomer.set(c.id, c.divisionId);
   const byEstimate = new Map(estimates.map((e) => [
     e.id,
     // The estimate's explicit division pick wins over project/customer inference.

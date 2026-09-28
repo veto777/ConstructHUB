@@ -1,3 +1,4 @@
+import { ensurePaymentLedgerSchema } from "./payment-ledger-schema";
 import { pool } from "../db";
 
 // Idempotent schema setup for the CRM tenancy layer. Run on boot instead of
@@ -803,4 +804,5 @@ export async function ensureCrmSchema(): Promise<void> {
   } catch (e: any) {
     console.warn("[crm] sku backfill skipped:", e?.message || e);
   }
+  await ensurePaymentLedgerSchema();
 }

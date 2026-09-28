@@ -90,23 +90,12 @@ export function isBackupDue(cfg: BackupConfig, now: Date = new Date()): boolean 
 
 // ── CSV (RFC 4180, by hand) ───────────────────────────────────────────────────
 
-export type CellValue = string | number | null;
+import { toCsv, type CellValue } from "./csv";
+export { csvCell, toCsv } from "./csv";
 export interface BackupSection {
   name: string;
   headers: string[];
   rows: CellValue[][];
-}
-
-export function csvCell(v: CellValue): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-export function toCsv(headers: string[], rows: CellValue[][]): string {
-  const lines = [headers.map(csvCell).join(",")];
-  for (const r of rows) lines.push(r.map(csvCell).join(","));
-  return lines.join("\r\n") + "\r\n";
 }
 
 // ── SpreadsheetML 2003 ("Excel" without a dependency) ────────────────────────
@@ -225,7 +214,7 @@ export interface BackupAttachment {
 export function buildAttachments(sections: BackupSection[], format: BackupFormat, dateStamp: string): BackupAttachment[] {
   if (format === "xlsx") {
     return [{
-      filename: `constructhub-backup-${dateStamp}.xls`,
+      filename: `constructhub-export-${dateStamp}.xls`,
       contentType: "application/vnd.ms-excel",
       content: toSpreadsheetXml(sections),
     }];
@@ -265,7 +254,7 @@ async function resolveRecipient(org: OrgRow, cfg: BackupConfig): Promise<string 
 /** Generate the export and email it. Throws on failure — the caller stamps. */
 export async function sendBackupForOrg(org: OrgRow, cfg: BackupConfig): Promise<BackupStats> {
   const recipient = await resolveRecipient(org, cfg);
-  if (!recipient) throw new Error("No backup recipient — set an email in Settings → Auto-backup.");
+  if (!recipient) throw new Error("No export recipient — set an email in Settings → Scheduled exports.");
 
   const sections = await buildBackupSections(org.id);
   const dateStamp = new Date().toISOString().slice(0, 10);
@@ -279,14 +268,14 @@ export async function sendBackupForOrg(org: OrgRow, cfg: BackupConfig): Promise<
 
   await sendWithFallback({
     to: recipient,
-    subject: `Your ConstructHub CRM backup — ${org.name} (${dateStamp})`,
+    subject: `Your ConstructHub CRM export — ${org.name} (${dateStamp})`,
     text:
-      `Attached: your ${org.name} backup as of ${dateStamp}.\n\n` +
+      `Attached: an export of clients, estimates and invoices for ${org.name} as of ${dateStamp}.\n\n` +
       `Clients: ${rows.clients}\nEstimates: ${rows.estimates}\nInvoices: ${rows.invoices}\n\n` +
       (cfg.format === "xlsx"
         ? `One Excel workbook (.xls) with three sheets: Clients, Estimates, Invoices.\n`
         : `Three CSV files: clients, estimates, invoices.\n`) +
-      `\nManage auto-backup in Settings → Auto-backup.`,
+      `\nThis export excludes attachments, signed documents, payments and other CRM records. Restore is not available.\nManage exports in Settings → Scheduled exports.`,
     attachments,
   });
 
@@ -355,12 +344,12 @@ export function startBackupScheduler(): void {
 const backupSettingsSchema = z.object({
   enabled: z.boolean(),
   frequency: z.enum(["weekly", "biweekly", "custom"]),
-  /** Required when frequency is "custom": days between backups. */
+  /** Required when frequency is "custom": days between exports. */
   customDays: z.number().int().min(1).max(90).nullable().optional(),
   format: z.enum(["csv", "xlsx"]),
   email: z.string().email().max(320),
 }).refine((v) => v.frequency !== "custom" || (v.customDays ?? 0) >= 1, {
-  message: "Choose how many days between backups (1–90).",
+  message: "Choose how many days between exports (1–90).",
 });
 
 export function registerCrmBackupRoutes(app: Express, getDevUser: GetUser): void {
@@ -387,7 +376,7 @@ export function registerCrmBackupRoutes(app: Express, getDevUser: GetUser): void
     if (!ctx) return;
     if (!requireOwnerRole(res, ctx)) return;
     const parsed = backupSettingsSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid backup settings", issues: parsed.error.issues });
+    if (!parsed.success) return res.status(400).json({ message: "Invalid export settings", issues: parsed.error.issues });
 
     // Merge — lastSentAt/lastError survive a settings save.
     await stampBackup(ctx.org.id, parsed.data);
@@ -400,7 +389,7 @@ export function registerCrmBackupRoutes(app: Express, getDevUser: GetUser): void
     if (!ctx) return;
     if (!requireOwnerRole(res, ctx)) return;
     if (running.has(ctx.org.id)) {
-      return res.status(409).json({ message: "A backup is already running for this organization" });
+      return res.status(409).json({ message: "An export is already running for this organization" });
     }
 
     const cfg = backupConfigOf(ctx.org.customFields);
@@ -413,7 +402,7 @@ export function registerCrmBackupRoutes(app: Express, getDevUser: GetUser): void
     } catch (e: any) {
       const message = String(e?.message || e).slice(0, 500);
       await stampBackup(ctx.org.id, { lastError: message, lastErrorAt: new Date().toISOString() }).catch(() => {});
-      res.status(500).json({ message: `Backup failed: ${message}` });
+      res.status(500).json({ message: `Export failed: ${message}` });
     } finally {
       running.delete(ctx.org.id);
     }

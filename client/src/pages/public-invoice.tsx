@@ -225,6 +225,11 @@ export default function PublicInvoicePage() {
                     <span className="font-medium tabular-nums">−{money(inv.retainageCents)}</span>
                   </div>
                 )}
+                {inv.refundedCents > 0 && (
+                  <div className="flex justify-between text-sm" data-testid="invoice-refunded">
+                    <span>Refunded</span><span>{money(inv.refundedCents)}</span>
+                  </div>
+                )}
                 {inv.paidCents > 0 && (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Already paid</span>

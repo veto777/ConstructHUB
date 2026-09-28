@@ -854,7 +854,7 @@ export default function CrmClientPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {canManageCustomers && <ViewAsClientButton customerId={id!} />}
+              {canManageCustomers && data.portalPath && <ViewAsClientButton customerId={id!} />}
               {canManageCustomers && (
                 <>
                   <Button variant="outline" size="sm" data-testid="button-edit-client" onClick={openEdit}>
@@ -1036,7 +1036,7 @@ export default function CrmClientPage() {
                 <div>
                   <span className="text-muted-foreground">Collected to date</span>{" "}
                   <span className="font-semibold tabular-nums" data-testid="text-collected">
-                    {money((payments ?? []).filter((p) => p.status === "succeeded").reduce((s, p) => s + (p.amountCents ?? 0), 0))}
+                    {money((payments ?? []).filter((p) => ["succeeded", "partially_refunded", "refunded"].includes(p.status)).reduce((s, p) => s + Math.max(0, (p.amountCents ?? 0) - (p.refundedCents ?? 0)), 0))}
                   </span>
                 </div>
               </div>
@@ -1060,6 +1060,7 @@ export default function CrmClientPage() {
                           </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
+                          {p.refundedCents > 0 && <span>{money(p.refundedCents)} refunded · </span>}
                           {when(p.paidAt ?? p.createdAt)}{p.note ? ` · ${p.note}` : ""}
                         </div>
                       </div>
@@ -1415,7 +1416,7 @@ export default function CrmClientPage() {
                         </StatusPill>
                       </div>
                       <div className="text-sm text-muted-foreground mt-0.5 tabular-nums">
-                        {money(inv.totalCents)}{inv.paidCents > 0 && !inv.paidAt ? ` · ${money(inv.paidCents)} paid` : ""}
+                        {money(inv.totalCents)}{inv.refundedCents > 0 ? ` · ${money(inv.refundedCents)} refunded` : ""}{inv.paidCents > 0 && !inv.paidAt ? ` · ${money(inv.paidCents)} paid` : ""}
                         {open ? ` · ${money(due)} due` : ""}
                       </div>
                     </div>
@@ -1442,7 +1443,7 @@ export default function CrmClientPage() {
                           <Landmark className="h-4 w-4 mr-2" /> Record payment
                         </Button>
                       )}
-                      {canInvoice && !inv.voidedAt && (inv.paidCents ?? 0) > 0 && (
+                      {canInvoice && !inv.voidedAt && ((inv.paidCents ?? 0) > 0 || (inv.refundedCents ?? 0) > 0) && (
                         <InvoiceReceiptButton invoiceId={inv.id} invoiceNumber={inv.number} />
                       )}
                       {canInvoice && !inv.voidedAt && !(inv.paidCents > 0) && (

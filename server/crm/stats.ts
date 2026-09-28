@@ -17,6 +17,8 @@ import {
   CRM_PROJECT_STAGE_META,
 } from "@shared/schema";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { objectPolicy } from "./object-access";
+import { divisionScopeOf } from "./divisions";
 import { requireOrg, requirePermission } from "./tenancy";
 
 type GetUser = (req: any, res: any) => any;
@@ -63,6 +65,21 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
     // Org-wide revenue rollups — reporting seats only (field/sub are blind).
     if (!requirePermission(res, ctx, "seeReporting")) return;
     const orgId = ctx.org.id;
+
+    // Reuse the object policy before aggregation, including assignment overrides.
+    if (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) {
+      const access = objectPolicy(ctx);
+      const estimates = await access.filter("estimates", await db.select().from(crmEstimates).where(eq(crmEstimates.orgId, orgId)));
+      const projects = await access.filter("projects", await db.select().from(crmProjects).where(eq(crmProjects.orgId, orgId)));
+      const invoices = await access.filter("invoices", await db.select().from(crmInvoices).where(eq(crmInvoices.orgId, orgId)));
+      const sum = <T,>(rows: T[], value: (r: T) => number) => ({ count: rows.length, totalCents: rows.reduce((n, r) => n + value(r), 0) });
+      return res.json({
+        openEstimates: sum(estimates.filter(e => (OPEN_ESTIMATE as readonly string[]).includes(e.status)), e => e.totalCents),
+        jobsWon: sum(estimates.filter(e => e.status === "approved"), e => e.approvedTotalCents ?? e.totalCents),
+        unscheduledJobs: sum(projects.filter(p => p.status === "approved" && !p.archivedAt), p => p.contractValueCents ?? 0),
+        openInvoices: sum(invoices.filter(i => (OPEN_INVOICE as readonly string[]).includes(i.status)), i => Math.max(0, i.totalCents - i.paidCents)),
+      });
+    }
 
     const [openEst] = await db.select({
       count: sql<number>`count(*)::int`,
@@ -127,6 +144,8 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       return m ? (m.displayName || m.email || null) : null;
     };
 
+    const access = objectPolicy(ctx);
+    const restricted = divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs;
     type Item = { id: string; at: string; actor: string; text: string; link: string | null };
     const items: Item[] = [];
     const money = (c: number) =>
@@ -136,6 +155,10 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       .where(eq(crmTeamActivity.orgId, orgId))
       .orderBy(desc(crmTeamActivity.createdAt)).limit(limit);
     for (const r of logged) {
+      if (restricted) {
+        const ref = /^\/crm\/(clients|projects|estimates)\/([^/?]+)/.exec(r.link ?? "");
+        if (!ref || !await access.visible(ref[1] === "clients" ? "customers" : ref[1] as "projects" | "estimates", ref[2])) continue;
+      }
       items.push({
         id: `a:${r.id}`,
         at: (r.createdAt ?? new Date()).toISOString(),
@@ -151,6 +174,7 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       actor: crmEstimateEvents.actor,
       createdAt: crmEstimateEvents.createdAt,
       meta: crmEstimateEvents.meta,
+      estimateId: crmEstimates.id,
       estNumber: crmEstimates.number,
       customerId: crmEstimates.customerId,
       custName: crmCustomers.displayName,
@@ -171,6 +195,7 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       ))
       .orderBy(desc(crmEstimateEvents.createdAt)).limit(limit * 2);
     for (const e of events) {
+      if (restricted && !await access.visible("estimates", e.estimateId)) continue;
       const ref = e.estNumber ? `estimate ${e.estNumber}` : "an estimate";
       const member = memberName(e.actor);
       const link = `/crm/clients/${e.customerId}`;
@@ -206,6 +231,7 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       .where(and(eq(crmPayments.orgId, orgId), eq(crmPayments.status, "succeeded")))
       .orderBy(desc(crmPayments.createdAt)).limit(limit);
     for (const p of pays) {
+      if (restricted && !await access.visible("payments", p.id)) continue;
       items.push({
         id: `p:${p.id}`,
         at: (p.createdAt ?? new Date()).toISOString(),

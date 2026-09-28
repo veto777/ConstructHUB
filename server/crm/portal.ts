@@ -1,3 +1,4 @@
+import { invoiceRefundTotals } from "./refund-summary";
 /**
  * Send an estimate, track that it was opened, and let the client approve or
  * decline from their own portal.
@@ -1649,13 +1650,14 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
       }
     }
 
+    const [refundSummary] = await invoiceRefundTotals(inv.orgId, [inv]);
     const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
     res.json({
       invoice: {
         number: inv.number, title: inv.title, status: inv.status,
         subtotalCents: inv.subtotalCents, discountCents: inv.discountCents,
         taxCents: inv.taxCents, totalCents: inv.totalCents,
-        retainageCents: inv.retainageCents, paidCents: inv.paidCents,
+        retainageCents: inv.retainageCents, paidCents: inv.paidCents, refundedCents: refundSummary.refundedCents,
         dueCents: due, dueAt: inv.dueAt, paidAt: inv.paidAt, notes: inv.notes,
         createdAt: inv.createdAt,
       },

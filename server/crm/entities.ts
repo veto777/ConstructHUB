@@ -1,3 +1,6 @@
+import { invoiceRefundTotals } from "./refund-summary";
+import { objectPolicy, canShareWholeClientPortal } from "./object-access";
+import { csvCell } from "./csv";
 /**
  * CRM entities — customers, projects, jobs, estimates, plus the org-wide
  * Documents Center lists (filtered estimates/invoices for /crm/estimates and
@@ -318,8 +321,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         ilike(crmCustomers.addressLine1, `%${q}%`),
       ) as any);
     }
-    const rows = await db.select().from(crmCustomers).where(and(...where))
+    let rows = await db.select().from(crmCustomers).where(and(...where))
       .orderBy(desc(crmCustomers.createdAt)).limit(500);
+    rows = await objectPolicy(ctx).filter("customers", rows);
     // Bid outcome per client, for the Won / Undecided / Declined tabs: any
     // approved estimate wins; else an open (sent/viewed) one means undecided;
     // else any declined means declined; no bids → null. Scoped to the listed
@@ -379,7 +383,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       entityType: "customer", entityId: row.id, customerId: row.id,
       meta: { name: row.displayName },
     });
-    res.status(201).json({ ...row, portalToken: undefined, portalPath: `/portal/${row.portalToken}` });
+    res.status(201).json({ ...row, portalToken: undefined, portalPath: canShareWholeClientPortal(ctx) ? `/portal/${row.portalToken}` : undefined });
   });
 
   /**
@@ -393,19 +397,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const ctx = await ctxFor(req, res, "exportData");
     if (!ctx) return;
 
-    const rows = await db.select().from(crmCustomers)
+    let rows = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), isNull(crmCustomers.archivedAt)))
       .orderBy(asc(crmCustomers.displayName)).limit(10000);
 
-    const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
+    rows = await objectPolicy(ctx).filter("customers", rows);
     const header = ["id", "name", "email", "phone", "address", "city", "state", "postal_code", "created_at"];
     const lines = rows.map((c) => [
       c.id, c.displayName, c.email, c.phone, c.addressLine1, c.city, c.state, c.postalCode,
       c.createdAt ? new Date(c.createdAt).toISOString() : "",
-    ].map(esc).join(","));
+    ].map(csvCell).join(","));
     const csv = [header.join(","), ...lines].join("\n") + "\n";
 
     logActivity(ctx, "data.exported", {
@@ -433,9 +434,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.json({
       customer: { ...c, portalToken: undefined },
       // Only someone who can manage customers gets the shareable portal link.
-      portalPath: ctx.permissions.manageCustomers ? `/portal/${c.portalToken}` : undefined,
-      projects: projects.map((p) => presentProject(p, ctx)),
-      estimates: estimates.map((e) => presentEstimate(e, ctx)),
+      portalPath: canShareWholeClientPortal(ctx) ? `/portal/${c.portalToken}` : undefined,
+      projects: (await objectPolicy(ctx).filter("projects", projects)).map((p) => presentProject(p, ctx)),
+      estimates: (await objectPolicy(ctx).filter("estimates", estimates)).map((e) => presentEstimate(e, ctx)),
     });
   });
 
@@ -549,7 +550,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (req.query.status) where.push(eq(crmProjects.status, String(req.query.status)));
     if (req.query.customerId) where.push(eq(crmProjects.customerId, String(req.query.customerId)));
     // A field tech without viewAllJobs sees only projects they're PM on.
-    if (!ctx.permissions.viewAllJobs) where.push(eq(crmProjects.projectManagerMemberId, ctx.member.id));
+    if (!ctx.permissions.viewAllJobs) {
+      const allowed = await objectPolicy(ctx).filter("projects", await db.select().from(crmProjects).where(eq(crmProjects.orgId, ctx.org.id)));
+      where.push(inArray(crmProjects.id, allowed.map(p => p.id)));
+    }
     // A division-scoped member sees ONLY their division's projects — the
     // unassigned commons stay with owners and division-less members (STRICT).
     const divScope = divisionScopeOf(ctx.member);
@@ -594,7 +598,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmProjects)
       .where(eq(crmProjects.orgId, ctx.org.id));
     const [row] = await db.insert(crmProjects).values({
-      ...parsed.data, orgId: ctx.org.id, number: `P-${1000 + n + 1}`,
+      ...parsed.data, divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx.member), orgId: ctx.org.id, number: `P-${1000 + n + 1}`,
     } as any).returning();
     res.status(201).json(presentProject(row, ctx));
   });
@@ -708,13 +712,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (req.query.status) where.push(eq(crmEstimates.status, String(req.query.status)));
       let rows = await db.select().from(crmEstimates).where(and(...where))
         .orderBy(desc(crmEstimates.createdAt)).limit(500);
-      // Division scoping: the estimate's project's division, else its customer's
-      // latest project's, else unassigned — which a scoped member never sees (STRICT).
-      const divScope = divisionScopeOf(ctx.member);
-      if (divScope) {
-        const maps = await divisionMapsForOrg(ctx.org.id);
-        rows = rows.filter((e) => divisionVisible(divScope, docDivisionFromMaps(maps, e)));
-      }
+      rows = await objectPolicy(ctx).filter("estimates", rows);
       return res.json(rows.map((e) => presentEstimate(e, ctx)));
     }
 
@@ -745,20 +743,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     let rows: { doc: typeof crmEstimates.$inferSelect; customerName: string | null }[];
     let filtered: number;
     let total: number;
-    if (divScope) {
-      // Division scoping resolves through project/customer maps, so it stays a
-      // JS filter — counts are computed after it, never from raw SQL totals.
-      const maps = await divisionMapsForOrg(ctx.org.id);
+    if (divScope || !ctx.permissions.viewAllJobs) {
+      const access = objectPolicy(ctx);
       const all = await db.select({ doc: crmEstimates, customerName: crmCustomers.displayName })
         .from(crmEstimates).leftJoin(crmCustomers, joinCust)
         .where(and(...where)).orderBy(order);
-      const visible = all.filter((r) => divisionVisible(divScope, docDivisionFromMaps(maps, r.doc)));
+      const ids = new Set((await access.filter("estimates", all.map(r => r.doc))).map(r => r.id));
+      const visible = all.filter(r => ids.has(r.doc.id));
       filtered = visible.length;
       rows = visible.slice(0, 500);
-      const everyDoc = await db.select({
-        projectId: crmEstimates.projectId, customerId: crmEstimates.customerId,
-      }).from(crmEstimates).where(eq(crmEstimates.orgId, ctx.org.id));
-      total = everyDoc.filter((d) => divisionVisible(divScope, docDivisionFromMaps(maps, d))).length;
+      total = (await access.filter("estimates", await db.select().from(crmEstimates).where(eq(crmEstimates.orgId, ctx.org.id)))).length;
     } else {
       rows = await db.select({ doc: crmEstimates, customerName: crmCustomers.displayName })
         .from(crmEstimates).leftJoin(crmCustomers, joinCust)
@@ -799,7 +793,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         const maps = await divisionMapsForOrg(ctx.org.id);
         rows = rows.filter((i) => divisionVisible(divScope, docDivisionFromMaps(maps, i)));
       }
-      return res.json(rows);
+      rows = await objectPolicy(ctx).filter("invoices", rows);
+      return res.json(await invoiceRefundTotals(ctx.org.id, rows));
     }
 
     // ── Documents Center mode. "overdue" is derived, never stored: an open
@@ -842,18 +837,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     let rows: { doc: typeof crmInvoices.$inferSelect; customerName: string | null }[];
     let filtered: number;
     let total: number;
-    if (divScope) {
-      const maps = await divisionMapsForOrg(ctx.org.id);
+    if (divScope || !ctx.permissions.viewAllJobs) {
+      const access = objectPolicy(ctx);
       const all = await db.select({ doc: crmInvoices, customerName: crmCustomers.displayName })
         .from(crmInvoices).leftJoin(crmCustomers, joinCust)
         .where(and(...where)).orderBy(order);
-      const visible = all.filter((r) => divisionVisible(divScope, docDivisionFromMaps(maps, r.doc)));
+      const ids = new Set((await access.filter("invoices", all.map(r => r.doc))).map(r => r.id));
+      const visible = all.filter(r => ids.has(r.doc.id));
       filtered = visible.length;
       rows = visible.slice(0, 500);
-      const everyDoc = await db.select({
-        projectId: crmInvoices.projectId, estimateId: crmInvoices.estimateId, customerId: crmInvoices.customerId,
-      }).from(crmInvoices).where(eq(crmInvoices.orgId, ctx.org.id));
-      total = everyDoc.filter((d) => divisionVisible(divScope, docDivisionFromMaps(maps, d))).length;
+      total = (await access.filter("invoices", await db.select().from(crmInvoices).where(eq(crmInvoices.orgId, ctx.org.id)))).length;
     } else {
       rows = await db.select({ doc: crmInvoices, customerName: crmCustomers.displayName })
         .from(crmInvoices).leftJoin(crmCustomers, joinCust)
@@ -866,7 +859,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       total = t;
     }
     res.json({
-      rows: rows.map((r) => ({ ...r.doc, customerName: r.customerName ?? null, overdue: isOverdue(r.doc) })),
+      rows: await invoiceRefundTotals(ctx.org.id, rows.map((r) => ({ ...r.doc, customerName: r.customerName ?? null, overdue: isOverdue(r.doc) }))),
       total,
       filtered,
     });
@@ -913,7 +906,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
     const [est] = await db.insert(crmEstimates).values({
       orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
-      divisionId: d.divisionId ?? null,
+      divisionId: d.divisionId ?? divisionScopeOf(ctx.member),
       number: `E-${1000 + n + 1}`, title: d.title, introText: d.introText ?? null,
       termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
       taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,

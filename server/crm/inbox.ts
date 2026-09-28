@@ -1,3 +1,5 @@
+import { objectPolicy } from "./object-access";
+import { divisionScopeOf } from "./divisions";
 /**
  * The Messages center — every client message in one place, threaded per
  * client, unread/read like text messages.
@@ -79,6 +81,13 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
         AND read_at IS NULL
     `) as any).rows ?? [];
     const unreadTotal: number = unreadRows[0]?.n ?? 0;
+    if (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) {
+      const access = objectPolicy(ctx);
+      const visible = [];
+      for (const r of rows) if (await access.visible("customers", r.customerId)) visible.push(r);
+      const unread = await db.select().from(crmClientComments).where(and(eq(crmClientComments.orgId, ctx.org.id), isNull(crmClientComments.authorMemberId), isNull(crmClientComments.readAt)));
+      return res.json({ threads: visible, unreadTotal: (await access.filter("client-comments", unread)).length });
+    }
     res.json({ unreadTotal, threads: rows });
   });
 
@@ -102,7 +111,7 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
 
     res.json({
       customer: { id: cust.id, displayName: cust.displayName, email: cust.email },
-      messages: msgs.reverse().map((m) => ({
+      messages: (await objectPolicy(ctx).filter("client-comments", msgs)).reverse().map((m) => ({
         id: m.id,
         body: m.body,
         fromClient: !m.authorMemberId,
