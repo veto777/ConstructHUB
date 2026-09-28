@@ -124,6 +124,7 @@ export async function setupAuth(app: Express) {
         callbackURL: "/api/auth/google/callback",
         proxy: true,
         passReqToCallback: true,
+        state: true, // Bind the OAuth callback to the initiating browser session.
       },
       async (req: any, accessToken, refreshToken, profile, done) => {
         try {
