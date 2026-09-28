@@ -124,10 +124,6 @@ export async function registerRoutes(
   function getDevUser(req: any, res: any): any {
     const user = req.user;
     if (user) return user;
-    if (DEV_AUTH_BYPASS || DEMO_AUTOLOGIN) {
-      req.user = { id: 1 };
-      return req.user;
-    }
     res.status(401).json({ message: "Not authenticated" });
     return null;
   }
