@@ -179,9 +179,12 @@ access. **✅ APPROVED 2026-09-23** (application #3, case `1-4033000042334`) —
 Business Profile APIs in that project's API Library (owner console click — no gcloud/service-account
 creds exist on any box). ⚠️ Google policy rider from the approval email: **no public statements or
 press releases suggesting partnership/sponsorship/endorsement by Google** without prior written
-approval. Keep `SHOW_COMPETITOR_INTEL` and `SHOW_GOOGLE_REVIEWS` **off** until the integration is
-built AND the review-gating flow is fixed (see `.agents/memory/review-gating-flag.md`) — Google
-re-audits sensitive-scope apps after approval.
+approval. **2026-09-28: `SHOW_COMPETITOR_INTEL` and `SHOW_GOOGLE_REVIEWS` turned back ON and deployed**
+(commits 19d15fd, 7ba311a, 22d63d6). The Google Reviews flow was made compliant first: every rating is
+offered the Google review option, no reward is tied to a review (the +1% review bonus and the $5,000
+drawing were removed; the 3% referral program stays, decoupled), no Yelp ask, and the "zero bad reviews"
+explainer was rewritten. Competitor Intel copy says "public ad activity", never "spy". Google re-audits
+sensitive-scope apps, so **never reintroduce review gating, review incentives or surveillance wording.**
 
 | Date | Event |
 |---|---|
