@@ -39,7 +39,7 @@ const STATES = [
 ];
 
 // Office names that denote the assessment / property-appraiser office.
-const APPRAISER_RE = /property appraiser|assessor|appraiser|auditor|equalization|assessment|tax commissioner|revenue commissioner/i;
+const APPRAISER_RE = /property appraiser|assessor|appraiser|auditor|equalization|assessment|tax commissioner|revenue commission(?:er)?/i;
 // Names to always skip (not assessment offices).
 const SKIP_RE = /historic aerials|netr mapping|mapping and gis|\bgis\b|tax collector|treasurer|clerk|recorder|register of deeds|sheriff/i;
 
@@ -131,7 +131,7 @@ function parseAppraiser(html: string, stateCode: string, county: string): Apprai
   candidates.sort((a, b) =>
     (b.portalUrl ? 1 : 0) - (a.portalUrl ? 1 : 0) ||
     (/appraiser|assessor/i.test(b.name) ? 1 : 0) - (/appraiser|assessor/i.test(a.name) ? 1 : 0));
-  return candidates[0] || { stateCode, county, name: `${county} Assessor`, phone: null, portalUrl: null, platform: null, source: "netronline" };
+  return candidates[0] || { stateCode, county, name: `${county} property records`, phone: null, portalUrl: null, platform: null, source: "netronline" };
 }
 
 async function mapPool<T, R>(items: T[], fn: (item: T) => Promise<R>, conc: number): Promise<R[]> {
@@ -170,7 +170,7 @@ async function main() {
           return parseAppraiser(html, st, c.name);
         } catch (e: any) {
           console.warn(`  [${st}/${c.name}] failed: ${e?.message || e}`);
-          return { stateCode: st, county: c.name, name: `${c.name} Assessor`, phone: null, portalUrl: null, platform: null, source: "netronline" as const };
+          return { stateCode: st, county: c.name, name: `${c.name} property records`, phone: null, portalUrl: null, platform: null, source: "netronline" as const };
         }
       }, CONCURRENCY);
 
