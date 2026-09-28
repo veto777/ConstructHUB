@@ -501,7 +501,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
           Connect Your Website &amp; Google Ads
         </h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Click Guard protects your Google Ads budget by detecting fraudulent clicks on your website and automatically excluding those IPs from your campaigns.
+          Click Guard records script-observed visits and flags unusual patterns. To apply its local IP exclusion list, install and schedule the separate script in your Google Ads account.
         </p>
       </div>
 
@@ -667,7 +667,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <CardContent className="space-y-4">
               <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). This script runs every hour, calls ConstructHUB's API, gets your latest blocked IPs, and adds them as IP exclusions on all your active campaigns. Fraudsters can no longer see or click your ads.
+                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). This script runs every hour, calls ConstructHUB's API, gets your latest blocked IPs, and adds them as IP exclusions on all your active campaigns. Google applies IP exclusions where supported; changing IPs and campaign limitations can reduce their effectiveness.
                 </p>
               </div>
 
@@ -829,8 +829,8 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <Card className=" bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-tip-budget">
               <CardContent className="p-5">
                 <DollarSign className="h-8 w-8 text-emerald-400 mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Save Up to 25% of Ad Spend</h4>
-                <p className="text-xs text-muted-foreground">Contractors in roofing and HVAC lose thousands monthly to click fraud. Blocking IPs on Google Ads means fraudsters can't even see your ads anymore.</p>
+                <h4 className="text-sm font-semibold text-foreground mb-1">Review IP Exclusions</h4>
+                <p className="text-xs text-muted-foreground">IP exclusions can reduce repeated traffic from specified addresses on supported campaigns, but do not identify a person or guarantee savings.</p>
               </CardContent>
             </Card>
             <Card className=" bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-tip-auto">
@@ -844,7 +844,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <CardContent className="p-5">
                 <Fingerprint className="h-8 w-8 text-purple-400 mb-3" />
                 <h4 className="text-sm font-semibold text-foreground mb-1">Smarter Than IP Alone</h4>
-                <p className="text-xs text-muted-foreground">Click Guard uses device fingerprinting, VPN detection, and behavior analysis to catch fraudsters that IP-only tools miss.</p>
+                <p className="text-xs text-muted-foreground">Click Guard compares reported fingerprints and visit patterns. These signals can flag legitimate visitors and do not establish identity or fraud.</p>
               </CardContent>
             </Card>
           </div>
@@ -951,7 +951,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
         <Card className="bg-card border-border" data-testid="card-savings">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-400" /> Your Savings
+              <ShieldCheck className="h-5 w-5 text-emerald-400" /> Illustrative Cost Estimate
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
@@ -959,11 +959,11 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
               {(analytics?.blockedIps ?? 0) > 0 ? (
                 <>
                   <p className="text-3xl font-bold text-emerald-400">${((analytics?.blockedIps ?? 0) * 4.5).toFixed(0)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Estimated savings from blocked fraudulent clicks</p>
-                  <p className="text-xs text-muted-foreground mt-1">Based on avg $4.50 CPC for construction</p>
+                  <p className="text-xs text-muted-foreground mt-1">Illustration based on listed IPs; not measured savings</p>
+                  <p className="text-xs text-muted-foreground mt-1">Assumes $4.50 per click; no actual ad-cost data is connected</p>
                 </>
               ) : (
-                <p className="text-blue-500 text-sm">No clicks saved in this range</p>
+                <p className="text-blue-500 text-sm">No listed IPs in this range</p>
               )}
             </div>
           </CardContent>
@@ -1744,6 +1744,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
 
   return (
     <div className="space-y-6">
+      <p className="rounded-md border p-4 text-sm text-muted-foreground">Detection preferences below are saved but do not yet change automatic detection or exclusions. Use the Link Ads instructions to apply IP exclusions. VPN Shield has separate browser controls.</p>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
           <Globe className="h-5 w-5 text-blue-500" /> Your Domains
@@ -2208,7 +2209,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground">Aggressive Blocking</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                By enabling this feature, Click Guard will apply an extremely aggressive approach to block click fraud. Recommended for high-CPC campaigns.
+                Saved preference only: this mode does not change the current automatic traffic rules.
               </p>
             </div>
             <Switch

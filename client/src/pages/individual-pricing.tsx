@@ -179,7 +179,7 @@ const TOOLS: ToolCategory[] = [
           "5 protected websites",
           "25,000 tracked visits/mo",
           "Click fraud detection",
-          "VPN & bot detection",
+          "Heuristic traffic signals",
           "Auto Google Ads IP exclusion",
           "Full fraud analytics dashboard",
           "Traffic sources breakdown",
@@ -240,8 +240,8 @@ const TOOLS: ToolCategory[] = [
     buttonColor: "bg-red-500 hover:bg-red-600 text-white",
     ringColor: "ring-red-500/40",
     badgeColor: "bg-red-500/10 text-red-500 border-red-500/20",
-    tagline: "Block anonymous visitors polluting your data",
-    description: "Detect and block VPN, proxy, and datacenter traffic from your websites. Protects analytics accuracy by filtering out anonymous non-customer visits that distort your data.",
+    tagline: "Review possible proxy traffic",
+    description: "Review possible proxy signals from browser reports and a limited IP-prefix list. Optional overlays or redirects run after page load and can be bypassed; legitimate VPN users may be flagged.",
     tiers: [
       {
         name: "Basic",

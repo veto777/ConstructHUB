@@ -133,7 +133,7 @@ const TOOLS: ToolShowcase[] = [
   },
   {
     title: "IP Tracker",
-    tagline: "Know exactly who visits your website",
+    tagline: "Understand script-observed website visits",
     description: "Real-time visitor tracking with device fingerprinting, geo-location, traffic source analysis, browser/OS detection, and detailed visitor activity timelines. A modern replacement for TraceMyIP, built for contractors.",
     whyItMatters: "Your website is your digital storefront. Knowing who visits, where they came from, and what pages they viewed gives you intelligence most contractors never have.",
     icon: Fingerprint,
@@ -141,7 +141,7 @@ const TOOLS: ToolShowcase[] = [
   },
   {
     title: "VPN Shield",
-    tagline: "Block anonymous visitors polluting your data",
+    tagline: "Review possible proxy traffic",
     description: "Flag possible proxy traffic using browser reports and a limited IP-prefix list. Optional page overlays or redirects run after load and can be bypassed.",
     whyItMatters: "VPN use can be legitimate, and heuristic signals can produce false positives. User-agent crawler exemptions are not identity verification.",
     icon: ShieldOff,

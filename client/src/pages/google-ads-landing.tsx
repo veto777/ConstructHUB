@@ -217,7 +217,7 @@ const keyPoints = [
 const pipeline = [
   { step: "01", title: "Install Click Guard", desc: "Add our lightweight tracking script to your website. It loads asynchronously and records visits that execute it.", icon: Globe, color: "from-[#4285F4] to-[#3367D6]" },
   { step: "02", title: "Review Traffic Signals", desc: "Click Guard flags repeated IP visits, matching device fingerprints and user-agent patterns. These signals do not establish identity or fraud.", icon: Fingerprint, color: "from-[#34A853] to-[#2D9A46]" },
-  { step: "03", title: "Block & Protect", desc: "Fraudulent IPs are automatically pushed to your Google Ads exclusion list. Your budget stays safe.", icon: ShieldCheck, color: "from-[#FBBC05] to-[#F9AB00]" },
+  { step: "03", title: "Review & Exclude", desc: "Install the separate Google Ads script to apply your local IP exclusion list on supported campaigns. Savings are not guaranteed.", icon: ShieldCheck, color: "from-[#FBBC05] to-[#F9AB00]" },
 ];
 
 export default function GoogleAdsLandingPage() {
@@ -333,7 +333,7 @@ export default function GoogleAdsLandingPage() {
               <CheckCircle2 className="h-4 w-4 text-[#34A853]" /> Real-time IP tracking
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-[#34A853]" /> Auto-block fraudulent clicks
+              <CheckCircle2 className="h-4 w-4 text-[#34A853]" /> Build an IP exclusion list
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[#34A853]" /> 12-section campaign guide
@@ -527,9 +527,9 @@ export default function GoogleAdsLandingPage() {
                     <ShieldCheck className="h-4 w-4" /> With Click Guard
                   </h3>
                   {[
-                    "Auto-block repeat offenders",
+                    "Flag repeat visits for review",
                     "IP fingerprinting & device tracking",
-                    "VPN & bot detection built in",
+                    "Heuristic traffic signals",
                     "Real-time traffic source analytics",
                     "Direct Google Ads exclusion sync",
                   ].map((item, i) => (
