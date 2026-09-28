@@ -55,3 +55,26 @@ test('property lookup APIs suppress dead links while retaining the office @seria
   }
 });
 
+
+test('manual scrape rejects a stored but unverified portal @serial', async ({ request }) => {
+  const { q } = await import('./db');
+  const [original] = await q('select id, link_status, is_active from permit_databases where portal_url is not null limit 1');
+  try {
+    await q("update permit_databases set link_status='dead', is_active=true where id=$1",[original.id]);
+    const response=await request.post('/api/scrape',{data:{databaseId:original.id,searchTerm:'Audit fixture',searchType:'address'}});
+    expect(response.status()).toBe(400);
+    expect((await response.json()).message).toContain('verified');
+  } finally {
+    await q('update permit_databases set link_status=$1,is_active=$2 where id=$3',[original.link_status,original.is_active,original.id]);
+  }
+});
+
+test('permit API withholds legacy contacts without deleting their stored values',async({request})=>{
+ const {q}=await import('./db');
+ const [stored]=await q('select id,county_id,phone from permit_databases where phone is not null limit 1');
+ expect(stored).toBeTruthy();
+ const response=await request.get(`/api/databases/county/${stored.county_id}`);expect(response.ok()).toBeTruthy();
+ const shown=(await response.json()).find((r:any)=>r.id===stored.id);
+ expect(shown.phone).toBeNull();expect(shown.email).toBeNull();expect(shown.address).toBeNull();
+ const [after]=await q('select phone from permit_databases where id=$1',[stored.id]);expect(after.phone).toBe(stored.phone);
+});

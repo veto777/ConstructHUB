@@ -1,3 +1,4 @@
+import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -229,7 +230,7 @@ export default function SearchPage() {
 
   const scopedDbCount = useMemo(() => {
     if (!databases) return 0;
-    const active = databases.filter(d => d.isActive);
+    const active = databases.filter(d => governmentLinksAvailable(d) && canScrapeGovernmentPortal(d));
     if (scopeLocation === "all" && scopeState === "all") return active.length;
     if (scopeLocation === "all" && scopeState !== "all") {
       const stateCountyIds = new Set(counties?.filter(c => c.stateCode === scopeState).map(c => c.id) ?? []);
@@ -451,7 +452,7 @@ export default function SearchPage() {
           </h1>
           <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
           <p className="text-sm text-muted-foreground max-w-lg">
-            Search 32,864+ permit databases across all 50 states in real time. Find who's pulling permits in your area, track competitor activity, and discover new leads — all from government portals scraped live.
+            Search available permit records and find official portals by jurisdiction. Live search coverage varies by portal.
           </p>
         </div>
 

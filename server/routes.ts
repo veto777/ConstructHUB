@@ -1,4 +1,4 @@
-import { governmentLinksForDisplay } from "@shared/government-links";
+import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmentPortal, governmentPermitForDisplay } from "@shared/government-links";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -171,10 +171,10 @@ export async function registerRoutes(
         limit: req.query.limit ? parseInt(req.query.limit as string) : 25,
       };
       const result = await storage.getDatabasesFiltered(params);
-      res.json({ ...result, databases: result.databases.map(governmentLinksForDisplay) });
+      res.json({ ...result, databases: result.databases.map(governmentPermitForDisplay) });
     } else {
       const databases = await storage.getDatabases();
-      res.json(databases.map(governmentLinksForDisplay));
+      res.json(databases.map(governmentPermitForDisplay));
     }
   });
 
@@ -186,7 +186,7 @@ export async function registerRoutes(
   app.get("/api/databases/county/:countyId", async (req, res) => {
     const countyId = parseInt(req.params.countyId);
     const databases = await storage.getDatabasesByCounty(countyId);
-    res.json(databases.map(governmentLinksForDisplay));
+    res.json(databases.map(governmentPermitForDisplay));
   });
 
   app.post("/api/search", async (req, res) => {
@@ -228,7 +228,7 @@ export async function registerRoutes(
       }));
 
       const searchId = randomUUID().slice(0, 8);
-      startLiveSearch(searchId, query.id, searchType, searchValue, databases as any)
+      startLiveSearch(searchId, query.id, searchType, searchValue, databases.map(governmentLinksForDisplay) as any)
         .catch((err) => console.error("Live search init error:", err));
 
       res.json({
@@ -286,8 +286,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Database not found" });
       }
 
+      if (!governmentLinksAvailable(db)) {
+        return res.status(400).json({ message: "This portal has not been verified as live" });
+      }
+
       if (!db.searchUrl && !db.portalUrl) {
         return res.status(400).json({ message: "This database has no portal URL configured" });
+      }
+
+      if (!canScrapeGovernmentPortal(db)) {
+        return res.status(400).json({ message: "Automated search is not supported for this portal. Open the official portal to search." });
       }
 
       const query = await storage.createSearchQuery({
@@ -298,7 +306,7 @@ export async function registerRoutes(
 
       const jobId = randomUUID().slice(0, 8);
       const url = db.searchUrl || db.portalUrl!;
-      const platform = db.platform || "SmartGov";
+      const platform = db.platform!;
 
       scrapeByPlatform(platform, url, searchTerm, searchType || "address", db.id, db.name, query.id, jobId)
         .catch((err) => console.error("Scrape error:", err));

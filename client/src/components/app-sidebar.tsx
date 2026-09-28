@@ -381,7 +381,7 @@ export function AppSidebar() {
             <span className="font-semibold tabular-nums">{countyCount}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Active databases</span>
+            <span className="text-muted-foreground">Directory entries</span>
             <span className="font-semibold tabular-nums">{activeCount}</span>
           </div>
           <div className="border-t border-sidebar-border pt-3 mt-2">

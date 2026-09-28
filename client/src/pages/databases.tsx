@@ -1,4 +1,4 @@
-import { governmentLinksAvailable } from "@shared/government-links";
+import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -398,7 +398,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
               {database.platform && <span className="ml-1.5">{database.platform}</span>}
             </p>
           </div>
-          {governmentLinksAvailable(database) && (database.portalUrl || database.searchUrl) && (
+          {governmentLinksAvailable(database) && canScrapeGovernmentPortal(database) && (
             <Button
               size="sm"
               variant="outline"

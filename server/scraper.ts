@@ -1,3 +1,4 @@
+import { canScrapeGovernmentPortal } from "@shared/government-links";
 import { chromium, type Browser, type Page, type BrowserContext } from "playwright-core";
 import * as cheerio from "cheerio";
 import { storage } from "./storage";
@@ -178,7 +179,7 @@ export async function startLiveSearch(
   searchValue: string,
   databases: { id: number; name: string; jurisdiction: string | null; countyId: number; platform: string | null; searchUrl: string | null; portalUrl: string | null; isActive: boolean }[]
 ): Promise<LiveSearchJob> {
-  const activeDbs = databases.filter(db => db.isActive && (db.searchUrl || db.portalUrl) && db.platform && db.platform !== "Contact Required" && db.platform !== "LAMA");
+  const activeDbs = databases.filter(db => db.isActive && canScrapeGovernmentPortal(db));
 
   const job: LiveSearchJob = {
     searchId,
@@ -2589,6 +2590,9 @@ export async function scrapeByPlatform(
   queryId: number,
   jobId: string
 ): Promise<ScrapeResult[]> {
+  if (!canScrapeGovernmentPortal({ platform, searchUrl, portalUrl: null })) {
+    throw new Error("No verified adapter for this portal jurisdiction");
+  }
   switch (platform) {
     case "SmartGov":
       return scrapeSmartGov(searchUrl, searchTerm, databaseId, databaseName, queryId, jobId);
