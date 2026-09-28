@@ -1,3 +1,4 @@
+import { recordCheckoutPayment } from "./payment-ledger";
 import { objectPolicy } from "./object-access";
 /**
  * Connected payments — the contractor's own Stripe account, ACH-first.
@@ -383,15 +384,16 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         success_url: `${base}${opts.successPath}?paid=1`,
         cancel_url: `${base}${opts.successPath}?paid=0`,
         metadata: opts.metadata,
+        payment_intent_data: { metadata: opts.metadata },
       }, { stripeAccount: acct.externalAccountId }); // direct charge on THEIR account
 
-      await db.insert(crmPayments).values({
+      await recordCheckoutPayment({
         orgId: org.id,
         provider: "stripe", externalId: session.id,
         amountCents, currency: acct.defaultCurrency || "usd",
         method: rails.ach ? "ach" : "card", status: "pending", applicationFeeCents: 0,
         ...opts.pendingRow,
-      } as any);
+      }, session, acct.externalAccountId);
       res.json({ url: session.url, amountCents, rails });
       return true;
     } catch (e: any) {
@@ -721,18 +723,19 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         line_items: lineItems,
         success_url: `${base}/i/${t}?paid=1`,
         cancel_url: `${base}/i/${t}?paid=0`,
+        payment_intent_data: { metadata: { invoiceId: inv.id, orgId: inv.orgId, customerId: inv.customerId } },
         metadata: { invoiceId: inv.id, orgId: inv.orgId, customerId: inv.customerId,
           ...(fee > 0 ? { cardFeeCents: String(fee) } : {}) },
       }, { stripeAccount: acct.externalAccountId });
 
-      await db.insert(crmPayments).values({
+      await recordCheckoutPayment({
         orgId: inv.orgId, customerId: inv.customerId, invoiceId: inv.id,
         projectId: inv.projectId ?? null, provider: "stripe", externalId: session.id,
         purpose: "progress", amountCents: amount, currency: acct.defaultCurrency || "usd",
         method: choice === "card" ? "card" : choice === "ach" ? "ach" : (rails.ach ? "ach" : "card"),
         status: "pending", applicationFeeCents: 0,
         note: fee > 0 ? `Card processing fee $${(fee / 100).toFixed(2)} paid by the client on top.` : null,
-      } as any);
+      }, session, acct.externalAccountId);
       res.json({ url: session.url, amountCents: amount, cardFeeCents: fee, achAvailable: acct.achEnabled });
     } catch (e: any) {
       console.error("[crm] invoice checkout failed:", e?.message || e);
@@ -809,16 +812,17 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         cancel_url: `${base}/e/${t}?paid=0`,
         // application_fee_amount omitted entirely: we take nothing.
         metadata: { estimateId: est.id, orgId: est.orgId, customerId: est.customerId },
+        payment_intent_data: { metadata: { estimateId: est.id, orgId: est.orgId, customerId: est.customerId } },
       }, { stripeAccount: acct.externalAccountId }); // ← direct charge on THEIR account
 
-      await db.insert(crmPayments).values({
+      await recordCheckoutPayment({
         orgId: est.orgId, customerId: est.customerId, estimateId: est.id,
         projectId: est.projectId ?? null, provider: "stripe",
         externalId: session.id, purpose: est.depositCents ? "deposit" : "final",
         amountCents: amount, currency: acct.defaultCurrency || "usd",
         method: rails.ach ? "ach" : "card", status: "pending",
         applicationFeeCents: 0,
-      } as any);
+      }, session, acct.externalAccountId);
 
       res.json({ url: session.url, amountCents: amount, achAvailable: acct.achEnabled });
     } catch (e: any) {
