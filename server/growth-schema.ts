@@ -8,6 +8,7 @@ export async function ensureGrowthSchema() {
       created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(key,period)
     );
     DELETE FROM growth_budgets WHERE created_at < now() - interval '62 days';
+    ALTER TABLE competitor_scans ADD COLUMN IF NOT EXISTS error_message text;
     ALTER TABLE ranking_grid_scans ADD COLUMN IF NOT EXISTS user_id integer;
     CREATE INDEX IF NOT EXISTS ranking_grid_owner_idx ON ranking_grid_scans(user_id);
     ALTER TABLE search_queries ADD COLUMN IF NOT EXISTS user_id integer;

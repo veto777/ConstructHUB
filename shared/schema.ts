@@ -250,6 +250,7 @@ export type RankingGridResult = typeof rankingGridResults.$inferSelect;
 export type InsertRankingGridResult = z.infer<typeof insertRankingGridResultSchema>;
 
 export const competitorScans = pgTable("competitor_scans", {
+  errorMessage: text("error_message"),
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull(),
   industry: text("industry").notNull(),

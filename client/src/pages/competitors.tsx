@@ -775,7 +775,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
               </Badge>
             )}
             {scan.status === "failed" && (
-              <Badge variant="destructive">Failed</Badge>
+              <span className="text-sm text-destructive" role="alert">{scan.errorMessage || "Scan failed. Please try again."}</span>
             )}
             <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={deleting} data-testid={`button-delete-scan-${scan.id}`}>
               <Trash2 className="w-4 h-4" />

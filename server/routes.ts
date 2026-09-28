@@ -1,3 +1,4 @@
+import { competitorPlaces, placesResponse } from "./competitor-provider";
 import { rateLimit, actorKey } from "./growth-limits";
 import { ownedBy } from "./ownership";
 import type { Express } from "express";
@@ -2001,8 +2002,10 @@ Rules:
     if (!(await requirePlatinum(req, res))) return;
     try {
       const userId = (req as any).user.id;
-      const { industry, location, lat, lon, radius } = req.body;
-      if (!industry || !location) return res.status(400).json({ message: "industry and location are required" });
+      const parsed = z.object({ industry: z.string().trim().min(1).max(120), location: z.string().trim().min(1).max(250), radius: z.number().int().min(1).max(100).default(25) }).safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Provide industry, location and a radius from 1 to 100 miles." });
+      const { industry, location, radius } = parsed.data;
+      const lat = null, lon = null;
 
       const [scan] = await db.insert(competitorScans).values({
         userId,
@@ -2184,28 +2187,14 @@ Rules:
   async function runCompetitorScan(scanId: number, userId: number, industry: string, location: string, lat: string | null, lon: string | null, radius: number) {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
-      await db.update(competitorScans).set({ status: "failed" }).where(eq(competitorScans.id, scanId));
+      await db.update(competitorScans).set({ status: "failed", errorMessage: "Google Places is not configured." }).where(eq(competitorScans.id, scanId));
       return;
     }
 
     try {
-      const query = `${industry} in ${location}`;
-      let allPlaces: any[] = [];
-      let nextPageToken: string | null = null;
-
-      for (let page = 0; page < 3; page++) {
-        let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`;
-        if (lat && lon) url += `&location=${lat},${lon}&radius=${radius * 1609}`;
-        if (nextPageToken) url = `https://maps.googleapis.com/maps/api/place/textsearch/json?pagetoken=${encodeURIComponent(nextPageToken)}&key=${apiKey}`;
-
-        const searchRes = await fetch(url);
-        const data = await searchRes.json() as any;
-
-        if (data.results) allPlaces = allPlaces.concat(data.results);
-        nextPageToken = data.next_page_token || null;
-        if (!nextPageToken) break;
-        await new Promise(r => setTimeout(r, 2000));
-      }
+      const found = await competitorPlaces(industry, location, radius, apiKey);
+      const allPlaces = found.places;
+      await db.update(competitorScans).set({ lat: String(found.center.lat), lon: String(found.center.lng), errorMessage: null }).where(eq(competitorScans.id, scanId));
 
       for (const place of allPlaces) {
         let detailReviews: any[] = [];
@@ -2214,15 +2203,14 @@ Rules:
 
         try {
           const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=reviews,formatted_phone_number,website&key=${apiKey}`;
-          const detailRes = await fetch(detailUrl);
-          const detailData = await detailRes.json() as any;
+          const detailData = await placesResponse(detailUrl, "Competitor details");
           if (detailData.result) {
             detailReviews = detailData.result.reviews || [];
             phone = detailData.result.formatted_phone_number || null;
             website = detailData.result.website || null;
           }
           await new Promise(r => setTimeout(r, 200));
-        } catch (e) {}
+        } catch (e) { throw e; }
 
         const reviewAnalysis = analyzeReviews(detailReviews, place, industry);
         const bsAnalysis = analyzeBsScore(place, reviewAnalysis);
@@ -2247,9 +2235,10 @@ Rules:
       }
 
       await db.update(competitorScans).set({ status: "completed", totalFound: allPlaces.length }).where(eq(competitorScans.id, scanId));
-    } catch (err) {
+    } catch (err: any) {
       console.error("Competitor scan failed:", err);
-      await db.update(competitorScans).set({ status: "failed" }).where(eq(competitorScans.id, scanId));
+      await db.delete(competitorListings).where(eq(competitorListings.scanId, scanId));
+      await db.update(competitorScans).set({ status: "failed", totalFound: 0, errorMessage: err.message || "Provider request failed." }).where(eq(competitorScans.id, scanId));
     }
   }
 
