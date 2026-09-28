@@ -16,6 +16,13 @@ try {
   }
 } catch { /* no .env — the suite falls back to its built-in defaults */ }
 
+// Resolve every integration target and child port from this checkout's lane.
+const lanePort = Number(process.env.E2E_PORT || process.env.PORT || 8119);
+process.env.CRM_TEST_BASE_URL ??= `http://127.0.0.1:${lanePort}`;
+process.env.CRM_TEST_DATABASE_URL ??= process.env.DATABASE_URL;
+process.env.TEST_GATE_PORT = String(lanePort + 1);
+process.env.TEST_HOVER_PORT = String(lanePort + 2);
+
 //
 // Files run SERIALLY (fileParallelism:false): the dev-server suites share one
 // dev-bypass user and one org — several flip the user's role via SQL
