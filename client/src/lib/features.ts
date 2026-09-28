@@ -24,3 +24,12 @@ export const SHOW_COMPETITOR_INTEL = true;
 // and incentivized reviews, and the FTC's consumer-review rule (16 CFR 465)
 // prohibits buying positive reviews.
 export const SHOW_GOOGLE_REVIEWS = true;
+
+// ---------------------------------------------------------------------------
+// SHOW_AD_ACTIVITY controls the "Public Ad Activity" part of Competitor Intel
+// (the /competitors tab, its landing-page card and pricing rows). OFF because
+// there is no ad data source: the scanner builds "ads" out of ordinary Google
+// Places listings, which is fabricated data. The server also refuses
+// /api/ad-spy/*. Turn on only after wiring a real ad source (e.g. Google Ads
+// Transparency data) and removing the Places-based fabrication.
+export const SHOW_AD_ACTIVITY = false;

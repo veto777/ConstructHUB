@@ -1992,6 +1992,13 @@ Rules:
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
+  // No ad data source exists: runAdSpyScan builds "ads" from Google Places
+  // listings, i.e. fabricated data. Refuse the whole surface until a real
+  // source is wired (client flag: SHOW_AD_ACTIVITY).
+  app.use("/api/ad-spy", (_req, res) => {
+    res.status(410).json({ message: "Ad activity is unavailable until a real ad data source is connected." });
+  });
+
   app.get("/api/ad-spy/keywords", async (req, res) => {
     if (!(await requirePlatinum(req, res))) return;
     try {

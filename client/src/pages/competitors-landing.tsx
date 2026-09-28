@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { SHOW_AD_ACTIVITY } from "@/lib/features";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -179,16 +180,18 @@ const tools = [
     badgeColor: "bg-red-500/10 text-red-400 border-red-500/20",
     features: ["Fake review pattern detection", "0-100 BS score per business", "Review timeline analysis"],
   },
-  {
+  ...(SHOW_AD_ACTIVITY ? [{
     icon: Megaphone,
-    title: "Public Ad Activity",
-    description: "See which businesses are running public Google Ads for your keywords, with the ad headlines and descriptions anyone searching can see. Track their campaigns across desktop, mobile, and tablet.",
-    gradient: "from-blue-500/20 to-indigo-500/20",
-    border: "border-blue-500/20",
-    badge: "Intelligence",
-    badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    features: ["Live ad capture", "Keyword tracking", "Device-specific monitoring"],
-  },
+      title: "Public Ad Activity",
+      description: "See which businesses are running public Google Ads for your keywords, with the ad headlines and descriptions anyone searching can see. Track their campaigns across desktop, mobile, and tablet.",
+      gradient: "from-blue-500/20 to-indigo-500/20",
+      border: "border-blue-500/20",
+      badge: "Intelligence",
+      badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+      features: ["Live ad capture", "Keyword tracking", "Device-specific monitoring"],
+
+  }] : []),
+
   {
     icon: BarChart3,
     title: "Competitor Profiles",
@@ -213,7 +216,7 @@ const tools = [
 
 const pipeline = [
   { step: "01", title: "Scan Your Market", desc: "Select your industry (roofing, HVAC, plumbing, etc.) and enter your location. Our system queries Google to find every competitor within your specified radius — 10, 25, 50, or 100 miles.", icon: Search, color: "from-[#EAB308] to-[#CA8A04]" },
-  { step: "02", title: "Analyze the Competition", desc: "We pull full profiles for every competitor — ratings, reviews, photos, website, hours, categories. Our BS Meter scores their reviews to detect fakes. Public Ad Activity shows the Google Ads anyone searching your keywords can see.", icon: Eye, color: "from-[#4A6CF7] to-[#3B5DE7]" },
+  { step: "02", title: "Analyze the Competition", desc: "We pull full profiles for every competitor — ratings, reviews, photos, website, hours, categories. Our BS Meter scores their reviews to detect fakes.", icon: Eye, color: "from-[#4A6CF7] to-[#3B5DE7]" },
   { step: "03", title: "Outmaneuver Everyone", desc: "Use competitor insights to craft better ads, target underserved areas, improve your reviews strategy, and position your business where the competition is weakest. Knowledge is the ultimate competitive advantage.", icon: Target, color: "from-[#EF4444] to-[#DC2626]" },
 ];
 
@@ -322,7 +325,7 @@ export default function CompetitorsLandingPage() {
           </h1>
           <p className="mt-6 text-lg sm:text-xl text-muted-foreground dark:text-white/50 max-w-2xl mx-auto leading-relaxed animate-in-delay-3">
             Stop guessing what your competitors are doing. Scan your entire market, analyze every
-            competitor's reviews with our BS Meter, see who's advertising for your keywords, and find the gaps
+            competitor's reviews with our BS Meter, and find the gaps
             in your market that nobody else sees.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
@@ -344,9 +347,11 @@ export default function CompetitorsLandingPage() {
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-yellow-400" /> BS Meter fake review detection
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-yellow-400" /> Public Google Ads activity
-            </div>
+            {SHOW_AD_ACTIVITY && (
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-yellow-400" /> Public Google Ads activity
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-red-400" /> Platinum exclusive
             </div>

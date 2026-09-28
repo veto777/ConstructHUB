@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SHOW_AD_ACTIVITY } from "@/lib/features";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -156,7 +157,7 @@ export default function CompetitorsPage() {
           </h1>
           <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
           <p className="text-muted-foreground text-sm max-w-lg">
-            Know exactly who you're competing against. Index every competitor in your market, track their rankings and reviews, and see who's advertising on Google for your keywords.
+            Know exactly who you're competing against. Index every competitor in your market, and track their rankings and reviews.
           </p>
         </div>
 
@@ -166,10 +167,12 @@ export default function CompetitorsPage() {
               <Search className="w-4 h-4" />
               Market Scan
             </TabsTrigger>
-            <TabsTrigger value="ad-spy" className="flex items-center gap-1.5" data-testid="tab-ad-spy">
-              <Megaphone className="w-4 h-4" />
-              Ad Activity
-            </TabsTrigger>
+            {SHOW_AD_ACTIVITY && (
+              <TabsTrigger value="ad-spy" className="flex items-center gap-1.5" data-testid="tab-ad-spy">
+                <Megaphone className="w-4 h-4" />
+                Ad Activity
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="market-scan" className="space-y-6">
@@ -260,9 +263,11 @@ export default function CompetitorsPage() {
             ))}
           </TabsContent>
 
-          <TabsContent value="ad-spy" className="space-y-6">
-            <AdSpyTab />
-          </TabsContent>
+          {SHOW_AD_ACTIVITY && (
+            <TabsContent value="ad-spy" className="space-y-6">
+              <AdSpyTab />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>

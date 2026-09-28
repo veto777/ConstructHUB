@@ -354,7 +354,6 @@ const TOOLS: ToolCategory[] = [
           "Competitor Reports": "Basic",
           "Review Analysis": false,
           "BS Meter (Fake Reviews)": false,
-          "Public Ad Activity": false,
           "Scheduled Scans": false,
           "Rating Monitoring": true,
         },
@@ -370,7 +369,6 @@ const TOOLS: ToolCategory[] = [
           "Full competitor reports",
           "Review sentiment analysis",
           "BS Meter fake review detection",
-          "Public ad activity tracking",
         ],
         limits: {
           "Users": "1",
@@ -379,7 +377,6 @@ const TOOLS: ToolCategory[] = [
           "Competitor Reports": "Full",
           "Review Analysis": true,
           "BS Meter (Fake Reviews)": true,
-          "Public Ad Activity": true,
           "Scheduled Scans": false,
           "Rating Monitoring": true,
         },
@@ -393,7 +390,6 @@ const TOOLS: ToolCategory[] = [
           "Unlimited market scans",
           "Full competitor reports",
           "BS Meter + review analysis",
-          "Public ad activity tracking",
           "Scheduled automatic scans",
         ],
         limits: {
@@ -403,7 +399,6 @@ const TOOLS: ToolCategory[] = [
           "Competitor Reports": "Full",
           "Review Analysis": true,
           "BS Meter (Fake Reviews)": true,
-          "Public Ad Activity": true,
           "Scheduled Scans": true,
           "Rating Monitoring": true,
         },
@@ -411,7 +406,7 @@ const TOOLS: ToolCategory[] = [
     ],
     comparisonFeatures: [
       "Users", "Competitor Tracking", "Market Scans/mo", "Competitor Reports",
-      "Review Analysis", "BS Meter (Fake Reviews)", "Public Ad Activity",
+      "Review Analysis", "BS Meter (Fake Reviews)",
       "Scheduled Scans", "Rating Monitoring",
     ],
   },
