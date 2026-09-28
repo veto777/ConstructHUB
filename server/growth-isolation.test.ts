@@ -26,7 +26,7 @@ async function api(path: string, cookie = "", method = "GET", body?: any) {
   return fetch(base + path, { method, headers: { cookie, "content-type": "application/json", "x-forwarded-for": testIp }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
 beforeAll(async () => {
-  if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a3") throw new Error("Requires lane a3 DB");
+  if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
   child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
     env: { ...process.env, PORT: String(port), NODE_ENV: "development", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", SESSION_SECRET: secret, EMAIL_FORCE_SINK: "true", STRIPE_SECRET_KEY: "", GOOGLE_PLACES_API_KEY: "", },
     stdio: ["ignore", "pipe", "pipe"], detached: true,
@@ -56,6 +56,7 @@ afterAll(async () => {
   await pool.query("delete from click_visits where domain_id=any($1::int[])", [domainIds]);
   await pool.query("delete from tracked_domains where id=any($1::int[])", [domainIds]);
   await pool.query("delete from review_requests where token=any($1::text[])", [reviewTokens]);
+  await pool.query("delete from review_reminder_settings where user_id=any($1::int[])", [users]);
   await pool.query("delete from review_referral_settings where user_id=any($1::int[])", [users]);
   await pool.query("delete from review_recipient_preferences where user_id=any($1::int[])", [users]);
   await pool.query("delete from users where id=any($1::int[])", [users]);
@@ -179,5 +180,25 @@ describe("contractor referral settings", () => {
     expect((await (await api(`/api/review/${token}`)).json()).referralOffer).toContain("Fixture referral");
     await api("/api/review-referral-settings", a, "PUT", { enabled: false, offer: "Saved terms" });
     expect((await (await api(`/api/review/${token}`)).json()).referralOffer).toBeNull();
+  });
+});
+
+describe("settings validation and photo plan caps", () => {
+  it("validates reminder settings while preserving an explicit zero limit", async () => {
+    expect((await api("/api/review-reminder-settings", a, "PUT", { timeWindows: [], timezone: "invalid" })).status).toBe(400);
+    expect((await api("/api/review-reminder-settings", a, "PUT", { maxReminders: 0, timezone: "Asia/Tokyo" })).status).toBe(200);
+    const settings = await (await api("/api/review-reminder-settings", a)).json();
+    expect(settings.maxReminders).toBe(0); expect(settings.timezone).toBe("Asia/Tokyo");
+  });
+  it("rejects a batch above the Standard quota before starting work", async () => {
+    const sharp = (await import("sharp")).default;
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "white" } }).png().toBuffer();
+    const form = new FormData(); form.append("photos", new Blob([png], { type: "image/png" }), "fixture.png");
+    const upload = await fetch(base + "/api/photos/upload", { method: "POST", headers: { cookie: a, "x-forwarded-for": testIp }, body: form });
+    expect(upload.status).toBe(200);
+    const { files } = await upload.json();
+    const rejected = await api("/api/photos/process", a, "POST", { fileIds: Array(6).fill(files[0].id) });
+    expect(rejected.status).toBe(403); expect((await rejected.json()).limit).toBe(5);
+    expect((await api("/api/photos/process", a, "POST", { fileIds: Array(11).fill(files[0].id) })).status).toBe(400);
   });
 });
