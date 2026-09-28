@@ -20,7 +20,7 @@ const QUICK_QUESTIONS = [
   "Tell me about the Master Class",
 ];
 
-const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 const FREE_INQUIRY_LIMIT = 3;
 
 export default function SiteAssistantChat() {
@@ -116,7 +116,7 @@ export default function SiteAssistantChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages,
+          messages: newMessages.slice(-10),
           captchaToken: captchaToken || undefined,
         }),
       });
@@ -152,7 +152,7 @@ export default function SiteAssistantChat() {
 
     const nextCount = inquiryCount + 1;
 
-    if (nextCount > FREE_INQUIRY_LIMIT && !captchaVerified) {
+    if (RECAPTCHA_SITE_KEY && nextCount > FREE_INQUIRY_LIMIT && !captchaVerified) {
       setPendingMessage(text.trim());
       setShowCaptcha(true);
       return;

@@ -1,3 +1,4 @@
+import { rateLimit, actorKey } from "./growth-limits";
 import { ownedBy } from "./ownership";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
@@ -49,6 +50,8 @@ if (DEMO_AUTOLOGIN) {
   console.warn("⚠️  CRM_DEMO_AUTOLOGIN is enabled — public demo instance, all requests authenticate as user 1.");
 }
 
+const growthCostLimit = rateLimit("growth-processing", 30, 60);
+
 const photoOpenai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -61,14 +64,14 @@ fs.mkdirSync(processedDir, { recursive: true });
 
 const upload = multer({
   dest: uploadDir,
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 10, fields: 20, fieldSize: 32 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
     cb(null, allowed.includes(file.mimetype) || file.mimetype.startsWith("image/"));
   },
 });
 
-const uploadedFiles = new Map<string, { originalName: string; path: string; mimetype: string }>();
+const uploadedFiles = new Map<string, { createdAt: number; originalName: string; path: string; mimetype: string }>();
 const processedFiles = new Map<string, { originalName: string; path: string; newName: string }>();
 
 const processedIndexPath = path.join(process.cwd(), "tmp", "photo-processed", "_index.json");
@@ -96,6 +99,7 @@ function saveProcessedIndex() {
 loadProcessedIndex();
 
 type ProcessingJob = {
+  owner: string;
   status: "running" | "done" | "error";
   total: number;
   processed: number;
@@ -108,6 +112,11 @@ type ProcessingJob = {
 const processingJobs = new Map<string, ProcessingJob>();
 setInterval(() => {
   const cutoff = Date.now() - 60 * 60 * 1000;
+  if (![...processingJobs.values()].some(job => job.status === "running")) {
+    for (const [id, file] of uploadedFiles) if (file.createdAt < cutoff) {
+      fs.rmSync(file.path, { force: true }); uploadedFiles.delete(id);
+    }
+  }
   for (const [id, job] of processingJobs.entries()) {
     if (job.finishedAt && job.finishedAt < cutoff) processingJobs.delete(id);
   }
@@ -117,6 +126,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.use(["/api/photos", "/api/gmb/review-response", "/api/review/:token/generate-review"], (req, res, next) => {
+    if (req.method !== "POST") return next();
+    return growthCostLimit(req, res, next);
+  });
   registerStripeRoutes(app);
   registerTrackingRoutes(app);
   registerAdsConsultantRoutes(app);
@@ -497,7 +510,10 @@ export async function registerRoutes(
     res.json(records);
   });
 
-  app.post("/api/photos/upload", upload.array("photos", 50), (req, res) => {
+  app.post("/api/photos/upload", (req, res, next) => {
+    if (uploadedFiles.size >= 200) return res.status(429).json({ message: "Upload storage is busy. Try again later." });
+    next();
+  }, upload.array("photos", 10), (req, res) => {
     try {
       const files = req.files as Express.Multer.File[];
       if (!files || files.length === 0) {
@@ -508,6 +524,7 @@ export async function registerRoutes(
       for (const file of files) {
         const fileId = randomUUID().slice(0, 12);
         uploadedFiles.set(fileId, {
+          createdAt: Date.now(),
           originalName: file.originalname,
           path: file.path,
           mimetype: file.mimetype,
@@ -932,14 +949,19 @@ The description should naturally incorporate the service keyword and location. I
         mirrorPhotos,
       } = req.body;
 
-      if (!fileIds || !Array.isArray(fileIds) || fileIds.length === 0) {
+      if (!fileIds || !Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 10 || fileIds.some((id: unknown) => typeof id !== "string")) {
         return res.status(400).json({ message: "fileIds array is required" });
       }
 
+      const active = [...processingJobs.values()].filter(job => job.status === "running");
+      if (active.length >= 4 || active.some(job => job.owner === actorKey(req))) {
+        return res.status(429).json({ message: "Photo processing is busy. Wait for your current job to finish." });
+      }
       const jobId = randomUUID().slice(0, 12);
       const results: { fileId: string; processedId: string; newName: string }[] = [];
       const errors: { fileId: string; error: string }[] = [];
       processingJobs.set(jobId, {
+        owner: actorKey(req),
         status: "running",
         total: fileIds.length,
         processed: 0,
@@ -1077,7 +1099,7 @@ The description should naturally incorporate the service keyword and location. I
 
   app.get("/api/photos/process/:jobId", (req, res) => {
     const job = processingJobs.get(req.params.jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (!job || job.owner !== actorKey(req)) return res.status(404).json({ message: "Job not found" });
     res.json({
       status: job.status,
       total: job.total,
@@ -1429,7 +1451,7 @@ The description should naturally incorporate the service keyword and location. I
     }
   });
 
-  app.post("/api/media/upload", upload.array("photos", 50), async (req, res) => {
+  app.post("/api/media/upload", upload.array("photos", 10), async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
     try {
@@ -5490,7 +5512,7 @@ function main() {
         return res.status(409).json({ message: "Submit a rating first" });
       }
       const { highlights } = req.body;
-      if (typeof highlights !== "string" || !highlights.trim()) {
+      if (typeof highlights !== "string" || !highlights.trim() || highlights.length > 4000) {
         return res.status(400).json({ message: "Describe your own experience before creating a draft." });
       }
       const prompt = reviewDraftPrompt(request.companyName || "the company", request.feedbackRating, highlights.trim());
@@ -5982,7 +6004,7 @@ function main() {
     }
   });
 
-  app.post("/api/upload/review-photos", upload.array("photos", 50), async (req, res) => {
+  app.post("/api/upload/review-photos", upload.array("photos", 10), async (req, res) => {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });

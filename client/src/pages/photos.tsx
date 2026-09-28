@@ -997,7 +997,7 @@ export default function PhotosPage() {
         const msg = err?.name === "AbortError"
           ? "Upload timed out. Try with smaller photos."
           : err?.message?.includes("413") || err?.message?.includes("too large")
-            ? "One of your photos is too large. Try photos under 20MB each."
+            ? "One of your photos is too large. Try photos under 10MB each (up to 10 per upload)."
             : "Failed to upload photos. Please try again.";
         toast({ title: "Upload failed", description: msg, variant: "destructive" });
         return;

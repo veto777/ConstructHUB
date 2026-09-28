@@ -1,3 +1,4 @@
+import { chatInput, rateLimit, siteChatGate } from "./growth-limits";
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 
@@ -165,14 +166,11 @@ If someone asks about something not covered in your knowledge base, say so hones
 Always format responses in plain text with clear structure. Use line breaks between paragraphs. Bold key terms with **double asterisks** when helpful.`;
 
 export function registerAdsConsultantRoutes(app: Express) {
-  app.post("/api/ads-consultant/chat", async (req: Request, res: Response) => {
+  app.post("/api/ads-consultant/chat", rateLimit("ads-consultant"), async (req: Request, res: Response) => {
     try {
-      const { messages } = req.body;
-
-      if (!messages || !Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ message: "Messages array is required" });
-      }
-
+      const parsed = chatInput.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Provide 1–10 user/assistant messages, at most 4,000 characters each." });
+      const { messages } = parsed.data;
       const userMessages = messages.slice(-10).map((m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: m.content,

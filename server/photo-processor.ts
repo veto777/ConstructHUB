@@ -59,7 +59,7 @@ export async function processPhoto(options: ProcessOptions): Promise<void> {
   const { inputPath, outputPath, watermark, filters, exif, mirror } = options;
 
   const normalizedBuf = await withTimeout(
-    (mirror ? sharp(inputPath).rotate().flop() : sharp(inputPath).rotate()).toBuffer(),
+    (mirror ? sharp(inputPath, { limitInputPixels: 40_000_000 }).rotate().flop() : sharp(inputPath, { limitInputPixels: 40_000_000 }).rotate()).toBuffer(),
     20000,
     "Normalizing image orientation"
   );
@@ -106,7 +106,7 @@ export async function processPhoto(options: ProcessOptions): Promise<void> {
         const maxWmHeight = Math.floor(height * 0.15);
 
         let wmResized = await withTimeout(
-          sharp(watermark.imagePath)
+          sharp(watermark.imagePath, { limitInputPixels: 40_000_000 })
             .resize({ width: maxWmWidth, height: maxWmHeight, fit: "inside", withoutEnlargement: true })
             .ensureAlpha()
             .png()
@@ -227,7 +227,7 @@ export async function processPhoto(options: ProcessOptions): Promise<void> {
 }
 
 export async function analyzePhoto(inputPath: string): Promise<{ brightness: number; contrast: number; saturation: number }> {
-  const { channels } = await withTimeout(sharp(inputPath).resize({ width: 1024, fit: "inside", withoutEnlargement: true }).stats(), 15000, "Analyzing photo");
+  const { channels } = await withTimeout(sharp(inputPath, { limitInputPixels: 40_000_000 }).resize({ width: 1024, fit: "inside", withoutEnlargement: true }).stats(), 15000, "Analyzing photo");
 
   const rMean = channels[0]?.mean ?? 128;
   const gMean = channels[1]?.mean ?? 128;

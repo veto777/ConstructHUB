@@ -1,3 +1,4 @@
+import { chatInput, rateLimit, siteChatGate } from "./growth-limits";
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 
@@ -224,35 +225,16 @@ Always format responses in plain text with clear structure. Use line breaks betw
 You should enthusiastically but naturally guide visitors toward trying the platform. When appropriate, mention the free trial.`;
 
 export function registerSiteAssistantRoutes(app: Express) {
-  app.post("/api/site-assistant/chat", async (req: Request, res: Response) => {
+  app.post("/api/site-assistant/chat", rateLimit("site-assistant"), async (req: Request, res: Response) => {
     try {
-      const { messages, captchaToken } = req.body;
-
-      if (!messages || !Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ message: "Messages array is required" });
-      }
-
-      const userMessageCount = messages.filter((m: any) => m.role === "user").length;
-
-      if (userMessageCount > 3 && !captchaToken) {
-        return res.status(429).json({
-          message: "Rate limit reached. Please complete the verification to continue.",
-          requiresCaptcha: true,
-        });
-      }
-
-      if (userMessageCount > 3 && captchaToken) {
-        const verifyRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `secret=6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe&response=${captchaToken}`,
-        });
-        const verifyData = await verifyRes.json() as any;
-        if (!verifyData.success) {
-          return res.status(403).json({ message: "Captcha verification failed" });
-        }
-      }
-
+      const parsed = chatInput.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Provide 1–10 user/assistant messages, at most 4,000 characters each." });
+      const { messages } = parsed.data;
+      const gate = await siteChatGate(req);
+      if (gate !== "ok") return res.status(gate === "unconfigured" ? 503 : gate === "captcha" ? 429 : 403).json({
+        message: gate === "unconfigured" ? "Verification is unavailable. Please try again later." : "Please complete verification to continue.",
+        requiresCaptcha: gate === "captcha" || gate === "invalid",
+      });
       const userMessages = messages.slice(-10).map((m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
