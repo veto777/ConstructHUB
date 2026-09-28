@@ -155,7 +155,7 @@ function CountUp({ end, suffix = "", prefix = "", duration = 2000 }: { end: numb
 const stats = [
   { value: 20, suffix: "+", label: "Industries Covered", sub: "Roofing, HVAC, plumbing & more" },
   { value: 100, suffix: "+", label: "Competitors Per Scan", sub: "Complete market indexing" },
-  { value: 85, suffix: "%", label: "Fake Review Detection", sub: "Our BS Meter catches fraud" },
+  { value: 0, suffix: "–100", label: "Heuristic Signal Score", sub: "Signals worth a closer look" },
   { value: 24, suffix: "/7", label: "Ad Monitoring", sub: "Track competitor campaigns" },
 ];
 
@@ -173,12 +173,12 @@ const tools = [
   {
     icon: Star,
     title: "Review Analysis & BS Meter",
-    description: "Our proprietary BS Meter scores every competitor's reviews on a 0-100 scale. We detect patterns of fake reviews — sudden spikes, generic language, reviewer patterns — so you can see who's honest and who's buying reviews.",
+    description: "Our BS Meter summarizes signals worth a closer look on a 0–100 heuristic scale. It uses a selected review sample and cannot establish whether reviews are authentic, purchased, or written with AI.",
     gradient: "from-red-500/20 to-rose-500/20",
     border: "border-red-500/20",
     badge: "Exclusive",
     badgeColor: "bg-red-500/10 text-red-400 border-red-500/20",
-    features: ["Fake review pattern detection", "0-100 BS score per business", "Review timeline analysis"],
+    features: ["Signals worth a closer look", "0–100 heuristic signal score", "Sample size and limitations"],
   },
   ...(SHOW_AD_ACTIVITY ? [{
     icon: Megaphone,
@@ -216,13 +216,13 @@ const tools = [
 
 const pipeline = [
   { step: "01", title: "Scan Your Market", desc: "Select your industry (roofing, HVAC, plumbing, etc.) and enter your location. Our system queries Google to find every competitor within your specified radius — 10, 25, 50, or 100 miles.", icon: Search, color: "from-[#EAB308] to-[#CA8A04]" },
-  { step: "02", title: "Analyze the Competition", desc: "We pull full profiles for every competitor — ratings, reviews, photos, website, hours, categories. Our BS Meter scores their reviews to detect fakes.", icon: Eye, color: "from-[#4A6CF7] to-[#3B5DE7]" },
+  { step: "02", title: "Analyze the Competition", desc: "We pull full profiles for every competitor — ratings, reviews, photos, website, hours, categories. Our BS Meter highlights signals worth a closer look in the available review sample.", icon: Eye, color: "from-[#4A6CF7] to-[#3B5DE7]" },
   { step: "03", title: "Outmaneuver Everyone", desc: "Use competitor insights to craft better ads, target underserved areas, improve your reviews strategy, and position your business where the competition is weakest. Knowledge is the ultimate competitive advantage.", icon: Target, color: "from-[#EF4444] to-[#DC2626]" },
 ];
 
 const insights = [
-  { icon: ThumbsDown, color: "text-red-400", title: "Competitors Buying Reviews", desc: "Our BS Meter detects sudden review spikes, generic language patterns, and suspicious reviewer profiles that indicate fake reviews." },
-  { icon: Megaphone, color: "text-blue-400", title: "What Ads They're Running", desc: "See the exact headlines, descriptions, and keywords your competitors bid on. Know their strategy before they know yours." },
+  { icon: ThumbsDown, color: "text-red-400", title: "Review Sample Patterns", desc: "Our BS Meter highlights common phrases and other signals worth a closer look; these are not evidence of wrongdoing." },
+  { icon: Megaphone, color: "text-blue-400", title: "What Ads They're Running", desc: "Public ad activity is unavailable until a verified ad-data provider is connected." },
   { icon: MapPin, color: "text-emerald-400", title: "Underserved Areas", desc: "Identify neighborhoods and zip codes where competitors have low density — the easiest markets to dominate." },
   { icon: Star, color: "text-yellow-400", title: "Reputation Gaps", desc: "Find competitors with low ratings or few reviews. These are markets where strong service and honest reviews can win you more customers." },
   { icon: DollarSign, color: "text-violet-400", title: "Pricing Intelligence", desc: "Compare competitor positioning, service offerings, and how they present themselves. Spot pricing gaps you can exploit." },
@@ -316,7 +316,7 @@ export default function CompetitorsLandingPage() {
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] animate-in-delay-2" data-testid="text-hero-title">
             <span className="bg-gradient-to-r from-foreground via-foreground to-foreground/60 dark:from-white dark:via-white dark:to-white/60 bg-clip-text text-transparent">
-              Know Everything
+              Learn More
             </span>
             <br />
             <span className="bg-gradient-to-r from-[#EAB308] via-[#EF4444] to-[#4A6CF7] bg-clip-text text-transparent animate-gradient-text">
@@ -345,7 +345,7 @@ export default function CompetitorsLandingPage() {
               <CheckCircle2 className="h-4 w-4 text-yellow-400" /> 20+ industries supported
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-yellow-400" /> BS Meter fake review detection
+              <CheckCircle2 className="h-4 w-4 text-yellow-400" /> BS Meter: signals worth a closer look
             </div>
             {SHOW_AD_ACTIVITY && (
               <div className="flex items-center gap-2">
@@ -405,10 +405,10 @@ export default function CompetitorsLandingPage() {
                   </h3>
                   {[
                     "No idea what competitors are bidding on",
-                    "Can't tell if their reviews are real or fake",
+                    "Need more context about competitor reviews",
                     "Don't know which markets are underserved",
                     "Wasting ads budget on saturated keywords",
-                    "Losing jobs to contractors with fake reputations",
+                    "Need a clearer view of local competition",
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/50">
                       <div className="h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
@@ -422,10 +422,10 @@ export default function CompetitorsLandingPage() {
                   </h3>
                   {[
                     "See every ad your competitors are running",
-                    "BS Meter exposes fake review patterns",
+                    "BS Meter highlights patterns for further research",
                     "Identify gaps and underserved neighborhoods",
                     "Target keywords competitors aren't using",
-                    "Build a real reputation that beats the fakers",
+                    "Build a reputation through your own customer experiences",
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/50">
                       <CheckCircle2 className="h-3.5 w-3.5 text-[#EAB308] shrink-0" />
@@ -496,7 +496,7 @@ export default function CompetitorsLandingPage() {
               <span className="bg-gradient-to-r from-[#EAB308] to-[#EF4444] bg-clip-text text-transparent"> Full Visibility</span>
             </h2>
             <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-xl mx-auto">
-              Three steps to know everything about every competitor in your market.
+              Three steps to explore available public information in your market.
             </p>
           </div>
           <div className="space-y-6">
@@ -544,15 +544,14 @@ export default function CompetitorsLandingPage() {
                   <span className="text-[#EF4444]"> BS Meter</span>
                 </h2>
                 <p className="text-muted-foreground dark:text-white/50 max-w-xl mx-auto text-sm leading-relaxed">
-                  Our proprietary algorithm analyzes every competitor's reviews to detect fraud.
-                  Fake reviews are a massive problem in the contractor space — and we expose them.
+                  Signals worth a closer look, based on a limited provider-selected sample. The score is a heuristic, not a fraud verdict or probability. Sample size is shown with each analysis.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
-                  { score: "0-30", label: "Organic", color: "text-emerald-400", bg: "bg-emerald-500/10", desc: "Reviews appear legitimate and naturally accumulated over time" },
-                  { score: "30-60", label: "Moderate Risk", color: "text-yellow-400", bg: "bg-yellow-500/10", desc: "Some suspicious patterns detected — sudden spikes or generic language" },
-                  { score: "60-100", label: "High Risk", color: "text-red-400", bg: "bg-red-500/10", desc: "Strong indicators of purchased or fake reviews — proceed with caution" },
+                  { score: "0-30", label: "Few signals", color: "text-emerald-400", bg: "bg-emerald-500/10", desc: "Few selected signals; authenticity cannot be determined" },
+                  { score: "30-60", label: "Some signals", color: "text-yellow-400", bg: "bg-yellow-500/10", desc: "Some patterns to consider alongside the sample size" },
+                  { score: "60-100", label: "More signals", color: "text-red-400", bg: "bg-red-500/10", desc: "More selected patterns; further context is needed" },
                 ].map((tier, i) => (
                   <div key={tier.score} className={`${tier.bg} rounded-xl p-5 border border-border dark:border-white/[0.06]`} data-testid={`bs-tier-${i}`}>
                     <div className={`text-2xl font-extrabold ${tier.color} mb-1`}>{tier.score}</div>
