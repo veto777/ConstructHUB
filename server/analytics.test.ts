@@ -125,6 +125,18 @@ describe("POST /api/analytics/events consent gate", () => {
     expect(rows[0].ip).toBe("203.0.113.0/24");
   });
 
+  it("redacts bearer path segments even when clients submit raw URLs", async () => {
+    const vid = randomUUID();
+    vidsToClean.push(vid);
+    const r = await postEvents(
+      { events: [{ path: "/review/private-token/unsubscribe", referrer: "https://example.invalid/contract/sign/private-contract?secret=1" }] },
+      `ch_consent=granted; ch_vid=${vid}`, freshXff(),
+    );
+    expect(r.status).toBe(200);
+    const { rows } = await q("select path, referrer from ch_analytics_events where visitor_id = $1", [vid]);
+    expect(rows).toEqual([{ path: "/review/:token/unsubscribe", referrer: "https://example.invalid/contract/sign/:token" }]);
+  });
+
   it("429s once an ip blows through 120 events in the window", async () => {
     const vid = randomUUID();
     vidsToClean.push(vid);

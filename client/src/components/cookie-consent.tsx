@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
 import { isClientPortal } from "@/lib/site";
+import { analyticsPath } from "@shared/analytics-path";
 
 function readCookie(name: string): string | null {
   for (const part of document.cookie.split(";")) {
@@ -23,7 +24,7 @@ function readCookie(name: string): string | null {
 
 function sendPageview(path: string) {
   const body = JSON.stringify({
-    events: [{ type: "pageview", path, referrer: document.referrer || null }],
+    events: [{ type: "pageview", path, referrer: analyticsPath(document.referrer) || null }],
   });
   // sendBeacon survives navigation; fetch is the fallback.
   try {
@@ -51,7 +52,7 @@ export function CookieConsent() {
   // in the analytics tables or the /admin Top-pages list.
   useEffect(() => {
     if (consent !== "granted") return;
-    const path = location.replace(/^\/(e|i|co|portal|lead-form)\/[^/?]+/, "/$1/:token");
+    const path = analyticsPath(location);
     sendPageview(path);
   }, [location, consent]);
 
