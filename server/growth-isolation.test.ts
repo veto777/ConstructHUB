@@ -120,3 +120,20 @@ describe("recipient-wide opt-out", () => {
     expect((await pool.query("select unsubscribed from review_requests where token=$1", [tokens[1]])).rows[0].unsubscribed).toBe(true);
   });
 });
+
+describe("password reset session revocation and auth budgets", () => {
+  it("revokes an existing authenticated session and rejects token replay", async () => {
+    const cookie = await account(), userId = users[users.length - 1], token = randomUUID();
+    await pool.query("update users set reset_token=$1, reset_expiry=$3 where id=$2", [token, userId, new Date(Date.now()+3600000).toISOString()]);
+    expect((await (await api("/api/auth/me", cookie)).json()).id).toBe(userId);
+    expect((await api("/api/auth/reset-password", "", "POST", { token, password: "Fixture-password-123" })).status).toBe(200);
+    expect(await (await api("/api/auth/me", cookie)).json()).toBeNull();
+    expect((await api("/api/auth/reset-password", "", "POST", { token, password: "Fixture-password-456" })).status).toBe(400);
+  });
+  it("rate limits repeated account attempts across signup/login/forgot-password", async () => {
+    const email = `${randomUUID()}@example.invalid`;
+    for (let i=0;i<10;i++) expect((await api("/api/auth/login", "", "POST", { email, password: "incorrect" })).status).toBe(401);
+    expect((await api("/api/auth/forgot-password", "", "POST", { email })).status).toBe(429);
+    expect((await api("/api/auth/signup", "", "POST", { email, password: "Fixture-password-123" })).status).toBe(429);
+  });
+});
