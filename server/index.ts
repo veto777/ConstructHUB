@@ -74,6 +74,8 @@ process.on("unhandledRejection", (reason) => {
   try {
     const { seedDatabase } = await import("./seed");
     await seedDatabase();
+    const { ensureGrowthSchema } = await import("./growth-schema");
+    await ensureGrowthSchema();
     await setupAuth(app);
     await registerRoutes(httpServer, app);
 

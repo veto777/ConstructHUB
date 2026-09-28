@@ -59,6 +59,7 @@ export const permitDatabases = pgTable("permit_databases", {
 });
 
 export const searchQueries = pgTable("search_queries", {
+  userId: integer("user_id"),
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   searchType: text("search_type").notNull(),
   searchValue: text("search_value").notNull(),
@@ -190,6 +191,7 @@ export const gmbEditHistory = pgTable("gmb_edit_history", {
 });
 
 export const rankingGridScans = pgTable("ranking_grid_scans", {
+  userId: integer("user_id"),
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   businessName: text("business_name").notNull(),
   placeId: text("place_id").notNull(),

@@ -1,3 +1,4 @@
+import { ownedBy } from "./ownership";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -19,7 +20,7 @@ import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, e
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { db } from "./db";
-import { subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
+import { searchQueries, subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
@@ -185,6 +186,24 @@ export async function registerRoutes(
     res.json(databases);
   });
 
+  const ownerScope = (req: any) => ({ id: req.user.id, admin: isAdmin(req.user) });
+  const canReadQuery = async (req: any, id: number) => {
+    const [row] = await db.select({ id: searchQueries.id }).from(searchQueries)
+      .where(and(eq(searchQueries.id, id), ownedBy(searchQueries.userId, ownerScope(req))));
+    return !!row;
+  };
+  const scrapeOwners = new Map<string, number>();
+  app.use(["/api/search", "/api/search-queries", "/api/search-results", "/api/scrape",
+    "/api/scrape-schedules", "/api/permit-details", "/api/ranking-grid"], (req, res, next) => {
+    if (!getDevUser(req, res)) return;
+    next();
+  });
+  // These schedules refresh the shared permit directory, not personal searches.
+  app.use("/api/scrape-schedules", (req, res, next) => {
+    if (!isAdmin(req.user)) return res.status(403).json({ message: "Administrator access required" });
+    next();
+  });
+
   app.post("/api/search", async (req, res) => {
     try {
       const { searchType, searchValue, scopeCountyId, scopeState } = req.body;
@@ -195,6 +214,7 @@ export async function registerRoutes(
       const parsedCountyId = scopeCountyId ? parseInt(scopeCountyId) : null;
 
       const query = await storage.createSearchQuery({
+        userId: req.user!.id,
         searchType,
         searchValue,
         countyId: parsedCountyId,
@@ -241,7 +261,7 @@ export async function registerRoutes(
 
   app.get("/api/search/live/:searchId", async (req, res) => {
     const job = getLiveSearchJob(req.params.searchId);
-    if (!job) {
+    if (!job || !(await canReadQuery(req, job.queryId))) {
       return res.status(404).json({ message: "Search job not found" });
     }
 
@@ -287,12 +307,14 @@ export async function registerRoutes(
       }
 
       const query = await storage.createSearchQuery({
+        userId: req.user!.id,
         searchType: searchType || "address",
         searchValue: searchTerm,
         countyId: db.countyId,
       });
 
       const jobId = randomUUID().slice(0, 8);
+      scrapeOwners.set(jobId, req.user!.id);
       const url = db.searchUrl || db.portalUrl!;
       const platform = db.platform || "SmartGov";
 
@@ -307,16 +329,16 @@ export async function registerRoutes(
 
   app.get("/api/scrape/status/:jobId", async (req, res) => {
     const progress = getScrapeProgress(req.params.jobId);
-    if (!progress) {
+    if (!progress || scrapeOwners.get(req.params.jobId) !== req.user!.id) {
       return res.status(404).json({ message: "Job not found" });
     }
     res.json(progress);
   });
 
-  app.get("/api/scrape/jobs", async (_req, res) => {
+  app.get("/api/scrape/jobs", async (req, res) => {
     const jobs = getAllScrapeJobs();
     const arr: any[] = [];
-    jobs.forEach((val, key) => arr.push({ jobId: key, ...val }));
+    jobs.forEach((val, key) => { if (scrapeOwners.get(key) === req.user!.id) arr.push({ jobId: key, ...val }); });
     res.json(arr);
   });
 
@@ -357,30 +379,32 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/search-queries", async (_req, res) => {
-    const queries = await storage.getSearchQueries();
+  app.get("/api/search-queries", async (req, res) => {
+    const queries = await storage.getSearchQueries(ownerScope(req));
     res.json(queries);
   });
 
   app.delete("/api/search-queries/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    if (!(await canReadQuery(req, id))) return res.status(404).json({ message: "Search not found" });
     await storage.deleteSearchQuery(id);
     res.json({ success: true });
   });
 
-  app.delete("/api/search-queries", async (_req, res) => {
-    await storage.deleteAllSearchQueries();
+  app.delete("/api/search-queries", async (req, res) => {
+    await storage.deleteAllSearchQueries(ownerScope(req));
     res.json({ success: true });
   });
 
-  app.get("/api/search-results/recent", async (_req, res) => {
-    const results = await storage.getRecentSearchResults();
+  app.get("/api/search-results/recent", async (req, res) => {
+    const results = await storage.getRecentSearchResults(ownerScope(req));
     res.json(results);
   });
 
   app.get("/api/search-results/:queryId", async (req, res) => {
     const queryId = parseInt(req.params.queryId);
+    if (!(await canReadQuery(req, queryId))) return res.status(404).json({ message: "Search not found" });
     const results = await storage.getSearchResults(queryId);
     res.json(results);
   });
@@ -1676,7 +1700,7 @@ Rules:
 
   app.get("/api/ranking-grid/map/:scanId", async (req, res) => {
     try {
-      const scan = await storage.getRankingGridScanById(parseInt(req.params.scanId));
+      const scan = await storage.getRankingGridScanById(parseInt(req.params.scanId), ownerScope(req));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
 
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
@@ -1711,7 +1735,7 @@ Rules:
       }
 
       res.setHeader("Content-Type", mapRes.headers.get("content-type") || "image/png");
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Cache-Control", "private, max-age=3600");
       const buffer = await mapRes.arrayBuffer();
       res.send(Buffer.from(buffer));
     } catch (err: any) {
@@ -1720,13 +1744,10 @@ Rules:
   });
 
   // Ranking Grid Routes
-  // NOTE: ranking_grid_scans has no user_id column yet, so these are scoped to
-  // authenticated users as a group rather than per-owner. Add a user_id column +
-  // per-user filtering to fully isolate one contractor's scans from another's.
   app.get("/api/ranking-grid/scans", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      const scans = await storage.getRankingGridScans();
+      const scans = await storage.getRankingGridScans(ownerScope(req));
       res.json(scans);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1736,7 +1757,7 @@ Rules:
   app.get("/api/ranking-grid/scans/:id", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      const scan = await storage.getRankingGridScanById(parseInt(req.params.id));
+      const scan = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
       const results = await storage.getRankingGridResults(scan.id);
       res.json({ scan, results });
@@ -1762,7 +1783,7 @@ Rules:
           .limit(1);
 
         if (sub && sub.status === "trialing") {
-          const existingScans = await storage.getRankingGridScans();
+          const existingScans = await storage.getRankingGridScans({ id: user.id, admin: false });
           if (existingScans.length >= 1) {
             return res.status(403).json({ message: "Free trial is limited to 1 GMB Ranking Grid report. Upgrade your plan for unlimited scans." });
           }
@@ -1770,6 +1791,7 @@ Rules:
       }
 
       const scan = await storage.createRankingGridScan({
+        userId: user.id,
         businessName,
         placeId,
         address: address || null,
@@ -1794,7 +1816,9 @@ Rules:
   app.delete("/api/ranking-grid/scans/:id", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      await storage.deleteRankingGridScan(parseInt(req.params.id));
+      const scan = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
+      if (!scan) return res.status(404).json({ message: "Scan not found" });
+      await storage.deleteRankingGridScan(scan.id);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -4706,7 +4730,7 @@ function main() {
 })();`;
 
     res.setHeader("Content-Type", "application/javascript");
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Cache-Control", "private, max-age=3600");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.send(script);
   });
@@ -5958,7 +5982,7 @@ function main() {
     }
   });
 
-  app.post("/api/upload/review-photos", upload.array("photos", 10), async (req, res) => {
+  app.post("/api/upload/review-photos", upload.array("photos", 50), async (req, res) => {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
