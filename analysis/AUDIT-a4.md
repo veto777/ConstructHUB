@@ -219,3 +219,206 @@ npx tsx scripts/validate-gov-data-audit.ts
 Review source evidence before accepting new manual candidates. Candidate URLs retained on nulled records are recheckable without republishing them. Ordinary audit/source runs resume checkpoints; `--fresh` starts a new evidence round. Apply checks the input hashes and completion evidence and is idempotent. The legacy portal builder now preserves current entries and null tombstones, and requires linked-source evidence for additions; the old link verifier now uses the same GET/content verdicts.
 
 The database proof scripts `scripts/test-gov-seeding.ts`, `scripts/apply-gov-data-lane.ts` and `scripts/report-gov-seed-coverage.ts` explicitly guard the lane database identity. Run them with the lane environment loaded and only against `constructhub_dev_a4`; the full application is started with `npm run dev` using the lane environment on 8159. No production rollout was performed or authorized.
+
+
+## Round 2 — three-tier source-listed links
+
+Owner-directed continuation on 2026-09-28, in `/home/veto/ConstructHUB-a4`, branch `lane/a4`, port **8159**, database **constructhub_dev_a4**. This section supersedes round 1's strict-null rule and its open issue about hiding inconclusive links. No reset, push, production access, deployment, live payment, real SMS or external email was performed.
+
+**Final reference totals: 2,839 verified / 1,576 unconfirmed / 308 dead-nulled / 394 no-URL.** There are **4,415 visible source-listed links**, up from **2,634**: **1,781 restored links**, with no previously published URL removed or changed. Assessment offices: **2,363 / 1,421 / 307 / 394**. Permit portals: **476 / 155 / 1 / 0**. All **4,194 source-matching phone values** and office names remain unchanged from round 1.
+
+The new policy is implemented in the JSON, both seeders, existing database status/date columns, directory/lookup APIs, CRM suggestions and UI. `verified` and `unconfirmed` links remain active; `dead` URLs are null with the existing honest fallback. `none` distinguishes records without a source URL. Legacy `live` rows remain compatible. The existing `last_verified_at` column stores the actual last check, including inconclusive checks; boot never fabricates a new check time. Unconfirmed links show **“Official site · not auto-verified · Last checked YYYY-MM-DD”** in property, permit and CRM views.
+
+### Method and evidence
+
+Reclassified the existing 5,117-record evidence set rather than crawling it again. A bounded Chromium retry, with per-host serialization, revisited **741 distinct URLs** from the blocked/rate-limited/server-error/timeout set and certificate checks. It used normal TLS validation and no login, forms, CAPTCHA bypass or TLS bypass. Interrupted runs resumed local checkpoints. A separate Chromium check covered the newly discovered Tennessee replacement, for **742 distinct browser-checked URLs** overall. **452 dead-candidate records** received fresh replacement research against NETR and/or actual links on official pages; every final dead record is covered. Successful page checks still do not prove login, application submission or records retrieval works.
+
+- Maryland: the [SDAT page](https://sdat.dat.maryland.gov/RealProperty/Pages/default.aspx) identifies the state agency and statewide search. Combined with NETR's county-specific source listings, this verifies **all 24 Maryland links** without demanding a county name on the landing page. Independent web content evidence is retained; local anti-bot behavior is not concealed.
+- Montana: its real statewide Property.MT.Gov identity is sufficient with the county source association. A county name is no longer mandatory on a state portal.
+- Tennessee: **80 retired-host links** failed browser certificate checks. The [Comptroller's official replacement announcement](https://comptroller.tn.gov/news/2022/12/15/comptroller-s-office-launches-redesigned-property-assessment-data-webpage.html) links the replacement TPAD URL. Its browser response is **403**, so it is published as **unconfirmed**, not falsely verified. Only records already sourced to that agency's old portal are reassigned.
+- A tenant's permit portal or a source-evidenced assessment-office homepage is not a generic city/vendor homepage merely because its title is “Home.” Department subdomains, documented office domains and genuine tenant deployments retain the topic/identity checks. Actual generic homepages, 404/410, soft 404, parking, DNS/refused connections and browser certificate failures remain dead.
+
+Raw `analysis/gov-*.json` evidence was removed from the git index with `git rm --cached`; the local files remain. Compressed replay inputs (about **1.8 MB**, including the original `gov-data-audit.json` and supporting evidence) are committed under `scripts/data/`. The small independent/statewide checks and output hashes are also committed. See `scripts/data/README.md` for reproducible offline replay. No `.env` contents or secrets are included.
+
+### Round-2 feature matrix
+
+| Feature | Page/route | API | How verified | Status |
+|---|---|---|---|---|
+| Visible, dated unconfirmed assessment links | `/property`, county deep link | GET `/api/property-appraisers` | Real seeded Chromium flow, source-link fixture, curl, policy tests | FIXED 3ef9c82 |
+| County and property lookup metadata | Property/search | GET `/api/property-appraisers/county/:id`; POST `/api/property-lookup` | Real DB status mutation with restoration; URL/status/date assertions; curl | FIXED 3ef9c82 |
+| Visible, dated unconfirmed permit links | `/databases` | GET `/api/databases`; GET `/api/databases/county/:id`; GET `/api/databases/counts` | Real API calls plus Chromium unconfirmed/dead fixtures; legacy contacts remain withheld | FIXED 3ef9c82 |
+| CRM permit suggestions | `/crm/projects/:id?portal=1`, Permits tab | GET `/api/crm/projects/:id/permits/suggest` | Real temporary project, state-boundary checks, unconfirmed status/date and rendered notice; fixture cleaned up | FIXED 3ef9c82 |
+| Dead/no-source fallback and supported scrape gating | Property, databases, search | Directory APIs; POST `/api/scrape` | Policy/unit tests; dead-link Playwright; real API rejects dead scrape; empty-scope search curl | PASS |
+| End-to-end reference status propagation | Startup seeders | Internal Drizzle updates | Verified→unconfirmed→dead integration proof; full reconciliation twice; stable IDs/notes and no repeated changes | FIXED 3ef9c82, a5d79ee |
+| State agency and dedicated department recognition | Reference pipeline | GET/render of sourced URLs | Archived content, independent SDAT check, normal-TLS Chromium checks; state/host mismatch regression tests | FIXED 3ef9c82, b606a7c, 8616d41 |
+| Link rechecks and future permit builds | `scripts/verify-links.ts`, `scripts/build-permit-portals.ts` | Source/portal GETs; internal DB update code | Code review, script type-check, shared classifier tests; no broad DB verifier crawl repeated | FIXED 3ef9c82 |
+| Evidence reclassification and restoration | JSON → startup → API → UI | Directory/lookup/suggestion APIs | All 5,117 rows validated; compressed replay; real lane reconciliation and seeded browser proof | FIXED be2b421 |
+| Authenticated government workflows | External portals | External login/search/application endpoints | Landing links only; no credentials or submissions used | NOT-TESTABLE without portal access/fixtures |
+
+### Before and after, by state
+
+Before is the **published round-1 snapshot**, not a new claim that every suppressed URL was dead. **Before nulled*** includes every hidden URL with a retained source candidate (including inconclusive checks). Round 1 had no visible unconfirmed tier. **No-URL** means no source URL/candidate, not a closed office. After **dead-nulled** counts only the final dead classification after replacement research. Rows and totals are reference-file counts, not DB coverage; permit states with zero rows have a coverage gap.
+
+#### Assessment offices
+
+| State | Before verified | Before unconfirmed | Before nulled* | Before no-URL | After verified | After unconfirmed | After dead-nulled | After no-URL |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| AK | 6 | 0 | 5 | 39 | 7 | 2 | 2 | 39 |
+| AL | 35 | 0 | 35 | 1 | 42 | 21 | 7 | 1 |
+| AR | 33 | 0 | 51 | 0 | 33 | 51 | 0 | 0 |
+| AZ | 9 | 0 | 6 | 0 | 9 | 6 | 0 | 0 |
+| CA | 36 | 0 | 22 | 0 | 36 | 14 | 8 | 0 |
+| CO | 47 | 0 | 16 | 1 | 47 | 14 | 2 | 1 |
+| CT | 118 | 0 | 51 | 4 | 120 | 38 | 11 | 4 |
+| DC | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 |
+| DE | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
+| FL | 34 | 0 | 33 | 0 | 36 | 31 | 0 | 0 |
+| GA | 129 | 0 | 30 | 0 | 129 | 30 | 0 | 0 |
+| HI | 2 | 0 | 2 | 0 | 2 | 2 | 0 | 0 |
+| IA | 39 | 0 | 61 | 0 | 39 | 60 | 1 | 0 |
+| ID | 23 | 0 | 18 | 3 | 25 | 9 | 7 | 3 |
+| IL | 65 | 0 | 31 | 6 | 69 | 14 | 13 | 6 |
+| IN | 45 | 0 | 46 | 1 | 47 | 41 | 3 | 1 |
+| KS | 60 | 0 | 44 | 1 | 61 | 33 | 10 | 1 |
+| KY | 37 | 0 | 75 | 9 | 38 | 71 | 3 | 9 |
+| LA | 32 | 0 | 32 | 1 | 40 | 18 | 6 | 1 |
+| MA | 145 | 0 | 199 | 23 | 146 | 160 | 38 | 23 |
+| MD | 0 | 0 | 24 | 0 | 24 | 0 | 0 | 0 |
+| ME | 175 | 0 | 87 | 32 | 178 | 65 | 19 | 32 |
+| MI | 54 | 0 | 29 | 0 | 58 | 17 | 8 | 0 |
+| MN | 35 | 0 | 51 | 1 | 38 | 43 | 5 | 1 |
+| MO | 71 | 0 | 36 | 8 | 79 | 19 | 9 | 8 |
+| MS | 54 | 0 | 27 | 11 | 56 | 19 | 6 | 11 |
+| MT | 0 | 0 | 56 | 0 | 56 | 0 | 0 | 0 |
+| NC | 54 | 0 | 29 | 17 | 55 | 26 | 2 | 17 |
+| ND | 32 | 0 | 17 | 4 | 34 | 10 | 5 | 4 |
+| NE | 34 | 0 | 58 | 1 | 36 | 39 | 17 | 1 |
+| NH | 58 | 0 | 164 | 16 | 59 | 126 | 37 | 16 |
+| NJ | 20 | 0 | 1 | 0 | 20 | 1 | 0 | 0 |
+| NM | 23 | 0 | 8 | 2 | 23 | 5 | 3 | 2 |
+| NV | 16 | 0 | 1 | 0 | 16 | 1 | 0 | 0 |
+| NY | 24 | 0 | 33 | 5 | 27 | 26 | 4 | 5 |
+| OH | 41 | 0 | 46 | 1 | 43 | 41 | 3 | 1 |
+| OK | 47 | 0 | 30 | 0 | 49 | 25 | 3 | 0 |
+| OR | 17 | 0 | 17 | 2 | 18 | 14 | 2 | 2 |
+| PA | 50 | 0 | 17 | 0 | 51 | 10 | 6 | 0 |
+| RI | 25 | 0 | 13 | 1 | 25 | 13 | 0 | 1 |
+| SC | 28 | 0 | 18 | 0 | 29 | 15 | 2 | 0 |
+| SD | 15 | 0 | 26 | 25 | 16 | 19 | 6 | 25 |
+| TN | 13 | 0 | 83 | 0 | 14 | 82 | 0 | 0 |
+| TX | 203 | 0 | 51 | 0 | 205 | 47 | 2 | 0 |
+| UT | 14 | 0 | 14 | 1 | 15 | 7 | 6 | 1 |
+| VA | 60 | 0 | 72 | 1 | 61 | 60 | 11 | 1 |
+| VT | 39 | 0 | 61 | 152 | 42 | 31 | 27 | 152 |
+| WA | 29 | 0 | 10 | 0 | 29 | 10 | 0 | 0 |
+| WI | 12 | 0 | 35 | 25 | 12 | 27 | 8 | 25 |
+| WV | 50 | 0 | 5 | 0 | 51 | 4 | 0 | 0 |
+| WY | 15 | 0 | 8 | 0 | 15 | 3 | 5 | 0 |
+| **Total** | 2206 | 0 | 1885 | 394 | 2363 | 1421 | 307 | 394 |
+
+#### Permit portals
+
+| State | Before verified | Before unconfirmed | Before nulled* | Before no-URL | After verified | After unconfirmed | After dead-nulled | After no-URL |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| AK | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| AL | 9 | 0 | 0 | 0 | 9 | 0 | 0 | 0 |
+| AR | 4 | 0 | 2 | 0 | 4 | 2 | 0 | 0 |
+| AZ | 15 | 0 | 2 | 0 | 15 | 2 | 0 | 0 |
+| CA | 82 | 0 | 28 | 0 | 85 | 25 | 0 | 0 |
+| CO | 17 | 0 | 7 | 0 | 18 | 6 | 0 | 0 |
+| CT | 4 | 0 | 6 | 0 | 10 | 0 | 0 | 0 |
+| DC | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| DE | 1 | 0 | 1 | 0 | 1 | 1 | 0 | 0 |
+| FL | 43 | 0 | 12 | 0 | 43 | 12 | 0 | 0 |
+| GA | 10 | 0 | 8 | 0 | 12 | 5 | 1 | 0 |
+| HI | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| IA | 8 | 0 | 3 | 0 | 9 | 2 | 0 | 0 |
+| ID | 7 | 0 | 2 | 0 | 7 | 2 | 0 | 0 |
+| IL | 14 | 0 | 7 | 0 | 17 | 4 | 0 | 0 |
+| IN | 7 | 0 | 3 | 0 | 8 | 2 | 0 | 0 |
+| KS | 4 | 0 | 4 | 0 | 4 | 4 | 0 | 0 |
+| KY | 0 | 0 | 2 | 0 | 0 | 2 | 0 | 0 |
+| LA | 1 | 0 | 2 | 0 | 1 | 2 | 0 | 0 |
+| MA | 7 | 0 | 11 | 0 | 15 | 3 | 0 | 0 |
+| MD | 9 | 0 | 2 | 0 | 10 | 1 | 0 | 0 |
+| ME | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| MI | 1 | 0 | 2 | 0 | 1 | 2 | 0 | 0 |
+| MN | 11 | 0 | 1 | 0 | 12 | 0 | 0 | 0 |
+| MO | 4 | 0 | 5 | 0 | 4 | 5 | 0 | 0 |
+| MS | 0 | 0 | 2 | 0 | 0 | 2 | 0 | 0 |
+| MT | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 |
+| NC | 11 | 0 | 6 | 0 | 12 | 5 | 0 | 0 |
+| ND | 3 | 0 | 1 | 0 | 3 | 1 | 0 | 0 |
+| NE | 4 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |
+| NH | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| NJ | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
+| NM | 3 | 0 | 2 | 0 | 3 | 2 | 0 | 0 |
+| NV | 3 | 0 | 3 | 0 | 3 | 3 | 0 | 0 |
+| NY | 4 | 0 | 4 | 0 | 4 | 4 | 0 | 0 |
+| OH | 12 | 0 | 8 | 0 | 14 | 6 | 0 | 0 |
+| OK | 2 | 0 | 3 | 0 | 2 | 3 | 0 | 0 |
+| OR | 9 | 0 | 8 | 0 | 9 | 8 | 0 | 0 |
+| PA | 2 | 0 | 5 | 0 | 4 | 3 | 0 | 0 |
+| RI | 0 | 0 | 6 | 0 | 6 | 0 | 0 | 0 |
+| SC | 6 | 0 | 3 | 0 | 7 | 2 | 0 | 0 |
+| SD | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| TN | 12 | 0 | 2 | 0 | 13 | 1 | 0 | 0 |
+| TX | 50 | 0 | 17 | 0 | 55 | 12 | 0 | 0 |
+| UT | 4 | 0 | 4 | 0 | 4 | 4 | 0 | 0 |
+| VA | 11 | 0 | 7 | 0 | 12 | 6 | 0 | 0 |
+| VT | 0 | 0 | 1 | 0 | 1 | 0 | 0 | 0 |
+| WA | 19 | 0 | 9 | 0 | 19 | 9 | 0 | 0 |
+| WI | 3 | 0 | 3 | 0 | 4 | 2 | 0 | 0 |
+| WV | 2 | 0 | 0 | 0 | 2 | 0 | 0 | 0 |
+| WY | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| **Total** | 428 | 0 | 204 | 0 | 476 | 155 | 1 | 0 |
+
+### Database propagation and limits
+
+Reference reconciliation preserved all **3,040 appraiser IDs** and **32,992 permit-row IDs**, all notes, and all phone values. The initial application restored 1,002 stored appraiser URLs and 248 permit URLs; the Tennessee follow-up restored another 78 stored appraiser URLs. Both applications were repeated with **zero repeat changes**. Reference and stored counts differ because the existing county-only model cannot represent all source jurisdictions.
+
+Final real API coverage: **2,717 visible appraiser links** (1,777 `verified`, 939 `unconfirmed`, one compatible legacy `live`) and **742 visible permit rows** (551 `verified`, 191 `unconfirmed`). Dead URLs remain null/suppressed. The permit API still withholds legacy contacts without provenance. These counts do not pretend that unmatched municipal source records are present in the database.
+
+### Open issues, ranked (round 2)
+
+1. **P1 — Municipal assessment coverage remains blocked by the county-only model.** `shared/schema.ts:96`, `server/seed-all-appraisers.ts:68`. Repro: inspect ME/Abbot in the reference JSON and query `/api/property-appraisers`; it cannot map to an authoritative county row. The round-1 unmatched-source list and geographic-model recommendation remain applicable.
+2. **P2 — 31 permit reference jurisdictions still have no safe DB match.** `server/seed-permit-portals.ts:49`. Repro: run the guarded lane reconciliation and inspect its unmatched jurisdiction warnings. No city-to-county relationships were guessed; schema/geographic identity work is still required.
+3. **P2 — 1,576 shown links remain unconfirmed; 308 candidates remain dead and 394 records have no URL.** `server/government-link-policy.ts:24`, `scripts/apply-gov-round2.ts:1`. Repro: inspect `analysis/gov-round2-decisions.json` after offline replay, or filter either reference JSON by `linkStatus`. The one dead permit reference is Duluth GA: Chromium reports `ERR_CERT_AUTHORITY_INVALID` for its sourced eSuite URL. Links with explicit TLS/browser errors are not reopened by ignoring certificate validation. A reviewed replacement or operator remediation is required.
+4. **P2 — Landing-page tiers do not certify automated scraping or complete permit workflows.** `shared/government-links.ts:11`, `server/scraper.ts:596`. Repro: choose a vendor/jurisdiction without a supported adapter; a visible official link does not create an adapter. Credentials, fixture-backed adapters and portal-specific result assertions remain necessary.
+5. **P2 — CRM city-to-county suggestions and permit contact provenance remain incomplete.** `server/crm/ops.ts:939`, `shared/government-links.ts:31`. Repro: a Tampa FL project can omit the Hillsborough county office; stored legacy permit contact fields remain absent from sanitized directory responses. Geographic mapping and official field-level sourcing are still needed.
+
+### Recommended improvements (round 2)
+
+| Rank | Improvement | Impact | Effort |
+|---|---|---|---|
+| 1 | Add authoritative municipality/county/assessment-district identities and relationships | High: recovers unmatched offices and correct CRM suggestions | High |
+| 2 | Schedule gentle three-tier rechecks with a human-review queue and source/verdict history | High: handles blocking and real link decay without removing useful links | Medium |
+| 3 | Add “Report a bad link” and visible source citations beside the check date | High: contractors can flag errors and understand provenance | Low–medium |
+| 4 | Add dedicated assessment-office registry metadata instead of growing classifier exceptions | Medium–high: makes department identity explicit and maintainable | Medium |
+| 5 | Implement jurisdiction-specific search adapters and source-backed permit contacts | High: improves actual records retrieval and application preparation | High |
+| 6 | Make the full test harness own and reset its lane server per run | Medium: avoids accumulated password-reset rate limits on repeated suites | Low–medium |
+
+### Merge and final validation
+
+- Merged `main` into `lane/a4`: initial integration **9614f30**, lane-a1 round-2 integration **0f4b4d4**, and final main correction **412c1c5**. Final main revision **2b315bb** is an ancestor of this branch. Conflicts in `server/routes.ts`, `server/crm/admin.test.ts` and `server/crm/hover.test.ts` retained both government checks and main's ownership/quota guards, plus this lane's single-port setting.
+- `npm run check`: **0 errors**. `npx tsc --project scripts/tsconfig.gov-audit.json`: **0 errors**.
+- Final post-merge `npm test`: **778 passed, 43 skipped**, **80 test files passed and two skipped**; exit 0. The skipped tests require auxiliary listeners. This is not a claim that all 821 tests ran.
+- Final Playwright run: **13 passed**, with `E2E_PORT=8159 E2E_DB=constructhub_dev_a4 E2E_WORKERS=1`, including the actual seeded unconfirmed-office UI, lookup metadata, CRM notices and cross-state guard.
+- Final real curl smoke: **12 successful calls**, including an empty-scope search and removal of its test query. No populated external scrape or submission was attempted.
+- Offline replay and independent validator: **5,117 records**, **4,415 visible URLs**, **4,194 unchanged sourced phones**, all Maryland records verified, and replacement research present for every final dead row. Replay leaves the committed data/output hashes unchanged.
+- Real seed integration additionally pins the periodic-verifier edge case: after a newer dead verdict nulls the stored URL, an older verified/unconfirmed reference cannot reactivate it (**a5d79ee**). The final full reference reconciliation ran twice with **zero URL, phone, status or row-count changes**; IDs and notes were retained.
+
+Two validation exceptions are recorded explicitly. Repeated early full-suite runs exhausted an existing in-memory password-reset limiter; restarting only the owned 8159 server produced passing runs. Also, the first merged-main suite introduced a new growth-isolation child on **8162** before its missing single-port guard was noticed. That child is no longer listening; no unrelated process was killed. **b6a4f77** makes that suite honor `CRM_TEST_SINGLE_PORT`, and subsequent final runs skipped all auxiliary-listener suites. This initial 8162 use was outside the lane's authorized port, not a claimed isolation success. No production or other-lane database was used.
+
+`CLAUDE.md` now records the owner-approved three-tier rule so a future refresh does not reinstate the strict-null policy. All code, data, compressed replay inputs and this report are committed; raw evidence and run logs remain local and ignored.
+
+Offline replay (Node 20, no network or database):
+
+```sh
+npx tsx scripts/restore-gov-audit-evidence.ts
+npx tsx scripts/apply-gov-round2.ts --preview
+npx tsx scripts/apply-gov-round2.ts
+npx tsx scripts/validate-gov-round2.ts
+```
+
+The legacy round-1 strict-null apply/validator commands above are historical; the round-2 commands supersede them. All external rechecks used the existing evidence and current sources, with raw evidence retained locally and compressed replay inputs committed. No production rollout is included.
