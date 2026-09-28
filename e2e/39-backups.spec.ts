@@ -23,6 +23,8 @@ test.describe("auto-backup settings", () => {
     try {
       await gotoCrm(page, "/crm/settings");
       await expect(page.getByTestId("card-backup")).toBeVisible();
+      await expect(page.getByTestId("card-backup")).toContainText("An export of clients, estimates and invoices");
+      await expect(page.getByTestId("card-backup")).toContainText("Restore is not available");
       await expect(page.getByTestId("text-backup-last-sent")).toBeVisible();
 
       // Enable + configure.
@@ -37,7 +39,7 @@ test.describe("auto-backup settings", () => {
 
       await page.getByTestId("input-backup-email").fill(recipient);
       await page.getByTestId("button-save-backup").click();
-      await expect(page.getByText("Backup settings saved", { exact: true })).toBeVisible();
+      await expect(page.getByText("Export settings saved", { exact: true })).toBeVisible();
 
       // Persisted: a reload shows the same choices.
       await gotoCrm(page, "/crm/settings");
@@ -47,7 +49,7 @@ test.describe("auto-backup settings", () => {
 
       // Send now → toast with the row counts, DB lastSentAt set.
       await page.getByTestId("button-send-backup-now").click();
-      await expect(page.getByText("Backup sent", { exact: true })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText("Export sent", { exact: true })).toBeVisible({ timeout: 20_000 });
       await expect(page.getByText(/\d+ clients, \d+ estimates, \d+ invoices/).first()).toBeVisible();
 
       const rows = await q<{ last: string | null }>(

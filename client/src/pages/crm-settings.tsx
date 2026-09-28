@@ -517,9 +517,9 @@ export default function CrmSettingsPage() {
       })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
-      toast({ title: "Backup settings saved" });
+      toast({ title: "Export settings saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save backup settings", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save export settings", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   const sendBackupNow = useMutation({
@@ -527,11 +527,11 @@ export default function CrmSettingsPage() {
     onSuccess: (r: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
       toast({
-        title: "Backup sent",
+        title: "Export sent",
         description: `${r.rows.clients} clients, ${r.rows.estimates} estimates, ${r.rows.invoices} invoices · ${(r.bytes / 1024).toFixed(1)} KB to ${r.recipient}`,
       });
     },
-    onError: (e: any) => toast({ title: "Backup failed", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Export failed", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   // ── Payments: card fee passthrough + financing links ──────────────────────
@@ -1464,17 +1464,16 @@ export default function CrmSettingsPage() {
           <CardHeader>
             <SectionTitle
               icon={DatabaseBackup}
-              title="Auto-backup"
-              description="Your whole book of business — clients, estimates and invoices — emailed to you every week or two."
-              infoKey="backups"
+              title="Scheduled exports"
+              description="An export of clients, estimates and invoices, emailed on your schedule. Attachments, signed documents, payments and other CRM records are excluded. Restore is not available."
             />
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-sm font-medium">Automatic email backups</div>
+                <div className="text-sm font-medium">Automatic email exports</div>
                 <div className="text-xs text-muted-foreground">
-                  When a backup comes due it's generated and emailed automatically (checked every 15 minutes).
+                  When an export comes due it's generated and emailed automatically (checked every 15 minutes).
                 </div>
               </div>
               <Switch
@@ -1531,7 +1530,7 @@ export default function CrmSettingsPage() {
                 disabled={saveBackup.isPending || !backupForm.email.trim()}
                 data-testid="button-save-backup">
                 {saveBackup.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Save backup settings
+                Save export settings
               </Button>
             </div>
             <div className="flex flex-wrap items-center gap-3 border-t pt-4">
@@ -1541,7 +1540,7 @@ export default function CrmSettingsPage() {
                 {sendBackupNow.isPending
                   ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   : <DatabaseBackup className="h-4 w-4 mr-2" />}
-                Send backup now
+                Send export now
               </Button>
               <div className="text-xs text-muted-foreground" data-testid="text-backup-last-sent">
                 {backupCfg.lastSentAt
@@ -1551,7 +1550,7 @@ export default function CrmSettingsPage() {
             </div>
             {backupCfg.lastError && (
               <p className="text-xs text-destructive" data-testid="text-backup-error">
-                Last backup failed: {backupCfg.lastError}
+                Last export failed: {backupCfg.lastError}
               </p>
             )}
           </CardContent>
