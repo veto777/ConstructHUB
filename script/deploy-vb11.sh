@@ -55,11 +55,12 @@ echo "== restart =="
 echo "== verify =="
 # A boot that loses a module logs "Failed to initialize CRM module" but keeps
 # serving static pages — catch it here.
-sleep 10
+# Boot seeding takes ~12s on vb11 before the port opens; poll instead of a fixed sleep.
+"${SSH[@]}" "for i in \$(seq 1 45); do curl -s -o /dev/null http://127.0.0.1:8110/ && exit 0; sleep 2; done; echo 'DEPLOY BROKEN: :8110 not listening after 90s' >&2; exit 1"
 "${SSH[@]}" "
   set -e
   systemctl --user is-active constructhub.service
-  if journalctl --user -u constructhub.service --since '-1min' --no-pager | grep -E 'Failed to initialize|Cannot find module|Fatal startup'; then
+  if journalctl --user -u constructhub.service --since '-2min' --no-pager | grep -E 'Failed to initialize|Cannot find module|Fatal startup'; then
     echo 'DEPLOY BROKEN: boot errors above' >&2
     exit 1
   fi
