@@ -1,3 +1,4 @@
+import { objectPolicy } from "./object-access";
 /**
  * HOVER integration — native, per-org, zero-touch after one click.
  *
@@ -1478,7 +1479,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       .orderBy(desc(crmMeasurements.createdAt))
       .limit(100);
     res.json({
-      measurements: rows.map((r) => {
+      measurements: (await objectPolicy(ctx).filter("measurements", rows)).map((r) => {
         const raw = (r.rawPayload ?? {}) as any;
         return {
           id: r.id,

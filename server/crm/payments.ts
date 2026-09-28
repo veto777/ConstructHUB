@@ -1,3 +1,4 @@
+import { objectPolicy } from "./object-access";
 /**
  * Connected payments — the contractor's own Stripe account, ACH-first.
  *
@@ -328,7 +329,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (req.query.invoiceId) where.push(eq(crmPayments.invoiceId, String(req.query.invoiceId)));
     const rows = await db.select().from(crmPayments)
       .where(and(...where)).orderBy(desc(crmPayments.createdAt)).limit(200);
-    res.json(rows);
+    res.json(await objectPolicy(ctx).filter("payments", rows));
   });
 
   // ── Contractor: take a payment — hosted checkout link ─────────────────────
