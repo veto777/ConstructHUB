@@ -42,6 +42,15 @@ try {
     const [p] = await db.select().from(permitDatabases).where(eq(permitDatabases.id, oldPortal.id));
     for (const row of [a,p]) { assert.equal(row.linkStatus,linkStatus); assert.equal(row.isActive,available); }
   }
+  // A newer periodic dead verdict has no URL left to compare with stale JSON.
+  await syncAppraiserRecords([{...app, linkStatus: 'verified', lastVerifiedAt: '2026-09-28T00:00:00.000Z'}]);
+  await syncPermitPortals([{...portal, linkStatus: 'unconfirmed', lastVerifiedAt: '2026-09-28T00:00:00.000Z'}]);
+  const [deadApp] = await db.select().from(propertyAppraisers).where(eq(propertyAppraisers.id, oldApp.id));
+  const [deadPortal] = await db.select().from(permitDatabases).where(eq(permitDatabases.id, oldPortal.id));
+  for (const row of [deadApp, deadPortal]) {
+    assert.equal(row.portalUrl, null); assert.equal(row.searchUrl, null);
+    assert.equal(row.linkStatus, 'dead'); assert.equal(row.isActive, false);
+  }
   const missingCounty = portals.find((r: any) => r.jurisdiction === 'Allen County, IN');
   const countyBefore = await db.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, missingCounty.jurisdiction));
   await syncPermitPortals([missingCounty]);
@@ -50,7 +59,7 @@ try {
   const countyTwice = await db.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, missingCounty.jurisdiction));
   assert.equal(countyOnce.length, 1); assert.equal(countyTwice.length, 1);
   assert.equal(countyOnce[0].id, countyTwice[0].id);
-  writeFileSync('analysis/gov-seeding-test.json', JSON.stringify({ checkedAt: new Date().toISOString(), database: 'constructhub_dev_a4', before, after: await count(), countyPortalInserted: countyBefore.length === 0, assertions: ['changed and nulled URLs/phones propagated', 'inactive status propagated', 'restored URL and phone propagated', 'IDs and custom notes preserved', 'repeat seed added no duplicates', 'missing county portal inserted by exact county/state key and stable on repeat'] }, null, 2) + '\n');
+  writeFileSync('analysis/gov-seeding-test.json', JSON.stringify({ checkedAt: new Date().toISOString(), database: 'constructhub_dev_a4', before, after: await count(), countyPortalInserted: countyBefore.length === 0, assertions: ['changed and nulled URLs/phones propagated', 'inactive status propagated', 'stale reference cannot restore a newer nulled dead link', 'restored URL and phone propagated', 'IDs and custom notes preserved', 'repeat seed added no duplicates', 'missing county portal inserted by exact county/state key and stable on repeat'] }, null, 2) + '\n');
 } finally {
   const { id: aid, ...a } = oldApp; const { id: pid, ...p } = oldPortal;
   await db.update(propertyAppraisers).set(a).where(eq(propertyAppraisers.id, aid));
