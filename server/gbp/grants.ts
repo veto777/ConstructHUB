@@ -45,4 +45,19 @@ export async function accessToken(userId: number, http: typeof fetch = fetch): P
   refreshing.set(userId,run);
   try { return await run; } finally { refreshing.delete(userId); }
 }
-export async function invalidate(userId: number) { await pool.query('UPDATE gbp_grants SET reconnect_required=true,access_token=NULL WHERE user_id=$1',[userId]); }
+/** Google user data is kept only while a grant is usable (privacy policy §4 and retention). Location
+ *  rows stay (the contractor edits them) and keep their resource names so a reconnect re-links them. */
+export async function purgeGoogleData(userId: number, db: { query: typeof pool.query } = pool) {
+  await db.query(`DELETE FROM google_profile_reviews WHERE user_id=$1 AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'`,[userId]);
+  await db.query('DELETE FROM gbp_daily_metrics WHERE location_id IN (SELECT id FROM business_locations WHERE user_id=$1)',[userId]);
+  await db.query('DELETE FROM gbp_sync_status WHERE location_id IN (SELECT id FROM business_locations WHERE user_id=$1)',[userId]);
+}
+export async function invalidate(userId: number) {
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    await c.query('UPDATE gbp_grants SET reconnect_required=true,access_token=NULL WHERE user_id=$1',[userId]);
+    await purgeGoogleData(userId, c as any);
+    await c.query('COMMIT');
+  } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+}

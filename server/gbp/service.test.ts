@@ -109,6 +109,8 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
       await handlers.get('post /api/gbp/disconnect')({},res);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({connected:false,revoked:false}));expect((await grantStatus(userId)).connected).toBe(false);
       expect(tokenHttp.mock.calls[0][0]).toBe('https://oauth2.googleapis.com/revoke');
+      const left=await pool.query(`SELECT (SELECT count(*) FROM google_profile_reviews WHERE user_id=$1 AND google_review_id LIKE 'accounts/%') reviews,(SELECT count(*) FROM gbp_daily_metrics WHERE location_id=$2) metrics,(SELECT count(*) FROM gbp_sync_status WHERE location_id=$2) sync,(SELECT count(*) FROM business_locations WHERE id=$2) locations`,[userId,locationId]);
+      expect(left.rows[0]).toMatchObject({reviews:'0',metrics:'0',sync:'0',locations:'1'});
     }finally {vi.unstubAllGlobals()}
   });
 

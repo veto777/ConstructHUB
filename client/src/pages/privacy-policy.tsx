@@ -163,7 +163,7 @@ export default function PrivacyPolicyPage() {
           <p>
             You can revoke ConstructHUB's access to your Google account at any time through your{" "}
             <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-permissions">Google Account permissions page</a>, or by contacting us at{" "}
-            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a>. Upon revocation, we stop accessing your Google Business Profile data.
+            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a>. Upon revocation or disconnection, we stop accessing your Google Business Profile data and delete the reviews, performance metrics and sync records we retrieved from Google. Business locations you imported remain in your ConstructHUB account, where you can edit or delete them.
           </p>
         </section>
 
@@ -233,7 +233,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul className="list-disc pl-6 space-y-1 mb-4">
             <li>Account data: Retained until account deletion is requested</li>
-            <li>Google Business Profile data: Retained only while your Google account is connected; removed when you disconnect, revoke access, or delete your account</li>
+            <li>Google Business Profile data: Retained only while your Google account is connected; synced reviews and performance metrics are deleted when you disconnect, when we detect that access was revoked, or when you delete your account</li>
             <li>Tracking and analytics data (IP Tracker, Click Guard, VPN Shield): Retained for up to 24 months</li>
             <li>Payment and transaction records: Retained for 7 years as required by financial regulations</li>
             <li>Email communication logs: Retained for 12 months</li>

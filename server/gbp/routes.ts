@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import { pool } from '../db';
 import { oauthBaseUrl } from '../site-context';
 import { GBP_SCOPE, GoogleError, METRICS } from './client';
-import { grantStatus, saveGrant, invalidate } from './grants';
+import { grantStatus, saveGrant, invalidate, purgeGoogleData } from './grants';
 import { clientFor, discover, importLocations, syncLocation, reply, publicError } from './service';
 declare module 'express-session' { interface SessionData { gbpOAuth?: {state:string;userId:number;expires:number;redirect:string} } }
 export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) {
@@ -33,7 +33,9 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) 
     res.json({...await grantStatus(id),locations});
   });
   route('post','/api/gbp/disconnect',async(_req,res,id)=>{
-    const {rows:[grant]}=await pool.query('DELETE FROM gbp_grants WHERE user_id=$1 RETURNING refresh_token,access_token',[id]);
+    const c=await pool.connect();let grant:any;
+    try {await c.query('BEGIN');({rows:[grant]}=await c.query('DELETE FROM gbp_grants WHERE user_id=$1 RETURNING refresh_token,access_token',[id]));await purgeGoogleData(id,c as any);await c.query('COMMIT');}
+    catch(e){await c.query('ROLLBACK');throw e;} finally {c.release();}
     // Disconnect is immediate even if Google is unavailable. Report remote revocation failure.
     let revoked=true;
     if(grant?.refresh_token || grant?.access_token) {
