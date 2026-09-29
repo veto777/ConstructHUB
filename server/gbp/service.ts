@@ -30,6 +30,15 @@ export async function importLocations(userId: number, requested: any[], client =
   });
   const imported = [];
   for (const l of selected) {
+    // A location the contractor added by Places search (same place, not yet linked) is linked in place
+    // so its settings and citations carry over, instead of a duplicate row being created.
+    const {rows:[already]} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_account_name=$2 AND gbp_location_name=$3',[userId,l.accountResource,l.gbpName]);
+    if (!already && l.placeId) {
+      const {rows:[linked]} = await pool.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,updated_at=now()
+        WHERE id=(SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id=$5 ORDER BY id LIMIT 1) RETURNING id`,
+        [userId,l.accountResource,l.gbpName,l.businessName,l.placeId]);
+      if (linked) { imported.push(linked); continue; }
+    }
     const {rows:[row]} = await pool.query(`INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,address,city,state,zip_code,country,phone,website,place_id)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,gbp_account_name,gbp_location_name)
       DO UPDATE SET business_name=$2,address=$5,city=$6,state=$7,zip_code=$8,country=$9,phone=$10,website=$11,place_id=$12,updated_at=now() RETURNING id`,

@@ -14,7 +14,7 @@ const http=vi.fn(async(input:any,options:any)=>{
   const url=new URL(input);let body:any={};let status=200;
   if(url.pathname==='/v1/accounts') body={accounts:[{name:'accounts/fixture',accountName:'Fixture account'},{name:'accounts/denied'}]};
   else if(url.pathname==='/v1/accounts/denied/locations'){body={error:{code:403}};status=403;}
-  else if(url.pathname.endsWith('/locations')) body={locations:[{name:'locations/fixture',title:'Fixture business'}]};
+  else if(url.pathname.endsWith('/locations')) body={locations:[{name:'locations/fixture',title:'Fixture business',metadata:{placeId:'ChIJfixtureplace'}}]};
   else if(url.pathname.endsWith('/reply')) {if(failReply){status=403;body={error:{code:403}}}else body=options.method==='DELETE'?{}:{comment:JSON.parse(options.body).comment,updateTime:'2026-09-02T00:00:00Z'};}
   else if(url.pathname.endsWith('/reviews')) {
     body=failReviews?{error:{code:403}}:{reviews:reviewRows};status=failReviews?403:200;
@@ -56,8 +56,9 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
   it('surfaces per-account errors and imports only verified canonical resources idempotently',async()=>{
     const d=await discover(client);expect(d.errors[0]).toMatchObject({account:'accounts/denied',kind:'permission'});
     await expect(importLocations(userId,[{accountResource:'accounts/fake',gbpName:'locations/fake'}],client)).rejects.toMatchObject({kind:'permission'});
+    const {rows:[manual]}=await pool.query(`INSERT INTO business_locations(user_id,business_name,place_id) VALUES($1,'Added by Places search','ChIJfixtureplace') RETURNING id`,[userId]);
     await importLocations(userId,[{...d.locations[0],businessName:'Untrusted client name'}],client);await importLocations(userId,d.locations,client);
-    const {rows}=await pool.query('SELECT * FROM business_locations WHERE user_id=$1',[userId]);expect(rows).toHaveLength(1);expect(rows[0].business_name).toBe('Fixture business');locationId=rows[0].id;
+    const {rows}=await pool.query('SELECT * FROM business_locations WHERE user_id=$1',[userId]);expect(rows).toHaveLength(1);expect(rows[0].id).toBe(manual.id);expect(rows[0].gbp_location_name).toBe('locations/fixture');expect(rows[0].business_name).toBe('Fixture business');locationId=rows[0].id;
   });
   it('upserts edits and reconciles deletions only after complete successful review sync',async()=>{
     reviewRows=[fixtureReview()];await syncLocation(userId,locationId,client);reviewRows[0].comment='Updated by Google';await syncLocation(userId,locationId,client);
