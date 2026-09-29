@@ -194,10 +194,12 @@ function MyGoogleCalendarCard() {
     const q = new URLSearchParams(window.location.search);
     const cal = q.get("calendar");
     if (!cal) return;
-    if (cal === "connected" || q.get("connected")) {
+    // The server encodes the result inside the param: calendar=connected=1 | calendar=error=<reason>.
+    if (cal === "connected" || cal === "connected=1") {
       toast({ title: "Google Calendar connected", description: "Your appointments will sync to your own calendar." });
     } else {
-      toast({ title: "Google Calendar connection failed", description: q.get("error") ?? cal, variant: "destructive" });
+      const reason = cal.startsWith("error=") ? decodeURIComponent(cal.slice(6)) : q.get("error") ?? cal;
+      toast({ title: "Google Calendar connection failed", description: reason, variant: "destructive" });
     }
     const url = new URL(window.location.href);
     url.searchParams.delete("calendar");
