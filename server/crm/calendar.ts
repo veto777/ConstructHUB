@@ -10,7 +10,7 @@
  *    (counter + 1) kills every old copy.
  *
  * 2. Google Calendar push (true sync). An org-level OAuth round-trip with the
- *    calendar.events scope and a refresh token, stored on the org
+ *    calendar.app.created scope and a refresh token, stored on the org
  *    (custom_fields->googleCalendar) rather than the user — the schedule
  *    belongs to the company, not to whoever clicked connect. Sync upserts the
  *    org's appointments into a dedicated "ConstructHub CRM" secondary calendar
@@ -44,7 +44,9 @@ type GetUser = (req: any, res: any) => any;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+// calendar.app.created: create our own secondary calendar and manage events on it — and nothing
+// else. (calendar.events cannot create calendars: Google answers "insufficient authentication scopes".)
+const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
 const GOOGLE_CALENDAR_NAME = "ConstructHub CRM";
 
 export function googleCalendarConfigured(): boolean {
@@ -226,8 +228,9 @@ async function googleApi(token: string, path: string, init: RequestInit = {}): P
 /** Find or create the dedicated secondary calendar; returns its id. */
 async function ensureGoogleCalendar(token: string, gc: GoogleConnection): Promise<string> {
   if (gc.calendarId) return gc.calendarId;
-  const list = await googleApi(token, "/users/me/calendarList?maxResults=250");
-  const existing = (list.items ?? []).find((c: any) => c.summary === GOOGLE_CALENDAR_NAME);
+  // calendarList may be outside the app-created scope; a failed lookup just means "create it".
+  const list = await googleApi(token, "/users/me/calendarList?maxResults=250").catch(() => null);
+  const existing = (list?.items ?? []).find((c: any) => c.summary === GOOGLE_CALENDAR_NAME);
   if (existing) return existing.id;
   const created = await googleApi(token, "/calendars", {
     method: "POST",
@@ -372,7 +375,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     res.json({
       configured: googleCalendarConfigured(),
       missing: googleCalendarMissing(),
-      scope: CALENDAR_EVENTS_SCOPE,
+      scope: CALENDAR_SCOPE,
       // The org-wide "company calendar" (owner/admin's optional choice)…
       connection: present(gc),
       // …and this member's own connection — their appointments, their account.
@@ -411,7 +414,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
       client_id: GOOGLE_CLIENT_ID!,
       redirect_uri: `${oauthBaseUrl(req)}/api/crm/calendar/google/callback`,
       response_type: "code",
-      scope: CALENDAR_EVENTS_SCOPE,
+      scope: CALENDAR_SCOPE,
       access_type: "offline",
       prompt: "consent", // a refresh token is only guaranteed with an explicit consent screen
       state,
@@ -573,7 +576,12 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
       gc.lastSyncAt = new Date().toISOString();
       gc.lastSyncError = message;
       await saveGc(gc);
-      res.status(502).json({ message });
+      // Not 502: Cloudflare replaces origin 502s with its own HTML error page.
+      const reconnect = /insufficient authentication scopes|invalid_grant/i.test(message);
+      res.status(409).json({
+        message: reconnect ? "Google Calendar needs to be reconnected to grant the updated permission. Click Disconnect, then Connect Google Calendar." : message,
+        reconnect,
+      });
     }
   });
 

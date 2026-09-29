@@ -1843,7 +1843,7 @@ export default function CrmSettingsPage() {
                   Missing environment {(gcalStatus.missing ?? []).length === 1 ? "variable" : "variables"}:{" "}
                   <code>{(gcalStatus.missing ?? []).join(", ")}</code>. Add {(gcalStatus.missing ?? []).length === 1 ? "it" : "them"} to
                   the server <code>.env</code> and restart — the same Google OAuth client the sign-in flow uses,
-                  with the <code>calendar.events</code> scope authorized.
+                  with the <code>calendar.app.created</code> scope authorized.
                 </p>
               </div>
             )}

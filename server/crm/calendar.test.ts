@@ -282,7 +282,7 @@ describe("google calendar honesty (dev server)", () => {
       }
       expect(res.body.missing).toContain("GOOGLE_CLIENT_ID");
     }
-    expect(res.body.scope).toBe("https://www.googleapis.com/auth/calendar.events");
+    expect(res.body.scope).toBe("https://www.googleapis.com/auth/calendar.app.created");
     expect("connection" in res.body).toBe(true);
   });
 
