@@ -19,6 +19,15 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🔍 Full audit 2026-09-28 (deployed 09-29 00:17 UTC)
+Summary + owner actions + ranked next work: `analysis/AUDIT-SUMMARY-2026-09-28.md` (lane reports
+AUDIT-a1/a2-gbp/a3/a4 beside it). Pre-deploy DB dump on vb11: `backups/pre-audit-deploy-20260929T001714Z.dump`.
+Open owner items: enable the 4 GBP APIs + register `https://constructhub.us/api/gbp/callback`;
+Stripe `sk_test_` key for lanes; SignalWire signing key on vb11; Terms-vs-Privacy SMS wording; CRM
+entitlement policy. Lane envs have Stripe secrets BLANKED (only a live key exists) — keep it so.
+Browser suites need their own server env: CRM specs → `VITE_FORCE_PORTAL=true` + bypass (let
+Playwright boot it); growth-reviews → bypass OFF; `playwright.gbp.config.ts` is pinned to lane a2.
+
 ## 🟢 Production host: vb11 (moved from vb7 2026-09-26 22:52 UTC, 194s downtime)
 - **LIVE = vb11 `~/ConstructHUB-live`** — NOT vb11 `~/ConstructHUB` (that is a dev tree; never deploy prod there).
 - Units (vb11 `systemctl --user`): `constructhub.service` (:8110), `constructhub-demo.service` (:8111,
