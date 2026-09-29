@@ -1,10 +1,25 @@
 import { pool } from '../db';
 import { GoogleClient, GoogleError, mapLocation, mapPerformance, performancePath, resource } from './client';
-import { accessToken, grantStatus, invalidate } from './grants';
+import { accessToken, grantUsable, invalidate, soleSubject } from './grants';
 import type { PoolClient } from 'pg';
 import { DatabaseLimiter } from './quota';
 const quota = new DatabaseLimiter();
-export const clientFor = (userId: number) => new GoogleClient(() => accessToken(userId), fetch, quota);
+export const clientFor = (userId: number, subject: string|null = null) => new GoogleClient(() => accessToken(userId, subject), fetch, quota);
+/** Listings across every connected Google account, each tagged with the account that manages it. */
+export async function discoverAll(userId: number, make: typeof clientFor = clientFor) {
+  const {rows:grants} = await pool.query(`SELECT google_subject,email FROM gbp_grants WHERE user_id=$1 AND NOT reconnect_required AND $2=ANY(scopes) ORDER BY updated_at DESC`,[userId,'https://www.googleapis.com/auth/business.manage']);
+  if (!grants.length) throw new GoogleError('auth','Google Business Profile not connected. Connect a Google account.',401);
+  const accounts: any[] = [], locations: any[] = [], errors: any[] = [];
+  for (const g of grants) {
+    try {
+      const d = await discover(make(userId, g.google_subject));
+      accounts.push(...d.accounts.map((a: any) => ({...a, grantSubject: g.google_subject, grantEmail: g.email})));
+      locations.push(...d.locations.map((l: any) => ({...l, grantSubject: g.google_subject, grantEmail: g.email})));
+      errors.push(...d.errors.map((e: any) => ({...e, grantEmail: g.email})));
+    } catch (e) { errors.push({account: g.email, grantEmail: g.email, ...publicError(e)}); }
+  }
+  return { accounts, locations, errors };
+}
 export async function discover(client: GoogleClient) {
   const accounts = await client.pages('accounts','/v1/accounts','accounts');
   const locations: any[] = [], errors: any[] = [];
@@ -20,29 +35,33 @@ export async function discover(client: GoogleClient) {
   return { accounts, locations, errors };
 }
 export function publicError(e: unknown) { return e instanceof GoogleError ? {message:e.message,kind:e.kind,needsAuth:e.kind==='auth'} : {message:'GBP operation failed. Try again.',kind:'internal',needsAuth:false}; }
-export async function importLocations(userId: number, requested: any[], client = clientFor(userId)) {
+export async function importLocations(userId: number, requested: any[], client?: GoogleClient) {
   if (!Array.isArray(requested) || !requested.length || requested.length > 100) throw new GoogleError('invalid','Select 1–100 locations',400);
-  const discovered = await discover(client);
+  const discovered = client ? await discover(client) : await discoverAll(userId);
   const selected = requested.map(r => {
-    const found = discovered.locations.find(l => l.accountResource === r.accountResource && l.gbpName === r.gbpName);
+    const found = discovered.locations.find((l: any) => l.accountResource === r.accountResource && l.gbpName === r.gbpName && (!client ? l.grantSubject === r.grantSubject : true));
     if (!found) throw new GoogleError('permission','Selected location could not be verified with Google. Refresh the list.',403);
-    return found;
+    return {...found, grantSubject: found.grantSubject ?? r.grantSubject ?? null};
   });
   const imported = [];
   for (const l of selected) {
     // A location the contractor added by Places search (same place, not yet linked) is linked in place
     // so its settings and citations carry over, instead of a duplicate row being created.
-    const {rows:[already]} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_account_name=$2 AND gbp_location_name=$3',[userId,l.accountResource,l.gbpName]);
+    // The same listing can be reachable through two Google accounts: keep one row, managed by the latest import.
+    const {rows:[already]} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name=$2 ORDER BY id LIMIT 1',[userId,l.gbpName]);
+    if (already) {
+      await pool.query('UPDATE business_locations SET gbp_account_name=$2,gbp_google_subject=$3,updated_at=now() WHERE id=$1',[already.id,l.accountResource,l.grantSubject]);
+    }
     if (!already && l.placeId) {
-      const {rows:[linked]} = await pool.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,updated_at=now()
+      const {rows:[linked]} = await pool.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,gbp_google_subject=$6,updated_at=now()
         WHERE id=(SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id=$5 ORDER BY id LIMIT 1) RETURNING id`,
-        [userId,l.accountResource,l.gbpName,l.businessName,l.placeId]);
+        [userId,l.accountResource,l.gbpName,l.businessName,l.placeId,l.grantSubject]);
       if (linked) { imported.push(linked); continue; }
     }
-    const {rows:[row]} = await pool.query(`INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,address,city,state,zip_code,country,phone,website,place_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,gbp_account_name,gbp_location_name)
-      DO UPDATE SET business_name=$2,address=$5,city=$6,state=$7,zip_code=$8,country=$9,phone=$10,website=$11,place_id=$12,updated_at=now() RETURNING id`,
-      [userId,l.businessName,l.accountResource,l.gbpName,l.address,l.city,l.state,l.zipCode,l.country,l.phone,l.website,l.placeId]);
+    const {rows:[row]} = await pool.query(`INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,address,city,state,zip_code,country,phone,website,place_id,gbp_google_subject)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(user_id,gbp_account_name,gbp_location_name)
+      DO UPDATE SET business_name=$2,address=$5,city=$6,state=$7,zip_code=$8,country=$9,phone=$10,website=$11,place_id=$12,gbp_google_subject=$13,updated_at=now() RETURNING id`,
+      [userId,l.businessName,l.accountResource,l.gbpName,l.address,l.city,l.state,l.zipCode,l.country,l.phone,l.website,l.placeId,l.grantSubject]);
     imported.push(row);
   }
   return { imported:imported.length, locations:imported, errors:discovered.errors };
@@ -69,8 +88,10 @@ export function mapReview(r: any, parent: string) {
   return {name,rating,reviewer:r.reviewer?.displayName || 'Anonymous',photo:r.reviewer?.profilePhotoUrl || null,
     comment:r.comment || null,date:r.createTime,reply:r.reviewReply?.comment || null,replyDate:r.reviewReply?.updateTime || null};
 }
-export async function syncLocation(userId: number, id: number, client = clientFor(userId)) {
+export async function syncLocation(userId: number, id: number, client?: GoogleClient) {
   const l = await ownedLocation(userId,id);
+  const subject = l.gbp_google_subject ?? await soleSubject(userId);
+  client ??= clientFor(userId, subject);
   return withLocationLock(id, async c => {
     const result: Record<string,unknown> = {};
     for (const kind of ['reviews','performance']) {
@@ -116,13 +137,13 @@ export async function syncLocation(userId: number, id: number, client = clientFo
       } catch(e) {
         const error = publicError(e); result[kind] = error;
         await c.query('UPDATE gbp_sync_status SET last_error=$3 WHERE location_id=$1 AND kind=$2',[id,kind,error.message]);
-        if(e instanceof GoogleError && e.kind==='auth') await invalidate(userId);
+        if(e instanceof GoogleError && e.kind==='auth') await invalidate(userId, subject);
       }
     }
     return result;
   });
 }
-export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client = clientFor(userId)) {
+export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client?: GoogleClient) {
   if(typeof comment !== 'string' || comment.length > 4096 || (action==='publish' && !comment.trim())) throw new GoogleError('invalid','Reply must contain 1–4096 characters',400);
   const {rows:[review]} = await pool.query('SELECT * FROM google_profile_reviews WHERE id=$1 AND user_id=$2',[id,userId]);
   if(!review) throw new GoogleError('invalid','Review not found',404);
@@ -130,8 +151,10 @@ export async function reply(userId: number,id: number,comment: string, action: '
     const {rows:[r]} = await pool.query('UPDATE google_profile_reviews SET reply_draft=$3,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *',[id,userId,comment||null]);
     return {replyStatus:r.reply_status,replyDraft:r.reply_draft};
   }
-  if(!(await grantStatus(userId)).connected) throw new GoogleError('auth','Reconnect Google Business Profile, or save your reply as a draft.',401);
   const l = await ownedLocation(userId,review.location_id);
+  const subject = l.gbp_google_subject ?? await soleSubject(userId);
+  if(!(await grantUsable(userId, subject))) throw new GoogleError('auth','Reconnect the Google account that manages this listing, or save your reply as a draft.',401);
+  client ??= clientFor(userId, subject);
   if(review.google_deleted || !review.google_review_id?.startsWith(`${l.gbp_account_name}/${l.gbp_location_name}/reviews/`)) throw new GoogleError('invalid','This review is not an active Google review. Save a draft instead.',400);
   return withLocationLock(l.id,async c => {
     // Keep the last confirmed reply intact until Google acknowledges the operation.
@@ -144,7 +167,7 @@ export async function reply(userId: number,id: number,comment: string, action: '
       return {replyStatus:r.reply_status,replyComment:r.reply_comment};
     } catch(e) {
       await c.query('UPDATE google_profile_reviews SET reply_error=$2 WHERE id=$1',[id,publicError(e).message]);
-      if(e instanceof GoogleError && e.kind==='auth') await invalidate(userId);
+      if(e instanceof GoogleError && e.kind==='auth') await invalidate(userId, subject);
       throw e;
     }
   });
@@ -153,7 +176,8 @@ let workerBusy = false;
 export async function runGbpWorker(sync = syncLocation) {
   if(workerBusy) return; workerBusy=true;
   try {
-    const {rows} = await pool.query(`SELECT l.id,l.user_id FROM business_locations l JOIN gbp_grants g ON g.user_id=l.user_id
+    const {rows} = await pool.query(`SELECT DISTINCT l.id,l.user_id FROM business_locations l JOIN gbp_grants g ON g.user_id=l.user_id
+      AND (g.google_subject=l.gbp_google_subject OR (l.gbp_google_subject IS NULL AND (SELECT count(*) FROM gbp_grants x WHERE x.user_id=l.user_id)=1))
       WHERE l.gbp_location_name IS NOT NULL AND NOT g.reconnect_required AND $1=ANY(g.scopes)
       AND NOT EXISTS(SELECT 1 FROM gbp_sync_status s WHERE s.location_id=l.id AND s.last_attempt>now()-interval '6 hours') ORDER BY l.id LIMIT 100`,['https://www.googleapis.com/auth/business.manage']);
     for(const l of rows) {try {await sync(l.user_id,l.id);} catch {/* next tick retries; no token/provider payload logging */}}

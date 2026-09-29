@@ -3,17 +3,18 @@ import { randomBytes } from 'crypto';
 import { pool } from '../db';
 import { oauthBaseUrl } from '../site-context';
 import { GBP_SCOPE, GoogleError, METRICS } from './client';
-import { grantStatus, saveGrant, invalidate, purgeGoogleData } from './grants';
-import { clientFor, discover, importLocations, syncLocation, reply, publicError } from './service';
+import { grantStatus, saveGrant, purgeGoogleData } from './grants';
+import { discoverAll, importLocations, syncLocation, reply, publicError } from './service';
 declare module 'express-session' { interface SessionData { gbpOAuth?: {state:string;userId:number;expires:number;redirect:string} } }
 export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) {
   const route = (method: 'get'|'post'|'patch'|'delete',path: string,fn: (req: Request,res: Response,userId: number)=>Promise<any>) => {
-    app[method](path,async(req,res)=>{const user=auth(req,res);if(!user)return;try {await fn(req,res,user.id);}catch(e){if(e instanceof GoogleError && e.kind==="auth") await invalidate(user.id);res.status(e instanceof GoogleError?e.status:500).json(publicError(e));}});
+    // Grants are invalidated per Google account where the failure happened (grants/service), never all at once here.
+    app[method](path,async(req,res)=>{const user=auth(req,res);if(!user)return;try {await fn(req,res,user.id);}catch(e){res.status(e instanceof GoogleError?e.status:500).json(publicError(e));}});
   };
   route('get','/api/gbp/connect',async(req,res,userId)=>{
     const redirect=`${oauthBaseUrl(req)}/api/gbp/callback`,state=randomBytes(32).toString('hex');
     req.session.gbpOAuth={state,userId,redirect,expires:Date.now()+10*60*1000};
-    const q=new URLSearchParams({client_id:process.env.GOOGLE_CLIENT_ID!,redirect_uri:redirect,response_type:'code',scope:`openid email profile ${GBP_SCOPE}`,access_type:'offline',prompt:'consent',state});
+    const q=new URLSearchParams({client_id:process.env.GOOGLE_CLIENT_ID!,redirect_uri:redirect,response_type:'code',scope:`openid email profile ${GBP_SCOPE}`,access_type:'offline',prompt:'consent select_account',state});
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${q}`);
   });
   route('get','/api/gbp/callback',async(req,res,userId)=>{
@@ -29,23 +30,43 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) 
     }catch {res.redirect('/locations?gbp=consent-failed');}
   });
   route('get','/api/gbp/status',async(_req,res,id)=>{
-    const {rows:locations}=await pool.query(`SELECT l.id,l.business_name AS name,s.kind,s.last_success,s.last_attempt,s.last_error FROM business_locations l LEFT JOIN gbp_sync_status s ON s.location_id=l.id WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL ORDER BY l.id,s.kind`,[id]);
+    const {rows:locations}=await pool.query(`SELECT l.id,l.business_name AS name,g.email AS account_email,s.kind,s.last_success,s.last_attempt,s.last_error FROM business_locations l
+      LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject
+      LEFT JOIN gbp_sync_status s ON s.location_id=l.id WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL ORDER BY l.id,s.kind`,[id]);
     res.json({...await grantStatus(id),locations});
   });
-  route('post','/api/gbp/disconnect',async(_req,res,id)=>{
-    const c=await pool.connect();let grant:any;
-    try {await c.query('BEGIN');({rows:[grant]}=await c.query('DELETE FROM gbp_grants WHERE user_id=$1 RETURNING refresh_token,access_token',[id]));await purgeGoogleData(id,c as any);await c.query('COMMIT');}
+  route('post','/api/gbp/disconnect',async(req,res,id)=>{
+    // With a subject, disconnect that one Google account (and purge only its listings' Google data); without, all.
+    const subject=typeof req.body?.subject==='string'?req.body.subject:null;
+    const c=await pool.connect();let grants:any[]=[];
+    try {await c.query('BEGIN');({rows:grants}=await c.query('DELETE FROM gbp_grants WHERE user_id=$1 AND ($2::text IS NULL OR google_subject=$2) RETURNING refresh_token,access_token',[id,subject]));await purgeGoogleData(id,subject,c as any);await c.query('COMMIT');}
     catch(e){await c.query('ROLLBACK');throw e;} finally {c.release();}
     // Disconnect is immediate even if Google is unavailable. Report remote revocation failure.
     let revoked=true;
-    if(grant?.refresh_token || grant?.access_token) {
-      try { const r=await fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:grant.refresh_token||grant.access_token}),signal:AbortSignal.timeout(20000)});revoked=r.ok; }
+    for(const grant of grants) if(grant?.refresh_token || grant?.access_token) {
+      try { const r=await fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:grant.refresh_token||grant.access_token}),signal:AbortSignal.timeout(20000)});revoked=revoked&&r.ok; }
       catch {revoked=false;}
     }
-    res.json({connected:false,revoked,message:revoked?'Disconnected':'Disconnected locally. Remove ConstructHUB access in your Google Account to finish revocation.'});
+    res.json({...await grantStatus(id),revoked,message:revoked?'Disconnected':'Disconnected locally. Remove ConstructHUB access in your Google Account to finish revocation.'});
   });
-  route('get','/api/gbp/accounts',async(_req,res,id)=>res.json({accounts:await clientFor(id).pages('accounts','/v1/accounts','accounts')}));
-  route('get','/api/gbp/locations',async(_req,res,id)=>res.json(await discover(clientFor(id))));
+  route('get','/api/gbp/accounts',async(_req,res,id)=>res.json({accounts:(await discoverAll(id)).accounts}));
+  route('get','/api/gbp/locations',async(_req,res,id)=>res.json(await discoverAll(id)));
+  // Per-location answer to "which Google account is this synced through, and which still need one?"
+  route('get','/api/gbp/linkage',async(_req,res,id)=>{
+    const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.gbp_location_name,g.email AS account_email,(g.google_subject IS NOT NULL AND NOT g.reconnect_required) AS account_ok,
+      (SELECT max(last_success) FROM gbp_sync_status s WHERE s.location_id=l.id) AS last_success,
+      (SELECT string_agg(last_error,'; ') FROM gbp_sync_status s WHERE s.location_id=l.id AND last_error IS NOT NULL) AS last_error
+      FROM business_locations l LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject WHERE l.user_id=$1 ORDER BY l.id`,[id]);
+    const status=await grantStatus(id);
+    let found:any[]=[],errors:any[]=[];
+    if(status.connected && locations.some(l=>!l.gbp_location_name)) ({locations:found,errors}=await discoverAll(id));
+    res.json({accounts:status.accounts,errors,locations:locations.map(l=>{
+      if(l.gbp_location_name) return {id:l.id,state:l.account_ok?'synced':'reconnect',accountEmail:l.account_email,lastSuccess:l.last_success,lastError:l.last_error};
+      const match=l.place_id?found.find((f:any)=>f.placeId===l.place_id):null;
+      return match?{id:l.id,state:'available',accountEmail:match.grantEmail,listing:{accountResource:match.accountResource,gbpName:match.gbpName,grantSubject:match.grantSubject}}
+        :{id:l.id,state:'unlinked'};
+    })});
+  });
   route('post','/api/gbp/import',async(req,res,id)=>res.json(await importLocations(id,req.body.locations)));
   route('post','/api/gbp/locations/:id/sync',async(req,res,id)=>res.json(await syncLocation(id,Number(req.params.id))));
   route('patch','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),req.body.replyComment,req.body.action==='publish'?'publish':'draft')));

@@ -5,7 +5,7 @@ import {DatabaseLimiter} from './quota';
 import {registerGbpRoutes} from './routes';
 import {saveGrant,grantStatus,accessToken} from './grants';
 import {GBP_SCOPE,GoogleClient,Limiter} from './client';
-import {discover,importLocations,syncLocation,reply,runGbpWorker} from './service';
+import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker} from './service';
 let userId:number,otherId:number,locationId:number,reviewId:number;
 let reviewRows:any[]=[];let failReviews=false, failReply=false;let reviewPaging=false,failSecondPage=false;
 const today=new Date();today.setUTCDate(today.getUTCDate()-2);const metricDate={year:today.getUTCFullYear(),month:today.getUTCMonth()+1,day:today.getUTCDate()};
@@ -40,16 +40,22 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     expect((await grantStatus(userId)).connected).toBe(false);
     await saveGrant(userId,{sub:'google-a',email:'a@example.invalid',email_verified:true},{access_token:'a',refresh_token:'ra',scope:GBP_SCOPE});
     await saveGrant(userId,{sub:'google-b',email:'b@example.invalid',email_verified:true},{access_token:'b',scope:GBP_SCOPE});
-    expect((await pool.query('SELECT refresh_token FROM gbp_grants WHERE user_id=$1',[userId])).rows[0].refresh_token).toBeNull();
-    expect(await grantStatus(userId)).toMatchObject({connected:true,email:'b@example.invalid'});
-    expect(JSON.stringify(await grantStatus(userId))).not.toContain('access_token');
+    // Two Google accounts coexist; a refresh token is never borrowed across accounts.
+    const tokens=(await pool.query('SELECT google_subject,refresh_token FROM gbp_grants WHERE user_id=$1 ORDER BY google_subject',[userId])).rows;
+    expect(tokens).toEqual([{google_subject:'google-a',refresh_token:'ra'},{google_subject:'google-b',refresh_token:null}]);
+    const status=await grantStatus(userId);
+    expect(status).toMatchObject({connected:true,email:'b@example.invalid'});expect(status.accounts.map((a:any)=>a.email).sort()).toEqual(['a@example.invalid','b@example.invalid']);
+    expect(JSON.stringify(status)).not.toContain('access_token');
+    const tagged=await discoverAll(userId,(_u:number,subject:string|null)=>subject==='google-a'?client:new GoogleClient(async()=>'x',async()=>new Response(JSON.stringify({accounts:[]})),new Limiter(()=>0,async()=>{}),async()=>{}));
+    expect(tagged.locations.every((l:any)=>l.grantSubject==='google-a'&&l.grantEmail==='a@example.invalid')).toBe(true);expect(tagged.locations.length).toBeGreaterThan(0);
+    await pool.query("DELETE FROM gbp_grants WHERE user_id=$1 AND google_subject='google-a'",[userId]);
   });
   it('refreshes expired tokens once; invalid_grant requests reconnect without deleting history',async()=>{
     await saveGrant(userId,{sub:'google-b',email:'b@example.invalid',email_verified:true},{access_token:'expired',refresh_token:'rb',scope:GBP_SCOPE,expires_in:-1});
     const tokenHttp=vi.fn(async()=>new Response(JSON.stringify({access_token:'fresh',expires_in:3600})));
-    expect(await Promise.all([accessToken(userId,tokenHttp),accessToken(userId,tokenHttp)])).toEqual(['fresh','fresh']);expect(tokenHttp).toHaveBeenCalledTimes(1);
+    expect(await Promise.all([accessToken(userId,'google-b',tokenHttp),accessToken(userId,null,tokenHttp)])).toEqual(['fresh','fresh']);expect(tokenHttp).toHaveBeenCalledTimes(1);
     await pool.query("UPDATE gbp_grants SET expires_at=now()-interval '1 hour' WHERE user_id=$1",[userId]);
-    await expect(accessToken(userId,async()=>new Response(JSON.stringify({error:'invalid_grant'}),{status:400}))).rejects.toMatchObject({kind:'auth'});
+    await expect(accessToken(userId,'google-b',async()=>new Response(JSON.stringify({error:'invalid_grant'}),{status:400}))).rejects.toMatchObject({kind:'auth'});
     expect(await grantStatus(userId)).toMatchObject({connected:false,reconnectRequired:true});
     await saveGrant(userId,{sub:'google-b',email:'b@example.invalid',email_verified:true},{access_token:'fresh',scope:GBP_SCOPE});
   });

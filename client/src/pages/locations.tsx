@@ -1,4 +1,4 @@
-import { GbpConnection } from "@/components/gbp-connection";
+import { GbpConnection, GbpLinkCell } from "@/components/gbp-connection";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -154,7 +154,7 @@ export default function LocationsPage() {
                   <TableHead className="text-center">Reviews</TableHead>
                   <TableHead className="text-center">Performance</TableHead>
                   <TableHead className="text-center">Avg. Rank</TableHead>
-                  <TableHead>Google resource</TableHead>
+                  <TableHead>Google account</TableHead>
                   <TableHead>Date Added</TableHead>
                 </TableRow>
               </TableHeader>
@@ -201,13 +201,7 @@ export default function LocationsPage() {
                       <span className="text-sm">Unavailable</span>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={loc.gbpLocationName ? "default" : "outline"}
-                        className="text-[10px]"
-                        data-testid={`badge-gbp-${loc.id}`}
-                      >
-                        {loc.gbpLocationName ? "Imported" : "Local only"}
-                      </Badge>
+                      <GbpLinkCell locationId={loc.id} />
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-muted-foreground" data-testid={`text-date-${loc.id}`}>
@@ -406,7 +400,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
         {!gbpLoading && !gbpError && gbpLocations.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Found {gbpLocations.length} location{gbpLocations.length !== 1 ? "s" : ""} in your Google account</p>
+              <p className="text-sm text-muted-foreground">Found {gbpLocations.length} location{gbpLocations.length !== 1 ? "s" : ""} across your connected Google accounts</p>
               <Button size="sm" onClick={() => {
                 if (selectedGbp.size === gbpLocations.length) {
                   setSelectedGbp(new Set());
@@ -432,6 +426,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
                     <p className="text-sm font-medium truncate">{loc.businessName}</p>
                     <p className="text-xs text-muted-foreground truncate">{loc.address}</p>
                     {loc.phone && <p className="text-xs text-muted-foreground">{loc.phone}</p>}
+                    {loc.grantEmail && <p className="text-xs text-muted-foreground">Managed by {loc.grantEmail}</p>}
                   </div>
                 </div>
               ))}
