@@ -68,14 +68,15 @@ export async function purgeGoogleData(userId: number, subject: string|null = nul
   const locs = `SELECT id FROM business_locations WHERE user_id=$1 AND ($2::text IS NULL OR gbp_google_subject=$2 OR gbp_google_subject IS NULL)`;
   await db.query(`DELETE FROM google_profile_reviews WHERE user_id=$1 AND google_review_id LIKE 'accounts/%/locations/%/reviews/%' AND location_id IN (${locs})`,[userId,subject]);
   await db.query(`DELETE FROM gbp_daily_metrics WHERE location_id IN (${locs})`,[userId,subject]);
-  await db.query(`DELETE FROM gbp_sync_status WHERE location_id IN (${locs})`,[userId,subject]);
+  // Sync-status rows are ConstructHUB's own records (and carry the error users need to see); reset the backfill cursor only.
+  await db.query(`UPDATE gbp_sync_status SET cursor_date=NULL,last_success=NULL WHERE location_id IN (${locs})`,[userId,subject]);
 }
 export async function invalidate(userId: number, subject: string|null = null) {
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
-    await c.query('UPDATE gbp_grants SET reconnect_required=true,access_token=NULL WHERE user_id=$1 AND ($2::text IS NULL OR google_subject=$2)',[userId,subject]);
-    await purgeGoogleData(userId, subject, c as any);
+    const {rowCount} = await c.query('UPDATE gbp_grants SET reconnect_required=true,access_token=NULL WHERE user_id=$1 AND ($2::text IS NULL OR google_subject=$2)',[userId,subject]);
+    if (rowCount) await purgeGoogleData(userId, subject, c as any);
     await c.query('COMMIT');
   } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }

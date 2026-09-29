@@ -58,7 +58,7 @@ export function GbpLinkCell({ locationId }: { locationId: number }) {
   return <div className="space-y-1" data-testid={`gbp-link-${locationId}`}>
     <Badge variant="outline" className="text-[10px]">Not linked</Badge>
     <p className="text-xs text-muted-foreground max-w-[220px]">Not managed by a connected Google account.</p>
-    <a href="/api/gbp/connect" onClick={stop} className="text-xs text-primary underline">Connect the Google account that manages it</a>
+    <a href="/api/gbp/connect" onClick={stop} className="text-xs text-primary underline">Connect its Google account</a>
   </div>;
 }
 
