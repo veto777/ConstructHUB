@@ -94,6 +94,7 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
   client ??= clientFor(userId, subject);
   return withLocationLock(id, async c => {
     const result: Record<string,unknown> = {};
+    let verified: boolean|undefined;
     for (const kind of ['profile','reviews','performance']) {
       await c.query(`INSERT INTO gbp_sync_status(location_id,kind,last_attempt) VALUES($1,$2,now()) ON CONFLICT(location_id,kind) DO UPDATE SET last_attempt=now()`,[id,kind]);
       try {
@@ -104,6 +105,7 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           const media = await client.request('reviews',`/v4/${parent}/media?pageSize=1`).catch(() => null);
           const customerMedia = await client.request('reviews',`/v4/${parent}/media/customers?pageSize=1`).catch(() => null);
           const p = mapProfile(info, attrs);
+          verified = !!info?.metadata?.hasVoiceOfMerchant;
           await c.query(`UPDATE business_locations SET business_name=COALESCE($2,business_name),phone=$3,website=$4,address=$5,city=$6,state=$7,zip_code=$8,country=COALESCE($9,country),
             categories=$10,description=$11,service_areas=$12,services=$13,hours=$14,opening_date=$15,open_status=COALESCE($16,open_status),
             place_id=COALESCE($17,place_id),google_cid=COALESCE($18,google_cid),
@@ -155,7 +157,10 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
         }
         await c.query('UPDATE gbp_sync_status SET last_success=now(),last_error=NULL WHERE location_id=$1 AND kind=$2',[id,kind]);
       } catch(e) {
-        const error = publicError(e); result[kind] = error;
+        const error = publicError(e);
+        // Google only shares performance for listings whose owner it has verified (voice of merchant).
+        if (kind === 'performance' && verified === false && error.kind === 'permission') error.message = 'Google only shares performance stats for verified listings. Verify this listing in Google Business Profile, then sync again.';
+        result[kind] = error;
         await c.query('UPDATE gbp_sync_status SET last_error=$3 WHERE location_id=$1 AND kind=$2',[id,kind,error.message]);
         if(e instanceof GoogleError && e.kind==='auth') await invalidate(userId, subject);
       }
