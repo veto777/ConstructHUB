@@ -5,7 +5,7 @@ import {DatabaseLimiter} from './quota';
 import {registerGbpRoutes} from './routes';
 import {saveGrant,grantStatus,accessToken} from './grants';
 import {GBP_SCOPE,GoogleClient,Limiter} from './client';
-import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker} from './service';
+import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker,unlinkLocation} from './service';
 let userId:number,otherId:number,locationId:number,reviewId:number;
 let reviewRows:any[]=[];let failReviews=false, failReply=false;let reviewPaging=false,failSecondPage=false;
 const today=new Date();today.setUTCDate(today.getUTCDate()-2);const metricDate={year:today.getUTCFullYear(),month:today.getUTCMonth()+1,day:today.getUTCDate()};
@@ -14,6 +14,10 @@ const http=vi.fn(async(input:any,options:any)=>{
   const url=new URL(input);let body:any={};let status=200;
   if(url.pathname==='/v1/accounts') body={accounts:[{name:'accounts/fixture',accountName:'Fixture account'},{name:'accounts/denied'}]};
   else if(url.pathname==='/v1/accounts/denied/locations'){body={error:{code:403}};status=403;}
+  else if(url.pathname==='/v1/locations/fixture') body={name:'locations/fixture',title:'Fixture business',phoneNumbers:{primaryPhone:'(555) 010-0000'},categories:{primaryCategory:{displayName:'Roofing contractor',serviceTypes:[{serviceTypeId:'job_type_id:roof_repair',displayName:'Roof repair'}]}},storefrontAddress:{addressLines:['1 Main St'],locality:'Town',administrativeArea:'WA',postalCode:'98000',regionCode:'US'},profile:{description:'Fixture description'},serviceArea:{places:{placeInfos:[{placeName:'Town, WA, USA'}]}},regularHours:{periods:[{openDay:'MONDAY',openTime:{hours:8},closeDay:'MONDAY',closeTime:{hours:17,minutes:30}}]},openInfo:{status:'OPEN',openingDate:{year:2003,month:2,day:1}},metadata:{placeId:'ChIJfixtureplace',mapsUri:'https://maps.google.com/?cid=1'},serviceItems:[{structuredServiceItem:{serviceTypeId:'job_type_id:roof_repair'}},{freeFormServiceItem:{label:{displayName:'Gutter guards'}}}]};
+  else if(url.pathname==='/v1/locations/fixture/attributes') body={attributes:[{name:'locations/fixture/attributes/url_facebook',uriValues:[{uri:'https://www.facebook.com/fixture'}]},{name:'locations/fixture/attributes/url_text_messaging',uriValues:[{uri:'sms:+15550100000'}]}]};
+  else if(url.pathname.endsWith('/media/customers')) body={totalMediaItemCount:4};
+  else if(url.pathname.endsWith('/media')) body={totalMediaItemCount:12};
   else if(url.pathname.endsWith('/locations')) body={locations:[{name:'locations/fixture',title:'Fixture business',metadata:{placeId:'ChIJfixtureplace'}}]};
   else if(url.pathname.endsWith('/reply')) {if(failReply){status=403;body={error:{code:403}}}else body=options.method==='DELETE'?{}:{comment:JSON.parse(options.body).comment,updateTime:'2026-09-02T00:00:00Z'};}
   else if(url.pathname.endsWith('/reviews')) {
@@ -73,6 +77,10 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     failReviews=false;reviewRows=[];await syncLocation(userId,locationId,client);expect((await pool.query('SELECT google_deleted FROM google_profile_reviews WHERE id=$1',[reviewId])).rows[0].google_deleted).toBe(true);
     reviewRows=[fixtureReview()];await syncLocation(userId,locationId,client);
     const statuses=(await pool.query('SELECT * FROM gbp_sync_status WHERE location_id=$1',[locationId])).rows;expect(statuses.every(s=>s.last_success&&!s.last_error)).toBe(true);
+    const {rows:[prof]}=await pool.query('SELECT * FROM business_locations WHERE id=$1',[locationId]);
+    expect(prof).toMatchObject({description:'Fixture description',phone:'(555) 010-0000',address:'1 Main St',city:'Town',opening_date:'2003-02-01',business_photo_count:12,customer_photo_count:4});
+    expect(prof.services).toEqual(['Roof repair','Gutter guards']);expect(prof.service_areas).toEqual(['Town, WA, USA']);
+    expect(prof.hours).toMatchObject({Monday:'8:00 AM – 5:30 PM',Tuesday:'Closed'});expect(prof.social_profiles).toMatchObject({facebook:'https://www.facebook.com/fixture'});expect(prof.social_profiles.text_messaging).toBeUndefined();
     expect((await pool.query('SELECT value::text FROM gbp_daily_metrics WHERE location_id=$1',[locationId])).rows).toEqual([{value:'0'}]);
   });
   it('does not apply a partial multi-page snapshot and upserts every successful page',async()=>{
@@ -121,4 +129,14 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     }finally {vi.unstubAllGlobals()}
   });
 
+});
+describe('per-location unlink',()=>{
+  it('keeps the location, drops its Google link and synced data, and marks it so connecting does not re-link it',async()=>{
+    await expect(unlinkLocation(otherId,locationId)).rejects.toMatchObject({status:404});
+    await unlinkLocation(userId,locationId);
+    const {rows:[l]}=await pool.query('SELECT * FROM business_locations WHERE id=$1',[locationId]);
+    expect(l).toMatchObject({gbp_location_name:null,gbp_account_name:null,gbp_google_subject:null,gbp_unlinked_by_user:true});
+    const left=await pool.query(`SELECT (SELECT count(*) FROM google_profile_reviews WHERE location_id=$1 AND google_review_id LIKE 'accounts/%') r,(SELECT count(*) FROM gbp_daily_metrics WHERE location_id=$1) m,(SELECT count(*) FROM gbp_sync_status WHERE location_id=$1) s`,[locationId]);
+    expect(left.rows[0]).toEqual({r:'0',m:'0',s:'0'});
+  });
 });

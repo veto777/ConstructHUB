@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 type Linkage = {
   accounts: { subject: string; email: string; connected: boolean; reconnectRequired: boolean }[];
   errors: { grantEmail?: string; message: string }[];
-  locations: { id: number; state: 'synced'|'reconnect'|'available'|'unlinked'; accountEmail?: string; lastSuccess?: string|null; lastError?: string|null;
+  locations: { id: number; state: 'synced'|'reconnect'|'available'|'unlinked'; unlinkedByUser?: boolean; accountEmail?: string; lastSuccess?: string|null; lastError?: string|null;
     listing?: { accountResource: string; gbpName: string; grantSubject: string } }[];
 };
 const refreshAll = () => ['/api/gbp/status','/api/gbp/linkage','/api/locations','/api/google-profile-reviews','/api/gbp/locations','/api/auth/me']
@@ -23,12 +23,19 @@ function useLinkLocations() {
   return useMutation({
     mutationFn: async (listings: NonNullable<Linkage['locations'][number]['listing']>[]) => {
       const r = await apiRequest('POST', '/api/gbp/import', { locations: listings });
-      const imported = await r.json();
-      for (const l of imported.locations ?? []) await apiRequest('POST', `/api/gbp/locations/${l.id}/sync`).catch(() => null);
-      return imported;
+      return r.json();
     },
-    onSuccess: (r) => { refreshAll(); toast({ title: `Linked ${r.imported} location${r.imported === 1 ? '' : 's'}`, description: 'Reviews and performance are syncing from Google.' }); },
+    onSuccess: (r) => { refreshAll(); toast({ title: `Linked ${r.imported} location${r.imported === 1 ? '' : 's'}`, description: 'Profile, services, hours, social links, photos, reviews and performance synced from Google.' }); },
     onError: (e: Error) => toast({ title: 'Could not link location', description: e.message, variant: 'destructive' }),
+  });
+}
+
+function useUnlinkLocation() {
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: number) => (await apiRequest('POST', `/api/gbp/locations/${id}/unlink`)).json(),
+    onSuccess: () => { refreshAll(); toast({ title: 'Location unlinked', description: 'It no longer syncs from Google. Its synced Google reviews and stats were removed.' }); },
+    onError: (e: Error) => toast({ title: 'Could not unlink location', description: e.message, variant: 'destructive' }),
   });
 }
 
@@ -36,6 +43,9 @@ function useLinkLocations() {
 export function GbpLinkCell({ locationId }: { locationId: number }) {
   const { data, isLoading } = useGbpLinkage();
   const link = useLinkLocations();
+  const unlink = useUnlinkLocation();
+  const unlinkButton = <Button size="sm" variant="outline" className="h-7 text-xs" disabled={unlink.isPending} data-testid={`button-unlink-gbp-${locationId}`}
+    onClick={(e) => { e.stopPropagation(); if (window.confirm('Stop syncing this location from Google? Its synced Google reviews and performance stats will be removed from ConstructHUB. The location itself stays, and you can link it again anytime.')) unlink.mutate(locationId); }}>Unlink</Button>;
   const row = data?.locations.find(l => l.id === locationId);
   if (isLoading) return <span className="text-xs text-muted-foreground">Checking…</span>;
   if (!row) return <span className="text-xs text-muted-foreground">—</span>;
@@ -44,14 +54,15 @@ export function GbpLinkCell({ locationId }: { locationId: number }) {
     <Badge className="text-[10px] bg-green-600 hover:bg-green-600">Synced</Badge>
     <p className="text-xs text-muted-foreground truncate max-w-[220px]">via {row.accountEmail}</p>
     <p className={`text-[11px] ${row.lastError ? 'text-destructive' : 'text-muted-foreground'}`}>{row.lastError ? row.lastError : row.lastSuccess ? `Last sync ${new Date(row.lastSuccess).toLocaleString()}` : 'First sync pending'}</p>
+    {unlinkButton}
   </div>;
   if (row.state === 'reconnect') return <div className="space-y-1" data-testid={`gbp-link-${locationId}`}>
     <Badge variant="destructive" className="text-[10px]">Reconnect</Badge>
     <p className="text-xs text-muted-foreground truncate max-w-[220px]">{row.accountEmail ? `${row.accountEmail} access expired` : 'Its Google account was disconnected'}</p>
-    <a href="/api/gbp/connect" onClick={stop} className="text-xs text-primary underline">Reconnect Google account</a>
+    <div className="flex gap-2 items-center"><a href="/api/gbp/connect" onClick={stop} className="text-xs text-primary underline">Reconnect Google account</a>{unlinkButton}</div>
   </div>;
   if (row.state === 'available') return <div className="space-y-1" data-testid={`gbp-link-${locationId}`}>
-    <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">Ready to link</Badge>
+    <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">{row.unlinkedByUser ? 'Unlinked by you' : 'Ready to link'}</Badge>
     <p className="text-xs text-muted-foreground truncate max-w-[220px]">Managed by {row.accountEmail}</p>
     <Button size="sm" className="h-7 text-xs" disabled={link.isPending} onClick={(e) => { stop(e); link.mutate([row.listing!]); }} data-testid={`button-link-gbp-${locationId}`}>Link &amp; sync</Button>
   </div>;
@@ -75,7 +86,7 @@ export function GbpConnection({locationId}:{locationId?:number}) {
   const accounts: Linkage['accounts'] = data?.accounts ?? (data?.email ? [{subject:'',email:data.email,connected:!!data.connected,reconnectRequired:!!data.reconnectRequired}] : []);
   const rows = linkage?.locations ?? [];
   const count = (s: string) => rows.filter(r => r.state === s).length;
-  const available = rows.filter(r => r.state === 'available' && r.listing).map(r => r.listing!);
+  const available = rows.filter(r => r.state === 'available' && r.listing && !r.unlinkedByUser).map(r => r.listing!);
   const locations=(data?.locations||[]).filter((l:any)=>!locationId||l.id===locationId);
   const unique=[...new Map<number,any>(locations.map((l:any)=>[l.id,l])).values()];
   const failedParam = typeof window!=='undefined' && new URLSearchParams(window.location.search).get('gbp')==='consent-failed';
@@ -88,7 +99,8 @@ export function GbpConnection({locationId}:{locationId?:number}) {
             <Badge variant={a.connected ? 'default' : 'destructive'} className="text-[10px]">{a.connected ? 'Connected' : 'Reconnect needed'}</Badge>
             <span>{a.email}</span>
             {!a.connected && <a href="/api/gbp/connect" className="text-primary underline">Reconnect</a>}
-            {a.subject && <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={mutation.isPending} onClick={()=>mutation.mutate({path:'/api/gbp/disconnect',body:{subject:a.subject}})}>Disconnect</Button>}
+            {a.subject && <Button size="sm" variant="outline" className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10" disabled={mutation.isPending} data-testid="button-disconnect-google-account"
+              onClick={()=>{ if (window.confirm(`Disconnect ${a.email}? ConstructHUB's access to this Google account is revoked, its locations stop syncing, and the Google reviews and stats synced through it are removed. Your locations stay.`)) mutation.mutate({path:'/api/gbp/disconnect',body:{subject:a.subject}}); }}>Disconnect</Button>}
           </div>)}
         </div>}
     {failedParam && !data?.connected && <p role="alert">Google connection was not completed. Try again and allow Business Profile access.</p>}

@@ -2560,6 +2560,14 @@ Rules:
       const id = parseInt(req.params.id);
       const [location] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
       if (!location) return res.status(404).json({ message: "Location not found" });
+      // Linked to a Business Profile: the owner's own profile is the source, not public Places data.
+      if (location.gbpLocationName) {
+        const { syncLocation, publicError } = await import("./gbp/service");
+        const result: any = await syncLocation(user.id, id);
+        const [fresh] = await db.select().from(businessLocations).where(eq(businessLocations.id, id));
+        if (result?.profile?.kind) return res.status(409).json({ message: publicError(result.profile).message || result.profile.message });
+        return res.json(fresh);
+      }
       if (!location.placeId) return res.status(400).json({ message: "Location has no Google Place ID" });
 
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;

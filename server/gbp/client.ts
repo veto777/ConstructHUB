@@ -117,3 +117,56 @@ export function mapPerformance(data: any): {date: string; metric: string; value:
   }
   return rows;
 }
+
+const DAYS = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+const clock = (t: any) => {
+  const h = Number(t?.hours ?? 0), m = Number(t?.minutes ?? 0);
+  return `${((h % 12) || 12)}:${String(m).padStart(2,'0')} ${h % 24 < 12 ? 'AM' : 'PM'}`;
+};
+/** Business Information location → ConstructHUB business_locations fields (Google is the source of truth). */
+export function mapProfile(loc: any, attributes: any[] = []) {
+  const cats = loc.categories || {};
+  const allCats = [cats.primaryCategory, ...(cats.additionalCategories || [])].filter(Boolean);
+  const serviceNames = new Map<string,string>();
+  for (const c of allCats) for (const t of c.serviceTypes || []) if (t.serviceTypeId && t.displayName) serviceNames.set(t.serviceTypeId, t.displayName);
+  const pretty = (id: string) => { const s = id.split(':').pop()!.replace(/_/g,' '); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const services = [...new Set((loc.serviceItems || []).map((i: any) =>
+    i.freeFormServiceItem?.label?.displayName || (i.structuredServiceItem?.serviceTypeId ? serviceNames.get(i.structuredServiceItem.serviceTypeId) || pretty(i.structuredServiceItem.serviceTypeId) : null)
+  ).filter(Boolean) as string[])];
+  let hours: Record<string,string> | null = null;
+  if (loc.regularHours?.periods?.length) {
+    hours = {};
+    for (const day of DAYS) {
+      const ps = loc.regularHours.periods.filter((p: any) => p.openDay === day);
+      hours[cap(day)] = !ps.length ? 'Closed' : ps.map((p: any) =>
+        (!p.openTime?.hours && !p.openTime?.minutes && Number(p.closeTime?.hours) === 24) ? 'Open 24 hours' : `${clock(p.openTime)} – ${clock(p.closeTime)}`).join(', ');
+    }
+  }
+  const a = loc.storefrontAddress || {};
+  const od = loc.openInfo?.openingDate;
+  const status: Record<string,string> = { OPEN: 'Open', CLOSED_TEMPORARILY: 'Temporarily closed', CLOSED_PERMANENTLY: 'Permanently closed' };
+  const social: Record<string,string> = {};
+  const socialKeys: Record<string,string> = { url_facebook:'facebook', url_instagram:'instagram', url_linkedin:'linkedin', url_pinterest:'pinterest', url_tiktok:'tiktok', url_twitter:'twitter', url_youtube:'youtube' };
+  for (const at of attributes) {
+    const key = socialKeys[String(at.name || '').split('/').pop()!];
+    const uri = at.uriValues?.[0]?.uri;
+    if (key && typeof uri === 'string' && /^https:\/\//.test(uri)) social[key] = uri;
+  }
+  return {
+    businessName: loc.title || null,
+    phone: loc.phoneNumbers?.primaryPhone || null,
+    website: loc.websiteUri || null,
+    address: a.addressLines?.join(', ') || null, city: a.locality || null, state: a.administrativeArea || null,
+    zipCode: a.postalCode || null, country: a.regionCode || null,
+    categories: allCats.map((c: any) => c.displayName).filter(Boolean),
+    description: loc.profile?.description || null,
+    serviceAreas: (loc.serviceArea?.places?.placeInfos || []).map((p: any) => p.placeName).filter(Boolean),
+    services, hours,
+    openingDate: od?.year ? [od.year, od.month, od.day].filter(Boolean).map((n: number, i: number) => i ? String(n).padStart(2,'0') : String(n)).join('-') : null,
+    openStatus: status[loc.openInfo?.status] || null,
+    placeId: loc.metadata?.placeId || null, googleCid: loc.metadata?.mapsUri || null,
+    social,
+  };
+}
+export const PROFILE_READ_MASK = 'name,title,phoneNumbers,categories,storefrontAddress,websiteUri,regularHours,serviceArea,profile,openInfo,metadata,serviceItems';

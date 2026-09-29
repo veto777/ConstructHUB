@@ -1,5 +1,5 @@
 import { pool } from '../db';
-import { GoogleClient, GoogleError, mapLocation, mapPerformance, performancePath, resource } from './client';
+import { GoogleClient, GoogleError, mapLocation, mapPerformance, mapProfile, performancePath, resource, PROFILE_READ_MASK } from './client';
 import { accessToken, grantUsable, invalidate, soleSubject } from './grants';
 import type { PoolClient } from 'pg';
 import { DatabaseLimiter } from './quota';
@@ -50,10 +50,10 @@ export async function importLocations(userId: number, requested: any[], client?:
     // The same listing can be reachable through two Google accounts: keep one row, managed by the latest import.
     const {rows:[already]} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name=$2 ORDER BY id LIMIT 1',[userId,l.gbpName]);
     if (already) {
-      await pool.query('UPDATE business_locations SET gbp_account_name=$2,gbp_google_subject=$3,updated_at=now() WHERE id=$1',[already.id,l.accountResource,l.grantSubject]);
+      await pool.query('UPDATE business_locations SET gbp_account_name=$2,gbp_google_subject=$3,gbp_unlinked_by_user=false,updated_at=now() WHERE id=$1',[already.id,l.accountResource,l.grantSubject]);
     }
     if (!already && l.placeId) {
-      const {rows:[linked]} = await pool.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,gbp_google_subject=$6,updated_at=now()
+      const {rows:[linked]} = await pool.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,gbp_google_subject=$6,gbp_unlinked_by_user=false,updated_at=now()
         WHERE id=(SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id=$5 ORDER BY id LIMIT 1) RETURNING id`,
         [userId,l.accountResource,l.gbpName,l.businessName,l.placeId,l.grantSubject]);
       if (linked) { imported.push(linked); continue; }
@@ -94,10 +94,27 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
   client ??= clientFor(userId, subject);
   return withLocationLock(id, async c => {
     const result: Record<string,unknown> = {};
-    for (const kind of ['reviews','performance']) {
+    for (const kind of ['profile','reviews','performance']) {
       await c.query(`INSERT INTO gbp_sync_status(location_id,kind,last_attempt) VALUES($1,$2,now()) ON CONFLICT(location_id,kind) DO UPDATE SET last_attempt=now()`,[id,kind]);
       try {
-        if (kind === 'reviews') {
+        if (kind === 'profile') {
+          const info = await client.request('information',`/v1/${l.gbp_location_name}?readMask=${PROFILE_READ_MASK}`);
+          const attrs = await client.request('information',`/v1/${l.gbp_location_name}/attributes`).then(r => r.attributes || []).catch(() => []);
+          const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
+          const media = await client.request('reviews',`/v4/${parent}/media?pageSize=1`).catch(() => null);
+          const customerMedia = await client.request('reviews',`/v4/${parent}/media/customers?pageSize=1`).catch(() => null);
+          const p = mapProfile(info, attrs);
+          await c.query(`UPDATE business_locations SET business_name=COALESCE($2,business_name),phone=$3,website=$4,address=$5,city=$6,state=$7,zip_code=$8,country=COALESCE($9,country),
+            categories=$10,description=$11,service_areas=$12,services=$13,hours=$14,opening_date=$15,open_status=COALESCE($16,open_status),
+            place_id=COALESCE($17,place_id),google_cid=COALESCE($18,google_cid),
+            social_profiles=COALESCE(social_profiles,'{}'::jsonb)||$19::jsonb,
+            business_photo_count=COALESCE($20,business_photo_count),customer_photo_count=COALESCE($21,customer_photo_count),updated_at=now() WHERE id=$1`,
+            [id,p.businessName,p.phone,p.website,p.address,p.city,p.state,p.zipCode,p.country,p.categories,p.description,p.serviceAreas,p.services,
+             p.hours ? JSON.stringify(p.hours) : null,p.openingDate,p.openStatus,p.placeId,p.googleCid,JSON.stringify(p.social),
+             typeof media?.totalMediaItemCount === 'number' ? media.totalMediaItemCount : null,
+             typeof customerMedia?.totalMediaItemCount === 'number' ? customerMedia.totalMediaItemCount : null]);
+          result.profile = {services:p.services.length,serviceAreas:p.serviceAreas.length,social:Object.keys(p.social).length};
+        } else if (kind === 'reviews') {
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
           const reviews = (await client.pages('reviews',`/v4/${parent}/reviews`,'reviews')).map(r => mapReview(r,parent));
           await c.query('BEGIN');
@@ -111,6 +128,8 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
               [userId,id,r.name,r.reviewer,r.photo,r.rating,r.comment,r.date,r.reply,r.replyDate,r.reply?'posted':'draft']);
             await c.query('COMMIT');
           } catch(e) { await c.query('ROLLBACK'); throw e; }
+          await c.query(`UPDATE business_locations SET review_count=s.n,avg_rating=s.avg,updated_at=now() FROM
+            (SELECT count(*)::int n, round(avg(rating)::numeric,2)::real avg FROM google_profile_reviews WHERE user_id=$2 AND location_id=$1 AND NOT google_deleted AND google_review_id LIKE 'accounts/%') s WHERE id=$1`,[id,userId]);
           result.reviews = {count:reviews.length};
         } else {
           const {rows:[s]} = await c.query('SELECT cursor_date::text FROM gbp_sync_status WHERE location_id=$1 AND kind=$2',[id,kind]);
@@ -131,6 +150,7 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
             if (rows.length) await c.query('UPDATE gbp_sync_status SET cursor_date=$2 WHERE location_id=$1 AND kind=$3',[id,endString,kind]);
             await c.query('COMMIT');
           } catch(e) {await c.query('ROLLBACK');throw e;}
+          await c.query(`UPDATE business_locations SET monthly_views=COALESCE((SELECT sum(value)::int FROM gbp_daily_metrics WHERE location_id=$1 AND metric LIKE 'BUSINESS_IMPRESSIONS_%' AND date>current_date-30),0) WHERE id=$1`,[id]);
           result.performance = {count:rows.length,available:rows.length>0};
         }
         await c.query('UPDATE gbp_sync_status SET last_success=now(),last_error=NULL WHERE location_id=$1 AND kind=$2',[id,kind]);
@@ -186,4 +206,31 @@ export async function runGbpWorker(sync = syncLocation) {
 export function startGbpWorker() {
   if (process.env.GBP_SYNC_DISABLED === "true") return;
   const timer=setInterval(()=>void runGbpWorker(),60_000);timer.unref();return timer;
+}
+
+/** After a Google account connects: link the contractor's matching Places-added rows and fully sync
+ *  every listing that account manages, so the Locations pages fill in without further clicks. */
+export async function autoLinkAndSync(userId: number, subject: string) {
+  const d = await discover(clientFor(userId, subject));
+  const {rows} = await pool.query('SELECT place_id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id IS NOT NULL AND NOT gbp_unlinked_by_user',[userId]);
+  const wanted = new Set(rows.map(r => r.place_id));
+  const toLink = d.locations.filter((l: any) => l.placeId && wanted.has(l.placeId)).map((l: any) => ({...l, grantSubject: subject}));
+  if (toLink.length) await importLocations(userId, toLink);
+  const {rows:mine} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_google_subject=$2 AND gbp_location_name IS NOT NULL',[userId,subject]);
+  for (const l of mine) await syncLocation(userId, l.id).catch(() => null);
+}
+
+/** Stop syncing one location: drop its Google link and the Google data synced for it; keep the row. */
+export async function unlinkLocation(userId: number, id: number) {
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const {rowCount} = await c.query('UPDATE business_locations SET gbp_account_name=NULL,gbp_location_name=NULL,gbp_google_subject=NULL,gbp_unlinked_by_user=true,updated_at=now() WHERE id=$1 AND user_id=$2',[id,userId]);
+    if (!rowCount) throw new GoogleError('invalid','Location not found',404);
+    await c.query(`DELETE FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'`,[userId,id]);
+    await c.query('DELETE FROM gbp_daily_metrics WHERE location_id=$1',[id]);
+    await c.query('DELETE FROM gbp_sync_status WHERE location_id=$1',[id]);
+    await c.query('COMMIT');
+  } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+  return { unlinked: true };
 }

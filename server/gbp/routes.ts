@@ -4,7 +4,7 @@ import { pool } from '../db';
 import { oauthBaseUrl } from '../site-context';
 import { GBP_SCOPE, GoogleError, METRICS } from './client';
 import { grantStatus, saveGrant, purgeGoogleData } from './grants';
-import { discoverAll, importLocations, syncLocation, reply, publicError } from './service';
+import { discoverAll, importLocations, syncLocation, reply, publicError, autoLinkAndSync, unlinkLocation } from './service';
 declare module 'express-session' { interface SessionData { gbpOAuth?: {state:string;userId:number;expires:number;redirect:string} } }
 export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) {
   const route = (method: 'get'|'post'|'patch'|'delete',path: string,fn: (req: Request,res: Response,userId: number)=>Promise<any>) => {
@@ -25,7 +25,10 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) 
       const tokens=await response.json();if(!response.ok) throw new Error('Token exchange failed');
       const identity=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:`Bearer ${tokens.access_token}`},signal:AbortSignal.timeout(20000)});
       if(!identity.ok) throw new Error('Identity verification failed');
-      await saveGrant(userId,await identity.json(),tokens);
+      const who=await identity.json();
+      await saveGrant(userId,who,tokens);
+      // Fill the Locations pages without further clicks; failures show per location in sync status.
+      void autoLinkAndSync(userId,who.sub).catch(()=>console.error('GBP auto-link after connect failed'));
       res.redirect('/locations?gbp=connected');
     }catch {res.redirect('/locations?gbp=consent-failed');}
   });
@@ -53,7 +56,7 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) 
   route('get','/api/gbp/locations',async(_req,res,id)=>res.json(await discoverAll(id)));
   // Per-location answer to "which Google account is this synced through, and which still need one?"
   route('get','/api/gbp/linkage',async(_req,res,id)=>{
-    const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.gbp_location_name,g.email AS account_email,(g.google_subject IS NOT NULL AND NOT g.reconnect_required) AS account_ok,
+    const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.gbp_location_name,l.gbp_unlinked_by_user,g.email AS account_email,(g.google_subject IS NOT NULL AND NOT g.reconnect_required) AS account_ok,
       (SELECT max(last_success) FROM gbp_sync_status s WHERE s.location_id=l.id) AS last_success,
       (SELECT string_agg(last_error,'; ') FROM gbp_sync_status s WHERE s.location_id=l.id AND last_error IS NOT NULL) AS last_error
       FROM business_locations l LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject WHERE l.user_id=$1 ORDER BY l.id`,[id]);
@@ -63,11 +66,18 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any) 
     res.json({accounts:status.accounts,errors,locations:locations.map(l=>{
       if(l.gbp_location_name) return {id:l.id,state:l.account_ok?'synced':'reconnect',accountEmail:l.account_email,lastSuccess:l.last_success,lastError:l.last_error};
       const match=l.place_id?found.find((f:any)=>f.placeId===l.place_id):null;
-      return match?{id:l.id,state:'available',accountEmail:match.grantEmail,listing:{accountResource:match.accountResource,gbpName:match.gbpName,grantSubject:match.grantSubject}}
+      return match?{id:l.id,state:'available',unlinkedByUser:l.gbp_unlinked_by_user,accountEmail:match.grantEmail,listing:{accountResource:match.accountResource,gbpName:match.gbpName,grantSubject:match.grantSubject}}
         :{id:l.id,state:'unlinked'};
     })});
   });
-  route('post','/api/gbp/import',async(req,res,id)=>res.json(await importLocations(id,req.body.locations)));
+  route('post','/api/gbp/import',async(req,res,id)=>{
+    const result=await importLocations(id,req.body.locations);
+    // Linking = a full first sync (profile, reviews, performance) before answering.
+    const synced:Record<number,unknown>={};
+    for(const l of result.locations) synced[l.id]=await syncLocation(id,l.id).catch(e=>publicError(e));
+    res.json({...result,synced});
+  });
+  route('post','/api/gbp/locations/:id/unlink',async(req,res,id)=>res.json(await unlinkLocation(id,Number(req.params.id))));
   route('post','/api/gbp/locations/:id/sync',async(req,res,id)=>res.json(await syncLocation(id,Number(req.params.id))));
   route('patch','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),req.body.replyComment,req.body.action==='publish'?'publish':'draft')));
   route('delete','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),'','delete')));
