@@ -149,6 +149,9 @@ export async function registerRoutes(
     return null;
   }
 
+  const { ensureAccountEventsSchema, registerAccountEventRoutes } = await import("./account-events");
+  await ensureAccountEventsSchema();
+  registerAccountEventRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
   const { registerGbpRoutes } = await import("./gbp/routes");
