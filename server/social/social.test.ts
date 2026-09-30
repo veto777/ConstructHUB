@@ -484,6 +484,14 @@ describe("real Postgres, mocked Blotato publishing", () => {
       "Fixture offer A", "General non-project-specific maintenance tip; no claims about completed work.", "Fixture offer B",
     ]);
   });
+  it("does not spend AI budget on a destination missing required fields", async () => {
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    await saveSettings(userId, autoSchema.parse({ destinations: [{ ...destination, accountId: "fixture-facebook", platform: "facebook" }] }));
+    const generate = vi.fn(async () => "Never called");
+    await expect(userLock(userId, (c) => generateDue(c, userId, generate, true))).rejects.toMatchObject({ status: 400, message: "Facebook requires a Page" });
+    expect(generate).not.toHaveBeenCalled();
+    expect((await pool.query("SELECT * FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`])).rows).toHaveLength(0);
+  });
   it("disconnect cancels unsent work, disables generation, deletes the encrypted key, and logs activity", async () => {
     await disconnect(userId, null);
     expect(

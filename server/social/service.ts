@@ -386,6 +386,14 @@ export async function generateDue(
     throw new SocialError("Add a business in Locations before generating");
   const kind = s.mix[row.sequence % s.mix.length],
     source = await sourceFor(userId, kind, Math.floor(row.sequence / s.mix.length));
+  // Reject known target/media problems before charging for text generation.
+  for (const d of s.destinations) {
+    try {
+      postPayload(d, "Draft", source.mediaUrls, true);
+    } catch (e) {
+      throw new SocialError((e as Error).message);
+    }
+  }
   if (!(await takeBudget(`social-ai:${userId}`, s.aiDailyBudget, 1, 86400000)))
     throw new SocialError("Daily social AI budget reached", 429);
   const text = await generate({
