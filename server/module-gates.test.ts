@@ -26,7 +26,7 @@ import { registerCloudflareRoutes } from './cloudflare/routes';
 import { registerGscRoutes } from './gsc/routes';
 import { runEdgeJob, EDGE_PLAN_PAUSED } from './cloudflare/worker';
 import { registerDomainRoutes } from './domains/routes';
-import { runDomainWorker, scheduleMonitors, DOMAINS_PLAN_PAUSED } from './domains/service';
+import { runDomainWorker, scheduleMonitors, DOMAINS_PLAN_PAUSED, DOMAINS_VERIFY_PAUSED } from './domains/service';
 import { registerMailAlertRoutes } from './mail-alerts/routes';
 import { registerGmailOAuth, runMailWorker } from './mail-alerts/gmail';
 import { registerInboundMail } from './mail-alerts/inbound';
@@ -138,6 +138,37 @@ describe('Agency-only module routes', () => {
   });
 });
 
+describe('Saved credentials stay removable without the plan', () => {
+  it('lets an account without the module list and disconnect what it connected earlier, behind re-auth, and nothing more', async () => {
+    const user = users.pro;
+    await pool.query("INSERT INTO ads_grants(user_id,manager_id,refresh_token,verified) VALUES($1,'1112223334',$2,true)", [user, encryptToken('fixture-refresh')]);
+    // A pasted Cloudflare token (not one ConstructHUB created), so disconnecting makes no provider call.
+    const [cf, gsc] = (await pool.query("INSERT INTO edge_connections(user_id,provider,subject,email,token,method) VALUES($1,'cloudflare','p3-saved-cf','cf@example.invalid',$2,'paste'),($1,'gsc','p3-saved-gsc','gsc@example.invalid',$2,'oauth') RETURNING id", [user, encryptToken('fixture-token')])).rows.map(r => r.id);
+    await pool.query("INSERT INTO mail_alert_grants(user_id,google_subject,email,access_token,refresh_token,expires_at) VALUES($1,'p3-saved-gmail','gmail@example.invalid',$2,$3,now()+interval '1 hour')", [user, encryptToken('fixture-access'), encryptToken('fixture-refresh')]);
+    expect((await call(user, '/api/ads/saved-connection')).data).toEqual({ saved: true, managerId: '1112223334' });
+    expect((await call(user, '/api/cloudflare/saved-connections')).data).toEqual({ items: [{ id: cf, label: 'cf@example.invalid' }] });
+    expect((await call(user, '/api/gsc/saved-connections')).data).toEqual({ items: [{ id: gsc, label: 'gsc@example.invalid' }] });
+    expect((await call(user, '/api/mail-alerts/oauth/saved-connections')).data).toEqual({ items: [{ subject: 'p3-saved-gmail', email: 'gmail@example.invalid' }] });
+    // The module itself stays closed, and a signed-out caller gets nothing.
+    for (const path of ['/api/ads/status', '/api/cloudflare/connections?limit=1', '/api/gsc/assets', '/api/mail-alerts/settings'])
+      expect((await call(user, path)).status, path).toBe(402);
+    for (const path of ['/api/ads/saved-connection', '/api/cloudflare/saved-connections', '/api/mail-alerts/oauth/saved-connections'])
+      expect((await call(null, path)).status, path).toBe(401);
+    // Disconnecting still needs a recent sign-in.
+    expect((await call(user, '/api/ads/disconnect', 'POST', { confirm: true })).data).toMatchObject({ reauth: true });
+    sessions.get(user).recentAuth = { userId: user, at: Date.now() };
+    expect((await call(user, '/api/ads/disconnect', 'POST', { confirm: true })).status).toBe(200);
+    expect((await call(user, '/api/cloudflare/disconnect', 'POST', { ids: [cf] })).status).toBe(200);
+    expect((await call(user, '/api/gsc/disconnect', 'POST', { ids: [gsc] })).status).toBe(200);
+    expect((await call(user, '/api/mail-alerts/oauth/disconnect', 'POST', { subject: 'p3-saved-gmail' })).status).toBe(200);
+    const left = (await pool.query('SELECT (SELECT count(*) FROM ads_grants WHERE user_id=$1)+(SELECT count(*) FROM edge_connections WHERE user_id=$1)+(SELECT count(*) FROM mail_alert_grants WHERE user_id=$1) n', [user])).rows[0].n;
+    expect(Number(left)).toBe(0);
+    expect((await call(user, '/api/ads/saved-connection')).data).toEqual({ saved: false, managerId: null });
+    delete sessions.get(user).recentAuth;
+    await pool.query('DELETE FROM growth_budgets WHERE key=ANY($1)', [[`edge:disconnect:${user}`]]);
+  });
+});
+
 describe('Agency workspace for owners and members', () => {
   it('keeps a non-Agency owner\'s own locations, location pages and social workbench working through the agency middleware', async () => {
     const list = await call(users.pro, '/api/locations?paged=true');
@@ -240,6 +271,11 @@ describe('Background workers skip owners whose plan no longer includes the modul
     await runDomainWorker({ adapter, onlyUser: users.lapsed });
     expect(adapter).not.toHaveBeenCalled();
     expect((await pool.query('SELECT status,error FROM domain_jobs WHERE id=$1', [job])).rows[0]).toEqual({ status: 'failed', error: DOMAINS_PLAN_PAUSED });
+    // A change already applied at the registrar says so; only its verification stopped.
+    const applied = randomUUID();
+    await pool.query("INSERT INTO domain_jobs(id,user_id,domain_id,kind,status,run_at) VALUES($1,$2,$3,'change','verifying','2000-01-01')", [applied, users.lapsed, domain]);
+    await runDomainWorker({ adapter, onlyUser: users.lapsed });
+    expect((await pool.query('SELECT status,error FROM domain_jobs WHERE id=$1', [applied])).rows[0]).toEqual({ status: 'verification_failed', error: DOMAINS_VERIFY_PAUSED });
   });
   it('mail alerts: keeps no forwarded mail and runs no Gmail sync for a lapsed owner', async () => {
     const previousDomain = process.env.INBOUND_MAIL_DOMAIN, previousOauth = process.env.GMAIL_OAUTH_ENABLED;

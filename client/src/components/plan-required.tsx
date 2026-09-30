@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Lock } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -63,6 +66,95 @@ const MODULE_DETAILS: Record<ModuleKey, string[]> = {
   ],
 };
 
+type SavedItem = { key: string; label: string; url: string; body: unknown };
+/**
+ * Credentials saved before the plan changed stay removable: these list and disconnect routes are the only
+ * ones in each module that answer without the plan (server/ads/routes.ts, server/cloudflare/routes.ts,
+ * server/mail-alerts/gmail.ts). Disconnecting still asks for a recent sign-in.
+ */
+const SAVED: Partial<Record<ModuleKey, { url: string; items: (data: any) => SavedItem[] }[]>> = {
+  adsManager: [
+    {
+      url: "/api/ads/saved-connection",
+      items: (d) =>
+        d?.saved
+          ? [{ key: "ads", label: `Google Ads manager account${d.managerId ? ` ${d.managerId}` : ""}`, url: "/api/ads/disconnect", body: { confirm: true } }]
+          : [],
+    },
+  ],
+  cloudflareSearchConsole: (["cloudflare", "gsc"] as const).map((provider) => ({
+    url: `/api/${provider}/saved-connections`,
+    items: (d: any) =>
+      (d?.items ?? []).map((c: any) => ({
+        key: `${provider}-${c.id}`,
+        label: `${provider === "gsc" ? "Search Console" : "Cloudflare"}: ${c.label}`,
+        url: `/api/${provider}/disconnect`,
+        body: { ids: [c.id] },
+      })),
+  })),
+  domainsMailAlerts: [
+    {
+      url: "/api/mail-alerts/oauth/saved-connections",
+      items: (d) =>
+        (d?.items ?? []).map((g: any) => ({
+          key: `gmail-${g.subject}`,
+          label: `Gmail: ${g.email}`,
+          url: "/api/mail-alerts/oauth/disconnect",
+          body: { subject: g.subject },
+        })),
+    },
+  ],
+};
+
+function SavedConnections({ module }: { module: ModuleKey }) {
+  const sources = SAVED[module] ?? [];
+  const results = useQueries({ queries: sources.map((s) => ({ queryKey: [s.url] })) });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
+  const items = results.flatMap((r, i) => sources[i].items(r.data));
+  if (!items.length && !notice) return null;
+  async function disconnect(item: SavedItem) {
+    setBusy(item.key);
+    setNotice(null);
+    try {
+      const r = await (await apiRequest("POST", item.url, item.body)).json();
+      setNotice({ text: r?.message ?? r?.results?.[0]?.message ?? "Disconnected.", failed: false });
+      await Promise.all(sources.map((s) => queryClient.invalidateQueries({ queryKey: [s.url] })));
+    } catch (e) {
+      setNotice({ text: apiErrorMessage(e), failed: true });
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <div className="space-y-2 border-t pt-4" data-testid="saved-connections">
+      {items.length > 0 && (
+        <>
+          <h3 className="text-sm font-medium">Saved connections</h3>
+          <p className="text-sm text-muted-foreground">
+            These were connected earlier. They are not used without the plan, and you can remove them here.
+          </p>
+          <ul className="space-y-2">
+            {items.map((item) => (
+              <li key={item.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 break-all">{item.label}</span>
+                <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => disconnect(item)}>
+                  {busy === item.key ? "Disconnecting…" : "Disconnect"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {notice && (
+        <p role={notice.failed ? "alert" : "status"} className={notice.failed ? "text-sm text-destructive" : "text-sm"}>
+          {notice.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const dollars = (cents: number) =>
   `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 
@@ -102,6 +194,7 @@ export function PlanRequired({ module, error, className }: { module: ModuleKey; 
         <Button asChild>
           <Link href="/pricing" data-testid="link-plan-required-pricing">See plans and pricing</Link>
         </Button>
+        <SavedConnections module={module} />
       </CardContent>
     </Card>
   );

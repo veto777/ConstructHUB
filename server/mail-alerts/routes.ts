@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { pool } from "../db";
 import { rateLimit } from "../growth-limits";
-import { requireModule } from "../entitlements";
+import { requireMailModule } from "./gmail";
 import { forwardingAddress } from "./service";
 import { pageInput } from "../domains/routes";
 import { SENDERS, REGISTRAR_SENDERS } from "./classify";
@@ -15,11 +15,12 @@ export function registerMailAlertRoutes(
     next();
   });
   // Agency-only module (Domains + Gmail alerts). The inbound mail webhook (/api/inbound-mail, inbound.ts) is
-  // authenticated by its shared secret instead and is not under this path.
+  // authenticated by its shared secret instead and is not under this path. Removing a saved Gmail connection
+  // stays open without the plan (gmailRemovalRoute).
   app.use(
     "/api/mail-alerts",
     rateLimit("mail-alerts", 120, 300),
-    requireModule("domainsMailAlerts"),
+    requireMailModule(),
   );
   const route = (
     method: "get" | "post",

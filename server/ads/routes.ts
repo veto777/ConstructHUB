@@ -23,8 +23,10 @@ async function targets(user:number,s:z.infer<typeof selection>) {
   return rows.map(r=>r.customer_id as string);
 }
 export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,options:{http?:typeof fetch}={}) {
-  // Agency-only module: every /api/ads route answers 402 plan_required unless the plan includes it.
-  app.use('/api/ads', (req,res,next)=>{if(!auth(req,res))return;next();},rateLimit('ads-api',300,600,60000),requireModule('adsManager'));
+  // Agency-only module: every /api/ads route answers 402 plan_required unless the plan includes it, except
+  // removing a saved MCC connection (list + disconnect), which an account without the plan must still be able to do.
+  const gate=requireModule('adsManager'),removal=(req:Request)=>(req.method==='GET'&&req.path==='/saved-connection')||(req.method==='POST'&&req.path==='/disconnect');
+  app.use('/api/ads', (req,res,next)=>{if(!auth(req,res))return;next();},rateLimit('ads-api',300,600,60000),(req,res,next)=>removal(req)?next():gate(req,res,next));
   app.use(['/api/ads/connect','/api/ads/callback','/api/ads/disconnect'],rateLimit('ads-connections',10,30));
   const route=(method:'get'|'post'|'patch',path:string,fn:(req:Request,res:Response,user:number)=>Promise<unknown>)=>app[method](`/api/ads${path}`,async(req,res)=>{
     try{const user=auth(req,res);if(!user)return;await fn(req,res,user.id);}catch(e){res.status(e instanceof AdsError?e.status:e instanceof z.ZodError?400:500).json({message:e instanceof AdsError?e.message:e instanceof z.ZodError?'Invalid input. Check IDs, selection and protection settings.':'Ads operation failed.'});}
@@ -33,6 +35,11 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
   route('get','/status',async(_req,res,user)=>{
     const {rows:[g]}=await pool.query('SELECT manager_id,verified,reconnect_required,updated_at FROM ads_grants WHERE user_id=$1',[user]);
     res.json({configured:configured(),connected:!!g&&!g.reconnect_required,grant:g||null,workerEnabled:process.env.GOOGLE_ADS_WORKER_ENABLED==='true',defaultManagerId:process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.replaceAll('-','')||'',starterNegatives:STARTER_NEGATIVES,playbook:optimizationSteps});
+  });
+  // Only whether a connection is saved (for the plan_required card's Disconnect button); no module data.
+  route('get','/saved-connection',async(_req,res,user)=>{
+    const {rows:[g]}=await pool.query('SELECT manager_id FROM ads_grants WHERE user_id=$1',[user]);
+    res.json({saved:!!g,managerId:g?.manager_id??null});
   });
   route('post','/connect',async(req,res,user)=>{
     if(!requireRecentAuth(req,res)) return;

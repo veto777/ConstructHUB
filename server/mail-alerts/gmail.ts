@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { randomBytes } from "node:crypto";
 import { pool } from "../db";
 import { requireRecentAuth } from "../account-security";
@@ -21,6 +21,21 @@ declare module "express-session" {
     };
   }
 }
+/** Removing a saved Gmail connection (list + disconnect) never needs the plan: an account without the module
+ * must still be able to delete the Google tokens it saved earlier. Both /api/mail-alerts gates use this. */
+export const gmailRemovalRoute = (req: Request) => {
+  const path = req.baseUrl + req.path;
+  return (
+    (req.method === "GET" &&
+      path === "/api/mail-alerts/oauth/saved-connections") ||
+    (req.method === "POST" && path === "/api/mail-alerts/oauth/disconnect")
+  );
+};
+export const requireMailModule = () => {
+  const gate = requireModule("domainsMailAlerts");
+  return (req: Request, res: Response, next: NextFunction) =>
+    gmailRemovalRoute(req) ? next() : gate(req, res, next);
+};
 export function registerGmailOAuth(
   app: Express,
   auth: (req: any, res: any) => any,
@@ -30,8 +45,18 @@ export function registerGmailOAuth(
   app.use(
     "/api/mail-alerts/oauth",
     rateLimit("gmail-oauth", 10, 30),
-    requireModule("domainsMailAlerts"),
+    requireMailModule(),
   );
+  // Only what identifies each saved Gmail account (for the plan_required card's Disconnect buttons).
+  app.get("/api/mail-alerts/oauth/saved-connections", async (req, res) => {
+    const u = auth(req, res);
+    if (!u) return;
+    const { rows } = await pool.query(
+      "SELECT google_subject subject,email FROM mail_alert_grants WHERE user_id=$1 ORDER BY email LIMIT 100",
+      [u.id],
+    );
+    res.json({ items: rows });
+  });
   app.get("/api/mail-alerts/oauth/connect", async (req, res) => {
     const u = auth(req, res);
     if (!u) return;

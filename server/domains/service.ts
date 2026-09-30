@@ -23,6 +23,8 @@ import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
 export const domainsAllowed = async (user: number) =>
   (await getEntitlements(user)).modules.domainsMailAlerts;
 export const DOMAINS_PLAN_PAUSED = `Not run: ${MODULE_NAMES.domainsMailAlerts} is included with the ${PLANS[planForModule("domainsMailAlerts")].name} plan.`;
+/** A change already made at the registrar was run; only the follow-up DNS check stopped. */
+export const DOMAINS_VERIFY_PAUSED = `Applied at the registrar, but verification stopped: ${MODULE_NAMES.domainsMailAlerts} is included with the ${PLANS[planForModule("domainsMailAlerts")].name} plan.`;
 export type Dependencies = {
   adapter?: (connection: any) => RegistrarAdapter;
   http?: typeof fetch;
@@ -488,8 +490,8 @@ export async function runDomainWorker(
     if (!(await domainsAllowed(job.user_id))) {
       // Nothing reaches the registrar. An applied change awaiting verification keeps that distinction.
       await c.query(
-        "UPDATE domain_jobs SET status=CASE WHEN status='verifying' THEN 'verification_failed' ELSE 'failed' END,error=$2,updated_at=now() WHERE id=$1",
-        [job.id, DOMAINS_PLAN_PAUSED],
+        "UPDATE domain_jobs SET status=CASE WHEN status='verifying' THEN 'verification_failed' ELSE 'failed' END,error=CASE WHEN status='verifying' THEN $3 ELSE $2 END,updated_at=now() WHERE id=$1",
+        [job.id, DOMAINS_PLAN_PAUSED, DOMAINS_VERIFY_PAUSED],
       );
       if (job.kind === "monitor")
         await c.query(
