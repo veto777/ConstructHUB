@@ -2,6 +2,7 @@ import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/gov
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,6 +71,20 @@ const searchTypes = [
   { value: "permit", label: "Permit #", icon: FileText },
 ];
 
+// Search history and Databases record some searches under their scraper's names.
+const SEARCH_TYPE_ALIASES: Record<string, string> = { permit_number: "permit", company_name: "company" };
+
+function initialSearchType(): string {
+  const raw = readQueryParam("type");
+  const type = raw ? SEARCH_TYPE_ALIASES[raw] ?? raw : null;
+  return type && searchTypes.some((t) => t.value === type) ? type : "address";
+}
+
+/** A portal the live search actually queries: a usable official link plus a supported scraper. */
+const isLiveSearchable = (db: PermitDatabase) => governmentLinksAvailable(db) && canScrapeGovernmentPortal(db);
+
+const portalCount = (n: number) => `${n.toLocaleString()} searchable portal${n === 1 ? "" : "s"}`;
+
 interface LiveDatabase {
   id: number;
   name: string;
@@ -102,12 +117,22 @@ function parseDate(dateStr: string | null | undefined): Date | null {
 
 export default function SearchPage() {
   const { toast } = useToast();
-  const [searchType, setSearchType] = useState("address");
-  const [searchValue, setSearchValue] = useState("");
-  const [scopeLocation, setScopeLocation] = useState<string>("all");
-  const [scopeState, setScopeState] = useState<string>("all");
+  // The form (and the running search's id) live in the address bar, so a refresh or a
+  // "Search again" link from History reopens the same search: ?state=&loc=&type=&q=&sid=
+  const [searchType, setSearchType] = useState(initialSearchType);
+  const [searchValue, setSearchValue] = useState(() => readQueryParam("q") ?? "");
+  const [scopeLocation, setScopeLocation] = useState<string>(() => {
+    const loc = readQueryParam("loc");
+    return loc && /^(county|city)-\d+$/.test(loc) ? loc : "all";
+  });
+  const [scopeState, setScopeState] = useState<string>(() => readQueryParam("state")?.toUpperCase() || "all");
   const [locationSearch, setLocationSearch] = useState("");
-  const [searchId, setSearchId] = useState<string | null>(null);
+  const [searchId, setSearchId] = useState<string | null>(() => {
+    const sid = readQueryParam("sid");
+    return sid && /^[A-Za-z0-9-]{1,40}$/.test(sid) ? sid : null;
+  });
+  // True while showing a search reopened from the URL rather than one started here.
+  const restoredSearchRef = useRef(searchId !== null);
   const [liveStatus, setLiveStatus] = useState<LiveSearchStatus | null>(null);
   const [initialResults, setInitialResults] = useState<any[] | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -127,11 +152,12 @@ export default function SearchPage() {
     queryKey: ["/api/counties"],
   });
 
-  const { data: dbCounts } = useQuery<{ total: number; county: number; city: number }>({
+  // `searchable` (nationwide live-searchable portals) is used when the server reports it.
+  const { data: dbCounts } = useQuery<{ total: number; county: number; city: number; searchable?: number }>({
     queryKey: ["/api/databases/counts"],
   });
 
-  const { data: databases } = useQuery<PermitDatabase[]>({
+  const { data: databases, isLoading: databasesLoading } = useQuery<PermitDatabase[]>({
     queryKey: ["/api/databases/county-state", scopeState],
     queryFn: async () => {
       if (scopeState === "all") return [];
@@ -163,19 +189,45 @@ export default function SearchPage() {
 
   const stateCounties = useMemo(() => {
     if (!counties) return [];
-    if (scopeState === "all") return counties;
-    return counties.filter(c => c.stateCode === scopeState);
+    const list = scopeState === "all" ? counties : counties.filter(c => c.stateCode === scopeState);
+    return [...list].sort((a, b) => a.state.localeCompare(b.state) || a.name.localeCompare(b.name));
   }, [counties, scopeState]);
+
+  // One definition everywhere (picker, counts, footer): portals the live search can query.
+  const searchableDbs = useMemo(() => (databases ?? []).filter(isLiveSearchable), [databases]);
+
+  // Values from the URL: a county selects its state; unknown counties/states/portals reset.
+  useEffect(() => {
+    if (!counties) return;
+    if (scopeLocation.startsWith("county-")) {
+      const county = counties.find(c => `county-${c.id}` === scopeLocation);
+      if (!county) setScopeLocation("all");
+      else if (county.stateCode !== scopeState) setScopeState(county.stateCode);
+    } else if (scopeState !== "all" && !counties.some(c => c.stateCode === scopeState)) {
+      setScopeState("all");
+      setScopeLocation("all");
+    }
+  }, [counties]);
+
+  useEffect(() => {
+    if (!databases || !scopeLocation.startsWith("city-")) return;
+    if (!searchableDbs.some(d => `city-${d.id}` === scopeLocation)) setScopeLocation("all");
+  }, [databases]);
+
+  useEffect(() => {
+    replaceQueryParams({
+      state: scopeState !== "all" ? scopeState : null,
+      loc: scopeLocation !== "all" ? scopeLocation : null,
+      type: searchType !== "address" ? searchType : null,
+      q: searchValue.trim() || null,
+      sid: searchId,
+    });
+  }, [scopeState, scopeLocation, searchType, searchValue, searchId]);
 
   const filteredLocationOptions = useMemo(() => {
     const search = locationSearch.toLowerCase().trim();
     const stateFilteredCounties = stateCounties;
-    const stateFilteredDbs = databases?.filter(d => {
-      const county = counties?.find(c => c.id === d.countyId);
-      if (!county) return false;
-      if (scopeState !== "all" && county.stateCode !== scopeState) return false;
-      return d.isActive;
-    }) ?? [];
+    const stateFilteredDbs = searchableDbs;
 
     if (!search) {
       return { counties: stateFilteredCounties, databases: stateFilteredDbs };
@@ -198,7 +250,7 @@ export default function SearchPage() {
     );
 
     return { counties: allMatchedCounties, databases: matchedDbs };
-  }, [stateCounties, databases, counties, scopeState, locationSearch]);
+  }, [stateCounties, searchableDbs, locationSearch]);
 
   const scopeCountyId = useMemo(() => {
     if (scopeLocation === "all") return null;
@@ -228,17 +280,19 @@ export default function SearchPage() {
     return null;
   }, [scopeLocation, databases, counties]);
 
-  const scopedDbCount = useMemo(() => {
-    if (!databases) return 0;
-    const active = databases.filter(d => governmentLinksAvailable(d) && canScrapeGovernmentPortal(d));
-    if (scopeLocation === "all" && scopeState === "all") return active.length;
-    if (scopeLocation === "all" && scopeState !== "all") {
-      const stateCountyIds = new Set(counties?.filter(c => c.stateCode === scopeState).map(c => c.id) ?? []);
-      return active.filter(d => stateCountyIds.has(d.countyId)).length;
-    }
-    if (!scopeCountyId) return active.length;
-    return active.filter(d => d.countyId === scopeCountyId).length;
-  }, [databases, scopeCountyId, scopeState, scopeLocation, counties]);
+  // null = not known yet (still loading, or the server doesn't report a nationwide count).
+  const scopedDbCount = useMemo<number | null>(() => {
+    if (scopeState === "all") return typeof dbCounts?.searchable === "number" ? dbCounts.searchable : null;
+    if (!databases) return null;
+    if (scopeCountyId) return searchableDbs.filter(d => d.countyId === scopeCountyId).length;
+    return searchableDbs.length;
+  }, [scopeState, dbCounts, databases, searchableDbs, scopeCountyId]);
+
+  const scopePlace = useMemo(() => {
+    if (scopeState === "all") return "nationwide";
+    const county = scopeCountyId ? counties?.find(c => c.id === scopeCountyId) : null;
+    return county ? `in ${county.name} County, ${selectedStateName}` : `in ${selectedStateName}`;
+  }, [scopeState, scopeCountyId, counties, selectedStateName]);
 
   const searchMutation = useMutation({
     mutationFn: async (payload: { searchType: string; searchValue: string; scopeCountyId: number | null; scopeState?: string }) => {
@@ -264,6 +318,17 @@ export default function SearchPage() {
     const poll = async () => {
       try {
         const res = await fetch(`/api/search/live/${searchId}`);
+        if (res.status === 404) {
+          // Live searches are kept in server memory; an old link (or a restart) loses them.
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          if (restoredSearchRef.current) {
+            restoredSearchRef.current = false;
+            setSearchId(null);
+            toast({ title: "That search is no longer available", description: "Run it again to get fresh results." });
+          }
+          return;
+        }
         if (res.ok) {
           const data: LiveSearchStatus = await res.json();
           setLiveStatus(data);
@@ -291,6 +356,7 @@ export default function SearchPage() {
       toast({ title: "Enter a search value", variant: "destructive" });
       return;
     }
+    restoredSearchRef.current = false;
     setSearchId(null);
     setLiveStatus(null);
     setInitialResults(null);
@@ -390,6 +456,8 @@ export default function SearchPage() {
     return results;
   }, [rawResults, filterDateFrom, filterDateTo, filterCounty, filterJurisdiction, filterStatuses, counties]);
 
+  const dateRangeInverted = !!filterDateFrom && !!filterDateTo && filterDateFrom > filterDateTo;
+
   const activeFilterCount = [
     filterDateFrom, filterDateTo,
     filterCounty !== "all" ? filterCounty : "",
@@ -433,7 +501,6 @@ export default function SearchPage() {
     }
   };
 
-  const activeDbCount = dbCounts?.total ?? 0;
   const selectedIcon = searchTypes.find((t) => t.value === searchType)?.icon ?? Search;
   const IconComponent = selectedIcon;
 
@@ -485,6 +552,11 @@ export default function SearchPage() {
               onValueChange={(val) => {
                 setScopeLocation(val);
                 setLocationSearch("");
+                // Picking a county under "All States" narrows to its state so its portals load.
+                if (val.startsWith("county-") && scopeState === "all") {
+                  const county = counties?.find(c => `county-${c.id}` === val);
+                  if (county) setScopeState(county.stateCode);
+                }
               }}
             >
               <SelectTrigger data-testid="select-scope-location" className="w-full">
@@ -509,13 +581,16 @@ export default function SearchPage() {
                   {scopeState === "all" ? "All Counties & Cities" : `All ${selectedStateName} Counties & Cities`}
                 </SelectItem>
                 {filteredLocationOptions.counties.map((county) => {
+                  // Counties here already matched the filter (by name, state or one of their portals).
                   const countyDbs = filteredLocationOptions.databases.filter(d => d.countyId === county.id);
-                  if (countyDbs.length === 0 && locationSearch) return null;
                   return (
                     <SelectGroup key={county.id}>
                       <SelectItem value={`county-${county.id}`}>
-                        <span className="font-medium">{county.name} County</span>
-                        <span className="text-muted-foreground ml-1">({countyDbs.length} databases)</span>
+                        <span className="font-medium">{county.name} County{scopeState === "all" ? `, ${county.stateCode}` : ""}</span>
+                        {/* Per-county counts need the state's portals; under All States they aren't loaded. */}
+                        {scopeState !== "all" && databases && (
+                          <span className="text-muted-foreground ml-1">({portalCount(countyDbs.length)})</span>
+                        )}
                       </SelectItem>
                       {countyDbs.map(db => (
                         <SelectItem key={db.id} value={`city-${db.id}`} className="pl-8">
@@ -596,7 +671,9 @@ export default function SearchPage() {
                   <Input
                     type="date"
                     value={filterDateFrom}
+                    max={filterDateTo || undefined}
                     onChange={(e) => setFilterDateFrom(e.target.value)}
+                    aria-invalid={dateRangeInverted}
                     className="h-8 text-xs"
                     data-testid="input-filter-date-from"
                   />
@@ -609,12 +686,19 @@ export default function SearchPage() {
                   <Input
                     type="date"
                     value={filterDateTo}
+                    min={filterDateFrom || undefined}
                     onChange={(e) => setFilterDateTo(e.target.value)}
+                    aria-invalid={dateRangeInverted}
                     className="h-8 text-xs"
                     data-testid="input-filter-date-to"
                   />
                 </div>
               </div>
+              {dateRangeInverted && (
+                <p className="text-xs text-destructive" role="alert" data-testid="text-date-range-error">
+                  End date is before start date, so no permits can match. Adjust one of the dates.
+                </p>
+              )}
 
               {activeFilterCount > 0 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -640,9 +724,12 @@ export default function SearchPage() {
           )}
 
           <div className="flex items-center justify-between gap-4 pt-1">
-            <p className="text-xs text-muted-foreground">
-              {scopedDbCount} database{scopedDbCount !== 1 ? "s" : ""}
-              {scopeState !== "all" ? ` in ${scopeState === "WA" ? "Washington" : "Florida"}` : ""}
+            <p className="text-xs text-muted-foreground" data-testid="text-scope-count">
+              {scopedDbCount !== null
+                ? `${portalCount(scopedDbCount)} ${scopePlace}`
+                : scopeState !== "all" && databasesLoading
+                  ? `Counting searchable portals ${scopePlace}…`
+                  : "Searches every live-searchable portal nationwide"}
             </p>
             <Button
               onClick={handleSearch}

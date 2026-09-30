@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,10 +18,21 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Clock,
@@ -31,18 +43,39 @@ import {
 } from "lucide-react";
 import type { ScrapeSchedule, PermitDatabase } from "@shared/schema";
 
+/** A schedule can only refresh a portal the live scraper supports and whose link is usable. */
+const isLiveSearchable = (db: PermitDatabase) => governmentLinksAvailable(db) && canScrapeGovernmentPortal(db);
+
 export default function SchedulesPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ScrapeSchedule | null>(null);
 
   const { data: schedules, isLoading, error } = useQuery<ScrapeSchedule[]>({
     queryKey: ["/api/scrape-schedules"],
   });
 
-  const { data: databases } = useQuery<PermitDatabase[]>({
-    queryKey: ["/api/databases"],
+  // ?scrapable=true lets the server send only live-searchable portals; the filter below
+  // keeps the picker to those portals whichever list comes back.
+  const { data: databaseRows, isLoading: databasesLoading } = useQuery<PermitDatabase[]>({
+    queryKey: ["/api/databases?scrapable=true"],
     enabled: !!schedules,
   });
+
+  // One option per scrape target: rows for a place that spans counties share a portal,
+  // and a schedule on any of them would scrape the same URL.
+  const databases = useMemo(() => {
+    const seen = new Set<string>();
+    return (databaseRows ?? []).filter(isLiveSearchable)
+      .sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction) || a.name.localeCompare(b.name) || a.id - b.id)
+      .filter((db) => {
+        const target = `${db.platform}|${db.searchUrl || db.portalUrl}`;
+        if (seen.has(target)) return false;
+        seen.add(target);
+        return true;
+      });
+  }, [databaseRows]);
+  const databaseById = useMemo(() => new Map((databaseRows ?? []).map((d) => [d.id, d])), [databaseRows]);
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
@@ -50,6 +83,9 @@ export default function SchedulesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scrape-schedules"] });
+    },
+    onError: (err, vars) => {
+      toast({ title: vars.isActive ? "Could not resume schedule" : "Could not pause schedule", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -61,10 +97,16 @@ export default function SchedulesPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/scrape-schedules"] });
       toast({ title: "Schedule deleted" });
     },
+    onError: (err) => {
+      toast({ title: "Could not delete schedule", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
 
-  const getDatabaseName = (dbId: number) =>
-    databases?.find((d) => d.id === dbId)?.name ?? `Database #${dbId}`;
+  const getDatabaseName = (dbId: number) => {
+    const db = databaseById.get(dbId);
+    if (db) return databaseLabel(db);
+    return databaseRows ? `Database #${dbId} (not a live-searchable portal)` : `Database #${dbId}`;
+  };
 
   if (error) return <div className="p-6"><Card className="p-6" role="alert">
     <h1 className="text-xl font-semibold">System permit-refresh schedules</h1>
@@ -112,9 +154,13 @@ export default function SchedulesPage() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Scrape Schedule</DialogTitle>
+                <DialogDescription>
+                  Choose a live-searchable permit portal and what to search it for.
+                </DialogDescription>
               </DialogHeader>
               <AddScheduleForm
-                databases={databases ?? []}
+                databases={databases}
+                loading={databasesLoading}
                 onSuccess={() => {
                   setDialogOpen(false);
                   toast({ title: "Schedule created" });
@@ -174,7 +220,10 @@ export default function SchedulesPage() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => deleteMutation.mutate(schedule.id)}
+                      onClick={() => setPendingDelete(schedule)}
+                      disabled={deleteMutation.isPending}
+                      aria-label="Delete schedule"
+                      title="Delete schedule"
                       data-testid={`button-delete-schedule-${schedule.id}`}
                     >
                       <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -196,21 +245,51 @@ export default function SchedulesPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this schedule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `${getDatabaseName(pendingDelete.databaseId)} — ${pendingDelete.searchType}: "${pendingDelete.searchValue}" (${pendingDelete.frequency}). It stops refreshing and can't be restored.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-schedule">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (pendingDelete) deleteMutation.mutate(pendingDelete.id); }}
+              data-testid="button-confirm-delete-schedule"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
+function databaseLabel(db: PermitDatabase) {
+  return db.name === db.jurisdiction ? db.name : `${db.name} — ${db.jurisdiction}`;
+}
+
 function AddScheduleForm({
   databases,
+  loading,
   onSuccess,
 }: {
   databases: PermitDatabase[];
+  loading: boolean;
   onSuccess: () => void;
 }) {
   const [databaseId, setDatabaseId] = useState("");
   const [searchType, setSearchType] = useState("address");
   const [searchValue, setSearchValue] = useState("");
   const [frequency, setFrequency] = useState("daily");
+  const { toast } = useToast();
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -219,6 +298,9 @@ function AddScheduleForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scrape-schedules"] });
       onSuccess();
+    },
+    onError: (err) => {
+      toast({ title: "Could not create schedule", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -237,19 +319,22 @@ function AddScheduleForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pt-1">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-muted-foreground">Database</Label>
-        <Select value={databaseId} onValueChange={setDatabaseId}>
+        <Label className="text-xs font-medium text-muted-foreground">Portal</Label>
+        <Select value={databaseId} onValueChange={setDatabaseId} disabled={loading || databases.length === 0}>
           <SelectTrigger data-testid="select-schedule-database">
-            <SelectValue placeholder="Select a database" />
+            <SelectValue placeholder={loading ? "Loading portals…" : databases.length ? `Select one of ${databases.length} live-searchable portals` : "No live-searchable portals available"} />
           </SelectTrigger>
           <SelectContent>
             {databases.map((db) => (
               <SelectItem key={db.id} value={db.id.toString()}>
-                {db.name}
+                {databaseLabel(db)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        <p className="text-[11px] text-muted-foreground">
+          Only portals our scraper can search automatically are listed.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

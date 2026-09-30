@@ -1,6 +1,7 @@
 import { governmentLinkNotice, governmentLinksAvailable } from "@shared/government-links";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,8 @@ import {
   ArrowUpRight,
   Filter,
   Phone,
-  Globe,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { County } from "@shared/schema";
 
@@ -45,9 +47,25 @@ export default function PropertyPage() {
     queryKey: ["/api/property-appraisers"],
   });
 
-  const [stateFilter, setStateFilter] = useState<string>("all");
-  const [countyFilter, setCountyFilter] = useState<string>(() => new URLSearchParams(window.location.search).get("countyId") || "all");
-  const [searchQuery, setSearchQuery] = useState("");
+  // Filters live in the address bar (?state=WA&countyId=12&q=…&page=2); ?countyId= is
+  // also the deep link the Search page's "Property lookup" uses.
+  const [stateFilter, setStateFilter] = useState<string>(() => readQueryParam("state")?.toUpperCase() || "all");
+  const [countyFilter, setCountyFilter] = useState<string>(() => String(readQueryInt("countyId") ?? "all"));
+  const [searchQuery, setSearchQuery] = useState(() => readQueryParam("q") ?? "");
+  const [page, setPage] = useState(() => readQueryInt("page") ?? 1);
+
+  // A county deep link selects its state so the county filter is visible (and
+  // clearable); an id with no office on record, or an unknown state, falls back to all.
+  useEffect(() => {
+    if (!appraisers) return;
+    if (countyFilter !== "all") {
+      const county = appraisers.find(a => String(a.countyId) === countyFilter)?.county;
+      if (!county) setCountyFilter("all");
+      else if (county.stateCode !== stateFilter) setStateFilter(county.stateCode);
+    } else if (stateFilter !== "all" && !appraisers.some(a => a.county?.stateCode === stateFilter)) {
+      setStateFilter("all");
+    }
+  }, [appraisers]);
 
   const states = useMemo(() => {
     if (!appraisers) return [];
@@ -96,18 +114,37 @@ export default function PropertyPage() {
     });
   }, [appraisers, stateFilter, countyFilter, searchQuery]);
 
-  const handleStateChange = (val: string) => {
-    setStateFilter(val);
-    setCountyFilter("all");
-  };
-
-  const [page, setPage] = useState(1);
   const perPage = 25;
   const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  // A page number past the end (stale link, narrower filter) shows the last page.
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const paginated = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
+
+  useEffect(() => {
+    if (!appraisers) return;
+    replaceQueryParams({
+      state: stateFilter !== "all" ? stateFilter : null,
+      countyId: countyFilter !== "all" ? countyFilter : null,
+      q: searchQuery.trim() || null,
+      page: currentPage > 1 ? currentPage : null,
+    });
+  }, [appraisers, stateFilter, countyFilter, searchQuery, currentPage]);
+
+  const goToPage = (next: number) => {
+    setPage(Math.min(Math.max(1, next), Math.max(1, totalPages)));
+    document.querySelector("[data-testid=page-property]")?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const handleStateChange2 = (val: string) => {
-    handleStateChange(val);
+    setStateFilter(val);
+    setCountyFilter("all");
+    setPage(1);
+  };
+
+  const clearFilters = () => {
+    setStateFilter("all");
+    setCountyFilter("all");
+    setSearchQuery("");
     setPage(1);
   };
 
@@ -156,7 +193,7 @@ export default function PropertyPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by city, county, or state..."
+              placeholder="Search by office, county, or state…"
               value={searchQuery}
               onChange={handleSearchChange}
               className="pl-9 h-9 text-sm"
@@ -196,7 +233,7 @@ export default function PropertyPage() {
             {hasFilters && (
               <button
                 type="button"
-                onClick={() => { setStateFilter("all"); setCountyFilter("all"); setSearchQuery(""); }}
+                onClick={clearFilters}
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-clear-filters"
               >
@@ -205,7 +242,7 @@ export default function PropertyPage() {
             )}
             <span className="text-xs text-muted-foreground ml-auto">
               {filtered.length > perPage
-                ? `Showing ${(page - 1) * perPage + 1}–${Math.min(page * perPage, filtered.length)} of ${filtered.length.toLocaleString()} results`
+                ? `Showing ${(currentPage - 1) * perPage + 1}–${Math.min(currentPage * perPage, filtered.length)} of ${filtered.length.toLocaleString()} results`
                 : `${filtered.length} result${filtered.length !== 1 ? "s" : ""}`}
             </span>
           </div>
@@ -225,7 +262,7 @@ export default function PropertyPage() {
               {hasFilters && (
                 <button
                   type="button"
-                  onClick={() => { setStateFilter("all"); setCountyFilter("all"); setSearchQuery(""); }}
+                  onClick={clearFilters}
                   className="text-xs text-primary mt-2 hover:underline"
                   data-testid="button-clear-empty"
                 >
@@ -241,7 +278,7 @@ export default function PropertyPage() {
                 style={{ boxShadow: 'var(--shadow-2xs)' }}
                 data-testid={`card-appraiser-${appraiser.id}`}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold">{appraiser.name}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
@@ -255,8 +292,9 @@ export default function PropertyPage() {
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-3 mt-2">
-                      {appraiser.phone && (
+                    {/* The official site opens from "Visit"; no second inline link to the same URL. */}
+                    {appraiser.phone && (
+                      <div className="flex flex-wrap items-center gap-3 mt-2">
                         <a
                           href={`tel:${appraiser.phone}`}
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
@@ -265,20 +303,8 @@ export default function PropertyPage() {
                           <Phone className="h-3 w-3" />
                           {appraiser.phone}
                         </a>
-                      )}
-                      {governmentLinksAvailable(appraiser) && appraiser.portalUrl && (
-                        <a
-                          href={appraiser.portalUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                          data-testid={`link-website-${appraiser.id}`}
-                        >
-                          <Globe className="h-3 w-3" />
-                          Website
-                        </a>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {governmentLinksAvailable(appraiser) && governmentLinkNotice(appraiser) && <p className="text-xs text-muted-foreground mt-2">{governmentLinkNotice(appraiser)}</p>}
 
@@ -297,11 +323,11 @@ export default function PropertyPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                     <Badge variant="outline" className="text-[10px] h-5 px-1.5">
                       {appraiser.county?.stateCode}
                     </Badge>
-                    {governmentLinksAvailable(appraiser) && appraiser.searchUrl && <Button
+                    {governmentLinksAvailable(appraiser) && appraiser.searchUrl && appraiser.searchUrl !== appraiser.portalUrl && <Button
                       size="sm"
                       variant="outline"
                       asChild
@@ -333,6 +359,33 @@ export default function PropertyPage() {
                 </div>
               </Card>
             ))
+          )}
+          {!isLoading && totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 py-4" data-testid="pagination">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => goToPage(currentPage - 1)}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Prev
+              </Button>
+              <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-page-status">
+                Page {currentPage} of {totalPages.toLocaleString()}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => goToPage(currentPage + 1)}
+                data-testid="button-next-page"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           )}
         </div>
 
