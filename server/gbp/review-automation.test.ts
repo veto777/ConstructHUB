@@ -119,4 +119,10 @@ describe('AI reply settings and queue with injected AI/publisher',()=>{
   it('review reports contain actual review evidence and never mark submission on read',async()=>{
     const r=await add();const report=await reportFor(user,'reviews',r);expect(report.text).toContain('Untrusted review text');expect(report.formUrl).toContain('9945796');expect(report.reportedAt).toBeNull();await expect(reportFor(other,'reviews',r)).rejects.toMatchObject({status:404});
   });
+  it('a manually entered review with no listing still gets a report, without a listing link',async()=>{
+    const r=(await pool.query(`INSERT INTO google_profile_reviews(user_id,reviewer_name,rating,comment,review_date) VALUES($1,'Manual fixture',2,'Manual review text',now()) RETURNING id`,[user])).rows[0].id;
+    const report=await reportFor(user,'reviews',r);
+    expect(report.text).toContain('Business: Not linked to an imported listing');expect(report.text).toContain('Local record (not verified on Google)');expect(report.text).toContain('Manual review text');expect(report.listingUrl).toBeNull();
+    await expect(reportFor(other,'reviews',r)).rejects.toMatchObject({status:404});
+  });
 });

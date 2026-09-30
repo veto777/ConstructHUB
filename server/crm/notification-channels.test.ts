@@ -453,7 +453,7 @@ describe("notification channel matrix (dev server)", () => {
       const lead = await api(`/api/public/leads/${token}`, {
         method: "POST",
         headers: { "x-forwarded-for": ip },
-        body: JSON.stringify({ name, message: "roof leak" }),
+        body: JSON.stringify({ name, phone: "555-0100", message: "roof leak" }),
       });
       expect(lead.status).toBe(201);
 
@@ -473,7 +473,7 @@ describe("notification channel matrix (dev server)", () => {
       const lead = await api(`/api/public/leads/${token}`, {
         method: "POST",
         headers: { "x-forwarded-for": ip.replace(/\d+$/, "99") },
-        body: JSON.stringify({ name, message: "siding" }),
+        body: JSON.stringify({ name, phone: "555-0100", message: "siding" }),
       });
       expect(lead.status).toBe(201);
 

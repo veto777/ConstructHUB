@@ -4,7 +4,7 @@ import { AiReplySettings } from "@/components/ai-review-replies";
 import { GbpConnection } from "@/components/gbp-connection";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useUrlParam } from "@/hooks/use-url-param";
 
+// Pacific time with the real abbreviation (PDT in summer, PST in winter).
 const formatPST = (dateStr: string) => {
   try {
     return new Date(dateStr).toLocaleString("en-US", {
@@ -38,11 +39,32 @@ const formatPST = (dateStr: string) => {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
-    }) + " PST";
+      timeZoneName: "short",
+    });
   } catch {
     return new Date(dateStr).toLocaleString();
   }
 };
+
+// The browser's own calendar date (YYYY-MM-DD). toISOString() is the UTC date,
+// which is already "tomorrow" every US evening.
+const localYmd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const tomorrowYmd = () => { const d = new Date(); d.setDate(d.getDate() + 1); return localYmd(d); };
+
+// "Eastern Time" for America/New_York; the IANA id if the browser can't name it.
+const timeZoneLabel = (tz: string) => {
+  try {
+    const part = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "longGeneric" as any })
+      .formatToParts(new Date()).find(p => p.type === "timeZoneName");
+    return part?.value || tz;
+  } catch {
+    return tz;
+  }
+};
+
+// Server upload limit per request (multer upload.array("photos", 10)).
+const PHOTO_UPLOAD_BATCH = 10;
 
 const stepLabels: Record<string, string> = {
   rating: "Rating",
@@ -120,6 +142,7 @@ export default function GoogleReviewsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedReviewId, setExpandedReviewId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [confirmDeleteTemplateId, setConfirmDeleteTemplateId] = useState<number | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [confirmPermanentDeleteId, setConfirmPermanentDeleteId] = useState<number | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -190,22 +213,37 @@ export default function GoogleReviewsPage() {
       return;
     }
     setUploadingPhotos(true);
+    const all = Array.from(files);
+    let uploaded = 0;
     try {
-      const formData = new FormData();
-      for (const file of Array.from(files)) {
-        formData.append("photos", file);
+      // The server takes at most PHOTO_UPLOAD_BATCH files per request, so a
+      // bigger selection goes up in consecutive batches.
+      for (let i = 0; i < all.length; i += PHOTO_UPLOAD_BATCH) {
+        const formData = new FormData();
+        for (const file of all.slice(i, i + PHOTO_UPLOAD_BATCH)) {
+          formData.append("photos", file);
+        }
+        const res = await fetch("/api/upload/review-photos", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(body?.message || `Upload failed (${res.status})`);
+        }
+        const data = await res.json();
+        uploaded += data.photos.length;
+        setAttachedPhotos(prev => [...prev, ...data.photos]);
       }
-      const res = await fetch("/api/upload/review-photos", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
+      toast({ title: "Photos uploaded", description: `${uploaded} photo${uploaded !== 1 ? "s" : ""} attached.` });
+    } catch (err: any) {
+      const detail = err?.message || "Could not upload photos.";
+      toast({
+        title: "Upload failed",
+        description: uploaded > 0 ? `${uploaded} of ${all.length} photos attached. ${detail}` : detail,
+        variant: "destructive",
       });
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
-      setAttachedPhotos(prev => [...prev, ...data.photos]);
-      toast({ title: "Photos uploaded", description: `${data.photos.length} photo${data.photos.length > 1 ? "s" : ""} attached.` });
-    } catch {
-      toast({ title: "Upload failed", description: "Could not upload photos. Try again.", variant: "destructive" });
     } finally {
       setUploadingPhotos(false);
       e.target.value = "";
@@ -271,9 +309,15 @@ export default function GoogleReviewsPage() {
         setSavedBccEmails(updated);
         localStorage.setItem("savedBccEmails", JSON.stringify(updated));
       }
+      // A scheduled send is described in the browser's own time zone (the
+      // server's message is formatted in the server's zone).
+      const picked = scheduleEnabled && scheduleDate && scheduleTime ? new Date(`${scheduleDate}T${scheduleTime}`) : null;
+      const scheduledAt = picked && /scheduled/i.test(data?.message || "") ? picked : null;
       toast({
-        title: scheduleEnabled ? "Scheduled!" : "Review request sent!",
-        description: data?.message || `Feedback request emailed to ${clientEmail}`,
+        title: scheduledAt ? "Scheduled!" : "Review request sent!",
+        description: scheduledAt
+          ? `Review request will be sent ${scheduledAt.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
+          : data?.message || `Feedback request emailed to ${clientEmail}`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
       setCreateOpen(false);
@@ -292,7 +336,7 @@ export default function GoogleReviewsPage() {
       setScheduleTime("09:00");
     },
     onError: (err: any) => {
-      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to send", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -305,6 +349,9 @@ export default function GoogleReviewsPage() {
       toast({ title: "Resent!", description: "Review request email sent again." });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
     },
+    onError: (err: any) => {
+      toast({ title: "Could not resend", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -315,6 +362,9 @@ export default function GoogleReviewsPage() {
       toast({ title: "Moved to Trash", description: "Review request moved to trash. It will be permanently deleted after 14 days." });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/trash"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not delete", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -331,6 +381,9 @@ export default function GoogleReviewsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/trash"] });
     },
+    onError: (err: any) => {
+      toast({ title: "Could not restore", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
 
   const permanentDeleteMutation = useMutation({
@@ -340,6 +393,9 @@ export default function GoogleReviewsPage() {
     onSuccess: () => {
       toast({ title: "Permanently Deleted", description: "Review request permanently removed." });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/trash"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not delete", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -353,14 +409,16 @@ export default function GoogleReviewsPage() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (template: any) => {
       toast({ title: "Template saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/review-templates"] });
+      // Added from inside the send dialog: pick the new profile for this request.
+      if (createOpen && template?.id) setSelectedTemplateId(String(template.id));
       setTemplateDialogOpen(false);
       resetTemplateForm();
     },
     onError: (err: any) => {
-      toast({ title: "Failed to save template", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to save template", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -382,7 +440,7 @@ export default function GoogleReviewsPage() {
       resetTemplateForm();
     },
     onError: (err: any) => {
-      toast({ title: "Failed to update template", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to update template", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -393,6 +451,9 @@ export default function GoogleReviewsPage() {
     onSuccess: () => {
       toast({ title: "Template deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/review-templates"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not delete template", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -435,6 +496,8 @@ export default function GoogleReviewsPage() {
     if (review.googleLinkOpened) return <Badge className="bg-green-600 text-white" data-testid={`badge-status-${review.id}`}><CheckCircle2 className="w-3 h-3 mr-1" />Google link opened</Badge>;
     if (review.status === "positive_feedback") return <Badge className="bg-blue-600 text-white" data-testid={`badge-status-${review.id}`}><Star className="w-3 h-3 mr-1" />Positive</Badge>;
     if (review.status === "negative_feedback") return <Badge variant="secondary" data-testid={`badge-status-${review.id}`}><MessageSquare className="w-3 h-3 mr-1" />Feedback</Badge>;
+    // No response and unsubscribed: the card's own "Unsubscribed" badge says it all — never "Pending".
+    if (review.unsubscribed) return null;
     if (review.status === "scheduled") return <Badge className="bg-amber-500/80 text-white" data-testid={`badge-status-${review.id}`}><CalendarDays className="w-3 h-3 mr-1" />Scheduled{review.scheduledFor ? ` · ${new Date(review.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</Badge>;
     return <Badge variant="outline" data-testid={`badge-status-${review.id}`}><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
   };
@@ -447,9 +510,9 @@ export default function GoogleReviewsPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6 relative">
       <FloatingParticles color="#f59e0b" />
-      <div className="flex items-center justify-between relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
             <Star className="w-5 h-5 text-amber-500" />
           </div>
           <div>
@@ -460,7 +523,7 @@ export default function GoogleReviewsPage() {
           </div>
         </div>
         {pageTab === "requests" && (
-          <Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={openSendDialog} data-testid="button-new-review-request">
+          <Button className="bg-amber-500 hover:bg-amber-600 text-white w-full sm:w-auto shrink-0" onClick={openSendDialog} data-testid="button-new-review-request">
             <Plus className="w-4 h-4 mr-2" />
             New Review Request
           </Button>
@@ -480,7 +543,7 @@ export default function GoogleReviewsPage() {
         </TabsList>
       </Tabs>
 
-      {pageTab === "requests" && (<div className="contents">
+      {pageTab === "requests" && (<div className="space-y-6">
 
       {createOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center" data-testid="modal-send-review">
@@ -499,7 +562,7 @@ export default function GoogleReviewsPage() {
                 Send Review Request
               </h2>
               <p className="text-sm text-muted-foreground">
-                Send a feedback request to your client. They'll rate their experience, and happy clients will be guided to leave a Google review.
+                Send a feedback request to your client. They'll rate their experience and every client is invited to leave a Google review.
               </p>
             </div>
             <div className="space-y-5">
@@ -509,7 +572,8 @@ export default function GoogleReviewsPage() {
                   <>
                     <Select value={selectedTemplateId} onValueChange={(val) => {
                       if (val === "__create__") {
-                        window.location.href = "/settings";
+                        // Opens on top of this dialog, so the request typed so far is kept.
+                        openNewTemplate();
                       } else {
                         setSelectedTemplateId(val);
                       }
@@ -523,11 +587,13 @@ export default function GoogleReviewsPage() {
                             {t.name} {t.isDefault ? "(Default)" : ""}
                           </SelectItem>
                         ))}
-                        <SelectItem value="__create__">
-                          <span className="flex items-center gap-1 text-primary">
-                            <Plus className="w-3.5 h-3.5" /> Add another profile...
-                          </span>
-                        </SelectItem>
+                        {templates.length < maxTemplates && (
+                          <SelectItem value="__create__">
+                            <span className="flex items-center gap-1 text-primary">
+                              <Plus className="w-3.5 h-3.5" /> Add another profile...
+                            </span>
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">Reviews will be directed to this profile's Google review link</p>
@@ -538,9 +604,9 @@ export default function GoogleReviewsPage() {
                       <AlertTriangle className="w-4 h-4 shrink-0" />
                       No Google Business Profiles set up yet.
                     </p>
-                    <a href="/settings" className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-primary hover:underline" data-testid="link-create-profile">
-                      <Plus className="w-3.5 h-3.5" /> Create one in Settings
-                    </a>
+                    <button type="button" onClick={openNewTemplate} className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-primary hover:underline" data-testid="link-create-profile">
+                      <Plus className="w-3.5 h-3.5" /> Add a Google Business Profile
+                    </button>
                   </div>
                 )}
               </div>
@@ -594,16 +660,17 @@ export default function GoogleReviewsPage() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
+                {/* On phones the tooltip hangs off the whole label row (full dialog width); from sm up, beside the icon. */}
+                <div className="relative flex items-center gap-1.5">
                   <Label htmlFor="bccEmail"><Mail className="w-3.5 h-3.5 inline mr-1" />BCC Email</Label>
-                  <div className="relative">
+                  <div className="sm:relative">
                     <button type="button" onClick={() => setBccInfoOpen(!bccInfoOpen)} className="text-amber-500 hover:text-amber-600 transition-colors" data-testid="icon-bcc-info">
                       <Info className="w-3.5 h-3.5" />
                     </button>
                     {bccInfoOpen && (
                       <>
                         <div className="fixed inset-0 z-[299]" onClick={() => setBccInfoOpen(false)} />
-                        <div className="absolute top-0 left-full ml-2 w-72 p-3 rounded-lg bg-popover border border-border shadow-lg text-xs text-popover-foreground z-[300]" data-testid="tooltip-bcc-info">
+                        <div className="absolute top-full left-0 right-0 mt-2 sm:right-auto sm:top-0 sm:left-full sm:mt-0 sm:ml-2 sm:w-72 p-3 rounded-lg bg-popover border border-border shadow-lg text-xs text-popover-foreground z-[300]" data-testid="tooltip-bcc-info">
                           <button type="button" onClick={() => setBccInfoOpen(false)} className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
                           <p className="font-semibold text-amber-500 mb-1.5">Why this is critical for deliverability</p>
                           <p className="mb-1.5">Adding a BCC of your existing business email helps the review request avoid spam folders. Email providers like Gmail track sender-recipient relationships — if this client has already received emails from you, that trust carries over.</p>
@@ -942,7 +1009,7 @@ export default function GoogleReviewsPage() {
                           type="date"
                           value={scheduleDate}
                           onChange={e => setScheduleDate(e.target.value)}
-                          min={new Date().toISOString().split("T")[0]}
+                          min={localYmd(new Date())}
                           className="text-sm"
                           data-testid="input-schedule-date"
                         />
@@ -960,9 +1027,9 @@ export default function GoogleReviewsPage() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        { label: "Tomorrow 9am", getDate: () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; }, time: "09:00" },
-                        { label: "Tomorrow 3pm", getDate: () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; }, time: "15:00" },
-                        { label: "Tomorrow 6pm", getDate: () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; }, time: "18:00" },
+                        { label: "Tomorrow 9am", getDate: tomorrowYmd, time: "09:00" },
+                        { label: "Tomorrow 3pm", getDate: tomorrowYmd, time: "15:00" },
+                        { label: "Tomorrow 6pm", getDate: tomorrowYmd, time: "18:00" },
                       ].map(preset => (
                         <button
                           key={preset.label}
@@ -1104,7 +1171,7 @@ export default function GoogleReviewsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold" data-testid="stat-total-sent">{reviews.length}</p>
+            <p className="text-2xl font-bold" data-testid="stat-total-sent">{reviews.filter((r: any) => r.status !== "scheduled" && r.status !== "suppressed").length}</p>
             <p className="text-xs text-muted-foreground">Total Sent</p>
           </CardContent>
         </Card>
@@ -1122,7 +1189,7 @@ export default function GoogleReviewsPage() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-amber-600" data-testid="stat-pending">{reviews.filter((r: any) => r.status === "sent").length}</p>
+            <p className="text-2xl font-bold text-amber-600" data-testid="stat-pending">{reviews.filter((r: any) => r.status === "sent" && !r.unsubscribed).length}</p>
             <p className="text-xs text-muted-foreground">Awaiting Response</p>
           </CardContent>
         </Card>
@@ -1196,16 +1263,39 @@ export default function GoogleReviewsPage() {
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteTemplateMutation.mutate(template.id)}
-                      title="Delete template"
-                      data-testid={`button-delete-template-${template.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {confirmDeleteTemplateId === template.id ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-destructive hover:bg-destructive hover:text-white font-semibold"
+                          onClick={() => { deleteTemplateMutation.mutate(template.id); setConfirmDeleteTemplateId(null); }}
+                          data-testid={`button-confirm-delete-template-${template.id}`}
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground"
+                          onClick={() => setConfirmDeleteTemplateId(null)}
+                          data-testid={`button-cancel-delete-template-${template.id}`}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => setConfirmDeleteTemplateId(template.id)}
+                        title="Delete template"
+                        data-testid={`button-delete-template-${template.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1256,7 +1346,7 @@ export default function GoogleReviewsPage() {
             <div className="text-center py-12 space-y-3">
               <Star className="w-10 h-10 text-muted-foreground mx-auto" />
               <p className="font-medium">No review requests yet</p>
-              <p className="text-sm text-muted-foreground">Send your first review request to start collecting Google reviews from happy clients.</p>
+              <p className="text-sm text-muted-foreground">Send your first review request to start collecting Google reviews from your clients.</p>
             </div>
           ) : filteredReviews.length === 0 ? (
             <div className="text-center py-8 space-y-2">
@@ -1340,17 +1430,19 @@ export default function GoogleReviewsPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => { e.stopPropagation(); resendMutation.mutate(review.id); }}
-                        disabled={resendMutation.isPending}
-                        title="Resend email"
-                        data-testid={`button-resend-${review.id}`}
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </Button>
+                      {!review.unsubscribed && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => { e.stopPropagation(); resendMutation.mutate(review.id); }}
+                          disabled={resendMutation.isPending}
+                          title="Resend email"
+                          data-testid={`button-resend-${review.id}`}
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                      )}
                       {confirmDeleteId === review.id ? (
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
@@ -1400,12 +1492,12 @@ export default function GoogleReviewsPage() {
                               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Personal Review Link</p>
                               <span className="text-[10px] text-muted-foreground">Send manually if needed</span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Input
                                 value={reviewUrl}
                                 readOnly
                                 onClick={(e) => { e.stopPropagation(); (e.currentTarget as HTMLInputElement).select(); }}
-                                className="h-8 text-xs font-mono bg-background"
+                                className="h-8 text-xs font-mono bg-background w-full sm:w-auto sm:flex-1 min-w-0"
                                 data-testid={`input-review-link-${review.id}`}
                               />
                               <Button
@@ -1512,8 +1604,16 @@ export default function GoogleReviewsPage() {
                           </div>
                         </div>
 
-                        {review.lastStep && !review.reviewSubmitted && (
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800">
+                        {review.lastStep === "done" || review.lastStep === "bonus_reviews" ? (
+                          // ConstructHUB can't see whether a review was actually posted on Google — only that the flow was finished.
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 border-border/50" data-testid={`tile-flow-completed-${review.id}`}>
+                            <CheckCircle2 className="w-4 h-4 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-muted-foreground">Completed flow</p>
+                            </div>
+                          </div>
+                        ) : review.lastStep && !review.reviewSubmitted ? (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800" data-testid={`tile-flow-bounced-${review.id}`}>
                             <Target className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
                             <div className="min-w-0">
                               <p className="text-xs font-medium text-orange-700 dark:text-orange-300">
@@ -1521,7 +1621,7 @@ export default function GoogleReviewsPage() {
                               </p>
                             </div>
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
                       {(review.feedbackComments || review.feedbackCategories || (review.feedbackRating && review.feedbackRating < 9)) && (
@@ -1815,6 +1915,7 @@ function GoogleProfileReviewsTab() {
   const [replyText, setReplyText] = useState("");
   const [noteEditId, setNoteEditId] = useState<number | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [confirmDeleteReviewId, setConfirmDeleteReviewId] = useState<number | null>(null);
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const [locationSearch, setLocationSearch] = useState("");
 
@@ -1849,13 +1950,17 @@ function GoogleProfileReviewsTab() {
       const res = await apiRequest(action === "delete" ? "DELETE" : "PATCH", `/api/google-profile-reviews/${id}/reply`, { replyComment, action });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, { replyComment, action = "draft" }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/google-profile-reviews"] });
-      toast({ title: "Reply action confirmed" });
+      toast({
+        title: action === "publish" ? "Reply published to Google"
+          : action === "delete" ? "Reply deleted from Google"
+          : replyComment.trim() ? "Draft saved in ConstructHUB" : "Draft discarded",
+      });
       setReplyingToId(null);
       setReplyText("");
     },
-    onError: (e: Error) => { queryClient.invalidateQueries({queryKey:["/api/gbp/status"]}); queryClient.invalidateQueries({queryKey:["/api/google-profile-reviews"]}); toast({title:"Reply failed",description:e.message,variant:"destructive"}); },
+    onError: (e: Error) => { queryClient.invalidateQueries({queryKey:["/api/gbp/status"]}); queryClient.invalidateQueries({queryKey:["/api/google-profile-reviews"]}); toast({title:"Reply failed",description:apiErrorMessage(e),variant:"destructive"}); },
   });
 
   const noteMutation = useMutation({
@@ -1869,6 +1974,9 @@ function GoogleProfileReviewsTab() {
       setNoteEditId(null);
       setNoteText("");
     },
+    onError: (err: any) => {
+      toast({ title: "Could not save note", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -1878,6 +1986,9 @@ function GoogleProfileReviewsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/google-profile-reviews"] });
       toast({ title: "Review deleted" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not delete review", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -2120,18 +2231,19 @@ function GoogleProfileReviewsTab() {
             return (
               <Card key={review.id} data-testid={`card-profile-review-${review.id}`}>
                 <CardContent className="p-0">
-                  {locationName && (
-                    <div className="px-4 pt-3 pb-2 border-b border-border/30 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Building2 className="w-3.5 h-3.5" />
-                        <span className="font-medium text-foreground">{locationName}</span>
-                        {locationCategories && (
-                          <>
-                            <span className="text-border">|</span>
-                            <span>{locationCategories}</span>
-                          </>
-                        )}
-                      </div>
+                  <div className={`px-4 pt-3 pb-2 border-b border-border/30 flex items-center gap-2 ${locationName ? "justify-between" : "justify-end"}`}>
+                      {locationName && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+                          <Building2 className="w-3.5 h-3.5 shrink-0" />
+                          <span className="font-medium text-foreground truncate">{locationName}</span>
+                          {locationCategories && (
+                            <>
+                              <span className="text-border">|</span>
+                              <span className="truncate">{locationCategories}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -2145,8 +2257,7 @@ function GoogleProfileReviewsTab() {
                         <StickyNote className="w-3 h-3" />
                         {review.internalNote ? "Edit Note" : "Add Internal Note"}
                       </Button>
-                    </div>
-                  )}
+                  </div>
 
                   <div className="p-4">
                     <div className="flex items-start gap-3">
@@ -2228,16 +2339,39 @@ function GoogleProfileReviewsTab() {
                             <MessageSquare className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteMutation.mutate(review.id)}
-                          title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
-                          data-testid={`button-delete-review-${review.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {confirmDeleteReviewId === review.id ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-destructive hover:bg-destructive hover:text-white font-semibold"
+                              onClick={() => { deleteMutation.mutate(review.id); setConfirmDeleteReviewId(null); }}
+                              data-testid={`button-confirm-delete-review-${review.id}`}
+                            >
+                              Delete
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-muted-foreground"
+                              onClick={() => setConfirmDeleteReviewId(null)}
+                              data-testid={`button-cancel-delete-review-${review.id}`}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setConfirmDeleteReviewId(review.id)}
+                            title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
+                            data-testid={`button-delete-review-${review.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -2270,7 +2404,21 @@ function GoogleProfileReviewsTab() {
 
                     <GoogleReport type="reviews" id={review.id} />
                     {!review.googleReviewId && <p className="text-xs text-muted-foreground">Manually entered record — not synced from Google.</p>}
-                    {review.replyDraft && <p className="p-3 text-sm">Draft saved in ConstructHUB: {review.replyDraft}</p>}
+                    {review.replyDraft && (
+                      <div className="p-3 flex items-start gap-2" data-testid={`reply-draft-${review.id}`}>
+                        <p className="text-sm flex-1 min-w-0 break-words">Draft saved in ConstructHUB: {review.replyDraft}</p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive shrink-0"
+                          disabled={replyMutation.isPending}
+                          onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "draft" })}
+                          data-testid={`button-discard-draft-${review.id}`}
+                        >
+                          Discard draft
+                        </Button>
+                      </div>
+                    )}
                     {review.replyError && <p role="alert" className="text-destructive">{review.replyError}</p>}
                     {review.replyComment && (
                       <div className="mt-4 ml-4 sm:ml-13 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 rounded-lg">
@@ -2335,8 +2483,16 @@ function ReminderSettingsCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/review-reminder-settings"] });
       toast({ title: "Reminder settings saved" });
     },
-    onError: () => {
-      toast({ title: "Failed to save settings", variant: "destructive" });
+    onError: (err: any) => {
+      // 400 bodies carry zod's flatten(): { errors: { fieldErrors: { timeWindows: ["Window end must follow its start"] } } }
+      let detail = apiErrorMessage(err);
+      try {
+        const body = JSON.parse(String(err?.message ?? "").replace(/^\d{3}:\s*/, ""));
+        const fieldErrors = body?.errors?.fieldErrors ?? {};
+        const first = Object.values(fieldErrors).flat().find((m): m is string => typeof m === "string");
+        if (first) detail = first;
+      } catch { /* not JSON — keep apiErrorMessage */ }
+      toast({ title: "Failed to save settings", description: detail, variant: "destructive" });
     },
   });
 
@@ -2348,6 +2504,8 @@ function ReminderSettingsCard() {
   function updateTimeWindow(index: number, field: "start" | "end", value: number) {
     const windows = [...(currentSettings.timeWindows || [])];
     windows[index] = { ...windows[index], [field]: value };
+    // A window must end after it starts — moving the start past the end pushes the end along.
+    if (field === "start" && windows[index].end <= value) windows[index] = { ...windows[index], end: value + 1 };
     setLocalSettings({ ...currentSettings, timeWindows: windows });
   }
 
@@ -2451,7 +2609,7 @@ function ReminderSettingsCard() {
               <div className="space-y-3">
                 <Label className="flex items-center gap-2 text-base font-medium">
                   <Clock className="h-4 w-4" />
-                  Delivery Time Windows (EST)
+                  Delivery Time Windows ({timeZoneLabel(currentSettings.timezone || "America/New_York")})
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   Each reminder is sent during a different time window for better open rates. Times rotate through the windows below.
@@ -2459,7 +2617,7 @@ function ReminderSettingsCard() {
 
                 <div className="grid gap-3">
                   {(currentSettings.timeWindows || []).slice(0, currentSettings.maxReminders).map((window: any, i: number) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
+                    <div key={i} className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
                       <Badge variant="outline" className="shrink-0 text-xs min-w-[100px] justify-center">
                         {reminderLabels[i] || `Reminder ${i + 1}`}
                       </Badge>
@@ -2467,7 +2625,7 @@ function ReminderSettingsCard() {
                         value={String(window.start)}
                         onValueChange={v => updateTimeWindow(i, "start", parseInt(v))}
                       >
-                        <SelectTrigger className="w-[130px]" data-testid={`select-window-start-${i}`}>
+                        <SelectTrigger className="w-full sm:w-[130px]" data-testid={`select-window-start-${i}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2481,11 +2639,11 @@ function ReminderSettingsCard() {
                         value={String(window.end)}
                         onValueChange={v => updateTimeWindow(i, "end", parseInt(v))}
                       >
-                        <SelectTrigger className="w-[130px]" data-testid={`select-window-end-${i}`}>
+                        <SelectTrigger className="w-full sm:w-[130px]" data-testid={`select-window-end-${i}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: 15 }, (_, h) => h + 7).map(h => (
+                          {Array.from({ length: 15 }, (_, h) => h + 7).filter(h => h > window.start || h === window.end).map(h => (
                             <SelectItem key={h} value={String(h)}>{formatHour(h)}</SelectItem>
                           ))}
                         </SelectContent>

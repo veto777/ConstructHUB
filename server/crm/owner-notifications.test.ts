@@ -377,7 +377,7 @@ describe("owner notifications (dev server)", () => {
     const leadA = await api(`/api/public/leads/${token}`, {
       method: "POST",
       headers: { "x-forwarded-for": ipA },
-      body: JSON.stringify({ name: `Vitest Lead ${stamp} A`, message: "roof leak" }),
+      body: JSON.stringify({ name: `Vitest Lead ${stamp} A`, phone: "555-0100", message: "roof leak" }),
     });
     expect(leadA.status).toBe(201);
 
@@ -392,7 +392,7 @@ describe("owner notifications (dev server)", () => {
       const leadB = await api(`/api/public/leads/${token}`, {
         method: "POST",
         headers: { "x-forwarded-for": ipA.replace(/\d+$/, "99") },
-        body: JSON.stringify({ name: `Vitest Lead ${stamp} B`, message: "siding" }),
+        body: JSON.stringify({ name: `Vitest Lead ${stamp} B`, phone: "555-0100", message: "siding" }),
       });
       expect(leadB.status).toBe(201);
       await sleep(1200);

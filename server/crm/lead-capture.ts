@@ -83,14 +83,20 @@ async function orgForLeadToken(token: string): Promise<typeof crmOrgs.$inferSele
 
 // ── Lead intake ─────────────────────────────────────────────────────────────
 
+// Messages are written for the person filling in the form: the public form
+// shows the first one as-is.
 const leadSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  email: z.string().trim().email().max(200).nullish(),
-  phone: z.string().trim().max(40).nullish(),
-  message: z.string().trim().max(5000).nullish(),
-  address: z.string().trim().max(300).nullish(),
+  name: z.string().trim().min(1, "Add your name").max(200, "Name is too long (200 characters max)"),
+  email: z.string().trim().email("Enter a valid email address").max(200, "Email is too long (200 characters max)").nullish(),
+  phone: z.string().trim().max(40, "Phone number is too long (40 characters max)").nullish(),
+  message: z.string().trim().max(5000, "Message is too long (5,000 characters max)").nullish(),
+  address: z.string().trim().max(300, "Address is too long (300 characters max)").nullish(),
   // Honeypot: invisible to humans, irresistible to bots. Must come back empty.
   website: z.string().max(300).nullish(),
+}).refine((d) => !!(d.email || d.phone), {
+  // A lead nobody can reach is not a lead.
+  message: "Add an email or phone so we can reach you",
+  path: ["email"],
 });
 
 /** The per-org "Website" lead source, created on first use. */
@@ -122,7 +128,7 @@ async function orgOwnerMember(org: typeof crmOrgs.$inferSelect) {
 async function notifyLeadReceived(
   org: typeof crmOrgs.$inferSelect,
   owner: typeof crmMembers.$inferSelect | null,
-  lead: { name: string; email?: string | null; phone?: string | null; message?: string | null },
+  lead: { id: string; name: string; email?: string | null; phone?: string | null; message?: string | null },
 ) {
   if (!["inApp","email","sms"].some((c) => crmNotificationChannel(org.customFields, "leadReceived", c as any))) return;
 
@@ -131,7 +137,7 @@ async function notifyLeadReceived(
     org, pref: "leadReceived",
     title: `New website lead — ${lead.name}`,
     body: [lead.email, lead.phone].filter(Boolean).join(" · ") || null,
-    link: "/crm/clients",
+    link: `/crm/clients/${lead.id}`,
   });
   if (!crmNotificationChannel(org.customFields, "leadReceived", "email")) return;
 
@@ -212,7 +218,9 @@ export function registerCrmLeadCaptureRoutes(app: Express, getDevUser: GetUser):
     if (!org) return res.status(404).json({ message: "This form is no longer available." });
 
     const parsed = leadSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid submission", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid submission", issues: parsed.error.issues });
+    }
 
     const { name, email, phone, message, address, website } = parsed.data;
     // Bots fill the invisible field; humans never see it. Pretend it worked.
@@ -221,7 +229,7 @@ export function registerCrmLeadCaptureRoutes(app: Express, getDevUser: GetUser):
 
     const owner = await orgOwnerMember(org);
     const leadSourceId = await websiteLeadSourceId(org.id);
-    await db.insert(crmCustomers).values({
+    const [created] = await db.insert(crmCustomers).values({
       orgId: org.id,
       displayName: name,
       email: email || null,
@@ -232,9 +240,10 @@ export function registerCrmLeadCaptureRoutes(app: Express, getDevUser: GetUser):
       ownerMemberId: owner?.id ?? null,
       tags: ["website-lead"],
       portalToken: randomBytes(24).toString("hex"),
-    });
+    }).returning({ id: crmCustomers.id });
 
-    notifyLeadReceived(org, owner, { name, email, phone, message })
+    // The bell item opens this lead, not the whole client list.
+    notifyLeadReceived(org, owner, { id: created.id, name, email, phone, message })
       .catch((e: any) => console.error("[crm] lead notify failed:", e?.message || e));
     res.status(201).json({ ok: true });
   });

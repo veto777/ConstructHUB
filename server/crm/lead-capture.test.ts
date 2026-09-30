@@ -82,10 +82,10 @@ describe("manage endpoints (token lifecycle)", () => {
     expect(rotated.status).toBe(200);
     expect(rotated.body.token).not.toBe(old);
 
-    const stale = await postLead(old, { name: name("stale"), website: "" });
+    const stale = await postLead(old, { name: name("stale"), phone: "555-0100", website: "" });
     expect(stale.status).toBe(404);
 
-    const fresh = await postLead(rotated.body.token, { name: name("fresh"), website: "" });
+    const fresh = await postLead(rotated.body.token, { name: name("fresh"), phone: "555-0100", website: "" });
     expect(fresh.status).toBe(201);
     const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
       [ORG_ID, name("fresh")]);
@@ -142,7 +142,7 @@ describe("public intake", () => {
 
   it("a filled honeypot gets the same 201 — and creates nothing", async () => {
     const token = await getToken();
-    const res = await postLead(token, { name: name("bot"), website: "http://spam.example" });
+    const res = await postLead(token, { name: name("bot"), email: "bot@example.com", website: "http://spam.example" });
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ ok: true });
     const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
@@ -153,7 +153,7 @@ describe("public intake", () => {
   it("rejects an unknown token with 404 on both the header and the submit", async () => {
     const bogus = `${ORG_ID}.deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef`;
     expect((await api(`/api/public/leads/${bogus}`)).status).toBe(404);
-    expect((await postLead(bogus, { name: name("ghost") })).status).toBe(404);
+    expect((await postLead(bogus, { name: name("ghost"), phone: "555-0100" })).status).toBe(404);
     const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
       [ORG_ID, name("ghost")]);
     expect(rows.length).toBe(0);
@@ -165,6 +165,41 @@ describe("public intake", () => {
     expect(res.status).toBe(400);
   });
 
+  it("a lead with no email and no phone is a 400 with a readable reason, never a customer", async () => {
+    const token = await getToken();
+    const res = await postLead(token, { name: name("unreachable"), message: "Call me maybe" });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("Add an email or phone so we can reach you");
+    const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
+      [ORG_ID, name("unreachable")]);
+    expect(rows.length).toBe(0);
+  });
+
+  it("an overlong phone explains itself instead of 'Invalid submission'", async () => {
+    const token = await getToken();
+    const res = await postLead(token, { name: name("longphone"), phone: "5".repeat(60) });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/phone number is too long/i);
+  });
+
+  it("the new-lead bell item links to that lead, not the client list", async () => {
+    const token = await getToken();
+    const ip = `10.78.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`;
+    const res = await postLead(token, { name: name("linked"), phone: "555-0101" }, { "x-forwarded-for": ip });
+    expect(res.status).toBe(201);
+    const [lead] = await q<{ id: string }>(`select id from crm_customers where org_id = $1 and display_name = $2`,
+      [ORG_ID, name("linked")]);
+    expect(lead?.id).toBeTruthy();
+    // The bell row is written best-effort after the 201; give it a moment.
+    let links: string[] = [];
+    for (let i = 0; i < 20 && !links.length; i++) {
+      await new Promise((r) => setTimeout(r, 150));
+      links = (await q<{ link: string }>(`select link from crm_notifications where org_id = $1 and title = $2`,
+        [ORG_ID, `New website lead — ${name("linked")}`])).map((r) => r.link);
+    }
+    if (links.length) expect(links.every((l) => l === `/crm/clients/${lead.id}`)).toBe(true);
+  });
+
   it("rate limit trips after 10 submissions per IP — same 201, no eleventh lead", async () => {
     const token = await getToken();
     // A forged per-run source IP keeps this test isolated from every other
@@ -173,10 +208,10 @@ describe("public intake", () => {
     const ff = { "x-forwarded-for": ip };
 
     for (let i = 1; i <= 10; i++) {
-      const res = await postLead(token, { name: name(`flood ${i}`) }, ff);
+      const res = await postLead(token, { name: name(`flood ${i}`), phone: "555-0100" }, ff);
       expect(res.status).toBe(201);
     }
-    const eleventh = await postLead(token, { name: name("flood 11") }, ff);
+    const eleventh = await postLead(token, { name: name("flood 11"), phone: "555-0100" }, ff);
     expect(eleventh.status).toBe(201);
     expect(eleventh.body).toEqual({ ok: true });
 

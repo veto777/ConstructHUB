@@ -40,13 +40,14 @@ export async function reportFor(userId:number,type:'changes'|'reviews',id:number
   const table=type==='changes'?'gbp_guard_changes':'google_profile_reviews';
   const {rows:[record]}=await pool.query(`SELECT * FROM ${table} WHERE id=$1 AND user_id=$2`,[id,userId]);
   if(!record)throw new GoogleError('invalid','Record not found',404);
-  const {rows:[l]}=await pool.query('SELECT * FROM business_locations WHERE id=$1 AND user_id=$2',[record.location_id,userId]);
-  if(!l)throw new GoogleError('invalid','Listing not found',404);
-  const link=listingLink(l);
+  const {rows:[l]}=record.location_id==null?{rows:[]}:await pool.query('SELECT * FROM business_locations WHERE id=$1 AND user_id=$2',[record.location_id,userId]);
+  // A manually entered review may have no imported listing; its report still works, it just can't link one.
+  if(!l&&type==='changes')throw new GoogleError('invalid','Listing not found',404);
+  const link=l?listingLink(l):null;
   const details=type==='changes'?`Field: ${record.field}\nApproved value: ${JSON.stringify(record.old_value)}\nObserved value: ${JSON.stringify(record.new_value)}\nDetected: ${new Date(record.detected_at).toISOString()}\nSource: ${record.source}\nEvidence: ${JSON.stringify(record.evidence)}`
     :`Review: ${record.google_review_id||'Local record (not verified on Google)'}\nReviewer: ${record.reviewer_name}\nRating: ${record.rating}\nDate: ${new Date(record.review_date).toISOString()}\nText: ${record.comment||'(No text)'}`;
   const {rows:[a]}=type==='reviews'?await pool.query('SELECT reported_at FROM gbp_review_automation WHERE review_id=$1 AND user_id=$2',[id,userId]):{rows:[record]};
-  return {text:`Business: ${l.business_name}\nListing: ${link||'Unavailable — locate the listing on Google Maps'}\n${details}\n\nOwner explanation and supporting evidence: `,
+  return {text:`Business: ${l?.business_name??'Not linked to an imported listing'}\nListing: ${link||'Unavailable — locate the listing on Google Maps'}\n${details}\n\nOwner explanation and supporting evidence: `,
     listingUrl:link,formUrl:type==='changes'?'https://support.google.com/business/contact/business_redressal_form':'https://support.google.com/business/workflow/9945796',reportedAt:a?.reported_at??null};
 }
 export function registerProfileGuardRoutes(app:Express,auth:(req:any,res:any)=>any) {
