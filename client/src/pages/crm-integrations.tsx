@@ -32,6 +32,16 @@ import {
 export default function CrmIntegrationsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  /** Claim "Copied" only when the clipboard took the text (denied permission
+   *  or an insecure context → say so; the text stays on screen to copy). */
+  const copyText = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Copied" });
+    } catch {
+      toast({ title: "Copy failed", description: `Select the ${what} and copy it by hand.`, variant: "destructive" });
+    }
+  };
 
   const { data: me, isLoading: meLoading, isError: meError } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const allowed = me?.permissions?.manageSettings === true;
@@ -362,10 +372,8 @@ export default function CrmIntegrationsPage() {
                   <Input readOnly value={leadFormUrl} data-testid="input-lead-form-url"
                     onFocus={(e) => e.target.select()} />
                   <Button size="sm" variant="outline" className="shrink-0" data-testid="button-copy-lead-link"
-                    onClick={() => {
-                      if (leadFormUrl) navigator.clipboard?.writeText(leadFormUrl).catch(() => {});
-                      toast({ title: "Copied" });
-                    }}>
+                    disabled={!leadFormUrl}
+                    onClick={() => { if (leadFormUrl) void copyText(leadFormUrl, "link"); }}>
                     <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
                   </Button>
                 </div>
@@ -376,10 +384,8 @@ export default function CrmIntegrationsPage() {
                   <code className="flex-1 rounded bg-muted px-2 py-1.5 text-xs font-mono break-all"
                     data-testid="text-lead-embed">{leadEmbed}</code>
                   <Button size="sm" variant="outline" className="shrink-0" data-testid="button-copy-lead-embed"
-                    onClick={() => {
-                      if (leadEmbed) navigator.clipboard?.writeText(leadEmbed).catch(() => {});
-                      toast({ title: "Copied" });
-                    }}>
+                    disabled={!leadEmbed}
+                    onClick={() => { if (leadEmbed) void copyText(leadEmbed, "embed code"); }}>
                     <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
                   </Button>
                 </div>
@@ -506,10 +512,7 @@ export default function CrmIntegrationsPage() {
                       {freshKey.key}
                     </code>
                     <Button size="sm" variant="outline" data-testid="button-copy-api-key"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(freshKey.key).catch(() => {});
-                        toast({ title: "Copied" });
-                      }}>
+                      onClick={() => void copyText(freshKey.key, "key")}>
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
                   </div>

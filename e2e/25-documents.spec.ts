@@ -39,14 +39,26 @@ test.describe("/crm/estimates", { tag: "@serial" }, () => {
     await expect(summary).toHaveText(`${all.total} of ${all.total}`);
 
     // One checkbox narrows; a second combines (OR); unchecking widens back.
+    // "All" is ticked exactly when no status filter applies (Kimi QA: the
+    // boxes used to read "none" while the list showed everything).
+    const allBox = page.getByTestId("filter-status-all");
+    await expect(allBox).toBeChecked();
     await page.getByTestId("filter-status-draft").check();
     await expect(summary).toHaveText(`${drafts.filtered} of ${all.total}`);
+    await expect(allBox).not.toBeChecked();
     await page.getByTestId("filter-status-sent").check();
     await expect(summary).toHaveText(`${both.filtered} of ${all.total}`);
     await page.getByTestId("filter-status-draft").uncheck();
     await expect(summary).toHaveText(`${sent.filtered} of ${all.total}`);
     await page.getByTestId("filter-status-sent").uncheck();
     await expect(summary).toHaveText(`${all.total} of ${all.total}`);
+    await expect(allBox).toBeChecked();
+    // Ticking "All" clears whatever statuses were picked.
+    await page.getByTestId("filter-status-draft").check();
+    await expect(summary).toHaveText(`${drafts.filtered} of ${all.total}`);
+    await allBox.check();
+    await expect(summary).toHaveText(`${all.total} of ${all.total}`);
+    await expect(page.getByTestId("filter-status-draft")).not.toBeChecked();
 
     // Custom date range in the far future narrows to nothing — with the
     // honest empty state, not a crash.

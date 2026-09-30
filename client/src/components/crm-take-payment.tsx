@@ -43,6 +43,17 @@ export function invoiceDueCents(inv: any): number {
 const ONLINE_OFF_TEXT =
   "Online payment links need a connected Stripe account that can take charges — set it up on the Payments page.";
 
+/** Clipboard write that reports whether it happened (denied permission or an
+ *  insecure context → false), so nothing claims "copied" when it wasn't. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Payment states that mean an estimate's deposit is already paid (or settling). */
 const DEPOSIT_TAKEN = ["succeeded", "processing", "partially_refunded", "refunded"];
 
@@ -80,6 +91,7 @@ export function TakePaymentDialog({
   const [method, setMethod] = useState("check");
   const [note, setNote] = useState("");
   const [link, setLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [depositLink, setDepositLink] = useState<{ estimateId: string; url: string } | null>(null);
 
   const inv = payable.find((i) => i.id === invoiceId) ?? payable[0] ?? null;
@@ -133,11 +145,15 @@ export function TakePaymentDialog({
   const makeLink = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/invoices/${inv.id}/payment-link`, {})).json(),
-    onSuccess: (r: any) => {
+    onSuccess: async (r: any) => {
       setLink(r.url ?? null);
+      setLinkCopied(false);
       if (r.url) {
-        navigator.clipboard?.writeText(r.url).catch(() => {});
-        toast({ title: "Payment link created — copied", description: "Text or email it to the client; they pay by card or bank (ACH)." });
+        const copied = await copyText(r.url);
+        setLinkCopied(copied);
+        toast(copied
+          ? { title: "Payment link created — copied", description: "Text or email it to the client; they pay by card or bank (ACH)." }
+          : { title: "Payment link created", description: "Copy it from the box below, then text or email it to the client; they pay by card or bank (ACH)." });
       }
       onChanged?.();
     },
@@ -149,11 +165,13 @@ export function TakePaymentDialog({
       estimateId,
       r: await (await apiRequest("POST", `/api/crm/estimates/${estimateId}/payment-link`, {})).json(),
     }),
-    onSuccess: ({ estimateId, r }: { estimateId: string; r: any }) => {
+    onSuccess: async ({ estimateId, r }: { estimateId: string; r: any }) => {
       if (r.url) {
         setDepositLink({ estimateId, url: r.url });
-        navigator.clipboard?.writeText(r.url).catch(() => {});
-        toast({ title: "Deposit link created — copied", description: "Text or email it to the client; they pay by card or bank (ACH)." });
+        const copied = await copyText(r.url);
+        toast(copied
+          ? { title: "Deposit link created — copied", description: "Text or email it to the client; they pay by card or bank (ACH)." }
+          : { title: "Deposit link created", description: "Copy it from the box below, then text or email it to the client; they pay by card or bank (ACH)." });
       }
       onChanged?.();
     },
@@ -190,7 +208,11 @@ export function TakePaymentDialog({
                     <Input readOnly value={depositLink.url} className="text-xs" data-testid="input-deposit-link"
                       onFocus={(ev) => ev.target.select()} />
                     <Button size="sm" variant="outline" aria-label="Copy deposit link"
-                      onClick={() => { navigator.clipboard?.writeText(depositLink.url); toast({ title: "Copied" }); }}>
+                      onClick={async () => {
+                        toast(await copyText(depositLink.url)
+                          ? { title: "Copied" }
+                          : { title: "Copy failed", description: "Select the link and copy it by hand.", variant: "destructive" });
+                      }}>
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
@@ -241,7 +263,13 @@ export function TakePaymentDialog({
                     <Input readOnly value={link} className="text-xs" data-testid="input-checkout-link"
                       onFocus={(e) => e.target.select()} />
                     <Button size="sm" variant="outline" data-testid="button-copy-checkout-result"
-                      onClick={() => { navigator.clipboard?.writeText(link); toast({ title: "Copied" }); }}>
+                      onClick={async () => {
+                        const copied = await copyText(link);
+                        if (copied) setLinkCopied(true);
+                        toast(copied
+                          ? { title: "Copied" }
+                          : { title: "Copy failed", description: "Select the link and copy it by hand.", variant: "destructive" });
+                      }}>
                       <Copy className="h-4 w-4" />
                     </Button>
                     <Button size="sm" variant="ghost" asChild>
@@ -251,7 +279,7 @@ export function TakePaymentDialog({
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Copied to your clipboard. The link expires after the client pays or abandons it.
+                    {linkCopied ? "Copied to your clipboard. " : ""}The link expires after the client pays or abandons it.
                   </p>
                 </div>
               ) : onlineOff ? (

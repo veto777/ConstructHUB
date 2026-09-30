@@ -14,15 +14,18 @@ const CRM_HOST_PREFIXES = ["portal.", "demo."];
 /** The product identity every CRM surface carries. */
 export const CRM_NAME = "ConstructHub CRM";
 
-/** Local dev: ?portal=1 or VITE_FORCE_PORTAL=true renders the CRM on localhost. */
+/** Local dev: ?portal=1 or VITE_FORCE_PORTAL=true renders the CRM on localhost.
+ *  ?portal=0 switches the force off for that URL — it is how marketingUrl()
+ *  reaches the marketing pages from a forced portal on the same bare host. */
 function forcedPortal(): boolean {
   if (typeof window === "undefined") return false;
-  if (import.meta.env?.VITE_FORCE_PORTAL === "true") return true;
+  let q: string | null = null;
   try {
-    return new URLSearchParams(window.location.search).get("portal") === "1";
-  } catch {
-    return false;
-  }
+    q = new URLSearchParams(window.location.search).get("portal");
+  } catch { /* no usable query — fall through to the build flag */ }
+  if (q === "0") return false;
+  if (import.meta.env?.VITE_FORCE_PORTAL === "true") return true;
+  return q === "1";
 }
 
 export function isPortal(): boolean {
@@ -71,6 +74,10 @@ export function marketingUrl(path = "/"): string {
   if (typeof window === "undefined") return path;
   const host = window.location.host.toLowerCase();
   const prefix = CRM_HOST_PREFIXES.find((p) => host.startsWith(p));
-  if (!prefix) return path;
-  return `${window.location.protocol}//${host.slice(prefix.length)}${path}`;
+  if (prefix) return `${window.location.protocol}//${host.slice(prefix.length)}${path}`;
+  // A portal forced onto a bare host (local dev) has no marketing routes of
+  // its own — a bare /pricing would fall into the portal's catch-all and land
+  // on the CRM dashboard. The marketing face is this host with the force off.
+  if (forcedPortal()) return `${path}${path.includes("?") ? "&" : "?"}portal=0`;
+  return path;
 }

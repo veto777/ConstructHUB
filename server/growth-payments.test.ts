@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// The Stripe SDK is mocked, but server/stripe.ts refuses to build a client
+// without a key (PaymentsNotConfiguredError → 503). Any value will do here.
+process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_mocked_stripe";
 const mocks = vi.hoisted(() => ({ checkout: vi.fn(), verify: vi.fn(), rows: [] as any[][] }));
 vi.mock("stripe", () => ({ default: class {
   checkout = { sessions: { create: mocks.checkout } };

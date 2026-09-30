@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { InfoTip } from "@/components/info-tip";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Loader2, Ruler, Send, Zap } from "lucide-react";
 
 const money = (c?: number | null) =>
@@ -108,7 +108,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
       setStep("review");
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
     },
-    onError: (e: any) => toast({ title: "Quick Bid couldn't price this", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Quick Bid couldn't price this", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const save = useMutation({
@@ -127,7 +127,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
       toast({ title: "Bid updated" });
     },
-    onError: (e: any) => toast({ title: "Could not save the bid", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save the bid", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Step 3: the send dialog (message box → email) ────────────────────────
@@ -153,7 +153,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
       (await apiRequest("POST", `/api/crm/estimates/${estimate.id}/send`, {
         email: sendTo || undefined, message: sendMsg || undefined,
       })).json(),
-    onSuccess: (r: any) => {
+    onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
       setSendOpen(false);
       setOpen(false);
@@ -162,15 +162,22 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
       if (r.emailed) {
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}.` });
       } else {
-        navigator.clipboard?.writeText(window.location.origin + r.link);
+        // Only say "copied" when the clipboard took it; otherwise show the link.
+        const url = r.link ? window.location.origin + r.link : null;
+        let copied = false;
+        if (url) {
+          try { await navigator.clipboard.writeText(url); copied = true; } catch { /* shown below */ }
+        }
         toast({
-          title: "Email failed — link copied",
-          description: "Send this link to your client directly.",
+          title: copied ? "Email failed — link copied" : "Email failed",
+          description: copied
+            ? "Send this link to your client directly."
+            : url ? `Send this link to your client directly: ${url}` : "Open the estimate and share its client link directly.",
           variant: "destructive",
         });
       }
     },
-    onError: (e: any) => toast({ title: "Could not send", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const setLine = (idx: number, patch: Partial<ReviewLine>) => {
