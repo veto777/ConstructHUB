@@ -11,9 +11,12 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   };
   const requests: any[] = [];
   let uploadBytes = "";
+  let finishUpload!: () => void;
+  const uploadFinished = new Promise<void>(resolve => { finishUpload = resolve; });
   await page.route("https://example.com/fixture-upload", async route => {
     expect(route.request().method()).toBe("PUT");
     uploadBytes = route.request().postData() || "";
+    await uploadFinished;
     await route.fulfill({ status: 200, body: "" });
   });
   // Browser contract fixture: no key or publish request can reach Blotato or AI.
@@ -109,6 +112,8 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
     .selectOption("https://example.com/fixture.jpg");
   await page.getByLabel("Upload media", { exact: true }).setInputFiles({ name: "fixture.jpg", mimeType: "image/jpeg", buffer: Buffer.from("explicit upload fixture bytes") });
   await expect.poll(() => uploadBytes).toBe("explicit upload fixture bytes");
+  await expect(page.getByRole("button", { name: "Save draft", exact: true })).toBeDisabled();
+  finishUpload();
   await expect(page.getByRole("button", { name: "Post now", exact: true })).toBeEnabled();
   await page
     .getByLabel("Schedule time", { exact: true })

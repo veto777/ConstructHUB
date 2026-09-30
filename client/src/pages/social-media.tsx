@@ -495,6 +495,7 @@ export default function SocialMediaPage() {
                   disabled={
                     !data?.connected ||
                     mutation.isPending ||
+                    uploading ||
                     !text.trim() ||
                     !destinations.length
                   }
