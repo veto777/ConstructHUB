@@ -19,6 +19,29 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🚀 2026-09-30 — round-4 lanes + pre-launch QA (deployed 16:08 UTC)
+- **Shipped:** agency mode + email onboarding (a1), Site Scan fix guidance (a2), Google Ads/LSA manager (a3),
+  Social business selector (a4), Cloudflare + Search Console (a5; Global Key is exchanged for a scoped token and
+  never stored), domain registrars (point/update only, no transfer code) + Gmail alert forwarding (a7). None of
+  these check a plan yet — gate them when pricing is decided.
+- **QA:** 44-agent click-through (400 confirmed findings) → 3 fix rounds → Kimi manual pass (38 findings) → fixed.
+  Findings/results: tower scratchpad of session b63db1cc (qa/, kimi-qa/). Pricing reviews (Codex, Kimi, Claude +
+  side-by-side) are in the same scratchpad `pricing/` — owner decisions pending (13 pricing-page items wait).
+- **Deploy script** now (1) deletes stale hashed bundles in `dist/public/assets` (old bundles stayed downloadable,
+  incl. paid Google Ads guide text now served only by `/api/google-ads-guide/:slug`) and (2) runs
+  `npx playwright-core install chromium-headless-shell` — live permit search was failing because playwright-core
+  1.62 wanted build 1234 while vb11 had 1243. Scrapers use `CHROMIUM_PATH` or the managed build (no Replit path).
+- **Boot migrations that ran on prod:** state_guides link-status columns; permit rows re-pointed to real
+  counties (27,971) with placeholders cleaned (32,549) and 139 seeded duplicates removed; UNIQUE (org_id, number)
+  on crm_invoices/estimates/projects/commitments (skipped automatically on any DB that has duplicates).
+- **DB sessions are pinned to UTC** (`server/db.ts`); prod Postgres is already UTC. Tests: `PGOPTIONS="-c TimeZone=UTC"`.
+- **Browser tests need three servers** (scratch DB `constructhub_dev_a6`): CRM specs → `VITE_FORCE_PORTAL=true` +
+  bypass on; growth specs → portal false + bypass on (+ `INBOUND_MAIL_DOMAIN/SECRET` for domains-mail); anonymous
+  specs (growth-reviews, growth-round2, profile-guard-auth, account-security) → bypass OFF. The dev server drops
+  page loads under 3+ parallel workers (static index.html shown); failing sweeps pass at `E2E_WORKERS=1`.
+  `growth-round2 › real provider failure` needs Google Places unconfigured.
+- Pre-deploy dumps: vb11 `~/backups/constructhub-predeploy-*.sql.gz`.
+
 ## 🧩 Features shipped 2026-09-30 (security, Profile Guard, AI replies, Posts & Photos, Social, Guides)
 Reports: `analysis/FEATURE-a1.md` (security), `-a2` (Profile Guard + AI review replies), `-a3` (Posts & Photos),
 `-a4` (Social via Blotato + Guides). Pre-deploy dump: vb11 `backups/pre-features-20260930T002817Z.dump`.
