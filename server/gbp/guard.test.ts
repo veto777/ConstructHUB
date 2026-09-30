@@ -28,7 +28,7 @@ const http=vi.fn(async(input:any,options:any)=>{
 });
 const client=new GoogleClient(async()=>'fixture',http,new Limiter(()=>0,async()=>{}),async()=>{});
 beforeAll(async()=>{
-  const url=new URL(process.env.DATABASE_URL!);if(url.pathname!=='/constructhub_dev_a2'||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a2 only');
+  const url=new URL(process.env.DATABASE_URL!);if(!/^\/constructhub_dev(?:_a\d+)?$/.test(url.pathname)||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('Local ConstructHUB development database required');
   await ensureGbpSchema();await ensureAccountEventsSchema();await ensureProfileGuardSchema();await ensureProfileGuardSchema();
   const {rows}=await pool.query("INSERT INTO users(email,password_hash) VALUES('guard-'||gen_random_uuid()||'@example.invalid',$1),('guard-'||gen_random_uuid()||'@example.invalid',null) RETURNING id",[await bcrypt.hash('test-password',4)]);[user,other]=rows.map(r=>r.id);
   id=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,place_id) VALUES($1,'Guard fixture','accounts/guardfixture','locations/guardfixture','fixture-place') RETURNING id",[user])).rows[0].id;
