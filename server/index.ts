@@ -40,7 +40,7 @@ export function log(message: string, source = "express") {
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const isSiteScan = req.path.startsWith("/api/sitescan") || req.path.startsWith("/api/admin/sitescan");
+  const isSiteScan = req.path.startsWith("/api/agency") || req.path.startsWith("/api/sitescan") || req.path.startsWith("/api/admin/sitescan");
   const path = isSiteScan ? req.path.replace(/[a-f0-9]{64}/g, ":token") : req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 

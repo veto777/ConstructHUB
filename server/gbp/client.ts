@@ -54,7 +54,11 @@ export class GoogleClient {
         await this.wait(1000 * 2 ** attempt); continue;
       }
       let data: any;
-      try { data = response.status === 204 ? {} : await response.json(); }
+      try {
+        const text=response.status===204?'':await response.text();
+        const emptyAccept=response.ok&&method==='POST'&&/^\/v1\/accounts\/[\w-]+\/invitations\/[\w-]+:accept$/.test(path)&&!text.trim();
+        data=response.status===204||emptyAccept?{}:JSON.parse(text);
+      }
       catch { if(response.ok) throw new GoogleError('transient','Google returned an unreadable response. Try again.',503); data={}; }
       if (response.ok) {
         if (!data || typeof data !== 'object' || Array.isArray(data) || data.error) throw new GoogleError('transient','Google returned an invalid response. Try again.',503);
