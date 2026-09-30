@@ -170,14 +170,14 @@ const services = [
   {
     icon: Camera,
     title: "SEO Photo Optimizer",
-    description: "Optimize Google Business photos with watermarks, EXIF metadata injection, AI-generated descriptions, and SEO-friendly filenames that boost local rankings.",
+    description: "Watermark, rename, geotag and describe your job photos in one batch. Google strips EXIF on upload, so geotags don't promise a ranking benefit.",
     gradient: "from-blue-500/20 to-indigo-500/20",
     border: "border-blue-500/20",
   },
   {
     icon: Eye,
     title: "GMB Monitor",
-    description: "Track every edit to your Google Business listings in real time. Get alerts on name, address, photo, and hours changes. Includes AI Review Response Generator.",
+    description: "Check your Google Business listings against Google on demand and keep a history of every change a check finds. Includes AI Review Response Generator.",
     gradient: "from-purple-500/20 to-violet-500/20",
     border: "border-purple-500/20",
   },

@@ -244,7 +244,7 @@ export default function PricingPage() {
               { icon: Search, label: "Permit Search", desc: "All 50 states" },
               { icon: Camera, label: "Photo Optimizer", desc: "GMB ready photos" },
               { icon: BarChart3, label: "Ranking Grid", desc: "Track local rankings" },
-              { icon: Shield, label: "Edit Monitor", desc: "GMB change alerts" },
+              { icon: Shield, label: "Edit Monitor", desc: "On-demand GMB change checks" },
               { icon: Building2, label: "Property Records", desc: "Nationwide data" },
               { icon: Users, label: "Expert Consulting", desc: "Platinum only — $250 first session" },
             ].map((item, i) => (
@@ -343,7 +343,7 @@ export default function PricingPage() {
                     { name: "Property Records Access", values: [false, true, true, true, true, true] },
                     { name: "Scrape Scheduling", values: [false, false, true, true, true, true] },
                     { name: "All 50 States + DC Coverage", values: [true, true, true, true, true, true] },
-                    { name: "32,864+ Permit Databases", values: [true, true, true, true, true, true] },
+                    { name: "County & City Jurisdictions Listed", values: [true, true, true, true, true, true] },
                   ]},
                   { category: "Google Business Tools", features: [
                     { name: "GMB Photo Optimizations", values: ["5/mo", "25/mo", "50/mo", "Unlimited", "Unlimited", "Unlimited"] },
@@ -405,8 +405,8 @@ export default function PricingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {[
-              { icon: Search, title: "Find Leads Before Anyone Else", desc: "Access 32,864+ permit databases across all 50 states. Know who's building, renovating, and pulling permits in your area before your competitors do." },
-              { icon: Shield, title: "Stop Wasting Money on Fake Clicks", desc: "Google Click Guard blocks competitors and bots from draining your ad budget. Most contractors lose 25%+ of their ad spend to fraud without knowing it." },
+              { icon: Search, title: "Find Leads Before Anyone Else", desc: "Find the permit office for any county or city we list in all 50 states and DC, and search the government portals we support. Know who's building, renovating, and pulling permits in your area." },
+              { icon: Shield, title: "Stop Wasting Money on Fake Clicks", desc: "Some ad clicks come from bots, competitors, or people who will never hire you. Google Click Guard shows script-observed visits so you can build an IP exclusion list for your campaigns." },
               { icon: Globe, title: "Dominate Your Local Market", desc: "From GMB optimization to competitor analysis, get the same tools that 7-figure contractors use to own their local search results and generate leads 24/7." },
             ].map((item, i) => (
               <Card key={i} className="border-border/50 p-5" data-testid={`card-benefit-${i}`}>
@@ -772,22 +772,16 @@ export default function PricingPage() {
 
           <Card className="relative max-w-4xl mx-auto border-[#F97316]/30 hover:border-[#F97316]/60 transition-all duration-200" data-testid="card-dfy-bundle">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#4A6CF7] via-[#F97316] to-[#4A6CF7] rounded-t-lg" />
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
-              <Badge className="bg-[#F97316] text-white border-none px-4 text-xs font-bold shadow-lg">
-                SAVE ~30%
-              </Badge>
-            </div>
             <CardContent className="p-6 sm:p-8 text-center pt-8">
               <div className="flex items-center justify-center gap-3 mb-3">
                 <Briefcase className="w-8 h-8 text-[#F97316]" />
                 <h3 className="text-2xl font-extrabold" data-testid="text-dfy-bundle-title">Complete Business Build</h3>
               </div>
               <p className="text-muted-foreground max-w-xl mx-auto mb-4">
-                Everything above in one package. We handle your entire business setup from formation to marketing —
+                Business Formation & Filing, GMB & Website Setup, and SEO & Ad Campaigns in one package. We handle your entire business setup from formation to marketing —
                 all paperwork, online presence, SEO, and advertising. You focus on getting licensed and learning your trade.
               </p>
               <div className="flex items-center justify-center gap-4 mb-3">
-                <span className="text-xl font-bold text-muted-foreground line-through">$38,000+</span>
                 <span className="text-4xl font-extrabold text-[#F97316]">$29,999</span>
               </div>
               <p className="text-xs text-muted-foreground mb-4">

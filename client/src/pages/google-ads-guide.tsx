@@ -123,7 +123,7 @@ const GUIDE_SECTIONS = [
     bg: "bg-[#34A853]/10",
     number: "11",
     title: "Click Fraud: The Hidden Budget Killer",
-    description: "25-33% of contractor clicks are fraudulent. Telemarketers, competitors, and bots are draining your budget daily. Learn who's clicking and how to stop them.",
+    description: "Some clicks on contractor ads come from telemarketers, competitors, and bots rather than customers. Learn how to spot who's clicking and how to exclude them.",
     screenshots: 0,
     critical: true,
   },
@@ -239,7 +239,7 @@ export default function GoogleAdsGuidePage() {
               { label: "Guide Pages", value: "12", sub: "step-by-step walkthroughs", color: "text-[#4285F4]" },
               { label: "Screenshots", value: "11+", sub: "real Google Ads settings", color: "text-[#34A853]" },
               { label: "Contractor CPC", value: "$30-50", sub: "avg cost per click", color: "text-[#FBBC05]" },
-              { label: "Potential Savings", value: "25%+", sub: "with Click Guard", color: "text-[#4285F4]" },
+              { label: "IP Exclusions", value: "500", sub: "max per Google Ads campaign", color: "text-[#4285F4]" },
             ].map((stat, i) => (
               <Card key={stat.label} className={`bg-card border-border text-center card-hover-glow animate-scale-in`} style={{ animationDelay: `${0.3 + i * 0.1}s` }} data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
                 <CardContent className="p-4">

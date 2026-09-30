@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { copyrightNotice } from "@/lib/marketing";
 
 export default function TermsOfUsePage() {
   useEffect(() => {
@@ -11,7 +12,7 @@ export default function TermsOfUsePage() {
         <a href="/" className="text-primary hover:underline text-sm" data-testid="link-back-home">Back to Home</a>
 
         <h1 className="text-3xl font-bold mt-6 mb-2" data-testid="heading-terms-title">Terms of Use</h1>
-        <p className="text-sm text-muted-foreground mb-8" data-testid="text-effective-date">Effective Date: June 20, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8" data-testid="text-effective-date">Effective Date: September 30, 2026</p>
 
         <div className="space-y-8 text-sm leading-relaxed">
           <section data-testid="section-introduction">
@@ -231,7 +232,7 @@ export default function TermsOfUsePage() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-border text-xs text-muted-foreground" data-testid="text-copyright">
-          &copy; 2025 Construction Hub. All rights reserved.
+          {copyrightNotice()}
         </div>
       </div>
     </div>

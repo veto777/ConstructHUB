@@ -5,6 +5,7 @@ import { subscriptions, users, masterClassModules, coursePurchases, servicePurch
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
 import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS } from "./catalog";
+import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 
 // Lazily constructed: importing PLANS / helpers from this module (tenancy,
 // tests) must not require STRIPE_SECRET_KEY. The client is only built when a
@@ -294,10 +295,10 @@ export function registerStripeRoutes(app: Express) {
               price_data: {
                 currency: "usd",
                 product_data: {
-                  name: "ConstructHUB Master Class — Complete Bundle (50% Off)",
+                  name: `ConstructHUB ${COURSE_BUNDLE.name}`,
                   description: allModules.map(m => m.title).join(", "),
                 },
-                unit_amount: 249900,
+                unit_amount: COURSE_BUNDLE.priceCents,
               },
               quantity: 1,
             },
@@ -370,7 +371,7 @@ export function registerStripeRoutes(app: Express) {
           }
           const [mod] = await db.select().from(masterClassModules).where(eq(masterClassModules.id, moduleId)).limit(1);
           if (!mod) return res.status(400).json({ message: `Unknown course module: ${moduleId}` });
-          resolved.push({ id: String(item.id ?? `course_module_${moduleId}`), type, name: `Master Class — ${mod.title}`, price: mod.price, moduleId });
+          resolved.push({ id: `course_module_${moduleId}`, type, name: `Master Class — ${mod.title}`, price: mod.price, moduleId });
         } else if (type === "course_bundle") {
           resolved.push({ id: "course_bundle", type, name: COURSE_BUNDLE.name, price: COURSE_BUNDLE.priceCents, moduleId: null });
         } else if (type === "dfy_service" || type === "dfy_bundle") {
@@ -380,6 +381,19 @@ export function registerStripeRoutes(app: Express) {
         } else {
           return res.status(400).json({ message: `Unsupported cart item type: ${type}` });
         }
+      }
+
+      // One charge per thing bought. Checked on the server-resolved items (ids
+      // are canonical here), so a crafted or stale cart can't pay twice for a
+      // service: not the same item twice, and not a bundle plus a part of it.
+      if (new Set(resolved.map((item) => item.id)).size !== resolved.length) {
+        return res.status(400).json({ message: "Your cart lists the same item more than once. Remove the duplicate before checkout." });
+      }
+      const overlap = bundleOverlaps(resolved);
+      if (overlap.length) {
+        return res.status(400).json({
+          message: `Your cart has the ${BUNDLE_NAMES[overlap[0].bundleId]} plus items it already includes (${overlap.map((o) => o.part.name).join(", ")}). Remove them before checkout.`,
+        });
       }
 
       const customerId = await getOrCreateCustomer(user.id, user.email);
