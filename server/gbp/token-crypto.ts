@@ -33,6 +33,13 @@ export async function ensureGbpTokenEncryption(db: Pick<typeof pool, 'query'> = 
   for (const row of rows) for (const column of ['access_token', 'refresh_token'] as const) {
     const value = row[column];
     if (value && !value.startsWith('v1:')) await db.query(`UPDATE gbp_grants SET ${column}=$1 WHERE user_id=$2 AND google_subject=$3 AND ${column}=$4`, [encryptToken(value), row.user_id, row.google_subject, value]);
-    else if (value) decryptToken(value); // Detect a wrong key/corrupted row at boot.
+    else if (value) {
+      // One unreadable credential must not stop the site from booting: drop it and ask that user to reconnect.
+      try { decryptToken(value); }
+      catch (e: any) {
+        console.error(`[security] unreadable GBP credential for user ${row.user_id} (${e?.message}); marking reconnect_required`);
+        await db.query('UPDATE gbp_grants SET access_token=NULL,refresh_token=NULL,reconnect_required=true WHERE user_id=$1 AND google_subject=$2',[row.user_id,row.google_subject]);
+      }
+    }
   }
 }
