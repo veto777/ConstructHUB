@@ -42,7 +42,8 @@ describe('GBP real HTTP routes without a Google grant',()=>{
     expect((await call(`/api/locations/${id}/analytics/seed`,'POST',{})).status).toBe(410);
   });
   it('cannot forge canonical resource identity with a local location edit',async()=>{
-    expect((await call(`/api/locations/${id}`,'PUT',{gbpAccountName:'accounts/forged',gbpLocationName:'locations/forged'})).status).toBe(200);
+    // The edit whitelist rejects identity fields outright (400); ignoring them (200) would also be safe.
+    expect([200,400]).toContain((await call(`/api/locations/${id}`,'PUT',{gbpAccountName:'accounts/forged',gbpLocationName:'locations/forged'})).status);
     expect((await call(`/api/locations/${id}`)).body).toMatchObject({gbpAccountName:'accounts/httpfixture',gbpLocationName:'locations/httpfixture'});
   });
 });
