@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { useUrlParam } from "@/hooks/use-url-param";
+import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 
 type CoursePurchase = {
   id: number;
@@ -333,6 +334,10 @@ export default function MasterClassPage() {
   const statesNoLicensing = guides ? guides.length - statesWithLicensing : 0;
 
   return (
+    <>
+    {/* Signed out, this page has no app frame: the header brings the way home,
+        sign-in and the cart the Add to Cart buttons below fill. */}
+    <PublicPageHeader next="/master-class" cart />
     <div className="h-full overflow-y-auto">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-3">
@@ -2731,6 +2736,8 @@ export default function MasterClassPage() {
           </TabsContent>
         </Tabs>
       </div>
+      <PublicPageFooter />
     </div>
+    </>
   );
 }
