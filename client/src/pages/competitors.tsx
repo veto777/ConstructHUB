@@ -32,6 +32,10 @@ import { COMPETITOR_INTEL_PLANS } from "@shared/plan-copy";
  */
 function planRequiredFrom(err: unknown): { requiredPlan: PlanKey | null; message: string } | null {
   const raw = err instanceof Error ? err.message : String(err ?? "");
+  // Before the server moves this gate to entitlements it answers a plain 403
+  // whose message names retired plans: treat it as "not on your plan", but
+  // show our own wording instead of the server's.
+  if (/^403:/.test(raw)) return { requiredPlan: null, message: "" };
   const match = /^402:\s*(.*)$/s.exec(raw);
   if (!match) return null;
   try {

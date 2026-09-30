@@ -419,7 +419,12 @@ export default function MasterClassPage() {
                     <p className="text-[10px] sm:text-xs text-muted-foreground">States Require a License</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-background/60 border">
-                    <p className="text-xl sm:text-2xl font-bold text-[#F97316]">{usd(BUNDLE_PRICE_CENTS)}</p>
+                    {/* At or above the sales threshold the bundle has no price here either. */}
+                    {bundlePriceShown ? (
+                      <p className="text-xl sm:text-2xl font-bold text-[#F97316]" data-testid="text-overview-bundle-price">{usd(BUNDLE_PRICE_CENTS)}</p>
+                    ) : (
+                      <Link href={SALES_HREF} className="block text-sm sm:text-base font-bold leading-tight text-[#F97316] hover:underline" data-testid="link-overview-bundle-sales">{SALES_REP_LABEL}</Link>
+                    )}
                     <p className="text-[10px] sm:text-xs text-muted-foreground" data-testid="text-bundle-reference">
                       {modulesTotalCents !== null ? <><span className="line-through">{usd(modulesTotalCents)}</span> separately</> : "All four modules"}
                     </p>

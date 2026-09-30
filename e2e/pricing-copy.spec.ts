@@ -11,7 +11,7 @@ import { SALES_REP_LABEL, planPriceLine } from "../shared/plan-copy";
 const LEGACY = /\bPlatinum\b|\bGold (and|&) Platinum\b|\$995|\$499\/mo|Unlimited everything|billed separately|Separate membership|\$29,999|\$5,500|\$15,000|\$7,500|\$2,499/;
 
 const PAGES = [
-  "/", "/landing", "/terms", "/crm-app", "/crm-terms", "/master-class-landing", "/master-class?tab=pricing",
+  "/", "/landing", "/terms", "/crm-app", "/crm-terms", "/master-class-landing", "/master-class", "/master-class?tab=pricing",
   "/competitors-landing", "/permits-landing", "/google-ads-landing", "/reinstatement", "/privacy",
 ];
 
@@ -98,4 +98,18 @@ test("Competitor Intel: an entitled account gets the scan form", async ({ page }
   await page.goto("/competitors");
   await expect(page.getByTestId("button-start-scan")).toBeVisible();
   await expect(page.getByTestId("text-plan-required")).toHaveCount(0);
+});
+
+test("Competitor Intel: the pre-entitlements 403 shows the same prompt, not the retired plan names", async ({ page }) => {
+  await page.route("**/api/competitors/scans", (route) => route.request().method() === "GET"
+    ? route.fulfill({
+      status: 403, contentType: "application/json",
+      body: JSON.stringify({ message: "Competitor Intelligence requires a Gold or Platinum membership. Upgrade your plan to access this feature." }),
+    })
+    : route.continue());
+  await page.goto("/competitors");
+  await expect(page.getByTestId("text-plan-required")).toHaveText("Your plan does not include Competitor Intel.");
+  await expect(page.getByTestId("button-upgrade-plan")).toHaveText(/See plans/);
+  await expect(page.getByTestId("button-start-scan")).toHaveCount(0);
+  expect(await bodyText(page)).not.toMatch(LEGACY);
 });

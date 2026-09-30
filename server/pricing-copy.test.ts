@@ -164,6 +164,18 @@ describe("page copy outside /pricing", () => {
     expect(src).toContain("showsPrice(mod.price)");
   });
 
+  it("master-class shows the bundle price only behind the sales-threshold check", () => {
+    // Every place that prints the bundle price must sit in a bundlePriceShown
+    // branch — the overview tab's stat card once printed it unconditionally.
+    const lines = read("client/src/pages/master-class.tsx").split("\n");
+    const sites = lines.map((line, i) => ({ line, i })).filter(({ line }) => line.includes("usd(BUNDLE_PRICE_CENTS)"));
+    expect(sites.length).toBeGreaterThan(0);
+    for (const { i } of sites) {
+      const context = lines.slice(Math.max(0, i - 45), i + 1).join("\n");
+      expect(context, `line ${i + 1}`).toMatch(/bundlePriceShown/);
+    }
+  });
+
   it("home no longer links to the retired individual-tools page", () => {
     expect(read("client/src/pages/home.tsx")).not.toContain("/individual-pricing");
   });
