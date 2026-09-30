@@ -147,3 +147,39 @@ test("public lead magnet shows summary and email verification guidance", async (
   ).toBeVisible();
   await expect(page.getByText("Missing title", { exact: false })).toBeVisible();
 });
+
+test("configured CAPTCHA can be solved again after a rejected submission", async ({ page }) => {
+  await page.route("**/api/sitescan/public/config", r => r.fulfill({ json: { captchaSiteKey: "fixture-site-key" } }));
+  await page.route("https://www.google.com/recaptcha/api.js*", r => r.fulfill({
+    contentType: "application/javascript",
+    body: `window.grecaptcha = {
+      ready: callback => callback(),
+      render: (id, options) => {
+        const button = document.createElement('button');
+        button.type = 'button'; button.textContent = 'Solve fixture CAPTCHA';
+        button.onclick = () => options.callback('fixture-token');
+        document.getElementById(id).appendChild(button);
+        return 0;
+      },
+      reset: () => { window.captchaReset = true; }
+    };`,
+  }));
+  let attempts = 0;
+  await page.route("**/api/sitescan/public/start", r => {
+    attempts++;
+    return r.fulfill({ status: 400, json: { message: "CAPTCHA failed." } });
+  });
+  await page.goto("/free-site-scan");
+  await page.getByLabel("Website URL").fill("https://fixture.test/");
+  await page.getByLabel("Email", { exact: true }).fill("fixture@example.invalid");
+  const submit = page.getByRole("button", { name: "Scan my website" });
+  await expect(submit).toBeDisabled();
+  await page.getByRole("button", { name: "Solve fixture CAPTCHA" }).click();
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("CAPTCHA failed");
+  await expect(submit).toBeDisabled();
+  expect(await page.evaluate(() => (window as any).captchaReset)).toBe(true);
+  await page.getByRole("button", { name: "Solve fixture CAPTCHA" }).click();
+  await submit.click();
+  await expect.poll(() => attempts).toBe(2);
+});

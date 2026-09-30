@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -455,6 +455,7 @@ export function FreeSiteScanPage() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [captchaToken, setCaptcha] = useState("");
+  const captchaWidget = useRef<number | null>(null);
   const verify = new URLSearchParams(window.location.search).get("verify");
   const { data: config } = useQuery<any>({
     queryKey: ["/api/sitescan/public/config"],
@@ -467,10 +468,11 @@ export function FreeSiteScanPage() {
       if (!stopped && g?.render)
         g.ready(() => {
           if (!stopped)
-            g.render("sitescan-captcha", {
+            captchaWidget.current = g.render("sitescan-captcha", {
               sitekey: config.captchaSiteKey,
               callback: setCaptcha,
               "expired-callback": () => setCaptcha(""),
+              "error-callback": () => setCaptcha(""),
             });
         });
     };
@@ -523,6 +525,11 @@ export function FreeSiteScanPage() {
               setAccess(r.access);
             } catch (e: any) {
               setError(e.message);
+              // Tokens are single-use, including when a later server step fails.
+              if (captchaWidget.current !== null) {
+                (window as any).grecaptcha?.reset(captchaWidget.current);
+                setCaptcha("");
+              }
             } finally {
               setBusy(false);
             }
@@ -547,7 +554,7 @@ export function FreeSiteScanPage() {
             />
           </label>
           <div id="sitescan-captcha" />
-          <Button disabled={busy}>Scan my website</Button>
+          <Button disabled={busy || !config || (!!config.captchaSiteKey && !captchaToken)}>Scan my website</Button>
           <p className="text-xs">
             We use your email to deliver this report.{" "}
             <a href="/privacy" className="underline">
