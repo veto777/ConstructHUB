@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, apiErrorMessage } from '@/lib/queryClient';
 let pending: Promise<void> | null = null;
+/** The person closed the verification dialog themselves (Escape, Cancel, outside click). */
+export class VerificationCancelled extends Error {}
 export function requestRecentAuth(): Promise<void> {
   if (!pending) pending = new Promise<void>((resolve,reject) => {
     window.dispatchEvent(new CustomEvent('reauth-required',{detail:{resolve,reject}}));
@@ -18,7 +20,8 @@ let gbpConnectPending=false;
 /** Google connect preflight: apiRequest asks for verification on the 403 reauth answer, then we go to Google's consent page. */
 export function startGbpConnect(onError: (message: string) => void) {
   gbpConnectPending=true;
-  return apiRequest('GET','/api/gbp/connect?format=json').then(r=>r.json()).then(d=>window.location.assign(d.url)).catch(e=>onError(apiErrorMessage(e))).finally(()=>{gbpConnectPending=false;});
+  // A cancel the person chose needs no error toast (it would also swallow their next Escape).
+  return apiRequest('GET','/api/gbp/connect?format=json').then(r=>r.json()).then(d=>window.location.assign(d.url)).catch(e=>{if(!(e instanceof VerificationCancelled))onError(apiErrorMessage(e));}).finally(()=>{gbpConnectPending=false;});
 }
 /** The server's Google step-up (/api/auth/google?reauth=1) returns to `next`, adding reauth=google-failed when Google couldn't confirm the account. */
 function continueWithGoogle() {
@@ -30,6 +33,8 @@ export function RecentAuthModal() {
   const [challenge,setChallenge]=useState<{resolve:()=>void;reject:(e:Error)=>void}|null>(null);
   const [method,setMethod]=useState(''),[value,setValue]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[sent,setSent]=useState(false),[sentTo,setSentTo]=useState('');
   const [google,setGoogle]=useState(false),[accountEmail,setAccountEmail]=useState(''),[forGbp,setForGbp]=useState(false);
+  // Opened from code, not a trigger: remember what had focus so closing returns it there (e.g. into an open dialog).
+  const returnFocus=useRef<HTMLElement|null>(null);
   // Back from a Google step-up that failed: say so once and drop the flag from the URL.
   useEffect(()=>{
     const url=new URL(window.location.href);
@@ -40,6 +45,7 @@ export function RecentAuthModal() {
   },[toast]);
   useEffect(()=>{
     const listen=(event:Event)=>{
+      returnFocus.current=document.activeElement instanceof HTMLElement&&document.activeElement!==document.body?document.activeElement:null;
       setChallenge((event as CustomEvent).detail);setValue('');setError('');setSent(false);setSentTo('');setMethod('');setGoogle(false);setAccountEmail('');setForGbp(gbpConnectPending);
       apiRequest('GET','/api/auth/reauth').then(r=>r.json()).then(d=>{setMethod(d.method);setGoogle(d.google===true);setAccountEmail(typeof d.email==='string'?d.email:'');}).catch(e=>setError(apiErrorMessage(e)));
     };
@@ -53,7 +59,7 @@ export function RecentAuthModal() {
     window.addEventListener('reauth-required',listen);document.addEventListener('click',connect,true);
     return ()=>{window.removeEventListener('reauth-required',listen);document.removeEventListener('click',connect,true);};
   },[toast]);
-  const close=()=>{challenge?.reject(new Error('Verification cancelled'));setChallenge(null);};
+  const close=()=>{challenge?.reject(new VerificationCancelled('Verification cancelled'));setChallenge(null);};
   // Email verification has no code until one is sent, so the code field waits for it.
   const needsCode=method==='email'&&!sent;
   const sendCode=async()=>{
@@ -61,7 +67,7 @@ export function RecentAuthModal() {
     try{const r=await apiRequest('POST','/api/auth/reauth/email');const d=await r.json().catch(()=>({}));setSentTo(typeof d?.sentTo==='string'?d.sentTo:'');setSent(true);setValue('');}
     catch(e){setError(apiErrorMessage(e));}finally{setBusy(false);}
   };
-  return <Dialog open={!!challenge} onOpenChange={open=>{if(!open)close();}}><DialogContent><DialogHeader><DialogTitle>Verify your identity</DialogTitle><DialogDescription data-testid="text-reauth-reason">{forGbp
+  return <Dialog open={!!challenge} onOpenChange={open=>{if(!open)close();}}><DialogContent onCloseAutoFocus={e=>{const el=returnFocus.current;returnFocus.current=null;if(el?.isConnected){e.preventDefault();el.focus();}}}><DialogHeader><DialogTitle>Verify your identity</DialogTitle><DialogDescription data-testid="text-reauth-reason">{forGbp
       ?"To connect Google Business Profile, confirm it's you first. Google's sign-in opens next."
       :"To change security settings or other sensitive account details, confirm it's you first."} Verification lasts 12 hours.</DialogDescription></DialogHeader>
     {method && <form className="space-y-4" onSubmit={async e=>{e.preventDefault();if(needsCode)return;setBusy(true);setError('');try{await apiRequest('POST','/api/auth/reauth',{value});challenge?.resolve();setChallenge(null);}catch(e){setError(apiErrorMessage(e));}finally{setBusy(false);}}}>

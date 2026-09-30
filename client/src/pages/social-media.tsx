@@ -227,6 +227,13 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
       setUploading(false);
     }
   }
+  // Nothing loaded (e.g. a stale or foreign ?business=): say why instead of an empty workbench.
+  if (error && !data) return (
+    <div role="alert" className="rounded-md border border-destructive/40 p-4 space-y-1" data-testid="alert-social-load">
+      <p className="font-medium">Could not load Social Media: {apiErrorMessage(error)}</p>
+      <p className="text-sm text-muted-foreground">Choose another business above, or refresh the page.</p>
+    </div>
+  );
   return (
     <div className="h-full overflow-y-auto">
 
@@ -244,7 +251,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
         </header>
         {isLoading && <p>Loading Social Media…</p>}
         {error && (
-          <p role="alert">Could not load Social Media. Sign in and refresh.</p>
+          <p role="alert">Could not refresh Social Media: {apiErrorMessage(error)}</p>
         )}
         {!all && <Card>
           <CardHeader>

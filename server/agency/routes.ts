@@ -17,13 +17,37 @@ export async function requestAccess(req:Request):Promise<AgencyAccess> {
   return accessFor(req.user.id,req.session?.agencyOwner??req.user.id);
 }
 const clientInput=z.object({name:z.string().trim().min(1).max(200),contactEmail:z.string().trim().email().max(254).nullable().default(null),notes:z.string().max(10000).default(''),tags:z.array(z.string().trim().min(1).max(100)).max(30).default([]),folder:z.string().trim().max(100).nullable().default(null)}).strict();
+// Curated, field-specific messages: raw Zod text is never echoed, and refinements written for people
+// ("Provide an address or Place ID") pass through as-is.
+const agencyFieldMessages:Record<string,string>={
+  name:'Enter a name (1 to 200 characters).',
+  contactEmail:'Enter a valid contact email, or leave it blank.',
+  notes:'Notes must be 10,000 characters or fewer.',
+  tags:'Each tag must be 1 to 100 characters, with up to 30 tags.',
+  folder:'Folder must be 100 characters or fewer.',
+  email:'Enter the email address of a registered ConstructHUB user.',
+  role:'Choose a role: admin, manager or viewer.',
+  clientIds:'Client IDs must be numbers from your client list.',
+  clientId:'Choose a client.',
+  subject:'Choose a connected agency Google account. If none is listed, connect the agency Google account first.',
+  businessName:'Enter the exact business name on Google (up to 300 characters).',
+  address:'Address must be 500 characters or fewer.',
+  placeId:'Place ID must be 300 characters or fewer.',
+  owner:'Choose a workspace.',
+};
+export function agencyInputMessage(e:z.ZodError):string {
+  const issue=e.issues[0];
+  if(!issue)return 'Invalid input';
+  if(issue.code==='custom'&&issue.message&&issue.message!=='Invalid input')return issue.message;
+  return agencyFieldMessages[String(issue.path[0]??'')]??'Invalid input';
+}
 export const csvCell=(value:unknown)=>'"'+String(value??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';
 export function registerAgencyRoutes(app:Express) {
   const route=(method:'get'|'post'|'put'|'delete',path:string,fn:(req:Request,res:Response,a:AgencyAccess)=>Promise<any>)=>app[method]('/api/agency'+path,async(req,res)=>{
     try {const a=await requestAccess(req);res.setHeader('Cache-Control','no-store');
       if(method!=='get'&&!await takeBudget(`agency-route:${a.actor}`,100))throw new GoogleError('quota','Request limit reached',429);
       await fn(req,res,a);
-    }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json({message:e instanceof z.ZodError?'Invalid input':e instanceof GoogleError?e.message:'Agency operation failed'});}
+    }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json({message:e instanceof z.ZodError?agencyInputMessage(e):e instanceof GoogleError?e.message:'Agency operation failed'});}
   });
   route('get','/me',async(req,res,a)=>{
     const {rows}=await pool.query('SELECT w.user_id,w.name FROM agency_workspaces w WHERE w.user_id=$1 OR EXISTS(SELECT 1 FROM agency_members m WHERE m.user_id=w.user_id AND m.member_id=$1) ORDER BY w.user_id LIMIT 50',[a.actor]);

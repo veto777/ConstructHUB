@@ -65,7 +65,9 @@ export function registerAgencyAccess(app:Express) {
         const {rows}=await pool.query(`SELECT p.*,count(*) OVER()::int total FROM citation_campaigns p JOIN business_locations l ON l.id=p.location_id AND l.user_id=p.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ${w.sql} AND ($8::int IS NULL OR l.id=$8) ORDER BY p.id DESC LIMIT 50 OFFSET $9`,[...w.values,id,f.offset]);
         return void res.json(req.query.paged==='true'?{items:rows.map(camel),total:rows[0]?.total??0}:rows.map(camel));
       }
-      if(req.path==='/api/social'&&req.method==='GET') {
+      // The agency social list is for delegated members (or an explicit agency client filter). The owner's own
+      // per-business workbench (?businessId=) is served by server/social/routes.ts, never this owner-wide list.
+      if(req.path==='/api/social'&&req.method==='GET'&&req.query.businessId===undefined&&(member||req.query.clientId!==undefined)) {
         const f=filters.parse(req.query);
         const {rows:posts}=await pool.query(`SELECT p.*,m.client_id,count(*) OVER()::int total FROM social_posts p LEFT JOIN agency_social_post_clients m ON m.post_id=p.id AND m.user_id=p.user_id WHERE p.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients ac WHERE ac.user_id=p.user_id AND ac.member_id=$3 AND ac.client_id=m.client_id)) AND ($4::int IS NULL OR m.client_id=$4) AND p.payload::text ILIKE $5 ORDER BY p.created_at DESC,p.id LIMIT 50 OFFSET $6`,[a.owner,a.allClients,a.actor,f.clientId??null,`%${f.q.replace(/[\\%_]/g,'\\$&')}%`,f.offset]);
         const {rows:[connection]}=await pool.query('SELECT accounts FROM social_connections WHERE user_id=$1',[a.owner]);
