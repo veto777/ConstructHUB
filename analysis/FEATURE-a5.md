@@ -1,3 +1,9 @@
+# Round 4 — Cloudflare and Search Console
+
+See [FEATURE-a5-cf-gsc.md](FEATURE-a5-cf-gsc.md) for the implementation, walkthrough, owner configuration, limits and test evidence. New UI: growth sidebar → Cloudflare / Search Console; Guides, Locations Insights and Site Scan hooks.
+
+---
+
 # Lane a5 — Site Scan
 
 Built in `/home/veto/ConstructHUB-a5`, branch `lane/a5`, using only port **8169** and database **constructhub_dev_a5**. No deployment, push, production access, other lane process changes, real provider writes or paid API calls.

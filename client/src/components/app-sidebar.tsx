@@ -156,6 +156,8 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "Social Media", url: "/social-media", icon: Megaphone },
   { title: "Site Scan", url: "/site-scan", icon: Search },
   { title: "Guides", url: "/guides", icon: BookOpen },
+  { title: "Cloudflare", url: "/cloudflare", icon: Search },
+  { title: "Search Console", url: "/search-console", icon: Search },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/competitors-landing" }] : []),

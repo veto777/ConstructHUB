@@ -1,3 +1,4 @@
+import { ScanIndexingSummary } from "./site-connections";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -430,6 +431,7 @@ export default function SiteScanPage() {
                 </p>
               )}
               <ScanReport report={job.report} draft={job.aiDraft} />
+              <ScanIndexingSummary scanId={job.id} />
             </>
           )}
         </section>

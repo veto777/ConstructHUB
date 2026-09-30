@@ -1,3 +1,4 @@
+import { LocationSearchSummary } from "./site-connections";
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection, GbpLinkCell } from "@/components/gbp-connection";
 import { InfoTip } from "@/components/info-tip";
@@ -522,7 +523,7 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
           </div>
 
           <div className="flex-1 min-w-0">
-            {activeTab === "insights" && <InsightsTab location={location} />}
+            {activeTab === "insights" && <div className="space-y-4"><LocationSearchSummary locationId={location.id}/><InsightsTab location={location} /></div>}
             {activeTab === "guard" && <ProfileGuard locationId={location.id} linked={!!location.gbpLocationName} />}
             {activeTab === "info" && <LocationInfoTab location={location} />}
             {activeTab === "services" && <ServicesTab location={location} />}

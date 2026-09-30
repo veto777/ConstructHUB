@@ -1,3 +1,4 @@
+import { SiteConnectionGuide } from "./site-connection-guide";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 const guides = [
   {
@@ -102,7 +103,8 @@ export default function GuidesPage() {
         <a className="underline text-primary" href="/social-media">
           Open Social Media
         </a>
-        {guides.map((g) => (
+        <SiteConnectionGuide />
+      {guides.map((g) => (
           <Card key={g.title}>
             <CardHeader>
               <CardTitle>{g.title}</CardTitle>
