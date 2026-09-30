@@ -600,6 +600,9 @@ export default function PublicEstimatePage() {
               <div>
                 <div className="font-semibold">
                   {answerBlock.code === "not_sent" ? "This estimate hasn't been sent yet"
+                    // An imported estimate that was never sent from ConstructHUB:
+                    // the server's message already says who to ask, so no suffix.
+                    : answerBlock.code === "not_open" ? "Not open for online approval yet"
                     : answerBlock.code === "superseded" ? "You've already approved this job"
                     : "This estimate is no longer open"}
                 </div>

@@ -204,7 +204,7 @@ describe("crm stats + team activity (dev server)", () => {
     expect((await api("/api/crm/team-activity", {}, cookie)).status).toBe(200);
   });
 
-  it("stats: the four headline numbers match the hand-computed fixtures", async () => {
+  it("stats: the headline numbers match the hand-computed fixtures", async () => {
     const r = await api("/api/crm/stats", {}, cookie);
     expect(r.status).toBe(200);
     expect(r.body).toEqual({
@@ -213,6 +213,11 @@ describe("crm stats + team activity (dev server)", () => {
       unscheduledJobs: { count: 1, totalCents: 12_000 },   // approved, unarchived
       // 10k + 15k + clamped-to-0 corrupt row (uncamped sum would be 23_000).
       openInvoices: { count: 3, totalCents: 25_000 },
+      // Unarchived, not cancelled/paid: P1 approved 12k + P3 scheduled 7k
+      // (P2 is archived).
+      openPipeline: { count: 2, totalCents: 19_000 },
+      // Active clients in org A only (the cross-org customer is in org B).
+      clients: { count: 1 },
     });
   });
 

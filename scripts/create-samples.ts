@@ -18,7 +18,7 @@ const argVal = (flag: string, dflt?: string) => {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] : dflt;
 };
-const ORG_ID = argVal("--org");
+const ORG_ID: string = argVal("--org") ?? "";
 const TO = argVal("--to", "alpinesidingcompany@gmail.com")!;
 if (!ORG_ID) throw new Error("--org required");
 
@@ -26,6 +26,7 @@ const { db } = await import("../server/db");
 const s = await import("../shared/schema");
 const { and, eq, sql } = await import("drizzle-orm");
 const { sendWithFallback } = await import("../server/email");
+const { nextDocNumber } = await import("../server/crm/doc-number");
 
 const tok = () => randomBytes(24).toString("hex");
 const PORTAL = "https://portal.constructhub.us";
@@ -67,12 +68,6 @@ async function main() {
   const [org] = await db.select().from(s.crmOrgs).where(eq(s.crmOrgs.id, ORG_ID)).limit(1);
   if (!org) throw new Error("org not found");
 
-  const [{ n: seq }] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(s.crmEstimates)
-    .where(eq(s.crmEstimates.orgId, ORG_ID));
-  let next = 1000 + seq + 1;
-
   for (const smp of SAMPLES) {
     // customer — reuse if one with this email+name exists
     let [cust] = await db.select().from(s.crmCustomers)
@@ -100,22 +95,29 @@ async function main() {
     const taxBps = org.defaultTaxRateBps ?? 0;
     const tax = Math.round((subtotal * taxBps) / 10000);
     const total = subtotal + tax;
-    const number = `E-${next++}`;
 
-    const [est] = await db.insert(s.crmEstimates).values({
-      orgId: ORG_ID, customerId: cust.id, number, title: smp.title,
-      termsText: org.termsAndConditions ?? null,
-      taxRateBps: taxBps, subtotalCents: subtotal, discountCents: 0, taxCents: tax, totalCents: total,
-      publicToken: tok(), status: "sent",
-      sentAt: new Date(), expiresAt: new Date(Date.now() + 7 * 86400000), sentToEmail: TO,
-      customFields: { sampleKey: smp.key, sample: true, taxSource: { source: "org-default", bps: taxBps } },
-    }).returning();
-    await db.insert(s.crmEstimateItems).values(
-      smp.items.map((it, idx) => ({
-        orgId: ORG_ID, estimateId: est.id, name: it.name, quantityMilli: it.qty * 1000,
-        unitPriceCents: it.price, totalCents: it.price * it.qty, taxable: true, sortOrder: idx,
-      })),
-    );
+    // The number comes from the CRM's one allocator, inside the insert's
+    // transaction — never 1000 + count(*), which repeats a number that still
+    // exists after any delete and would trip the (org_id, number) unique index.
+    const est = await db.transaction(async (tx) => {
+      const number = await nextDocNumber(tx, "E", ORG_ID);
+      const [row] = await tx.insert(s.crmEstimates).values({
+        orgId: ORG_ID, customerId: cust.id, number, title: smp.title,
+        termsText: org.termsAndConditions ?? null,
+        taxRateBps: taxBps, subtotalCents: subtotal, discountCents: 0, taxCents: tax, totalCents: total,
+        publicToken: tok(), status: "sent",
+        sentAt: new Date(), expiresAt: new Date(Date.now() + 7 * 86400000), sentToEmail: TO,
+        customFields: { sampleKey: smp.key, sample: true, taxSource: { source: "org-default", bps: taxBps } },
+      }).returning();
+      await tx.insert(s.crmEstimateItems).values(
+        smp.items.map((it, idx) => ({
+          orgId: ORG_ID, estimateId: row.id, name: it.name, quantityMilli: it.qty * 1000,
+          unitPriceCents: it.price, totalCents: it.price * it.qty, taxable: true, sortOrder: idx,
+        })),
+      );
+      return row;
+    });
+    const number = est.number;
 
     const link = `${PORTAL}/e/${est.publicToken}`;
     try {

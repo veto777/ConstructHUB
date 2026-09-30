@@ -507,10 +507,14 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       rows.map((c) => ({ ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none" }));
 
     // Paged mode (opt-in with ?paged=1, or any limit/offset): { rows, total,
-    // bidCounts, limit, offset }. total and bidCounts cover EVERY client the
-    // caller may see (under the same search), not just the returned page, so
-    // the list can say "Showing 100 of 2,527" and the tabs count the whole book.
-    const paged = req.query.paged === "1" || req.query.limit !== undefined || req.query.offset !== undefined;
+    // bidCounts, limit, offset }. bidCounts cover EVERY client the caller may
+    // see (under the same search), not just the returned page, so the tabs
+    // count the whole book. ?bidStatus=won|undecided|declined|none filters on
+    // the server, so a tab pages through every matching client rather than
+    // the pages loaded so far; total is the number of clients that match
+    // (search and bidStatus), so the list can say "Showing 100 of 2,527".
+    const paged = req.query.paged === "1" || req.query.limit !== undefined || req.query.offset !== undefined
+      || req.query.bidStatus !== undefined;
     if (paged) {
       const int = (v: any, dflt: number, min: number, max: number) => {
         const n = parseInt(String(v ?? ""), 10);
@@ -518,13 +522,19 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       };
       const limit = int(req.query.limit, 100, 1, 500);
       const offset = int(req.query.offset, 0, 0, 1_000_000);
+      const bidStatus = req.query.bidStatus === undefined || req.query.bidStatus === "" || req.query.bidStatus === "all"
+        ? null : String(req.query.bidStatus);
+      if (bidStatus && !["won", "undecided", "declined", "none"].includes(bidStatus)) {
+        return res.status(400).json({ message: "bidStatus must be one of: won, undecided, declined, none." });
+      }
       const all = await objectPolicy(ctx).filter("customers",
         await db.select().from(crmCustomers).where(and(...where)).orderBy(desc(crmCustomers.createdAt)));
       const outcome = await outcomesFor(all.map((c) => c.id));
       const bidCounts = { won: 0, undecided: 0, declined: 0, none: 0 } as Record<string, number>;
       for (const c of all) bidCounts[outcome.get(c.id) ?? "none"] += 1;
-      const page = all.slice(offset, offset + limit);
-      return res.json({ rows: present(page, outcome), total: all.length, bidCounts, limit, offset });
+      const matching = bidStatus ? all.filter((c) => (outcome.get(c.id) ?? "none") === bidStatus) : all;
+      const page = matching.slice(offset, offset + limit);
+      return res.json({ rows: present(page, outcome), total: matching.length, bidCounts, limit, offset });
     }
 
     // Legacy shape: bare array of the newest 500 (every picker relies on it).
@@ -659,12 +669,13 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
   /**
    * Hard-delete a client — OWNER only (requireOwnerRole, never a permission
-   * flag), for cleaning up test records. A client with ANY estimates, invoices
-   * or projects is refused with 409 unless ?force=1 is passed, which deletes
-   * the whole tree transactionally (documents, line items, payments, jobs,
-   * the projects' change orders / punch list / daily logs / selections /
-   * budget, costs and phases, measurements, notes, comments — everything
-   * under the client). The client's calendar visits always go with it.
+   * flag), for cleaning up test records. A client with ANY estimates,
+   * invoices, projects or calendar visits is refused with 409 (the counts in
+   * the body, for the confirm dialog) unless ?force=1 is passed, which
+   * deletes the whole tree transactionally (documents, line items, payments,
+   * jobs, the projects' change orders / punch list / daily logs / selections
+   * / budget, costs and phases, measurements, notes, comments, visits —
+   * everything under the client).
    */
   app.delete("/api/crm/customers/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
@@ -684,9 +695,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const invoices = await countOf(crmInvoices, crmInvoices.customerId);
     const projects = await countOf(crmProjects, crmProjects.customerId);
     // Visits on the calendar — the client's own, or booked against one of
-    // their projects. They always go with the client (no FK would catch
-    // them, and a visit for a deleted client is an orphan on the schedule);
-    // the count is reported so the confirm can name them.
+    // their projects, whatever the date. They go with the client (no FK
+    // would catch them, and a visit for a deleted client is an orphan on the
+    // schedule), so a client with visits needs the same confirmation as one
+    // with documents, and the count names them.
     const [{ n: appointments }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmAppointments)
       .where(and(
         eq(crmAppointments.orgId, orgId),
@@ -696,7 +708,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         ),
       ));
     const force = req.query.force === "1";
-    if ((estimates || invoices || projects) && !force) {
+    if ((estimates || invoices || projects || appointments) && !force) {
       return res.status(409).json({
         message: `This client has ${estimates} estimate(s), ${invoices} invoice(s), ${projects} project(s) ` +
           `and ${appointments} scheduled visit(s). Deleting removes the entire tree — every document, ` +
@@ -995,12 +1007,32 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       // unanswered estimate past its expiry — plus any row a person marked
       // expired by hand. `lt` binds through the column, so the timestamp
       // comparison happens in the same (UTC) terms the rows were written in.
-      const conds: any[] = [inArray(crmEstimates.status, dq.statuses)];
-      if (dq.statuses.includes("expired")) {
+      // The mirror image: Sent / Viewed alone leave out the derived-expired
+      // rows (the list shows those as expired), unless Expired is ticked too.
+      const now = new Date();
+      const withExpired = dq.statuses.includes("expired");
+      const open = dq.statuses.filter((s) => s === "sent" || s === "viewed");
+      const rest = dq.statuses.filter((s) => s !== "sent" && s !== "viewed");
+      const conds: any[] = [];
+      if (rest.length) conds.push(inArray(crmEstimates.status, rest));
+      if (open.length) {
+        conds.push(withExpired
+          ? inArray(crmEstimates.status, open)
+          : and(
+            inArray(crmEstimates.status, open),
+            or(
+              isNull(crmEstimates.expiresAt),
+              gte(crmEstimates.expiresAt, now),
+              isNotNull(crmEstimates.approvedAt),
+              isNotNull(crmEstimates.declinedAt),
+            ),
+          ));
+      }
+      if (withExpired) {
         conds.push(and(
           inArray(crmEstimates.status, ["sent", "viewed"]),
           isNotNull(crmEstimates.expiresAt),
-          lt(crmEstimates.expiresAt, new Date()),
+          lt(crmEstimates.expiresAt, now),
           isNull(crmEstimates.approvedAt),
           isNull(crmEstimates.declinedAt),
         ));

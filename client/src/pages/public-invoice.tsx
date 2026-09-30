@@ -22,18 +22,26 @@ export default function PublicInvoicePage() {
   const [, params] = useRoute("/i/:token");
   const token = params?.token;
   const { toast } = useToast();
+  // A contractor preview grant (the CRM's Preview button) rides in the page
+  // URL — forward it to the API, as the estimate page does.
+  const previewGrant = new URLSearchParams(window.location.search).get("preview");
+  const docUrl = `/api/public/invoices/${token}${previewGrant ? `?preview=${encodeURIComponent(previewGrant)}` : ""}`;
   const { data, isLoading, error } = useQuery<any>({
-    queryKey: [`/api/public/invoices/${token}`], enabled: !!token, retry: false,
+    queryKey: [docUrl], enabled: !!token, retry: false,
   });
+  const preview = data?.preview === true;
 
   // Fee + financing info, fetched only once the document itself loaded (which
   // means the email gate already passed — this endpoint is gated the same way).
+  // Never in a contractor preview: there is no client session to pass the gate,
+  // and the preview can't pay anyway.
   const { data: payInfo } = useQuery<any>({
-    queryKey: [`/api/public/invoices/${token}/pay-info`], enabled: !!data, retry: false,
+    queryKey: [`/api/public/invoices/${token}/pay-info`], enabled: !!data && !preview, retry: false,
   });
 
-  // Engagement heartbeat — starts only once the document has loaded.
-  useEngagementTracker("invoice", token, !!data);
+  // Engagement heartbeat — starts only once the document has loaded, and
+  // never for a contractor preview (that's not client behaviour).
+  useEngagementTracker("invoice", token, !!data && !preview);
 
   const pay = useMutation({
     mutationFn: async (method?: "card" | "ach") => {
@@ -58,22 +66,11 @@ export default function PublicInvoicePage() {
     const status = Number(raw.match(/^(\d{3}):/)?.[1] ?? 0);
     let body: any = null;
     try { body = JSON.parse(raw.replace(/^\d{3}:\s*/, "")); } catch { /* plain-text body */ }
-    // 401 requiresVerification = the email gate.
+    // 401 requiresVerification = the email gate. A sign-in link that was
+    // already used or had expired lands back here with ?auth=expired — the
+    // gate itself says so (one notice, not two).
     if (status === 401 && body?.requiresVerification) {
-      // A sign-in link that was already used or had expired lands back here
-      // with ?auth=expired (the verify route) — say so above the gate.
-      const expired = new URLSearchParams(window.location.search).get("auth") === "expired";
-      return (
-        <>
-          {expired && (
-            <div className="bg-amber-500/10 border-b border-amber-500/40 px-4 py-3 text-center text-sm"
-              role="status" data-testid="notice-link-expired">
-              That sign-in link expired or was already used — enter your email below to get a new one.
-            </div>
-          )}
-          <DocGateChallenge docType="invoice" token={token!} />
-        </>
-      );
+      return <DocGateChallenge docType="invoice" token={token!} />;
     }
     // 410 = the contractor voided the invoice: nothing is owed on it.
     const company = body?.company?.name as string | undefined;
@@ -110,6 +107,15 @@ export default function PublicInvoicePage() {
     <main className="min-h-screen bg-muted/40 py-10 px-4" style={themeStyle} data-testid="public-invoice-root">
       <PrintLockdown />
       <div className="max-w-3xl mx-auto space-y-5">
+        {preview && (
+          <Card className="border-amber-500/50 bg-amber-500/5" data-testid="preview-banner">
+            <CardContent className="p-4 text-sm text-center">
+              <span className="font-medium">Contractor preview</span> — this is what your client
+              sees after verifying their email. Paying is disabled here.
+            </CardContent>
+          </Card>
+        )}
+
         {settled && (
           <Card className="border-emerald-500/50 bg-emerald-500/5">
             <CardContent className="p-5 flex items-start gap-3">
@@ -283,7 +289,7 @@ export default function PublicInvoicePage() {
           </div>
         </Card>
 
-        {!settled && !processing && inv.dueCents > 0 && (
+        {!preview && !settled && !processing && inv.dueCents > 0 && (
           <Card className="shadow-md border-primary/30">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2"><Landmark className="h-5 w-5" /> Pay this invoice</CardTitle>
@@ -356,7 +362,7 @@ export default function PublicInvoicePage() {
           </Card>
         )}
 
-        {payInfo?.financing && (
+        {!preview && payInfo?.financing && (
           <Card className="shadow-sm">
             <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-muted-foreground">Prefer to spread payments out?</div>

@@ -420,8 +420,12 @@ export const stateGuides = pgTable("state_guides", {
   stateCode: text("state_code").notNull().unique(),
   stateName: text("state_name").notNull(),
   sosName: text("sos_name").notNull(),
-  // Nullable: a Secretary of State link that goes dead becomes null (never a
-  // guessed replacement) — the UI then offers an honest search fallback.
+  // Nullable (server/state-guides-schema.ts drops the old NOT NULL): the UI
+  // never serves a dead Secretary of State link — it shows an honest search
+  // fallback instead of a guessed replacement. The boot sync in
+  // server/seed-reference-data.ts keeps a dead link's old value and relies on
+  // sos_url_status = 'dead' to hide it, so it works on databases where the
+  // NOT NULL is still in place.
   sosUrl: text("sos_url"),
   entityTypes: text("entity_types").array(),
   licensingBoardName: text("licensing_board_name"),
@@ -443,8 +447,10 @@ export const stateGuides = pgTable("state_guides", {
   overview: text("overview"),
   // Link-check result per agency URL (link policy: verified | unconfirmed |
   // dead | none) and the date the links were last checked ("2026-09-30"),
-  // from server/data/state-guides.json. Null = not checked yet. Added by
-  // server/state-guides-schema.ts (ALTER … ADD COLUMN IF NOT EXISTS).
+  // from server/data/state-guides.json. Null = not checked yet. All text,
+  // added idempotently (ADD COLUMN IF NOT EXISTS) by the boot sync in
+  // server/seed-reference-data.ts and by server/state-guides-schema.ts, which
+  // scripts/apply-schema-migration.ts runs.
   sosUrlStatus: text("sos_url_status"),
   licensingBoardUrlStatus: text("licensing_board_url_status"),
   workersCompUrlStatus: text("workers_comp_url_status"),

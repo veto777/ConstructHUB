@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
+import { crmNotificationChannel } from "@shared/schema";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
 
@@ -182,7 +183,18 @@ describe("public intake", () => {
     expect(res.body.message).toMatch(/phone number is too long/i);
   });
 
-  it("the new-lead bell item links to that lead, not the client list", async () => {
+  it("the new-lead bell item links to that lead, not the client list", async ({ skip }) => {
+    // The bell row is written only when the org's leadReceived pref has the
+    // in-app channel on and the org has an active owner to ring — the same
+    // test notifyLeadReceived/notifyMembers apply. Off → nothing to check.
+    const [org] = await q<{ custom_fields: unknown }>(`select custom_fields from crm_orgs where id = $1`, [ORG_ID]);
+    if (!crmNotificationChannel(org?.custom_fields, "leadReceived", "inApp")) {
+      skip("this org has in-app leadReceived notifications turned off");
+    }
+    const [{ n: owners }] = await q<{ n: number }>(
+      `select count(*)::int as n from crm_members where org_id = $1 and status = 'active' and role = 'owner'`, [ORG_ID]);
+    if (!owners) skip("this org has no active owner for the bell to notify");
+
     const token = await getToken();
     const ip = `10.78.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`;
     const res = await postLead(token, { name: name("linked"), phone: "555-0101" }, { "x-forwarded-for": ip });
@@ -197,7 +209,9 @@ describe("public intake", () => {
       links = (await q<{ link: string }>(`select link from crm_notifications where org_id = $1 and title = $2`,
         [ORG_ID, `New website lead — ${name("linked")}`])).map((r) => r.link);
     }
-    if (links.length) expect(links.every((l) => l === `/crm/clients/${lead.id}`)).toBe(true);
+    // In-app is on, so a missing row is a failure, not a pass.
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.every((l) => l === `/crm/clients/${lead.id}`)).toBe(true);
   });
 
   it("rate limit trips after 10 submissions per IP — same 201, no eleventh lead", async () => {

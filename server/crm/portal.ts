@@ -175,18 +175,36 @@ function previewGrantValid(kind: PreviewDoc, docId: string, grant: string): bool
  * or null when they can. Runs after the answered/expired checks:
  *   • not_sent  — a draft (or one pulled back to draft) was never put in front
  *                 of the client, so it can't be signed yet;
+ *   • not_open  — not a draft, but never sent from ConstructHUB either (a row
+ *                 brought in by an import carries its status with no sentAt).
+ *                 Nothing here pretends it was sent — sent_at is never
+ *                 backfilled — so the client is told to ask for it;
  *   • superseded — the client already signed the other half of a scope
  *                 selection (the "your selections" estimate, or the original
  *                 it was generated from): one job, one contract;
  *   • withdrawn — the contractor cancelled it, or a newer selection replaced it.
  * `link` points the client at the document that took its place, when there is
  * one — always the same customer's, the only session that gets this far.
+ * `companyName` is the letterhead name the page shows; when a caller doesn't
+ * have it, it is resolved the same way (the estimate's division, else the org).
  */
 async function estimateAnswerBlock(
   est: typeof crmEstimates.$inferSelect,
-): Promise<{ code: "not_sent" | "superseded" | "withdrawn"; message: string; link?: string } | null> {
-  if (!est.sentAt || est.status === "draft") {
+  companyName?: string | null,
+): Promise<{ code: "not_sent" | "not_open" | "superseded" | "withdrawn"; message: string; link?: string } | null> {
+  if (est.status === "draft") {
     return { code: "not_sent", message: "This estimate hasn't been sent yet, so it can't be approved or declined." };
+  }
+  if (!est.sentAt && est.status !== "cancelled") {
+    let name = companyName ?? null;
+    if (!name) {
+      const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
+      name = org ? companyBranding(org, await resolveEstimateDivision(est)).name : null;
+    }
+    return {
+      code: "not_open",
+      message: `This estimate isn't open for online approval yet — ask ${name || "your contractor"} to send it from ConstructHUB.`,
+    };
   }
   const cf = (est.customFields ?? {}) as Record<string, any>;
   const relatedIds = [cf.clientSelection?.newEstimateId, cf.selectedFromEstimateId]
@@ -640,9 +658,11 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         eq(crmEstimateDiscounts.enabled, true),
       ))
       .orderBy(asc(crmEstimateDiscounts.sortOrder), asc(crmEstimateDiscounts.createdAt));
-    // Not answerable (a draft, the other half of an already-signed scope
-    // selection, or withdrawn): the page renders read-only with this notice.
-    const answerBlock = current.approvedAt || current.declinedAt ? null : await estimateAnswerBlock(current);
+    // Not answerable (a draft, an imported row never sent from here, the
+    // other half of an already-signed scope selection, or withdrawn): the
+    // page renders read-only with this notice.
+    const answerBlock = current.approvedAt || current.declinedAt
+      ? null : await estimateAnswerBlock(current, view.company.name);
     res.json({
       ...view,
       preview: preview || undefined, // read-only: the page hides approve/pay

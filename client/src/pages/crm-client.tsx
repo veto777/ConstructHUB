@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
@@ -47,6 +47,15 @@ const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const when = (d?: string | null) => (d ? new Date(d).toLocaleString() : null);
+
+/** Readable labels for a payment's stored method slug (as on /crm/payments). */
+const METHOD_LABELS: Record<string, string> = {
+  cash: "Cash", check: "Check", wire: "Wire transfer", credit_card: "Credit card",
+  ach: "Bank transfer (ACH)", card: "Card", other: "Other",
+};
+
+/** The 409 body of an unforced client delete: what the whole tree holds. */
+type ClientTree = { estimates: number; invoices: number; projects: number; appointments: number };
 
 interface Item {
   kind: string; name: string; description?: string | null;
@@ -745,17 +754,41 @@ export default function CrmClientPage() {
   });
 
   // ── Owner-only hard delete (test-record cleanup) ──────────────────────────
+  // The first confirm sends a plain DELETE. A client with nothing attached is
+  // deleted there; otherwise the server answers 409 with what the whole tree
+  // holds (every visit, whatever its date — counts this page could only
+  // estimate), and the dialog asks again with those numbers before ?force=1.
   const [delOpen, setDelOpen] = useState(false);
+  const [delTree, setDelTree] = useState<ClientTree | null>(null);
   const deleteClient = useMutation({
-    mutationFn: async (force: boolean) =>
-      (await apiRequest("DELETE", `/api/crm/customers/${id}${force ? "?force=1" : ""}`)).json(),
-    onSuccess: () => {
+    mutationFn: async (force: boolean): Promise<{ deleted: true } | { deleted: false; tree: ClientTree }> => {
+      try {
+        await apiRequest("DELETE", `/api/crm/customers/${id}${force ? "?force=1" : ""}`);
+        return { deleted: true };
+      } catch (e: any) {
+        const m = /^409:\s*([\s\S]*)$/.exec(String(e?.message ?? ""));
+        let body: any = null;
+        try { body = m ? JSON.parse(m[1]) : null; } catch { /* not the counts body */ }
+        const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+        if (!force && body && typeof body.estimates === "number") {
+          return {
+            deleted: false,
+            tree: { estimates: n(body.estimates), invoices: n(body.invoices), projects: n(body.projects), appointments: n(body.appointments) },
+          };
+        }
+        throw e;
+      }
+    },
+    onSuccess: (r) => {
+      if (!r.deleted) { setDelTree(r.tree); return; }
+      setDelOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       toast({ title: "Client deleted" });
       setLocation("/crm/clients");
     },
     onError: (e: any) => {
       setDelOpen(false);
+      setDelTree(null);
       toast({ title: "Could not delete client", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
@@ -870,6 +903,14 @@ export default function CrmClientPage() {
     onSuccess: (r: any) => { if (r.url) window.open(r.url, "_blank", "noopener"); },
     onError: (e: any) => toast({ title: "Could not open preview", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  // The same read-only preview for an invoice (15-minute grant; paying is
+  // disabled on that page).
+  const previewInvoice = useMutation({
+    mutationFn: async (invoiceId: string) =>
+      (await apiRequest("POST", `/api/crm/invoices/${invoiceId}/preview-link`, {})).json(),
+    onSuccess: (r: any) => { if (r.url) window.open(r.url, "_blank", "noopener"); },
+    onError: (e: any) => toast({ title: "Could not open preview", description: apiErrorMessage(e), variant: "destructive" }),
+  });
 
   if (isLoading) {
     return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -877,14 +918,17 @@ export default function CrmClientPage() {
 
   if (isError || !data) {
     const connectionProblem = isError && !notFound;
-    // A 404 is the server saying the record is gone (an owner hard delete),
-    // not a network problem — say that, and point back to the list.
+    // A 404 only says this workspace can't show that client — it may have
+    // been deleted, the link may be wrong, or it may belong to another
+    // workspace or a part of the business you can't see. Don't claim which;
+    // point back to the list.
     return (
       <ErrorCard
-        title={connectionProblem ? "Couldn't load this client" : "This client was deleted"}
+        title={connectionProblem ? "Couldn't load this client" : "This client isn't available"}
         description={connectionProblem
           ? "Check your connection and refresh the page."
-          : "It's no longer in your client list. If you followed an old link, find the client from All clients."}
+          : "It may have been deleted, the link may be wrong, or it may belong to another workspace. " +
+            "Find the client from All clients."}
       >
         <Link href="/crm/clients">
           <Button variant="outline" size="sm" data-testid="link-error-back-clients">
@@ -1070,55 +1114,59 @@ export default function CrmClientPage() {
                   <Copy className="h-4 w-4 mr-2" /> Copy portal link
                 </Button>
               )}
-              {isOwner && (() => {
-                const estN = (data.estimates ?? []).length;
-                const projN = (data.projects ?? []).length;
-                const invN = (invoices ?? []).length;
-                // The server always deletes the client's calendar visits with
-                // them (their own, and any booked against their projects) —
-                // name them. The server deletes EVERY such visit, whatever the
-                // date, but this page only loads 30 days back to a year ahead,
-                // so the count is labelled with that window, never passed off
-                // as the total.
-                const projIds = new Set((data.projects ?? []).map((p: any) => p.id));
-                const visitN = (apptData?.appointments ?? []).filter((a: any) =>
-                  a.customerId === id || (a.projectId && projIds.has(a.projectId))).length;
-                const visits = visitN > 0
-                  ? `every calendar visit booked for them (${visitN} scheduled visit(s) from the last 30 days through the next year)`
-                  : "any calendar visits booked for them";
-                const hasDocs = estN + projN + invN > 0;
-                return (
-                  <AlertDialog open={delOpen} onOpenChange={setDelOpen}>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" data-testid="button-delete-client"
-                        className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent data-testid="dialog-delete-client">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete {c.displayName}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {hasDocs
-                            ? `This permanently deletes ${c.displayName} AND their entire tree: ` +
-                              `${estN} estimate(s), ${invN} invoice(s), ${projN} project(s) and ${visits}, ` +
-                              `with all line items, payments and history. This cannot be undone.`
-                            : `This permanently deletes ${c.displayName} and ${visits}. This cannot be undone.`}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel data-testid="button-cancel-delete-client">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
+              {isOwner && (
+                // Two steps: the plain delete first; if the client has
+                // anything attached, the server's 409 counts (the whole tree,
+                // not what this page happens to have loaded) and a second,
+                // explicit confirm before ?force=1.
+                <AlertDialog open={delOpen}
+                  onOpenChange={(o) => { if (deleteClient.isPending) return; setDelOpen(o); if (!o) setDelTree(null); }}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-delete-client"
+                      className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent data-testid="dialog-delete-client">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        {delTree ? `Delete ${c.displayName} and everything under them?` : `Delete ${c.displayName}?`}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription data-testid="text-delete-client-detail">
+                        {delTree
+                          ? `${c.displayName} has ${delTree.estimates} estimate(s), ${delTree.invoices} invoice(s), ` +
+                            `${delTree.projects} project(s) and ${delTree.appointments} calendar visit(s). ` +
+                            "Deleting removes the entire tree — every document with its line items, payments and " +
+                            "history, every project record (change orders, punch list, daily logs, selections, " +
+                            "budget and costs) and every visit. This cannot be undone."
+                          : `This permanently deletes ${c.displayName}. If they have any estimates, invoices, ` +
+                            "projects or calendar visits, you'll see how many and confirm again before anything " +
+                            "is removed. This cannot be undone."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-delete-client" disabled={deleteClient.isPending}>
+                        Cancel
+                      </AlertDialogCancel>
+                      {delTree ? (
+                        <Button variant="destructive" disabled={deleteClient.isPending}
+                          data-testid="button-confirm-delete-client-force"
+                          onClick={() => deleteClient.mutate(true)}>
+                          {deleteClient.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Delete everything
+                        </Button>
+                      ) : (
+                        <Button variant="destructive" disabled={deleteClient.isPending}
                           data-testid="button-confirm-delete-client"
-                          onClick={() => deleteClient.mutate(hasDocs)}
-                        >
+                          onClick={() => deleteClient.mutate(false)}>
+                          {deleteClient.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                           Delete permanently
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                );
-              })()}
+                        </Button>
+                      )}
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </div>
         </CardContent>
@@ -1616,6 +1664,18 @@ export default function CrmClientPage() {
                           </span>
                         );
                       })()}
+                      {/* What the client sees, read-only (a voided invoice's page
+                          only says it was cancelled, so it gets no preview). */}
+                      {canInvoice && !inv.voidedAt && (
+                        <Button size="sm" variant="ghost"
+                          onClick={() => previewInvoice.mutate(inv.id)} disabled={previewInvoice.isPending}
+                          data-testid={`button-preview-invoice-${inv.id}`}>
+                          {previewInvoice.isPending && previewInvoice.variables === inv.id
+                            ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            : <Eye className="h-4 w-4 mr-2" />}
+                          Preview
+                        </Button>
+                      )}
                       {/* A voided invoice's link answers 410 — never offer to copy it. */}
                       {inv.publicToken && !inv.voidedAt && (
                         <Button size="sm" variant="ghost" data-testid={`button-copy-invoice-${inv.id}`}
@@ -1803,7 +1863,7 @@ export default function CrmClientPage() {
           <DialogHeader>
             <DialogTitle>Reverse this payment?</DialogTitle>
             <DialogDescription>
-              {reverseFor && <>{money(reverseFor.amountCents)} · {reverseFor.method ?? "manual"} from {c.displayName}.</>}{" "}
+              {reverseFor && <>{money(reverseFor.amountCents)} · {METHOD_LABELS[reverseFor.method] ?? reverseFor.method ?? "manual"} from {c.displayName}.</>}{" "}
               The payment stays in the history marked "reversed", the invoice balance goes back up,
               and the reason is noted on the client. Use this for a payment recorded by mistake.
             </DialogDescription>
