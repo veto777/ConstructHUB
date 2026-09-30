@@ -110,7 +110,7 @@ export function agencyQuote(locationsInput: number): AgencyQuote {
  * Ranking-grid credits one grid costs: one per 25 grid points, rounded up
  * (3x3 and 5x5 = 1, 7x7 = 2, 9x9 = 4, 11x11 = 5, 13x13 = 7, 15x15 = 9). Mirrors
  * the server's gridCreditCost (server/growth-quotas.ts), which is what is
- * charged; server/pricing-display.test.ts keeps the two equal.
+ * charged; server/client-plan-ui.test.ts keeps the two equal.
  */
 export function gridCreditCost(gridSize: number): number {
   const size = Math.max(1, Math.floor(Number(gridSize) || 3));

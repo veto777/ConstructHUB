@@ -508,7 +508,20 @@ test.describe("settings: usage and API keys", () => {
     await gotoCrm(page, "/settings?tab=api-keys");
     await expect(page.getByTestId("text-api-keys-empty")).toHaveText("Nothing is saved for Cloudflare, Search Console, Google Ads and Gmail.");
     await expect(page.getByTestId("text-api-keys-elsewhere")).toContainText("Registrar API keys (Porkbun, Name.com) are listed on the Domains page.");
+    // No remove route exists for them yet, so none is promised.
+    await expect(page.getByTestId("text-api-keys-elsewhere")).toContainText("They can't be removed from ConstructHUB yet.");
     await expect(page.getByTestId("text-api-keys-error")).toHaveCount(0);
+  });
+
+  test("without the Agency plan the tab doesn't send registrar keys to a page that won't list them", async ({ page }) => {
+    await mockBilling(page, PRO_STRIPE);
+    await mockEntitlements(page, PRO_ENTITLEMENTS);
+    await mockSavedCredentials(page, { cloudflare: [], gsc: [], ads: { saved: false, managerId: null }, gmail: [], registrar: null });
+    await gotoCrm(page, "/settings?tab=api-keys");
+    const note = page.getByTestId("text-api-keys-elsewhere");
+    await expect(note).toContainText("Registrar API keys (Porkbun, Name.com) can't be listed or removed here yet.");
+    await expect(note).toContainText(`lists them on the ${PLANS.agency.name} plan`);
+    await expect(note).not.toContainText("are listed on the Domains page");
   });
 });
 

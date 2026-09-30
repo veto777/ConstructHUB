@@ -173,6 +173,8 @@ export default function PricingPage() {
       setConfirm(null);
       void queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription"] });
       void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      // The Agency workspace (and its sidebar lock) follows the plan through /api/agency/me.
+      void queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
       toast({ title: "Plan changed", description: `You're now on ${PLANS[r.plan].name}, billed ${intervalWord(r.interval)}.` });
     },
     onError: (err, r) => { setConfirm(null); handlePlanError("Couldn't change your plan", r, err); },

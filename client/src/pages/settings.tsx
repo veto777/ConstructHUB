@@ -30,7 +30,7 @@ import { VerificationCancelled } from "@/components/recent-auth";
 import { TalkToSalesButton, TalkToSalesDialog } from "@/components/talk-to-sales";
 import { ToastAction } from "@/components/ui/toast";
 import {
-  ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS, PLAN_KEYS, TRIAL_DAYS, effectivePlanKey,
+  ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS, PLAN_KEYS, TRIAL_DAYS, effectivePlanKey, planForModule,
   type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import {
@@ -845,6 +845,7 @@ function BetaAccessSection({ user }: { user: any }) {
       // The trial is a plan grant: billing, limits and the Agency-only pages all change with it.
       queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
       toast({ title: "Trial activated", description: data.message });
     },
     onError: (err: any) => {
@@ -1465,6 +1466,7 @@ function BillingSection() {
   const refreshBilling = () => {
     void queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription"] });
     void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
   };
 
   const portalMutation = useMutation({
@@ -1853,6 +1855,8 @@ function ApiKeysSection() {
   // A list the server doesn't offer (yet) can't be summed up as "nothing saved": name only what was checked.
   const unavailable = CREDENTIAL_SOURCES.filter((s, i) => s.optional && results[i].isSuccess && results[i].data === null);
   const checked = CREDENTIAL_SOURCES.filter((s, i) => results[i].isSuccess && results[i].data !== null);
+  // Which modules the plan includes: where a source the server can't list here can be seen at all.
+  const { data: entitlements } = useQuery<Pick<EntitlementsInfo, "modules">>({ queryKey: ["/api/entitlements"] });
   const [confirm, setConfirm] = useState<{ item: SavedCredential; source: CredentialSource } | null>(null);
 
   const remove = useMutation({
@@ -1932,12 +1936,20 @@ function ApiKeysSection() {
               Couldn't load your {source.serviceName} connections. {apiErrorMessage(error)}
             </p>
           ))}
-          {unavailable.map((source) => (
-            <p key={source.url} className="text-sm text-muted-foreground" data-testid="text-api-keys-elsewhere">
-              {source.serviceName.charAt(0).toUpperCase() + source.serviceName.slice(1)} are listed on the{" "}
-              <RouterLink href={source.manageHref} className="text-primary hover:underline">{source.manageLabel}</RouterLink> page.
-            </p>
-          ))}
+          {unavailable.map((source) => {
+            const name = source.serviceName.charAt(0).toUpperCase() + source.serviceName.slice(1);
+            const page = <RouterLink href={source.manageHref} className="text-primary hover:underline">{source.manageLabel}</RouterLink>;
+            // Without the module that page shows the upgrade card, not the keys; and a list the
+            // server doesn't offer has no remove route either, so neither is promised.
+            const locked = entitlements?.modules?.[source.module] === false;
+            return (
+              <p key={source.url} className="text-sm text-muted-foreground" data-testid="text-api-keys-elsewhere">
+                {locked
+                  ? <>{name} can't be listed or removed here yet. The {page} page lists them on the {PLANS[planForModule(source.module)].name} plan.</>
+                  : <>{name} are listed on the {page} page. They can't be removed from ConstructHUB yet.</>}
+              </p>
+            );
+          })}
           <div className="border-t pt-3 text-xs text-muted-foreground space-y-1.5">
             <p>You add a key on the page that uses it:</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
