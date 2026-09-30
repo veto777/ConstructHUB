@@ -84,6 +84,26 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     expect(prof.hours).toMatchObject({Monday:'8:00 AM – 5:30 PM',Tuesday:'Closed'});expect(prof.social_profiles).toMatchObject({facebook:'https://www.facebook.com/fixture'});expect(prof.social_profiles.text_messaging).toBeUndefined();
     expect((await pool.query('SELECT value::text FROM gbp_daily_metrics WHERE location_id=$1',[locationId])).rows).toEqual([{value:'0'}]);
   });
+  it('reconciles removed social links, preserves local-only fields and reports optional sync failures', async () => {
+    await pool.query(`UPDATE business_locations SET social_profiles=$2 WHERE id=$1`, [locationId,
+      JSON.stringify({facebook:'https://facebook.com/old',instagram:'https://instagram.com/removed',custom:'https://example.invalid/local'})]);
+    await syncLocation(userId,locationId,client);
+    const read = async () => (await pool.query('SELECT social_profiles,business_photo_count FROM business_locations WHERE id=$1',[locationId])).rows[0];
+    expect((await read()).social_profiles).toEqual({facebook:'https://www.facebook.com/fixture',custom:'https://example.invalid/local'});
+    const failing = new GoogleClient(async () => 'fixture', async (url, init) => {
+      if (String(url).includes('/attributes') || String(url).includes('/media')) return new Response('{}',{status:403});
+      return http(url,init);
+    }, new Limiter(()=>0,async()=>{}),async()=>{});
+    const result:any = await syncLocation(userId,locationId,failing);
+    expect(result.profile.warnings).toHaveLength(3);
+    expect((await read()).social_profiles.facebook).toBe('https://www.facebook.com/fixture');
+    expect((await read()).business_photo_count).toBe(12);
+    expect((await pool.query("SELECT last_error FROM gbp_sync_status WHERE location_id=$1 AND kind='profile'",[locationId])).rows[0].last_error).toContain('Social profiles');
+    const empty = new GoogleClient(async () => 'fixture', async (url, init) => String(url).includes('/attributes')
+      ? new Response('{}') : http(url,init), new Limiter(()=>0,async()=>{}),async()=>{});
+    await syncLocation(userId,locationId,empty);
+    expect((await read()).social_profiles).toEqual({custom:'https://example.invalid/local'});
+  });
   it('does not apply a partial multi-page snapshot and upserts every successful page',async()=>{
     const before=(await pool.query('SELECT comment FROM google_profile_reviews WHERE id=$1',[reviewId])).rows[0].comment;
     reviewPaging=true;failSecondPage=true;await syncLocation(userId,locationId,client);

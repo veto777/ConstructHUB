@@ -101,22 +101,37 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
       try {
         if (kind === 'profile') {
           const info = await client.request('information',`/v1/${l.gbp_location_name}?readMask=${PROFILE_READ_MASK}`);
-          const attrs = await client.request('information',`/v1/${l.gbp_location_name}/attributes`).then(r => r.attributes || []).catch(() => []);
+          const warnings: string[] = [];
+          const optional = async (label: string, load: () => Promise<any>) => {
+            try { return await load(); }
+            catch (e) {
+              if (e instanceof GoogleError && e.kind === 'auth') throw e;
+              warnings.push(`${label}: ${publicError(e).message}`);
+              return null;
+            }
+          };
+          const attrs = await optional('Social profiles', async () => {
+            const response = await client!.request('information', `/v1/${l.gbp_location_name}/attributes`);
+            if (response.attributes !== undefined && !Array.isArray(response.attributes))
+              throw new GoogleError('invalid', 'Invalid Google attributes response');
+            return response.attributes || [];
+          });
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
-          const media = await client.request('reviews',`/v4/${parent}/media?pageSize=1`).catch(() => null);
-          const customerMedia = await client.request('reviews',`/v4/${parent}/media/customers?pageSize=1`).catch(() => null);
-          const p = mapProfile(info, attrs);
+          const media = await optional('Business photos', () => client!.request('reviews',`/v4/${parent}/media?pageSize=1`));
+          const customerMedia = await optional('Customer photos', () => client!.request('reviews',`/v4/${parent}/media/customers?pageSize=1`));
+          const p = mapProfile(info, attrs || []);
           verified = !!info?.metadata?.hasVoiceOfMerchant;
           await c.query(`UPDATE business_locations SET business_name=COALESCE($2,business_name),phone=$3,website=$4,address=$5,city=$6,state=$7,zip_code=$8,country=COALESCE($9,country),
             categories=$10,description=$11,service_areas=$12,services=$13,hours=$14,opening_date=$15,open_status=COALESCE($16,open_status),
             place_id=COALESCE($17,place_id),google_cid=COALESCE($18,google_cid),
-            social_profiles=COALESCE(social_profiles,'{}'::jsonb)||$19::jsonb,
+            social_profiles=CASE WHEN $19::jsonb IS NULL THEN social_profiles ELSE
+              (COALESCE(social_profiles,'{}'::jsonb) - ARRAY['facebook','instagram','linkedin','pinterest','tiktok','twitter','youtube']) || $19::jsonb END,
             business_photo_count=COALESCE($20,business_photo_count),customer_photo_count=COALESCE($21,customer_photo_count),updated_at=now() WHERE id=$1`,
             [id,p.businessName,p.phone,p.website,p.address,p.city,p.state,p.zipCode,p.country,p.categories,p.description,p.serviceAreas,p.services,
-             p.hours ? JSON.stringify(p.hours) : null,p.openingDate,p.openStatus,p.placeId,p.googleCid,JSON.stringify(p.social),
+             p.hours ? JSON.stringify(p.hours) : null,p.openingDate,p.openStatus,p.placeId,p.googleCid,attrs === null ? null : JSON.stringify(p.social),
              typeof media?.totalMediaItemCount === 'number' ? media.totalMediaItemCount : null,
              typeof customerMedia?.totalMediaItemCount === 'number' ? customerMedia.totalMediaItemCount : null]);
-          result.profile = {services:p.services.length,serviceAreas:p.serviceAreas.length,social:Object.keys(p.social).length};
+          result.profile = {services:p.services.length,serviceAreas:p.serviceAreas.length,social:attrs === null ? null : Object.keys(p.social).length,warnings};
         } else if (kind === 'reviews') {
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
           const reviews = (await client.pages('reviews',`/v4/${parent}/reviews`,'reviews')).map(r => mapReview(r,parent));
@@ -158,7 +173,9 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           await c.query(`UPDATE business_locations SET monthly_views=COALESCE((SELECT sum(value)::int FROM gbp_daily_metrics WHERE location_id=$1 AND metric LIKE 'BUSINESS_IMPRESSIONS_%' AND date>current_date-30),0) WHERE id=$1`,[id]);
           result.performance = {count:rows.length,available:rows.length>0};
         }
-        await c.query('UPDATE gbp_sync_status SET last_success=now(),last_error=NULL WHERE location_id=$1 AND kind=$2',[id,kind]);
+        const warnings = (result[kind] as any)?.warnings as string[] | undefined;
+        await c.query('UPDATE gbp_sync_status SET last_success=now(),last_error=$3 WHERE location_id=$1 AND kind=$2',
+          [id,kind,warnings?.length ? warnings.join('; ') : null]);
       } catch(e) {
         const error = publicError(e);
         // Google only shares performance for listings whose owner it has verified (voice of merchant).
