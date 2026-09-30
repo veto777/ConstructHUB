@@ -15,6 +15,7 @@ const routes = new Map<string, any[]>(),
   provider = {
     generate: vi.fn(async () => "AI DRAFT: Use the observed page subject."),
   };
+const captcha = vi.fn(async () => new Response('{"success":true}'));
 let own: string, foreign: string;
 const auth = (req: any, res: any) => {
   if (req.testUser) return { id: req.testUser };
@@ -72,7 +73,7 @@ beforeAll(async () => {
   registerSiteScanRoutes(app, auth, {
     provider,
     send: mail,
-    http: vi.fn(async () => new Response('{"success":true}')) as any,
+    http: captcha as any,
   });
   own = await enqueue(1, "https://sitescan-fixture.test/", 2, 0);
   foreign = await enqueue(null, "https://sitescan-other.test/", 1, 0);
@@ -305,4 +306,30 @@ it("serializes schedule caps while allowing updates at the limit", async () => {
   expect(rows).toHaveLength(10);
   expect(rows.some(r => r.page_cap === 20)).toBe(true);
   await pool.query("DELETE FROM sitescan_schedules WHERE url LIKE 'https://sitescan-cap-%'");
+});
+
+it("failed CAPTCHA attempts do not exhaust scan budgets or capture leads", async () => {
+  const previous = process.env.RECAPTCHA_SECRET_KEY;
+  process.env.RECAPTCHA_SECRET_KEY = "fixture-secret";
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE 'sitescan:lead-%'");
+  const start = (captchaToken?: string) => call("post", "/api/sitescan/public/start", {
+    user: null,
+    body: { url: "https://sitescan-captcha.test/", email: "captcha@example.invalid", captchaToken },
+  });
+  const sent = mail.mock.calls.length;
+  try {
+    for (let i = 0; i < 4; i++) expect((await start()).status).toBe(400);
+    captcha.mockResolvedValueOnce(new Response('{"success":false}'));
+    expect((await start("invalid")).status).toBe(400);
+    captcha.mockRejectedValueOnce(new Error("offline"));
+    expect((await start("unavailable")).status).toBe(503);
+    expect(mail.mock.calls).toHaveLength(sent);
+    const { rows } = await pool.query("SELECT * FROM growth_budgets WHERE key LIKE 'sitescan:lead-%'");
+    expect(rows).toHaveLength(0);
+    expect((await start("valid-fixture")).status).toBe(202);
+    expect(mail.mock.calls).toHaveLength(sent + 1);
+  } finally {
+    if (previous === undefined) delete process.env.RECAPTCHA_SECRET_KEY;
+    else process.env.RECAPTCHA_SECRET_KEY = previous;
+  }
 });

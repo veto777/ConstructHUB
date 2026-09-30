@@ -334,6 +334,28 @@ export function registerSiteScanRoutes(
         .status(400)
         .json({ message: "Enter a public HTTP or HTTPS website URL." });
     }
+    if (process.env.RECAPTCHA_SECRET_KEY) {
+      if (!body.captchaToken)
+        return res.status(400).json({ message: "Complete the CAPTCHA." });
+      try {
+        const r = await deps.http(
+          "https://www.google.com/recaptcha/api/siteverify",
+          {
+            method: "POST",
+            body: new URLSearchParams({
+              secret: process.env.RECAPTCHA_SECRET_KEY,
+              response: body.captchaToken,
+            }),
+            signal: AbortSignal.timeout(5000),
+          },
+        );
+        const c = await r.json();
+        if (!r.ok || c.success !== true)
+          return res.status(400).json({ message: "CAPTCHA failed." });
+      } catch {
+        return res.status(503).json({ message: "CAPTCHA unavailable. Please retry." });
+      }
+    }
     if (
       !(await takeBudget("sitescan:lead-ip:" + ipKey(req), 3, 1, 86400_000)) ||
       !(await takeBudget(
@@ -347,24 +369,7 @@ export function registerSiteScanRoutes(
       return res
         .status(429)
         .json({ message: "Free scan limit reached. Try again tomorrow." });
-    if (process.env.RECAPTCHA_SECRET_KEY) {
-      if (!body.captchaToken)
-        return res.status(400).json({ message: "Complete the CAPTCHA." });
-      const r = await deps.http(
-        "https://www.google.com/recaptcha/api/siteverify",
-        {
-          method: "POST",
-          body: new URLSearchParams({
-            secret: process.env.RECAPTCHA_SECRET_KEY,
-            response: body.captchaToken,
-          }),
-          signal: AbortSignal.timeout(5000),
-        },
-      );
-      const c = await r.json();
-      if (!r.ok || c.success !== true)
-        return res.status(400).json({ message: "CAPTCHA failed." });
-    }
+
     const job = await enqueue(null, url, 11, 1),
       verify = token(),
       access = token();
