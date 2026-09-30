@@ -42,6 +42,9 @@ export type PlanLimits = {
   reviewTemplates: number;
 };
 
+/** The numeric limits (the ones an add-on can raise). */
+export type CountLimitKey = { [K in keyof PlanLimits]: PlanLimits[K] extends number ? K : never }[keyof PlanLimits];
+
 export type PlanModules = {
   agencyWorkspace: boolean;
   adsManager: boolean;
@@ -117,7 +120,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "8 Competitor Intel scans / month",
       "30 ranking-grid credits / month",
       "15 Site Scans / month",
-      "Permit searches — fair use",
+      "5,000 permit searches / month",
       "CRM — 10 seats, team text alerts (1,500 / month)",
       "1 client-texting number included (500 texts / month)",
       "Priority support + onboarding call",
@@ -185,13 +188,19 @@ export type Addon = {
   /** One-time fee charged with the first invoice. */
   setupCents?: number;
   availableOn: PlanKey[];
+  /**
+   * What one unit adds to the plan's limits (server/entitlements.ts applies
+   * it). Empty for an add-on that isn't a count, like the texting number: the
+   * texting gate is the plan's own.
+   */
+  grants: Partial<Record<CountLimitKey, number>>;
 };
 export const ADDONS: Record<AddonKey, Addon> = {
-  extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location (10+ locations: Agency).", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "pro", "growth"] },
-  extra_seat: { key: "extra_seat", name: "Extra seat", description: "One more CRM or agency team seat.", monthlyCents: 1500, annualCents: 15000, availableOn: ["starter", "pro", "growth", "agency"] },
-  protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["pro", "growth", "agency"] },
-  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier: 500 texts / month, then $0.02 each.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"] },
-  competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"] },
+  extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location (10+ locations: Agency).", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "pro", "growth"], grants: { locations: 1 } },
+  extra_seat: { key: "extra_seat", name: "Extra seat", description: "One more CRM or agency team seat.", monthlyCents: 1500, annualCents: 15000, availableOn: ["starter", "pro", "growth", "agency"], grants: { crmSeats: 1 } },
+  protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["pro", "growth", "agency"], grants: { protectedSites: 1 } },
+  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier: 500 texts / month, then $0.02 each.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
+  competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"], grants: { competitorScans: 10 } },
 };
 
 export const TRIAL_DAYS = 1;
@@ -207,9 +216,19 @@ export const LEGACY_PLAN_MAP: Record<string, PlanKey> = {
   standard: "starter", professional: "starter", business: "pro", premium: "pro", gold: "growth", platinum: "agency",
 };
 
+/**
+ * Subscription statuses that keep the plan's features. `past_due` is a Stripe
+ * subscription whose renewal payment failed while Stripe retries the card:
+ * access stays on through the retries, and Stripe moves the subscription to
+ * canceled or unpaid (both without access) if the retries fail. `incomplete`
+ * (the first payment never went through), `incomplete_expired`, `unpaid`,
+ * `paused` and `canceled` have no access.
+ */
+export const ACCESS_STATUSES: readonly string[] = ["active", "trialing", "past_due"];
+
 /** Resolve a stored subscription row to the plan whose entitlements apply, or null (no active plan). */
 export function effectivePlanKey(sub: { plan?: string | null; status?: string | null } | null | undefined): PlanKey | null {
-  if (!sub?.plan || !(sub.status === "active" || sub.status === "trialing")) return null;
+  if (!sub?.plan || !ACCESS_STATUSES.includes(sub.status ?? "")) return null;
   if ((PLAN_KEYS as readonly string[]).includes(sub.plan)) return sub.plan as PlanKey;
   return LEGACY_PLAN_MAP[sub.plan] ?? null;
 }
@@ -276,4 +295,16 @@ export function agencyPriceCents(locations: number, interval: BillingInterval): 
 export function maxExtraLocations(plan: PlanKey): number {
   if (plan === "agency") return 0;
   return Math.max(0, PLANS.agency.limits.locations - 1 - PLANS[plan].limits.locations);
+}
+
+/**
+ * Ranking-grid credits a grid costs: one credit per 25 grid points, rounded up
+ * (3x3 and 5x5 = 1, 7x7 = 2, 9x9 = 4, 11x11 = 5, 13x13 = 7, 15x15 = 9). The
+ * Places cost of a grid grows with its points, so credits do too. The server
+ * charges this (server/growth-quotas.ts); the client can show it beside the
+ * grid-size picker.
+ */
+export function gridCreditCost(gridSize: number): number {
+  const size = Math.max(1, Math.floor(Number(gridSize) || 3));
+  return Math.ceil((size * size) / 25);
 }

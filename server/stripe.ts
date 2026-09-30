@@ -8,7 +8,7 @@ import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sen
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 import {
   PLANS as PRICE_BOOK, PLAN_KEYS, ADDON_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
-  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS, LEGACY_PLAN_MAP, isPlanKey,
+  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS,
 } from "@shared/plans";
 import { stripe, PaymentsNotConfiguredError } from "./billing/client";
 import { describeSubscription } from "./billing/prices";
@@ -18,7 +18,8 @@ import {
 } from "./billing/order";
 import {
   billingSchemaReady, hasLiveStripeSubscription, trialEligible, eventAppliesToRow, subscriptionRowUpdate,
-  canceledRowUpdate, subscriptionSummary, LIVE_STATUSES,
+  canceledRowUpdate, subscriptionSummary, LIVE_STATUSES, recordCancellation, cancellationFor, cancellationOf,
+  withBillingLock,
 } from "./billing/sync";
 import { startAgencyLocationSync } from "./billing/agency-sync";
 
@@ -45,22 +46,8 @@ function sendStripeError(res: Response, err: any) {
   return res.status(500).json({ message: err?.message });
 }
 
-/**
- * @deprecated Compatibility view for server/growth-quotas.ts and
- * server/crm/tenancy.ts until they read getEntitlements() (server/entitlements.ts).
- * Every value is derived from shared/plans.ts — no price or limit lives in this
- * file. Legacy keys resolve through LEGACY_PLAN_MAP. Photo optimisation is
- * included on every plan (fair use), so it reads -1 (unlimited) here.
- */
-export const PLANS: Record<string, { name: string; limits: { searches: number; photos: number; rankings: number; users: number } }> =
-  Object.fromEntries([...PLAN_KEYS, ...Object.keys(LEGACY_PLAN_MAP)].map((key) => {
-    const plan = PRICE_BOOK[isPlanKey(key) ? key : LEGACY_PLAN_MAP[key]];
-    const l = plan.limits;
-    return [key, {
-      name: plan.name,
-      limits: { searches: l.permitSearches, photos: -1, rankings: l.gridCredits || l.gridCreditsPerLocation * l.locations, users: l.crmSeats },
-    }];
-  }));
+// Plan limits are read through getEntitlements() (server/entitlements.ts) —
+// quotas, CRM seats and module gates alike. This file only sells the plans.
 
 /** GET /api/stripe/plans — the price book, straight from shared/plans.ts. */
 export function priceBook() {
@@ -121,6 +108,13 @@ const orderMetadata = (userId: number, order: PlanOrder) => ({
 const NO_SUBSCRIPTION = () => new BillingRequestError(409,
   "You don't have an active subscription to change. Choose a plan in Pricing to start one.", "no_subscription");
 
+/** create-checkout for someone who already has a live subscription: change it instead, never a second one. */
+const hasSubscription = (status: string) => new BillingRequestError(409,
+  ["past_due", "unpaid", "incomplete"].includes(status)
+    ? "Your subscription has a payment that needs attention. Open Manage billing to update your card — a second subscription is never started."
+    : "You already have a subscription. Change your plan or add-ons from Pricing — that updates it in place instead of starting a second one.",
+  "has_subscription");
+
 /** The user's live Stripe subscription (for change-plan / add-ons), or a 409. */
 async function liveSubscription(userId: number) {
   const row = await subscriptionRowFor(userId);
@@ -130,10 +124,19 @@ async function liveSubscription(userId: number) {
     // The row missed the webhook that ended it. Record what Stripe says, so
     // create-checkout stops answering has_subscription and the customer can
     // start a new plan instead of being refused by both routes.
-    await db.update(subscriptions).set(subscriptionRowUpdate(sub)).where(eq(subscriptions.id, row.id));
+    await writeSubscriptionRow({ id: row.id }, sub);
     throw NO_SUBSCRIPTION();
   }
   return { row, sub, current: describeSubscription(sub.items.data) };
+}
+
+/** Record a Stripe subscription on the row: the drizzle columns, then its cancellation state (plain-SQL columns). */
+async function writeSubscriptionRow(where: { id: number } | { userId: number }, sub: Stripe.Subscription, fallbackPlan?: string | null) {
+  const set = subscriptionRowUpdate(sub, fallbackPlan);
+  await db.update(subscriptions).set(set)
+    .where("id" in where ? eq(subscriptions.id, where.id) : eq(subscriptions.userId, where.userId));
+  await recordCancellation(where, sub);
+  return set;
 }
 
 /**
@@ -144,7 +147,7 @@ async function liveSubscription(userId: number) {
 async function applyToSubscription(userId: number, row: SubscriptionRow, sub: Stripe.Subscription, current: ReturnType<typeof describeSubscription>, order: PlanOrder) {
   const change = await subscriptionChange(stripe, current, order);
   if (!change.items.length && !change.addInvoiceItems.length) {
-    return { changed: false, subscription: subscriptionSummary(row) };
+    return { changed: false, subscription: subscriptionSummary(row, cancellationOf(sub)) };
   }
   const updated = await stripe.subscriptions.update(sub.id, {
     items: change.items,
@@ -153,9 +156,8 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
     payment_behavior: "error_if_incomplete",
     metadata: { userId: String(userId), plan: order.plan, interval: order.interval },
   });
-  const set = subscriptionRowUpdate(updated);
-  await db.update(subscriptions).set(set).where(eq(subscriptions.id, row.id));
-  return { changed: true, subscription: subscriptionSummary({ ...row, ...set } as SubscriptionRow) };
+  const set = await writeSubscriptionRow({ id: row.id }, updated);
+  return { changed: true, subscription: subscriptionSummary({ ...row, ...set } as SubscriptionRow, cancellationOf(updated)) };
 }
 
 /** Step-up: plan and add-on changes charge the saved card without a Stripe page. */
@@ -179,7 +181,8 @@ export function registerStripeRoutes(app: Express) {
       const user = (req as any).user;
       if (!user) return res.json(subscriptionSummary(null));
       await billingSchemaReady();
-      res.json(subscriptionSummary(await subscriptionRowFor(user.id)));
+      const row = await subscriptionRowFor(user.id);
+      res.json(subscriptionSummary(row, row?.stripeSubscriptionId ? await cancellationFor(row.id) : null));
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -204,41 +207,55 @@ export function registerStripeRoutes(app: Express) {
 
       const order = parsePlanOrder(req.body ?? {});
       await billingSchemaReady();
-      const row = await subscriptionRowFor(user.id);
-      if (hasLiveStripeSubscription(row)) {
-        const unpaid = ["past_due", "unpaid", "incomplete"].includes(row!.status);
-        return res.status(409).json({
-          code: "has_subscription",
-          message: unpaid
-            ? "Your subscription has a payment that needs attention. Open Manage billing to update your card — a second subscription is never started."
-            : "You already have a subscription. Change your plan or add-ons from Pricing — that updates it in place instead of starting a second one.",
-        });
-      }
+      // One account's checkout starts one at a time (a double click or a second
+      // tab waits here), so the open-checkout sweep below sees the other one.
+      const url = await withBillingLock(user.id, async () => {
+        const row = await subscriptionRowFor(user.id);
+        if (hasLiveStripeSubscription(row)) throw hasSubscription(row!.status);
 
-      const customerId = await getOrCreateCustomer(user.id, user.email, row ?? null);
-      const line_items = await checkoutLineItems(stripe, order);
-      // One open plan checkout per customer: a checkout left open in another
-      // tab is expired first, so finishing both can't start two subscriptions.
-      const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
-      for (const stale of open.data) {
-        if (stale.mode === "subscription") await stripe.checkout.sessions.expire(stale.id);
-      }
-      const metadata = orderMetadata(user.id, order);
+        const customerId = await getOrCreateCustomer(user.id, user.email, row ?? null);
+        // Ask Stripe too: the row can lag the webhook (a checkout just paid in
+        // another tab), and a trial code clears the row's subscription id. A
+        // live subscription is never joined by a second one, and the 1-day
+        // trial is for a customer who never had a subscription.
+        let trial = trialEligible(row);
+        if (row?.stripeCustomerId) {
+          const history = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
+          const live = history.data.find((s) => LIVE_STATUSES.has(s.status));
+          if (live) {
+            // Record it (as the webhook will), so the account gets what it pays
+            // for now and Pricing can change that subscription in place.
+            await writeSubscriptionRow({ id: row.id }, live);
+            throw hasSubscription(live.status);
+          }
+          if (history.data.length) trial = false;
+        }
 
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: "subscription",
-        line_items,
-        subscription_data: {
-          ...(trialEligible(row) ? { trial_period_days: TRIAL_DAYS } : {}),
+        const line_items = await checkoutLineItems(stripe, order);
+        // One open plan checkout per customer: a checkout left open in another
+        // tab is expired first, so finishing both can't start two subscriptions.
+        const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
+        for (const stale of open.data) {
+          if (stale.mode === "subscription") await stripe.checkout.sessions.expire(stale.id);
+        }
+        const metadata = orderMetadata(user.id, order);
+
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          mode: "subscription",
+          line_items,
+          subscription_data: {
+            ...(trial ? { trial_period_days: TRIAL_DAYS } : {}),
+            metadata,
+          },
+          success_url: `${getBaseUrl(req)}/pricing?success=true`,
+          cancel_url: `${getBaseUrl(req)}/pricing?canceled=true`,
           metadata,
-        },
-        success_url: `${getBaseUrl(req)}/pricing?success=true`,
-        cancel_url: `${getBaseUrl(req)}/pricing?canceled=true`,
-        metadata,
+        });
+        return session.url;
       });
 
-      res.json({ url: session.url });
+      res.json({ url });
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -259,13 +276,15 @@ export function registerStripeRoutes(app: Express) {
       if (!(await recentAuthOk(req, res))) return;
 
       await billingSchemaReady();
-      const { row, sub, current } = await liveSubscription(user.id);
-      const order = parsePlanOrder(req.body ?? {}, {
-        interval: current.interval,
-        addons: current.addons,
-        agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
-      });
-      res.json(await applyToSubscription(user.id, row, sub, current, order));
+      res.json(await withBillingLock(user.id, async () => {
+        const { row, sub, current } = await liveSubscription(user.id);
+        const order = parsePlanOrder(req.body ?? {}, {
+          interval: current.interval,
+          addons: current.addons,
+          agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
+        });
+        return applyToSubscription(user.id, row, sub, current, order);
+      }));
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -288,21 +307,23 @@ export function registerStripeRoutes(app: Express) {
       if (!(await recentAuthOk(req, res))) return;
 
       await billingSchemaReady();
-      const { row, sub, current } = await liveSubscription(user.id);
-      if (!current.plan || !current.interval) {
-        throw new BillingRequestError(409,
-          "Your subscription is on an older plan. Switch to a current plan first (Change plan), then add add-ons.", "legacy_plan");
-      }
-      const addons = Object.fromEntries(
-        Object.entries({ ...current.addons, ...requested }).filter(([, qty]) => (qty ?? 0) > 0));
-      checkAddonsForPlan(current.plan, addons);
-      const order: PlanOrder = {
-        plan: current.plan,
-        interval: current.interval,
-        addons,
-        agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
-      };
-      res.json(await applyToSubscription(user.id, row, sub, current, order));
+      res.json(await withBillingLock(user.id, async () => {
+        const { row, sub, current } = await liveSubscription(user.id);
+        if (!current.plan || !current.interval) {
+          throw new BillingRequestError(409,
+            "Your subscription is on an older plan. Switch to a current plan first (Change plan), then add add-ons.", "legacy_plan");
+        }
+        const addons = Object.fromEntries(
+          Object.entries({ ...current.addons, ...requested }).filter(([, qty]) => (qty ?? 0) > 0));
+        checkAddonsForPlan(current.plan, addons);
+        const order: PlanOrder = {
+          plan: current.plan,
+          interval: current.interval,
+          addons,
+          agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
+        };
+        return applyToSubscription(user.id, row, sub, current, order);
+      }));
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -602,10 +623,7 @@ export function registerStripeRoutes(app: Express) {
               // this should not happen; if it does, both bill — say so loudly.
               console.error(`[billing] user ${userId} now has two live subscriptions (${tracked.stripeSubscriptionId} and ${stripeSubscription.id}); tracking the new one — cancel the other in Stripe.`);
             }
-            await db
-              .update(subscriptions)
-              .set(subscriptionRowUpdate(stripeSubscription, session.metadata?.plan))
-              .where(eq(subscriptions.userId, userId));
+            await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
           }
           break;
         }
@@ -621,13 +639,10 @@ export function registerStripeRoutes(app: Express) {
             .where(eq(subscriptions.stripeCustomerId, customerId))
             .limit(1);
 
-          if (existingSub && eventAppliesToRow(existingSub, sub.id)) {
-            await db
-              .update(subscriptions)
-              .set(subscriptionRowUpdate(sub))
-              .where(eq(subscriptions.id, existingSub.id));
+          if (existingSub && eventAppliesToRow(existingSub, sub)) {
+            await writeSubscriptionRow({ id: existingSub.id }, sub);
           } else if (existingSub) {
-            console.warn(`[billing] ${event.type} for ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId}.`);
+            console.warn(`[billing] ${event.type} for ${sub.id} (${sub.status}) ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "a live trial-code grant"}.`);
           }
           break;
         }
@@ -648,6 +663,7 @@ export function registerStripeRoutes(app: Express) {
               .update(subscriptions)
               .set(canceledRowUpdate())
               .where(eq(subscriptions.id, existingSub.id));
+            await recordCancellation({ id: existingSub.id }, null);
           } else if (existingSub) {
             console.warn(`[billing] deletion of ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "no subscription"}.`);
           }

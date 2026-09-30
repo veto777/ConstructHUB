@@ -70,6 +70,8 @@ describe("trial codes", () => {
 
     const dunning = await account("growth", { status: "past_due" });
     expect(await redeemTrialCode(dunning, c)).toMatchObject({ status: 409 });
+    // Past due keeps the plan while Stripe retries the card.
+    expect((await getEntitlements(dunning)).plan).toBe("growth");
 
     const granted = await account("platinum", { stripe: null });
     expect(await redeemTrialCode(granted, c)).toMatchObject({ status: 409 });
@@ -81,6 +83,13 @@ describe("trial codes", () => {
     const lapsed = await account("pro", { status: "canceled", customer: "cus_p_fixture" });
     expect("trialEnd" in await redeemTrialCode(lapsed, await code(1))).toBe(true);
     expect(await sub(lapsed)).toMatchObject([{ plan: "agency", status: "trialing", stripe_subscription_id: null, stripe_price_id: null, stripe_customer_id: "cus_p_fixture" }]);
+
+    // What the ended subscription bought doesn't ride along into the trial.
+    const expired = await account("pro", { status: "incomplete_expired", customer: "cus_p_fixture2" });
+    await pool.query("update subscriptions set addons=$2, billing_interval='year', agency_locations=40 where user_id=$1", [expired, { competitor_pack: 3 }]);
+    expect("trialEnd" in await redeemTrialCode(expired, await code(1))).toBe(true);
+    expect(await sub(expired)).toMatchObject([{ plan: "agency", status: "trialing", addons: {}, billing_interval: null, agency_locations: null }]);
+    expect((await getEntitlements(expired)).allowances?.competitorScans).toBe(20);
 
     const now = new Date();
     const long = await account();

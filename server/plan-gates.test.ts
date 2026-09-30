@@ -73,6 +73,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     await pool.query("delete from ranking_grid_scans where user_id=any($1::int[])", [users]);
     await pool.query("delete from tracked_domains where user_id=any($1::int[])", [users]);
     await pool.query("delete from review_templates where user_id=any($1::int[])", [users]);
+    await pool.query("delete from seo_contracts where user_id=any($1::int[])", [users]);
     await pool.query("delete from gbp_guard where user_id=any($1::int[])", [users]);
     await pool.query("delete from business_locations where user_id=any($1::int[])", [users]);
     await pool.query("delete from beta_access_codes where id=any($1::int[])", [codes]);
@@ -154,6 +155,14 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     expect(sixth.status).toBe(403);
     expect(sixth.body).toMatchObject({ code: "limit_reached", feature: "reviewTemplates", limit: 5, upgradePlan: "pro" });
 
+    // Saves racing at the limit: counted and inserted under one lock, so exactly the allowance lands.
+    const racer = await account("starter");
+    const race = await Promise.all(Array.from({ length: 8 }, (_, i) => template(100 + i, racer)));
+    expect(race.filter((r) => r.status === 200)).toHaveLength(5);
+    expect(race.filter((r) => r.status === 403)).toHaveLength(3);
+    expect(Number((await pool.query("select count(*) from review_templates where user_id=$1", [racer.id])).rows[0].count)).toBe(5);
+    expect(Number((await pool.query("select count(*) from review_templates where user_id=$1 and is_default", [racer.id])).rows[0].count)).toBe(1);
+
     const guard = await api("/api/gbp/locations/2147483647/guard", none, "PUT", { mode: "notify", watched: [] });
     expect(guard.status).toBe(402);
     expect(guard.body.requiredPlan).toBe("starter");
@@ -222,10 +231,36 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     expect(new Date(during.body.grantEndsAt).getTime()).toBeGreaterThan(Date.now() + 86400_000);
     expect((await api("/api/competitors/scans", trial)).status).toBe(200);
 
-    // Past its end date the trial is inactive everywhere.
+    expect((await api("/api/stripe/subscription", trial)).body).toMatchObject({ plan: "agency", status: "trialing", effectivePlan: "agency", cancelAtPeriodEnd: null });
+
+    // Past its end date the trial is inactive everywhere, the billing page included.
     await pool.query("update subscriptions set current_period_end=now()-interval '1 minute' where user_id=$1", [trial.id]);
     expect((await api("/api/entitlements", trial)).body).toMatchObject({ plan: null, accessPlan: null });
     expect((await api("/api/beta-codes/status", trial)).body.active).toBe(false);
     expect((await api("/api/competitors/scans", trial)).status).toBe(402);
+    expect((await api("/api/stripe/subscription", trial)).body).toMatchObject({ plan: "agency", status: "inactive", effectivePlan: null });
+  });
+
+  it("$1,000 and up is talk-to-sales on the SEO contract flow too — no contract to sign online, no checkout", async () => {
+    for (const packageId of ["dfy_seo_first_page", "dfy_seo_growth", "dfy_seo_domination", "dfy_seo_ads"]) {
+      const res = await api("/api/contracts/create", starter, "POST", { packageId });
+      expect(res.status, packageId).toBe(409);
+      expect(res.body).toMatchObject({ code: "talk_to_sales" });
+      expect(res.body.message).toMatch(/Talk to a sales rep/);
+    }
+    expect((await api("/api/contracts/create", starter, "POST", { packageId: "constructor" })).status).toBe(400);
+    expect(Number((await pool.query("select count(*) from seo_contracts where user_id=$1", [starter.id])).rows[0].count)).toBe(0);
+
+    // A contract signed before the price book changed isn't paid online either (the server has no Stripe key here,
+    // so a 409 proves the refusal comes before any checkout is attempted).
+    const token = `p-gates-${randomUUID()}`;
+    await pool.query(
+      `insert into seo_contracts(user_id,email,token,package_id,package_name,monthly_price,total_price,term_months,status,signed_at,expires_at)
+       values($1,'p-gates@example.invalid',$2,'dfy_seo_growth','SEO Growth',600000,3600000,6,'signed',now(),now()+interval '1 day')`, [starter.id, token]);
+    const pay = await api(`/api/contracts/${token}/checkout`, starter, "POST", {});
+    expect(pay.status).toBe(409);
+    expect(pay.body).toMatchObject({ code: "talk_to_sales", items: ["SEO Growth"] });
+    // Someone else's contract is still a 403, not a sales answer.
+    expect((await api(`/api/contracts/${token}/checkout`, pro, "POST", {})).status).toBe(403);
   });
 });

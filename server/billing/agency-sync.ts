@@ -6,15 +6,16 @@
  *
  * Idempotent: a subscription whose band quantity already matches is left
  * alone, so running twice (or after a restart) changes nothing. Quantity
- * changes use proration, which lands on the next invoice. Never runs without a
- * Stripe key.
+ * changes are prorated: on the next invoice for monthly subscriptions,
+ * invoiced immediately for yearly ones (agencyProrationBehavior). Never runs
+ * without a Stripe key.
  */
 import type Stripe from "stripe";
 import { pool } from "../db";
 import { PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, agencyExtraLocations } from "@shared/plans";
 import { stripe as appStripe, stripeConfigured } from "./client";
 import { describeSubscription, agencyLocationsPriceSpec, resolvePriceId } from "./prices";
-import { LIVE_STATUSES, billingSchemaReady } from "./sync";
+import { LIVE_STATUSES, billingSchemaReady, withBillingLock } from "./sync";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FIRST_RUN_DELAY_MS = 5 * 60 * 1000;
@@ -25,6 +26,17 @@ export async function linkedGbpLocationCount(userId: number): Promise<number> {
     `SELECT count(DISTINCT gbp_location_name)::int AS n FROM business_locations
       WHERE user_id = $1 AND gbp_location_name IS NOT NULL`, [userId]);
   return Number(row?.n ?? 0);
+}
+
+/**
+ * How a location-count change is billed. Monthly: the prorated difference
+ * lands on the next monthly invoice. Yearly: invoiced right away
+ * (always_invoice) — otherwise locations linked mid-year would wait for the
+ * renewal up to 12 months later, and never be collected if the customer
+ * cancels at period end.
+ */
+export function agencyProrationBehavior(interval: "month" | "year"): Stripe.SubscriptionUpdateParams.ProrationBehavior {
+  return interval === "year" ? "always_invoice" : "create_prorations";
 }
 
 export type AgencySyncResult = { checked: number; changed: number; failed: number };
@@ -44,36 +56,42 @@ export async function syncAgencyLocations(opts: { stripe?: Stripe; log?: Log } =
     [[...LIVE_STATUSES]]);
   const included = PLANS.agency.limits.locations;
   const result: AgencySyncResult = { checked: 0, changed: 0, failed: 0 };
+  /** One subscription; true when its Stripe items changed. */
+  const syncOne = async (row: { id: number; user_id: number; stripe_subscription_id: string }): Promise<boolean> => {
+    const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+    if (!LIVE_STATUSES.has(sub.status)) return false;
+    const shape = describeSubscription(sub.items.data);
+    if (shape.plan !== "agency" || !shape.interval) {
+      log(`Agency location sync: user ${row.user_id} subscription ${sub.id} has no Agency plan item — skipped.`);
+      return false;
+    }
+    const linked = await linkedGbpLocationCount(row.user_id);
+    if (linked > AGENCY_SELF_SERVE_MAX_LOCATIONS) {
+      log(`Agency location sync: user ${row.user_id} has ${linked} linked locations — above ${AGENCY_SELF_SERVE_MAX_LOCATIONS}, needs a sales quote; billing ${AGENCY_SELF_SERVE_MAX_LOCATIONS}.`);
+    }
+    const billed = Math.max(included, Math.min(linked, AGENCY_SELF_SERVE_MAX_LOCATIONS));
+    const extra = agencyExtraLocations(billed);
+    if (extra === shape.agencyExtraLocations) {
+      await pool.query(
+        `UPDATE subscriptions SET agency_locations = $2 WHERE id = $1 AND agency_locations IS DISTINCT FROM $2`,
+        [row.id, billed]);
+      return false;
+    }
+    let change: Stripe.SubscriptionUpdateParams.Item;
+    if (shape.agencyItem && extra === 0) change = { id: shape.agencyItem.id, deleted: true };
+    else if (shape.agencyItem) change = { id: shape.agencyItem.id, quantity: extra };
+    else change = { price: await resolvePriceId(stripe, agencyLocationsPriceSpec(shape.interval)), quantity: extra };
+    await stripe.subscriptions.update(sub.id, { items: [change], proration_behavior: agencyProrationBehavior(shape.interval) });
+    await pool.query(`UPDATE subscriptions SET agency_locations = $2 WHERE id = $1`, [row.id, billed]);
+    log(`Agency location sync: user ${row.user_id} now billed for ${billed} locations (was ${included + shape.agencyExtraLocations}; ${linked} linked).`);
+    return true;
+  };
   for (const row of rows) {
     result.checked++;
     try {
-      const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
-      if (!LIVE_STATUSES.has(sub.status)) continue;
-      const shape = describeSubscription(sub.items.data);
-      if (shape.plan !== "agency" || !shape.interval) {
-        log(`Agency location sync: user ${row.user_id} subscription ${sub.id} has no Agency plan item — skipped.`);
-        continue;
-      }
-      const linked = await linkedGbpLocationCount(row.user_id);
-      if (linked > AGENCY_SELF_SERVE_MAX_LOCATIONS) {
-        log(`Agency location sync: user ${row.user_id} has ${linked} linked locations — above ${AGENCY_SELF_SERVE_MAX_LOCATIONS}, needs a sales quote; billing ${AGENCY_SELF_SERVE_MAX_LOCATIONS}.`);
-      }
-      const billed = Math.max(included, Math.min(linked, AGENCY_SELF_SERVE_MAX_LOCATIONS));
-      const extra = agencyExtraLocations(billed);
-      if (extra === shape.agencyExtraLocations) {
-        await pool.query(
-          `UPDATE subscriptions SET agency_locations = $2 WHERE id = $1 AND agency_locations IS DISTINCT FROM $2`,
-          [row.id, billed]);
-        continue;
-      }
-      let change: Stripe.SubscriptionUpdateParams.Item;
-      if (shape.agencyItem && extra === 0) change = { id: shape.agencyItem.id, deleted: true };
-      else if (shape.agencyItem) change = { id: shape.agencyItem.id, quantity: extra };
-      else change = { price: await resolvePriceId(stripe, agencyLocationsPriceSpec(shape.interval)), quantity: extra };
-      await stripe.subscriptions.update(sub.id, { items: [change], proration_behavior: "create_prorations" });
-      await pool.query(`UPDATE subscriptions SET agency_locations = $2 WHERE id = $1`, [row.id, billed]);
-      result.changed++;
-      log(`Agency location sync: user ${row.user_id} now billed for ${billed} locations (was ${included + shape.agencyExtraLocations}; ${linked} linked).`);
+      // Serialized with the account's own plan / add-on changes, so both never
+      // edit the subscription's items from the same stale read.
+      if (await withBillingLock(row.user_id, () => syncOne(row))) result.changed++;
     } catch (e: any) {
       result.failed++;
       log(`Agency location sync: user ${row.user_id} failed — ${e?.message || e}`);

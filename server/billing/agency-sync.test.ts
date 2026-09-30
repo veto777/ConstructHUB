@@ -70,6 +70,14 @@ describe("Agency location sync", () => {
     expect(lines.join("\n")).toMatch(/user 42 now billed for 25 locations \(was 10; 25 linked\)/);
   });
 
+  it("a yearly Agency subscription's location change is invoiced right away (always_invoice), not at the renewal", async () => {
+    mocks.linked.set(42, 30);
+    const yearly = (item: any) => ({ ...item, price: { ...item.price, recurring: { interval: "year" } } });
+    const stripe = fakeStripe([yearly(planItem), yearly(bandItem(5))]);
+    await syncAgencyLocations({ stripe, log });
+    expect(stripe.subscriptions.update.mock.calls[0][1]).toEqual({ items: [{ id: "si_band", quantity: 20 }], proration_behavior: "always_invoice" });
+  });
+
   it("is idempotent: a matching quantity is left alone", async () => {
     mocks.linked.set(42, 25);
     const stripe = fakeStripe([planItem, bandItem(15)]);

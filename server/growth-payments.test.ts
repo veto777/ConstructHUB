@@ -5,6 +5,8 @@ process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_mocked_stripe";
 const mocks = vi.hoisted(() => ({ checkout: vi.fn(), verify: vi.fn(), rows: [] as any[][], created: [] as any[] }));
 vi.mock("stripe", () => ({ default: class {
   checkout = { sessions: { create: mocks.checkout, list: async () => ({ data: [] }), expire: async () => ({}) } };
+  // Plan checkout asks Stripe for the customer's subscriptions (none here).
+  subscriptions = { list: async () => ({ data: [] }) };
   webhooks = { constructEvent: mocks.verify };
   // Plan prices are Stripe Prices found by lookup key, created on first use.
   prices = {

@@ -59,3 +59,13 @@ export function talkToSalesMessage(names: string[]): string {
 export function sendTalkToSales(res: Response, names: string[]) {
   return res.status(409).json({ code: TALK_TO_SALES_CODE, message: talkToSalesMessage(names), items: names });
 }
+
+const oneLine = (value: unknown, max: number) => String(value ?? "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+
+/**
+ * Subject line for the sales inquiry email (POST /api/seo-inquiry, which now
+ * carries every sales request): "Sales inquiry — <first service> — <name>".
+ */
+export function salesInquirySubject(services: readonly string[] | null | undefined, name: string): string {
+  return `Sales inquiry — ${oneLine(services?.[0], 100) || "General"} — ${oneLine(name, 150)}`;
+}

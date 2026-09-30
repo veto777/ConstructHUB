@@ -3,6 +3,7 @@ import { getReferralSettings, saveReferralSettings, referralSettingsInput } from
 import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
 import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
 import { PLANS } from "@shared/plans";
+import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
@@ -34,7 +35,7 @@ import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, e
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { db, pool } from "./db";
-import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
+import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, reviewTemplates, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
@@ -3275,6 +3276,7 @@ Rules:
     website: inquiryText("Website", 500).optional().nullable(),
     services: z.array(inquiryText("Service", 100)).max(30).optional().nullable(),
     message: inquiryText("Message", 5000).optional().nullable(),
+    company: inquiryText("Company", 200).optional().nullable(),
   });
   const reinstatementInput = z.object({
     name: inquiryText("Name", 200).min(1, "Please fill in all required fields."),
@@ -3293,18 +3295,22 @@ Rules:
     try {
       const parsed = seoInquiryInput.safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
-      const { name, email, phone, website, services, message } = parsed.data;
+      const { name, email, phone, website, services, message, company } = parsed.data;
 
       const servicesList = services && services.length > 0 ? services.join(", ") : "Not specified";
 
+      // Every sales request comes through here (services, Agency above 500
+      // locations, custom work, $1,000+ cart items), so the subject names what
+      // was asked about first.
       await sendWithFallback({
         from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
         to: process.env.SMTP_EMAIL,
         replyTo: email,
-        subject: `SEO Services Inquiry — ${oneLine(name).slice(0, 150)}`,
+        subject: salesInquirySubject(services, name),
         html: `
-          <h2>New SEO Services Inquiry</h2>
+          <h2>New sales inquiry</h2>
           <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+          <p><strong>Company:</strong> ${escapeHtml(company || "N/A")}</p>
           <p><strong>Email:</strong> ${escapeHtml(email)}</p>
           <p><strong>Phone:</strong> ${escapeHtml(phone || "N/A")}</p>
           <p><strong>Website:</strong> ${escapeHtml(website || "N/A")}</p>
@@ -3316,7 +3322,7 @@ Rules:
 
       res.json({ success: true });
     } catch (err: any) {
-      console.error("SEO inquiry email failed:", err);
+      console.error("Sales inquiry email failed:", err);
       res.status(500).json({ message: "Failed to submit inquiry. Please try again." });
     }
   });
@@ -4695,12 +4701,15 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
-      const { packageId } = req.body;
-      if (!packageId || !SEO_PACKAGES[packageId]) {
+      const { packageId } = req.body ?? {};
+      if (typeof packageId !== "string" || !Object.hasOwn(SEO_PACKAGES, packageId)) {
         return res.status(400).json({ message: "Invalid package" });
       }
 
       const pkg = SEO_PACKAGES[packageId];
+      // $1,000 and up is quoted by a sales rep (owner decision 2026-09-30):
+      // no online contract-and-checkout for it. Every SEO package is above that.
+      if (isSalesOnly(pkg.totalPrice)) return sendTalkToSales(res, [pkg.name]);
       const token = randomUUID();
       const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
@@ -4830,6 +4839,10 @@ function main() {
       if (!user || user.id !== contract.userId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
+
+      // Never an online checkout at $1,000 or more, a contract signed before
+      // the price book changed included: a sales rep invoices it.
+      if (isSalesOnly(contract.totalPrice)) return sendTalkToSales(res, [contract.packageName]);
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-01-27.acacia" as any });
@@ -5002,15 +5015,17 @@ function main() {
 
       const ent = await requirePlan(res, user.id, "Saving review request templates", (a) => a.reviewTemplates !== 0);
       if (!ent) return;
-      const existing = await storage.getReviewTemplatesByUser(user.id);
       const max = ent.allowances!.reviewTemplates;
-      if (max !== -1 && existing.length >= max) {
+      const limitReached = (used: number) => {
         const raise = raiseHint(ent, "reviewTemplates", ["template"]);
         return sendLimitReached(res, {
-          feature: "reviewTemplates", limit: max, used: existing.length, upgradePlan: raise.upgradePlan, addon: null,
-          message: `Your ${PLANS[ent.accessPlan!].name} plan includes ${plural(max, "review request template")} and ${inUse(existing.length)}. Delete one you no longer use. ${raise.text}`.trim(),
+          feature: "reviewTemplates", limit: max, used, upgradePlan: raise.upgradePlan, addon: null,
+          message: `Your ${PLANS[ent.accessPlan!].name} plan includes ${plural(max, "review request template")} and ${inUse(used)}. Delete one you no longer use. ${raise.text}`.trim(),
         });
-      }
+      };
+      // Early answer at the limit, before resolving the review link.
+      const existing = await storage.getReviewTemplatesByUser(user.id);
+      if (max !== -1 && existing.length >= max) return limitReached(existing.length);
 
       const { name, googleProfileUrl, projectDescription, isDefault } = req.body;
       if (!name || !googleProfileUrl) {
@@ -5020,20 +5035,25 @@ function main() {
       const resolvedProfileUrl = await resolveReviewLink(googleProfileUrl);
       if (!resolvedProfileUrl) return res.status(400).json({ message: GOOGLE_REVIEW_LINK_MESSAGE });
 
-      if (isDefault) {
-        for (const t of existing) {
-          if (t.isDefault) await storage.updateReviewTemplate(t.id, { isDefault: false });
+      // Count and insert under the per-account lock, so two saves at the limit can't both land.
+      const outcome = await withAccountLock(user.id, async (tx) => {
+        const [{ n: used }] = await tx.select({ n: count() }).from(reviewTemplates).where(eq(reviewTemplates.userId, user.id));
+        if (max !== -1 && used >= max) return { used, template: null };
+        if (isDefault) {
+          await tx.update(reviewTemplates).set({ isDefault: false })
+            .where(and(eq(reviewTemplates.userId, user.id), eq(reviewTemplates.isDefault, true)));
         }
-      }
-
-      const template = await storage.createReviewTemplate({
-        userId: user.id,
-        name,
-        googleProfileUrl: resolvedProfileUrl,
-        projectDescription: projectDescription || null,
-        isDefault: isDefault || existing.length === 0,
+        const [template] = await tx.insert(reviewTemplates).values({
+          userId: user.id,
+          name,
+          googleProfileUrl: resolvedProfileUrl,
+          projectDescription: projectDescription || null,
+          isDefault: isDefault || used === 0,
+        }).returning();
+        return { used, template };
       });
-      res.json(template);
+      if (!outcome.template) return limitReached(outcome.used);
+      res.json(outcome.template);
     } catch (err: any) {
       console.error("Error creating template:", err);
       res.status(500).json({ message: "Failed to create template" });

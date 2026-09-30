@@ -3,12 +3,15 @@
  * add-ons and the daily Agency location sync all write the row through
  * subscriptionRowUpdate(), so the plan, interval and add-on quantities stored
  * here are read from the subscription's items (./prices describeSubscription)
- * — never from anything the client sent.
+ * — never from anything the client sent. Whether the subscription is set to
+ * end (recordCancellation) is written beside them, and withBillingLock keeps
+ * one account's billing changes from running at the same time.
  */
 import type Stripe from "stripe";
 import { pool } from "../db";
 import type { subscriptions } from "@shared/schema";
-import { PLANS, LEGACY_PLAN_MAP, isPlanKey, effectivePlanKey } from "@shared/plans";
+import { PLANS, LEGACY_PLAN_MAP, ACCESS_STATUSES, isPlanKey } from "@shared/plans";
+import { activePlanKey, grantExpired } from "../entitlements";
 import { describeSubscription } from "./prices";
 import { ensureBillingSchema } from "./schema";
 
@@ -60,10 +63,18 @@ export const trialEligible = (row: Pick<SubscriptionRow, "stripeSubscriptionId">
  * Whether a subscription event may write this row. The row tracks ONE
  * subscription; an event for a different one (e.g. a second subscription left
  * over from the old double-billing upgrade) must not overwrite it — unless the
- * tracked one is already over.
+ * tracked one is already over. A row with no Stripe subscription may be a live
+ * trial-code grant: only a live subscription replaces it, never a late event
+ * for one that already ended.
  */
-export function eventAppliesToRow(row: Pick<SubscriptionRow, "stripeSubscriptionId" | "status">, subscriptionId: string): boolean {
-  return !row.stripeSubscriptionId || row.stripeSubscriptionId === subscriptionId || !LIVE_STATUSES.has(row.status);
+export function eventAppliesToRow(
+  row: Pick<SubscriptionRow, "stripeSubscriptionId" | "status" | "plan" | "currentPeriodEnd">,
+  sub: { id: string; status: string },
+  now = new Date(),
+): boolean {
+  if (row.stripeSubscriptionId) return row.stripeSubscriptionId === sub.id || !LIVE_STATUSES.has(row.status);
+  const liveGrant = !!activePlanKey({ plan: row.plan, status: row.status, stripe_subscription_id: null, current_period_end: row.currentPeriodEnd }, now);
+  return !liveGrant || LIVE_STATUSES.has(sub.status);
 }
 
 /**
@@ -97,17 +108,67 @@ export const canceledRowUpdate = (): SubscriptionSet => ({
 });
 
 /**
+ * Whether (and when) a Stripe subscription is set to end. Stripe's portal may
+ * record a cancellation either as cancel_at_period_end or as a cancel_at date;
+ * a cancel_at on or before the period end is "ends at period end" too.
+ */
+export type Cancellation = { cancelAtPeriodEnd: boolean | null; cancelAt: Date | null };
+
+export function cancellationOf(sub: Stripe.Subscription): Cancellation {
+  const epoch = (sub as any).cancel_at;
+  const cancelAt = typeof epoch === "number" && Number.isFinite(epoch) ? new Date(epoch * 1000) : null;
+  const periodEnd = subscriptionPeriodEnd(sub);
+  const atPeriodEnd = sub.cancel_at_period_end === true
+    || (!!cancelAt && !!periodEnd && cancelAt.getTime() <= periodEnd.getTime());
+  return { cancelAtPeriodEnd: atPeriodEnd, cancelAt: cancelAt ?? (atPeriodEnd ? periodEnd : null) };
+}
+
+/**
+ * Store a subscription's cancellation state beside the drizzle columns
+ * (cancel_at_period_end / cancel_at are plain-SQL columns, see ./schema).
+ * `sub` null = the tracked subscription ended: nothing left to cancel.
+ */
+export async function recordCancellation(where: { id: number } | { userId: number }, sub: Stripe.Subscription | null): Promise<void> {
+  await billingSchemaReady();
+  const c: Cancellation = sub ? cancellationOf(sub) : { cancelAtPeriodEnd: null, cancelAt: null };
+  const [column, value] = "id" in where ? ["id", where.id] : ["user_id", where.userId];
+  await pool.query(
+    `UPDATE subscriptions SET cancel_at_period_end = $2, cancel_at = $3 WHERE ${column} = $1`,
+    [value, c.cancelAtPeriodEnd, c.cancelAt]);
+}
+
+/** The stored cancellation state of a row (null = never synced from Stripe). */
+export async function cancellationFor(rowId: number): Promise<Cancellation> {
+  await billingSchemaReady();
+  const { rows: [r] } = await pool.query("SELECT cancel_at_period_end, cancel_at FROM subscriptions WHERE id = $1", [rowId]);
+  return {
+    cancelAtPeriodEnd: typeof r?.cancel_at_period_end === "boolean" ? r.cancel_at_period_end : null,
+    cancelAt: r?.cancel_at ? new Date(r.cancel_at) : null,
+  };
+}
+
+/**
  * What GET /api/stripe/subscription (and the change routes) report.
  * `interval` and `locations` repeat `billingInterval` and `agencyLocations`
  * under the names the pricing/Settings client reads. Without them a yearly
  * subscriber's plan or location change is sent as monthly.
+ *
+ * A Stripe-less grant (trial code) whose end date has passed reports
+ * status "inactive" and no effective plan — the same rule getEntitlements
+ * applies, so the page never shows an expired trial as a live one.
+ * `cancelAtPeriodEnd` is only known for Stripe subscriptions (null otherwise,
+ * or while a row has not been synced since the column was added).
  */
-export function subscriptionSummary(row: Partial<SubscriptionRow> | null | undefined) {
-  if (!row) return { plan: "free", effectivePlan: null, status: "inactive", billingInterval: null, interval: null, addons: {}, agencyLocations: null, locations: null, currentPeriodEnd: null, stripeSubscriptionId: null };
+export function subscriptionSummary(row: Partial<SubscriptionRow> | null | undefined, cancellation: Cancellation | null = null, now = new Date()) {
+  if (!row) return { plan: "free", effectivePlan: null, status: "inactive", billingInterval: null, interval: null, addons: {}, agencyLocations: null, locations: null, currentPeriodEnd: null, stripeSubscriptionId: null, cancelAtPeriodEnd: null, cancelAt: null };
+  const snake = { plan: row.plan, status: row.status, stripe_subscription_id: row.stripeSubscriptionId, current_period_end: row.currentPeriodEnd };
+  const viaStripe = !!row.stripeSubscriptionId;
+  // A grant still marked trialing/active past its end date has simply run out.
+  const ranOut = grantExpired(snake, now) && ACCESS_STATUSES.includes(row.status ?? "");
   return {
     plan: row.plan ?? "free",
-    effectivePlan: effectivePlanKey({ plan: row.plan, status: row.status }),
-    status: row.status ?? "inactive",
+    effectivePlan: activePlanKey(snake, now),
+    status: ranOut ? "inactive" : row.status ?? "inactive",
     billingInterval: row.billingInterval ?? null,
     interval: row.billingInterval ?? null,
     addons: row.addons ?? {},
@@ -115,5 +176,31 @@ export function subscriptionSummary(row: Partial<SubscriptionRow> | null | undef
     locations: row.agencyLocations ?? null,
     currentPeriodEnd: row.currentPeriodEnd ?? null,
     stripeSubscriptionId: row.stripeSubscriptionId ?? null,
+    cancelAtPeriodEnd: viaStripe ? cancellation?.cancelAtPeriodEnd ?? null : null,
+    cancelAt: viaStripe ? cancellation?.cancelAt ?? null : null,
   };
+}
+
+const billingQueues = new Map<number, Promise<void>>();
+/**
+ * Runs one account's billing changes one at a time (create-checkout,
+ * change-plan, add-ons): two requests at the same moment — a double click, two
+ * tabs — can't both find "no open checkout" and each start one, or both
+ * reprice the same subscription items. Per process; the app runs as one
+ * process (constructhub.service), and Stripe-side checks in the routes cover
+ * what a lock can't (a subscription the webhook hasn't reported yet).
+ */
+export async function withBillingLock<T>(userId: number, fn: () => Promise<T>): Promise<T> {
+  const prior = billingQueues.get(userId) ?? Promise.resolve();
+  let release!: () => void;
+  const mine = new Promise<void>((resolve) => { release = resolve; });
+  const tail = prior.then(() => mine);
+  billingQueues.set(userId, tail);
+  await prior;
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (billingQueues.get(userId) === tail) billingQueues.delete(userId);
+  }
 }

@@ -12,7 +12,7 @@ vi.mock("./db", () => ({
 }));
 import {
   getEntitlements, activePlanKey, grantExpired, allowancesFor, parseAddons, ADDON_GRANTS, requirePlan,
-  sendLocationLimit, raiseHint, cheapestPlanWhere, TOP_PLAN,
+  sendLocationLimit, raiseHint, cheapestPlanWhere, TOP_PLAN, hasModule, usersWithModule, planPausedMessage,
 } from "./entitlements";
 import { ADDONS, PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP } from "@shared/plans";
 
@@ -41,8 +41,20 @@ describe("plan resolution", () => {
     expect((await getEntitlements(7)).modules.adsManager).toBe(false);
   });
 
+  it("keeps a past-due subscription's plan while Stripe retries the card", async () => {
+    mocks.row = customer("growth", { status: "past_due", addons: { competitor_pack: 1 } });
+    const ent = await getEntitlements(7);
+    expect(ent.plan).toBe("growth");
+    expect(ent.allowances?.competitorScans).toBe(18);
+    const { pool } = await import("./db");
+    const [sql, values] = (pool.query as any).mock.calls.at(-1);
+    expect(sql).toMatch(/x\.status = ANY\(\$2::text\[\]\)/);
+    expect(values[1]).toEqual(["active", "trialing", "past_due"]);
+  });
+
   it("has no plan for missing, inactive or unknown subscriptions", async () => {
-    for (const row of [undefined, customer(null), customer("pro", { status: "canceled" }), customer("free"), customer("mystery")]) {
+    for (const row of [undefined, customer(null), customer("pro", { status: "canceled" }), customer("pro", { status: "unpaid" }),
+      customer("pro", { status: "incomplete" }), customer("pro", { status: "incomplete_expired" }), customer("free"), customer("mystery")]) {
       mocks.row = row;
       const ent = await getEntitlements(7);
       expect(ent.plan).toBeNull();
@@ -80,9 +92,13 @@ describe("plan resolution", () => {
 });
 
 describe("add-ons", () => {
-  it("keeps ADDON_GRANTS in step with the price book's descriptions", () => {
-    expect(ADDONS.competitor_pack.description).toContain(`${ADDON_GRANTS.competitor_pack.competitorScans} more`);
-    expect(Object.keys(ADDON_GRANTS).sort()).toEqual(Object.keys(ADDONS).sort());
+  it("reads ADDON_GRANTS from the price book's own grants, which match the descriptions", () => {
+    for (const key of Object.keys(ADDONS) as (keyof typeof ADDONS)[]) expect(ADDON_GRANTS[key]).toBe(ADDONS[key].grants);
+    expect(ADDONS.competitor_pack.description).toContain(`${ADDONS.competitor_pack.grants.competitorScans} more`);
+    expect(ADDONS.extra_location.grants).toEqual({ locations: 1 });
+    expect(ADDONS.extra_seat.grants).toEqual({ crmSeats: 1 });
+    expect(ADDONS.protected_site.grants).toEqual({ protectedSites: 1 });
+    expect(ADDONS.texting_number.grants).toEqual({});
   });
 
   it("applies only the add-ons the plan sells", () => {
@@ -101,6 +117,42 @@ describe("add-ons", () => {
     const ent = await getEntitlements(7);
     expect(ent.allowances).toMatchObject({ competitorScans: 28, crmSeats: 13 });
     expect(ent.limits?.competitorScans).toBe(8);
+  });
+});
+
+describe("module helpers", () => {
+  it("hasModule follows the plan (and platform-admin access)", async () => {
+    mocks.row = customer("agency");
+    expect(await hasModule(7, "adsManager")).toBe(true);
+    mocks.row = customer("growth");
+    expect(await hasModule(7, "adsManager")).toBe(false);
+  });
+
+  it("usersWithModule answers a whole batch in one query, with the same rules", async () => {
+    const { pool } = await import("./db");
+    const query = pool.query as any;
+    const future = new Date(Date.now() + 86400_000), past = new Date(Date.now() - 1000);
+    query.mockImplementationOnce(async (sql: string, values: any[]) => {
+      expect(sql).toMatch(/WHERE u\.id = ANY\(\$1::int\[\]\)/);
+      expect(values[0]).toEqual([1, 2, 3, 4, 5, 6]);
+      return { rows: [
+        { account_id: 1, email: "a@example.invalid", plan: "agency", status: "active", stripe_subscription_id: "sub_1" },
+        { account_id: 2, email: "b@example.invalid", plan: "growth", status: "active", stripe_subscription_id: "sub_2" },
+        { account_id: 3, email: "c@example.invalid", plan: "platinum", status: "past_due", stripe_subscription_id: "sub_3" },
+        { account_id: 4, email: "d@example.invalid", plan: "agency", status: "trialing", stripe_subscription_id: null, current_period_end: past },
+        { account_id: 5, email: "e@example.invalid", plan: "agency", status: "trialing", stripe_subscription_id: null, current_period_end: future },
+        { account_id: 6, email: "support@constructhub.us", plan: null, status: null },
+      ] };
+    });
+    const before = query.mock.calls.length;
+    const allowed = await usersWithModule([1, 2, 3, 4, 5, 6, 6, Number.NaN], "domainsMailAlerts");
+    expect([...allowed].sort()).toEqual([1, 3, 5, 6]);
+    expect(query.mock.calls.length - before).toBe(1);
+    expect(await usersWithModule([], "adsManager")).toEqual(new Set());
+  });
+
+  it("planPausedMessage names the module and the plan that includes it", () => {
+    expect(planPausedMessage("cloudflareSearchConsole")).toBe("Not run: Cloudflare + Search Console is included with the Agency plan.");
   });
 });
 
