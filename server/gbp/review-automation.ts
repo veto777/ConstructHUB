@@ -73,28 +73,27 @@ export async function generateReply(s:ReplySettings,r:any,business:string) {
   if(result.choices[0]?.finish_reason!=='stop')throw new Error('Incomplete AI reply');
   return result.choices[0]?.message.content?.trim()||'';
 }
+const NEW_REVIEW_WINDOW_MS=14*86400_000;
 export async function notifyNewReviews(userId:number,id:number) {
-  // The first review import for a location is history, not news: record it silently with one summary.
+  // The first review import for a location is history, not news: record it silently.
   const {rows:[seen]}=await pool.query(`SELECT count(*)::int n FROM gbp_review_automation a JOIN google_profile_reviews r ON r.id=a.review_id
     WHERE r.user_id=$1 AND r.location_id=$2`,[userId,id]);
   if(!seen.n){
-    const {rows:initial}=await pool.query(`INSERT INTO gbp_review_automation(user_id,review_id,notified_at)
+    await pool.query(`INSERT INTO gbp_review_automation(user_id,review_id,notified_at)
       SELECT user_id,id,now() FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND NOT google_deleted AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'
-      ON CONFLICT DO NOTHING RETURNING review_id`,[userId,id]);
-    if(initial.length){
-      const {rows:[l]}=await pool.query('SELECT business_name FROM business_locations WHERE id=$1',[id]);
-      await notifyUser(userId,'gbp.new_review',{title:`Imported ${initial.length} existing Google review${initial.length===1?'':'s'}`,body:`${l?.business_name??'Location'} — you'll be notified about new reviews from now on.`,link:'/google-reviews'});
-    }
+      ON CONFLICT DO NOTHING`,[userId,id]);
     return 0;
   }
   const {rows}=await pool.query(`INSERT INTO gbp_review_automation(user_id,review_id)
     SELECT user_id,id FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND NOT google_deleted AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'
     ON CONFLICT DO NOTHING RETURNING review_id`,[userId,id]);
   // Existing rows with a backfill/report record still need their first notification.
-  const {rows:pending}=await pool.query(`SELECT r.id,r.rating,r.reviewer_name FROM google_profile_reviews r JOIN gbp_review_automation a ON a.review_id=r.id
+  const {rows:pending}=await pool.query(`SELECT r.id,r.rating,r.reviewer_name,r.review_date FROM google_profile_reviews r JOIN gbp_review_automation a ON a.review_id=r.id
     WHERE r.user_id=$1 AND r.location_id=$2 AND a.notified_at IS NULL AND NOT r.google_deleted
     AND r.google_review_id LIKE 'accounts/%/locations/%/reviews/%'`,[userId,id]);
   for(const r of pending) {
+    // Only recent reviews are news; an old review surfacing late is recorded without an alert.
+    if(!r.review_date||Date.now()-new Date(r.review_date).getTime()>NEW_REVIEW_WINDOW_MS){await pool.query('UPDATE gbp_review_automation SET notified_at=now() WHERE user_id=$1 AND review_id=$2',[userId,r.id]);continue;}
     await notifyUser(userId,'gbp.new_review',{title:'New Google review',body:`${r.reviewer_name}: ${r.rating} stars.`,link:'/google-reviews',actionUrl:'/google-reviews'});
     await pool.query('UPDATE gbp_review_automation SET notified_at=now() WHERE user_id=$1 AND review_id=$2',[userId,r.id]);
   }

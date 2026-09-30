@@ -13,6 +13,8 @@ import { sendWithFallback } from "./email";
 
 import { NOTIFICATION_KINDS, type NotificationDefaults, type NotificationKind } from "./notification-kinds";
 export const KIND_DEFAULTS: Record<NotificationKind, NotificationDefaults> = NOTIFICATION_KINDS;
+/** The bell shows recent activity only; older rows stay out of the feed and the unread count. */
+export const NOTIFICATION_DAYS = 30;
 const fallback = { label: "Account notification", inApp: true, email: false };
 
 export async function ensureAccountEventsSchema() {
@@ -75,8 +77,8 @@ export async function logActivity(req: any | null, userId: number, kind: string,
 export function registerAccountEventRoutes(app: Express, auth: (req: any, res: any) => any) {
   app.get("/api/notifications", async (req, res) => {
     const u = auth(req, res); if (!u) return;
-    const { rows } = await pool.query("SELECT id,kind,title,body,link,severity,read_at,created_at FROM user_notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100", [u.id]);
-    const { rows: [c] } = await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND read_at IS NULL", [u.id]);
+    const { rows } = await pool.query(`SELECT id,kind,title,body,link,severity,read_at,created_at FROM user_notifications WHERE user_id=$1 AND created_at > now() - interval '${NOTIFICATION_DAYS} days' ORDER BY created_at DESC LIMIT 100`, [u.id]);
+    const { rows: [c] } = await pool.query(`SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND read_at IS NULL AND created_at > now() - interval '${NOTIFICATION_DAYS} days'`, [u.id]);
     res.json({ unread: c.n, notifications: rows });
   });
   app.post("/api/notifications/read", async (req, res) => {

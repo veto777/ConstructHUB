@@ -10,10 +10,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 export function NotificationBell() {
   const {data,error,isLoading}=useQuery<any>({queryKey:['/api/notifications'],refetchInterval:30000});
   const read=useMutation({mutationFn:async(ids?:number[])=>apiRequest('POST','/api/notifications/read',ids?{ids}:{}),onSuccess:()=>{queryClient.invalidateQueries({queryKey:['/api/notifications']});}});
-  return <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" aria-label={`Notifications (${data?.unread??0} unread)`}><Bell className="w-4 h-4"/>{!!data?.unread && <span>{data.unread}</span>}</Button></PopoverTrigger><PopoverContent className="w-96 max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-auto break-words" align="end"><h2 className="font-semibold">Notifications</h2><Button variant="ghost" disabled={read.isPending} onClick={()=>read.mutate(undefined)}>Mark all read</Button>
+  return <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" className="relative" aria-label={`Notifications (${data?.unread??0} unread)`} data-testid="button-notification-bell"><Bell className="w-4 h-4"/>{!!data?.unread && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-orange-500 text-white text-[10px] font-bold leading-[18px] text-center" data-testid="badge-notification-count">{data.unread>99?'99+':data.unread}</span>}</Button></PopoverTrigger><PopoverContent className="w-96 max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-auto break-words" align="end"><h2 className="font-semibold">Notifications</h2><Button variant="ghost" disabled={read.isPending} onClick={()=>read.mutate(undefined)}>Mark all read</Button>
     {read.isError && <p role="alert">{apiErrorMessage(read.error)}</p>}
     {isLoading && <p>Loading notifications…</p>}{error && <p role="alert">Unable to load notifications.</p>}
-    {data?.notifications?.length===0 && <p>No notifications yet.</p>}
+    {data?.notifications?.length===0 && <p className="text-sm text-muted-foreground">Nothing new in the last 30 days.</p>}
     {data?.notifications.map((n:any)=><div key={n.id} className={`border-t py-3 ${!n.read_at?'font-medium':''}`}><a href={n.link || '/settings?tab=security'} onClick={()=>read.mutate([Number(n.id)])}>{n.title}</a><p className="text-xs whitespace-pre-line">{n.body}</p><time className="text-xs">{new Date(n.created_at).toLocaleString()}</time>{!n.read_at && <Button variant="ghost" size="sm" onClick={()=>read.mutate([Number(n.id)])}>Mark read</Button>}</div>)}
   </PopoverContent></Popover>;
 }
