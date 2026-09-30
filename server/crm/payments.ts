@@ -73,6 +73,16 @@ async function activeAccount(orgId: string) {
   return row ?? null;
 }
 
+/** Which online rails a client could use right now for this amount — the
+ *  same account + policy check the pay routes apply, for pages that must not
+ *  offer a Pay button the server will refuse. */
+export async function onlinePaymentRails(
+  org: typeof crmOrgs.$inferSelect | null | undefined, amountCents: number,
+): Promise<{ ach: boolean; card: boolean }> {
+  if (!org || !stripe) return { ach: false, card: false };
+  return allowedRails(org, await activeAccount(org.id), amountCents);
+}
+
 // ── Org payment settings (custom_fields->payments) ──────────────────────────
 
 export type OrgPaymentSettings = {
@@ -636,7 +646,8 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const acct = await activeAccount(inv.orgId);
     const dueCents = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
     const settings = paymentSettingsOf(org);
-    const rails = allowedRails(org, acct, dueCents);
+    // No Stripe key on this server → the pay route answers 503, so no rail.
+    const rails = stripe ? allowedRails(org, acct, dueCents) : { ach: false, card: false };
     const fee = cardFeeCents(org, dueCents);
     res.json({
       dueCents,
@@ -650,14 +661,20 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
   });
 
   /** Public: the estimate page's financing link (deposit fee stays contractor-
-   *  absorbed — the surcharge applies to card invoice payments only). */
+   *  absorbed — the surcharge applies to card invoice payments only), plus
+   *  whether the deposit can be paid online at all — the same rail check the
+   *  deposit pay route applies, so the page can skip a button that must fail. */
   app.get("/api/public/estimates/:token/pay-info", async (req: any, res) => {
     const t = String(req.params.token || "");
     const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
     if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
     if (!(await requireDocSession(req, res, est.customerId))) return;
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
-    res.json({ financing: getPrimaryFinancing(org) });
+    const amount = est.depositCents && est.depositCents > 0
+      ? est.depositCents
+      : (est.approvedTotalCents ?? est.totalCents);
+    const rails = await onlinePaymentRails(org, amount ?? 0);
+    res.json({ financing: getPrimaryFinancing(org), cardAvailable: rails.card, achAvailable: rails.ach });
   });
 
   /** Public: pay an invoice. Same direct-charge model as the deposit flow. */

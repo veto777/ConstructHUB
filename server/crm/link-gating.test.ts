@@ -237,6 +237,17 @@ describe("verified session (the recipient's browser)", () => {
     expect(approve.status).toBe(200);
     expect(approve.body.status).toBe("approved");
 
+    // pay-info says whether the deposit can be paid online; when it says no
+    // rail is offered, the pay route agrees (no dead Pay button on the page).
+    const info = await api(`/api/public/estimates/${publicToken}/pay-info`, {}, verify.cookie);
+    expect(info.status).toBe(200);
+    expect(typeof info.body.cardAvailable).toBe("boolean");
+    expect(typeof info.body.achAvailable).toBe("boolean");
+    if (!info.body.cardAvailable && !info.body.achAvailable) {
+      const pay = await api(`/api/public/estimates/${publicToken}/pay`, { method: "POST", body: "{}" }, verify.cookie);
+      expect(pay.status).toBe(503);
+    }
+
     // Single-use: the same magic link cannot mint a second session.
     const again = await api(`/api/client/auth/verify?token=${raw}`);
     expect(again.status).toBe(302);
