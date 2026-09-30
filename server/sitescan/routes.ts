@@ -7,6 +7,13 @@ import { takeBudget, rateLimit, ipKey } from "../growth-limits";
 import { logActivity } from "../account-events";
 import { sendWithFallback } from "../email";
 import { requirePlatformAdmin } from "../crm/admin";
+import {
+  PRIMARY_DOMAIN,
+  isKnownHost,
+  requestHost,
+  siteBaseUrl,
+  siteDomainOf,
+} from "../site-context";
 import { siteUrl } from "./http";
 import { enqueue, profileFor } from "./worker";
 import { pageInput, reportView, enqueueLocations } from "./agency";
@@ -23,6 +30,76 @@ const input = z.object({
 });
 const idSchema = z.string().uuid(),
   tokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
+const DAY = 86400_000;
+// Return a reservation for work that never ran (provider outage, nothing to draft).
+const refundBudget = async (key: string, amount: number, period: string) => {
+  if (amount > 0)
+    await pool.query(
+      "UPDATE growth_budgets SET used=greatest(0,used-$3) WHERE key=$1 AND period=$2",
+      [key, period, amount],
+    );
+};
+/**
+ * The free scan is a marketing page, so its verification link belongs on the
+ * caller's allowlisted marketing domain (never the portal, never a spoofed
+ * Host). Dev uses the request origin so local links open the running server.
+ */
+export function marketingBaseUrl(req: any): string {
+  if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT)
+    return siteBaseUrl(req);
+  const host = requestHost(req);
+  if (isKnownHost(host)) return `https://${siteDomainOf(host)}`;
+  return (
+    (process.env.APP_URL || "").trim().replace(/\/+$/, "") ||
+    `https://${PRIMARY_DOMAIN}`
+  );
+}
+const scoreLabel: Record<string, string> = {
+  local: "Local",
+  content: "Content",
+  technical: "Technical",
+  performance: "Performance",
+  "ai-readiness": "AI Readiness",
+};
+const labLabel: Record<string, string> = {
+  "largest-contentful-paint": "Largest Contentful Paint",
+  "cumulative-layout-shift": "Cumulative Layout Shift",
+  "total-blocking-time": "Total Blocking Time",
+  "speed-index": "Speed Index",
+  "total-byte-weight": "Total page weight",
+  "uses-optimized-images": "Image optimization",
+  "uses-responsive-images": "Responsive images",
+};
+/** Plain-language PageSpeed lines for the PDF (no raw JSON). */
+export function psiLines(psi: any[]): string[] {
+  return psi.map((p) => {
+    const head =
+      [p.strategy, p.url].filter(Boolean).join(" · ") || "PageSpeed";
+    if (p.unavailable)
+      return `${head}: PageSpeed data unavailable (${p.unavailable})`;
+    const lab = Object.entries(p.lab || {}).flatMap(([k, v]: [string, any]) => {
+      const shown = v?.display ?? v?.value;
+      return shown === null || shown === undefined
+        ? []
+        : [`  ${labLabel[k] ?? k}: ${shown}`];
+    });
+    const field = p.field || p.originField;
+    return [
+      `${head}: performance score ${typeof p.score === "number" ? p.score : "not reported"}`,
+      ...lab,
+      field
+        ? `  Real-user field data${p.field ? "" : " (site-wide)"}: ${Object.entries(
+            field,
+          )
+            .map(
+              ([k, m]: [string, any]) =>
+                `${k.toLowerCase().replace(/_/g, " ")} ${m?.category ?? "no rating"}`,
+            )
+            .join("; ")}`
+        : "  No real-user field data reported.",
+    ].join("\n");
+  });
+}
 export function registerSiteScanRoutes(
   app: Express,
   auth: (req: any, res: any) => any,
@@ -289,49 +366,64 @@ export function registerSiteScanRoutes(
     if (!j) return;
     if (j.status !== "completed")
       return res.status(409).json({ message: "Wait for the report." });
-    if (!(await takeBudget("sitescan:ai:" + user, 3, 1, 86400_000)))
+    // Same window takeBudget uses, so a refund reaches the reservation just made.
+    const period = String(Math.floor(Date.now() / DAY));
+    const draftKey = "sitescan:ai:" + user,
+      callsKey = "sitescan:ai-calls:" + user,
+      globalKey = "sitescan:ai-global";
+    if (!(await takeBudget(draftKey, 3, 1, DAY)))
       return res
         .status(429)
         .json({ message: "Daily AI draft budget reached (3)." });
     const batches = planBatches(j.state, j.report.findings, j.profile);
-    if (!batches.length)
+    if (!batches.length) {
+      await refundBudget(draftKey, 1, period);
       return res
         .status(409)
         .json({ message: "No readable pages are available for an AI plan." });
+    }
+    const callsTaken = await takeBudget(callsKey, 20, batches.length, DAY);
     if (
-      !(await takeBudget(
-        "sitescan:ai-calls:" + user,
-        20,
-        batches.length,
-        86400_000,
-      )) ||
-      !(await takeBudget("sitescan:ai-global", 100, batches.length, 86400_000))
-    )
+      !callsTaken ||
+      !(await takeBudget(globalKey, 100, batches.length, DAY))
+    ) {
+      await refundBudget(draftKey, 1, period);
+      if (callsTaken) await refundBudget(callsKey, batches.length, period);
       return res
         .status(429)
         .json({ message: "AI provider-call budget exhausted. Try tomorrow." });
+    }
+    const sections: string[] = [];
     try {
-      const sections: string[] = [];
       for (const batch of batches)
         sections.push(await deps.provider.generate(batch));
-      const draft = sections
-        .map(
-          (text, i) =>
-            `AI DRAFT — page batch ${i + 1}/${sections.length}\n\n${text}`,
-        )
-        .join("\n\n");
-      await pool.query(
-        "UPDATE sitescan_jobs SET ai_draft=$3 WHERE id=$1 AND user_id=$2",
-        [j.id, user, draft],
-      );
-      await logActivity(req, user, "sitescan.plan_drafted", { id: j.id });
-      res.json({ draft, label: "AI draft — review before publishing" });
     } catch {
-      res.status(503).json({
+      // No draft was produced: give back the draft and every call that did not complete.
+      const unused = batches.length - sections.length;
+      await refundBudget(draftKey, 1, period);
+      await refundBudget(callsKey, unused, period);
+      await refundBudget(globalKey, unused, period);
+      return res.status(503).json({
         message:
-          "AI provider unavailable. The audit and factual JSON-LD draft remain available.",
+          "AI provider unavailable, so no draft was created and your daily AI draft allowance was not used. The audit remains available" +
+          (j.report.jsonLdDraft
+            ? ", including the factual JSON-LD draft."
+            : "."),
       });
     }
+    // Only a provider failure is refunded; a storage error after generation is not an outage.
+    const draft = sections
+      .map(
+        (text, i) =>
+          `AI DRAFT — page batch ${i + 1}/${sections.length}\n\n${text}`,
+      )
+      .join("\n\n");
+    await pool.query(
+      "UPDATE sitescan_jobs SET ai_draft=$3 WHERE id=$1 AND user_id=$2",
+      [j.id, user, draft],
+    );
+    await logActivity(req, user, "sitescan.plan_drafted", { id: j.id });
+    res.json({ draft, label: "AI draft — review before publishing" });
   });
   owner("post", "/api/sitescan/jobs/:id/share", async (req, res, user) => {
     const j = await getJob(req, res, user);
@@ -434,8 +526,11 @@ export function registerSiteScanRoutes(
       .text((brand?.name || "ConstructHUB") + " Site Scan")
       .fontSize(11)
       .text(j.url)
-      .text("Overall: " + (j.report.scores.overall ?? "Unavailable"))
-      .text(JSON.stringify(j.report.scores.categories));
+      .text("Overall: " + (j.report.scores.overall ?? "Unavailable"));
+    for (const [k, v] of Object.entries(j.report.scores.categories || {}))
+      doc.text(
+        `${scoreLabel[k] ?? k.charAt(0).toUpperCase() + k.slice(1)}: ${v ?? "N/A"}`,
+      );
     doc
       .moveDown()
       .fontSize(10)
@@ -455,15 +550,18 @@ export function registerSiteScanRoutes(
           .text(
             f.title + "\n" + f.why + "\n" + f.fix + "\n" + f.urls.join("\n"),
           );
-    if (j.report.scoreExplanation)
-      doc.moveDown().text(JSON.stringify(j.report.scoreExplanation, null, 2));
+    if (j.report.scoreExplanation) {
+      doc.moveDown().text("What raised or lowered these scores:");
+      for (const [k, v] of Object.entries(j.report.scoreExplanation))
+        doc.text(`${scoreLabel[k] ?? k}: ${String(v)}`);
+    }
     if (j.report.psi?.length)
       doc
         .addPage()
         .fontSize(14)
         .text("PageSpeed measurements")
         .fontSize(9)
-        .text(JSON.stringify(j.report.psi, null, 2));
+        .text(psiLines(j.report.psi).join("\n\n"));
     if (j.ai_draft)
       doc
         .addPage()
@@ -584,8 +682,7 @@ export function registerSiteScanRoutes(
       "INSERT INTO sitescan_leads(id,job_id,email,verify_hash,access_hash) VALUES($1,$2,$3,$4,$5)",
       [randomUUID(), job, body.email, hashToken(verify), hashToken(access)],
     );
-    const base = process.env.APP_URL || "http://localhost:8169";
-    const link = base + "/free-site-scan?verify=" + verify;
+    const link = marketingBaseUrl(req) + "/free-site-scan?verify=" + verify;
     await deps.send({
       to: body.email,
       subject: "Verify your ConstructHUB Site Scan email",

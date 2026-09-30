@@ -1,7 +1,7 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   autoSchema,
+  publicMediaUrl,
   socialLimits,
   mixTypes,
   type AutoSettings,
@@ -19,6 +20,30 @@ import { CalendarDays, Send, Sparkles, Link2, BookOpen } from "lucide-react";
 import { GuidesContent } from "@/pages/guides";
 import { useUrlParam } from "@/hooks/use-url-param";
 const selectClass = "rounded-md border bg-background px-3 py-2 text-sm w-full";
+// Mirrors the server's curated messages so a bad field is named before saving.
+const settingsMessages: Record<string, string> = {
+  cadence: "Posts per period must be a whole number from 1 to 7.",
+  blackoutStart: "Blackout start must be an hour from 0 to 23.",
+  blackoutEnd: "Blackout end must be an hour from 0 to 23.",
+  aiDailyBudget: "Daily AI budget must be a whole number from 0 to 20.",
+  timezone: "Enter a valid timezone, for example America/New_York.",
+  mix: "Choose at least one content type.",
+  instructions: "Business instructions must be 4,000 characters or fewer.",
+  examples: "Writing examples must be 4,000 characters or fewer.",
+  destinations: "Choose valid accounts and pages (up to 20).",
+};
+function settingsProblem(settings: unknown): string {
+  const r = autoSchema.safeParse(settings);
+  if (r.success) return "";
+  const issue = r.error.issues[0];
+  return (
+    settingsMessages[String(issue.path[0] ?? "")] ??
+    (issue.message || "Check the auto mode settings.")
+  );
+}
+// Number inputs keep "" while cleared instead of turning into 0.
+const numberInput = (value: string) =>
+  value === "" ? "" : Number(value);
 type Account = {
   id: string;
   platform: Destination["platform"];
@@ -76,21 +101,28 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
       path: string;
       body?: unknown;
       method?: string;
+      /** Toast title on success; false when the caller reports the outcome itself. */
+      success?: string | false;
     }) => {
       const isConnection=['/connect','/disconnect'].includes(path);
       const activeScope=isConnection&&connectionScope==='agency'?'':scope;
       const url=path.includes('?')?`/api/social${path}`:`/api/social${path}?${activeScope}`;
       return (await apiRequest(method,url,body)).json();
     },
-    onSuccess: (result) => {
-      if(result.results){setBulkErrors(result.results.filter((r:any)=>!r.ok).map((r:any)=>r.error));setSelectedPosts([]);}
+    onSuccess: (result, vars) => {
+      let title = vars.success ?? "Saved";
+      if(result.results){
+        const failed=result.results.filter((r:any)=>!r.ok);
+        setBulkErrors(failed.map((r:any)=>r.error));setSelectedPosts([]);
+        if(failed.length)title=`${result.results.length-failed.length} of ${result.results.length} posts updated`;
+      }
       refreshSocial();
-      toast({ title: "Social Media saved" });
+      if (title !== false) toast({ title });
     },
     onError: (e: Error) =>
       toast({
         title: "Social Media",
-        description: e.message,
+        description: apiErrorMessage(e),
         variant: "destructive",
       }),
   });
@@ -104,6 +136,20 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean);
+  const badMedia = urls().filter((u) => !publicMediaUrl.safeParse(u).success);
+  const mediaProblem = badMedia.length
+    ? `Media URLs must be public HTTPS links. Fix or remove: ${badMedia[0]}`
+    : "";
+  // Why Post now / Save draft are disabled, in the order the user can fix it.
+  const postBlocker = !data?.connected
+    ? "Connect Blotato above to post."
+    : !destinations.length
+      ? "Choose at least one account above."
+      : !text.trim()
+        ? "Write the post text."
+        : uploading
+          ? "Wait for the upload to finish."
+          : mediaProblem;
   function choose(a: Account, checked: boolean) {
     setDestinations((ds) =>
       checked
@@ -130,6 +176,11 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
     try {
       await mutation.mutateAsync({
         path: "/posts",
+        success: draft
+          ? "Draft saved"
+          : schedule
+            ? "Post scheduled"
+            : "Post queued for publishing",
         body: {
           requestId,
           text,
@@ -160,6 +211,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
       const r = await mutation.mutateAsync({
         path: "/uploads",
         body: { filename: file.name },
+        success: false,
       });
       const put = await fetch(r.presignedUrl, {
         method: "PUT",
@@ -168,6 +220,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
       });
       if (!put.ok) throw new Error("Media upload failed");
       setMediaText((v) => [v, r.publicUrl].filter(Boolean).join("\n"));
+      toast({ title: "Media uploaded and attached" });
     } catch {
       toast({ title: "Upload failed. Try again.", variant: "destructive" });
     } finally {
@@ -237,6 +290,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                     await mutation.mutateAsync({
                       path: "/connect",
                       body: { apiKey },
+                      success: "Blotato key verified",
                     });
                     setKey("");
                   } catch {
@@ -250,7 +304,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                 <Button
                   variant="outline"
                   disabled={mutation.isPending}
-                  onClick={() => mutation.mutate({ path: "/disconnect" })}
+                  onClick={() => mutation.mutate({ path: "/disconnect", success: "Blotato disconnected" })}
                 >
                   Disconnect
                 </Button>
@@ -298,6 +352,19 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                 <legend className="font-medium mb-2">
                   Choose accounts and pages
                 </legend>
+                {!data?.connected ? (
+                  <p className="text-sm text-muted-foreground">
+                    Connect Blotato above to choose accounts.
+                  </p>
+                ) : (
+                  !accounts.length && (
+                    <p className="text-sm text-muted-foreground">
+                      No social accounts are available for this business.
+                      Connect accounts in Blotato, then add them under Map
+                      accounts and pages to this business above.
+                    </p>
+                  )
+                )}
                 {accounts.map((a) => {
                   const d = destinations.find((d) => d.accountId === a.id);
                   return (
@@ -323,6 +390,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                                 onClick={() =>
                                   mutation.mutate({
                                     path: `/accounts/${a.id}/pages`,
+                                    success: a.platform === "pinterest" ? "Boards refreshed" : "Pages refreshed",
                                   })
                                 }
                               >
@@ -506,32 +574,25 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                   onChange={(e) => setSchedule(e.target.value)}
                 />
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
                 <Button
-                  disabled={
-                    !data?.connected ||
-                    mutation.isPending ||
-                    uploading ||
-                    !text.trim() ||
-                    !destinations.length
-                  }
+                  disabled={!!postBlocker || mutation.isPending}
                   onClick={() => void submit(false)}
                 >
                   {schedule ? "Schedule post" : "Post now"}
                 </Button>
                 <Button
                   variant="outline"
-                  disabled={
-                    !data?.connected ||
-                    mutation.isPending ||
-                    uploading ||
-                    !text.trim() ||
-                    !destinations.length
-                  }
+                  disabled={!!postBlocker || mutation.isPending}
                   onClick={() => void submit(true)}
                 >
                   Save draft
                 </Button>
+                {postBlocker && (
+                  <span className="text-sm text-muted-foreground break-all">
+                    {postBlocker}
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -567,7 +628,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
               <select aria-label="Post platform filter" className={selectClass} value={postPlatform} onChange={e=>{setPostPlatform(e.target.value);setOffset(0);}}>{['',...Object.keys(socialLimits)].map(p=><option key={p} value={p}>{p||'All platforms'}</option>)}</select></div>
               <p>{data?.total||0} matching posts</p>
               <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>setSelectedPosts((data?.posts||[]).filter((p:any)=>['draft','queued'].includes(p.state)).map((p:any)=>p.id))}>Select this page of posts</Button>
-              {['approve','cancel'].map(action=><Button key={action} disabled={!selectedPosts.length||selectedPosts.length>100||mutation.isPending} onClick={()=>mutation.mutate({path:'/posts/bulk-action',body:{ids:selectedPosts,action}})}>{action==='approve'?'Approve selected drafts':'Cancel selected posts'}</Button>)}</div>
+              {['approve','cancel'].map(action=><Button key={action} disabled={!selectedPosts.length||selectedPosts.length>100||mutation.isPending} onClick={()=>mutation.mutate({path:'/posts/bulk-action',body:{ids:selectedPosts,action},success:action==='approve'?'Selected drafts approved':'Selected posts cancelled'})}>{action==='approve'?'Approve selected drafts':'Cancel selected posts'}</Button>)}</div>
               <p className="text-xs">{selectedPosts.length} selected (up to 100 per action). Approve publishes each saved draft as written.</p>
               {bulkErrors.map((error,i)=><p role="alert" key={i}>{error}</p>)}
               <Pager offset={offset} setOffset={setOffset} more={offset+25<(data?.total||0)} label="posts"/>
@@ -582,6 +643,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                     action={(action, text) =>
                       mutation.mutate({
                         path: `/posts/${p.id}/action${p.business_id?`?businessId=${p.business_id}`:"?"}`,
+                        success: action === "approve" ? "Draft approved and queued" : "Post cancelled",
                         body: { action, ...(text ? { text } : {}) },
                       })
                     }
@@ -654,7 +716,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                       max={7}
                       value={current.cadence}
                       onChange={(e) =>
-                        update("cadence", Number(e.target.value))
+                        update("cadence", numberInput(e.target.value))
                       }
                     />
                   </label>
@@ -736,7 +798,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                       max={23}
                       value={current.blackoutStart}
                       onChange={(e) =>
-                        update("blackoutStart", Number(e.target.value))
+                        update("blackoutStart", numberInput(e.target.value))
                       }
                     />
                   </label>
@@ -749,7 +811,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                       max={23}
                       value={current.blackoutEnd}
                       onChange={(e) =>
-                        update("blackoutEnd", Number(e.target.value))
+                        update("blackoutEnd", numberInput(e.target.value))
                       }
                     />
                   </label>
@@ -764,7 +826,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                     max={20}
                     value={current.aiDailyBudget}
                     onChange={(e) =>
-                      update("aiDailyBudget", Number(e.target.value))
+                      update("aiDailyBudget", numberInput(e.target.value))
                     }
                   />
                 </label>
@@ -779,21 +841,34 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                     {data.lastError}
                   </p>
                 )}
-                {data?.nextAt && (
+                {/* Only a connected, enabled auto mode has a real next run. */}
+                {data?.connected && data?.settings?.enabled && data?.nextAt && (
                   <p>
-                    Next generation due:{" "}
-                    {new Date(data.nextAt).toLocaleString()}
+                    Next generation:{" "}
+                    {Date.parse(data.nextAt) <= Date.now()
+                      ? "on the next scheduler run"
+                      : new Date(data.nextAt).toLocaleString()}
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2">
                   <Button
                     disabled={mutation.isPending}
                     onClick={async () => {
+                      const problem = settingsProblem(current);
+                      if (problem) {
+                        toast({
+                          title: "Check auto settings",
+                          description: problem,
+                          variant: "destructive",
+                        });
+                        return;
+                      }
                       try {
                         await mutation.mutateAsync({
                           path: "/settings",
                           method: "PUT",
                           body: current,
+                          success: "Auto settings saved",
                         });
                         setSettings(null);
                       } catch {}
@@ -804,7 +879,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                   <Button
                     variant="outline"
                     disabled={mutation.isPending || !data?.connected}
-                    onClick={() => mutation.mutate({ path: "/generate", body: {requestId:crypto.randomUUID()} })}
+                    onClick={() => mutation.mutate({ path: "/generate", body: {requestId:crypto.randomUUID()}, success: "Draft generation queued" })}
                   >
                     Generate draft from saved settings
                   </Button>
@@ -827,7 +902,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                 <Button
                   variant="outline"
                   disabled={mutation.isPending}
-                  onClick={() => mutation.mutate({ path: "/sources/sync-gbp" })}
+                  onClick={() => mutation.mutate({ path: "/sources/sync-gbp", success: "GBP refresh queued" })}
                 >
                   Sync recent GBP updates
                 </Button>
@@ -846,8 +921,48 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                   onChange={(e) => setSourceText(e.target.value)}
                   placeholder="Factual source text; offers should include conditions and expiry"
                 />
+                <div className="text-sm space-y-1">
+                  {urls().length ? (
+                    <>
+                      <p>Media attached to this source (from Compose):</p>
+                      <ul className="list-disc pl-5 break-all">
+                        {urls().map((u, i) => (
+                          <li
+                            key={i}
+                            className={
+                              publicMediaUrl.safeParse(u).success
+                                ? ""
+                                : "text-destructive"
+                            }
+                          >
+                            {u}
+                          </li>
+                        ))}
+                      </ul>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMediaText("")}
+                      >
+                        Clear attached media (also clears Compose)
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No media attached. Media URLs entered in Compose are
+                      attached to the next source you add.
+                    </p>
+                  )}
+                  {mediaProblem && (
+                    <p role="alert" className="text-destructive break-all">
+                      {mediaProblem}
+                    </p>
+                  )}
+                </div>
                 <Button
-                  disabled={mutation.isPending || !sourceText.trim()}
+                  disabled={
+                    mutation.isPending || !sourceText.trim() || !!mediaProblem
+                  }
                   onClick={async () => {
                     try {
                       await mutation.mutateAsync({
@@ -857,6 +972,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                           text: sourceText,
                           mediaUrls: urls(),
                         },
+                        success: "Source added",
                       });
                       setSourceText("");
                     } catch {}
@@ -865,8 +981,8 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                   Add content source
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Uses media URLs from Compose. Sources expire from generation
-                  after 30 days; remove offers when they end.
+                  Sources expire from generation after 30 days; remove offers
+                  when they end.
                 </p>
                 <p className="text-sm">GBP refresh: {data?.sourcesSync?.sync_requested?'Queued':data?.sourcesSync?.synced_at?new Date(data.sourcesSync.synced_at).toLocaleString():'Not yet requested'}{data?.sourcesSync?.sync_error?` — ${data.sourcesSync.sync_error}`:''}</p>
                 <Input aria-label="Search content sources" value={sourceSearch} onChange={e=>{setSourceSearch(e.target.value);setSourceOffset(0);}} placeholder="Search sources"/>
@@ -885,6 +1001,7 @@ function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) 
                       onClick={() =>
                         mutation.mutate({
                           path: `/sources/${s.id}`,
+                          success: "Source removed",
                           method: "DELETE",
                         })
                       }

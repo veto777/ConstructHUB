@@ -17,6 +17,34 @@ import {
   type ClientFactory,
   clientFactory,
 } from "./service";
+// Curated, field-specific messages. Raw Zod text is never echoed; custom
+// refinements (written for people) pass through as-is.
+const fieldMessages: Record<string, string> = {
+  apiKey: "Paste a Blotato API key (8 to 512 characters).",
+  text: "Enter the text. It cannot be empty or longer than the allowed length.",
+  mediaUrls: "Media URLs must be public HTTPS links (up to 10).",
+  destinations: "Choose valid accounts and pages (up to 20).",
+  scheduledTime: "Choose a valid schedule time.",
+  cadence: "Posts per period must be a whole number from 1 to 7.",
+  period: "Choose a cadence period of day or week.",
+  mode: "Choose a publishing mode.",
+  mix: "Choose at least one content type.",
+  instructions: "Business instructions must be 4,000 characters or fewer.",
+  examples: "Writing examples must be 4,000 characters or fewer.",
+  timezone: "Enter a valid timezone, for example America/New_York.",
+  blackoutStart: "Blackout start must be an hour from 0 to 23.",
+  blackoutEnd: "Blackout end must be an hour from 0 to 23.",
+  aiDailyBudget: "Daily AI budget must be a whole number from 0 to 20.",
+  kind: "Choose a source type.",
+  businessIds: "Choose between 1 and 1,000 different businesses.",
+};
+export function socialInputMessage(e: z.ZodError): string {
+  const issue = e.issues[0];
+  if (!issue) return "Invalid Social Media input";
+  if (issue.code === "custom" && issue.message && issue.message !== "Invalid input")
+    return issue.message;
+  return fieldMessages[String(issue.path[0] ?? "")] ?? "Invalid Social Media input";
+}
 export function registerSocialRoutes(
   app: Express,
   auth: (req: any, res: any) => any,
@@ -55,7 +83,7 @@ export function registerSocialRoutes(
                 e instanceof SocialError
                   ? e.message
                   : e instanceof z.ZodError
-                    ? "Invalid Social Media input"
+                    ? socialInputMessage(e)
                     : "Social Media operation could not be completed. Check your input and retry.",
             });
         }

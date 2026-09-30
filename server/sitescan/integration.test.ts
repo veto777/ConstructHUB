@@ -2,7 +2,13 @@ import { it, expect, vi, afterAll, beforeAll } from "vitest";
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { ensureSiteScanSchema } from "./schema";
-import { registerSiteScanRoutes, hashToken } from "./routes";
+import {
+  registerSiteScanRoutes,
+  hashToken,
+  marketingBaseUrl,
+  psiLines,
+} from "./routes";
+import { PRIMARY_DOMAIN, SITE_DOMAINS } from "../site-context";
 import { enqueue, runSiteScanWorker, runSchedules } from "./worker";
 import { emptyState } from "./audit";
 vi.mock("../account-events", () => ({
@@ -185,6 +191,86 @@ it("creates draft through injected provider, hashes shares and revokes access", 
     ).status,
   ).toBe(404);
 });
+it("refunds AI budgets when the provider fails and only mentions a JSON-LD draft that exists", async () => {
+  const keys = ["sitescan:ai:1", "sitescan:ai-calls:1", "sitescan:ai-global"];
+  const period = String(Math.floor(Date.now() / 86400_000));
+  const used = async () =>
+    Object.fromEntries(
+      (
+        await pool.query(
+          "SELECT key,used FROM growth_budgets WHERE key=ANY($1) AND period=$2",
+          [keys, period],
+        )
+      ).rows.map((r) => [r.key, r.used]),
+    );
+  const before = await used();
+  provider.generate.mockRejectedValueOnce(new Error("provider outage fixture"));
+  const r = await call("post", "/api/sitescan/jobs/:id/plan", {
+    params: { id: own },
+  });
+  expect(r.status).toBe(503);
+  expect(r.body.message).toContain("allowance was not used");
+  // This fixture job has no GBP profile, so there is no JSON-LD draft to point at.
+  expect(r.body.message).not.toContain("JSON-LD");
+  expect(await used()).toEqual(before);
+});
+it("PDF PageSpeed lines are plain language, never raw JSON", () => {
+  const text = psiLines([
+    {
+      strategy: "mobile",
+      url: "https://fixture.test/",
+      unavailable: "PageSpeed quota exceeded; retry after quota resets.",
+    },
+    {
+      strategy: "desktop",
+      url: "https://fixture.test/",
+      score: 72,
+      lab: {
+        "largest-contentful-paint": { value: 2500, display: "2.5 s" },
+        "speed-index": { value: null, display: null },
+      },
+      field: null,
+      originField: null,
+    },
+    { reason: "disabled", unavailable: "PageSpeed was not selected (0 pages)." },
+  ]).join("\n");
+  expect(text).toContain(
+    "mobile · https://fixture.test/: PageSpeed data unavailable (PageSpeed quota exceeded",
+  );
+  expect(text).toContain("desktop · https://fixture.test/: performance score 72");
+  expect(text).toContain("Largest Contentful Paint: 2.5 s");
+  expect(text).not.toContain("Speed Index");
+  expect(text).toContain("No real-user field data reported.");
+  expect(text).toContain("PageSpeed: PageSpeed data unavailable (PageSpeed was not selected");
+  expect(text).not.toMatch(/[{}"]/);
+});
+it("free-scan verification links use the caller's own origin, never a hardcoded localhost", () => {
+  expect(marketingBaseUrl({ headers: { host: "127.0.0.1:8208" } })).toBe(
+    "http://127.0.0.1:8208",
+  );
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("REPLIT_DEPLOYMENT", "");
+  vi.stubEnv("APP_URL", "");
+  try {
+    const apex = SITE_DOMAINS[SITE_DOMAINS.length - 1];
+    expect(marketingBaseUrl({ headers: { host: `www.${apex}` } })).toBe(
+      `https://${apex}`,
+    );
+    // The portal is not where a marketing lead should land.
+    expect(marketingBaseUrl({ headers: { host: `portal.${apex}` } })).toBe(
+      `https://${apex}`,
+    );
+    expect(marketingBaseUrl({ headers: { host: "attacker.example" } })).toBe(
+      `https://${PRIMARY_DOMAIN}`,
+    );
+    vi.stubEnv("APP_URL", "https://app.example.invalid/");
+    expect(marketingBaseUrl({ headers: { host: "attacker.example" } })).toBe(
+      "https://app.example.invalid",
+    );
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
 it("public access only returns summary, verification unlocks full report, email budgets persist", async () => {
   const start = await call("post", "/api/sitescan/public/start", {
     user: null,
@@ -216,6 +302,7 @@ it("public access only returns summary, verification unlocks full report, email 
   expect(summary.body.report).toBeUndefined();
   expect(summary.body.summary.findings.length).toBeLessThanOrEqual(5);
   const mailObject = (mail.mock.calls as any)[0][0];
+  expect(mailObject.text).not.toContain("localhost:8169");
   const value = mailObject.text.match(/verify=([a-f0-9]{64})/)[1];
   expect(
     (
