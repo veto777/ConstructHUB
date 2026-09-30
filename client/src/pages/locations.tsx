@@ -595,7 +595,7 @@ function LocationInfoTab({ location }: { location: BusinessLocation }) {
   });
 
   const hoursDisplay = location.hours
-    ? (typeof location.hours === "object"
+    ? (Array.isArray(location.hours) ? location.hours.join(", ") : typeof location.hours === "object"
       ? Object.entries(location.hours as Record<string, string>).map(([day, hrs]) => `${day}: ${hrs}`).join(", ")
       : String(location.hours))
     : null;

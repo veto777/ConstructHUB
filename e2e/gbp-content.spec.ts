@@ -196,3 +196,17 @@ test('profile Photos tab points to the shipped publisher and distinguishes unkno
     await page.getByTestId('button-posts-photos').click();
     await expect(page).toHaveURL(/\/gbp-content$/);
 });
+
+test('unlinked Places import remains available and renders weekday text without array indexes', async ({ page }) => {
+    const fixture = {id:99885,businessName:'Unlinked audit fixture',placeId:'fixture-place',gbpLocationName:null,hours:['Monday: 8:00 AM – 5:00 PM','Tuesday: Closed']};
+    let imported = false;
+    await page.route('**/api/locations', route=>route.fulfill({json:[fixture]}));
+    await page.route('**/api/locations/99885/import-google', route=>{imported=true;return route.fulfill({json:fixture});});
+    await page.goto('/locations');
+    await page.getByText('Unlinked audit fixture',{exact:true}).click();
+    await page.getByTestId('tab-info').click();
+    await expect(page.getByTestId('info-hours')).toHaveText('Monday: 8:00 AM – 5:00 PM, Tuesday: Closed');
+    await page.getByTestId('button-import-google').click();
+    await expect(page.getByText('Google data imported',{exact:true})).toBeVisible();
+    expect(imported).toBe(true);
+});
