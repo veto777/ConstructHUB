@@ -18,7 +18,7 @@ test.describe("/crm/clients", () => {
     // Search narrows the list.
     await search.fill("zzz-no-such-client");
     await expect(rows).toHaveCount(0);
-    await expect(page.getByText("No clients yet")).toBeVisible();
+    await expect(page.getByText(/No clients match/)).toBeVisible();
     await search.fill("");
     await expect(rows.first()).toBeVisible();
 

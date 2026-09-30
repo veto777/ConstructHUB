@@ -47,12 +47,17 @@ test.describe("owner-only delete", { tag: "@serial" }, () => {
     await page.getByTestId("button-delete-client").click();
     const dlg = page.getByTestId("dialog-delete-client");
     await expect(dlg).toBeVisible();
-    await expect(dlg).toContainText("entire tree");
-    await expect(dlg).toContainText("1 estimate(s)");
     await expect(dlg).toContainText("cannot be undone");
 
+    // Step 1 sends a plain DELETE; the server answers 409 with what else would go.
     await page.getByTestId("button-confirm-delete-client").click();
+    await expect(dlg).toContainText("entire tree");
+    await expect(dlg).toContainText("1 estimate(s)");
+    await page.getByTestId("button-confirm-delete-client-force").click();
     await page.waitForURL("**/crm/clients");
+    // That 409 is the designed first step, not a failure.
+    const i = guards.badResponses.findIndex((r) => r.startsWith("409 ") && r.includes(`/api/crm/customers/${customerId}`));
+    if (i >= 0) guards.badResponses.splice(i, 1);
     const check = await page.request.get(`/api/crm/customers/${customerId}`);
     expect(check.status()).toBe(404);
     guards.assertClean("owner client force delete");
