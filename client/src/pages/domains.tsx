@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
+import {
+  PlanRequired,
+  planRequiredFrom,
+  pollUnlessPlanRequired,
+} from "@/components/plan-required";
 const selectClass = "border rounded-md p-2 bg-background";
 // Mirrors the server's domainName check (server/domains/types.ts).
 const domainPattern = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
@@ -41,14 +46,19 @@ export default function DomainsPage() {
     data: domains,
     isLoading,
     error: loadError,
-  } = useQuery<any>({ queryKey: [domainsUrl], refetchInterval: 5000 });
-  const { data: guides } = useQuery<any>({ queryKey: ["/api/domains/guides"] });
+  } = useQuery<any>({
+    queryKey: [domainsUrl],
+    refetchInterval: pollUnlessPlanRequired(5000),
+  });
+  const { data: guides, error: guidesError } = useQuery<any>({
+    queryKey: ["/api/domains/guides"],
+  });
   const { data: connections } = useQuery<any>({
     queryKey: [`/api/domains/connections?page=${connectionPage}`],
   });
   const { data: jobs } = useQuery<any>({
     queryKey: [`/api/domains/jobs?page=${jobPage}&q=${encodeURIComponent(q)}`],
-    refetchInterval: 3000,
+    refetchInterval: pollUnlessPlanRequired(3000),
   });
   const { data: locations } = useQuery<any>({
     queryKey: [
@@ -84,18 +94,33 @@ export default function DomainsPage() {
     setSelected((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
     );
+  const header = (
+    <header>
+      <h1 className="text-3xl font-bold">Domains</h1>
+      <p className="text-muted-foreground">
+        Manage client DNS and nameservers. Domain registration stays with your
+        registrar.
+      </p>
+      <Link className="underline" href="/mail-alerts">
+        Provider mail alerts →
+      </Link>
+    </header>
+  );
+  const planGate = [loadError, guidesError].find((e) => planRequiredFrom(e));
+  if (planGate)
+    return (
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        {header}
+        <PlanRequired
+          module="domainsMailAlerts"
+          error={planGate}
+          className="max-w-3xl"
+        />
+      </div>
+    );
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <header>
-        <h1 className="text-3xl font-bold">Domains</h1>
-        <p className="text-muted-foreground">
-          Manage client DNS and nameservers. Domain registration stays with your
-          registrar.
-        </p>
-        <Link className="underline" href="/mail-alerts">
-          Provider mail alerts →
-        </Link>
-      </header>
+      {header}
       {error && (
         <p role="alert" className="text-destructive">
           {error}

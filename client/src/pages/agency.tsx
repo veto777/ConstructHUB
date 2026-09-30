@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useUrlParam } from '@/hooks/use-url-param';
+import { PlanRequired } from '@/components/plan-required';
 const knownTabs=['locations','clients','team','onboarding','jobs','settings'];
 const emailPattern=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function AgencyPage(){
@@ -16,14 +17,16 @@ export default function AgencyPage(){
   const [client,setClient]=useState(''),[subject,setSubject]=useState(''),[business,setBusiness]=useState(''),[address,setAddress]=useState(''),[placeId,setPlaceId]=useState('');
   const [agencyName,setAgencyName]=useState(''),[acceptAll,setAcceptAll]=useState(false);
   const {data:me}=useQuery<any>({queryKey:['/api/agency/me']});
+  // `entitled`: the open workspace's owner has the plan that includes the agency workspace (/me always answers).
+  const entitled=!!me?.entitled;
   const admin=me&&['owner','admin'].includes(me.role),write=me&&me.role!=='viewer';
   const tabs=['locations','clients',...(admin?['team']:[]),'onboarding','jobs',...(me?.role==='owner'?['settings']:[])];
   // ?tab= keeps the open tab across reloads and shared links; one this role can't open falls back to Locations.
   const tab=tabParam&&(me?tabs:knownTabs).includes(tabParam)?tabParam:'locations';
-  const {data:google}=useQuery<any>({queryKey:['/api/agency/google'],enabled:!!me});
+  const {data:google}=useQuery<any>({queryKey:['/api/agency/google'],enabled:entitled});
   const connectedGoogle=google?.accounts?.filter((g:any)=>g.connected)??[];
-  const {data:list,refetch}=useQuery<any>({queryKey:['/api/agency',tab,search,offset],enabled:!!me&&tab!=='locations'&&tab!=='settings',queryFn:()=>apiRequest('GET',`/api/agency/${tab}?q=${encodeURIComponent(search)}&offset=${offset}`).then(r=>r.json()),refetchInterval:tab==='jobs'||tab==='onboarding'?10000:false});
-  const {data:clients}=useQuery<any>({queryKey:[`/api/agency/clients?q=${encodeURIComponent(search)}`]});
+  const {data:list,refetch}=useQuery<any>({queryKey:['/api/agency',tab,search,offset],enabled:entitled&&tab!=='locations'&&tab!=='settings',queryFn:()=>apiRequest('GET',`/api/agency/${tab}?q=${encodeURIComponent(search)}&offset=${offset}`).then(r=>r.json()),refetchInterval:tab==='jobs'||tab==='onboarding'?10000:false});
+  const {data:clients}=useQuery<any>({queryKey:[`/api/agency/clients?q=${encodeURIComponent(search)}`],enabled:entitled});
   const say=(text:string,error=false)=>{setMessage(text);setFailed(error);};
   // The message sits above the forms; bring it into view when a long form's button (e.g. on a phone) sets it.
   const messageRef=useRef<HTMLParagraphElement>(null);
@@ -48,8 +51,16 @@ export default function AgencyPage(){
     if(!address.trim()&&!placeId.trim())return say('Provide an address or Place ID.',true);
     run('/onboarding',{clientId:Number(client),subject,businessName:business,address:address.trim()||undefined,placeId:placeId.trim()||undefined});
   }
+  const otherWorkspaces=me?.workspaces?.filter((w:any)=>w.user_id!==me.actor)??[];
+  const switcher=<div className="flex gap-3 items-center"><label>Workspace <select className={selectClass} aria-label="Workspace" value={me?.owner||''} onChange={async e=>{await run('/workspace',{owner:Number(e.target.value)});queryClient.clear();window.location.reload();}}><option value={me?.actor}>My workspace</option>{otherWorkspaces.map((w:any)=><option value={w.user_id} key={w.user_id}>{w.name}</option>)}</select></label><span>{me?.role}</span></div>;
+  // Without the plan: say so, and still let a team member open an agency workspace they belong to.
+  if(me&&!entitled)return <main className="p-6 max-w-7xl mx-auto space-y-5"><h1 className="text-3xl font-bold">Agency workspace</h1>
+    {otherWorkspaces.length>0&&<section className="space-y-2" aria-label="Workspaces you belong to"><p>You're a member of {otherWorkspaces.length===1?'an agency workspace':'agency workspaces'}. Open one to work on its clients.</p>{switcher}</section>}
+    {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined}>{message}</p>}
+    <PlanRequired module="agencyWorkspace" className="max-w-3xl"/>
+  </main>;
   return <main className="p-6 max-w-7xl mx-auto space-y-5"><h1 className="text-3xl font-bold">Agency workspace</h1>
-    <div className="flex gap-3 items-center"><label>Workspace <select className={selectClass} aria-label="Workspace" value={me?.owner||''} onChange={async e=>{await run('/workspace',{owner:Number(e.target.value)});queryClient.clear();window.location.reload();}}><option value={me?.actor}>My workspace</option>{me?.workspaces?.filter((w:any)=>w.user_id!==me.actor).map((w:any)=><option value={w.user_id} key={w.user_id}>{w.name}</option>)}</select></label><span>{me?.role}</span></div>
+    {switcher}
     <nav className="flex gap-2 flex-wrap">{tabs.map(t=><Button key={t} variant={t===tab?'default':'outline'} onClick={()=>{setTabParam(t==='locations'?null:t);setOffset(0);say('');}}>{t[0].toUpperCase()+t.slice(1)}</Button>)}</nav>
     {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined}>{message}</p>}
     {tab==='locations'?<AgencyWorkspace/>:<>

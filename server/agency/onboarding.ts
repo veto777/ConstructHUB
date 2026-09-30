@@ -7,7 +7,7 @@ import { takeBudget } from '../growth-limits';
 import { encryptToken, decryptToken } from '../gbp/token-crypto';
 import { clientFor } from '../gbp/service';
 import { GBP_SCOPE, GoogleError, resource } from '../gbp/client';
-import { clientAccess, positiveId, requireWrite, type AgencyAccess } from './access';
+import { agencyPlanPaused, clientAccess, positiveId, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
 import { refreshDiscovery, queueSync } from './jobs';
 export const googleHelp='https://support.google.com/business/answer/3403100';
 export const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
@@ -94,17 +94,29 @@ export async function pollInvitations(user:number,subject:string,make=clientFor)
     }
   }
 }
-export async function runOnboardingWorker(make=clientFor,send=sendWithFallback) {
-  const c=await pool.connect();let locked=false;
+/** `onlyUser` narrows a run to one agency owner (tests on a shared database). */
+export async function runOnboardingWorker(make=clientFor,send=sendWithFallback,onlyUser?:number) {
+  const c=await pool.connect();let locked=false;const only=[onlyUser??null];
   try {
     locked=(await c.query('SELECT pg_try_advisory_lock(7163,1) locked')).rows[0].locked;if(!locked)return;
-    await c.query("UPDATE agency_google_invitations SET status='uncertain',error='Acceptance interrupted. Check Google.' WHERE status='accepting'");
-    await c.query("UPDATE agency_onboarding SET status='expired' WHERE expires_at<=now() AND status NOT IN ('linked','expired')");
-    const {rows:mail}=await c.query(`SELECT * FROM agency_onboarding WHERE status IN ('sent','opened') AND expires_at>now() AND (sent_at IS NULL OR (reminders<2 AND reminder_at<now()-interval '3 days')) ORDER BY reminder_at NULLS FIRST LIMIT 20`);
-    for(const r of mail)try{await sendOnboarding(r,send);}catch{await c.query("UPDATE agency_onboarding SET error='Email delivery failed; retry pending',reminder_at=now() WHERE id=$1",[r.id]);}
-    await c.query(`INSERT INTO agency_poll_grants(user_id,subject) SELECT g.user_id,g.google_subject FROM gbp_grants g WHERE NOT g.reconnect_required AND (EXISTS(SELECT 1 FROM agency_onboarding r WHERE r.user_id=g.user_id AND r.subject=g.google_subject AND r.status NOT IN ('linked','expired')) OR EXISTS(SELECT 1 FROM agency_workspaces w WHERE w.user_id=g.user_id AND w.auto_accept_all)) ON CONFLICT DO NOTHING`);
-    const {rows:[g]}=await c.query(`UPDATE agency_poll_grants SET next_at=now()+interval '5 minutes' WHERE (user_id,subject)=(SELECT p.user_id,p.subject FROM agency_poll_grants p JOIN gbp_grants g ON g.user_id=p.user_id AND g.google_subject=p.subject AND NOT g.reconnect_required WHERE next_at<=now() ORDER BY next_at LIMIT 1) RETURNING *`);
-    if(g){if(g.refresh_requested){await refreshDiscovery(g.user_id,g.subject,make);await c.query('UPDATE agency_poll_grants SET refresh_requested=false WHERE user_id=$1 AND subject=$2',[g.user_id,g.subject]);}await pollInvitations(g.user_id,g.subject,make);}
+    await c.query("UPDATE agency_google_invitations SET status='uncertain',error='Acceptance interrupted. Check Google.' WHERE status='accepting' AND ($1::int IS NULL OR user_id=$1)",only);
+    await c.query("UPDATE agency_onboarding SET status='expired' WHERE expires_at<=now() AND status NOT IN ('linked','expired') AND ($1::int IS NULL OR user_id=$1)",only);
+    const {rows:mail}=await c.query(`SELECT * FROM agency_onboarding WHERE status IN ('sent','opened') AND expires_at>now() AND (sent_at IS NULL OR (reminders<2 AND reminder_at<now()-interval '3 days')) AND ($1::int IS NULL OR user_id=$1) ORDER BY reminder_at NULLS FIRST LIMIT 20`,only);
+    // Onboarding email and invitation polling follow the agency owner's current plan; paused work resumes if it returns.
+    const entitled=new Map<number,Promise<boolean>>(),allowed=(owner:number)=>{if(!entitled.has(owner))entitled.set(owner,workspaceEntitled(owner));return entitled.get(owner)!;};
+    for(const r of mail){
+      if(!await allowed(r.user_id)){await c.query('UPDATE agency_onboarding SET error=$2,reminder_at=now() WHERE id=$1',[r.id,agencyPlanPaused]);continue;}
+      try{await sendOnboarding(r,send);}catch{await c.query("UPDATE agency_onboarding SET error='Email delivery failed; retry pending',reminder_at=now() WHERE id=$1",[r.id]);}
+    }
+    await c.query(`INSERT INTO agency_poll_grants(user_id,subject) SELECT g.user_id,g.google_subject FROM gbp_grants g WHERE NOT g.reconnect_required AND ($1::int IS NULL OR g.user_id=$1) AND (EXISTS(SELECT 1 FROM agency_onboarding r WHERE r.user_id=g.user_id AND r.subject=g.google_subject AND r.status NOT IN ('linked','expired')) OR EXISTS(SELECT 1 FROM agency_workspaces w WHERE w.user_id=g.user_id AND w.auto_accept_all)) ON CONFLICT DO NOTHING`,only);
+    // One grant per tick; a grant whose owner's plan no longer includes the agency workspace is not polled and waits an hour.
+    for(let i=0;i<10;i++){
+      const {rows:[g]}=await c.query(`UPDATE agency_poll_grants SET next_at=now()+interval '5 minutes' WHERE (user_id,subject)=(SELECT p.user_id,p.subject FROM agency_poll_grants p JOIN gbp_grants g ON g.user_id=p.user_id AND g.google_subject=p.subject AND NOT g.reconnect_required WHERE next_at<=now() AND ($1::int IS NULL OR p.user_id=$1) ORDER BY next_at LIMIT 1) RETURNING *`,only);
+      if(!g)break;
+      if(!await allowed(g.user_id)){await c.query("UPDATE agency_poll_grants SET next_at=now()+interval '1 hour' WHERE user_id=$1 AND subject=$2",[g.user_id,g.subject]);continue;}
+      if(g.refresh_requested){await refreshDiscovery(g.user_id,g.subject,make);await c.query('UPDATE agency_poll_grants SET refresh_requested=false WHERE user_id=$1 AND subject=$2',[g.user_id,g.subject]);}
+      await pollInvitations(g.user_id,g.subject,make);break;
+    }
   }finally{if(locked)await c.query('SELECT pg_advisory_unlock(7163,1)');c.release();}
 }
 export function startOnboardingWorker(){if(process.env.GBP_SYNC_DISABLED==='true')return;const t=setInterval(()=>void runOnboardingWorker().catch(()=>console.error('Agency onboarding tick failed')),60000);t.unref();return t;}

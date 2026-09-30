@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useUrlParam } from '@/hooks/use-url-param';
+import { Link } from 'wouter';
+import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
 export function useAgencyFilter() {
   const [client,setClient]=useUrlParam('clientId'),[q,setQ]=useUrlParam('q'),[status,setStatus]=useUrlParam('status'),[offset,setOffset]=useUrlParam('offset');
   const params=new URLSearchParams({q:q||'',status:status||'all',offset:offset||'0',...(client?{clientId:client}:{})});
@@ -22,7 +24,33 @@ export function fullAddress(l:{address?:string|null;city?:string|null;state?:str
 export function Pager({offset,total,onChange}:{offset:number;total:number;onChange:(n:number)=>void}) {
   return <div className="flex gap-3 items-center text-sm"><Button variant="outline" disabled={!offset} onClick={()=>onChange(Math.max(0,offset-50))}>Previous page</Button><span>{total?offset+1:0}–{Math.min(offset+50,total)} of {total}</span><Button variant="outline" disabled={offset+50>=total} onClick={()=>onChange(offset+50)}>Next page</Button></div>;
 }
-export function AgencyWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;compact?:boolean}) {
+const statusLabels={all:'All statuses',synced:'Synced',reconnect:'Needs reconnect',unlinked:'Not linked',guard:'Guard alerts',unanswered:'Unanswered reviews',failed:'Failed posts'};
+/** The agency bulk workspace when the open workspace's plan includes it. Without it, compact spots show nothing
+ *  and the full list (the Locations page) is the owner's own location list, served by /api/locations. */
+export function AgencyWorkspace(props:{onOpen?:(id:number)=>void;compact?:boolean}) {
+  const {data:me,isError}=useQuery<any>({queryKey:['/api/agency/me']});
+  if(!me&&!isError)return null;
+  if(me?.entitled)return <AgencyBulkWorkspace {...props}/>;
+  return props.compact?null:<OwnLocations onOpen={props.onOpen}/>;
+}
+function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
+  const f=useAgencyFilter();
+  const params=new URLSearchParams({paged:'true',q:f.q,status:f.status,offset:String(f.offset)});
+  const {data,error}=useQuery<any>({queryKey:['/api/locations','paged',params.toString()],queryFn:()=>apiRequest('GET','/api/locations?'+params).then(r=>r.json())});
+  const agencyPlan=PLANS[planForModule('agencyWorkspace')].name;
+  return <section className="border rounded-lg p-4 space-y-3" aria-label="Your locations">
+    <div className="flex gap-2 flex-wrap">
+      <Input className="max-w-sm" aria-label="Global location search" placeholder="Search name, address, ZIP or Place ID…" value={f.q} onChange={e=>f.setQ(e.target.value)}/>
+      <select className={selectClass} aria-label="Location status" value={f.status} onChange={e=>f.setStatus(e.target.value)}>{Object.entries(statusLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
+    </div>
+    {error&&<p role="alert">Could not load locations.</p>}
+    <div className="overflow-auto"><table className="w-full text-sm"><thead><tr><th className="text-left p-2">Location</th><th className="text-left p-2">Address</th><th className="text-left p-2">Google link</th></tr></thead><tbody>{data?.items.map((l:any)=><tr key={l.id} className="border-t" data-testid={`own-location-${l.id}`}><td className="p-2"><button className="text-primary underline text-left" onClick={()=>onOpen?onOpen(l.id):window.location.assign(`/locations?location=${l.id}`)}>{l.businessName}</button></td><td className="p-2">{fullAddress(l)||'Not set'}</td><td className="p-2">{l.gbpLocationName?'Linked':'Not linked'}</td></tr>)}</tbody></table></div>
+    {data&&!data.items.length&&<p className="text-sm text-muted-foreground">{f.q||f.status!=='all'?'No locations match these filters.':'No locations yet.'}</p>}
+    <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
+    <p className="text-sm text-muted-foreground">Client workspaces, bulk actions across locations and CSV export are part of the {MODULE_NAMES.agencyWorkspace} on the <Link href="/pricing" className="text-primary underline">{agencyPlan} plan</Link>.</p>
+  </section>;
+}
+function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;compact?:boolean}) {
   const f=useAgencyFilter();const [clientSearch,setClientSearch]=useState(''),[expanded,setExpanded]=useState(!compact);
   const [ids,setIds]=useState<number[]>([]),[all,setAll]=useState(false),[action,setAction]=useState('sync'),[message,setMessage]=useState('');
   const [guard,setGuard]=useState('notify'),[aiMode,setAiMode]=useState('draft'),[tone,setTone]=useState('Warm and professional'),[signOff,setSignOff]=useState('');
@@ -49,7 +77,7 @@ export function AgencyWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>voi
       <Input className="max-w-xs" aria-label="Find client" placeholder="Find client…" value={clientSearch} onChange={e=>setClientSearch(e.target.value)}/>
       <select className={selectClass} aria-label="Client filter" value={f.client} onChange={e=>f.setClient(e.target.value)}><option value="">All accessible clients</option>{clients?.items?.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
       <Input className="max-w-sm" aria-label="Global location search" placeholder="Search name, address, ZIP or Place ID…" value={f.q} onChange={e=>f.setQ(e.target.value)}/>
-      <select className={selectClass} aria-label="Location status" value={f.status} onChange={e=>f.setStatus(e.target.value)}>{Object.entries({all:'All statuses',synced:'Synced',reconnect:'Needs reconnect',unlinked:'Not linked',guard:'Guard alerts',unanswered:'Unanswered reviews',failed:'Failed posts'}).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
+      <select className={selectClass} aria-label="Location status" value={f.status} onChange={e=>f.setStatus(e.target.value)}>{Object.entries(statusLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
     </div>
     <div className="flex flex-wrap gap-2">{stats&&Object.entries({synced:'Synced',reconnect:'Needs reconnect',unlinked:'Not linked',guard:'Locations with Guard alerts',unanswered:'Locations with unanswered reviews',failed:'Locations with failed posts'}).map(([k,v])=><Button key={k} variant="outline" size="sm" onClick={()=>{f.setStatus(k);setExpanded(true);}}>{v}: {stats[k]}</Button>)}</div>
     {error&&<p role="alert">Could not load locations.</p>}

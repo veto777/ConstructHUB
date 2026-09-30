@@ -12,6 +12,7 @@ import { buildPlan, readState, emptyState, normalize, fingerprint, appliedDocume
 import { auditAccount } from './audit';
 import { registerAdsRoutes } from './routes';
 import { runAdsWorker, linkStatus, invitationMail } from './worker';
+import { planForModule } from '@shared/plans';
 import { enqueue } from './store';
 let user:number,other:number,domain:number,connection:string,app:express.Express;
 const cid='1234567890', manager='9876543210';
@@ -52,6 +53,8 @@ beforeAll(async()=>{
   process.env.EMAIL_FORCE_SINK='1';
   await ensureGrowthSchema();await ensureAccountEventsSchema();await ensureAdsSchema();await ensureAdsSchema();
   [user,other]=(await pool.query("INSERT INTO users(email) VALUES('ads-'||gen_random_uuid()||'@example.invalid'),('ads-'||gen_random_uuid()||'@example.invalid') RETURNING id")).rows.map(r=>r.id);
+  // Both fixture agencies are on the plan that includes the Ads manager (the worker checks it per job).
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) SELECT unnest($1::int[]),$2,'active'",[[user,other],planForModule('adsManager')]);
   domain=(await pool.query("INSERT INTO tracked_domains(user_id,domain,tracking_id) VALUES($1,'fixture.example.invalid',gen_random_uuid()) RETURNING id",[user])).rows[0].id;
   connection=(await pool.query('INSERT INTO ads_grants(user_id,manager_id,refresh_token,verified) VALUES($1,$2,$3,true) RETURNING connection_id',[user,manager,encryptToken('fixture-refresh')])).rows[0].connection_id;
   await pool.query("INSERT INTO business_locations(user_id,business_name) SELECT $1,'Ads scale fixture location '||i FROM generate_series(1,1000) i",[user]);
@@ -66,6 +69,7 @@ beforeEach(async()=>{
   await pool.query('UPDATE ads_accounts SET snapshot=$3,status=\'ENABLED\',domain_id=$4 WHERE user_id=$1 AND customer_id=$2',[user,cid,JSON.stringify(state),domain]);
 });
 afterAll(async()=>{
+  await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1)',[[user,other]]);
   await pool.query('DELETE FROM blocked_ips WHERE domain_id=$1',[domain]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM tracked_domains WHERE id=$1',[domain]);await pool.query("DELETE FROM growth_budgets WHERE key=ANY($1)",[[`ads-queue:${user}`,`ads-queue:${other}`]]);await pool.end();
 });
 describe('Google Ads HTTP contract (all Google calls mocked)',()=>{

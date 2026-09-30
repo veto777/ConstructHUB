@@ -1,9 +1,22 @@
 import { z } from 'zod';
+import type { Response } from 'express';
 import { pool } from '../db';
 import { GoogleError } from '../gbp/client';
+import { getEntitlements, sendPlanRequired } from '../entitlements';
+import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
 export const positiveId = z.coerce.number().int().positive().max(2147483647);
 export type AgencyAccess = { owner: number; actor: number; role: 'owner'|'admin'|'manager'|'viewer'; allClients: boolean };
 export const missing = () => new GoogleError('invalid','Record not found',404);
+/** The agency workspace follows the workspace OWNER's plan: team seats come with the owner's plan, so a member
+ * needs no plan of their own. A platform admin acting in someone's workspace keeps access. */
+export async function workspaceEntitled(owner: number, actor = owner) {
+  if ((await getEntitlements(owner)).modules.agencyWorkspace) return true;
+  return actor !== owner && (await getEntitlements(actor)).isPlatformAdmin;
+}
+export const agencyPlan = planForModule('agencyWorkspace');
+export const agencyPlanRequired = (res: Response) => sendPlanRequired(res, agencyPlan, MODULE_NAMES.agencyWorkspace);
+/** Recorded on queued agency work that was not run because the owner's plan no longer includes it. */
+export const agencyPlanPaused = `Not run: ${MODULE_NAMES.agencyWorkspace} is included with the ${PLANS[agencyPlan].name} plan.`;
 export async function accessFor(actor: number, owner = actor): Promise<AgencyAccess> {
   if (owner === actor) return {owner,actor,role:'owner',allClients:true};
   const { rows:[m] } = await pool.query('SELECT role,all_clients FROM agency_members WHERE user_id=$1 AND member_id=$2',[owner,actor]);

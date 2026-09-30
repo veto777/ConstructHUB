@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { pool } from "../db";
 import { rateLimit } from "../growth-limits";
+import { requireModule } from "../entitlements";
 import { requireRecentAuth } from "../account-security";
 import { logActivity } from "../account-events";
 import { domainName, changeInput, DomainError } from "./types";
@@ -33,7 +34,12 @@ export function registerDomainRoutes(
     res.setHeader("Cache-Control", "no-store");
     next();
   });
-  app.use("/api/domains", rateLimit("domains", 120, 300));
+  // Agency-only module: every /api/domains route answers 402 plan_required unless the plan includes it.
+  app.use(
+    "/api/domains",
+    rateLimit("domains", 120, 300),
+    requireModule("domainsMailAlerts"),
+  );
   const route = (
     method: "get" | "post",
     path: string,

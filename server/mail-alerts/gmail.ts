@@ -5,6 +5,7 @@ import { requireRecentAuth } from "../account-security";
 import { encryptToken, decryptToken } from "../gbp/token-crypto";
 import { oauthBaseUrl } from "../site-context";
 import { rateLimit, takeBudget } from "../growth-limits";
+import { getEntitlements, requireModule } from "../entitlements";
 import { logActivity } from "../account-events";
 import { GMAIL_QUERY, classifyMail, parseMail } from "./classify";
 import { storeMatched, purgeExpiredMail, hash } from "./service";
@@ -25,7 +26,12 @@ export function registerGmailOAuth(
   auth: (req: any, res: any) => any,
   http: typeof fetch = fetch,
 ) {
-  app.use("/api/mail-alerts/oauth", rateLimit("gmail-oauth", 10, 30));
+  // Gated here as well, so the OAuth routes never depend on registration order with registerMailAlertRoutes.
+  app.use(
+    "/api/mail-alerts/oauth",
+    rateLimit("gmail-oauth", 10, 30),
+    requireModule("domainsMailAlerts"),
+  );
   app.get("/api/mail-alerts/oauth/connect", async (req, res) => {
     const u = auth(req, res);
     if (!u) return;
@@ -244,7 +250,11 @@ export async function syncGmail(g: any, http: typeof fetch = fetch) {
     ],
   );
 }
-export async function runMailWorker(http: typeof fetch = fetch) {
+/** `onlyUser` narrows the Gmail sync to one owner (tests on a shared database); expired mail is always purged. */
+export async function runMailWorker(
+  http: typeof fetch = fetch,
+  onlyUser?: number,
+) {
   await purgeExpiredMail();
   if (process.env.GMAIL_OAUTH_ENABLED !== "true") return;
   const c = await pool.connect();
@@ -255,11 +265,22 @@ export async function runMailWorker(http: typeof fetch = fetch) {
     } = await c.query("SELECT pg_try_advisory_lock(8189,8) locked");
     locked = r.locked;
     if (!locked) return;
-    const {
-      rows: [g],
-    } = await c.query(
-      "SELECT * FROM mail_alert_grants WHERE NOT needs_reconnect AND next_sync<=now() ORDER BY next_sync LIMIT 1",
+    // One Gmail sync per tick, for an owner whose plan still includes the module; others wait an hour.
+    const { rows: due } = await c.query(
+      "SELECT * FROM mail_alert_grants WHERE NOT needs_reconnect AND next_sync<=now() AND ($1::int IS NULL OR user_id=$1) ORDER BY next_sync LIMIT 10",
+      [onlyUser ?? null],
     );
+    let g: any;
+    for (const row of due) {
+      if ((await getEntitlements(row.user_id)).modules.domainsMailAlerts) {
+        g = row;
+        break;
+      }
+      await c.query(
+        "UPDATE mail_alert_grants SET next_sync=now()+interval '1 hour' WHERE user_id=$1 AND google_subject=$2",
+        [row.user_id, row.google_subject],
+      );
+    }
     if (!g) return;
     try {
       await syncGmail(g, http);

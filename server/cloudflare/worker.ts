@@ -16,6 +16,12 @@ import { CloudflareClient } from "./client";
 import { ProviderError, mapLocations, domain, queue } from "./common";
 import { sendWithFallback } from "../email";
 import { logActivity, notifyUser } from "../account-events";
+import { getEntitlements } from "../entitlements";
+import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
+/** Queued Cloudflare and Search Console work runs only while the owner's plan includes the module. */
+const edgeAllowed = async (user: number) =>
+  (await getEntitlements(user)).modules.cloudflareSearchConsole;
+export const EDGE_PLAN_PAUSED = `Not run: ${MODULE_NAMES.cloudflareSearchConsole} is included with the ${PLANS[planForModule("cloudflareSearchConsole")].name} plan.`;
 const esc = (s: string) =>
   s.replace(
     /[&<>"']/g,
@@ -157,6 +163,24 @@ export async function runEdgeJob(http: typeof fetch = fetch, owner?: number) {
       )
     ).rows[0];
     if (!job) return false;
+    if (!(await edgeAllowed(job.user_id))) {
+      // Nothing reached the provider: close the job, and return a confirmed change to its prior state.
+      await db.query(
+        "UPDATE edge_jobs SET state='failed',error=$2,finished_at=now() WHERE id=$1",
+        [job.id, EDGE_PLAN_PAUSED],
+      );
+      if (job.kind === "apply" || job.kind === "undo")
+        await db.query(
+          "UPDATE edge_actions SET state=$3 WHERE id=$1 AND user_id=$2 AND state=$4",
+          [
+            job.payload.actionId,
+            job.user_id,
+            job.kind === "apply" ? "preview" : "applied",
+            job.kind === "apply" ? "queued" : "reverting",
+          ],
+        );
+      return true;
+    }
     const c = (
       await db.query(
         "SELECT * FROM edge_connections WHERE id=$1 AND user_id=$2",
@@ -281,9 +305,19 @@ export async function runEdgeJob(http: typeof fetch = fetch, owner?: number) {
   }
 }
 export async function scheduleEdgeDiscovery() {
-  await pool.query(`INSERT INTO edge_jobs(user_id,connection_id,kind)
+  // Hourly rediscovery only for owners whose plan still includes the module.
+  const { rows } = await pool.query(
+    "SELECT DISTINCT user_id FROM edge_connections",
+  );
+  const owners: number[] = [];
+  for (const r of rows) if (await edgeAllowed(r.user_id)) owners.push(r.user_id);
+  if (!owners.length) return;
+  await pool.query(
+    `INSERT INTO edge_jobs(user_id,connection_id,kind)
     SELECT c.user_id,c.id,CASE WHEN method='agency' THEN 'memberships' ELSE 'discover' END FROM edge_connections c
-    WHERE NOT EXISTS(SELECT 1 FROM edge_jobs j WHERE j.connection_id=c.id AND j.kind IN ('discover','memberships') AND (j.state IN ('queued','running') OR j.started_at>now()-interval '1 hour')) ON CONFLICT DO NOTHING`);
+    WHERE c.user_id=ANY($1::int[]) AND NOT EXISTS(SELECT 1 FROM edge_jobs j WHERE j.connection_id=c.id AND j.kind IN ('discover','memberships') AND (j.state IN ('queued','running') OR j.started_at>now()-interval '1 hour')) ON CONFLICT DO NOTHING`,
+    [owners],
+  );
 }
 export function startEdgeWorker() {
   if (process.env.EDGE_SEARCH_WORKER_ENABLED !== "true") return;

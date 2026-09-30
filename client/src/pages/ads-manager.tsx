@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useUrlParam } from '@/hooks/use-url-param';
+import { PlanRequired, planRequiredFrom, pollUnlessPlanRequired } from '@/components/plan-required';
 type Tab='accounts'|'invitations'|'plans'|'jobs'|'findings';
 const labels:Record<Tab,string>={accounts:'Client accounts',invitations:'Access invitations',plans:'Protection previews',jobs:'Queue',findings:'Health audit'};
 const defaults=['jobs','careers','salary','training','DIY','tutorial','free','cheap'];
@@ -28,9 +29,9 @@ export default function AdsManagerPage() {
   useEffect(()=>setReviewed(false),[selected]);
   const [previewId,setPreviewId]=useState<string|null>(null),[previewPage,setPreviewPage]=useState(1);
   const [domainQ,setDomainQ]=useState(''),[domainPage,setDomainPage]=useState(1),[campaignCustomer,setCampaignCustomer]=useState(''),[campaignQ,setCampaignQ]=useState(''),[campaignPage,setCampaignPage]=useState(1);
-  const status=useQuery<any>({queryKey:['/api/ads/status'],refetchInterval:10000});
+  const status=useQuery<any>({queryKey:['/api/ads/status'],refetchInterval:pollUnlessPlanRequired(10000)});
   const params=new URLSearchParams({page:String(page),q,status:filter,lsa});
-  const data=useQuery<any>({queryKey:['ads-list',tab,params.toString()],queryFn:async()=> (await apiRequest('GET',`/api/ads/${tab}?${params}`)).json(),refetchInterval:5000});
+  const data=useQuery<any>({queryKey:['ads-list',tab,params.toString()],queryFn:async()=> (await apiRequest('GET',`/api/ads/${tab}?${params}`)).json(),refetchInterval:pollUnlessPlanRequired(5000)});
   const detail=useQuery<any>({queryKey:['ads-preview',previewId,previewPage,operationQ],enabled:!!previewId,queryFn:async()=>(await apiRequest('GET',`/api/ads/plans/${previewId}?page=${previewPage}&limit=25&q=${encodeURIComponent(operationQ)}`)).json()});
   const domains=useQuery<any>({queryKey:['ads-domains',domainQ,domainPage],enabled:tab==='accounts',queryFn:async()=>(await apiRequest('GET',`/api/ads/domains?q=${encodeURIComponent(domainQ)}&page=${domainPage}`)).json()});
   const campaigns=useQuery<any>({queryKey:['ads-campaigns',campaignCustomer,campaignQ,campaignPage],enabled:!!campaignCustomer,queryFn:async()=>(await apiRequest('GET',`/api/ads/accounts/${campaignCustomer}/campaigns?q=${encodeURIComponent(campaignQ)}&page=${campaignPage}`)).json()});
@@ -51,8 +52,11 @@ export default function AdsManagerPage() {
   };
   const enabled=status.data?.connected&&status.data?.grant?.verified;
   const rows:any[]=data.data?.items||[];
+  const header=<div><h1 className="text-2xl font-bold">Agency Ads &amp; LSA manager</h1><p className="text-muted-foreground">Connect an MCC, request client access, audit accounts and review protections before publishing.</p></div>;
+  const planGate=[status.error,data.error].find(e=>planRequiredFrom(e));
+  if(planGate)return <main className="p-6 max-w-7xl mx-auto space-y-6">{header}<PlanRequired module="adsManager" error={planGate} className="max-w-3xl"/></main>;
   return <main className="p-6 max-w-7xl mx-auto space-y-6">
-    <div><h1 className="text-2xl font-bold">Agency Ads &amp; LSA manager</h1><p className="text-muted-foreground">Connect an MCC, request client access, audit accounts and review protections before publishing.</p></div>
+    {header}
     {message&&<p role="status" className="rounded border p-3">{message}</p>}
     {(status.error||data.error)&&<p role="alert">{apiErrorMessage(status.error||data.error)}</p>}
     {new URLSearchParams(window.location.search).get('connect')==='failed'&&<p role="alert">Google connection failed. Allow Ads access and try again.</p>}

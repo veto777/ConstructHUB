@@ -7,6 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
+import {
+  PlanRequired,
+  planRequiredFrom,
+  pollUnlessPlanRequired,
+} from "@/components/plan-required";
 const sampledBlocks = (snapshot: any) =>
   Array.isArray(snapshot?.events)
     ? snapshot.events.filter((e: any) => e.action === "block").length
@@ -213,10 +218,12 @@ function MetricRows({ asset }: { asset: any }) {
   );
 }
 export function LocationSearchSummary({ locationId }: { locationId: number }) {
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: [`/api/gsc/locations/${locationId}/summary`],
   });
   const s = (data as any)?.search;
+  // Search Console is an Agency-plan module; without it this location card has nothing honest to show.
+  if (planRequiredFrom(error)) return null;
   return (
     <Card>
       <CardContent className="p-4">
@@ -271,12 +278,13 @@ export default function SiteConnections({
   const assets = useQuery({
     queryKey: [listUrl],
     queryFn: () => read(listUrl),
-    refetchInterval: 15000,
+    refetchInterval: pollUnlessPlanRequired(15000),
   });
   const config = useQuery({
     queryKey: [`${base}/connections?limit=1`],
     queryFn: () => read(`${base}/connections?limit=1`),
   });
+  const planGate = [config.error, assets.error].find((e) => planRequiredFrom(e));
   async function act(fn: () => Promise<any>, title = "Request saved") {
     B(true);
     try {
@@ -320,19 +328,35 @@ export default function SiteConnections({
     );
     if (d) Z(d);
   }
+  const header = (
+    <header>
+      <h1 className="text-2xl font-bold">
+        {cf ? "Cloudflare protection" : "Google Search Console"}
+      </h1>
+      <p className="text-muted-foreground">
+        {cf
+          ? "Connect client accounts, inspect traffic, and review changes before blocking at the edge."
+          : "Manage client properties, search performance, sitemaps, and indexing monitoring."}
+      </p>
+    </header>
+  );
+  if (planGate)
+    return (
+      <div className="h-full overflow-y-auto">
+        <main className="max-w-6xl mx-auto p-6 space-y-6">
+          {header}
+          <PlanRequired
+            module="cloudflareSearchConsole"
+            error={planGate}
+            className="max-w-3xl"
+          />
+        </main>
+      </div>
+    );
   return (
     <div className="h-full overflow-y-auto">
       <main className="max-w-6xl mx-auto p-6 space-y-6">
-        <header>
-          <h1 className="text-2xl font-bold">
-            {cf ? "Cloudflare protection" : "Google Search Console"}
-          </h1>
-          <p className="text-muted-foreground">
-            {cf
-              ? "Connect client accounts, inspect traffic, and review changes before blocking at the edge."
-              : "Manage client properties, search performance, sitemaps, and indexing monitoring."}
-          </p>
-        </header>
+        {header}
         {config.data?.workerEnabled === false && (
           <p role="status" className="border rounded p-3">
             Background processing is disabled. Queued work will wait until the
@@ -1158,6 +1182,9 @@ export function SearchConsolePage() {
 }
 
 export function ScanIndexingSummary({ scanId }: { scanId: string }) {
+  // Same cached query the Search Console page uses; a 402 means the plan has no Search Console module.
+  const access = useQuery({ queryKey: ["/api/gsc/connections?limit=1"] });
+  if (access.isLoading || planRequiredFrom(access.error)) return null;
   return (
     <Card>
       <CardHeader>

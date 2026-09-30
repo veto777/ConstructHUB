@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { encryptToken, decryptToken } from "../gbp/token-crypto";
 import { notifyUser, logActivity } from "../account-events";
 import { parseMail, classifyMail, type Mail } from "./classify";
+import { getEntitlements } from "../entitlements";
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function forwardingAddress(userId: number) {
   const domain = process.env.INBOUND_MAIL_DOMAIN;
@@ -115,5 +116,8 @@ export async function ingest(raw: unknown, envelopeTo?: string) {
     "SELECT user_id FROM mail_alert_addresses WHERE token_hash=ANY($1::text[]) LIMIT 10",
     [tokens],
   );
-  for (const row of rows) await storeMatched(row.user_id, mail, "forwarding");
+  // Forwarded alerts are kept only for owners whose plan includes the module.
+  for (const row of rows)
+    if ((await getEntitlements(row.user_id)).modules.domainsMailAlerts)
+      await storeMatched(row.user_id, mail, "forwarding");
 }

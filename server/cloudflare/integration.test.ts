@@ -24,6 +24,7 @@ import {
 } from "../gsc/service";
 import { GSC_SCOPE } from "../gsc/client";
 import { runEdgeJob, memberships } from "./worker";
+import { planForModule } from "@shared/plans";
 vi.mock("../email", () => ({
   sendWithFallback: vi.fn(async () => ({ success: true })),
 }));
@@ -245,6 +246,11 @@ beforeAll(async () => {
     "INSERT INTO users(email) VALUES('edge-fixture-'||gen_random_uuid()||'@example.invalid'),('edge-other-'||gen_random_uuid()||'@example.invalid') RETURNING id",
   );
   [user, other] = rows.map((r) => r.id);
+  // The fixture owner is on the plan that includes Cloudflare + Search Console (the worker checks it per job).
+  await pool.query(
+    "INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,'active')",
+    [user, planForModule("cloudflareSearchConsole")],
+  );
   authUser = user;
   loc = (
     await pool.query(
@@ -295,6 +301,9 @@ beforeEach(() => {
   sets = {};
 });
 afterAll(async () => {
+  await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1::int[])", [
+    [user, other],
+  ]);
   await pool.query(
     "DELETE FROM business_locations WHERE user_id=ANY($1::int[])",
     [[user, other]],

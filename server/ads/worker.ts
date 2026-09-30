@@ -6,6 +6,11 @@ import { AdsError, type AdsApi, clientFor, searchAll } from './client';
 import { account, enqueue, grant, withAgencyLock } from './store';
 import { readState, buildPlan, protectionInput, fingerprint, appliedDocument, type PlanDocument } from './protections';
 import { auditAccount } from './audit';
+import { getEntitlements } from '../entitlements';
+import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
+/** Queued Ads work runs only while the owner's plan includes the module; nothing is sent to Google otherwise. */
+const adsAllowed=async(user:number)=>(await getEntitlements(user)).modules.adsManager;
+export const ADS_PLAN_PAUSED=`Not run: ${MODULE_NAMES.adsManager} is included with the ${PLANS[planForModule('adsManager')].name} plan.`;
 export const CLIENTS_QUERY=`SELECT customer_client.id,customer_client.descriptive_name,customer_client.manager,customer_client.status,customer_client.currency_code,customer_client.time_zone FROM customer_client WHERE customer_client.level > 0 ORDER BY customer_client.id`;
 export const LINKS_QUERY=`SELECT customer_client_link.resource_name,customer_client_link.client_customer,customer_client_link.status FROM customer_client_link`;
 export const linkStatus=(status:string)=>({PENDING:'pending',ACTIVE:'accepted',REFUSED:'rejected',CANCELED:'cancelled',INACTIVE:'cancelled'}[status]||'unknown');
@@ -145,6 +150,7 @@ export async function runAdsWorker(deps:WorkerDeps={}) {
       const {rows:[job]}=await pool.query(`UPDATE ads_jobs SET status='running',started_at=now(),attempts=attempts+1 WHERE id=(SELECT id FROM ads_jobs WHERE status='queued' AND due_at<=now() AND ($1::integer IS NULL OR user_id=$1) ORDER BY CASE WHEN kind IN ('poll','invite','cancel-invite','invitation-email','apply') THEN 0 WHEN kind IN ('discover','preview','undo-preview') THEN 1 ELSE 2 END,due_at,created_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *`,[deps.onlyUser||null]);
       if(!job) return false;
       try {
+        if(!await adsAllowed(job.user_id)) throw new AdsError(ADS_PLAN_PAUSED,402);
         await withAgencyLock(job.user_id,async()=>{
           const g=await grant(job.user_id,job.kind!=='discover');
           if(g.connection_id!==job.connection_id) throw new AdsError('MCC connection changed; job cancelled.',409);
@@ -167,9 +173,10 @@ export async function runAdsWorker(deps:WorkerDeps={}) {
     }finally{await lock.query('SELECT pg_advisory_unlock(8249,0)');}
   }finally{lock.release();}
 }
-export async function scheduleLinkPolls() {
-  const {rows}=await pool.query(`UPDATE ads_grants SET last_poll_at=now() WHERE user_id IN (SELECT user_id FROM ads_grants WHERE verified AND NOT reconnect_required AND (last_poll_at IS NULL OR last_poll_at<now()-interval '15 minutes') ORDER BY last_poll_at NULLS FIRST LIMIT 50 FOR UPDATE SKIP LOCKED) RETURNING user_id,connection_id`);
-  for(const g of rows) await enqueue(g.user_id,g.connection_id,'poll',{});
+/** `onlyUser` narrows a run to one owner (tests on a shared database). */
+export async function scheduleLinkPolls(onlyUser?:number) {
+  const {rows}=await pool.query(`UPDATE ads_grants SET last_poll_at=now() WHERE user_id IN (SELECT user_id FROM ads_grants WHERE verified AND NOT reconnect_required AND (last_poll_at IS NULL OR last_poll_at<now()-interval '15 minutes') AND ($1::int IS NULL OR user_id=$1) ORDER BY last_poll_at NULLS FIRST LIMIT 50 FOR UPDATE SKIP LOCKED) RETURNING user_id,connection_id`,[onlyUser??null]);
+  for(const g of rows) if(await adsAllowed(g.user_id)) await enqueue(g.user_id,g.connection_id,'poll',{});
 }
 export function startAdsWorker() {
   if(process.env.GOOGLE_ADS_WORKER_ENABLED!=='true') return;

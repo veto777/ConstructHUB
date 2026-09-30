@@ -5,6 +5,7 @@ import { pool } from "../db";
 import { requireRecentAuth } from "../account-security";
 import { logActivity, notifyUser } from "../account-events";
 import { rateLimit } from "../growth-limits";
+import { requireModule } from "../entitlements";
 import { CloudflareClient } from "./client";
 import { exchangeKey, saveConnection, cfFor, rulePack } from "./service";
 import {
@@ -96,7 +97,13 @@ export function registerAssetRoutes(
 ) {
   const route = routeFor(app, auth),
     base = `/api/${provider}`;
-  app.use(base, rateLimit(`site-integrations-${provider}`, 200, 400));
+  // Agency-only module (Cloudflare + Search Console): every /api/cloudflare and /api/gsc route answers
+  // 402 plan_required unless the plan includes it.
+  app.use(
+    base,
+    rateLimit(`site-integrations-${provider}`, 200, 400),
+    requireModule("cloudflareSearchConsole"),
+  );
   route("get", `${base}/assets`, async (req, res, user) =>
     res.json(await listAssets(user, provider, req.query)),
   );

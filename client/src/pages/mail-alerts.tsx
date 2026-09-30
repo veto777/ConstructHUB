@@ -6,6 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
 import { requestRecentAuth } from "@/components/recent-auth";
+import {
+  PlanRequired,
+  planRequiredFrom,
+  pollUnlessPlanRequired,
+} from "@/components/plan-required";
 export default function MailAlertsPage() {
   const [q, setQ] = useState(""),
     [page, setPage] = useState(1),
@@ -18,14 +23,18 @@ export default function MailAlertsPage() {
   const [clientQuery, setClientQuery] = useState(""),
     [clientPage, setClientPage] = useState(1),
     [clientId, setClientId] = useState("");
-  const { data: settings } = useQuery<any>({
+  const { data: settings, error: settingsError } = useQuery<any>({
     queryKey: [`/api/mail-alerts/settings?page=${accountPage}`],
   });
-  const { data: messages, isLoading } = useQuery<any>({
+  const {
+    data: messages,
+    isLoading,
+    error: messagesError,
+  } = useQuery<any>({
     queryKey: [
       `/api/mail-alerts?${new URLSearchParams({ q, page: String(page), category, severity })}`,
     ],
-    refetchInterval: 5000,
+    refetchInterval: pollUnlessPlanRequired(5000),
   });
   const { data: clients } = useQuery<any>({
     queryKey: [
@@ -47,18 +56,35 @@ export default function MailAlertsPage() {
       setBusy(false);
     }
   };
+  const header = (
+    <header>
+      <h1 className="text-3xl font-bold">Mail alerts</h1>
+      <p className="text-muted-foreground">
+        Known provider alerts for your client accounts. Matched messages
+        expire within 30 days.
+      </p>
+      <Link href="/domains" className="underline">
+        Manage domains →
+      </Link>
+    </header>
+  );
+  const planGate = [settingsError, messagesError].find((e) =>
+    planRequiredFrom(e),
+  );
+  if (planGate)
+    return (
+      <div className="p-6 space-y-6 max-w-6xl mx-auto">
+        {header}
+        <PlanRequired
+          module="domainsMailAlerts"
+          error={planGate}
+          className="max-w-3xl"
+        />
+      </div>
+    );
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <header>
-        <h1 className="text-3xl font-bold">Mail alerts</h1>
-        <p className="text-muted-foreground">
-          Known provider alerts for your client accounts. Matched messages
-          expire within 30 days.
-        </p>
-        <Link href="/domains" className="underline">
-          Manage domains →
-        </Link>
-      </header>
+      {header}
       {error && (
         <p role="alert" className="text-destructive">
           {error}
