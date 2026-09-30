@@ -7,10 +7,12 @@ import {
   emptyState,
   findingsFor,
   scoresFor,
+  scoreExplanation,
   type CrawlState,
 } from "./audit";
 import { pageSpeed, businessSchema } from "./providers";
 import { safeFetch } from "./http";
+import { enrichFindings, fixesFor, reconcileFixes } from "./guidance";
 import { robotsRules } from "./robots";
 export async function profileFor(user: number, id?: number) {
   const {
@@ -145,8 +147,17 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       .filter((p) => p.status === 200)
       .slice(0, job.psi_pages))
       for (const strategy of ["mobile", "desktop"] as const) {
+        if (deps.pageSpeed === pageSpeed && !process.env.PAGESPEED_API_KEY) {
+          psi.push(await pageSpeed(p.url, strategy));
+          continue;
+        }
         if (
-          !(await takeBudget("sitescan:psi:" + job.user_id, 20, 1, 86400_000)) ||
+          !(await takeBudget(
+            "sitescan:psi:" + job.user_id,
+            20,
+            1,
+            86400_000,
+          )) ||
           !(await takeBudget("sitescan:psi:global", 100, 1, 86400_000))
         ) {
           psi.push({
@@ -157,15 +168,34 @@ export async function runSiteScanWorker(deps = workerDependencies) {
           continue;
         }
         try {
+          const {
+            rows: [slot],
+          } = await pool.query(
+            `UPDATE sitescan_provider_budget SET next_at=GREATEST(next_at,clock_timestamp())+interval '1 second' WHERE id=1 RETURNING GREATEST(0,EXTRACT(EPOCH FROM (next_at-clock_timestamp()))*1000)::int delay`,
+          );
+          if (slot) await new Promise((r) => setTimeout(r, slot.delay));
           psi.push(await deps.pageSpeed(p.url, strategy));
         } catch {
           psi.push({
             url: p.url,
             strategy,
-            unavailable: "PageSpeed unavailable or quota exceeded",
+            reason: "request_error",
+            unavailable:
+              "PageSpeed request failed: network, timeout or invalid response. Retry later.",
           });
         }
       }
+    if (!job.psi_pages)
+      psi.push({
+        reason: "disabled",
+        unavailable:
+          "PageSpeed was not selected (0 pages). Retry with PageSpeed enabled.",
+      });
+    else if (!psi.length)
+      psi.push({
+        reason: "no_pages",
+        unavailable: "No successful HTML pages were available for PageSpeed.",
+      });
     const findings = findingsFor(state, job.profile);
     for (const p of psi)
       if (typeof p.score === "number" && p.score < 90)
@@ -180,13 +210,19 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         });
     const scores = scoresFor(findings, state, psi);
     const report = {
+      version: 2,
       url: job.url,
       scannedAt: new Date().toISOString(),
       pages: state.pages.length,
       remaining: state.queue.length,
       blocked: state.blocked.length,
       errors: state.errors,
-      findings,
+      findings: enrichFindings(findings, state, job.profile),
+      fixes: fixesFor(findings, state, job.profile),
+      platforms: [
+        ...new Set(state.pages.map((p) => p.platform || "Custom/unknown")),
+      ],
+      scoreExplanation: scoreExplanation(findings, state, psi),
       scores,
       psi,
       profile: job.profile,
@@ -207,8 +243,23 @@ export async function runSiteScanWorker(deps = workerDependencies) {
     const {
       rows: [previous],
     } = await pool.query(
-      "SELECT report FROM sitescan_jobs WHERE user_id=$1 AND url=$2 AND status='completed' AND id<>$3 ORDER BY completed_at DESC LIMIT 1",
-      [job.user_id, job.url, job.id],
+      "SELECT report,fix_done FROM sitescan_jobs WHERE user_id=$1 AND url=$2 AND profile->>'id' IS NOT DISTINCT FROM $4 AND status='completed' AND id<>$3 ORDER BY completed_at DESC LIMIT 1",
+      [
+        job.user_id,
+        job.url,
+        job.id,
+        job.profile?.id ? String(job.profile.id) : null,
+      ],
+    );
+    report.fixes = reconcileFixes(
+      report.fixes,
+      (previous?.report?.fixes || []).map((f: any) => ({
+        ...f,
+        done: previous.fix_done?.[f.key] ?? f.done,
+      })),
+      state,
+      job.profile,
+      psi,
     );
     const changed = await pool.query(
       "UPDATE sitescan_jobs SET report=$3,state=$4,status='completed',completed_at=now(),lease_until=NULL WHERE id=$1 AND lease_token=$2",

@@ -18,5 +18,13 @@ export async function ensureSiteScanSchema() {
     id uuid PRIMARY KEY, job_id uuid NOT NULL REFERENCES sitescan_jobs(id) ON DELETE CASCADE,
     email text NOT NULL, verify_hash text NOT NULL UNIQUE, access_hash text NOT NULL UNIQUE,
     verified_at timestamptz, expires_at timestamptz NOT NULL DEFAULT now()+interval '7 days',created_at timestamptz NOT NULL DEFAULT now()
-  );`);
+  );
+  ALTER TABLE sitescan_jobs ADD COLUMN IF NOT EXISTS fix_done jsonb NOT NULL DEFAULT '{}'::jsonb;
+  CREATE INDEX IF NOT EXISTS sitescan_jobs_client_history ON sitescan_jobs(user_id,url,completed_at DESC);
+  CREATE TABLE IF NOT EXISTS sitescan_branding (
+    user_id integer PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, name text NOT NULL, logo text
+  );
+  CREATE TABLE IF NOT EXISTS sitescan_provider_budget (id integer PRIMARY KEY, next_at timestamptz NOT NULL DEFAULT now());
+  INSERT INTO sitescan_provider_budget(id) VALUES(1) ON CONFLICT DO NOTHING;
+  `);
 }

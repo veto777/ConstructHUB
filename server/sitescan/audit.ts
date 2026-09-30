@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { brandMatches, detectPlatform, type Platform } from "./guidance";
 import { safeFetch, siteUrl, type PageResponse } from "./http";
 import { robotsRules } from "./robots";
 export const categories = [
@@ -26,6 +27,9 @@ export type Page = {
   text: string;
   h1: string[];
   links: string[];
+  linkEvidence?: { target: string; anchor: string }[];
+  platform?: Platform;
+  insecureResources?: string[];
   images: { url: string; alt: string | undefined }[];
   bytes: number;
   canonical: string | null;
@@ -91,6 +95,20 @@ export function parsePage(r: PageResponse): Page {
     .get()
     .filter(Boolean)
     .slice(0, 2000);
+  const linkEvidence = $("a[href]")
+    .map((_, el) => ({
+      target: absolute($(el).attr("href") || "") || "",
+      anchor:
+        $(el).text().trim().slice(0, 300) ||
+        $(el).attr("aria-label") ||
+        "(no text)",
+    }))
+    .get()
+    .filter((l) => l.target)
+    .slice(0, 2000);
+  const insecureResources = $('[src^="http:"],link[href^="http:"]')
+    .map((_, el) => $(el).attr("src") || $(el).attr("href") || "")
+    .get();
   const images = $("img")
     .map((_, el) => ({
       url: absolute($(el).attr("src") || "") || "",
@@ -128,6 +146,9 @@ export function parsePage(r: PageResponse): Page {
     text,
     h1,
     links,
+    linkEvidence,
+    platform: detectPlatform(r.body),
+    insecureResources,
     images,
     bytes: r.bytes,
     canonical: $('link[rel="canonical"]').length ? canonical : null,
@@ -312,14 +333,26 @@ export async function crawl(
   return state;
 }
 const businessTypes = new Set([
-  "LocalBusiness", "HomeAndConstructionBusiness", "Electrician",
-  "GeneralContractor", "HVACBusiness", "HousePainter", "Locksmith",
-  "MovingCompany", "Plumber", "RoofingContractor",
+  "LocalBusiness",
+  "HomeAndConstructionBusiness",
+  "Electrician",
+  "GeneralContractor",
+  "HVACBusiness",
+  "HousePainter",
+  "Locksmith",
+  "MovingCompany",
+  "Plumber",
+  "RoofingContractor",
 ]);
 function isBusinessSchema(value: any): boolean {
-  const types = Array.isArray(value?.["@type"]) ? value["@type"] : [value?.["@type"]];
-  return types.some((type: unknown) => typeof type === "string" &&
-    businessTypes.has(type.replace(/^https?:\/\/schema\.org\//, "")));
+  const types = Array.isArray(value?.["@type"])
+    ? value["@type"]
+    : [value?.["@type"]];
+  return types.some(
+    (type: unknown) =>
+      typeof type === "string" &&
+      businessTypes.has(type.replace(/^https?:\/\/schema\.org\//, "")),
+  );
 }
 export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
   const findings: Finding[] = [];
@@ -515,8 +548,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
         p.invalidSchema ||
         p.schema.some(
           (s) =>
-            isBusinessSchema(s) &&
-            (!s.name || (!s.address && !s.areaServed)),
+            isBusinessSchema(s) && (!s.name || (!s.address && !s.areaServed)),
         ),
     ),
     "Unparseable or incomplete markup reduces machine understanding.",
@@ -527,10 +559,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "local",
     "warning",
     "Business schema not found",
-    pages.length &&
-      !pages.some((p) =>
-        p.schema.some(isBusinessSchema),
-      )
+    pages.length && !pages.some((p) => p.schema.some(isBusinessSchema))
       ? [pages[0].url]
       : [],
     "Structured facts help identify the business.",
@@ -579,7 +608,9 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
         profile[key] &&
         !(key === "phone"
           ? digits.includes(String(profile[key]).replace(/\D/g, ""))
-          : text.includes(String(profile[key]).toLowerCase()))
+          : key === "business_name"
+            ? brandMatches(String(profile[key]), text)
+            : text.includes(String(profile[key]).toLowerCase()))
       )
         add(
           "nap-" + key,
@@ -587,7 +618,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
           "warning",
           `GBP ${label} not matched`,
           [pages[0].url],
-          "The synced GBP value was not found verbatim in scanned text; formatting may differ.",
+          "The synced GBP value was not matched in scanned text after normalization; this is a review prompt, not proof of an SEO penalty.",
           "Confirm the visible NAP matches the linked Google Business Profile.",
         );
     for (const [key, label] of [
@@ -679,7 +710,12 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "technical",
     "warning",
     "Broken checked links",
-    state.linkChecks
+    [
+      ...state.linkChecks,
+      ...pages
+        .filter((p) => p.status >= 400)
+        .map((p) => ({ url: p.url, status: p.status })),
+    ]
       .filter(
         (c) =>
           c.status !== null &&
@@ -704,17 +740,7 @@ export function scoresFor(findings: Finding[], state: CrawlState, psi: any[]) {
       ? null
       : category === "performance"
         ? null
-        : Math.max(
-            0,
-            100 -
-              findings
-                .filter((f) => f.category === category)
-                .reduce(
-                  (n, f) =>
-                    n + { critical: 20, warning: 8, info: 2 }[f.severity],
-                  0,
-                ),
-          );
+        : Math.max(0, 100 - deductionFor(findings, category));
   const measured = psi.filter((p) => typeof p.score === "number");
   if (measured.length)
     scores.performance = Math.round(
@@ -729,4 +755,48 @@ export function scoresFor(findings: Finding[], state: CrawlState, psi: any[]) {
       : null,
     categories: scores,
   };
+}
+
+export function deductionFor(findings: Finding[], category: Category) {
+  const groups = new Map<string, number>();
+  for (const f of findings.filter((f) => f.category === category)) {
+    const family = f.id.startsWith("gap-services-")
+      ? "gap-services"
+      : f.id.startsWith("gap-service_areas-")
+        ? "gap-service_areas"
+        : f.id;
+    groups.set(
+      family,
+      Math.max(
+        groups.get(family) || 0,
+        { critical: 20, warning: 8, info: 2 }[f.severity],
+      ),
+    );
+  }
+  const sum = [...groups.values()].reduce((a, b) => a + b, 0);
+  return category === "local" ? Math.min(30, sum) : sum;
+}
+export function scoreExplanation(
+  findings: Finding[],
+  state: CrawlState,
+  psi: any[],
+) {
+  return Object.fromEntries(
+    categories.map((c) => [
+      c,
+      c === "performance"
+        ? "Mean of available mobile/desktop Lighthouse lab scores; unavailable measurements are excluded. " +
+          (psi.length
+            ? ""
+            : "No PageSpeed pages selected or no successful HTML pages.")
+        : !state.pages.length
+          ? "Unavailable: no pages checked."
+          : `Starts at 100; critical -20, warning -8, info -2 per check family. ${c === "local" ? "Repeated service/area gaps count once per family; Local deductions capped at 30 because these checks are heuristics. " : ""}Observed deductions: ${deductionFor(findings, c)}. ${
+              findings
+                .filter((f) => f.category === c)
+                .map((f) => f.title)
+                .join("; ") || "No deductions from available checks."
+            } Removing a confirmed finding raises this audit score; it does not predict rankings.`,
+    ]),
+  );
 }
