@@ -477,7 +477,7 @@ export default function SocialMediaPage() {
                   onChange={(e) => setSchedule(e.target.value)}
                 />
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   disabled={
                     !data?.connected ||
@@ -756,7 +756,7 @@ export default function SocialMediaPage() {
                     {new Date(data.nextAt).toLocaleString()}
                   </p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     disabled={mutation.isPending}
                     onClick={async () => {

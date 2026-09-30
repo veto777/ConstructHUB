@@ -180,3 +180,17 @@ test("growth tools remain discoverable with Google Business collapsed", async ({
   await expect(google).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByTestId("link-nav-posts-&-photos")).toBeVisible();
 });
+
+test("social tabs and guides fit a narrow phone viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/social**", route => route.fulfill({ json: route.request().url().endsWith("/social") ? { connected: false, accounts: [], settings: autoSchema.parse({}), posts: [] } : [] }));
+  await page.goto("/social-media");
+  for (const name of ["Compose", "Calendar & queue", "Auto mode"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    const overflowing = await page.locator("main button, main input, main select").evaluateAll(elements => elements.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1; }).map(e => e.textContent || e.getAttribute("aria-label")));
+    expect(overflowing).toEqual([]);
+  }
+  await page.goto("/guides");
+  await expect(page.getByRole("region", { name: "Guides walkthroughs" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
