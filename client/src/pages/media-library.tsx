@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// Hover-revealed controls must stay visible on touch screens (no hover) and
+// when focused from the keyboard, or phone users can't tell they exist.
+const REVEAL_ON_HOVER = "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
 
 interface Folder {
   id: number;
@@ -78,6 +86,9 @@ export default function MediaLibraryPage() {
   const [renameValue, setRenameValue] = useState("");
   const [previewPhoto, setPreviewPhoto] = useState<Photo | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<number | null>(null);
+  // Folder awaiting delete confirmation; photoCount is null until it is known.
+  const [confirmFolder, setConfirmFolder] = useState<{ folder: Folder; photoCount: number | null } | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -125,8 +136,8 @@ export default function MediaLibraryPage() {
       const data = await res.json();
       setResult(data);
       toast({ title: "Address verified", description: `GPS: ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}` });
-    } catch {
-      toast({ title: "Could not verify address", description: "Check the address and try again.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Could not verify address", description: apiErrorMessage(err, "Check the address and try again."), variant: "destructive" });
       setResult(null);
     } finally { setGeocoding(false); }
   };
@@ -152,8 +163,20 @@ export default function MediaLibraryPage() {
       setShowNewFolder(false);
       toast({ title: "Folder created", description: folder.name });
     } catch (err: any) {
-      toast({ title: "Failed to create folder", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to create folder", description: apiErrorMessage(err), variant: "destructive" });
     } finally { setCreatingFolder(false); }
+  };
+
+  const requestDeleteFolder = async (folder: Folder) => {
+    setConfirmFolder({ folder, photoCount: activeFolderId === folder.id ? photos.length : null });
+    if (activeFolderId === folder.id) return;
+    // Count the photos that will go with the folder so the confirm can name them.
+    try {
+      const res = await fetch(`/api/media/folders/${folder.id}/photos`, { credentials: "include" });
+      if (!res.ok) return;
+      const list: Photo[] = await res.json();
+      setConfirmFolder(prev => prev?.folder.id === folder.id ? { folder, photoCount: list.length } : prev);
+    } catch { /* count stays unknown; the dialog says "every photo in it" */ }
   };
 
   const deleteFolder = async (folderId: number) => {
@@ -164,7 +187,7 @@ export default function MediaLibraryPage() {
       if (activeFolderId === folderId) goBack();
       toast({ title: "Folder deleted" });
     } catch (err: any) {
-      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+      toast({ title: "Delete failed", description: apiErrorMessage(err), variant: "destructive" });
     } finally { setDeletingFolder(null); }
   };
 
@@ -184,7 +207,7 @@ export default function MediaLibraryPage() {
       setEditingFolder(null);
       toast({ title: "Folder updated" });
     } catch (err: any) {
-      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+      toast({ title: "Update failed", description: apiErrorMessage(err), variant: "destructive" });
     } finally { setSavingEdit(false); }
   };
 
@@ -198,7 +221,10 @@ export default function MediaLibraryPage() {
         formData.append("photos", file);
       }
       const res = await fetch("/api/media/upload", { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || "Upload failed");
+      }
       const data = await res.json();
       setPhotos(prev => [...data.saved, ...prev]);
       toast({ title: "Photos uploaded", description: `${data.count} photo${data.count !== 1 ? "s" : ""} added.` });
@@ -217,20 +243,35 @@ export default function MediaLibraryPage() {
       setSelectedPhotos(prev => { const n = new Set(prev); n.delete(photoId); return n; });
       toast({ title: "Photo deleted" });
     } catch (err: any) {
-      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+      toast({ title: "Delete failed", description: apiErrorMessage(err), variant: "destructive" });
     }
   };
 
   const deleteSelected = async () => {
     const ids = Array.from(selectedPhotos);
+    const deleted = new Set<number>();
+    let firstError = "";
     for (const id of ids) {
       try {
         await apiRequest("DELETE", `/api/media/photos/${id}`);
-      } catch {}
+        deleted.add(id);
+      } catch (err) {
+        if (!firstError) firstError = apiErrorMessage(err);
+      }
     }
-    setPhotos(prev => prev.filter(p => !selectedPhotos.has(p.id)));
-    setSelectedPhotos(new Set());
-    toast({ title: `${ids.length} photo${ids.length !== 1 ? "s" : ""} deleted` });
+    // Only drop the photos the server actually deleted; failures stay selected.
+    setPhotos(prev => prev.filter(p => !deleted.has(p.id)));
+    setSelectedPhotos(new Set(ids.filter(id => !deleted.has(id))));
+    const failed = ids.length - deleted.size;
+    if (failed > 0) {
+      toast({
+        title: `${failed} of ${ids.length} photo${ids.length !== 1 ? "s" : ""} could not be deleted`,
+        description: `${deleted.size} deleted. ${firstError}`,
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: `${ids.length} photo${ids.length !== 1 ? "s" : ""} deleted` });
+    }
   };
 
   const renamePhoto = async (photoId: number) => {
@@ -242,7 +283,7 @@ export default function MediaLibraryPage() {
       setRenamingPhoto(null);
       setRenameValue("");
     } catch (err: any) {
-      toast({ title: "Rename failed", description: err.message, variant: "destructive" });
+      toast({ title: "Rename failed", description: apiErrorMessage(err), variant: "destructive" });
     }
   };
 
@@ -383,7 +424,7 @@ export default function MediaLibraryPage() {
           </Button>
         )}
         {selectedPhotos.size > 0 && (
-          <Button variant="destructive" size="sm" onClick={deleteSelected} data-testid="button-delete-selected">
+          <Button variant="destructive" size="sm" onClick={() => setConfirmBulkDelete(true)} data-testid="button-delete-selected">
             <Trash2 className="h-3.5 w-3.5 mr-1.5" />
             Delete ({selectedPhotos.size})
           </Button>
@@ -440,7 +481,7 @@ export default function MediaLibraryPage() {
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  GPS coordinates will be embedded into photos in this folder — just like when a phone takes a photo with location on. This helps Google associate your photos with the job site.
+                  GPS coordinates will be embedded into photos in this folder — just like when a phone takes a photo with location on. Google strips this data when photos are uploaded to a Business Profile, so it's for your own records and other sites, not a ranking boost.
                 </p>
                 {geocodedResult && (
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
@@ -574,7 +615,7 @@ export default function MediaLibraryPage() {
               </div>
               <h3 className="font-semibold text-lg mb-1" data-testid="text-empty-state">No folders yet</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto mb-5">
-                Create your first folder to start organizing project photos. You can add a client address to embed GPS coordinates into every photo — boosting your local SEO just like a phone does when location is enabled.
+                Create your first folder to start organizing project photos. You can add a client address to embed GPS coordinates into every photo, just like a phone does when location is enabled. Google strips EXIF on upload, so geotags don't promise a ranking benefit.
               </p>
               <Button
                 onClick={() => setShowNewFolder(true)}
@@ -611,7 +652,7 @@ export default function MediaLibraryPage() {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                          <button className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-all" data-testid={`folder-menu-${folder.id}`}>
+                          <button className={`p-1 rounded-md ${REVEAL_ON_HOVER} data-[state=open]:opacity-100 hover:bg-muted transition-all`} aria-label={`Folder actions for ${folder.name}`} data-testid={`folder-menu-${folder.id}`}>
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </DropdownMenuTrigger>
@@ -627,8 +668,9 @@ export default function MediaLibraryPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-red-600 dark:text-red-400"
-                            onClick={() => deleteFolder(folder.id)}
+                            onClick={() => requestDeleteFolder(folder)}
                             disabled={deletingFolder === folder.id}
+                            data-testid={`menu-delete-folder-${folder.id}`}
                           >
                             {deletingFolder === folder.id ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-2" />}
                             Delete Folder
@@ -710,8 +752,10 @@ export default function MediaLibraryPage() {
                   <button
                     onClick={e => { e.stopPropagation(); toggleSelect(photo.id); }}
                     className={`absolute top-2 left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      selectedPhotos.has(photo.id) ? "bg-amber-500 border-amber-500 text-white" : "bg-white/80 dark:bg-zinc-800/80 border-white dark:border-zinc-600 opacity-0 group-hover:opacity-100"
+                      selectedPhotos.has(photo.id) ? "bg-amber-500 border-amber-500 text-white" : `bg-white/80 dark:bg-zinc-800/80 border-white dark:border-zinc-600 ${REVEAL_ON_HOVER}`
                     }`}
+                    aria-label={selectedPhotos.has(photo.id) ? `Deselect ${photo.name}` : `Select ${photo.name}`}
+                    aria-pressed={selectedPhotos.has(photo.id)}
                     data-testid={`checkbox-photo-${photo.id}`}
                   >
                     {selectedPhotos.has(photo.id) && <Check className="h-3.5 w-3.5" />}
@@ -720,8 +764,9 @@ export default function MediaLibraryPage() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
-                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                        className={`absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center ${REVEAL_ON_HOVER} data-[state=open]:opacity-100 transition-opacity hover:bg-black/70`}
                         onClick={e => e.stopPropagation()}
+                        aria-label={`Photo actions for ${photo.name}`}
                         data-testid={`photo-menu-${photo.id}`}
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
@@ -850,6 +895,57 @@ export default function MediaLibraryPage() {
           )}
         </>
       )}
+
+      <AlertDialog open={!!confirmFolder} onOpenChange={o => { if (!o) setConfirmFolder(null); }}>
+        <AlertDialogContent data-testid="dialog-delete-folder">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete folder “{confirmFolder?.folder.name}”
+              {confirmFolder?.photoCount != null && confirmFolder.photoCount > 0
+                ? ` and its ${confirmFolder.photoCount} photo${confirmFolder.photoCount === 1 ? "" : "s"}`
+                : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmFolder?.photoCount === 0
+                ? "The folder is empty. This cannot be undone."
+                : confirmFolder?.photoCount != null
+                  ? `All ${confirmFolder.photoCount} photo${confirmFolder.photoCount === 1 ? "" : "s"} in it will be permanently deleted from your library and storage. This cannot be undone.`
+                  : "Every photo in it will be permanently deleted from your library and storage. This cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-folder">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (confirmFolder) deleteFolder(confirmFolder.folder.id); setConfirmFolder(null); }}
+              data-testid="button-confirm-delete-folder"
+            >
+              Delete folder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <AlertDialogContent data-testid="dialog-delete-selected">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedPhotos.size} photo{selectedPhotos.size === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The selected photos will be permanently deleted from your library and storage. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-selected">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void deleteSelected(); }}
+              data-testid="button-confirm-delete-selected"
+            >
+              Delete photos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
