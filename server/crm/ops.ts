@@ -307,12 +307,13 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const billedBps = estimateBilledBps(prior, approval.totalCents);
       if (prior.length && billedBps + pct > 10000) {
         const numbers = prior.map((p) => p.number ?? "an invoice").join(", ");
+        const one = prior.length === 1;
         const remainingBps = Math.max(0, 10000 - billedBps);
         return { error: {
           status: 409,
           message: remainingBps === 0
-            ? `This estimate is already invoiced in full as ${numbers}. Open that invoice, or void it before billing again.`
-            : `${numbers} already bill ${billedBps / 100}% of this estimate — only ${remainingBps / 100}% is left to invoice.`,
+            ? `This estimate is already invoiced in full as ${numbers}. ${one ? "Open that invoice, or void it" : "Open those invoices, or void one"} before billing again.`
+            : `${numbers} already ${one ? "bills" : "bill"} ${billedBps / 100}% of this estimate — only ${remainingBps / 100}% is left to invoice.`,
           invoices: prior.map((p) => ({ id: p.id, number: p.number })),
           billedBps: Math.min(10000, billedBps), remainingBps,
         } };

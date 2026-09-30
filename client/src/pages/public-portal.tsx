@@ -153,7 +153,7 @@ export default function PublicPortalPage() {
               <CardTitle className="text-base flex items-center gap-2">
                 <Receipt className="h-4 w-4 text-muted-foreground" /> Your invoices
               </CardTitle>
-              <CardDescription>Open one to see its payments to date.</CardDescription>
+              <CardDescription>Open one to see what's been paid and what's still due.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {invoices.map((i: any) => (

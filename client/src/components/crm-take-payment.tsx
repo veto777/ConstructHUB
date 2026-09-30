@@ -68,9 +68,12 @@ export function TakePaymentDialog({
   const { data: payStatus } = useQuery<any>({ queryKey: ["/api/crm/payments/status"], enabled: open });
   const onlineOff = Boolean(payStatus) && !payStatus.account?.chargesEnabled;
   const payable = (invoices ?? []).filter((i) => !i.voidedAt && invoiceDueCents(i) > 0);
+  // A deposit is not credited to later invoices, so once an estimate has a
+  // live invoice, collecting its deposit too would bill the client twice.
   const deposits = (estimates ?? []).filter((e) =>
     e.approvedAt && (e.depositCents ?? 0) >= 50
-    && !(payments ?? []).some((p) => p.estimateId === e.id && DEPOSIT_TAKEN.includes(p.status)));
+    && !(payments ?? []).some((p) => p.estimateId === e.id && DEPOSIT_TAKEN.includes(p.status))
+    && !(invoices ?? []).some((i) => i.estimateId === e.id && !i.voidedAt));
 
   const [invoiceId, setInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
