@@ -38,8 +38,10 @@ beforeAll(async()=>{
   await ensureGbpSchema();
   const {rows}=await pool.query("INSERT INTO users(email) VALUES('gbp-fixture-'||gen_random_uuid()::text||'@example.invalid'),('gbp-fixture-'||gen_random_uuid()::text||'@example.invalid') RETURNING id");
   [userId,otherId]=rows.map(r=>r.id);
+  // Scheduled syncs only run for accounts with a plan.
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active')",[userId]);
 });
-afterAll(async()=>{await pool.query('DELETE FROM google_profile_reviews WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[userId,otherId]]);await pool.end()});
+afterAll(async()=>{await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM google_profile_reviews WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[userId,otherId]]);await pool.end()});
 describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',()=>{
   it('refuses basic login scopes and binds the grant to its Google subject',async()=>{
     await expect(saveGrant(userId,{sub:'google-a',email:'a@example.invalid',email_verified:true},{access_token:'a',scope:'openid email'})).rejects.toThrow('not granted');
@@ -146,6 +148,11 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     const sync=vi.fn(async()=>({}));await runGbpWorker(sync);expect(sync).not.toHaveBeenCalled();
     await pool.query("UPDATE gbp_sync_status SET last_attempt=now()-interval '7 hours' WHERE location_id=$1",[locationId]);
     await runGbpWorker(sync);expect(sync).toHaveBeenCalledWith(userId,locationId);
+    // An account whose plan lapsed is not synced on schedule (no Google quota spent).
+    await pool.query("UPDATE subscriptions SET status='canceled' WHERE user_id=$1",[userId]);
+    await pool.query("UPDATE gbp_sync_status SET last_attempt=now()-interval '7 hours' WHERE location_id=$1",[locationId]);
+    sync.mockClear();await runGbpWorker(sync);expect(sync).not.toHaveBeenCalledWith(userId,locationId);
+    await pool.query("UPDATE subscriptions SET status='active' WHERE user_id=$1",[userId]);
   });
   it('rejects cross-user sync and replies',async()=>{await expect(syncLocation(otherId,locationId,client)).rejects.toMatchObject({status:404});await expect(reply(otherId,reviewId,'x','publish',client)).rejects.toMatchObject({status:404})});
   it('binds callback identity without logging in as the Google account, and disconnects despite remote revoke failure',async()=>{
