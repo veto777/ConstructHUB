@@ -26,7 +26,7 @@ export const DFY_CATALOG: Record<string, CatalogItem> = {
 // Master Class complete bundle (type: "course_bundle"). Individual modules
 // (type: "course_module") are priced from the masterClassModules table by id.
 export const COURSE_BUNDLE: CatalogItem = {
-  name: "Master Class — Complete Bundle (50% Off)",
+  name: "Master Class — Complete Bundle",
   priceCents: 249900,
 };
 

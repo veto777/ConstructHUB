@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { copyrightNotice } from "@/lib/marketing";
 
 export default function PrivacyPolicyPage() {
   useEffect(() => {
@@ -11,7 +12,7 @@ export default function PrivacyPolicyPage() {
         <a href="/" className="text-primary hover:underline text-sm" data-testid="link-back-home">Back to Home</a>
 
         <h1 className="text-3xl font-bold mt-6 mb-2" data-testid="heading-privacy-policy">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground mb-8" data-testid="text-effective-date">Effective Date: June 20, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8" data-testid="text-effective-date">Effective Date: September 30, 2026</p>
 
         <p className="mb-6" data-testid="text-intro">
           ConstructHUB ("we," "us," or "our") operates the website at constructhub.us. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or use our services. Please read this policy carefully. By accessing or using ConstructHUB, you agree to the terms of this Privacy Policy.
@@ -333,7 +334,7 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <p className="text-xs text-muted-foreground mt-10 border-t border-border pt-4" data-testid="text-copyright">
-          &copy; 2025 Construction Hub. All rights reserved.
+          {copyrightNotice()}
         </p>
       </div>
     </div>

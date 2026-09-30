@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,9 @@ const TRUST_POINTS = [
   { icon: MessageCircle, title: "Communication until resolved", desc: "We handle the appeal and keep you updated until Google makes its decision. Google alone decides whether a profile is reinstated." },
 ];
 
+/** Same shape the server's email check accepts (name@domain.tld). */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function ReinstatementPage() {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -73,15 +76,28 @@ export default function ReinstatementPage() {
       setFormData({ name: "", email: "", businessName: "", websiteUrl: "", businessAddress: "", businessType: "", multipleLocations: "no", problemDescription: "" });
     },
     onError: (err: Error) => {
-      toast({ title: "Submission failed", description: err.message, variant: "destructive" });
+      toast({ title: "Submission failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
+
+  // A real <form>: the browser checks type="email" first, then this catches
+  // what it lets through (e.g. "name@host" with no domain ending).
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit || submitMutation.isPending) return;
+    if (!EMAIL_PATTERN.test(formData.email.trim())) {
+      toast({ title: "Check your email", description: "Enter a valid email address", variant: "destructive" });
+      return;
+    }
+    submitMutation.mutate();
+  };
 
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const canSubmit = formData.name && formData.email && formData.businessName && formData.businessAddress && formData.businessType && formData.problemDescription;
+  const canSubmit = [formData.name, formData.email, formData.businessName, formData.businessAddress, formData.businessType, formData.problemDescription]
+    .every((v) => v.trim() !== "");
 
   return (
     <div className="h-full overflow-y-auto">
@@ -274,7 +290,7 @@ export default function ReinstatementPage() {
             <Card data-testid="card-reinstatement-form">
               <CardContent className="p-6">
                 <h3 className="text-lg font-bold mb-4">Tell us about your suspension</h3>
-                <div className="space-y-4">
+                <form className="space-y-4" onSubmit={handleSubmit} data-testid="form-reinstatement">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Your name <span className="text-red-500">(required)</span></Label>
@@ -282,7 +298,7 @@ export default function ReinstatementPage() {
                     </div>
                     <div>
                       <Label className="text-xs">Your email <span className="text-red-500">(required)</span></Label>
-                      <Input type="email" value={formData.email} onChange={e => updateField("email", e.target.value)} className="mt-1" data-testid="input-reinstate-email" />
+                      <Input type="email" required value={formData.email} onChange={e => updateField("email", e.target.value)} className="mt-1" data-testid="input-reinstate-email" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -339,15 +355,15 @@ export default function ReinstatementPage() {
                     />
                   </div>
                   <Button
+                    type="submit"
                     className="w-full bg-[#F97316] hover:bg-[#E86C0A] text-white h-11"
-                    onClick={() => submitMutation.mutate()}
                     disabled={!canSubmit || submitMutation.isPending}
                     data-testid="button-submit-reinstatement"
                   >
                     {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                     Submit
                   </Button>
-                </div>
+                </form>
               </CardContent>
             </Card>
           </div>

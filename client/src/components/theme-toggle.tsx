@@ -11,6 +11,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       variant="ghost"
       className={className}
       onClick={toggleTheme}
+      aria-label="Toggle theme"
       data-testid="button-theme-toggle"
     >
       {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}

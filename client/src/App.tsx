@@ -99,6 +99,7 @@ import { CrmTermsPage, CrmPrivacyPage } from "@/pages/crm-legal";
 import MediaLibraryPage from "@/pages/media-library";
 import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
+import { copyrightNotice } from "@/lib/marketing";
 
 function DashboardRouter() {
   return (
@@ -572,7 +573,7 @@ function AppContent() {
               <span className="mx-2 text-border">&middot;</span>
               <a href="/privacy" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-privacy">Privacy</a>
               <span className="mx-2 text-border">&middot;</span>
-              <span>&copy; {new Date().getFullYear()} ConstructHUB</span>
+              <span>{copyrightNotice()}</span>
             </footer>
           </main>
         </div>

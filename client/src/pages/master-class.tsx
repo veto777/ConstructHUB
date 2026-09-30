@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -182,6 +182,9 @@ function AgencyTile({ icon: Icon, iconClass, name, caption, agency, url, status,
   );
 }
 
+/** Same shape the server's email check accepts (name@domain.tld). */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** What the complete bundle charges (server/catalog.ts COURSE_BUNDLE — the server prices checkout). */
 const BUNDLE_PRICE_CENTS = 249900;
 const usd = (cents: number) => `$${(cents / 100).toLocaleString()}`;
@@ -300,9 +303,20 @@ export default function MasterClassPage() {
       setSeoName(""); setSeoEmail(""); setSeoPhone(""); setSeoWebsite(""); setSeoServices([]); setSeoMessage("");
     },
     onError: (err: Error) => {
-      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to send", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
+
+  // A real <form>: the browser checks type="email" first, then this catches
+  // what it lets through (e.g. "name@host" with no domain ending).
+  const submitSeoInquiry = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!EMAIL_PATTERN.test(seoEmail.trim())) {
+      toast({ title: "Check your email", description: "Enter a valid email address", variant: "destructive" });
+      return;
+    }
+    seoInquiryMutation.mutate({ name: seoName, email: seoEmail, phone: seoPhone, website: seoWebsite, services: seoServices, message: seoMessage });
+  };
 
   const toggleSeoService = (service: string) => {
     setSeoServices(prev => prev.includes(service) ? prev.filter(s => s !== service) : [...prev, service]);
@@ -1864,7 +1878,8 @@ export default function MasterClassPage() {
                     Whether you need help with link building, SEO audits, page speed optimization, Google Search Console setup, or content creation — we offer all of these services. Fill out the form below and we'll get back to you.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent>
+                  <form className="space-y-4" onSubmit={submitSeoInquiry} data-testid="form-seo-inquiry">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="seo-name">Full Name</Label>
@@ -1872,7 +1887,7 @@ export default function MasterClassPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="seo-email">Email</Label>
-                      <Input id="seo-email" type="email" placeholder="you@company.com" value={seoEmail} onChange={(e) => setSeoEmail(e.target.value)} data-testid="input-seo-email" />
+                      <Input id="seo-email" type="email" required placeholder="you@company.com" value={seoEmail} onChange={(e) => setSeoEmail(e.target.value)} data-testid="input-seo-email" />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="seo-phone">Phone</Label>
@@ -1918,14 +1933,15 @@ export default function MasterClassPage() {
                   </div>
 
                   <Button
+                    type="submit"
                     className="bg-[#F97316] hover:bg-[#E86C0A] text-white"
                     data-testid="button-submit-seo-inquiry"
-                    disabled={seoInquiryMutation.isPending || !seoName || !seoEmail}
-                    onClick={() => seoInquiryMutation.mutate({ name: seoName, email: seoEmail, phone: seoPhone, website: seoWebsite, services: seoServices, message: seoMessage })}
+                    disabled={seoInquiryMutation.isPending || !seoName.trim() || !seoEmail.trim()}
                   >
                     {seoInquiryMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
                     Submit Inquiry
                   </Button>
+                  </form>
                 </CardContent>
               </Card>
             </div>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useCart } from "@/contexts/cart-context";
 import { ShoppingCart, X, Loader2, Package, ArrowRight, Trash2, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -76,7 +76,7 @@ export function CartSheet() {
         setOpen(false);
         setLocation("/auth");
       } else {
-        toast({ title: "Failed to create contract", description: err.message, variant: "destructive" });
+        toast({ title: "Failed to create contract", description: apiErrorMessage(err), variant: "destructive" });
       }
     },
   });
@@ -96,7 +96,7 @@ export function CartSheet() {
         setOpen(false);
         setLocation("/auth");
       } else {
-        toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
+        toast({ title: "Checkout failed", description: apiErrorMessage(err), variant: "destructive" });
       }
     },
   });
@@ -122,11 +122,18 @@ export function CartSheet() {
   const total = getTotal();
   const isDev = import.meta.env.DEV;
   const isProcessing = checkoutMutation.isPending || contractMutation.isPending;
+  const cartError = checkoutMutation.error ?? contractMutation.error;
+  // A failed attempt's message stays until the cart changes or the sheet is
+  // reopened — never while a request is still running.
+  const clearCartError = () => {
+    if (checkoutMutation.isError) checkoutMutation.reset();
+    if (contractMutation.isError) contractMutation.reset();
+  };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(next) => { if (next) clearCartError(); setOpen(next); }}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" data-testid="button-cart-trigger">
+        <Button variant="ghost" size="icon" className="relative" aria-label="Cart" data-testid="button-cart-trigger">
           <ShoppingCart className="h-5 w-5" />
           {itemCount > 0 && (
             <Badge
@@ -205,7 +212,7 @@ export function CartSheet() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeItem(item.id)}
+                      onClick={() => { clearCartError(); removeItem(item.id); }}
                       data-testid={`button-remove-cart-item-${item.id}`}
                     >
                       <X className="h-4 w-4" />
@@ -231,6 +238,12 @@ export function CartSheet() {
                   ${(total / 100).toLocaleString()}
                 </span>
               </div>
+
+              {cartError && (
+                <p role="alert" className="text-sm text-destructive" data-testid="text-cart-error">
+                  {apiErrorMessage(cartError)}
+                </p>
+              )}
 
               <Button
                 className="w-full bg-[#F97316] hover:bg-[#ea6c10] text-white shadow-lg shadow-orange-500/25"
@@ -268,7 +281,7 @@ export function CartSheet() {
                 variant="ghost"
                 size="sm"
                 className="w-full text-muted-foreground"
-                onClick={clearCart}
+                onClick={() => { clearCartError(); clearCart(); }}
                 data-testid="button-clear-cart"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />

@@ -161,6 +161,10 @@ function CountUp({ end, suffix = "", prefix = "", duration = 2000 }: { end: numb
   return <span ref={ref}>{prefix}{count.toLocaleString("en-US")}{suffix}</span>;
 }
 
+/** Where "Enroll Now" goes: the course's pricing tab, after sign-up when signed out. */
+const ENROLL_PATH = "/master-class?tab=pricing";
+const SIGNUP_TO_ENROLL = `/auth?mode=signup&next=${encodeURIComponent(ENROLL_PATH)}`;
+
 /** Complete-bundle price — server/catalog.ts COURSE_BUNDLE (cents). */
 const BUNDLE_PRICE_CENTS = 249900;
 const dollars = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-US")}`;
@@ -168,7 +172,6 @@ const dollars = (cents: number) => `$${Math.round(cents / 100).toLocaleString("e
 const stats = [
   { value: 4, suffix: "", label: "Complete Modules", sub: "Formation to marketing" },
   { value: 50, suffix: "", label: "State Guides", sub: "Every state covered" },
-  { value: 100, suffix: "+", label: "Action Steps", sub: "Detailed checklists" },
   { value: BUNDLE_PRICE_CENTS / 100, prefix: "$", suffix: "", label: "Complete Bundle", sub: "All 4 modules, one price" },
 ];
 
@@ -335,7 +338,7 @@ export default function MasterClassLandingPage() {
                     Sign In
                   </Button>
                 </Link>
-                <Link href="/auth?mode=signup" data-testid="link-masterclass-getstarted">
+                <Link href={SIGNUP_TO_ENROLL} data-testid="link-masterclass-getstarted">
                   <Button size="sm" className="bg-[#F97316] hover:bg-[#EA580C] text-white shadow-lg shadow-orange-500/25">
                     Enroll Now <ArrowRight className="h-3.5 w-3.5 ml-1" />
                   </Button>
@@ -389,7 +392,7 @@ export default function MasterClassLandingPage() {
             consultants who've read about it.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
-            <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-hero-enroll">
+            <Link href={user ? ENROLL_PATH : SIGNUP_TO_ENROLL} data-testid="link-hero-enroll">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-8 h-12 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
                 <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
@@ -406,9 +409,6 @@ export default function MasterClassLandingPage() {
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-orange-400" /> 50 state-by-state guides
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-orange-400" /> 100+ action steps
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-blue-400" /> Built by real contractors
@@ -428,7 +428,7 @@ export default function MasterClassLandingPage() {
               <span className="bg-gradient-to-r from-[#F97316] to-[#4A6CF7] bg-clip-text text-transparent"> In One Course</span>
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {stats.map((stat, i) => (
               <Card key={stat.label} className={`bg-muted/50 dark:bg-white/[0.03] border-border dark:border-white/[0.06] p-6 text-center backdrop-blur-sm animate-in-delay-${i + 1}`} data-testid={`card-stat-${i}`}>
                 <div className="text-3xl sm:text-4xl font-extrabold text-foreground dark:text-white">
@@ -558,12 +558,12 @@ export default function MasterClassLandingPage() {
               )}
             </div>
             <p className="text-sm text-muted-foreground dark:text-white/40 max-w-lg mx-auto mb-6">
-              Get everything — all 4 modules, all 50 state guides, 100+ action steps, and lifetime access.
+              Get everything — all 4 modules, all 50 state guides, and lifetime access.
               {modulesTotal !== null && bundleSaving !== null && (
                 <> The modules cost {dollars(modulesTotal)} bought one at a time.</>
               )}
             </p>
-            <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-bundle-cta">
+            <Link href={user ? ENROLL_PATH : SIGNUP_TO_ENROLL} data-testid="link-bundle-cta">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-10 h-12 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
                 <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
@@ -757,7 +757,7 @@ export default function MasterClassLandingPage() {
             )}
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-final-enroll">
+            <Link href={user ? ENROLL_PATH : SIGNUP_TO_ENROLL} data-testid="link-final-enroll">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-10 h-13 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
                 Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
