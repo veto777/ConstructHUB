@@ -39,6 +39,7 @@ import LocationsPage from "@/pages/locations";
 import MasterClassPage from "@/pages/master-class";
 import ReinstatementPage from "@/pages/reinstatement";
 import GoogleBusinessPage from "@/pages/google-business";
+import AdsManagerPage from "@/pages/ads-manager";
 import GoogleAdsPage from "@/pages/google-ads";
 import GoogleAdsGuidePage from "@/pages/google-ads-guide";
 import GoogleAdsGuideSectionPage from "@/pages/google-ads-guide-section";
@@ -121,6 +122,7 @@ function DashboardRouter() {
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
+      <Route path="/ads-manager" component={AdsManagerPage} />
       <Route path="/google-ads-landing" component={GoogleAdsLandingPage} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
       <Route path="/google-ads-guide/:section" component={GoogleAdsGuideSectionPage} />
@@ -174,6 +176,7 @@ function PublicRouter() {
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
+      <Route path="/ads-manager" component={AdsManagerPage} />
       <Route path="/google-ads-landing" component={GoogleAdsLandingPage} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
       <Route path="/google-ads-guide/:section" component={GoogleAdsGuideSectionPage} />

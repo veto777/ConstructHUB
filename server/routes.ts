@@ -161,6 +161,12 @@ export async function registerRoutes(
   registerAgencyAccess(app);
   const { registerAgencyRoutes } = await import("./agency/routes");
   registerAgencyRoutes(app);
+  const { ensureAdsSchema } = await import("./ads/schema");
+  await ensureAdsSchema();
+  const { registerAdsRoutes } = await import("./ads/routes");
+  registerAdsRoutes(app, getDevUser);
+  const { startAdsWorker } = await import("./ads/worker");
+  startAdsWorker();
   const { ensureGbpTokenEncryption } = await import("./gbp/token-crypto");
   await ensureGbpTokenEncryption();
   const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");
