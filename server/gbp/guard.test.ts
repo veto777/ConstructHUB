@@ -86,6 +86,16 @@ describe('Profile Guard with real lane Postgres and mocked Google',()=>{
     const n=(await changes()).length;live.title='Hostile edit';await checkGuard(user,id,client);
     expect(await changes()).toHaveLength(n+1);expect((await changes()).at(-1).status).toBe('reverted');expect(live.title).toBe('Outside edit');
   });
+  it('keeps a change pending when Google returns an unconfirmed restore', async () => {
+    await configureGuard(user,id,'notify',['title']);
+    live.title='Unconfirmed change';
+    await checkGuard(user,id,client);
+    const change=(await changes()).at(-1)!;
+    const ignored=new GoogleClient(async()=>'fixture',async()=>new Response(JSON.stringify(live)),new Limiter(()=>0,async()=>{}),async()=>{});
+    await expect(resolveChange(user,id,change.id,'reject',ignored)).rejects.toMatchObject({status:503});
+    expect((await changes()).find(c=>c.id===change.id).status).toBe('pending');
+    await resolveChange(user,id,change.id,'reject',client);
+  });
   it('owner writes update only written snapshot fields, with no alert on next check',async()=>{
     const n=(await changes()).length;
     await writeOwnerProfile(user,id,{'profile.description':'Owner supplied description'},client);await checkGuard(user,id,client);expect(await changes()).toHaveLength(n);
