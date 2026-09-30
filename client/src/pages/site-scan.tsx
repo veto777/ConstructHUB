@@ -10,10 +10,119 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiRequest } from "@/lib/queryClient";
+import { crmTable } from "@/components/crm-ui";
+import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useUrlParam } from "@/hooks/use-url-param";
 const api = async (method: string, url: string, body?: unknown) =>
   (await apiRequest(method, url, body)).json();
+const categoryLabel: Record<string, string> = {
+  overall: "Overall",
+  local: "Local",
+  content: "Content",
+  technical: "Technical",
+  performance: "Performance",
+  "ai-readiness": "AI Readiness",
+};
+const labelFor = (key: string) =>
+  categoryLabel[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+// Colour follows the label actually shown: guidance impact when present, else severity.
+const toneClass: Record<string, string> = {
+  critical: "text-red-600",
+  warning: "text-amber-600",
+  info: "text-sky-600",
+  High: "text-red-600",
+  Medium: "text-amber-600",
+  Low: "text-sky-600",
+};
+const labMetricLabel: Record<string, string> = {
+  "largest-contentful-paint": "Largest Contentful Paint",
+  "cumulative-layout-shift": "Cumulative Layout Shift",
+  "total-blocking-time": "Total Blocking Time",
+  "speed-index": "Speed Index",
+  "total-byte-weight": "Total page weight",
+  "uses-optimized-images": "Image optimization",
+  "uses-responsive-images": "Responsive images",
+};
+function fieldMetric(key: string, m: any) {
+  const name = key
+    .replace(/_(MS|SCORE)$/, "")
+    .toLowerCase()
+    .replace(/_/g, " ");
+  const value =
+    typeof m?.percentile !== "number"
+      ? ""
+      : key.endsWith("_MS")
+        ? ` (75th percentile ${m.percentile} ms)`
+        : key === "CUMULATIVE_LAYOUT_SHIFT_SCORE"
+          ? ` (75th percentile ${(m.percentile / 100).toFixed(2)})`
+          : ` (75th percentile ${m.percentile})`;
+  return `${name.charAt(0).toUpperCase() + name.slice(1)}: ${m?.category ?? "no rating"}${value}`;
+}
+function PageSpeedDetails({ psi }: { psi: any[] }) {
+  return (
+    <details>
+      <summary>PageSpeed measurements and field data</summary>
+      <div className="space-y-3 mt-2 text-sm">
+        {psi.map((p: any, i: number) => (
+          <div key={i} className="border rounded p-3 space-y-1">
+            <p className="font-medium break-all">
+              {p.strategy === "desktop"
+                ? "Desktop"
+                : p.strategy === "mobile"
+                  ? "Mobile"
+                  : "PageSpeed"}
+              {p.url ? ` · ${p.url}` : ""}
+            </p>
+            {p.unavailable ? (
+              <p>PageSpeed data unavailable: {p.unavailable}</p>
+            ) : (
+              <>
+                <p>
+                  Performance score:{" "}
+                  {typeof p.score === "number" ? p.score : "Not reported"}
+                </p>
+                {p.lab && (
+                  <ul className="list-disc pl-5">
+                    {Object.entries(p.lab).map(([k, v]: [string, any]) => (
+                      <li key={k}>
+                        {labMetricLabel[k] ?? k}:{" "}
+                        {v?.display ?? v?.value ?? "Not reported"}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p>
+                  {p.field
+                    ? "Real-user field data (this page):"
+                    : p.originField
+                      ? "No real-user data for this page; site-wide field data:"
+                      : "No real-user field data reported by Google for this page or site."}
+                </p>
+                {(p.field || p.originField) && (
+                  <ul className="list-disc pl-5">
+                    {Object.entries(p.field || p.originField).map(
+                      ([k, m]: [string, any]) => (
+                        <li key={k}>{fieldMetric(k, m)}</li>
+                      ),
+                    )}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+        <details>
+          <summary>Raw data</summary>
+          <pre className="text-xs whitespace-pre-wrap break-all">
+            {JSON.stringify(psi, null, 2)}
+          </pre>
+        </details>
+      </div>
+    </details>
+  );
+}
+const whole = (value: string, min: number, max: number) =>
+  /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max;
 function canonicalUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -28,7 +137,7 @@ const severityOrder: Record<string, number> = {
   warning: 1,
   info: 2,
 };
-function Copy({ text }: { text: string }) {
+function Copy({ text, label = "Copy draft" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -38,7 +147,7 @@ function Copy({ text }: { text: string }) {
         navigator.clipboard.writeText(text).then(() => setCopied(true))
       }
     >
-      {copied ? "Copied" : "Copy draft"}
+      {copied ? "Copied" : label}
     </Button>
   );
 }
@@ -69,8 +178,8 @@ export function ScanReport({
         }).map(([name, value]) => (
           <Card key={name}>
             <CardContent className="pt-5">
-              <p className="capitalize text-sm text-muted-foreground">
-                {name.replace("-", " ")}
+              <p className="text-sm text-muted-foreground">
+                {labelFor(name)}
               </p>
               <p className="text-3xl font-semibold">
                 {value === null ? "N/A" : String(value)}
@@ -91,7 +200,7 @@ export function ScanReport({
           <summary>What raised or lowered these scores?</summary>
           {Object.entries(report.scoreExplanation).map(([k, v]) => (
             <p key={k} className="my-2">
-              <strong>{k}:</strong> {String(v)}
+              <strong>{labelFor(k)}:</strong> {String(v)}
             </p>
           ))}
         </details>
@@ -101,21 +210,29 @@ export function ScanReport({
           <strong>Why Performance is N/A</strong>
           {report.psi?.map((p: any, i: number) => (
             <p key={i}>
-              {p.strategy}: {p.unavailable || "No measurement returned"}
+              {p.strategy ? `${p.strategy}: ` : ""}
+              {p.unavailable || "No measurement returned"}
             </p>
           ))}
-          <p>
-            Server owner: add PAGESPEED_API_KEY and enable the PageSpeed
-            Insights API. Use Rescan / retry PageSpeed after correcting
-            configuration or waiting for quota.
-          </p>
+          {!report.psi?.length && (
+            <p>No PageSpeed measurement was returned for this scan.</p>
+          )}
+          {!summary && (
+            <p>
+              {report.psi?.some((p: any) =>
+                ["no_key", "configuration"].includes(p.reason),
+              )
+                ? "Server owner: add PAGESPEED_API_KEY and enable the PageSpeed Insights API, then use Rescan / retry PageSpeed."
+                : "Use Rescan / retry PageSpeed to measure again."}
+            </p>
+          )}
         </div>
       )}
       {["technical", "performance", "local", "content", "ai-readiness"].map(
         (category) => (
           <section key={category}>
-            <h2 className="text-xl font-semibold capitalize mb-3">
-              {category.replace("-", " ")}
+            <h2 className="text-xl font-semibold mb-3">
+              {labelFor(category)}
             </h2>
             <div className="space-y-3">
               {report.findings
@@ -145,9 +262,9 @@ export function ScanReport({
                       <CardTitle className="text-base">
                         <span
                           className={
-                            f.severity === "critical"
-                              ? "text-red-600"
-                              : "text-amber-600"
+                            toneClass[
+                              f.guidance ? f.guidance.impact : f.severity
+                            ] ?? "text-muted-foreground"
                           }
                         >
                           {f.guidance
@@ -204,9 +321,12 @@ export function ScanReport({
                 <p className="text-sm text-muted-foreground">
                   {summary
                     ? "Verify your email to see all findings in this category."
-                    : report.findingTotal
-                      ? "No findings in this category on the current results page. Use filters or Next findings to see more."
-                      : "No findings from available checks."}
+                    : category === "performance" &&
+                        report.scores.categories.performance === null
+                      ? "Not scored: PageSpeed data was unavailable for this scan (see Why Performance is N/A above)."
+                      : report.findingTotal
+                        ? "No findings in this category on the current results page. Use filters or Next findings to see more."
+                        : "No findings from available checks."}
                 </p>
               )}
             </div>
@@ -221,14 +341,7 @@ export function ScanReport({
             : "No synced GBP profile: NAP, service and service-area comparisons were not assessed."}
         </p>
       )}
-      {report.psi?.length > 0 && (
-        <details>
-          <summary>PageSpeed measurements and field data</summary>
-          <pre className="text-xs whitespace-pre-wrap break-all">
-            {JSON.stringify(report.psi, null, 2)}
-          </pre>
-        </details>
-      )}
+      {report.psi?.length > 0 && <PageSpeedDetails psi={report.psi} />}
       {report.jsonLdDraft && (
         <Card>
           <CardHeader>
@@ -284,11 +397,12 @@ export default function SiteScanPage() {
     [mailResult, setMailResult] = useState("");
   const [agencyName, setAgencyName] = useState(""),
     [logo, setLogo] = useState<string | null>(null);
+  // Empty filters are omitted: the agency access layer rejects an empty status.
   const listParams = new URLSearchParams({
     q: historyQ,
-    status: historyStatus,
     offset: String(historyOffset),
-    locationQ,
+    ...(historyStatus ? { status: historyStatus } : {}),
+    ...(locationQ ? { locationQ } : {}),
     locationOffset: String(locationOffset),
     ...(clientFilter ? { locationId: clientFilter } : {}),
   });
@@ -303,12 +417,12 @@ export default function SiteScanPage() {
       setScanParam(v === "" ? null : String(v), true);
   const [url, setUrl] = useState(""),
     [locationId, setLocationId] = useState(""),
-    [cap, setCap] = useState(150),
-    [psi, setPsi] = useState(1),
+    [cap, setCap] = useState("150"),
+    [psi, setPsi] = useState("1"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [share, setShare] = useState("");
-  const { data } = useQuery<any>({
+  const { data, error: listError } = useQuery<any>({
     queryKey: ["/api/sitescan", listParams.toString()],
     queryFn: () => api("GET", "/api/sitescan?" + listParams),
     refetchInterval: (q) =>
@@ -318,14 +432,25 @@ export default function SiteScanPage() {
         ? 3000
         : false,
   });
-  const { data: job } = useQuery<any>({
+  const { data: job, error: jobError } = useQuery<any>({
     queryKey: ["/api/sitescan/jobs/" + selected, reportParams.toString()],
     queryFn: () =>
       api("GET", "/api/sitescan/jobs/" + selected + "?" + reportParams),
     enabled: !!selected,
+    retry: false,
+    // Stop polling on an error too: an unknown or foreign scan id never recovers.
     refetchInterval: (q) =>
-      ["completed", "failed"].includes(q.state.data?.status) ? false : 3000,
+      q.state.error ||
+      ["completed", "failed"].includes(q.state.data?.status)
+        ? false
+        : 3000,
   });
+  // Numeric fields stay strings while typing so clearing them does not become 0.
+  const limitsError = !whole(cap, 1, 500)
+    ? "Page cap must be a whole number from 1 to 500."
+    : !whole(psi, 0, 5)
+      ? "PageSpeed pages must be a whole number from 0 to 5."
+      : "";
   useEffect(() => {
     if (!url && data?.locations?.[0]?.website) {
       setUrl(data.locations[0].website);
@@ -343,11 +468,19 @@ export default function SiteScanPage() {
           queryKey: ["/api/sitescan/jobs/" + selected],
         });
     } catch (e: any) {
-      setError(e.message);
+      setError(apiErrorMessage(e));
     } finally {
       setBusy(false);
     }
   };
+  const scheduleFor = (target: string, enabled: boolean, extra = {}) =>
+    action(async () => {
+      await api("POST", "/api/sitescan/schedule", {
+        url: target,
+        enabled,
+        ...extra,
+      });
+    });
   return (
     <main className="max-w-6xl mx-auto p-6 space-y-6">
       <AgencyWorkspace compact/>
@@ -433,13 +566,13 @@ export default function SiteScanPage() {
               </label>
             ))}
             <Button
-              disabled={busy || !checked.length}
+              disabled={busy || !checked.length || !!limitsError}
               onClick={() =>
                 action(async () => {
                   const r = await api("POST", "/api/sitescan/bulk", {
                     locationIds: checked,
-                    pageCap: cap,
-                    psiPages: psi,
+                    pageCap: Number(cap),
+                    psiPages: Number(psi),
                   });
                   setChecked([]);
                   setSelected(r.jobs[0].id);
@@ -491,7 +624,8 @@ export default function SiteScanPage() {
                 min={1}
                 max={500}
                 value={cap}
-                onChange={(e) => setCap(Number(e.target.value))}
+                aria-invalid={!whole(cap, 1, 500)}
+                onChange={(e) => setCap(e.target.value)}
               />
             </label>
             <label>
@@ -501,19 +635,23 @@ export default function SiteScanPage() {
                 min={0}
                 max={5}
                 value={psi}
-                onChange={(e) => setPsi(Number(e.target.value))}
+                aria-invalid={!whole(psi, 0, 5)}
+                onChange={(e) => setPsi(e.target.value)}
               />
             </label>
           </div>
+          {limitsError && (
+            <p className="text-sm text-red-600">{limitsError}</p>
+          )}
           <Button
-            disabled={busy || !url}
+            disabled={busy || !url || !!limitsError}
             onClick={() =>
               action(async () => {
                 const r = await api("POST", "/api/sitescan", {
                   url,
                   locationId: locationId ? Number(locationId) : undefined,
-                  pageCap: cap,
-                  psiPages: psi,
+                  pageCap: Number(cap),
+                  psiPages: Number(psi),
                 });
                 setSelected(r.id);
                 setShare("");
@@ -525,19 +663,17 @@ export default function SiteScanPage() {
           <Button
             variant="outline"
             className="ml-3"
-            disabled={busy || !url}
+            disabled={busy || !url || !!limitsError}
             onClick={() =>
-              action(async () => {
-                await api("POST", "/api/sitescan/schedule", {
-                  url,
+              scheduleFor(
+                url,
+                !data?.schedules.some((s: any) => s.url === canonicalUrl(url)),
+                {
                   locationId: locationId ? Number(locationId) : undefined,
-                  pageCap: cap,
-                  psiPages: psi,
-                  enabled: !data?.schedules.some(
-                    (s: any) => s.url === canonicalUrl(url),
-                  ),
-                });
-              })
+                  pageCap: Number(cap),
+                  psiPages: Number(psi),
+                },
+              )
             }
           >
             {data?.schedules.some((s: any) => s.url === canonicalUrl(url))
@@ -548,6 +684,40 @@ export default function SiteScanPage() {
             Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day (20
             AI page-batch calls). Larger scans can take several minutes.
           </p>
+          <div className="space-y-2">
+            <h2 className="font-semibold">
+              Monthly rescans ({data?.schedules?.length ?? 0} of 10)
+            </h2>
+            {!data?.schedules?.length ? (
+              <p className="text-sm text-muted-foreground">
+                No monthly rescans. Enter a website URL above and choose Enable
+                monthly rescan.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {data.schedules.map((s: any) => (
+                  <li
+                    key={s.url}
+                    className="flex flex-wrap items-center justify-between gap-2 border rounded p-2 text-sm"
+                  >
+                    <span className="break-all">
+                      {s.url} · up to {s.page_cap} pages · next run{" "}
+                      {new Date(s.next_at).toLocaleDateString()}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Disable schedule for ${s.url}`}
+                      disabled={busy}
+                      onClick={() => scheduleFor(s.url, false)}
+                    >
+                      Disable
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </CardContent>
       </Card>
       {error && (
@@ -557,6 +727,12 @@ export default function SiteScanPage() {
       )}
       <section>
         <h2 className="text-xl font-semibold mb-2">History & score trend</h2>
+        {listError && (
+          <p role="alert" className="text-red-600">
+            Could not load scan history:{" "}
+            {apiErrorMessage(listError, "please refresh and try again.")}
+          </p>
+        )}
         <label>
           Search history
           <Input
@@ -652,6 +828,13 @@ export default function SiteScanPage() {
           {data?.jobs.length === 0 && <p>No scans yet.</p>}
         </div>
       </section>
+      {selected && jobError && (
+        <p role="alert" className="text-red-600">
+          {/^(400|404):/.test(jobError.message)
+            ? "This report was not found. Choose a scan from your history."
+            : apiErrorMessage(jobError, "Could not load this report.")}
+        </p>
+      )}
       {job && (
         <section className="space-y-4">
           <h2 className="text-xl font-semibold break-all">{job.url}</h2>
@@ -680,17 +863,26 @@ export default function SiteScanPage() {
                 </a>
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    action(async () => {
+                  disabled={busy}
+                  onClick={() => {
+                    // Only a hash is stored, so a new link always replaces the old one.
+                    if (
+                      job.shareEnabled &&
+                      !window.confirm(
+                        "The current share link will stop working. Create a new link?",
+                      )
+                    )
+                      return;
+                    void action(async () => {
                       const r = await api(
                         "POST",
                         `/api/sitescan/jobs/${selected}/share`,
                       );
                       setShare(window.location.origin + r.path);
-                    })
-                  }
+                    });
+                  }}
                 >
-                  Create share link
+                  {job.shareEnabled ? "Replace share link" : "Create share link"}
                 </Button>
                 {job.shareEnabled && (
                   <Button
@@ -709,13 +901,29 @@ export default function SiteScanPage() {
                   </Button>
                 )}
               </div>
-              {share && (
-                <p className="break-all">
-                  Read-only link (30 days):{" "}
-                  <a href={share} className="underline">
-                    {share}
-                  </a>
-                </p>
+              {share ? (
+                <div className="space-y-1">
+                  <p className="break-all">
+                    Read-only link (30 days):{" "}
+                    <a href={share} className="underline">
+                      {share}
+                    </a>
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Copy key={share} text={share} label="Copy link" />
+                    <span className="text-sm text-muted-foreground">
+                      Copy this link now; it is shown only once.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                job.shareEnabled && (
+                  <p className="text-sm text-muted-foreground">
+                    A share link is active. For security it is shown only when
+                    created; use Replace share link to get a new one (the old
+                    link stops working).
+                  </p>
+                )
               )}
               <div className="space-y-3 border rounded p-4">
                 <Button
@@ -939,7 +1147,7 @@ export function FreeSiteScanPage() {
               });
               setAccess(r.access);
             } catch (e: any) {
-              setError(e.message);
+              setError(apiErrorMessage(e, "Could not start the scan."));
               // Tokens are single-use, including when a later server step fails.
               if (captchaWidget.current !== null) {
                 (window as any).grecaptcha?.reset(captchaWidget.current);
@@ -991,50 +1199,87 @@ export function FreeSiteScanPage() {
           limit was reached.
         </p>
       )}
-      {access && (
+      {access && data?.status !== "failed" && (
         <p>
           Check your email for the verification link to unlock the full report.
         </p>
       )}
-      {data && (
-        <p role="status">
-          Scan {data.status}. {data.error}
-        </p>
-      )}
+      {data &&
+        (data.status === "failed" ? (
+          <div className="space-y-3">
+            <p role="status">
+              We could not finish scanning this website. It may be offline,
+              blocking automated checks, or too slow to respond. Check that the
+              address opens in a browser, then try again.
+            </p>
+            <Button
+              variant="outline"
+              // A fresh page load also renders a fresh CAPTCHA for the next attempt.
+              onClick={() => window.location.assign(window.location.pathname)}
+            >
+              Scan another site
+            </Button>
+          </div>
+        ) : (
+          <p role="status">Scan {data.status}.</p>
+        ))}
       {data?.summary && <ScanReport report={data.summary} summary />}
       <ScanReport report={data?.report} />
     </main>
   );
 }
 export function SiteScanLeads() {
-  const { data, error } = useQuery<any>({
+  const { data, error, isLoading } = useQuery<any>({
     queryKey: ["/api/admin/sitescan-leads"],
     retry: false,
   });
+  const leads: any[] = data?.leads || [];
   return (
-    <section className="p-6">
-      <h2 className="text-xl font-semibold">Site Scan leads</h2>
-      {error && <p>Platform admin access required.</p>}
-      <table className="w-full text-sm">
-        <thead>
-          <tr>
-            <th>Email</th>
-            <th>Website</th>
-            <th>Verified</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.leads.map((l: any) => (
-            <tr key={l.id}>
-              <td>{l.email}</td>
-              <td>{l.url}</td>
-              <td>{l.verified_at ? "Yes" : "No"}</td>
-              <td>{l.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+    <Card data-testid="section-sitescan-leads">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Site Scan leads</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Emails captured by the free website scan (latest 500).
+        </p>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <p className="text-sm text-muted-foreground">
+            Platform admin access required.
+          </p>
+        ) : isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading leads…</p>
+        ) : !leads.length ? (
+          <p className="text-sm text-muted-foreground">
+            No Site Scan leads yet.
+          </p>
+        ) : (
+          <div className={crmTable.wrapper}>
+            <table className={crmTable.table}>
+              <thead className={crmTable.thead}>
+                <tr>
+                  <th className={crmTable.th}>Email</th>
+                  <th className={crmTable.th}>Website</th>
+                  <th className={crmTable.th}>Verified</th>
+                  <th className={crmTable.th}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map((l: any) => (
+                  <tr key={l.id} className={crmTable.tr}>
+                    <td className={crmTable.td}>{l.email}</td>
+                    <td className={`${crmTable.td} break-all`}>{l.url}</td>
+                    <td className={crmTable.td}>
+                      {l.verified_at ? "Yes" : "No"}
+                    </td>
+                    <td className={crmTable.td}>{l.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
