@@ -178,6 +178,12 @@ function localDailyVisits(hourly: Record<string, number> | undefined) {
   return daily;
 }
 
+// The visit endpoints load at most this many visits, newest first (storage.getClickVisits),
+// so the all-time total and a busy site's date range stop at it. A count at the cap is a
+// lower bound, shown with "+", never as an exact number.
+const VISIT_ROW_CAP = 1000;
+const countLabel = (n: number, partial: boolean) => (partial ? `${n.toLocaleString()}+` : n.toLocaleString());
+
 function formatTimeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -261,7 +267,7 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
             <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-install-status">
               {noVisits
                 ? "No visits recorded yet. Visits appear here only after this code runs on your site."
-                : `${domain.stats.totalVisits.toLocaleString()} visit${domain.stats.totalVisits !== 1 ? "s" : ""} recorded so far.`}
+                : `${countLabel(domain.stats.totalVisits, domain.stats.totalVisits >= VISIT_ROW_CAP)} visit${domain.stats.totalVisits !== 1 ? "s" : ""} recorded so far.`}
             </p>
           </div>
           {!noVisits && (
@@ -308,6 +314,11 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
   const last7 = chartDays.slice(-7).reduce((s, [, v]) => s + v, 0);
   const monthPrefix = localDayKey(now).slice(0, 7);
   const thisMonth = Object.entries(daily).filter(([k]) => k.startsWith(monthPrefix)).reduce((s, [, v]) => s + v, 0);
+  // At the cap the oldest visits in the range were not loaded: the oldest loaded day is
+  // partial and earlier days are unknown, not zero.
+  const oldestLoaded = (analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? Object.keys(daily).sort()[0] : undefined;
+  const partialFrom = (firstDay: string) => !!oldestLoaded && firstDay <= oldestLoaded;
+  const totalVisits = domain?.stats.totalVisits ?? 0;
 
   return (
     <div className="space-y-6">
@@ -324,12 +335,18 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
         <StatCard label="Online Now" value={online?.count ?? 0} icon={Activity} sub="Last 20 minutes" />
-        <StatCard label="Today" value={todayVisits} icon={Eye} />
-        <StatCard label="Yesterday" value={yesterdayVisits} icon={Clock} />
-        <StatCard label="Last 7 Days" value={last7} icon={BarChart3} />
-        <StatCard label="This Month" value={thisMonth} icon={Globe} />
-        <StatCard label="Total" value={domain?.stats.totalVisits ?? 0} icon={Users} sub="All time" />
+        <StatCard label="Today" value={countLabel(todayVisits, partialFrom(localDayKey(now)))} icon={Eye} />
+        <StatCard label="Yesterday" value={countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1))))} icon={Clock} />
+        <StatCard label="Last 7 Days" value={countLabel(last7, partialFrom(chartDays[7][0]))} icon={BarChart3} />
+        <StatCard label="This Month" value={countLabel(thisMonth, partialFrom(`${monthPrefix}-01`))} icon={Globe} />
+        <StatCard label="Total" value={countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP)} icon={Users} sub="All time" />
       </div>
+
+      {oldestLoaded && (
+        <p className="text-xs text-muted-foreground -mt-3" data-testid="text-visits-capped">
+          Only the latest {VISIT_ROW_CAP.toLocaleString()} visits in this period are loaded, so counts marked + are lower bounds and days before {new Date(`${oldestLoaded}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })} are not loaded.
+        </p>
+      )}
 
       {chartDays.some(([, v]) => v > 0) && (
         <Card className="bg-card border-border">
@@ -341,9 +358,9 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
               {chartDays.map(([date, count]) => (
                 <div key={date} className="flex-1 flex flex-col items-center gap-1">
                   <div
-                    className="w-full bg-primary/80 rounded-t hover:bg-primary transition-colors min-h-[2px]"
+                    className={`w-full rounded-t transition-colors min-h-[2px] ${oldestLoaded && date < oldestLoaded ? "bg-muted" : "bg-primary/80 hover:bg-primary"}`}
                     style={{ height: `${(count / maxDaily) * 100}%` }}
-                    title={`${date}: ${count} visits`}
+                    title={oldestLoaded && date < oldestLoaded ? `${date}: not loaded` : date === oldestLoaded ? `${date}: at least ${count} visits` : `${date}: ${count} visits`}
                   />
                   <span className="text-[8px] text-muted-foreground truncate w-full text-center">
                     {Number(date.slice(8, 10))}
@@ -380,8 +397,8 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
                         <div className="text-xs text-muted-foreground">{d.domain}</div>
                       </td>
                       <OnlineCell domainId={d.id} />
-                      <td className="text-right p-3 tabular-nums font-medium">{d.stats.totalVisits.toLocaleString()}</td>
-                      <td className="text-right p-3 tabular-nums">{d.stats.uniqueVisitors.toLocaleString()}</td>
+                      <td className="text-right p-3 tabular-nums font-medium">{countLabel(d.stats.totalVisits, d.stats.totalVisits >= VISIT_ROW_CAP)}</td>
+                      <td className="text-right p-3 tabular-nums">{countLabel(d.stats.uniqueVisitors, d.stats.totalVisits >= VISIT_ROW_CAP)}</td>
                       <td className="text-right p-3 tabular-nums">{d.stats.blockedIps}</td>
                     </tr>
                   ))}
@@ -597,7 +614,7 @@ function TrafficSourcesView({ domainId, analytics, since }: { domainId: number |
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground" data-testid="text-traffic-range">
-        Visits since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
+        {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Total Sources" value={sources.length} icon={Globe} />
