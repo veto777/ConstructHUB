@@ -1,179 +1,93 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import type { Express, Request, Response } from "express";
 import { db } from "./db";
-import { subscriptions, users, masterClassModules, coursePurchases, servicePurchases } from "@shared/schema";
+import { subscriptions, masterClassModules, coursePurchases, servicePurchases } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
-import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS } from "./catalog";
+import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sendTalkToSales } from "./catalog";
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
+import {
+  PLANS as PRICE_BOOK, PLAN_KEYS, ADDON_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
+  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS, LEGACY_PLAN_MAP, isPlanKey,
+} from "@shared/plans";
+import { stripe, PaymentsNotConfiguredError } from "./billing/client";
+import { describeSubscription } from "./billing/prices";
+import {
+  BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities, checkAddonsForPlan,
+  checkoutLineItems, subscriptionChange, type PlanOrder,
+} from "./billing/order";
+import {
+  billingSchemaReady, hasLiveStripeSubscription, trialEligible, eventAppliesToRow, subscriptionRowUpdate,
+  canceledRowUpdate, subscriptionSummary, LIVE_STATUSES,
+} from "./billing/sync";
+import { startAgencyLocationSync } from "./billing/agency-sync";
 
-// Lazily constructed: importing PLANS / helpers from this module (tenancy,
-// tests) must not require STRIPE_SECRET_KEY. The client is only built when a
-// Stripe API call actually runs.
-let _stripe: Stripe | null = null;
+export { PaymentsNotConfiguredError };
 
-/** No STRIPE_SECRET_KEY on this server: checkout can't start, and the caller
- *  hears that in plain words (503) instead of the SDK's "Neither apiKey nor
- *  config.authenticator provided". Nothing is charged either way. */
-export class PaymentsNotConfiguredError extends Error {
-  readonly status = 503;
-  constructor() {
-    super("Online payments aren't set up on this server yet. Nothing was charged — please try again later.");
-    this.name = "PaymentsNotConfiguredError";
-  }
-}
-
-/** A checkout/portal route's catch: the not-configured case as an honest 503,
- *  anything else as before. */
+/**
+ * A checkout/portal route's catch: the not-configured case as an honest 503,
+ * a request the price book can't sell as its own status + code, a declined
+ * card as 402 payment_failed, anything else as before.
+ */
 function sendStripeError(res: Response, err: any) {
   if (err instanceof PaymentsNotConfiguredError) {
     return res.status(err.status).json({ message: err.message });
   }
+  if (err instanceof BillingRequestError) {
+    return res.status(err.status).json(err.code ? { code: err.code, message: err.message } : { message: err.message });
+  }
+  if (err?.type === "StripeCardError" || err?.statusCode === 402) {
+    return res.status(402).json({
+      code: "payment_failed",
+      message: `Your card couldn't be charged, so nothing changed${err?.message ? ` (${err.message})` : ""}. Update your card in Manage billing and try again.`,
+    });
+  }
   return res.status(500).json({ message: err?.message });
 }
 
-function getStripe(): Stripe {
-  if (!_stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) throw new PaymentsNotConfiguredError();
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2025-01-27.acacia" as any,
-    });
-  }
-  return _stripe;
+/**
+ * @deprecated Compatibility view for server/growth-quotas.ts and
+ * server/crm/tenancy.ts until they read getEntitlements() (server/entitlements.ts).
+ * Every value is derived from shared/plans.ts — no price or limit lives in this
+ * file. Legacy keys resolve through LEGACY_PLAN_MAP. Photo optimisation is
+ * included on every plan (fair use), so it reads -1 (unlimited) here.
+ */
+export const PLANS: Record<string, { name: string; limits: { searches: number; photos: number; rankings: number; users: number } }> =
+  Object.fromEntries([...PLAN_KEYS, ...Object.keys(LEGACY_PLAN_MAP)].map((key) => {
+    const plan = PRICE_BOOK[isPlanKey(key) ? key : LEGACY_PLAN_MAP[key]];
+    const l = plan.limits;
+    return [key, {
+      name: plan.name,
+      limits: { searches: l.permitSearches, photos: -1, rankings: l.gridCredits || l.gridCreditsPerLocation * l.locations, users: l.crmSeats },
+    }];
+  }));
+
+/** GET /api/stripe/plans — the price book, straight from shared/plans.ts. */
+export function priceBook() {
+  return {
+    currency: "usd",
+    plans: PLAN_KEYS.map((key) => PRICE_BOOK[key]),
+    addons: ADDON_KEYS.map((key) => ADDONS[key]),
+    agency: {
+      includedLocations: PRICE_BOOK.agency.limits.locations,
+      bands: AGENCY_LOCATION_BANDS,
+      selfServeMaxLocations: AGENCY_SELF_SERVE_MAX_LOCATIONS,
+    },
+    trialDays: TRIAL_DAYS,
+    annualMonths: ANNUAL_MONTHS,
+    salesThresholdCents: SALES_THRESHOLD_CENTS,
+  };
 }
-const stripe = new Proxy({} as Stripe, {
-  get(_t, prop) {
-    const client = getStripe() as any;
-    const v = client[prop];
-    return typeof v === "function" ? v.bind(client) : v;
-  },
-});
 
-// current_period_end moved from the Subscription object to
-// items.data[].current_period_end in the Stripe 2025 (basil) API. Webhook
-// payloads render at the endpoint's configured version — not the client's
-// pinned version — so read the item field first and fall back to the legacy
-// top-level field. Returns null rather than an Invalid Date when neither exists.
-function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
-  const anySub = sub as any;
-  const epoch: number | undefined =
-    anySub.items?.data?.[0]?.current_period_end ?? anySub.current_period_end;
-  return typeof epoch === "number" && Number.isFinite(epoch)
-    ? new Date(epoch * 1000)
-    : null;
+type SubscriptionRow = typeof subscriptions.$inferSelect;
+
+async function subscriptionRowFor(userId: number): Promise<SubscriptionRow | undefined> {
+  const [row] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  return row;
 }
 
-// Exported so the CRM tenancy layer can enforce seat limits server-side
-// (limits.users) without duplicating the plan table.
-export const PLANS = {
-  standard: {
-    name: "Standard",
-    price: 1500,
-    features: [
-      "50 Permit Searches/mo",
-      "5 GMB Photo Optimizations/mo",
-      "3 GMB Ranking Grid Reports/mo",
-      "Basic GMB Edit Monitoring",
-      "1 User",
-      "Email Support",
-    ],
-    limits: { searches: 50, photos: 5, rankings: 3, users: 1, reviewTemplates: 1 },
-  },
-  professional: {
-    name: "Professional",
-    price: 3000,
-    features: [
-      "200 Permit Searches/mo",
-      "25 GMB Photo Optimizations/mo",
-      "10 GMB Ranking Grid Reports/mo",
-      "Advanced GMB Edit Monitoring",
-      "Property Records Access",
-      "1 User",
-      "Priority Email Support",
-    ],
-    limits: { searches: 200, photos: 25, rankings: 10, users: 1, reviewTemplates: 5 },
-  },
-  business: {
-    name: "Business",
-    price: 5000,
-    features: [
-      "350 Permit Searches/mo",
-      "50 GMB Photo Optimizations/mo",
-      "15 GMB Ranking Grid Reports/mo",
-      "Advanced GMB Edit Monitoring",
-      "Property Records Access",
-      "Scrape Scheduling",
-      "Google Click Guard — 1 Website",
-      "1 User",
-      "Priority Support",
-    ],
-    limits: { searches: 350, photos: 50, rankings: 15, users: 1, clickGuardSites: 1, reviewTemplates: 5 },
-  },
-  premium: {
-    name: "Premium",
-    price: 10000,
-    features: [
-      "500 Permit Searches/mo",
-      "Unlimited Photo Optimizations",
-      "25 GMB Ranking Grid Reports/mo",
-      "Advanced GMB Edit Monitoring",
-      "Property Records Access",
-      "Scrape Scheduling",
-      "Google Click Guard — 3 Websites",
-      "CRM Text Messaging — client texts + text alerts",
-      "IP Tracker — 1 Website",
-      "1 User",
-      "Dedicated Support",
-    ],
-    limits: { searches: 500, photos: -1, rankings: 25, users: 1, clickGuardSites: 3, ipTrackerSites: 1, reviewTemplates: 20 },
-  },
-  gold: {
-    name: "Gold",
-    price: 49900,
-    features: [
-      "Unlimited Permit Searches",
-      "Unlimited Photo Optimizations",
-      "Unlimited GMB Ranking Grid Reports",
-      "Advanced GMB Edit Monitoring",
-      "Property Records Access",
-      "Scrape Scheduling",
-      "IP Tracker — 1 Website",
-      "VPN Shield — 1 Website",
-      "CRM Text Messaging — client texts + text alerts",
-      "Competitor Intel — 1 Site",
-      "Up to 2 Users",
-      "Priority Support",
-    ],
-    limits: { searches: -1, photos: -1, rankings: -1, users: 2, ipTrackerSites: 1, vpnShieldSites: 1, competitorSites: 1, reviewTemplates: 20 },
-  },
-  platinum: {
-    name: "Platinum",
-    price: 99500,
-    features: [
-      "Unlimited Permit Searches",
-      "Unlimited Photo Optimizations",
-      "Unlimited GMB Ranking Grid Reports",
-      "Competitor Intelligence & BS Meter — 10 Sites",
-      "Advanced GMB Edit Monitoring",
-      "Property Records Access",
-      "Scrape Scheduling",
-      "IP Tracker — 10 Websites",
-      "VPN Shield — 10 Websites",
-      "CRM Text Messaging — client texts + text alerts",
-      "30-min Expert Consulting ($250 first session, $500 after)",
-      "Up to 5 Users",
-      "Dedicated Support",
-    ],
-    limits: { searches: -1, photos: -1, rankings: -1, users: 5, ipTrackerSites: 10, vpnShieldSites: 10, competitorSites: 10, reviewTemplates: 20 },
-  },
-};
-
-async function getOrCreateCustomer(userId: number, email: string) {
-  const [existing] = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.userId, userId))
-    .limit(1);
+async function getOrCreateCustomer(userId: number, email: string, existing?: SubscriptionRow | null) {
+  if (existing === undefined) existing = await subscriptionRowFor(userId);
 
   if (existing?.stripeCustomerId) {
     return existing.stripeCustomerId;
@@ -195,35 +109,87 @@ async function getOrCreateCustomer(userId: number, email: string) {
   return customer.id;
 }
 
+const orderMetadata = (userId: number, order: PlanOrder) => ({
+  userId: String(userId),
+  type: "plan",
+  plan: order.plan,
+  interval: order.interval,
+  addons: JSON.stringify(order.addons),
+  locations: order.agencyLocations === null ? "" : String(order.agencyLocations),
+});
+
+const NO_SUBSCRIPTION = () => new BillingRequestError(409,
+  "You don't have an active subscription to change. Choose a plan in Pricing to start one.", "no_subscription");
+
+/** The user's live Stripe subscription (for change-plan / add-ons), or a 409. */
+async function liveSubscription(userId: number) {
+  const row = await subscriptionRowFor(userId);
+  if (!row || !hasLiveStripeSubscription(row)) throw NO_SUBSCRIPTION();
+  const sub = await stripe.subscriptions.retrieve(row.stripeSubscriptionId!);
+  if (!LIVE_STATUSES.has(sub.status)) {
+    // The row missed the webhook that ended it. Record what Stripe says, so
+    // create-checkout stops answering has_subscription and the customer can
+    // start a new plan instead of being refused by both routes.
+    await db.update(subscriptions).set(subscriptionRowUpdate(sub)).where(eq(subscriptions.id, row.id));
+    throw NO_SUBSCRIPTION();
+  }
+  return { row, sub, current: describeSubscription(sub.items.data) };
+}
+
+/**
+ * Apply an order to the EXISTING subscription: items are repriced/requantified
+ * in place with proration, invoiced immediately; if the card can't pay, Stripe
+ * rejects the update and nothing changes (error_if_incomplete).
+ */
+async function applyToSubscription(userId: number, row: SubscriptionRow, sub: Stripe.Subscription, current: ReturnType<typeof describeSubscription>, order: PlanOrder) {
+  const change = await subscriptionChange(stripe, current, order);
+  if (!change.items.length && !change.addInvoiceItems.length) {
+    return { changed: false, subscription: subscriptionSummary(row) };
+  }
+  const updated = await stripe.subscriptions.update(sub.id, {
+    items: change.items,
+    ...(change.addInvoiceItems.length ? { add_invoice_items: change.addInvoiceItems } : {}),
+    proration_behavior: "always_invoice",
+    payment_behavior: "error_if_incomplete",
+    metadata: { userId: String(userId), plan: order.plan, interval: order.interval },
+  });
+  const set = subscriptionRowUpdate(updated);
+  await db.update(subscriptions).set(set).where(eq(subscriptions.id, row.id));
+  return { changed: true, subscription: subscriptionSummary({ ...row, ...set } as SubscriptionRow) };
+}
+
+/** Step-up: plan and add-on changes charge the saved card without a Stripe page. */
+async function recentAuthOk(req: Request, res: Response): Promise<boolean> {
+  const { requireRecentAuth } = await import("./account-security");
+  return requireRecentAuth(req, res);
+}
+
 export function registerStripeRoutes(app: Express) {
+  // Boot: add the billing columns before anything reads `subscriptions`, and
+  // schedule the daily Agency location sync (off without a Stripe key).
+  void billingSchemaReady();
+  startAgencyLocationSync();
+
   app.get("/api/stripe/plans", (_req: Request, res: Response) => {
-    res.json(PLANS);
+    res.json(priceBook());
   });
 
   app.get("/api/stripe/subscription", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
-      if (!user) return res.json({ plan: "free", status: "inactive" });
-
-      const [sub] = await db
-        .select()
-        .from(subscriptions)
-        .where(eq(subscriptions.userId, user.id))
-        .limit(1);
-
-      if (!sub) return res.json({ plan: "free", status: "inactive" });
-
-      res.json({
-        plan: sub.plan,
-        status: sub.status,
-        currentPeriodEnd: sub.currentPeriodEnd,
-        stripeSubscriptionId: sub.stripeSubscriptionId,
-      });
+      if (!user) return res.json(subscriptionSummary(null));
+      await billingSchemaReady();
+      res.json(subscriptionSummary(await subscriptionRowFor(user.id)));
     } catch (err: any) {
       sendStripeError(res, err);
     }
   });
 
+  /**
+   * New subscription: { plan, interval: "month"|"year", addons?: { key: qty }, locations? (Agency) }.
+   * Prices come only from shared/plans.ts. Someone already subscribed is sent
+   * to change-plan instead — a second subscription is never started.
+   */
   app.post("/api/stripe/create-checkout", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -236,37 +202,107 @@ export function registerStripeRoutes(app: Express) {
         return res.status(400).json({ message: "Your account is included in the beta — no payment needed." });
       }
 
-      const { plan } = req.body;
-      if (!plan || !PLANS[plan as keyof typeof PLANS]) {
-        return res.status(400).json({ message: "Invalid plan" });
+      const order = parsePlanOrder(req.body ?? {});
+      await billingSchemaReady();
+      const row = await subscriptionRowFor(user.id);
+      if (hasLiveStripeSubscription(row)) {
+        const unpaid = ["past_due", "unpaid", "incomplete"].includes(row!.status);
+        return res.status(409).json({
+          code: "has_subscription",
+          message: unpaid
+            ? "Your subscription has a payment that needs attention. Open Manage billing to update your card — a second subscription is never started."
+            : "You already have a subscription. Change your plan or add-ons from Pricing — that updates it in place instead of starting a second one.",
+        });
       }
 
-      const planConfig = PLANS[plan as keyof typeof PLANS];
-      const customerId = await getOrCreateCustomer(user.id, user.email);
+      const customerId = await getOrCreateCustomer(user.id, user.email, row ?? null);
+      const line_items = await checkoutLineItems(stripe, order);
+      // One open plan checkout per customer: a checkout left open in another
+      // tab is expired first, so finishing both can't start two subscriptions.
+      const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
+      for (const stale of open.data) {
+        if (stale.mode === "subscription") await stripe.checkout.sessions.expire(stale.id);
+      }
+      const metadata = orderMetadata(user.id, order);
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: "subscription",
-        line_items: [
-          {
-            price_data: {
-              currency: "usd",
-              product_data: { name: `ConstructHUB ${planConfig.name}` },
-              unit_amount: planConfig.price,
-              recurring: { interval: "month" },
-            },
-            quantity: 1,
-          },
-        ],
+        line_items,
         subscription_data: {
-          trial_period_days: 1,
+          ...(trialEligible(row) ? { trial_period_days: TRIAL_DAYS } : {}),
+          metadata,
         },
         success_url: `${getBaseUrl(req)}/pricing?success=true`,
         cancel_url: `${getBaseUrl(req)}/pricing?canceled=true`,
-        metadata: { userId: String(user.id), plan },
+        metadata,
       });
 
       res.json({ url: session.url });
+    } catch (err: any) {
+      sendStripeError(res, err);
+    }
+  });
+
+  /**
+   * Existing subscriber switches plan / interval / Agency locations (and may
+   * set add-on quantities in the same call). Updates the one subscription.
+   */
+  app.post("/api/stripe/change-plan", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ message: "Login required" });
+      // Cheap validation before any Stripe call or step-up prompt.
+      parsePlanKey(req.body?.plan);
+      parseInterval(req.body?.interval);
+      parseAddonQuantities(req.body?.addons);
+      if (!(await recentAuthOk(req, res))) return;
+
+      await billingSchemaReady();
+      const { row, sub, current } = await liveSubscription(user.id);
+      const order = parsePlanOrder(req.body ?? {}, {
+        interval: current.interval,
+        addons: current.addons,
+        agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
+      });
+      res.json(await applyToSubscription(user.id, row, sub, current, order));
+    } catch (err: any) {
+      sendStripeError(res, err);
+    }
+  });
+
+  /**
+   * Existing subscriber sets add-on quantities on the current plan (0 removes):
+   * { addons: { key: qty } }, or one add-on as { addon: key, quantity: qty }
+   * (the shape the Settings billing card sends).
+   */
+  app.post("/api/stripe/addons", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ message: "Login required" });
+      const single = req.body?.addons === undefined && req.body?.addon !== undefined;
+      const requested = parseAddonQuantities(single ? { [String(req.body.addon)]: req.body.quantity } : req.body?.addons);
+      if (!Object.keys(requested).length) {
+        return res.status(400).json({ message: "Choose an add-on quantity to change." });
+      }
+      if (!(await recentAuthOk(req, res))) return;
+
+      await billingSchemaReady();
+      const { row, sub, current } = await liveSubscription(user.id);
+      if (!current.plan || !current.interval) {
+        throw new BillingRequestError(409,
+          "Your subscription is on an older plan. Switch to a current plan first (Change plan), then add add-ons.", "legacy_plan");
+      }
+      const addons = Object.fromEntries(
+        Object.entries({ ...current.addons, ...requested }).filter(([, qty]) => (qty ?? 0) > 0));
+      checkAddonsForPlan(current.plan, addons);
+      const order: PlanOrder = {
+        plan: current.plan,
+        interval: current.interval,
+        addons,
+        agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
+      };
+      res.json(await applyToSubscription(user.id, row, sub, current, order));
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -277,11 +313,8 @@ export function registerStripeRoutes(app: Express) {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
-      const [sub] = await db
-        .select()
-        .from(subscriptions)
-        .where(eq(subscriptions.userId, user.id))
-        .limit(1);
+      await billingSchemaReady();
+      const sub = await subscriptionRowFor(user.id);
 
       if (!sub?.stripeCustomerId) {
         return res.status(400).json({ message: "No subscription found" });
@@ -306,7 +339,9 @@ export function registerStripeRoutes(app: Express) {
       const { moduleId, bundle } = req.body;
 
       if (bundle) {
+        if (isSalesOnly(COURSE_BUNDLE.priceCents)) return sendTalkToSales(res, [COURSE_BUNDLE.name]);
         const allModules = await db.select().from(masterClassModules).where(eq(masterClassModules.isActive, true));
+        await billingSchemaReady();
         const customerId = await getOrCreateCustomer(user.id, user.email);
 
         const session = await stripe.checkout.sessions.create({
@@ -337,7 +372,9 @@ export function registerStripeRoutes(app: Express) {
 
       const [mod] = await db.select().from(masterClassModules).where(eq(masterClassModules.id, moduleId)).limit(1);
       if (!mod) return res.status(404).json({ message: "Module not found" });
+      if (isSalesOnly(mod.price)) return sendTalkToSales(res, [`Master Class — ${mod.title}`]);
 
+      await billingSchemaReady();
       const customerId = await getOrCreateCustomer(user.id, user.email);
 
       const session = await stripe.checkout.sessions.create({
@@ -377,10 +414,6 @@ export function registerStripeRoutes(app: Express) {
         return res.status(400).json({ message: "Cart is empty" });
       }
 
-      if (items.some((item: any) => SEO_CONTRACT_REQUIRED_IDS.has(item?.id))) {
-        return res.status(400).json({ message: "SEO packages require a signed contract before payment. Please use the contract checkout flow." });
-      }
-
       // SECURITY: resolve every price and name server-side from the catalog / DB.
       // The client-supplied item.price and item.name are never trusted.
       const resolved: { id: string; type: string; name: string; price: number; moduleId: number | null }[] = [];
@@ -405,6 +438,15 @@ export function registerStripeRoutes(app: Express) {
         }
       }
 
+      // $1,000 and up is quoted by a sales rep — never a checkout (priced here,
+      // on the server-resolved amount, so a forged cart price can't slip under).
+      const salesOnly = resolved.filter((item) => isSalesOnly(item.price));
+      if (salesOnly.length) return sendTalkToSales(res, [...new Set(salesOnly.map((item) => item.name))]);
+
+      if (resolved.some((item) => SEO_CONTRACT_REQUIRED_IDS.has(item.id))) {
+        return res.status(400).json({ message: "SEO packages require a signed contract before payment. Please use the contract checkout flow." });
+      }
+
       // One charge per thing bought. Checked on the server-resolved items (ids
       // are canonical here), so a crafted or stale cart can't pay twice for a
       // service: not the same item twice, and not a bundle plus a part of it.
@@ -418,6 +460,7 @@ export function registerStripeRoutes(app: Express) {
         });
       }
 
+      await billingSchemaReady();
       const customerId = await getOrCreateCustomer(user.id, user.email);
 
       const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = resolved.map((item) => ({
@@ -506,7 +549,6 @@ export function registerStripeRoutes(app: Express) {
         case "checkout.session.completed": {
           const session = event.data.object as Stripe.Checkout.Session;
           const userId = parseInt(session.metadata?.userId || "0");
-          const plan = session.metadata?.plan || "standard";
           const metaType = session.metadata?.type;
 
           if (userId && metaType === "cart") {
@@ -550,23 +592,28 @@ export function registerStripeRoutes(app: Express) {
               stripeSessionId: session.id,
             });
           } else if (userId && session.subscription) {
+            // Plan, interval, add-ons and Agency locations are read from the
+            // subscription's items (prices we created), not from metadata.
+            await billingSchemaReady();
             const stripeSubscription = await stripe.subscriptions.retrieve(session.subscription as string);
+            const [tracked] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+            if (tracked && hasLiveStripeSubscription(tracked) && tracked.stripeSubscriptionId !== stripeSubscription.id) {
+              // Checkout refuses live subscribers and expires stale sessions, so
+              // this should not happen; if it does, both bill — say so loudly.
+              console.error(`[billing] user ${userId} now has two live subscriptions (${tracked.stripeSubscriptionId} and ${stripeSubscription.id}); tracking the new one — cancel the other in Stripe.`);
+            }
             await db
               .update(subscriptions)
-              .set({
-                stripeSubscriptionId: session.subscription as string,
-                stripePriceId: stripeSubscription.items.data[0]?.price?.id || null,
-                plan,
-                status: "active",
-                currentPeriodEnd: subscriptionPeriodEnd(stripeSubscription),
-              })
+              .set(subscriptionRowUpdate(stripeSubscription, session.metadata?.plan))
               .where(eq(subscriptions.userId, userId));
           }
           break;
         }
+        case "customer.subscription.created":
         case "customer.subscription.updated": {
           const sub = event.data.object as Stripe.Subscription;
           const customerId = sub.customer as string;
+          await billingSchemaReady();
 
           const [existingSub] = await db
             .select()
@@ -574,25 +621,36 @@ export function registerStripeRoutes(app: Express) {
             .where(eq(subscriptions.stripeCustomerId, customerId))
             .limit(1);
 
-          if (existingSub) {
+          if (existingSub && eventAppliesToRow(existingSub, sub.id)) {
             await db
               .update(subscriptions)
-              .set({
-                status: sub.status === "active" ? "active" : sub.status,
-                currentPeriodEnd: subscriptionPeriodEnd(sub),
-              })
+              .set(subscriptionRowUpdate(sub))
               .where(eq(subscriptions.id, existingSub.id));
+          } else if (existingSub) {
+            console.warn(`[billing] ${event.type} for ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId}.`);
           }
           break;
         }
         case "customer.subscription.deleted": {
           const sub = event.data.object as Stripe.Subscription;
           const customerId = sub.customer as string;
+          await billingSchemaReady();
 
-          await db
-            .update(subscriptions)
-            .set({ status: "canceled", plan: "free" })
-            .where(eq(subscriptions.stripeCustomerId, customerId));
+          // Only the subscription this account is on ends its plan; ending a
+          // stray second subscription must not cancel the one still paid for.
+          const [existingSub] = await db
+            .select()
+            .from(subscriptions)
+            .where(eq(subscriptions.stripeCustomerId, customerId))
+            .limit(1);
+          if (existingSub?.stripeSubscriptionId === sub.id) {
+            await db
+              .update(subscriptions)
+              .set(canceledRowUpdate())
+              .where(eq(subscriptions.id, existingSub.id));
+          } else if (existingSub) {
+            console.warn(`[billing] deletion of ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "no subscription"}.`);
+          }
           break;
         }
       }

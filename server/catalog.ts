@@ -5,6 +5,13 @@
 // The client is free to send whatever price/name it likes; the server ignores
 // it and looks the real value up by id. Keep these values in sync with the
 // display catalog in client/src/pages/pricing.tsx and master-class.tsx.
+//
+// Anything priced at SALES_THRESHOLD_CENTS ($1,000) or more is quoted by a
+// sales rep (owner decision 2026-09-30): no price on the page and no checkout.
+// Every checkout path refuses it with sendTalkToSales() (409); items under the
+// threshold keep their price and checkout.
+import type { Response } from "express";
+import { showsPrice, TALK_TO_SALES_CODE } from "@shared/plans";
 
 export interface CatalogItem {
   name: string;
@@ -38,3 +45,17 @@ export const SEO_CONTRACT_REQUIRED_IDS = new Set([
   "dfy_seo_domination",
   "dfy_seo_ads",
 ]);
+
+/** At or above SALES_THRESHOLD_CENTS: quoted by a sales rep, never checked out online. */
+export const isSalesOnly = (priceCents: number) => !showsPrice(priceCents);
+
+export function talkToSalesMessage(names: string[]): string {
+  const list = names.length ? names.join(", ") : "This service";
+  return `${list} ${names.length > 1 ? "are" : "is"} quoted by a sales rep, not sold online. ` +
+    "Talk to a sales rep — send an inquiry and we'll get back to you with a quote. Nothing was charged.";
+}
+
+/** The one refusal for a sales-only item at checkout or contract creation: 409 { code: "talk_to_sales" }. */
+export function sendTalkToSales(res: Response, names: string[]) {
+  return res.status(409).json({ code: TALK_TO_SALES_CODE, message: talkToSalesMessage(names), items: names });
+}

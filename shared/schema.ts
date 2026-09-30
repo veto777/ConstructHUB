@@ -306,6 +306,15 @@ export const subscriptions = pgTable("subscriptions", {
   status: text("status").notNull().default("inactive"),
   currentPeriodEnd: timestamp("current_period_end"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Written from the Stripe subscription's items (server/billing/sync.ts). The
+  // columns are added by server/billing/schema.ts (boot) and
+  // scripts/apply-schema-migration.ts. "month" | "year"; null = not on a
+  // current plan's price.
+  billingInterval: text("billing_interval"),
+  /** Add-on quantities, keyed by shared/plans.ts AddonKey. */
+  addons: jsonb("addons").$type<Record<string, number>>().notNull().default({}),
+  /** Agency only: locations billed (the 10 included + the band item's quantity). */
+  agencyLocations: integer("agency_locations"),
 });
 
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ createdAt: true });
