@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -55,8 +56,8 @@ export default function GoogleAdFraudPage() {
       subtitle: "We recorded visitor behavior. What we found will make your blood boil.",
       content: [
         {
-          heading: "80% of Recorded Visitors Were Bots",
-          text: "We installed screen recording software that captures every visitor's mouse movements, clicks, scrolls, and behavior on our clients' websites. After analyzing thousands of sessions from Google Ads traffic, the results were staggering: approximately 80% of the recorded behavior was clearly not human. These weren't real people — they were bots. The behavior was unmistakable: instant bounces, robotic mouse movements that covered just enough distance to mimic a real user, or completely static sessions with zero interaction. These bots are sophisticated enough to trigger a \"click\" in Google's system but provide zero value to the advertiser."
+          heading: "In Sessions We Reviewed, Most Looked Automated",
+          text: "In our own experience, we installed screen recording software that captures visitors' mouse movements, clicks, scrolls, and behavior on client websites. In the Google Ads sessions we reviewed, we judged roughly 80% of the recorded behavior to be not human. This is our observation from the accounts we worked on, not an independent audit, and your traffic may differ. These weren't real people — they were bots. The behavior was unmistakable: instant bounces, robotic mouse movements that covered just enough distance to mimic a real user, or completely static sessions with zero interaction. These bots are sophisticated enough to trigger a \"click\" in Google's system but provide zero value to the advertiser."
         },
         {
           heading: "Google Can Track Bots — It Chooses Not To",
@@ -291,8 +292,8 @@ export default function GoogleAdFraudPage() {
           text: "Google controls over 90% of the search advertising market. There is no meaningful alternative. You can't take your ad spend to a competitor and get the same reach. Microsoft Ads covers maybe 5-10% of search traffic. Google knows this. They know you can't leave. They know you can't sue. They know you can't prove fraud without data they refuse to share. This is the definition of a monopoly abusing its position — and until regulators catch up (if they ever do), advertisers are trapped."
         },
         {
-          heading: "This Should Be Illegal",
-          text: "Charging for services not rendered. Concealing evidence of fraud. Restricting your ability to protect yourself. Refusing independent audits. Creating artificial limitations (500 IP limit) that serve no purpose except to protect revenue. In any regulated industry, these practices would result in massive fines, consent decrees, and criminal referrals. But because Google is a tech company operating in a largely unregulated advertising space, they operate with impunity. This should be illegal. Until it is, you have to protect yourself."
+          heading: "Our Opinion: Advertisers Deserve More Transparency",
+          text: "In our opinion, advertisers should be able to see click-level data, audit invalid-click decisions independently, and exclude as much traffic as they need. Today those controls are limited, and the advertiser has little recourse beyond Google's own review process. Until that changes, it is worth keeping your own records and protecting your budget where you can."
         },
       ],
     },
@@ -316,15 +317,15 @@ export default function GoogleAdFraudPage() {
               </span>
             </h2>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl mx-auto animate-in-delay-2">
-              We deployed advanced IP tracking, device fingerprinting, and screen recording across dozens of contractor Google Ads accounts. What we found is that Google is not protecting you — and the evidence suggests they never intended to.
+              In contractor Google Ads accounts we have worked on, we used IP tracking, device fingerprinting, and screen recording to review ad traffic. This page shares what we observed and our opinion of it — it is not an independent audit, and your results may differ.
             </p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-4xl mx-auto mb-8">
             {[
-              { label: "Bot Traffic", value: "~80%", sub: "of recorded visitors were bots", color: "text-[#4285F4]", bg: " bg-[#4285F4]/5 border-[#4285F4]/20" },
-              { label: "Click Inflation", value: "33-50%", sub: "more clicks than real visits", color: "text-[#34A853]", bg: " bg-[#34A853]/5 border-[#34A853]/20" },
-              { label: "Real Customers", value: "10-25%", sub: "of clicks are actual leads", color: "text-[#FBBC05]", bg: " bg-[#FBBC05]/5 border-[#FBBC05]/20" },
+              { label: "Bot Traffic", value: "~80%", sub: "of sessions we reviewed looked automated", color: "text-[#4285F4]", bg: " bg-[#4285F4]/5 border-[#4285F4]/20" },
+              { label: "Click Gap", value: "33-50%", sub: "more clicks than visits we recorded", color: "text-[#34A853]", bg: " bg-[#34A853]/5 border-[#34A853]/20" },
+              { label: "Real Customers", value: "10-25%", sub: "of clicks became leads in our accounts", color: "text-[#FBBC05]", bg: " bg-[#FBBC05]/5 border-[#FBBC05]/20" },
               { label: "Global Ad Fraud", value: "$172B", sub: "projected losses by 2028", color: "text-[#4285F4]", bg: " bg-[#4285F4]/5 border-[#4285F4]/20" },
             ].map((stat, i) => (
               <Card key={stat.label} className={`${stat.bg} card-hover-glow animate-scale-in`} style={{ animationDelay: `${0.3 + i * 0.1}s` }} data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
@@ -342,9 +343,9 @@ export default function GoogleAdFraudPage() {
               <div className="flex items-start gap-3">
                 <Siren className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-semibold text-[#FBBC05] mb-1">This Is Not Theory — This Is Data</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Every claim on this page is backed by our direct tracking data from real contractor Google Ads accounts, combined with industry research from Juniper Research, Lunio, ClickPatrol, Fraud Blocker, and Google's own published documentation. We used server-side IP tracking, device fingerprinting, screen recording software, and cross-referenced everything against Google Ads reporting. The findings are consistent across every account we analyzed.
+                  <h4 className="text-sm font-semibold text-[#FBBC05] mb-1">What This Page Is Based On</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed" data-testid="text-fraud-basis">
+                    The figures here come from our own tracking in the contractor Google Ads accounts we reviewed (server-side IP tracking, device fingerprinting and screen recording compared against Google Ads reporting), plus published industry research from Juniper Research, Lunio, ClickPatrol, Fraud Blocker and Google's documentation. They are our observations and opinions, not an independent audit. Traffic signals do not prove fraud, and IP exclusions do not guarantee savings.
                   </p>
                 </div>
               </div>
@@ -472,55 +473,62 @@ export default function GoogleAdFraudPage() {
                   {
                     icon: Shield,
                     title: "Use Click Guard",
-                    desc: "Our tracking script captures every visitor's IP, device fingerprint, and behavior. We detect bots, VPN hopping, and competitor clicks that Google won't catch.",
+                    href: "/google-ads",
+                    desc: "Our tracking script records each visit's IP, device fingerprint and browser details, and flags bot-like agents, repeat visits and one device seen from many IPs.",
                     color: "text-[#4285F4]",
                     bg: "bg-[#4285F4]/10",
                   },
                   {
                     icon: Link2,
-                    title: "Link to Google Ads",
-                    desc: "Use the Google Click Guard page to install our automated sync script. It pushes blocked IPs directly into your Google Ads campaigns every hour — no manual work needed.",
+                    title: "Apply Your List in Google Ads",
+                    href: "/google-ads?tab=link-ads",
+                    desc: "Copy the script from the Google Ads Script tab and paste it into your own Google Ads account. Scheduled hourly, it adds your blocked IPs to your enabled campaigns.",
                     color: "text-[#34A853]",
                     bg: "bg-[#34A853]/10",
                   },
                   {
                     icon: Fingerprint,
                     title: "Track Device Fingerprints",
-                    desc: "IP blocking alone isn't enough. Click Guard's canvas fingerprinting identifies devices even when they switch VPNs, catching fraud that IP-only tools miss entirely.",
+                    href: "/google-ads?tab=tools",
+                    desc: "IP blocking alone isn't enough. Click Guard's canvas fingerprint can link visits from one browser across different IPs, such as a VPN switch. Similar devices can share a fingerprint, so treat a match as a signal.",
                     color: "text-[#FBBC05]",
                     bg: "bg-[#FBBC05]/10",
                   },
                   {
                     icon: BarChart3,
                     title: "Monitor Your Data",
-                    desc: "Use the Dashboard and Fraud Analytics tabs to see exactly who's clicking your ads, how often, and from where. Knowledge is the first step to stopping the bleeding.",
+                    href: "/google-ads?tab=fraud",
+                    desc: "Use the Dashboard and Traffic Signals tabs to see which visits were flagged, how often an IP returns, and what devices and browsers they use.",
                     color: "text-[#4285F4]",
                     bg: "bg-[#4285F4]/10",
                   },
                   {
                     icon: Download,
                     title: "Export Evidence",
-                    desc: "Download CSV reports of all fraudulent activity. If you ever need to dispute charges with Google or take legal action, you'll have documentation they can't argue with.",
+                    href: "/google-ads?tab=fraud",
+                    desc: "Download a CSV of the visits Click Guard recorded, including which ones were flagged. Keep it as your own record if you ask Google to review invalid-click charges.",
                     color: "text-[#34A853]",
                     bg: "bg-[#34A853]/10",
                   },
                   {
                     icon: GraduationCap,
                     title: "Learn Google Ads Strategy",
+                    href: "/google-ads-guide",
                     desc: "Check out the Google Ads page for our complete playbook on running profitable campaigns — including strategies to minimize exposure to fraud in the first place.",
                     color: "text-[#FBBC05]",
                     bg: "bg-[#FBBC05]/10",
                   },
                 ].map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-3 bg-card rounded-lg p-3 border border-border card-hover-glow stagger-item" style={{ animationDelay: `${idx * 0.08}s` }} data-testid={`action-${idx}`}>
+                  <Link key={idx} href={item.href} className="flex items-start gap-3 bg-card rounded-lg p-3 border border-border card-hover-glow stagger-item cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ animationDelay: `${idx * 0.08}s` }} data-testid={`action-${idx}`}>
                     <div className={`w-8 h-8 rounded-lg ${item.bg} flex items-center justify-center flex-shrink-0`}>
                       <item.icon className={`h-4 w-4 ${item.color}`} />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-semibold text-foreground">{item.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
                     </div>
-                  </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2" />
+                  </Link>
                 ))}
               </div>
             </CardContent>
@@ -535,13 +543,13 @@ export default function GoogleAdFraudPage() {
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 <Badge className="bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/20 px-3 py-1">
-                  <Skull className="h-3 w-3 mr-1" /> 80% bot traffic documented
+                  <Skull className="h-3 w-3 mr-1" /> ~80% automated in sessions we reviewed
                 </Badge>
                 <Badge className="bg-[#34A853]/10 text-[#34A853] border-[#34A853]/20 px-3 py-1">
-                  <AlertTriangle className="h-3 w-3 mr-1" /> 33-50% inflated clicks
+                  <AlertTriangle className="h-3 w-3 mr-1" /> 33-50% click gap we recorded
                 </Badge>
                 <Badge className="bg-[#FBBC05]/10 text-[#FBBC05] border-[#FBBC05]/20 px-3 py-1">
-                  <Ban className="h-3 w-3 mr-1" /> 500 IP limit is artificial
+                  <Ban className="h-3 w-3 mr-1" /> 500 IP limit per campaign
                 </Badge>
               </div>
             </CardContent>
@@ -549,7 +557,7 @@ export default function GoogleAdFraudPage() {
 
           <div className="max-w-4xl mx-auto text-center">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Sources: ConstructHUB internal research data, Juniper Research, Lunio, ClickPatrol, Fraud Blocker, Search Engine Journal, Google Ads Help Center, Google Ad Traffic Quality documentation. All claims are based on observed data from real contractor Google Ads accounts and publicly available industry research.
+              Sources: ConstructHUB's own observations in contractor Google Ads accounts we reviewed, Juniper Research, Lunio, ClickPatrol, Fraud Blocker, Search Engine Journal, Google Ads Help Center, Google Ad Traffic Quality documentation. Statements about Google's motives are our opinion.
             </p>
           </div>
         </div>

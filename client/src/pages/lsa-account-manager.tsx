@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   Shield, Link2, Users, Settings2, RefreshCw, Plus, CheckCircle,
   AlertTriangle, Clock, X, ChevronRight, DollarSign, Pause, Play,
   FileText, Search, Eye, Wifi, WifiOff, Send, BarChart3, History, Pencil,
+  Loader2, ShieldCheck,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -97,17 +98,58 @@ type AuditEntry = {
 
 type Tab = "manager" | "accounts" | "invitations" | "audit";
 
+type AdminAccess = "allowed" | "denied" | "gate" | "error";
+
 export default function LsaAccountManagerPage() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>("manager");
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
+  // Who counts as a platform admin is the server's decision (server/admin.ts,
+  // including the dev-bypass account). Ask the admin API itself rather than
+  // keeping a second, drifting email list in the client.
+  const { data: access, isLoading: accessLoading, isError: accessCheckFailed } = useQuery<AdminAccess>({
+    queryKey: ["/api/admin/lsa/manager", "access"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/lsa/manager", { credentials: "include", cache: "no-store" });
+      if (res.ok) return "allowed";
+      if (res.status === 403 || res.status === 401) {
+        const body = await res.json().catch(() => null);
+        return body?.gateRequired === true ? "gate" : "denied";
+      }
+      return "error";
+    },
+    enabled: !!user,
+  });
+
   if (!user) return null;
 
-  const ADMIN_EMAILS = ["support@constructhub.us", "alpinesidingcompany@gmail.com"];
-  const isAdmin = ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? "");
-  if (!isAdmin) {
+  if (accessLoading) {
+    return (
+      <div className="h-full flex items-center justify-center p-8" data-testid="view-lsa-access-checking">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (access === "gate") return <AdminGateCard />;
+
+  if (access === "error" || accessCheckFailed) {
+    return (
+      <div className="h-full flex items-center justify-center p-8">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2" data-testid="text-access-check-failed">Couldn't check access</h2>
+            <p className="text-sm text-muted-foreground">Refresh the page to try again.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (access !== "allowed") {
     return (
       <div className="h-full flex items-center justify-center p-8">
         <Card className="max-w-md w-full">
@@ -171,6 +213,59 @@ export default function LsaAccountManagerPage() {
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "audit" && <AuditLogTab />}
       </div>
+    </div>
+  );
+}
+
+/** The platform-admin passphrase wall (same one the /crm/admin console uses). */
+function AdminGateCard() {
+  const { toast } = useToast();
+  const [gateUser, setGateUser] = useState("");
+  const [gatePass, setGatePass] = useState("");
+  const gateLogin = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", "/api/admin/gate", { username: gateUser, password: gatePass })).json(),
+    onSuccess: () => {
+      setGatePass("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lsa/manager"] });
+    },
+    onError: (e: any) => toast({ title: "Sign-in failed", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
+  return (
+    <div className="h-full flex items-center justify-center p-8">
+      <Card className="max-w-sm w-full" data-testid="card-admin-gate">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <ShieldCheck className="h-5 w-5 text-primary" /> Platform Admin sign-in
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">The LSA Account Manager needs the admin console credentials.</p>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (gateUser && gatePass && !gateLogin.isPending) gateLogin.mutate();
+            }}
+            className="space-y-3"
+          >
+            <div>
+              <Label htmlFor="lsa-gate-user">Username</Label>
+              <Input id="lsa-gate-user" autoComplete="username" value={gateUser}
+                onChange={(e) => setGateUser(e.target.value)} data-testid="input-admin-gate-user" />
+            </div>
+            <div>
+              <Label htmlFor="lsa-gate-pass">Password</Label>
+              <Input id="lsa-gate-pass" type="password" autoComplete="current-password" value={gatePass}
+                onChange={(e) => setGatePass(e.target.value)} data-testid="input-admin-gate-pass" />
+            </div>
+            <Button type="submit" className="w-full" disabled={!gateUser || !gatePass || gateLogin.isPending}
+              data-testid="button-admin-gate-login">
+              {gateLogin.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Sign in
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
