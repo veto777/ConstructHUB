@@ -93,8 +93,8 @@ test.describe("create menu + quick message", () => {
     await expect(page.getByTestId("channel-text")).toBeDisabled();
     await expect(page.getByTestId("text-texting-off-hint")).toContainText("Texting is off");
     const enableLink = page.getByTestId("link-enable-texting");
-    await expect(enableLink).toContainText("Settings → Integrations");
-    await expect(enableLink).toHaveAttribute("href", "/crm/settings");
+    await expect(enableLink).toContainText("Settings → SMS");
+    await expect(enableLink).toHaveAttribute("href", "/crm/settings#sms");
     await expect(page.getByTestId("channel-email")).toBeEnabled();
 
     // Email sends and is recorded on the client's timeline.

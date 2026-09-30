@@ -13,7 +13,7 @@ import { gotoCrm, ORGS, switchOrg, watchPage } from "./helpers";
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.aspire));
 
 /** Throwaway client + one open invoice for $123.45, via the real API. */
-async function makeClientWithInvoice(page: Page): Promise<{ customerId: string; invoiceId: string }> {
+async function makeClientWithInvoice(page: Page): Promise<{ customerId: string; invoiceId: string; email: string }> {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const cust = await page.request.post("/api/crm/customers", {
     data: { displayName: `E2E Pay ${stamp}`, email: `e2e-pay-${stamp}@example.com` },
@@ -29,7 +29,7 @@ async function makeClientWithInvoice(page: Page): Promise<{ customerId: string; 
   });
   if (!inv.ok()) throw new Error(`create invoice: ${inv.status()} ${await inv.text()}`);
   const invoice = await inv.json();
-  return { customerId: customer.id, invoiceId: invoice.id };
+  return { customerId: customer.id, invoiceId: invoice.id, email: customer.email };
 }
 
 test.describe("client page = the HUB", () => {
@@ -72,7 +72,16 @@ test.describe("client page = the HUB", () => {
     const dialog = page.getByTestId("dialog-take-payment");
     await expect(dialog).toBeVisible();
 
-    await dialog.getByTestId("button-create-checkout-link").click();
+    // Without online payments set up, the dialog says so instead of offering a link.
+    const createLink = dialog.getByTestId("button-create-checkout-link");
+    const offText = dialog.getByTestId("text-online-links-off");
+    await expect(createLink.or(offText)).toBeVisible();
+    if (await offText.isVisible().catch(() => false)) {
+      await page.keyboard.press("Escape");
+      guards.assertClean("client-page checkout link (online payments off)");
+      return;
+    }
+    await createLink.click();
 
     // Two honest outcomes: a connected Stripe account yields a hosted checkout
     // URL (session CREATION only — the client completes the charge); without
@@ -116,13 +125,14 @@ test.describe("client page = the HUB", () => {
 test.describe("payments page = select a client", () => {
   test("pick a client, record a manual payment, see it in recent payments", async ({ page }) => {
     const guards = watchPage(page);
-    const { customerId } = await makeClientWithInvoice(page);
+    const { customerId, email } = await makeClientWithInvoice(page);
 
     await gotoCrm(page, "/crm/payments");
     await expect(page.locator("h1")).toContainText("Payments");
 
-    await page.getByTestId("select-take-client").click();
+    await page.getByTestId("input-take-client-search").fill(email);
     await page.getByTestId(`take-client-${customerId}`).click();
+    await expect(page.getByTestId("picked-take-client")).toBeVisible();
     await page.getByTestId("button-open-take-payment").click();
 
     const dialog = page.getByTestId("dialog-take-payment");
@@ -138,7 +148,7 @@ test.describe("payments page = select a client", () => {
     const row = page.locator('[data-testid^="payment-"]').first();
     await expect(row).toBeVisible();
     await expect(row).toContainText("$50.00");
-    await expect(row).toContainText("cash");
+    await expect(row).toContainText(/cash/i);
 
     guards.assertClean("payments-page manual payment");
   });

@@ -49,6 +49,8 @@ test.describe("/crm/pricebook", () => {
     // Price Chart: add a SKU, edit it, delete it — the full lifecycle.
     await page.getByTestId("button-add-item").click();
     await page.getByTestId("input-item-name").fill(`E2E SKU ${stamp}`);
+    // A flat-priced SKU needs its price before it can be saved.
+    await page.getByTestId("input-item-flat-price").fill("125");
     await page.getByTestId("button-save-item").click();
     await expect(page.getByText("SKU added", { exact: true })).toBeVisible();
     const row = page.locator('[data-testid^="pb-item-"]', { hasText: `E2E SKU ${stamp}` });
