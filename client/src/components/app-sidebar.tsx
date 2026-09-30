@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
   Eye, Grid3X3, CreditCard, Shield, MapPin, GraduationCap, ChevronRight,
@@ -28,6 +28,7 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -121,7 +122,24 @@ function GoogleAdsIcon({ className }: { className?: string }) {
 }
 
 type BadgeType = "new" | "hot" | "best";
-type NavChild = { title: string; url: string; icon: any; badge?: BadgeType; subChildren?: NavChild[] };
+/** testId overrides the title-derived test id when two items share a title. */
+type NavChild = { title: string; url: string; icon: any; badge?: BadgeType; subChildren?: NavChild[]; testId?: string };
+
+const navTestId = (item: { title: string; testId?: string }) =>
+  item.testId ?? `link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`;
+
+/** SPA navigation never scrolls to a #fragment on its own; find it once the page renders. */
+function scrollToFragment(url: string) {
+  const id = url.split("#")[1];
+  if (!id) return;
+  let tries = 0;
+  const tick = () => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    else if (tries++ < 30) setTimeout(tick, 100);
+  };
+  setTimeout(tick, 0);
+}
 type NavGroup = {
   label: string;
   icon: any;
@@ -179,8 +197,8 @@ const googleGroups: NavGroup[] = [
       { title: "Domains", url: "/domains", icon: Globe },
       { title: "Mail alerts", url: "/mail-alerts", icon: Bell },
       { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
-      { title: "GBP Monitor", url: "/gmb-monitor", icon: Eye },
-      { title: "Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },
+      { title: "GMB Edit Monitor", url: "/gmb-monitor", icon: Eye },
+      { title: "GMB Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },
       { title: "Photo Optimizer", url: "/photos", icon: Camera, subChildren: [
         { title: "Media Library", url: "/media-library", icon: FolderOpen },
       ]},
@@ -225,8 +243,9 @@ const pricingGroup: NavGroup = {
   children: [
     { title: "Subscription Plans", url: "/pricing", icon: Layers },
     { title: "Individual Tools", url: "/individual-pricing", icon: Zap },
-    { title: "Master Class", url: "/master-class-landing", icon: BookOpen },
-    { title: "SEO Services", url: "/pricing", icon: Rocket },
+    { title: "Master Class", url: "/master-class-landing", icon: BookOpen, testId: "link-nav-pricing-master-class" },
+    // The done-for-you SEO packages section of the pricing page.
+    { title: "SEO Services", url: "/pricing#done-for-you", icon: Rocket },
   ],
 };
 
@@ -263,12 +282,12 @@ function CollapsibleNavGroup({ group }: { group: NavGroup }) {
       {open && (
         <SidebarMenuSub>
           {group.children.map(item => (
-            <SidebarMenuSubItem key={item.url}>
+            <SidebarMenuSubItem key={item.title}>
               <SidebarMenuSubButton
                 asChild
                 isActive={location === item.url}
               >
-                <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`} className="flex items-center gap-1.5 w-full min-w-0">
+                <Link href={item.url} onClick={() => scrollToFragment(item.url)} data-testid={navTestId(item)} className="flex items-center gap-1.5 w-full min-w-0">
                   <item.icon className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{item.title}</span>
                   {item.badge && <FeatureBadge type={item.badge} label={item.title} />}
@@ -276,12 +295,12 @@ function CollapsibleNavGroup({ group }: { group: NavGroup }) {
               </SidebarMenuSubButton>
               {item.subChildren && item.subChildren.map(sub => (
                 <SidebarMenuSubButton
-                  key={sub.url}
+                  key={sub.title}
                   asChild
                   isActive={location === sub.url}
                   className="pl-6"
                 >
-                  <Link href={sub.url} data-testid={`link-nav-${sub.title.toLowerCase().replace(/\s+/g, "-")}`} className="flex items-center gap-1.5 w-full min-w-0">
+                  <Link href={sub.url} data-testid={navTestId(sub)} className="flex items-center gap-1.5 w-full min-w-0">
                     <sub.icon className="h-3 w-3 shrink-0" />
                     <span className="truncate text-xs">{sub.title}</span>
                     {sub.badge && <FeatureBadge type={sub.badge} label={sub.title} />}
@@ -299,6 +318,13 @@ function CollapsibleNavGroup({ group }: { group: NavGroup }) {
 export function AppSidebar() {
   const [location] = useLocation();
   const queryClient = useQueryClient();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  // On a phone the sidebar is a sheet over the page: close it once a link
+  // (group child, standalone item or the footer Settings) has navigated.
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: dbCounts } = useQuery<{ total: number; county: number; city: number }>({
     queryKey: ["/api/databases/counts"],
@@ -316,8 +342,17 @@ export function AppSidebar() {
   const countyCount = counties?.length ?? 0;
 
   const handleLogout = async () => {
-    await apiRequest("POST", "/api/auth/logout");
-    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } catch {
+      // Still signed in: refresh so the UI shows the truth, stay put.
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      return;
+    }
+    // Drop every cached account response and leave the signed-in page with a
+    // fresh document, so nothing from the old session lingers in memory.
+    queryClient.clear();
+    window.location.assign("/");
   };
 
   return (
@@ -467,6 +502,7 @@ export function AppSidebar() {
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0"
+                      aria-label="Settings"
                       data-testid="button-settings"
                     >
                       <Settings className="h-3.5 w-3.5" />
@@ -477,6 +513,7 @@ export function AppSidebar() {
                     size="sm"
                     className="h-7 w-7 p-0"
                     onClick={handleLogout}
+                    aria-label="Sign out"
                     data-testid="button-logout"
                   >
                     <LogOut className="h-3.5 w-3.5" />

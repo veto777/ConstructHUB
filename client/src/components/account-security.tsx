@@ -22,6 +22,38 @@ export function NotificationPreferences() {
   const save=useMutation({mutationFn:async(p:any)=>apiRequest('PUT','/api/notification-prefs',{prefs:[p]}),onSuccess:()=>{queryClient.invalidateQueries({queryKey:['/api/notification-prefs']});}});
   return <Card><CardHeader><CardTitle>Notifications</CardTitle></CardHeader><CardContent className="space-y-4"><p>Security emails are always on. Changes save immediately.</p>{(error||save.error) && <p role="alert">{apiErrorMessage(error||save.error)}</p>}{data?.prefs.map((p:any)=><div className="border-t py-3 flex flex-wrap gap-4 items-center" key={p.kind}><span className="flex-1">{p.label}</span><label className="flex gap-2 items-center">In app <Switch aria-label={`${p.label}: In app`} checked={p.inApp} disabled={save.isPending} onCheckedChange={v=>save.mutate({...p,inApp:v})}/></label><label className="flex gap-2 items-center">{p.security?'Email (always on)':'Email'} <Switch aria-label={`${p.label}: Email`} checked={p.security||p.email} disabled={p.security||save.isPending} onCheckedChange={v=>save.mutate({...p,email:v})}/></label></div>)}</CardContent></Card>;
 }
+const ACTIVITY_LABELS: Record<string, string> = {
+  'auth.login_success': 'Signed in', 'auth.login_failure': 'Failed sign-in attempt', 'auth.logout': 'Signed out',
+  'security.reauthenticated': 'Identity verified', 'security.password_changed': 'Password changed',
+  'security.2fa_changed': 'Two-factor sign-in turned on or off', 'security.device_revoked': 'Remembered device removed',
+  'security.recovery_codes_changed': 'New recovery codes generated',
+  'google.connected': 'Google account connected', 'google.disconnected': 'Google account disconnected',
+  'sitescan.started': 'Site Scan started', 'sitescan.shared': 'Site Scan report shared',
+  'sitescan.plan_drafted': 'Site Scan fix plan drafted', 'sitescan.fixes_updated': 'Site Scan fixes updated',
+};
+const ACTIVITY_AREAS: Record<string, string> = {
+  auth: 'Sign-in', security: 'Security', google: 'Google', gbp: 'Google Business Profile', sitescan: 'Site Scan',
+  social: 'Social media', ads: 'Google Ads', agency: 'Agency', cloudflare: 'Cloudflare', domains: 'Domains',
+  mail: 'Mail alerts', gsc: 'Search Console', payment: 'Payments',
+};
+const METHOD_LABELS: Record<string, string> = { google: 'Google', password: 'password', '2fa': 'two-factor code', email: 'email code', totp: 'authenticator' };
+/** Plain-language label for an activity kind; unknown kinds fall back to "Area: action". */
+export function activityLabel(kind: string, detail?: any): string {
+  const method = typeof detail?.method === 'string' ? METHOD_LABELS[detail.method] : undefined;
+  const known = ACTIVITY_LABELS[kind];
+  if (known) return method && /^(auth\.login|security\.reauth)/.test(kind) ? `${known} with ${method}` : known;
+  const [area, ...rest] = kind.split('.');
+  const action = rest.join(' ').replace(/[_-]+/g, ' ').trim();
+  const areaLabel = ACTIVITY_AREAS[area] || area.charAt(0).toUpperCase() + area.slice(1);
+  return action ? `${areaLabel}: ${action}` : areaLabel;
+}
+/** A "Since" date means local midnight of that day, not a UTC string comparison. */
+export function activitySince(createdAt: string, since: string): boolean {
+  if (!since) return true;
+  const start = new Date(`${since}T00:00`);
+  return Number.isNaN(start.getTime()) || new Date(createdAt).getTime() >= start.getTime();
+}
+
 export function SecurityActivity() {
   const [filter,setFilter]=useState(''),[since,setSince]=useState(''),[message,setMessage]=useState('');
   const {data,error}=useQuery<any>({queryKey:['/api/account-activity']});
@@ -35,12 +67,15 @@ export function SecurityActivity() {
     setMessage('Account disconnected. Reset your ConstructHUB password below. If you sign in only with Google, also secure your Google account and change its password.');
   }});
   const account=accounts.data?.accounts?.find((a:any)=>a.subject===subject);
+  const kinds=[...new Set<string>(data?.activity.map((a:any)=>a.kind)||[])];
+  const shown=(data?.activity||[]).filter((a:any)=>(!filter||a.kind===filter)&&activitySince(a.created_at,since));
   return <div className="space-y-6">
     {subject && <Card><CardHeader><CardTitle>Wasn't you?</CardTitle></CardHeader><CardContent className="space-y-3"><p>Disconnect {account?.email || 'this Google account'} and reset your password to secure your account.</p><Button disabled={secure.isPending} onClick={()=>secure.mutate()}>Disconnect account and secure sign-in</Button>{secure.error && <p role="alert">{apiErrorMessage(secure.error)}</p>}{message && <p role="status">{message}</p>}<p><a className="underline" href="/auth?mode=forgot-password">Reset password</a></p></CardContent></Card>}
     <Card><CardHeader><CardTitle>Remembered devices</CardTitle></CardHeader><CardContent>{devices.error && <p role="alert">{apiErrorMessage(devices.error)}</p>}{revoke.error && <p role="alert">{apiErrorMessage(revoke.error)}</p>}{devices.isLoading && <p>Loading devices…</p>}{devices.data?.devices.length===0 && <p>No remembered devices.</p>}{devices.data?.devices.map((d:any)=><div key={d.id} className="border-t py-3"><p className="break-all">{d.device||'Unknown device'}</p><p>Expires {new Date(d.expires_at).toLocaleString()}</p><Button variant="outline" disabled={revoke.isPending} onClick={()=>revoke.mutate(d.id)}>Revoke device</Button></div>)}</CardContent></Card>
-    <Card><CardHeader><CardTitle>Account activity</CardTitle></CardHeader><CardContent className="space-y-3"><label>Activity type <select aria-label="Activity type" value={filter} onChange={e=>setFilter(e.target.value)} className="border p-2 rounded bg-background"><option value="">All activity</option>{[...new Set<string>(data?.activity.map((a:any)=>a.kind)||[])].map(k=><option key={k}>{k}</option>)}</select></label> <label>Since <input aria-label="Since" type="date" value={since} onChange={e=>setSince(e.target.value)} className="border p-2 rounded bg-background"/></label>{error && <p role="alert">{apiErrorMessage(error)}</p>}
+    <Card><CardHeader><CardTitle>Account activity</CardTitle></CardHeader><CardContent className="space-y-3"><label>Activity type <select aria-label="Activity type" value={filter} onChange={e=>setFilter(e.target.value)} className="border p-2 rounded bg-background"><option value="">All activity</option>{kinds.map(k=><option key={k} value={k}>{activityLabel(k)}</option>)}</select></label> <label>Since <input aria-label="Since" type="date" value={since} onChange={e=>setSince(e.target.value)} className="border p-2 rounded bg-background"/></label>{error && <p role="alert">{apiErrorMessage(error)}</p>}
     <p className="text-sm text-muted-foreground">Most recent 200 events. IP and device describe the request, and may reflect a proxy.</p>
-    {data?.activity.filter((a:any)=>(!filter||a.kind===filter)&&(!since||a.created_at>=since)).map((a:any)=><div className="border-t py-3 break-words" key={a.id}><strong>{a.kind}</strong><p>{new Date(a.created_at).toLocaleString()}</p><p>IP: {a.ip||'Unavailable'} · Device: {a.user_agent||'Unavailable'}</p>{a.detail?.email && <p>{a.detail.email}</p>}</div>)}
-    {data?.activity.length===0 && <p>No activity recorded yet.</p>}</CardContent></Card>
+    {shown.map((a:any)=><div className="border-t py-3 break-words" key={a.id} data-testid="row-account-activity"><strong title={a.kind}>{activityLabel(a.kind,a.detail)}</strong><p>{new Date(a.created_at).toLocaleString()}</p><p>IP: {a.ip||'Unavailable'} · Device: {a.user_agent||'Unavailable'}</p>{a.detail?.email && <p>{a.detail.email}</p>}</div>)}
+    {data?.activity.length===0 && <p>No activity recorded yet.</p>}
+    {!!data?.activity.length && shown.length===0 && <p data-testid="text-activity-no-match">No activity matches these filters.</p>}</CardContent></Card>
   </div>;
 }

@@ -301,8 +301,6 @@ export default function CrmAdminPage() {
         subtitle="Every account and organization on ConstructHub — read-only monitoring."
       />
 
-      <SiteScanLeads />
-
       {/* ── Overview ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="section-overview">
         {/* Users/orgs have no dedicated page — the destination is the section below. */}
@@ -313,16 +311,25 @@ export default function CrmAdminPage() {
         <a href="#card-orgs" className="block h-full rounded-xl transition-shadow hover:shadow-md">
           <MetricCard icon={Building2} label="Orgs" value={overview?.orgs ?? "—"} testid="metric-orgs" />
         </a>
+        {/* Platform-wide totals: no link, because /crm/clients etc. show only
+            the admin's own workspace, not the numbers on these cards. */}
         <MetricCard icon={UserCircle} label="Clients" value={overview?.customers ?? "—"} testid="metric-customers"
-          href="/crm/clients" />
+          context="all orgs" />
         <MetricCard icon={FileText} label="Estimates" value={overview?.estimates ?? "—"} testid="metric-estimates"
-          href="/crm/estimates" />
+          context="all orgs" />
         <MetricCard icon={Receipt} label="Invoices" value={overview?.invoices ?? "—"} testid="metric-invoices"
-          href="/crm/invoices" />
+          context="all orgs" />
         <MetricCard icon={CreditCard} label="Payments" value={overview ? moneyCompact(overview.payments.succeededCents) : "—"}
-          testid="metric-payments" href="/crm/payments" valueClassName="text-2xl"
-          context={overview ? `${overview.payments.count} charges` : undefined} />
+          testid="metric-payments" valueClassName="text-2xl"
+          context={overview ? `${overview.payments.count} charges, all orgs` : undefined} />
       </div>
+
+      {/* Growth-site Site Scan leads — wide table, so it scrolls sideways on a phone. */}
+      <Card data-testid="card-sitescan-leads">
+        <CardContent className="p-0 overflow-x-auto [&_section]:p-4 sm:[&_section]:p-5 [&_th]:text-left [&_th]:pr-4 [&_td]:pr-4 [&_td]:py-1.5 [&_table]:min-w-[480px]">
+          <SiteScanLeads />
+        </CardContent>
+      </Card>
 
       {/* ── Users ────────────────────────────────────────────────────────── */}
       <Card data-testid="card-users" id="card-users" className="scroll-mt-6">

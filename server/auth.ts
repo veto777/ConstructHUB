@@ -54,6 +54,8 @@ declare module "express-session" {
     /** CRM beta invite token, carried through the Google OAuth round-trip. */
     betaToken?: string;
     authNext?: string;
+    /** "Continue with Google" step-up: the signed-in user it may re-verify. */
+    googleReauth?: { userId: number; expires: number };
   }
 }
 
@@ -148,6 +150,15 @@ export async function setupAuth(app: Express) {
           const displayName = profile.displayName || null;
           const avatarUrl = profile.photos?.[0]?.value || null;
 
+          // Step-up re-verification never creates, links or switches an
+          // account: only the Google identity already linked to the signed-in
+          // user can pass (the callback checks the id again).
+          const reauth = req.session?.googleReauth;
+          if (reauth) {
+            const [linked] = await db.select().from(users).where(eq(users.googleId, googleId));
+            return done(null, linked && linked.id === reauth.userId && reauth.expires > Date.now() ? linked : false);
+          }
+
           // A beta invite rides the OAuth round-trip in the session; only a
           // brand-new account redeems it (below), never an existing login.
           const betaToken = req.session?.betaToken;
@@ -230,6 +241,12 @@ export async function setupAuth(app: Express) {
     if (safeNext) {
       req.session.authNext = safeNext;
     }
+    // ?reauth=1 is the "Continue with Google" step-up for a signed-in user
+    // (sensitive actions need a verification from the last 12 hours). The
+    // account chooser always shows, pre-filled with the account's email.
+    const reauth = req.query.reauth === "1" && !!req.user;
+    if (reauth) req.session.googleReauth = { userId: req.user!.id, expires: Date.now() + 10 * 60_000 };
+    else delete req.session.googleReauth;
     const scopes = ["profile", "email"];
     if (gbp) {
       scopes.push("https://www.googleapis.com/auth/business.manage");
@@ -238,7 +255,8 @@ export async function setupAuth(app: Express) {
       scope: scopes,
       callbackURL,
       accessType: gbp ? "offline" : undefined,
-      prompt: gbp ? "consent" : undefined,
+      prompt: gbp ? "consent" : reauth ? "select_account" : undefined,
+      loginHint: reauth ? req.user!.email : undefined,
     } as any)(req, res, next);
   });
 
@@ -246,7 +264,34 @@ export async function setupAuth(app: Express) {
     "/api/auth/google/callback",
     (req, res, next) => {
       const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
-      passport.authenticate("google", { failureRedirect: "/auth?error=google-failed", callbackURL, keepSessionInfo: true } as any)(req, res, next);
+      // Read here, cleared in the callback: the verify function above must
+      // still see it to stay in step-up mode (no account create/link/switch).
+      const reauth = req.session.googleReauth;
+      // A custom callback so every Google outcome lands on a page: passport's
+      // failureRedirect only covers access_denied, and any other Google error
+      // (server_error, temporarily_unavailable, …) used to surface as raw JSON.
+      passport.authenticate("google", { callbackURL } as any, async (err: any, user: any) => {
+        delete req.session.googleReauth; // single use
+        if (reauth) {
+          // Step-up only: the session keeps its signed-in user either way.
+          const nextPath = safeNextPath(req.session.authNext) ?? "/settings?tab=security";
+          delete req.session.authNext;
+          const ok = !err && user && req.user?.id === reauth.userId && user.id === reauth.userId && reauth.expires > Date.now();
+          if (ok && !user.totpEnabled) {
+            markRecentAuth(req, user.id);
+            try { await logActivity(req, user.id, "security.reauthenticated", { method: "google" }); } catch { /* audit is best-effort here */ }
+            return res.redirect(nextPath);
+          }
+          return res.redirect(`${nextPath}${nextPath.includes("?") ? "&" : "?"}reauth=google-failed`);
+        }
+        if (err || !user) return res.redirect("/auth?error=google-failed");
+        // keepSessionInfo: the OAuth round-trip state (authNext) must survive
+        // passport's session regeneration on login.
+        req.logIn(user, { keepSessionInfo: true } as any, (loginErr) => {
+          if (loginErr) return res.redirect("/auth?error=google-failed");
+          next();
+        });
+      })(req, res, next);
     },
     async (req, res) => {
       try {
@@ -262,8 +307,13 @@ export async function setupAuth(app: Express) {
             });
             return;
           }
+          // A fresh Google sign-in is a fresh authentication — the same as a
+          // password login (below), so connecting Google Business Profile or
+          // turning on 2FA right after signing in never asks for an email
+          // code. 2FA accounts still re-verify with their authenticator.
+          if (!fullUser?.totpEnabled) markRecentAuth(req, req.user.id);
+          await logActivity(req, req.user.id, "auth.login_success", { method: "google" });
         }
-        if (req.user) await logActivity(req, req.user.id, "auth.login_success", { method: "google" });
       } catch {
         req.logout(() => res.redirect("/auth?error=google-failed"));
         return;
@@ -611,7 +661,11 @@ export async function setupAuth(app: Express) {
     try {
       const { displayName, companyName, companyLogoUrl, googleProfileUrl } = req.body;
       const updateData: any = {};
-      if (displayName !== undefined) updateData.displayName = String(displayName).slice(0, 200);
+      if (displayName !== undefined) {
+        const name = String(displayName ?? "").trim();
+        if (!name) return res.status(400).json({ message: "Display name is required" });
+        updateData.displayName = name.slice(0, 200);
+      }
       if (companyName !== undefined) updateData.companyName = String(companyName).slice(0, 200);
       if (companyLogoUrl !== undefined) {
         const logoStr = String(companyLogoUrl);
