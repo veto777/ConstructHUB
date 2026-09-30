@@ -114,7 +114,15 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     const id=Number(req.params.id);
     const {rows:[l]}=await pool.query('SELECT id FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);
     if(!l) throw new GoogleError('invalid','Location not found',404);
-    const {rows}=await pool.query(`SELECT date::text,metric,value::text FROM gbp_daily_metrics WHERE location_id=$1 AND date>=current_date-90 ORDER BY date,metric`,[id]);
-    res.json({source:'Google Business Profile Performance API',available:rows.length>0,metrics:METRICS,rows});
+    const days:Record<string,number|null>={'30d':30,'90d':90,'6m':183,'12m':366,'18m':548,'all':null};
+    const range=String(req.query.range||'90d') in days?String(req.query.range||'90d'):'90d';
+    const group=['day','week','month'].includes(String(req.query.group))?String(req.query.group):'day';
+    const since=days[range];
+    const {rows}=await pool.query(`SELECT to_char(date_trunc($2,date),'YYYY-MM-DD') AS date,metric,sum(value)::text AS value,max(date)::text AS last_day
+      FROM gbp_daily_metrics WHERE location_id=$1 ${since===null?'':'AND date>=current_date-$3::int'} GROUP BY 1,2 ORDER BY 1,2`,since===null?[id,group]:[id,group,since]);
+    const {rows:[span]}=await pool.query('SELECT min(date)::text first,max(date)::text last FROM gbp_daily_metrics WHERE location_id=$1',[id]);
+    // Google reports with a delay of a few days; those days read as zeros until Google fills them in.
+    const pending=new Date(Date.now()-5*86400000).toISOString().slice(0,10);
+    res.json({source:'Google Business Profile Performance API',available:rows.length>0,metrics:METRICS,rows,range,group,firstDate:span?.first??null,lastDate:span?.last??null,pendingAfter:pending});
   });
 }

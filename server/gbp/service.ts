@@ -89,6 +89,8 @@ export function mapReview(r: any, parent: string) {
   return {name,rating,reviewer:r.reviewer?.displayName || 'Anonymous',photo:r.reviewer?.profilePhotoUrl || null,
     comment:r.comment || null,date:r.createTime,reply:r.reviewReply?.comment || null,replyDate:r.reviewReply?.updateTime || null};
 }
+/** Google's Business Profile Performance API serves roughly the last 18 months of daily metrics. */
+export const PERFORMANCE_HISTORY_DAYS = 540;
 export async function syncLocation(userId: number, id: number, client?: GoogleClient) {
   const l = await ownedLocation(userId,id);
   const subject = l.gbp_google_subject ?? await soleSubject(userId);
@@ -165,11 +167,26 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           start.setUTCDate(start.getUTCDate()-(s?.cursor_date ? 7 : 89));
           const endString = end.toISOString().slice(0,10), startString = start.toISOString().slice(0,10);
           const rows = mapPerformance(await client.request('performance',performancePath(l.gbp_location_name,startString,endString)));
+          // Google keeps ~18 months of daily metrics. Once, back-fill everything older than what we store;
+          // from then on history accumulates here beyond Google's window. A failed back-fill never fails the sync.
+          const {rows:[old]} = await c.query('SELECT min(date)::text earliest FROM gbp_daily_metrics WHERE location_id=$1',[id]);
+          const floor = new Date(end); floor.setUTCDate(floor.getUTCDate()-PERFORMANCE_HISTORY_DAYS);
+          const floorString = floor.toISOString().slice(0,10);
+          const backEnd = new Date(`${(old?.earliest && old.earliest < startString ? old.earliest : startString)}T00:00:00Z`); backEnd.setUTCDate(backEnd.getUTCDate()-1);
+          const backEndString = backEnd.toISOString().slice(0,10);
+          let backfill: {date:string;metric:string;value:number}[] = [];
+          if (backEndString > floorString) {
+            backfill = await client.request('performance',performancePath(l.gbp_location_name,floorString,backEndString)).then(mapPerformance).catch(() => []);
+          }
           await c.query('BEGIN');
           try {
             await c.query('DELETE FROM gbp_daily_metrics WHERE location_id=$1 AND date BETWEEN $2 AND $3',[id,startString,endString]);
             for (const r of rows) {
               if(r.date < startString || r.date > endString) throw new GoogleError('invalid','Google returned a metric outside the requested range');
+              await c.query(`INSERT INTO gbp_daily_metrics(location_id,date,metric,value) VALUES($1,$2,$3,$4) ON CONFLICT(location_id,date,metric) DO UPDATE SET value=$4`,[id,r.date,r.metric,r.value]);
+            }
+            for (const r of backfill) {
+              if(r.date < floorString || r.date > backEndString) continue;
               await c.query(`INSERT INTO gbp_daily_metrics(location_id,date,metric,value) VALUES($1,$2,$3,$4) ON CONFLICT(location_id,date,metric) DO UPDATE SET value=$4`,[id,r.date,r.metric,r.value]);
             }
             // Keep the initial backfill window until Google actually supplies data.

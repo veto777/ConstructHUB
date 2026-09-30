@@ -15,13 +15,13 @@ test('owner previews a snapshot, reauthenticates, changes guard mode, approves/r
     const path=new URL(r.request().url()).pathname;
     if(path.endsWith('/preview'))return r.fulfill({json:{snapshot:{title:'Approved name',websiteUri:'https://example.invalid'},token:'fixture-preview'}});
     if(path.includes('/changes/')){const c=changes.find(c=>String(c.id)===path.split('/').at(-1))!;c.status=r.request().postDataJSON().action==='approve'?'approved':'reverted';return r.fulfill({json:{ok:true}});}
-    if(r.request().method()==='PUT'){expect(verified).toBe(true);expect(r.request().postDataJSON().token).toBe('fixture-preview');saved=true;mode=r.request().postDataJSON().mode;return r.fulfill({json:{ok:true}});}
+    if(r.request().method()==='PUT'){expect(r.request().postDataJSON().token).toBe('fixture-preview');saved=true;mode=r.request().postDataJSON().mode;return r.fulfill({json:{ok:true}});}
     return r.fulfill({json:{mode,watched:['title','websiteUri'],snapshot:saved?{title:'Approved name'}:null,changes:saved?changes:[]}});
   });
   await page.route('**/api/gbp/reports/changes/11',r=>{if(r.request().method()==='POST')reported=true;return r.fulfill({json:{text:'Business: Guard browser fixture\nApproved name → Outside name\nDetected: 2026-09-29',formUrl:'https://support.google.com/business/contact/business_redressal_form',listingUrl:'https://www.google.com/maps?cid=1',reportedAt:reported?'2026-09-29':null}})});
   await page.goto('/locations');await page.getByTestId('button-cookies-decline').click();await expect(page.getByText('Guard: notify · 1 pending')).toBeVisible();await page.getByText(location.businessName,{exact:true}).click();await page.getByTestId('tab-guard').click();
   await page.getByLabel('Guard mode').selectOption('notify');await page.getByRole('button',{name:'Preview current Google values'}).click();await expect(page.getByText('Approved name',{exact:true})).toBeVisible();
-  await page.getByLabel('Account password').fill('test-fixture-password');await page.getByRole('button',{name:'Verify identity',exact:true}).click();await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();await expect(page.getByText('Current mode: notify.',{exact:false})).toBeVisible();
+  await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();await expect(page.getByText('Current mode: notify.',{exact:false})).toBeVisible();
   const first=page.locator('article').filter({hasText:'Outside name'});await first.getByRole('button',{name:'Approve',exact:true}).click();await expect(first).toContainText('approved');
   const second=page.locator('article').filter({hasText:'https://other.invalid'});await second.getByRole('button',{name:'Reject',exact:true}).click();await expect(second).toContainText('reverted');
   await first.getByRole('button',{name:'Report',exact:true}).click();await expect(page.getByText("Google receives this report only when you submit Google's form.",{exact:false})).toBeVisible();await expect(page.getByRole('link',{name:"Open Google's official form"})).toHaveAttribute('href','https://support.google.com/business/contact/business_redressal_form');

@@ -27,6 +27,6 @@ test('connection, sync errors, draft versus confirmed reply and deletion',async(
 });
 test('performance renders unavailable separately from zero',async({page})=>{
   await page.route('**/api/locations',r=>r.fulfill({json:[{id:987,businessName:'Fixture business',gbpAccountName:'accounts/fixture',gbpLocationName:'locations/fixture'}]}));
-  await page.route('**/api/gbp/locations/987/performance',r=>r.fulfill({json:{available:true,source:'Google',metrics:['CALL_CLICKS','WEBSITE_CLICKS'],rows:[{date:'2026-09-25',metric:'CALL_CLICKS',value:'0'}]}}));
-  await page.goto('/locations');await page.getByText('Fixture business',{exact:true}).click();await expect(page.getByRole('cell',{name:'0',exact:true})).toBeVisible();await expect(page.getByRole('cell',{name:'Unavailable',exact:true})).toBeVisible();
+  await page.route('**/api/gbp/locations/987/performance*',r=>r.fulfill({json:{available:true,source:'Google',metrics:['CALL_CLICKS','WEBSITE_CLICKS'],rows:[{date:'2026-09-25',metric:'CALL_CLICKS',value:'0',last_day:'2026-09-25'}],pendingAfter:'2026-09-28'}}));
+  await page.goto('/locations');await page.getByText('Fixture business',{exact:true}).click();await expect(page.getByTestId('row-performance-total')).toContainText('Total');await expect(page.getByRole('cell',{name:'0',exact:true}).first()).toBeVisible();await expect(page.getByRole('cell',{name:'—',exact:true}).first()).toBeVisible();
 });

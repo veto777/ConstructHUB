@@ -543,15 +543,78 @@ function ChangeBadge({ value }: { value: number }) {
   );
 }
 
+const PERF_LABELS: Record<string, string> = {
+  BUSINESS_IMPRESSIONS_DESKTOP_MAPS: "Maps desktop", BUSINESS_IMPRESSIONS_DESKTOP_SEARCH: "Search desktop",
+  BUSINESS_IMPRESSIONS_MOBILE_MAPS: "Maps mobile", BUSINESS_IMPRESSIONS_MOBILE_SEARCH: "Search mobile",
+  WEBSITE_CLICKS: "Website clicks", CALL_CLICKS: "Call clicks", BUSINESS_DIRECTION_REQUESTS: "Directions",
+};
+type PerfData = { available: boolean; metrics: string[]; rows: { date: string; metric: string; value: string; last_day: string }[];
+  firstDate: string | null; lastDate: string | null; pendingAfter: string };
+
 function InsightsTab({ location }: { location: BusinessLocation }) {
-  const {data,error,isLoading}=useQuery<{available:boolean;source:string;metrics:string[];rows:{date:string;metric:string;value:string}[]}>({queryKey:['/api/gbp/locations',location.id,'performance']});
-  const dates=[...new Set(data?.rows.map(r=>r.date)||[])].reverse();
-  const labels:Record<string,string>={BUSINESS_IMPRESSIONS_DESKTOP_MAPS:'Maps desktop',BUSINESS_IMPRESSIONS_DESKTOP_SEARCH:'Search desktop',BUSINESS_IMPRESSIONS_MOBILE_MAPS:'Maps mobile',BUSINESS_IMPRESSIONS_MOBILE_SEARCH:'Search mobile',WEBSITE_CLICKS:'Website clicks',CALL_CLICKS:'Call clicks',BUSINESS_DIRECTION_REQUESTS:'Directions'};
-  return <div className="space-y-4"><GbpConnection locationId={location.id} />
-    <h3 className="font-semibold">Google performance — last 90 days</h3>
-    <p className="text-sm text-muted-foreground">Daily values reported by Google. Missing metrics are unavailable; zero means Google reported zero. Recent days may be delayed.</p>
-    {isLoading?<p>Loading performance…</p>:error?<p role="alert">Unable to load performance.</p>:!data?.available?<p>Performance unavailable. Import a Google location and sync to retrieve real metrics.</p>:<div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th className="p-2 text-left">Date</th>{data.metrics.map(m=><th className="p-2" key={m}>{labels[m]||m}</th>)}</tr></thead><tbody>{dates.map(date=><tr key={date}><td className="p-2">{date}</td>{data.metrics.map(metric=><td className="p-2 text-center" key={metric}>{data.rows.find(r=>r.date===date&&r.metric===metric)?.value??'Unavailable'}</td>)}</tr>)}</tbody></table></div>}
-  </div>;
+  const [range, setRange] = useState("90d");
+  const [group, setGroup] = useState<"day" | "week" | "month">("day");
+  const { data, error, isLoading } = useQuery<PerfData>({
+    queryKey: [`/api/gbp/locations/${location.id}/performance?range=${range}&group=${group}`],
+  });
+  const periods = [...new Set(data?.rows.map((r) => r.date) || [])].reverse();
+  const cell = (period: string, metric: string) => data?.rows.find((r) => r.date === period && r.metric === metric);
+  const total = (metric: string) => (data?.rows || []).filter((r) => r.metric === metric).reduce((n, r) => n + Number(r.value), 0);
+  const label = (d: string) => {
+    const dt = new Date(`${d}T00:00:00Z`);
+    if (group === "month") return dt.toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
+    if (group === "week") return `Week of ${dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
+    return d;
+  };
+  const pending = (period: string) => !!data && (data.rows.find((r) => r.date === period)?.last_day ?? period) > data.pendingAfter;
+  const rangeLabel: Record<string, string> = { "30d": "Last 30 days", "90d": "Last 90 days", "6m": "Last 6 months", "12m": "Last 12 months", "18m": "Last 18 months", all: "All stored history" };
+  const select = "border rounded-md px-2 py-1.5 text-sm bg-background";
+  return (
+    <div className="space-y-4">
+      <GbpConnection locationId={location.id} />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="font-semibold">Google performance — {rangeLabel[range].toLowerCase()}, by {group}</h3>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Values reported by Google. Google keeps about 18 months of history; ConstructHUB keeps every day it syncs, so your history grows past that over time.
+            {data?.firstDate ? ` Stored: ${data.firstDate} → ${data.lastDate}.` : ""}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <select className={select} value={range} onChange={(e) => setRange(e.target.value)} aria-label="Date range" data-testid="select-perf-range">
+            {Object.entries(rangeLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <select className={select} value={group} onChange={(e) => setGroup(e.target.value as any)} aria-label="Group by" data-testid="select-perf-group">
+            <option value="day">By day</option><option value="week">By week</option><option value="month">By month</option>
+          </select>
+        </div>
+      </div>
+      {isLoading ? <p>Loading performance…</p> : error ? <p role="alert">Unable to load performance.</p> : !data?.available ? (
+        <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="table-performance">
+            <thead><tr>
+              <th className="p-2 text-left">{group === "day" ? "Date" : group === "week" ? "Week" : "Month"}</th>
+              {data.metrics.map((m) => <th className="p-2" key={m}>{PERF_LABELS[m] || m}</th>)}
+            </tr></thead>
+            <tbody>
+              <tr className="border-b font-semibold bg-muted/40" data-testid="row-performance-total">
+                <td className="p-2">Total</td>
+                {data.metrics.map((m) => <td className="p-2 text-center" key={m}>{total(m).toLocaleString()}</td>)}
+              </tr>
+              {periods.map((p) => (
+                <tr key={p} className={pending(p) ? "text-muted-foreground" : ""}>
+                  <td className="p-2 whitespace-nowrap">{label(p)}{pending(p) && <span className="ml-2 text-[10px] rounded bg-muted px-1.5 py-0.5" title="Google reports with a delay of a few days">not final yet</span>}</td>
+                  {data.metrics.map((m) => <td className="p-2 text-center" key={m}>{cell(p, m) ? Number(cell(p, m)!.value).toLocaleString() : "—"}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function GoogleIcon() {
