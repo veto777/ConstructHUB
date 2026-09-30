@@ -5,7 +5,7 @@ import { parseEnv } from "node:util";
 import { randomUUID } from "node:crypto";
 const env = parseEnv(readFileSync(".env", "utf8"));
 const url = process.env.DATABASE_URL || env.DATABASE_URL;
-if (new URL(url).pathname !== "/constructhub_dev_a3") throw new Error("Wrong review test database");
+if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(url).pathname)) throw new Error("Wrong review test database");
 const pool = new pg.Pool({ connectionString: url });
 const tokens: string[] = [];
 async function review() {
@@ -14,7 +14,14 @@ async function review() {
     values(1,'Audit customer',$2,'Local test company','https://www.google.com/', $1)`, [token, `${token}@example.invalid`]);
   return token;
 }
+// The rating flow for 9-10 depends on the dev user's referral offer; run with it off and restore it after.
+let savedReferral: { enabled: boolean; offer: string } | undefined;
+test.beforeAll(async () => {
+  savedReferral = (await pool.query("select enabled, offer from review_referral_settings where user_id=1")).rows[0];
+  if (savedReferral) await pool.query("update review_referral_settings set enabled=false where user_id=1");
+});
 test.afterAll(async () => {
+  if (savedReferral) await pool.query("update review_referral_settings set enabled=$1 where user_id=1", [savedReferral.enabled]);
   await pool.query("delete from review_recipient_preferences where user_id=1 and email=any($1::text[])", [tokens.map(t => `${t}@example.invalid`)]);
   await pool.query("delete from review_requests where token = any($1::text[])", [tokens]);
   await pool.end();

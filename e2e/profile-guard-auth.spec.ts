@@ -25,9 +25,8 @@ test('real Guard settings require shared step-up and retry the saved mode with b
   await page.getByTestId('input-login-password').fill(password);
   await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/auth/login')),page.getByTestId('button-login').click()]);
   await pool.query("UPDATE session SET sess=(sess::jsonb-'recentAuth'-'profileGuardAuth')::json WHERE sess->'passport'->>'user'=$1",[String(user)]);
-  await page.goto('/locations');
+  await page.goto(`/locations?location=${location}`);
   await page.getByTestId('button-cookies-decline').click();
-  await page.getByTestId(`text-location-name-${location}`).click();
   await page.getByTestId('tab-guard').click();
   await page.getByLabel('Guard mode').selectOption('notify');
   await page.getByRole('button',{name:'Save guard settings',exact:true}).click();

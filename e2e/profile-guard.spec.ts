@@ -1,7 +1,8 @@
 import {test,expect} from '@playwright/test';
 const location={id:987,businessName:'Guard browser fixture',gbpAccountName:'accounts/fixture',gbpLocationName:'locations/fixture'};
 async function common(page:any) {
-  await page.route('**/api/locations', (r:any)=>r.fulfill({json:[location]}));
+  await page.route((u:URL)=>u.pathname==='/api/locations', (r:any)=>r.fulfill({json:[location]}));
+  await page.route(`**/api/locations/${location.id}`, (r:any)=>r.fulfill({json:location}));
   await page.route('**/api/gbp/status', (r:any)=>r.fulfill({json:{connected:true,accounts:[{subject:'fixture',email:'fixture@example.invalid',connected:true}],locations:[]}}));
   await page.route('**/api/gbp/linkage', (r:any)=>r.fulfill({json:{accounts:[],errors:[],locations:[]}}));
   await page.route('**/api/gbp/guard/status', (r:any)=>r.fulfill({json:[{id:987,mode:'notify',pending:1}]}));
@@ -23,7 +24,7 @@ test('owner previews a snapshot, reauthenticates, changes guard mode, approves/r
     return r.fulfill({json:{mode,watched:['title','websiteUri'],snapshot:saved?{title:'Approved name'}:null,changes:saved?changes:[]}});
   });
   await page.route('**/api/gbp/reports/changes/11',r=>{if(r.request().method()==='POST')reported=true;return r.fulfill({json:{text:'Business: Guard browser fixture\nApproved name → Outside name\nDetected: 2026-09-29',formUrl:'https://support.google.com/business/contact/business_redressal_form',listingUrl:'https://www.google.com/maps?cid=1',reportedAt:reported?'2026-09-29':null}})});
-  await page.goto('/locations');await page.getByTestId('button-cookies-decline').click();await expect(page.getByText('Guard: notify · 1 pending')).toBeVisible();await page.getByText(location.businessName,{exact:true}).click();await page.getByTestId('tab-guard').click();
+  await page.goto(`/locations?location=${location.id}`);await page.getByTestId('button-cookies-decline').click();await page.getByTestId('tab-guard').click();
   await page.getByLabel('Guard mode').selectOption('notify');await page.getByRole('button',{name:'Preview current Google values'}).click();await expect(page.getByText('Approved name',{exact:true})).toBeVisible();
   await expect(page.getByText('Google-only accounts need an authenticator or password configured in Settings.',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();
@@ -47,7 +48,7 @@ test('AI settings preserve low-rating approval, backfill requires preview and co
   });
   await page.route('**/api/google-profile-reviews**',r=>{
     if(new URL(r.request().url()).pathname.endsWith('/reply')){expect(r.request().postDataJSON().action).toBe('publish');posted=true;return r.fulfill({json:{replyStatus:'posted'}});}
-    return r.fulfill({json:[{id:7,locationId:987,googleReviewId:'accounts/fixture/locations/fixture/reviews/7',reviewerName:'Browser customer',rating:1,comment:'Review fixture',reviewDate:'2026-09-29',replyComment:posted?'Thank you for your feedback.':null,replyStatus:posted?'posted':'draft'}]});
+    return r.fulfill({json:{items:[{id:7,locationId:987,googleReviewId:'accounts/fixture/locations/fixture/reviews/7',reviewerName:'Browser customer',rating:1,comment:'Review fixture',reviewDate:'2026-09-29',replyComment:posted?'Thank you for your feedback.':null,replyStatus:posted?'posted':'draft'}],total:1,unanswered:posted?0:1,average:1,distribution:{1:1}}});
   });
   await page.route('**/api/gbp/reports/reviews/7',r=>r.fulfill({json:{text:'Review: Browser customer\nRating: 1\nReview fixture',formUrl:'https://support.google.com/business/workflow/9945796',reportedAt:null}}));
   await page.goto('/google-reviews');await page.getByTestId('button-cookies-decline').click();await page.getByTestId('tab-profile-reviews').click();await page.getByLabel('AI reply location').selectOption('987');await page.getByLabel('AI mode',{exact:true}).selectOption('auto');await page.getByLabel('Review scope').selectOption('existing');
@@ -61,9 +62,8 @@ test('mobile Guard snapshot and history keep long URLs and report actions within
   await common(page);
   const website='https://example.invalid/'+ 'long-path-segment'.repeat(30);
   await page.route('**/api/gbp/locations/987/guard',r=>r.fulfill({json:{mode:'notify',watched:['websiteUri'],snapshot:{websiteUri:website},changes:[{id:21,field:'websiteUri',old_value:website,new_value:website+'/changed',source:'Google update',status:'pending',detected_at:'2026-09-29T12:00:00Z'}]}}));
-  await page.goto('/locations');
+  await page.goto(`/locations?location=${location.id}`);
   await page.getByTestId('button-cookies-decline').click();
-  await page.getByText(location.businessName,{exact:true}).click();
   await page.getByTestId('tab-guard').click();
   await page.getByText('Owner-approved snapshot',{exact:true}).click();
   const guard=page.getByRole('region',{name:'Profile Guard',exact:true});

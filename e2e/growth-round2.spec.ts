@@ -5,7 +5,7 @@ import { parseEnv } from "node:util";
 import { createHmac, randomUUID } from "node:crypto";
 const env = parseEnv(readFileSync(".env", "utf8"));
 const databaseUrl = process.env.DATABASE_URL || env.DATABASE_URL;
-if (new URL(databaseUrl).pathname !== "/constructhub_dev_a3") throw new Error("Wrong growth test database");
+if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(databaseUrl).pathname)) throw new Error("Wrong growth test database");
 const pool = new pg.Pool({ connectionString: databaseUrl });
 let userId: number, cookie: string, sid: string;
 const tokens: string[] = [];
@@ -67,13 +67,17 @@ test("contractor enables a custom referral offer; disabling hides both cards", a
   await pool.query("insert into review_requests(user_id,client_name,client_email,company_name,google_profile_url,token) values($1,'Browser customer','browser@example.invalid','Fixture contractor','https://www.google.com/',$2)", [userId, token]);
   const customer = await browser.newContext();
   const cp = await customer.newPage();
-  await cp.goto(`http://127.0.0.1:8149/review/${token}`);
+  await cp.goto(`http://127.0.0.1:${process.env.E2E_PORT ?? "8149"}/review/${token}`);
   await cp.getByTestId("button-rating-10").click(); await cp.getByTestId("button-submit-rating").click();
   await expect(cp.getByTestId("text-referral-heading")).toBeVisible();
   await expect(cp.getByText(/Fixture offer:/)).toBeVisible();
   await toggle.click(); await page.getByRole("button", { name: "Save referral settings", exact: true }).click();
   await expect(toggle).not.toBeChecked();
-  await cp.reload(); await cp.getByTestId("button-rating-10").click(); await cp.getByTestId("button-submit-rating").click();
+  // A submitted rating resumes where it left off on reload, so use a fresh request link.
+  const token2 = randomUUID(); tokens.push(token2);
+  await pool.query("insert into review_requests(user_id,client_name,client_email,company_name,google_profile_url,token) values($1,'Browser customer','browser2@example.invalid','Fixture contractor','https://www.google.com/',$2)", [userId, token2]);
+  await cp.goto(`http://127.0.0.1:${process.env.E2E_PORT ?? "8149"}/review/${token2}`);
+  await cp.getByTestId("button-rating-10").click(); await cp.getByTestId("button-submit-rating").click();
   await expect(cp.getByTestId("input-review-highlights")).toBeVisible();
   await expect(cp.getByTestId("text-referral-heading")).toHaveCount(0);
   await customer.close();
