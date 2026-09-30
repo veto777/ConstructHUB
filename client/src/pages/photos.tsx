@@ -310,14 +310,18 @@ export default function PhotosPage() {
       return;
     }
     setSavingToLibrary(true);
+    // A folder made for this save stays selected if the save then fails, so a retry uses it instead of making another.
+    let createdFolder: { id: number; name: string } | null = null;
     try {
       let folderId = selectedFolderId;
       if (!folderId && newFolderName.trim()) {
         const res = await apiRequest("POST", "/api/media/folders", { name: newFolderName.trim() });
         const folder = await res.json();
+        createdFolder = folder;
         folderId = folder.id;
         setMediaFolders(prev => [folder, ...prev]);
         setNewFolderName("");
+        setSelectedFolderId(folder.id);
       }
       const res = await apiRequest("POST", "/api/media/save-processed", {
         folderId,
@@ -328,7 +332,14 @@ export default function PhotosPage() {
       setShowSaveToLibrary(false);
       setSelectedFolderId(null);
     } catch (err: any) {
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      const reason = apiErrorMessage(err, "Could not save the photos. Please try again.");
+      toast({
+        title: "Save failed",
+        description: createdFolder
+          ? `${reason} The folder "${createdFolder.name}" was created and is selected, so you can try again.`
+          : reason,
+        variant: "destructive",
+      });
     } finally {
       setSavingToLibrary(false);
     }

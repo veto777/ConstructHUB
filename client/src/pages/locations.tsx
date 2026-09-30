@@ -62,6 +62,14 @@ function showLocation(id: string | null) {
   window.history.replaceState(window.history.state, "", url.toString());
   window.dispatchEvent(new Event("urlparamchange"));
 }
+/** Street line plus city, state and ZIP. New locations store only the street line in `address`; older rows
+ *  (and Places text-search adds) hold Google's full formatted address, so don't append the locality twice. */
+function fullAddress(l: Pick<BusinessLocation, "address" | "city" | "state" | "zipCode">): string {
+  const street = l.address?.trim() || "";
+  if (street && l.city && l.state && street.includes(`${l.city}, ${l.state}`)) return street;
+  return [street, l.city, [l.state, l.zipCode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+}
+
 const refreshLocationLists = () => ["/api/locations", "/api/agency/locations", "/api/agency/dashboard", "/api/gbp/linkage", "/api/gbp/status"]
   .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
@@ -92,7 +100,7 @@ export default function LocationsPage() {
       <Button size="sm" variant="ghost" onClick={()=>setNotFound(null)}>Dismiss</Button>
     </div>}
     <AgencyWorkspace onOpen={id=>{setNotFound(null);showLocation(String(id));}}/>
-    <GbpConnection/>
+    <GbpConnection context="locations"/>
   </main>;
 }
 
@@ -234,7 +242,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{r.companyName || r.name || r.businessName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{r.address}</p>
+                  <p className="text-xs text-muted-foreground truncate">{r.formattedAddress || r.address}</p>
                 </div>
                 <Button size="sm" variant="ghost" className="shrink-0 text-xs gap-1">
                   <Plus className="w-3 h-3" /> Add
@@ -371,7 +379,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
             {location.address && (
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
-                {location.address}{location.city ? `, ${location.city}` : ""}{location.state ? `, ${location.state}` : ""} {location.zipCode || ""}
+                {fullAddress(location)}
               </p>
             )}
           </div>
@@ -462,7 +470,7 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
   const select = "border rounded-md px-2 py-1.5 text-sm bg-background";
   return (
     <div className="space-y-4">
-      <GbpConnection locationId={location.id} />
+      <GbpConnection locationId={location.id} context="locations" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 className="font-semibold">Google performance — {rangeLabel[range].toLowerCase()}, by {group}</h3>
@@ -580,7 +588,7 @@ function LocationInfoTab({ location }: { location: BusinessLocation }) {
           : <InfoRow label="Google CID" value={location.googleCid} fromGoogle={hasGoogle} />}
         <InfoRow label="Business Name" value={location.businessName} fromGoogle={hasGoogle} />
         <InfoRow label="Description" value={location.description} />
-        <InfoRow label="Address" value={[location.address, location.city, location.state, location.zipCode].filter(Boolean).join(", ")} fromGoogle={hasGoogle} />
+        <InfoRow label="Address" value={fullAddress(location)} fromGoogle={hasGoogle} />
         <InfoRow label="Service Areas" value={location.serviceAreas?.join(", ")} />
         <InfoRow label="Phone" value={location.phone} fromGoogle={hasGoogle} />
         <InfoRow
@@ -673,12 +681,15 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
     queryKey: [`/api/gbp/locations/${location.id}/media?source=${source}&limit=${limit}`],
     enabled: linked,
   });
+  // Photo counts come only from a Business Profile sync. Unlinked, the stored value is the schema default (0)
+  // or an old capped Places value, so show unknown instead of a number.
   const tile = (n: number | null | undefined, label: string, which: "business" | "customer") => (
     <button type="button" onClick={() => { setSource(which); setLimit(60); }}
       className={`rounded-lg border p-4 text-center transition-colors ${source === which ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
       data-testid={`tab-photos-${which}`}>
-      <p className="text-2xl font-bold" data-testid={`text-${which}-photo-count`}>{n || 0}</p>
+      <p className="text-2xl font-bold" data-testid={`text-${which}-photo-count`}>{linked ? (n ?? 0) : "—"}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
+      {!linked && <p className="text-[11px] text-muted-foreground mt-1">Link to Google Business Profile to see photo counts</p>}
     </button>
   );
   return (
@@ -741,10 +752,13 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
     SOCIAL_PLATFORMS.forEach(p => { init[p.key] = profiles[p.key] || ""; });
     return init;
   });
+  // Mirrors the server: each link is blank or a full https:// URL.
+  const invalid = new Set(SOCIAL_PLATFORMS.map(p => p.key).filter(k => values[k].trim() !== "" && !isHttpsLink(values[k].trim())));
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PUT", `/api/locations/${location.id}`, { socialProfiles: values });
+      const trimmed = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim()]));
+      const res = await apiRequest("PUT", `/api/locations/${location.id}`, { socialProfiles: trimmed });
       return res.json();
     },
     onSuccess: () => {
@@ -764,22 +778,34 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {SOCIAL_PLATFORMS.map(platform => (
-          <div key={platform.key} className="flex items-center gap-3">
-            <platform.Icon className="w-5 h-5 shrink-0 text-muted-foreground" />
-            <Label className="w-24 shrink-0 text-sm">{platform.label}</Label>
-            <Input
-              className="flex-1"
-              placeholder={`https://${platform.key}.com/...`}
-              value={values[platform.key]}
-              onChange={e => setValues(v => ({ ...v, [platform.key]: e.target.value }))}
-              data-testid={`input-social-${platform.key}`}
-            />
+          <div key={platform.key} className="space-y-1">
+            <div className="flex items-center gap-3">
+              <platform.Icon className="w-5 h-5 shrink-0 text-muted-foreground" />
+              <Label className="w-24 shrink-0 text-sm" htmlFor={`input-social-${platform.key}`}>{platform.label}</Label>
+              <Input
+                id={`input-social-${platform.key}`}
+                type="url"
+                inputMode="url"
+                className="flex-1"
+                placeholder={`https://${platform.key}.com/...`}
+                value={values[platform.key]}
+                onChange={e => setValues(v => ({ ...v, [platform.key]: e.target.value }))}
+                aria-invalid={invalid.has(platform.key)}
+                aria-describedby={invalid.has(platform.key) ? `error-social-${platform.key}` : undefined}
+                data-testid={`input-social-${platform.key}`}
+              />
+            </div>
+            {invalid.has(platform.key) && (
+              <p id={`error-social-${platform.key}`} className="text-xs text-destructive sm:pl-[8.5rem]" data-testid={`text-social-error-${platform.key}`}>
+                Enter the full link, starting with https://
+              </p>
+            )}
           </div>
         ))}
         <Button
           className="w-full mt-2"
           onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
+          disabled={saveMutation.isPending || invalid.size > 0}
           data-testid="button-save-social"
         >
           {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
@@ -791,6 +817,9 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function isHttpsLink(v: string): boolean {
+  try { return new URL(v).protocol === "https:"; } catch { return false; }
+}
 
 function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDeleted: () => void }) {
   const { toast } = useToast();
@@ -1015,7 +1044,7 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
   if (selectedCampaignId) {
     const campaign = locationCampaigns.find(c => c.id === selectedCampaignId);
     if (campaign) {
-      return <CampaignDetail campaign={campaign} onBack={() => setSelectedCampaignId(null)} />;
+      return <CampaignDetail campaign={campaign} location={location} onBack={() => setSelectedCampaignId(null)} />;
     }
   }
 
@@ -1143,7 +1172,7 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
   );
 }
 
-function CampaignDetail({ campaign, onBack }: { campaign: CitationCampaign; onBack: () => void }) {
+function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCampaign; location: BusinessLocation; onBack: () => void }) {
   const { toast } = useToast();
   const key = ["/api/citations/campaigns", campaign.id, "results"];
   const { data, isLoading } = useQuery<{ campaign: CitationCampaign; citations: Citation[] }>({ queryKey: key });
@@ -1182,8 +1211,14 @@ function CampaignDetail({ campaign, onBack }: { campaign: CitationCampaign; onBa
   const statusOf = (c: Citation): Status =>
     c.isFound === true ? (c.napConsistent === false ? "wrong" : "listed") : c.isFound === false ? "missing" : "unchecked";
   const count = (st: Status) => rows.filter((r) => statusOf(r) === st).length;
-  const city = campaign.address?.split(",")[1]?.trim() ?? "";
+  // Locations store the street line in `address` and the city separately. Only a legacy row with no city
+  // holds Google's full "street, city, ST zip" string, where the city is the second part.
+  const city = location.city?.trim() || campaign.address?.split(",")[1]?.trim() || "";
   const searchUrl = (c: Citation) => {
+    // A Business Profile lives on Google Maps, not at a crawlable google.com URL.
+    if (c.siteName === "Google Business Profile") {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${campaign.businessName} ${city}`.trim())}`;
+    }
     const site = (c.siteUrl || "").replace(/^https?:\/\//, "");
     return `https://www.google.com/search?q=${encodeURIComponent(`site:${site} "${campaign.businessName}" ${city}`.trim())}`;
   };

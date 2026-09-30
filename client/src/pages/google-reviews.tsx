@@ -66,6 +66,19 @@ const timeZoneLabel = (tz: string) => {
 // Server upload limit per request (multer upload.array("photos", 10)).
 const PHOTO_UPLOAD_BATCH = 10;
 
+/** Same hosts the server accepts for review links: google.<tld> (not the bare homepage), g.page, goo.gl, share.google. */
+function looksLikeGoogleReviewLink(input: string): boolean {
+  let v = input.trim();
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = `https://${v}`;
+  let u: URL;
+  try { u = new URL(v); } catch { return false; }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+  const host = u.hostname.toLowerCase();
+  const google = /^(?:[a-z0-9-]+\.)*google\.[a-z]{2,3}(?:\.[a-z]{2})?$/.test(host);
+  if (google) return !(u.pathname === "/" && !u.search);
+  return /^(?:[a-z0-9-]+\.)*(?:goo\.gl|g\.page|share\.google)$/.test(host);
+}
+
 const stepLabels: Record<string, string> = {
   rating: "Rating",
   improvement: "Improvement Feedback",
@@ -345,8 +358,10 @@ export default function GoogleReviewsPage() {
       const res = await apiRequest("POST", `/api/reviews/${id}/resend`);
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Resent!", description: "Review request email sent again." });
+    onSuccess: (data: any) => {
+      toast(data?.alreadyResponded
+        ? { title: "Email resent", description: data.message || "This customer already responded, so their answer is kept." }
+        : { title: "Resent!", description: "Review request email sent again." });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
     },
     onError: (err: any) => {
@@ -456,6 +471,9 @@ export default function GoogleReviewsPage() {
       toast({ title: "Could not delete template", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
+
+  // Mirrors the server check (the server also resolves short links): only Google-hosted review links.
+  const templateUrlInvalid = templateGoogleUrl.trim() !== "" && !looksLikeGoogleReviewLink(templateGoogleUrl);
 
   const resetTemplateForm = () => {
     setTemplateName("");
@@ -1117,11 +1135,20 @@ export default function GoogleReviewsPage() {
                 <Label htmlFor="tplUrl"><Link className="w-3.5 h-3.5 inline mr-1" />Google Review Link *</Label>
                 <Input
                   id="tplUrl"
+                  type="url"
+                  inputMode="url"
                   value={templateGoogleUrl}
                   onChange={(e) => setTemplateGoogleUrl(e.target.value)}
                   placeholder="https://g.page/r/..."
+                  aria-invalid={templateUrlInvalid}
+                  aria-describedby={templateUrlInvalid ? "tplUrl-error" : undefined}
                   data-testid="input-template-google-url"
                 />
+                {templateUrlInvalid && (
+                  <p id="tplUrl-error" className="text-xs text-destructive" data-testid="text-template-url-error">
+                    Paste your Google review link (https://g.page/r/... or a Google Maps link).
+                  </p>
+                )}
                 <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50">
                   <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-blue-700 dark:text-blue-300">
@@ -1154,7 +1181,7 @@ export default function GoogleReviewsPage() {
               <Button
                 className="w-full bg-amber-500 hover:bg-amber-600 text-white"
                 onClick={() => editingTemplate ? updateTemplateMutation.mutate() : createTemplateMutation.mutate()}
-                disabled={!templateName || !templateGoogleUrl || createTemplateMutation.isPending || updateTemplateMutation.isPending}
+                disabled={!templateName.trim() || !templateGoogleUrl.trim() || templateUrlInvalid || createTemplateMutation.isPending || updateTemplateMutation.isPending}
                 data-testid="button-save-template"
               >
                 {(createTemplateMutation.isPending || updateTemplateMutation.isPending) ? (
@@ -1437,7 +1464,7 @@ export default function GoogleReviewsPage() {
                           className="h-8 w-8"
                           onClick={(e) => { e.stopPropagation(); resendMutation.mutate(review.id); }}
                           disabled={resendMutation.isPending}
-                          title="Resend email"
+                          title={review.feedbackRating != null ? "Resend email (this customer already responded)" : "Resend email"}
                           data-testid={`button-resend-${review.id}`}
                         >
                           <RefreshCw className="w-4 h-4" />

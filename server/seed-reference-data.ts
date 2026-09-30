@@ -9,6 +9,61 @@ function loadJson(filename: string) {
   return JSON.parse(readFileSync(filePath, "utf8"));
 }
 
+/**
+ * Agency links in state-guides.json are re-checked by scripts/verify-state-guides.ts
+ * (verified / unconfirmed / dead -> null / none). Each boot copies the four URLs and
+ * their check status onto the existing rows, only where something differs, so fixed
+ * links reach databases that were seeded earlier (production included).
+ * The status columns are added idempotently here; they are read by master-class.tsx.
+ */
+async function syncStateGuideLinks(guidesData: any[]) {
+  await db.execute(sql`ALTER TABLE state_guides
+    ADD COLUMN IF NOT EXISTS sos_url_status text,
+    ADD COLUMN IF NOT EXISTS licensing_board_url_status text,
+    ADD COLUMN IF NOT EXISTS workers_comp_url_status text,
+    ADD COLUMN IF NOT EXISTS tax_board_url_status text,
+    ADD COLUMN IF NOT EXISTS links_checked_at text`);
+  const rows = guidesData.map((g: any) => ({
+    state_code: g.state_code,
+    sos_url: g.sos_url ?? null,
+    licensing_board_url: g.licensing_board_url ?? null,
+    workers_comp_url: g.workers_comp_url ?? null,
+    tax_board_url: g.tax_board_url ?? null,
+    sos_url_status: g.sos_url_status ?? null,
+    licensing_board_url_status: g.licensing_board_url_status ?? null,
+    workers_comp_url_status: g.workers_comp_url_status ?? null,
+    tax_board_url_status: g.tax_board_url_status ?? null,
+    links_checked_at: g.links_checked_at ?? null,
+  }));
+  // sos_url is NOT NULL: a Secretary of State link found dead keeps its old value, and its
+  // "dead" status hides it in the UI.
+  const result = await db.execute(sql`UPDATE state_guides g SET
+      sos_url = COALESCE(j.sos_url, g.sos_url),
+      licensing_board_url = j.licensing_board_url,
+      workers_comp_url = j.workers_comp_url,
+      tax_board_url = j.tax_board_url,
+      sos_url_status = j.sos_url_status,
+      licensing_board_url_status = j.licensing_board_url_status,
+      workers_comp_url_status = j.workers_comp_url_status,
+      tax_board_url_status = j.tax_board_url_status,
+      links_checked_at = j.links_checked_at
+    FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS j(
+      state_code text, sos_url text, licensing_board_url text, workers_comp_url text, tax_board_url text,
+      sos_url_status text, licensing_board_url_status text, workers_comp_url_status text, tax_board_url_status text,
+      links_checked_at text)
+    WHERE g.state_code = j.state_code AND (
+      g.sos_url IS DISTINCT FROM COALESCE(j.sos_url, g.sos_url)
+      OR g.licensing_board_url IS DISTINCT FROM j.licensing_board_url
+      OR g.workers_comp_url IS DISTINCT FROM j.workers_comp_url
+      OR g.tax_board_url IS DISTINCT FROM j.tax_board_url
+      OR g.sos_url_status IS DISTINCT FROM j.sos_url_status
+      OR g.licensing_board_url_status IS DISTINCT FROM j.licensing_board_url_status
+      OR g.workers_comp_url_status IS DISTINCT FROM j.workers_comp_url_status
+      OR g.tax_board_url_status IS DISTINCT FROM j.tax_board_url_status
+      OR g.links_checked_at IS DISTINCT FROM j.links_checked_at)`);
+  if (result.rowCount) console.log(`Updated agency links on ${result.rowCount} state guide(s) from state-guides.json.`);
+}
+
 export async function seedReferenceData() {
   const guideCount = await db.execute(sql`SELECT COUNT(*) as count FROM state_guides`);
   const totalGuides = Number(guideCount.rows[0].count);
@@ -48,6 +103,11 @@ export async function seedReferenceData() {
     console.log(`Seeded ${guidesData.length} state guides.`);
   } else {
     console.log(`Already have ${totalGuides} state guides.`);
+  }
+  try {
+    await syncStateGuideLinks(loadJson("state-guides.json"));
+  } catch (err: any) {
+    console.error("State guide link sync failed (will retry on next boot):", err?.message || err);
   }
 
   const stepCount = await db.execute(sql`SELECT COUNT(*) as count FROM state_guide_steps`);

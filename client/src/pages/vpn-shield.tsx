@@ -241,6 +241,7 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
               <CardTitle className="text-sm font-semibold">Top Countries</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
+              <p className="text-xs text-muted-foreground mb-2" data-testid="text-countries-source-note">Country/city come from Cloudflare on visits recorded after this update; older visits show Unknown.</p>
               <div className="space-y-2">
                 {stats.topCountries.slice(0, 8).map(c => (
                   <div key={c.name} className="flex items-center justify-between gap-2 text-sm">
@@ -526,6 +527,15 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
   );
 }
 
+const isHttpLink = (v: string) => { try { return ["http:", "https:"].includes(new URL(v).protocol); } catch { return false; } };
+const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+/** One IPv4 or IPv6 address (no ranges), like the server's net.isIP check. */
+function isIpAddress(v: string): boolean {
+  if (IPV4.test(v)) return true;
+  if (!v.includes(":") || !/^[0-9a-f:.]+(?:%[\w.-]+)?$/i.test(v)) return false;
+  try { new URL(`http://[${v.split("%")[0]}]/`); return true; } catch { return false; }
+}
+
 function SettingsTab({ domainId, domains }: { domainId: number | null; domains: VpnDomain[] }) {
   const { toast } = useToast();
   const domain = domains.find(d => d.id === domainId);
@@ -534,6 +544,14 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
   const [blockMode, setBlockMode] = useState(settings.vpnBlockMode || "block");
   const [redirectUrl, setRedirectUrl] = useState(settings.vpnRedirectUrl || "");
   const [whitelistedIps, setWhitelistedIps] = useState(settings.vpnWhitelistedIps || "");
+  // Same checks the server makes, shown before saving.
+  const trimmedRedirect = redirectUrl.trim();
+  const redirectError = blockMode === "redirect" && !trimmedRedirect ? "Redirect mode needs a full http:// or https:// link."
+    : trimmedRedirect && !isHttpLink(trimmedRedirect) ? "The redirect link must start with http:// or https://." : "";
+  const whitelist = String(whitelistedIps).split(/[\n,]+/).map((v: string) => v.trim()).filter(Boolean);
+  const badIp = whitelist.find((ip: string) => !isIpAddress(ip));
+  const whitelistError = badIp ? `"${badIp.slice(0, 60)}" is not a valid IP address. Enter one IPv4 or IPv6 address per line (no ranges).`
+    : whitelist.length > 500 ? "Whitelist up to 500 IP addresses." : "";
 
   const saveMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/vpn-shield/domains/${domainId}/settings`, {
@@ -596,11 +614,15 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <Input
+              type="url"
+              inputMode="url"
               placeholder="https://example.com/blocked"
               value={redirectUrl}
               onChange={e => setRedirectUrl(e.target.value)}
+              aria-invalid={!!redirectError}
               data-testid="input-redirect-url"
             />
+            {redirectError && <p className="mt-2 text-xs text-destructive" data-testid="text-redirect-url-error">{redirectError}</p>}
           </CardContent>
         </Card>
       )}
@@ -619,8 +641,10 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
             onChange={e => setWhitelistedIps(e.target.value)}
             className="font-mono text-sm resize-none"
             rows={5}
+            aria-invalid={!!whitelistError}
             data-testid="textarea-whitelisted-ips"
           />
+          {whitelistError && <p className="text-xs text-destructive" data-testid="text-whitelist-error">{whitelistError}</p>}
         </CardContent>
       </Card>
 
@@ -637,11 +661,14 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
         <Button
           className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:from-orange-600 hover:to-yellow-600"
           onClick={() => saveMutation.mutate()}
-          disabled={!domainId || saveMutation.isPending}
+          disabled={!domainId || saveMutation.isPending || !!redirectError || !!whitelistError}
           data-testid="button-save-vpn-settings"
         >
           {saveMutation.isPending ? "Saving..." : "Save Settings"}
         </Button>
+        {redirectError && blockMode !== "redirect" && (
+          <span className="text-xs text-destructive" data-testid="text-redirect-url-error-hidden">{redirectError} Switch to Redirect to fix or clear it.</span>
+        )}
         {domain ? (
           <span className="text-xs text-muted-foreground" data-testid="text-settings-site">Applies to {domain.name || domain.domain}</span>
         ) : (

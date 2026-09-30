@@ -18,6 +18,9 @@ import { ErrorCard } from "@/components/crm-ui";
  * bots. The server answers bot submissions with the same 201 as real ones,
  * so nothing here treats them differently either.
  */
+/** Visible fields that can carry a server validation message (the honeypot never does). */
+const FIELDS = ["name", "email", "phone", "address", "message"];
+
 export default function PublicLeadFormPage() {
   const [, params] = useRoute("/lead-form/:token");
   const token = params?.token;
@@ -25,6 +28,8 @@ export default function PublicLeadFormPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", message: "", address: "", website: "" });
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Per-field messages from the server's validation issues (path[0] is the field name).
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { data: org, isLoading, error: loadError } = useQuery<{ name: string; logoUrl: string | null }>({
     queryKey: [`/api/public/leads/${token}`], enabled: !!token, retry: false,
@@ -44,12 +49,30 @@ export default function PublicLeadFormPage() {
           website: form.website,
         }),
       });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Something went wrong");
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw Object.assign(new Error(body.message || "Something went wrong"), { issues: Array.isArray(body.issues) ? body.issues : [] });
+      }
       return r.json();
     },
     onSuccess: () => setSent(true),
-    onError: (e: any) => setError(String(e.message ?? e)),
+    onError: (e: any) => {
+      const byField: Record<string, string> = {};
+      for (const issue of e?.issues ?? []) {
+        const field = issue?.path?.[0];
+        if (typeof field === "string" && FIELDS.includes(field) && !byField[field] && issue.message) byField[field] = String(issue.message);
+      }
+      setFieldErrors(byField);
+      // A message already shown under its field isn't repeated below the form.
+      setError(Object.keys(byField).length ? null : String(e?.message ?? e));
+    },
   });
+  const fieldError = (field: string) => fieldErrors[field]
+    ? <p id={`lead-${field}-error`} className="text-xs text-destructive" data-testid={`text-lead-${field}-error`}>{fieldErrors[field]}</p>
+    : null;
+  const errorProps = (field: string) => fieldErrors[field]
+    ? { "aria-invalid": true, "aria-describedby": `lead-${field}-error` }
+    : {};
 
   if (isLoading) {
     return <div className="flex justify-center p-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -91,35 +114,41 @@ export default function PublicLeadFormPage() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   setError(null);
+                  setFieldErrors({});
                   submit.mutate();
                 }}
               >
                 <div className="space-y-1.5">
                   <Label htmlFor="lead-name">Name *</Label>
-                  <Input id="lead-name" required maxLength={200} data-testid="input-lead-name"
+                  <Input id="lead-name" required maxLength={200} data-testid="input-lead-name" {...errorProps("name")}
                     value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  {fieldError("name")}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="lead-email">Email</Label>
-                    <Input id="lead-email" type="email" data-testid="input-lead-email"
+                    <Input id="lead-email" type="email" maxLength={200} data-testid="input-lead-email" {...errorProps("email")}
                       value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                    {fieldError("email")}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="lead-phone">Phone</Label>
-                    <Input id="lead-phone" type="tel" data-testid="input-lead-phone"
+                    <Input id="lead-phone" type="tel" maxLength={40} data-testid="input-lead-phone" {...errorProps("phone")}
                       value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                    {fieldError("phone")}
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="lead-address">Address</Label>
-                  <Input id="lead-address" data-testid="input-lead-address"
+                  <Input id="lead-address" maxLength={300} data-testid="input-lead-address" {...errorProps("address")}
                     value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                  {fieldError("address")}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="lead-message">How can we help?</Label>
-                  <Textarea id="lead-message" rows={4} data-testid="textarea-lead-message"
+                  <Textarea id="lead-message" rows={4} maxLength={5000} data-testid="textarea-lead-message" {...errorProps("message")}
                     value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+                  {fieldError("message")}
                 </div>
                 {/* Honeypot — off-screen, unreachable by keyboard, ignored by autofill. */}
                 <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>

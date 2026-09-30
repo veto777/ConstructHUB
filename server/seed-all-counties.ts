@@ -3181,22 +3181,25 @@ export async function seedAllCounties() {
 
   const dbBatchSize = 100;
   for (let i = 0; i < countiesNeedingDb.length; i += dbBatchSize) {
-    const batch = countiesNeedingDb.slice(i, i + dbBatchSize).map((c, idx) => {
+    const batch = countiesNeedingDb.slice(i, i + dbBatchSize).map((c) => {
+      // A county is listed by its own name only: no invented "Building Department" office,
+      // contact note or searchable fields. Portal data comes solely from
+      // server/data/permit-portals.json (seed-permit-portals.ts). Unknown = null.
       return {
-        name: `${c.name} County Building Department`,
+        name: `${c.name} County, ${c.stateCode}`,
         jurisdiction: `${c.name} County, ${c.stateCode}`,
         jurisdictionType: "county" as const,
         countyId: c.id,
         portalUrl: null as string | null,
         searchUrl: null as string | null,
-        // No fabrication: platform/phone set only from verified sources.
         platform: null as string | null,
         phone: null as string | null,
         email: null as string | null,
         address: null as string | null,
-        searchableFields: ["address"] as string[],
-        isActive: true,
-        notes: `Contact ${c.name} County Building Department for permit information.`,
+        searchableFields: null as string[] | null,
+        isActive: false,
+        linkStatus: "none",
+        notes: null as string | null,
       };
     });
     await db.insert(permitDatabases).values(batch);

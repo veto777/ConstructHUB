@@ -123,6 +123,8 @@ function PageSpeedDetails({ psi }: { psi: any[] }) {
     </details>
   );
 }
+/** History and location picker page size; sent to the server so both page the same way. */
+const PAGE_SIZE = 25;
 const whole = (value: string, min: number, max: number) =>
   /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max;
 function canonicalUrl(value: string) {
@@ -403,6 +405,7 @@ export default function SiteScanPage() {
   const listParams = new URLSearchParams({
     q: historyQ,
     offset: String(historyOffset),
+    limit: String(PAGE_SIZE),
     ...(historyStatus ? { status: historyStatus } : {}),
     ...(locationQ ? { locationQ } : {}),
     locationOffset: String(locationOffset),
@@ -514,20 +517,20 @@ export default function SiteScanPage() {
               variant="outline"
               disabled={!locationOffset}
               onClick={() =>
-                setLocationOffset(Math.max(0, locationOffset - 25))
+                setLocationOffset(Math.max(0, locationOffset - PAGE_SIZE))
               }
             >
               Previous locations
             </Button>
             <span>
-              {locationOffset + 1}–
-              {Math.min(locationOffset + 25, data?.locationTotal || 0)} of{" "}
-              {data?.locationTotal || 0}
+              {data?.locationTotal
+                ? `${locationOffset + 1}–${Math.min(locationOffset + PAGE_SIZE, data.locationTotal)} of ${data.locationTotal}`
+                : "No Business Profile-linked locations"}
             </span>
             <Button
               variant="outline"
-              disabled={locationOffset + 25 >= (data?.locationTotal || 0)}
-              onClick={() => setLocationOffset(locationOffset + 25)}
+              disabled={locationOffset + PAGE_SIZE >= (data?.locationTotal || 0)}
+              onClick={() => setLocationOffset(locationOffset + PAGE_SIZE)}
             >
               Next locations
             </Button>
@@ -797,15 +800,15 @@ export default function SiteScanPage() {
           <Button
             variant="outline"
             disabled={!historyOffset}
-            onClick={() => setHistoryOffset(Math.max(0, historyOffset - 25))}
+            onClick={() => setHistoryOffset(Math.max(0, historyOffset - PAGE_SIZE))}
           >
             Previous scans
           </Button>
           <span>{data?.total || 0} scans</span>
           <Button
             variant="outline"
-            disabled={historyOffset + 25 >= (data?.total || 0)}
-            onClick={() => setHistoryOffset(historyOffset + 25)}
+            disabled={historyOffset + PAGE_SIZE >= (data?.total || 0)}
+            onClick={() => setHistoryOffset(historyOffset + PAGE_SIZE)}
           >
             Next scans
           </Button>

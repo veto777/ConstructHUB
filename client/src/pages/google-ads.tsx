@@ -91,6 +91,9 @@ type BlockedIp = {
   source: string;
 };
 
+// The exclusion-list URL (and the script that embeds it) carries a per-domain key.
+const PRIVATE_KEY_NOTE = "This link contains a private key — keep it in your Google Ads script only. Scripts copied before this update must be copied again (the old link now returns 403).";
+
 const FRAUD_TABS = ["Blocked IPs", "Countries", "Multi-Clicks", "Devices", "Browsers", "OS"];
 
 const PAGE_TABS = ["dashboard", "traffic", "fraud", "tools", "settings", "link-ads"] as const;
@@ -161,7 +164,7 @@ export default function ClickGuardPage() {
 
   const addDomainMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/click-guard/domains", { domain: newDomain, name: newDomainName || newDomain });
+      const res = await apiRequest("POST", "/api/click-guard/domains", { domain: newDomain.trim(), name: newDomainName.trim() || newDomain.trim() });
       return res.json();
     },
     onSuccess: () => {
@@ -170,6 +173,9 @@ export default function ClickGuardPage() {
       setNewDomain("");
       setNewDomainName("");
       toast({ title: "Domain added", description: "Your domain is now being tracked." });
+    },
+    onError: (e: unknown) => {
+      toast({ title: "Couldn't add domain", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
 
@@ -187,6 +193,9 @@ export default function ClickGuardPage() {
         setSelectedDomainId(null);
       }
       toast({ title: "Domain removed" });
+    },
+    onError: (e: unknown) => {
+      toast({ title: "Couldn't remove domain", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
 
@@ -302,7 +311,7 @@ export default function ClickGuardPage() {
                       size="sm"
                       className="bg-[#4285F4] text-white"
                       onClick={() => addDomainMutation.mutate()}
-                      disabled={!newDomain || addDomainMutation.isPending}
+                      disabled={!newDomain.trim() || addDomainMutation.isPending}
                       data-testid="button-save-domain"
                     >
                       {addDomainMutation.isPending ? "Adding..." : "Add"}
@@ -756,6 +765,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                       {scriptLoading ? "Loading script..." : scriptData?.script || "Select a domain to generate the script"}
                     </pre>
                   </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="text-script-key-note">{PRIVATE_KEY_NOTE}</p>
 
                   <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
                     <h4 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
@@ -786,7 +796,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="border-t border-border pt-4">
                 <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Code2 className="h-4 w-4 text-muted-foreground" />
-                  Public IP Exclusion API
+                  IP Exclusion List URL
                 </h4>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-muted rounded-lg border border-border px-4 py-2.5">
@@ -804,6 +814,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2" data-testid="text-exclusion-key-note">{PRIVATE_KEY_NOTE}</p>
                 <p className="text-xs text-muted-foreground mt-2">
                   When you schedule it hourly, the Google Ads Script calls this URL on each run. It returns up to 500 blocked IPs in JSON format. You can also use this with Microsoft Ads or any other platform.
                 </p>
@@ -1353,7 +1364,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                 ) : (
                   <div className="text-center py-8">
                     <Globe className="h-12 w-12 text-blue-500/30 mx-auto mb-2" />
-                    <p className="text-blue-500 text-sm">Data is on its way!</p>
+                    <p className="text-muted-foreground text-sm" data-testid="text-countries-empty">Country comes from Cloudflare on new visits; earlier visits show as Unknown.</p>
                   </div>
                 )}
               </div>
@@ -1418,7 +1429,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-blue-500 text-sm">Data is on its way!</p>
+                    <p className="text-muted-foreground text-sm">No visits recorded yet.</p>
                   </div>
                 )}
               </div>
@@ -1440,7 +1451,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-blue-500 text-sm">Data is on its way!</p>
+                    <p className="text-muted-foreground text-sm">No visits recorded yet.</p>
                   </div>
                 )}
               </div>
@@ -1462,7 +1473,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-blue-500 text-sm">Data is on its way!</p>
+                    <p className="text-muted-foreground text-sm">No visits recorded yet.</p>
                   </div>
                 )}
               </div>
@@ -1658,14 +1669,22 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
       queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"] });
       toast({ title: "Settings updated" });
     },
-    onError: () => {
-      toast({ title: "Failed to update", variant: "destructive" });
+    onError: (e: unknown) => {
+      toast({ title: "Failed to update", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
 
   const [clickThreshold, setClickThreshold] = useState(String(settings.clickThreshold || 1));
   const [blockDays, setBlockDays] = useState(String(settings.blockDays || 90));
   const [exclusionListRate, setExclusionListRate] = useState(String(settings.exclusionListRate || 500));
+  // Same whole-number ranges the server enforces; the Update button stays off until the value fits.
+  const rangeError = (value: string, label: string, min: number, max: number) => {
+    const n = Number(value.trim());
+    return /^\d+$/.test(value.trim()) && n >= min && n <= max ? "" : `${label} must be a whole number from ${min} to ${max}.`;
+  };
+  const thresholdError = rangeError(clickThreshold, "Click threshold", 1, 20);
+  const blockDaysError = rangeError(blockDays, "Block duration", 1, 90);
+  const exclusionRateError = rangeError(exclusionListRate, "Exclusion list length", 50, 500);
   const [manualExcludeIps, setManualExcludeIps] = useState(settings.manualExcludeIps || "");
   const [whitelistIps, setWhitelistIps] = useState(settings.whitelistIps || "");
 
@@ -1861,16 +1880,19 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                   className="w-20 bg-card border-border text-foreground text-center"
                   min={1}
                   max={20}
+                  aria-invalid={!!thresholdError}
                   data-testid="input-click-threshold"
                 />
                 <span className="text-sm text-muted-foreground">ad click within the timeframe</span>
               </div>
+              {thresholdError && <p className="mt-2 text-xs text-destructive" data-testid="text-threshold-error">{thresholdError}</p>}
               <div className="mt-3 flex gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
-                  onClick={() => updateSetting.mutate({ clickThreshold: parseInt(clickThreshold) })}
+                  onClick={() => updateSetting.mutate({ clickThreshold: Number(clickThreshold.trim()) })}
+                  disabled={!!thresholdError || updateSetting.isPending}
                   data-testid="button-update-threshold"
                 >
                   Update Threshold Rules
@@ -2012,6 +2034,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; not applied yet. Blocked IPs stay on the list until you remove them.
               </p>
+              {blockDaysError && <p className="mt-2 text-xs text-destructive" data-testid="text-block-days-error">{blockDaysError}</p>}
             </div>
             <div className="flex items-center gap-2">
               <Input
@@ -2021,13 +2044,15 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 className="w-20 bg-card border-border text-foreground text-center"
                 min={1}
                 max={90}
+                aria-invalid={!!blockDaysError}
                 data-testid="input-block-days"
               />
               <Button
                 size="sm"
                 variant="outline"
                 className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
-                onClick={() => updateSetting.mutate({ blockDays: parseInt(blockDays) })}
+                onClick={() => updateSetting.mutate({ blockDays: Number(blockDays.trim()) })}
+                disabled={!!blockDaysError || updateSetting.isPending}
                 data-testid="button-update-block-days"
               >
                 Update
@@ -2045,6 +2070,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; not applied yet. The exclusion list URL always serves up to 500 IPs.
               </p>
+              {exclusionRateError && <p className="mt-2 text-xs text-destructive" data-testid="text-exclusion-rate-error">{exclusionRateError}</p>}
             </div>
             <div className="flex items-center gap-2">
               <Input
@@ -2054,13 +2080,15 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 className="w-20 bg-card border-border text-foreground text-center"
                 min={50}
                 max={500}
+                aria-invalid={!!exclusionRateError}
                 data-testid="input-exclusion-rate"
               />
               <Button
                 size="sm"
                 variant="outline"
                 className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
-                onClick={() => updateSetting.mutate({ exclusionListRate: parseInt(exclusionListRate) })}
+                onClick={() => updateSetting.mutate({ exclusionListRate: Number(exclusionListRate.trim()) })}
+                disabled={!!exclusionRateError || updateSetting.isPending}
                 data-testid="button-update-exclusion"
               >
                 Update

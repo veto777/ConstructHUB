@@ -19,6 +19,8 @@ import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
 import { notifyMemberLogin, notifyMemberAccountChange } from "./crm/owner-notify";
 import { logMemberAuth } from "./crm/activity";
 import { resolveGoogleUrl } from "./google-url-resolver";
+import { GOOGLE_REVIEW_LINK_MESSAGE, googleReviewLink } from "./route-guards";
+import { isPlatformAdmin } from "./admin";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 
 /**
@@ -647,6 +649,7 @@ export async function setupAuth(app: Express) {
           totpEnabled: fresh.totpEnabled,
           hasPassword: !!fresh.passwordHash,
           hasGbpAccess: (await (await import("./gbp/grants")).grantStatus(fresh.id)).connected,
+          isPlatformAdmin: isPlatformAdmin(fresh),
           createdAt: fresh.createdAt,
         });
       } catch {
@@ -681,8 +684,16 @@ export async function setupAuth(app: Express) {
         updateData.companyLogoUrl = logoStr;
       }
       if (googleProfileUrl !== undefined) {
-        const resolved = await resolveGoogleUrl(String(googleProfileUrl).slice(0, 500));
-        updateData.googleProfileUrl = resolved;
+        // Same rule as review templates: resolve Google short links, then accept only Google hosts. Blank clears it.
+        let raw = String(googleProfileUrl ?? "").trim();
+        if (!raw) updateData.googleProfileUrl = null;
+        else {
+          if (raw.length > 500) return res.status(400).json({ message: GOOGLE_REVIEW_LINK_MESSAGE });
+          if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) raw = `https://${raw}`;
+          const link = googleReviewLink(await resolveGoogleUrl(raw));
+          if (!link) return res.status(400).json({ message: GOOGLE_REVIEW_LINK_MESSAGE });
+          updateData.googleProfileUrl = link;
+        }
       }
       if (req.body.avatarUrl !== undefined) {
         const avatarStr = String(req.body.avatarUrl);
