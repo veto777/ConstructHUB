@@ -9,6 +9,9 @@ import { ensureGbpContentSchema, enqueue, scheduleTimes, publicPhotoUrl, itemInp
 import { GoogleClient, Limiter } from './client';
 import { seoName, preparePhoto } from './content-upload';
 import sharp from 'sharp';
+import { Readable, Writable } from 'node:stream';
+import * as r2 from '../r2';
+import piexif from 'piexifjs';
 let user: number, other: number, location: number, photo: number, app: express.Express;
 const due = { start: '2026-01-01T12:00:00Z', everyMinutes: 1 };
 const ai = vi.fn(async () => 'Fixture AI draft');
@@ -81,6 +84,11 @@ describe('GBP content scheduling and validation', () => {
         await preparePhoto(buffer, name, { title: 'Fixture title', lat: 47.6, lon: -122.3 }, upload);
         const output = upload.mock.calls[0] as any;
         expect((await sharp(output[0]).metadata()).exif).toBeDefined();
+        const metadata = piexif.load(output[0].toString('binary'));
+        expect(Buffer.from(metadata['0th'][piexif.ImageIFD.XPTitle]).toString('utf16le')).toBe('Fixture title\0');
+        expect(metadata.GPS[piexif.GPSIFD.GPSLatitudeRef]).toBe('N');
+        expect(metadata.GPS[piexif.GPSIFD.GPSLongitudeRef]).toBe('W');
+        expect(metadata.GPS[piexif.GPSIFD.GPSLatitude][0]).toEqual([47,1]);
         expect(output[4]).toBe(name);
     });
 });
@@ -211,6 +219,31 @@ describe('real lane DB and mocked provider integration', () => {
 });
 
 describe('signed media links (no public bucket)', () => {
+    it('streams valid signed media, avoids storage on forged links, and contains source stream errors', async () => {
+        const { signMediaKey } = await import('./content');
+        const get = vi.spyOn(r2, 'getFromR2');
+        const path = '/api/public/gbp-media';
+        const layer = (app.router as any).stack.find((entry:any)=>entry.route?.methods.get && entry.match(path));
+        const exp = Math.floor(Date.now()/1000)+3600, key = 'media/fixture.jpg';
+        const invoke = async (sig:string) => {
+            const chunks:Buffer[] = [];
+            const response:any = new Writable({write(chunk,_encoding,done){chunks.push(Buffer.from(chunk));done();}});
+            response.statusCode=200;
+            response.setHeader=vi.fn();
+            response.status=(code:number)=>{response.statusCode=code;return response;};
+            response.json=(body:any)=>response.end(JSON.stringify(body));
+            await layer.route.stack[0].handle({query:{k:key,exp:String(exp),sig}},response);
+            return {response,body:Buffer.concat(chunks).toString()};
+        };
+        try {
+            expect((await invoke('forged')).response.statusCode).toBe(403);
+            expect(get).not.toHaveBeenCalled();
+            get.mockResolvedValue({body:Readable.from(['fixture image']) as any,contentType:'image/jpeg'});
+            expect((await invoke(signMediaKey(key,exp))).body).toBe('fixture image');
+            get.mockResolvedValue({body:new Readable({read(){this.destroy(new Error('Storage stream failed'));}}) as any,contentType:'image/jpeg'});
+            expect((await invoke(signMediaKey(key,exp))).response.destroyed).toBe(true);
+        } finally {get.mockRestore();}
+    });
     it('fails closed without a configured signing secret', async () => {
         const { verifyMediaSignature, signMediaKey } = await import('./content');
         const key = process.env.GBP_TOKEN_KEY, session = process.env.SESSION_SECRET;

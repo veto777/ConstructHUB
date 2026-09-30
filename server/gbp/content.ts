@@ -1,5 +1,6 @@
 /** GBP content queue. External boundaries are injectable; no credentials are stored here. */
 import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { pipeline } from 'node:stream/promises';
 import type { Express } from 'express';
 import { z } from 'zod';
 import { pool } from '../db';
@@ -249,9 +250,12 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
             res.setHeader('Content-Type', contentType || 'image/jpeg');
             res.setHeader('Cache-Control', 'private, max-age=300');
             const stream: any = body;
-            if (typeof stream.pipe === 'function') return stream.pipe(res);
+            if (typeof stream.pipe === 'function') {
+                await pipeline(stream, res);
+                return;
+            }
             res.send(Buffer.from(await stream.arrayBuffer()));
-        } catch { res.status(404).end(); }
+        } catch { if (!res.headersSent && !res.destroyed) res.status(404).end(); }
     });
     const route = (method: 'get' | 'post' | 'patch', suffix: string, fn: (req: any, user: number, location: number) => Promise<any>) => app[method](`/api/gbp/content/:location${suffix}`, async (req, res) => {
         const u = auth(req, res);
