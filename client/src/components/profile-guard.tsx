@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -48,7 +47,7 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
     <label className="block">Mode <select aria-label="Guard mode" className="border rounded p-2 bg-background" value={mode??data.mode} onChange={e=>setMode(e.target.value)}><option value="off">Off</option><option value="notify">Notify</option><option value="lockdown">Lockdown (auto-reject)</option></select></label>
     <fieldset className="grid grid-cols-2 gap-2"><legend>Watched fields</legend>{Object.entries(fieldLabels).map(([f,label])=><label key={f} className="text-sm flex gap-2"><input type="checkbox" checked={selected.includes(f)} onChange={e=>setWatched(e.target.checked?[...selected,f]:selected.filter(x=>x!==f))}/>{label}</label>)}</fieldset>
     {!data.snapshot&&<Button disabled={mutation.isPending} onClick={()=>act('POST',url+'/preview').then(setPreview).catch(()=>{})}>Preview current Google values</Button>}
-    {(data.snapshot||preview)&&<details open={!data.snapshot}><summary>{data.snapshot?'Owner-approved snapshot':'Review these values before approving your snapshot'}</summary><dl>{Object.entries(data.snapshot??preview.snapshot).map(([f,v])=><div key={f} className="border-b py-2"><dt className="font-medium">{fieldLabels[f]}</dt><dd className="whitespace-pre-wrap text-sm">{pretty(v)}</dd></div>)}</dl></details>}
+    {(data.snapshot||preview)&&<details open={!data.snapshot}><summary>{data.snapshot?'Owner-approved snapshot':'Review these values before approving your snapshot'}</summary><dl>{Object.entries(data.snapshot??preview.snapshot).map(([f,v])=><div key={f} className="border-b py-2"><dt className="font-medium">{fieldLabels[f]}</dt><dd className="whitespace-pre-wrap break-all text-sm">{pretty(v)}</dd></div>)}</dl></details>}
     <p className="text-xs text-muted-foreground">Saving Guard settings asks you to confirm it’s you (password, authenticator or an emailed code): once, then not again for 12 hours. This stops anyone using a signed-in session from quietly turning Guard off.</p>
     <Button disabled={mutation.isPending} onClick={()=>act('PUT',url,{mode:mode??data.mode,watched:selected,...(!data.snapshot&&preview?{token:preview.token}:{})}).then(()=>{setPreview(null);toast({title:'Profile Guard settings saved'});}).catch(()=>{})}>{!data.snapshot&&preview?'Approve snapshot and save settings':'Save guard settings'}</Button>
     <Button className="ml-2" variant="outline" disabled={mutation.isPending||data.mode==='off'} onClick={()=>act('POST',url+'/check').catch(()=>{})}>Check now</Button>
@@ -57,7 +56,7 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
     {data.changes.map((c:any)=><article className="border rounded p-3 space-y-2" key={c.id}>
       <p className="font-medium">{fieldLabels[c.field]??c.field} — {c.status}</p><p className="text-xs">{new Date(c.detected_at).toLocaleString()} · {c.source}</p>
       <div className="grid grid-cols-2 gap-3 text-sm"><div>Approved<pre className="whitespace-pre-wrap break-all">{pretty(c.old_value)}</pre></div><div>Detected<pre className="whitespace-pre-wrap break-all">{pretty(c.new_value)}</pre></div></div>
-      {c.error&&<p role="alert">{c.error}</p>}<div className="flex gap-2">{c.status==='pending'&&<><Button disabled={mutation.isPending} onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'approve'}).catch(()=>{})}>Approve</Button><Button disabled={mutation.isPending} variant="outline" onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'reject'}).catch(()=>{})}>Reject</Button></>}<GoogleReport type="changes" id={c.id}/>{c.reported_at&&<span>Reported locally</span>}</div>
+      {c.error&&<p role="alert">{c.error}</p>}<div className="flex flex-wrap gap-2">{c.status==='pending'&&<><Button disabled={mutation.isPending} onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'approve'}).catch(()=>{})}>Approve</Button><Button disabled={mutation.isPending} variant="outline" onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'reject'}).catch(()=>{})}>Reject</Button></>}<GoogleReport type="changes" id={c.id}/>{c.reported_at&&<span>Reported locally</span>}</div>
     </article>)}
   </section>;
 }
