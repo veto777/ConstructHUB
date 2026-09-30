@@ -26,11 +26,15 @@ export async function ensureGbpContentSchema() {
 export const categories = ['ADDITIONAL', 'EXTERIOR', 'INTERIOR', 'PRODUCT', 'AT_WORK', 'FOOD_AND_DRINK', 'MENU', 'COMMON_AREA', 'ROOMS', 'TEAMS', 'COVER'] as const;
 const id = z.number().int().positive();
 const https = z.string().url().max(2000).refine(v => new URL(v).protocol === 'https:', 'HTTPS required');
+const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(value => {
+    const date = new Date(value + 'Z');
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 16) === value;
+}, 'Enter a valid calendar date and time');
 export const itemInput = z.object({
     kind: z.enum(['photo', 'post']), photoIds: z.array(id).max(10).default([]), summary: z.string().trim().max(1500).default(''),
     category: z.enum(categories).default('ADDITIONAL'), topicType: z.enum(['STANDARD', 'EVENT', 'OFFER']).default('STANDARD'),
     callToAction: z.object({ actionType: z.enum(['BOOK', 'ORDER', 'SHOP', 'LEARN_MORE', 'SIGN_UP', 'CALL']), url: https.optional() }).optional(),
-    event: z.object({ title: z.string().min(1).max(58), start: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(v => Number.isFinite(Date.parse(v + 'Z'))), end: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(v => Number.isFinite(Date.parse(v + 'Z'))) }).optional(),
+    event: z.object({ title: z.string().min(1).max(58), start: localDateTime, end: localDateTime }).optional(),
     offer: z.object({ couponCode: z.string().max(100).optional(), redeemOnlineUrl: https.optional(), termsConditions: z.string().max(5000).optional() }).optional(),
 }).superRefine((v, c) => {
     if (v.kind === 'photo' && v.photoIds.length !== 1)

@@ -61,6 +61,13 @@ describe('GBP content scheduling and validation', () => {
         expect(() => scheduleTimes({ ...due, custom: [] }, 1)).toThrow();
         expect(() => scheduleTimes({ ...due, timezone: 'invalid' }, 1)).toThrow();
     });
+    it('rejects impossible event dates instead of silently publishing on a different day', () => {
+        const post = { kind: 'post', summary: 'Fixture event', topicType: 'EVENT',
+            event: { title: 'Fixture', start: '2027-02-29T09:00', end: '2027-03-02T10:00' } };
+        expect(itemInput.safeParse(post).success).toBe(false);
+        expect(itemInput.safeParse({ ...post, event: { ...post.event, start: '2028-02-29T09:00', end: '2028-03-01T10:00' } }).success).toBe(true);
+        expect(itemInput.safeParse({ ...post, event: { ...post.event, start: '2027-02-28T24:00' } }).success).toBe(false);
+    });
     it('validates offers and CTA URLs and confines photo URLs to owned R2 keys', () => {
         expect(itemInput.safeParse({ kind: 'post', summary: 'Offer', topicType: 'OFFER' }).success).toBe(false);
         expect(itemInput.safeParse({ kind: 'post', summary: 'Text', callToAction: { actionType: 'BOOK', url: 'javascript:alert(1)' } }).success).toBe(false);
