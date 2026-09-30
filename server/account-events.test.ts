@@ -1,6 +1,6 @@
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import { pool } from "./db";
-import { ensureAccountEventsSchema, notifyUser, logActivity, channelsFor } from "./account-events";
+import { ensureAccountEventsSchema, notifyUser, logActivity, channelsFor, registerAccountEventRoutes, KIND_DEFAULTS } from "./account-events";
 let userId: number;
 beforeAll(async () => {
   const target = new URL(process.env.DATABASE_URL!);
@@ -24,4 +24,32 @@ describe("account events", () => {
     const { rows: [a] } = await pool.query("SELECT kind,detail,ip,user_agent FROM account_activity WHERE user_id=$1", [userId]);
     expect(a).toMatchObject({ kind: "google.connected", detail: { email: "a@example.invalid" }, ip: "203.0.113.9", user_agent: "UA" });
   });
+  it("lists and persists every registered kind, including content and Site Scan delivery", async () => {
+    const handlers = new Map<string, any>();
+    const app: any = {};
+    for (const method of ['get', 'post', 'put']) {
+      app[method] = (path: string, handler: any) => handlers.set(`${method} ${path}`, handler);
+    }
+    registerAccountEventRoutes(app, req => req.user);
+    const req: any = { user: { id: userId } };
+    const response = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis() });
+    const listed = response();
+    await handlers.get('get /api/notification-prefs')(req, listed);
+    expect(listed.json.mock.calls[0][0].prefs.map((p: any) => p.kind).sort()).toEqual(Object.keys(KIND_DEFAULTS).sort());
+    for (const kind of ['gbp.post_failed', 'sitescan.completed', 'sitescan.regressed'] as const) {
+      expect(listed.json.mock.calls[0][0].prefs).toContainEqual(expect.objectContaining({ kind, inApp: true, email: false }));
+      const saved = response();
+      await handlers.get('put /api/notification-prefs')({ ...req, body: { prefs: [{ kind, inApp: false, email: false }] } }, saved);
+      expect(saved.json).toHaveBeenCalledWith({ ok: true });
+      await notifyUser(userId, kind, { title: 'Muted fixture' });
+      expect((await pool.query('SELECT id FROM user_notifications WHERE user_id=$1 AND kind=$2', [userId, kind])).rowCount).toBe(0);
+      await handlers.get('put /api/notification-prefs')({ ...req, body: { prefs: [{ kind, inApp: true, email: false }] } }, response());
+      await notifyUser(userId, kind, { title: 'Enabled fixture' });
+      expect((await pool.query('SELECT id FROM user_notifications WHERE user_id=$1 AND kind=$2', [userId, kind])).rowCount).toBe(1);
+    }
+    const invalid = response();
+    await handlers.get('put /api/notification-prefs')({ ...req, body: { prefs: [{ kind: 'unknown', inApp: true, email: false }] } }, invalid);
+    expect(invalid.status).toHaveBeenCalledWith(400);
+  });
+
 });

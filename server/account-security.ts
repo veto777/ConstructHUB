@@ -1,3 +1,4 @@
+import type { NotificationKind } from './notification-kinds';
 import type { Express, Request, Response, NextFunction } from 'express';
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -80,7 +81,7 @@ export async function trustedDevice(req: Request, userId: number): Promise<boole
   return rows.length === 1;
 }
 export async function revokeDevices(userId: number) { await pool.query('DELETE FROM account_trusted_devices WHERE user_id=$1', [userId]); }
-export async function securityChanged(req: Request, userId: number, kind: string, title: string) {
+export async function securityChanged(req: Request, userId: number, kind: NotificationKind, title: string) {
   await logActivity(req, userId, kind, { title });
   await notifyUser(userId,kind,{ title, link:'/settings?tab=security', actionUrl:'/settings?tab=security' });
 }

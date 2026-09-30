@@ -1,16 +1,4 @@
 import { pool } from "../db";
-export const SITESCAN_KINDS = {
-  "sitescan.completed": {
-    label: "Site Scan completed",
-    inApp: true,
-    email: false,
-  },
-  "sitescan.regressed": {
-    label: "Site Scan score dropped or new critical issue",
-    inApp: true,
-    email: false,
-  },
-};
 export async function ensureSiteScanSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS sitescan_jobs (
     id uuid PRIMARY KEY, user_id integer REFERENCES users(id) ON DELETE CASCADE,
