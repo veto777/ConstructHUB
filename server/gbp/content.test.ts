@@ -193,6 +193,19 @@ describe('real lane DB and mocked provider integration', () => {
 });
 
 describe('signed media links (no public bucket)', () => {
+    it('fails closed without a configured signing secret', async () => {
+        const { verifyMediaSignature, signMediaKey } = await import('./content');
+        const key = process.env.GBP_TOKEN_KEY, session = process.env.SESSION_SECRET;
+        delete process.env.GBP_TOKEN_KEY;
+        delete process.env.SESSION_SECRET;
+        try {
+            expect(() => signMediaKey('media/fixture.jpg', Date.now())).toThrow('not configured');
+            expect(verifyMediaSignature('media/fixture.jpg', Date.now(), 'forged')).toBe(false);
+        } finally {
+            if (key !== undefined) process.env.GBP_TOKEN_KEY = key;
+            if (session !== undefined) process.env.SESSION_SECRET = session;
+        }
+    });
     it('mints a short-lived signed link, verifies it, and rejects tampering, expiry and non-media keys', async () => {
         const { verifyMediaSignature, signMediaKey, resolveMediaRefs } = await import('./content');
         const saved = process.env.GBP_MEDIA_PUBLIC_BASE_URL; delete process.env.GBP_MEDIA_PUBLIC_BASE_URL;

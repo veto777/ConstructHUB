@@ -87,7 +87,11 @@ export function scheduleTimes(raw: unknown, count: number) {
 }
 // Google (and the vision model) must download photos from a public URL. Without a public bucket domain we
 // hand out a short-lived HMAC-signed link to /api/public/gbp-media that streams only media/ keys from R2.
-const mediaSigningKey = () => createHash('sha256').update(`gbp-media:${process.env.GBP_TOKEN_KEY || process.env.SESSION_SECRET || 'dev-only'}`).digest();
+const mediaSigningKey = () => {
+    const secret = process.env.GBP_TOKEN_KEY || process.env.SESSION_SECRET;
+    if (!secret) throw new GoogleError('invalid', 'Media signing is not configured', 503);
+    return createHash('sha256').update(`gbp-media:${secret}`).digest();
+};
 /** Queued payloads store r2:<key>; a fresh signed link is minted only when the job is dispatched. */
 export function resolveMediaRefs(payload: any): any {
     const fix = (m: any) => typeof m?.sourceUrl === 'string' && m.sourceUrl.startsWith('r2:') ? { ...m, sourceUrl: publicPhotoUrl(m.sourceUrl.slice(3)) } : m;
@@ -97,8 +101,10 @@ export function resolveMediaRefs(payload: any): any {
 export function signMediaKey(key: string, exp: number) { return createHmac('sha256', mediaSigningKey()).update(`${key}\n${exp}`).digest('base64url'); }
 export function verifyMediaSignature(key: string, exp: number, sig: string) {
     if (!key.startsWith('media/') || key.includes('..') || !Number.isFinite(exp) || exp < Date.now() / 1000) return false;
-    const want = Buffer.from(signMediaKey(key, exp)), got = Buffer.from(String(sig));
-    return want.length === got.length && timingSafeEqual(want, got);
+    try {
+        const want = Buffer.from(signMediaKey(key, exp)), got = Buffer.from(String(sig));
+        return want.length === got.length && timingSafeEqual(want, got);
+    } catch { return false; }
 }
 export function publicPhotoUrl(key: string, base = process.env.GBP_MEDIA_PUBLIC_BASE_URL, ttlSeconds = 3600) {
     if (!base) {
