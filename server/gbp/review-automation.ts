@@ -107,7 +107,7 @@ export async function processReplies(userId:number,id:number,generate=generateRe
         await pool.query("UPDATE gbp_review_automation SET ai_status='draft' WHERE review_id=$1",[r.id]);
         if(shouldAutoPublish(s,r.rating)) {
           // A human reply/draft arriving during generation wins; reply re-checks under its lock.
-          await publish(userId,r.id,text,'publish',undefined,{expectedDraft:text});
+          await publish(userId,r.id,text,'publish',undefined,{expectedDraft:text,expectedReview:{rating:r.rating,comment:r.comment}});
           await pool.query("UPDATE gbp_review_automation SET ai_status='posted' WHERE review_id=$1",[r.id]);
         }
       } catch {

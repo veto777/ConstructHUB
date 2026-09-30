@@ -171,8 +171,8 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
     return result;
   });
 }
-export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client?: GoogleClient, opts: { req?: any; expectedDraft?: string } = {}) {
-  const { req, expectedDraft } = opts;
+export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client?: GoogleClient, opts: { req?: any; expectedDraft?: string; expectedReview?: {rating:number;comment:string|null} } = {}) {
+  const { req, expectedDraft, expectedReview } = opts;
   if(typeof comment !== 'string' || comment.length > 4096 || (action==='publish' && !comment.trim())) throw new GoogleError('invalid','Reply must contain 1–4096 characters',400);
   const {rows:[review]} = await pool.query('SELECT * FROM google_profile_reviews WHERE id=$1 AND user_id=$2',[id,userId]);
   if(!review) throw new GoogleError('invalid','Review not found',404);
@@ -190,8 +190,11 @@ export async function reply(userId: number,id: number,comment: string, action: '
   if(review.google_deleted || !review.google_review_id?.startsWith(`${l.gbp_account_name}/${l.gbp_location_name}/reviews/`)) throw new GoogleError('invalid','This review is not an active Google review. Save a draft instead.',400);
   return withLocationLock(l.id,async c => {
     if(expectedDraft!==undefined) {
-      const {rows:[fresh]}=await c.query('SELECT reply_comment,reply_draft,google_deleted FROM google_profile_reviews WHERE id=$1 AND user_id=$2',[id,userId]);
-      if(!fresh||fresh.reply_comment||fresh.google_deleted||fresh.reply_draft!==expectedDraft)throw new GoogleError('invalid','Review changed while generating. Review it manually.',409);
+      const {rows:[fresh]}=await c.query('SELECT reply_comment,reply_draft,google_deleted,rating,comment FROM google_profile_reviews WHERE id=$1 AND user_id=$2',[id,userId]);
+      if(!fresh||fresh.reply_comment||fresh.google_deleted||fresh.reply_draft!==expectedDraft ||
+        (expectedReview && (fresh.rating!==expectedReview.rating || fresh.comment!==expectedReview.comment))) {
+        throw new GoogleError('invalid','Review changed while generating. Review it manually.',409);
+      }
     }
     // Keep the last confirmed reply intact until Google acknowledges the operation.
     if(action==='publish') await c.query('UPDATE google_profile_reviews SET reply_draft=$2 WHERE id=$1',[id,comment]);

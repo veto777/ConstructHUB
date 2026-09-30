@@ -79,6 +79,19 @@ describe('AI reply settings and queue with injected AI/publisher',()=>{
     const fresh=await add(5,new Date(),'Human draft');
     await expect(reply(user,fresh,'AI text','publish',client,{expectedDraft:'AI text'})).rejects.toMatchObject({status:409});expect(http).toHaveBeenCalledTimes(1);
   });
+  it('keeps a reply as a draft when the review changes during generation', async () => {
+    const r = await add(5);
+    await notifyNewReviews(user,id);
+    const http = vi.fn(async (_input:any, options:any) => new Response(JSON.stringify({comment:JSON.parse(options.body).comment})));
+    const client = new GoogleClient(async () => 'fixture', http, new Limiter(() => 0, async () => {}));
+    await processReplies(user,id,async () => {
+      await pool.query("UPDATE google_profile_reviews SET rating=1,comment='Updated complaint' WHERE id=$1",[r]);
+      return 'Thank you for your positive review.';
+    }, (u,r,text,action,_c,opts) => reply(u,r,text,action,client,opts));
+    expect(http).not.toHaveBeenCalled();
+    expect((await state(r)).ai_status).toBe('needs-review');
+    expect((await pool.query('SELECT reply_comment,reply_draft FROM google_profile_reviews WHERE id=$1',[r])).rows[0]).toEqual({reply_comment:null,reply_draft:'Thank you for your positive review.'});
+  });
   it('rejects overlong AI content and enforces the per-user daily budget',async()=>{
     const r=await add();await notifyNewReviews(user,id);await processReplies(user,id,async()=> 'x'.repeat(1000),publish as any);expect((await state(r)).ai_status).toBe('needs-review');
     const next=await add();await notifyNewReviews(user,id);
