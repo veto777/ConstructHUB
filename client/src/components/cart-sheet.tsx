@@ -3,17 +3,17 @@ import { useLocation } from "wouter";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useCart } from "@/contexts/cart-context";
-import { ShoppingCart, X, Loader2, Package, ArrowRight, Trash2, FileText } from "lucide-react";
+import { TalkToSalesButton } from "@/components/talk-to-sales";
+import { formatUsd } from "@/lib/pricing-display";
+import { SALES_THRESHOLD_CENTS } from "@shared/plans";
+import { ShoppingCart, X, Loader2, Package, ArrowRight, Trash2, MessageSquare } from "lucide-react";
 import { useState, useEffect } from "react";
 
-const SEO_PACKAGE_IDS = ["dfy_seo_first_page", "dfy_seo_growth", "dfy_seo_domination", "dfy_seo_ads"];
-
 export function CartSheet() {
-  const { items, removeItem, clearCart, getTotal, getItemCount } = useCart();
+  const { items, removeItem, clearCart, getTotal, getItemCount, salesItems, dismissSalesItem } = useCart();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
@@ -38,53 +38,11 @@ export function CartSheet() {
     }
   }, [cartSuccess, cartCanceled]);
 
-  const seoItems = items.filter(i => SEO_PACKAGE_IDS.includes(i.id));
-  const nonSeoItems = items.filter(i => !SEO_PACKAGE_IDS.includes(i.id));
-  const hasSeoItems = seoItems.length > 0;
-  const hasNonSeoItems = nonSeoItems.length > 0;
-
-  const contractMutation = useMutation({
-    mutationFn: async () => {
-      const results = [];
-      for (const seoItem of seoItems) {
-        const res = await apiRequest("POST", "/api/contracts/create", { packageId: seoItem.id });
-        const data = await res.json();
-        results.push(data);
-      }
-      return results;
-    },
-    onSuccess: (results) => {
-      seoItems.forEach(item => removeItem(item.id));
-
-      if (results.length === 1 && !hasNonSeoItems) {
-        setOpen(false);
-        setLocation(`/contract/sign/${results[0].token}`);
-        toast({
-          title: "Contract Created",
-          description: "Review and sign your SEO service agreement. A copy has been sent to your email.",
-        });
-      } else {
-        toast({
-          title: `${results.length} Contract${results.length > 1 ? "s" : ""} Sent`,
-          description: "Check your email to review and sign your SEO service agreement(s). You must sign before payment is processed.",
-        });
-      }
-    },
-    onError: (err: any) => {
-      if (err.message?.includes("Login required") || err.message?.includes("401")) {
-        toast({ title: "Sign in required", description: "Please sign in to continue.", variant: "destructive" });
-        setOpen(false);
-        setLocation("/auth");
-      } else {
-        toast({ title: "Failed to create contract", description: apiErrorMessage(err), variant: "destructive" });
-      }
-    },
-  });
-
+  // Only items under the sales threshold are ever in `items`; anything at or
+  // above it is a sales request (salesItems), never a checkout line.
   const checkoutMutation = useMutation({
     mutationFn: async () => {
-      const checkoutItems = hasNonSeoItems ? nonSeoItems : items;
-      const res = await apiRequest("POST", "/api/stripe/create-cart-checkout", { items: checkoutItems });
+      const res = await apiRequest("POST", "/api/stripe/create-cart-checkout", { items });
       return res.json();
     },
     onSuccess: (data) => {
@@ -101,34 +59,25 @@ export function CartSheet() {
     },
   });
 
+  const isDev = import.meta.env.DEV;
   const handleCheckout = () => {
     if (!user && !isDev) {
       setOpen(false);
       setLocation("/auth");
       return;
     }
-
-    if (hasSeoItems && hasNonSeoItems) {
-      contractMutation.mutate();
-      checkoutMutation.mutate();
-    } else if (hasSeoItems) {
-      contractMutation.mutate();
-    } else {
-      checkoutMutation.mutate();
-    }
+    checkoutMutation.mutate();
   };
 
   const itemCount = getItemCount();
   const total = getTotal();
-  const isDev = import.meta.env.DEV;
-  const isProcessing = checkoutMutation.isPending || contractMutation.isPending;
-  const cartError = checkoutMutation.error ?? contractMutation.error;
+  const isProcessing = checkoutMutation.isPending;
   // A failed attempt's message stays until the cart changes or the sheet is
   // reopened — never while a request is still running.
   const clearCartError = () => {
     if (checkoutMutation.isError) checkoutMutation.reset();
-    if (contractMutation.isError) contractMutation.reset();
   };
+  const empty = items.length === 0 && salesItems.length === 0;
 
   return (
     <Sheet open={open} onOpenChange={(next) => { if (next) clearCartError(); setOpen(next); }}>
@@ -156,7 +105,7 @@ export function CartSheet() {
           </SheetTitle>
         </SheetHeader>
 
-        {items.length === 0 ? (
+        {empty ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-12 space-y-4">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
               <Package className="h-8 w-8 text-muted-foreground" />
@@ -164,7 +113,7 @@ export function CartSheet() {
             <div>
               <p className="font-semibold text-lg" data-testid="text-cart-empty">Your cart is empty</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Browse our Master Class modules or Done-For-You services to get started.
+                Browse our Master Class or Done-For-You services to get started.
               </p>
             </div>
             <div className="flex gap-2">
@@ -179,6 +128,34 @@ export function CartSheet() {
         ) : (
           <>
             <div className="flex-1 overflow-y-auto space-y-3 py-4">
+              {salesItems.length > 0 && (
+                <div className="space-y-2 rounded-lg border border-[#4A6CF7]/30 bg-[#4A6CF7]/5 p-3" data-testid="section-cart-sales">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold">
+                    <MessageSquare className="h-4 w-4 text-[#4A6CF7]" /> Talk to a sales rep
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Anything {formatUsd(SALES_THRESHOLD_CENTS)} or more is priced with a sales rep, so it can't be checked out here.
+                  </p>
+                  {salesItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 rounded-md border border-border/50 bg-background p-2" data-testid={`card-cart-sales-${item.id}`}>
+                      <p className="flex-1 min-w-0 text-sm font-medium truncate">{item.name}</p>
+                      <TalkToSalesButton topic={item.name} onSent={() => dismissSalesItem(item.id)} size="sm" variant="outline" className="shrink-0 h-8" data-testid={`button-cart-sales-${item.id}`}>
+                        Talk to sales
+                      </TalkToSalesButton>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground"
+                        aria-label={`Dismiss ${item.name}`}
+                        onClick={() => dismissSalesItem(item.id)}
+                        data-testid={`button-dismiss-sales-${item.id}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {items.map((item) => (
                 <div
                   key={item.id}
@@ -196,22 +173,17 @@ export function CartSheet() {
                          item.type === "course_bundle" ? "Course Bundle" :
                          item.type === "dfy_bundle" ? "Service Bundle" : "Service"}
                       </Badge>
-                      {SEO_PACKAGE_IDS.includes(item.id) && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-0.5">
-                          <FileText className="h-2.5 w-2.5" />
-                          Contract Required
-                        </Badge>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="font-bold text-sm" data-testid={`text-cart-item-price-${item.id}`}>
-                      ${(item.price / 100).toLocaleString()}
+                      {formatUsd(item.price)}
                     </span>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      aria-label={`Remove ${item.name}`}
                       onClick={() => { clearCartError(); removeItem(item.id); }}
                       data-testid={`button-remove-cart-item-${item.id}`}
                     >
@@ -223,65 +195,48 @@ export function CartSheet() {
             </div>
 
             <div className="border-t pt-4 space-y-3">
-              {hasSeoItems && (
-                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300">
-                  <FileText className="h-4 w-4 mt-0.5 shrink-0" />
-                  <p className="text-xs leading-relaxed">
-                    SEO packages require a signed service agreement before payment. A contract will be sent to your email for review and signature.
-                  </p>
-                </div>
+              {items.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Subtotal</span>
+                    <span className="text-xl font-extrabold" data-testid="text-cart-total">
+                      {formatUsd(total)}
+                    </span>
+                  </div>
+
+                  {checkoutMutation.error && (
+                    <p role="alert" className="text-sm text-destructive" data-testid="text-cart-error">
+                      {apiErrorMessage(checkoutMutation.error)}
+                    </p>
+                  )}
+
+                  <Button
+                    className="w-full bg-[#F97316] hover:bg-[#ea6c10] text-white shadow-lg shadow-orange-500/25"
+                    size="lg"
+                    onClick={handleCheckout}
+                    disabled={isProcessing}
+                    data-testid="button-cart-checkout"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        Proceed to Checkout
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </>
               )}
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Subtotal</span>
-                <span className="text-xl font-extrabold" data-testid="text-cart-total">
-                  ${(total / 100).toLocaleString()}
-                </span>
-              </div>
-
-              {cartError && (
-                <p role="alert" className="text-sm text-destructive" data-testid="text-cart-error">
-                  {apiErrorMessage(cartError)}
-                </p>
-              )}
-
-              <Button
-                className="w-full bg-[#F97316] hover:bg-[#ea6c10] text-white shadow-lg shadow-orange-500/25"
-                size="lg"
-                onClick={handleCheckout}
-                disabled={isProcessing}
-                data-testid="button-cart-checkout"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Processing...
-                  </>
-                ) : hasSeoItems && !hasNonSeoItems ? (
-                  <>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Send Contract for Signature
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </>
-                ) : hasSeoItems && hasNonSeoItems ? (
-                  <>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Send Contract & Checkout
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </>
-                ) : (
-                  <>
-                    Proceed to Checkout
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </>
-                )}
-              </Button>
 
               <Button
                 variant="ghost"
                 size="sm"
                 className="w-full text-muted-foreground"
-                onClick={() => { clearCartError(); clearCart(); }}
+                onClick={() => { clearCartError(); clearCart(); salesItems.forEach(i => dismissSalesItem(i.id)); }}
                 data-testid="button-clear-cart"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
