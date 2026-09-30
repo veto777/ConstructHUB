@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { pool } from './db';
 import { encryptToken, decryptToken, ensureGbpTokenEncryption, tokenKey } from './gbp/token-crypto';
-import { ensureAccountSecuritySchema, requireRecentAuth, RECENT_AUTH_MS, replaceRecoveryCodes, consumeRecoveryCode, rememberDevice, trustedDevice, revokeDevices, registerAccountSecurityRoutes, validTotp } from './account-security';
+import { activateTwoFactor, ensureAccountSecuritySchema, requireRecentAuth, RECENT_AUTH_MS, replaceRecoveryCodes, consumeRecoveryCode, rememberDevice, trustedDevice, revokeDevices, registerAccountSecurityRoutes, validTotp } from './account-security';
 import { ensureAccountEventsSchema } from './account-events';
 import { TOTP } from 'otpauth';
 import bcrypt from 'bcryptjs';
@@ -44,6 +44,44 @@ describe('account security',()=>{
   await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash('fixture-password',4),id]);await verify(req,response());expect(req.session.recentAuth.userId).toBe(id);
   const totp=new TOTP({secret:'JBSWY3DPEHPK3PXP'});await pool.query('UPDATE users SET totp_enabled=true,totp_secret=$1 WHERE id=$2',[encryptToken('JBSWY3DPEHPK3PXP'),id]);delete req.session.recentAuth;const bad=response();await verify(req,bad);expect(bad.status).toHaveBeenCalledWith(401);expect(req.session.recentAuth).toBeUndefined();
   req.body.value=totp.generate();await verify(req,response());expect(req.session.recentAuth.userId).toBe(id);expect(validTotp(encryptToken('JBSWY3DPEHPK3PXP')!,req.body.value)).toBe(true);
+ });
+});
+
+describe('authenticator enrollment identity gate', () => {
+ it('rejects replaced seeds and concurrent activation without replacing issued recovery codes', async () => {
+  const oldSeed = encryptToken('JBSWY3DPEHPK3PXP')!;
+  const newSeed = encryptToken('JBSWY3DPEHPK3PXP')!;
+  await pool.query('UPDATE users SET totp_enabled=false,totp_secret=$1 WHERE id=$2', [newSeed, other]);
+  expect(await activateTwoFactor(other, oldSeed)).toBeNull();
+  const results = await Promise.all([activateTwoFactor(other, newSeed), activateTwoFactor(other, newSeed)]);
+  expect(results.filter(Boolean)).toHaveLength(1);
+  const codes = results.find(Boolean)!;
+  expect(codes).toHaveLength(10);
+  for (const code of codes) expect(await consumeRecoveryCode(other, code)).toBe(true);
+  await pool.query('UPDATE users SET totp_enabled=false,totp_secret=NULL WHERE id=$1', [other]);
+ });
+ it('blocks stale enrollment and activation before generating or accepting an attacker seed', async () => {
+  const express = (await import('express')).default;
+  const { setupAuth } = await import('./auth');
+  const app = express(); await setupAuth(app);
+  const route = (path: string) => (app.router as any).stack.find((l: any) => l.route?.path === path).route.stack.at(-1).handle;
+  await pool.query('UPDATE users SET totp_enabled=false,totp_secret=NULL WHERE id=$1', [other]);
+  const req: any = { user: { id: other }, isAuthenticated: () => true, headers: {}, session: {}, body: {} };
+  const stale = response();
+  await route('/api/auth/2fa/setup')(req, stale);
+  expect(stale.status).toHaveBeenCalledWith(403);
+  expect(stale.json).toHaveBeenCalledWith(expect.objectContaining({ reauth: true }));
+  expect((await pool.query('SELECT totp_secret FROM users WHERE id=$1', [other])).rows[0].totp_secret).toBeNull();
+  req.session.recentAuth = { userId: other, at: Date.now() };
+  const setup = response(); await route('/api/auth/2fa/setup')(req, setup);
+  const secret = setup.json.mock.calls[0][0].secret;
+  expect(secret).toBeTruthy();
+  req.body.code = new TOTP({ secret }).generate();
+  delete req.session.recentAuth;
+  const activation = response(); await route('/api/auth/2fa/verify')(req, activation);
+  expect(activation.status).toHaveBeenCalledWith(403);
+  expect((await pool.query('SELECT totp_enabled FROM users WHERE id=$1', [other])).rows[0].totp_enabled).toBe(false);
+  await pool.query('UPDATE users SET totp_secret=NULL WHERE id=$1', [other]);
  });
 });
 

@@ -1,4 +1,4 @@
-import { requireRecentAuth, markRecentAuth, trustedDevice, rememberDevice, replaceRecoveryCodes, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
+import { requireRecentAuth, markRecentAuth, trustedDevice, rememberDevice, activateTwoFactor, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
 import { encryptToken, decryptToken } from "./gbp/token-crypto";
 import { logActivity } from "./account-events";
 import { rateLimit, takeBudget } from "./growth-limits";
@@ -690,6 +690,7 @@ export async function setupAuth(app: Express) {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    if (!requireRecentAuth(req, res)) return;
     try {
       const [user] = await db.select().from(users).where(eq(users.id, req.user.id));
       if (!user) return res.status(404).json({ message: "User not found" });
@@ -708,7 +709,8 @@ export async function setupAuth(app: Express) {
 
       const otpauthUrl = totp.toString();
 
-      await db.update(users).set({ totpSecret: encryptToken(secret.base32) }).where(eq(users.id, user.id));
+      const saved = await pool.query('UPDATE users SET totp_secret=$1 WHERE id=$2 AND totp_enabled=false RETURNING id', [encryptToken(secret.base32), user.id]);
+      if (!saved.rowCount) return res.status(409).json({ message: 'Two-factor sign-in changed. Reload Settings.' });
 
       const QRCode = await import("qrcode");
       const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
@@ -727,6 +729,7 @@ export async function setupAuth(app: Express) {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    if (!requireRecentAuth(req, res)) return;
     try {
       const { code } = req.body;
       if (typeof code !== "string" || !/^[0-9]{6}$/.test(code)) {
@@ -753,8 +756,8 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ message: "Invalid code. Please check your authenticator app and try again." });
       }
 
-      await db.update(users).set({ totpEnabled: true }).where(eq(users.id, user.id));
-      const codes = await replaceRecoveryCodes(user.id);
+      const codes = await activateTwoFactor(user.id, user.totpSecret);
+      if (!codes) return res.status(409).json({ message: 'Two-factor setup changed. Reload Settings and try again.' });
       markRecentAuth(req, user.id);
       await securityChanged(req, user.id, "security.2fa_changed", "Two-factor sign-in was enabled");
       res.json({ message: "Two-factor authentication enabled successfully!", codes });

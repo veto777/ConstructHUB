@@ -43,17 +43,34 @@ export function validTotp(secret: string, code: unknown): boolean {
   if (typeof code !== 'string' || !/^\d{6}$/.test(code)) return false;
   return new TOTP({ issuer: 'ConstructHUB', algorithm: 'SHA1', digits: 6, period: 30, secret: decryptToken(secret)! }).validate({ token: code, window: 1 }) !== null;
 }
-export async function replaceRecoveryCodes(userId: number) {
+async function writeRecoveryCodes(connection: Pick<typeof pool, 'query'>, userId: number) {
   const codes = Array.from({ length: 10 }, () => randomBytes(8).toString('hex'));
+  await connection.query('DELETE FROM account_recovery_codes WHERE user_id=$1', [userId]);
+  for (const code of codes) await connection.query('INSERT INTO account_recovery_codes VALUES($1,$2)', [userId, hash(code)]);
+  return codes;
+}
+export async function replaceRecoveryCodes(userId: number) {
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
     await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
-    await c.query('DELETE FROM account_recovery_codes WHERE user_id=$1', [userId]);
-    for (const code of codes) await c.query('INSERT INTO account_recovery_codes VALUES($1,$2)', [userId, hash(code)]);
+    const codes = await writeRecoveryCodes(c, userId);
     await c.query('COMMIT');
+    return codes;
   } catch(e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
-  return codes;
+}
+/** Bind activation to the exact seed verified, and commit its recovery codes together. */
+export async function activateTwoFactor(userId: number, verifiedSecret: string) {
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const changed = await c.query(`UPDATE users SET totp_enabled=true
+      WHERE id=$1 AND totp_enabled=false AND totp_secret=$2 RETURNING id`, [userId, verifiedSecret]);
+    if (!changed.rowCount) { await c.query('ROLLBACK'); return null; }
+    const codes = await writeRecoveryCodes(c, userId);
+    await c.query('COMMIT');
+    return codes;
+  } catch(e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
 export async function consumeRecoveryCode(userId: number, code: unknown) {
   if (typeof code !== 'string' || !/^[a-f0-9]{16}$/i.test(code)) return false;
