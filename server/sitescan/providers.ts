@@ -8,15 +8,46 @@ export async function pageSpeed(
   const q = new URLSearchParams({ url, strategy, category: "performance" });
   if (process.env.PAGESPEED_API_KEY)
     q.set("key", process.env.PAGESPEED_API_KEY);
+  else if (http === fetch)
+    return {
+      url,
+      strategy,
+      score: null,
+      reason: "no_key",
+      unavailable:
+        "PageSpeed did not run: add PAGESPEED_API_KEY on the server, then retry.",
+    };
   const r = await http(
     "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?" + q,
     { signal: AbortSignal.timeout(45_000) },
   );
-  if (!r.ok) throw new Error("PageSpeed unavailable");
+  if (!r.ok)
+    return {
+      url,
+      strategy,
+      score: null,
+      reason:
+        r.status === 429
+          ? "quota"
+          : r.status === 401 || r.status === 403
+            ? "configuration"
+            : "provider_error",
+      unavailable:
+        r.status === 429
+          ? "PageSpeed quota exceeded; retry after quota resets."
+          : `PageSpeed HTTP ${r.status}. Check PAGESPEED_API_KEY, API enablement and key restrictions, then retry.`,
+    };
   const data = await r.json();
   const l = data.lighthouseResult;
   if (!l?.categories?.performance)
-    throw new Error("PageSpeed did not return measurements");
+    return {
+      url,
+      strategy,
+      score: null,
+      reason: "no_measurements",
+      unavailable:
+        "PageSpeed returned no Lighthouse measurements; retry later.",
+    };
   const audits = l.audits || {};
   return {
     url,
@@ -84,14 +115,12 @@ export function planEvidence(
 ) {
   return {
     profile,
-    findings: findings
-      .slice(0, 100)
-      .map((f) => ({
-        ...f,
-        urls: f.urls
-          .filter((url) => state.pages.some((p) => p.url === url))
-          .slice(0, 30),
-      })),
+    findings: findings.slice(0, 100).map((f) => ({
+      ...f,
+      urls: f.urls
+        .filter((url) => state.pages.some((p) => p.url === url))
+        .slice(0, 30),
+    })),
     pages: state.pages.slice(0, 30).map((p) => ({
       url: p.url,
       title: p.title.slice(0, 300),
