@@ -73,7 +73,7 @@ export async function purgeGoogleData(userId: number, subject: string|null = nul
   await db.query(`DELETE FROM gbp_guard_changes WHERE user_id=$1 AND location_id IN (${locs})`,[userId,subject]);
   await db.query(`DELETE FROM gbp_reply_settings WHERE user_id=$1 AND location_id IN (${locs})`,[userId,subject]);
   // Sync-status rows are ConstructHUB's own records (and carry the error users need to see); reset the backfill cursor only.
-  await db.query(`UPDATE gbp_sync_status SET cursor_date=NULL,last_success=NULL WHERE location_id IN (${locs})`,[userId,subject]);
+  await db.query(`UPDATE gbp_sync_status SET cursor_date=NULL,last_success=NULL,profile_snapshot=NULL WHERE location_id IN (${locs})`,[userId,subject]);
 }
 export async function invalidate(userId: number, subject: string|null = null) {
   const c = await pool.connect();

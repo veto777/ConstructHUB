@@ -98,6 +98,7 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
     let verified: boolean|undefined;
     for (const kind of ['profile','reviews','performance']) {
       await c.query(`INSERT INTO gbp_sync_status(location_id,kind,last_attempt) VALUES($1,$2,now()) ON CONFLICT(location_id,kind) DO UPDATE SET last_attempt=now()`,[id,kind]);
+      let profileSnapshot: Record<string, unknown> | null = null;
       try {
         if (kind === 'profile') {
           const info = await client.request('information',`/v1/${l.gbp_location_name}?readMask=${PROFILE_READ_MASK}`);
@@ -106,6 +107,12 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           const media = await client.request('reviews',`/v4/${parent}/media?pageSize=1`).catch(() => null);
           const customerMedia = await client.request('reviews',`/v4/${parent}/media/customers?pageSize=1`).catch(() => null);
           const p = mapProfile(info, attrs);
+          // Keep Google's observed values independent from editable local fields.
+          profileSnapshot = {
+            business_name: p.businessName, phone: p.phone, website: p.website,
+            address: p.address, city: p.city, state: p.state, zip_code: p.zipCode,
+            country: p.country, services: p.services, service_areas: p.serviceAreas,
+          };
           verified = !!info?.metadata?.hasVoiceOfMerchant;
           await c.query(`UPDATE business_locations SET business_name=COALESCE($2,business_name),phone=$3,website=$4,address=$5,city=$6,state=$7,zip_code=$8,country=COALESCE($9,country),
             categories=$10,description=$11,service_areas=$12,services=$13,hours=$14,opening_date=$15,open_status=COALESCE($16,open_status),
@@ -158,7 +165,9 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           await c.query(`UPDATE business_locations SET monthly_views=COALESCE((SELECT sum(value)::int FROM gbp_daily_metrics WHERE location_id=$1 AND metric LIKE 'BUSINESS_IMPRESSIONS_%' AND date>current_date-30),0) WHERE id=$1`,[id]);
           result.performance = {count:rows.length,available:rows.length>0};
         }
-        await c.query('UPDATE gbp_sync_status SET last_success=now(),last_error=NULL WHERE location_id=$1 AND kind=$2',[id,kind]);
+        await c.query(`UPDATE gbp_sync_status SET last_success=now(),last_error=NULL,
+          profile_snapshot=CASE WHEN kind='profile' THEN $3::jsonb ELSE profile_snapshot END
+          WHERE location_id=$1 AND kind=$2`,[id,kind,profileSnapshot]);
       } catch(e) {
         const error = publicError(e);
         // Google only shares performance for listings whose owner it has verified (voice of merchant).

@@ -37,6 +37,7 @@ export async function ensureGbpSchema() {
       kind text NOT NULL, last_success timestamptz, last_attempt timestamptz, last_error text, cursor_date date,
       PRIMARY KEY(location_id,kind)
     );
+    ALTER TABLE gbp_sync_status ADD COLUMN IF NOT EXISTS profile_snapshot jsonb;
     CREATE TABLE IF NOT EXISTS gbp_daily_metrics (
       location_id integer REFERENCES business_locations(id) ON DELETE CASCADE,
       date date NOT NULL, metric text NOT NULL, value bigint NOT NULL,

@@ -1,3 +1,4 @@
+import { profileFor } from "../sitescan/worker";
 import { decryptToken } from './token-crypto';
 import {beforeAll,afterAll,describe,it,expect,vi} from 'vitest';
 import {pool} from '../db';
@@ -80,6 +81,11 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     const statuses=(await pool.query('SELECT * FROM gbp_sync_status WHERE location_id=$1',[locationId])).rows;expect(statuses.every(s=>s.last_success&&!s.last_error)).toBe(true);
     const {rows:[prof]}=await pool.query('SELECT * FROM business_locations WHERE id=$1',[locationId]);
     expect(prof).toMatchObject({description:'Fixture description',phone:'(555) 010-0000',address:'1 Main St',city:'Town',opening_date:'2003-02-01',business_photo_count:12,customer_photo_count:4});
+    const observed = await profileFor(userId, locationId);
+    expect(observed).toMatchObject({business_name: prof.business_name, phone: prof.phone, services: prof.services});
+    await pool.query("UPDATE business_locations SET phone='local draft',services=ARRAY['Local draft service'] WHERE id=$1", [locationId]);
+    expect(await profileFor(userId, locationId)).toEqual(observed);
+    expect(await profileFor(userId + 100000, locationId)).toBeNull();
     expect(prof.services).toEqual(['Roof repair','Gutter guards']);expect(prof.service_areas).toEqual(['Town, WA, USA']);
     expect(prof.hours).toMatchObject({Monday:'8:00 AM – 5:30 PM',Tuesday:'Closed'});expect(prof.social_profiles).toMatchObject({facebook:'https://www.facebook.com/fixture'});expect(prof.social_profiles.text_messaging).toBeUndefined();
     expect((await pool.query('SELECT value::text FROM gbp_daily_metrics WHERE location_id=$1',[locationId])).rows).toEqual([{value:'0'}]);
@@ -127,6 +133,7 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
       expect(tokenHttp.mock.calls[0][0]).toBe('https://oauth2.googleapis.com/revoke');
       const left=await pool.query(`SELECT (SELECT count(*) FROM google_profile_reviews WHERE user_id=$1 AND google_review_id LIKE 'accounts/%') reviews,(SELECT count(*) FROM gbp_daily_metrics WHERE location_id=$2) metrics,(SELECT count(*) FROM gbp_sync_status WHERE location_id=$2) sync,(SELECT count(*) FROM business_locations WHERE id=$2) locations`,[userId,locationId]);
       expect(left.rows[0]).toMatchObject({reviews:'0',metrics:'0',locations:'1'});
+      expect((await pool.query("SELECT profile_snapshot FROM gbp_sync_status WHERE location_id=$1 AND kind='profile'", [locationId])).rows[0].profile_snapshot).toBeNull();
     }finally {vi.unstubAllGlobals()}
   });
 
