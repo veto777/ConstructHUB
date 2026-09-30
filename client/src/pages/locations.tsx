@@ -1,18 +1,23 @@
 import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { LocationSearchSummary } from "./site-connections";
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
-import { GbpConnection, GbpLinkCell } from "@/components/gbp-connection";
+import { GbpConnection } from "@/components/gbp-connection";
+import { startGbpConnect } from "@/components/recent-auth";
 import { InfoTip } from "@/components/info-tip";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { BusinessLocation, CitationCampaign, Citation } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -48,18 +53,45 @@ const SOCIAL_PLATFORMS = [
 ];
 
 
+/** Per-location view state kept in the URL; it belongs to one location and never carries over to the next. */
+const DETAIL_PARAMS = ["tab", "campaign", "range", "group"];
+function showLocation(id: string | null) {
+  const url = new URL(window.location.href);
+  for (const key of DETAIL_PARAMS) url.searchParams.delete(key);
+  if (id) url.searchParams.set("location", id); else url.searchParams.delete("location");
+  window.history.replaceState(window.history.state, "", url.toString());
+  window.dispatchEvent(new Event("urlparamchange"));
+}
+const refreshLocationLists = () => ["/api/locations", "/api/agency/locations", "/api/agency/dashboard", "/api/gbp/linkage", "/api/gbp/status"]
+  .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+
 export default function LocationsPage() {
-  const [locationParam, setLocationParam] = useUrlParam("location");
+  const { toast } = useToast();
+  const [locationParam] = useUrlParam("location");
+  const [gbpParam, setGbpParam] = useUrlParam("gbp");
   const [addDialogOpen,setAddDialogOpen]=useState(false);
+  const [notFound,setNotFound]=useState<string|null>(null);
   const {data:selectedLocation,error}=useQuery<BusinessLocation>({queryKey:["/api/locations",locationParam],enabled:!!locationParam});
-  if(locationParam&&selectedLocation)return <LocationDetail location={selectedLocation} onBack={()=>setLocationParam(null)} isPremiumPlus={true}/>;
-  return <main className="max-w-7xl mx-auto p-6 space-y-5">
-    <div className="flex justify-between"><h1 className="text-2xl font-bold" data-testid="text-locations-title">GMB Locations</h1>
+  // A stale or foreign ?location= says so and returns to a clean list URL (its ?tab must not stick to the next location).
+  useEffect(()=>{ if(locationParam&&error){ setNotFound(locationParam); showLocation(null); } },[locationParam,error]);
+  // /api/gbp/connect opened as a page (new tab, typed URL) lands here when identity must be verified first.
+  const connectStarted=useRef(false);
+  useEffect(()=>{
+    if(gbpParam!=="reauth"||connectStarted.current)return;
+    connectStarted.current=true;setGbpParam(null);
+    void startGbpConnect(message=>toast({title:"Google connection",description:message,variant:"destructive"})).finally(()=>{connectStarted.current=false;});
+  },[gbpParam]);
+  if(locationParam&&selectedLocation)return <LocationDetail location={selectedLocation} onBack={()=>showLocation(null)} onDeleted={()=>{showLocation(null);queryClient.removeQueries({queryKey:["/api/locations",locationParam],exact:true});refreshLocationLists();}} isPremiumPlus={true}/>;
+  return <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold" data-testid="text-locations-title">Business Profile Locations</h1>
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}><DialogTrigger asChild><Button data-testid="button-add-location">Add Location(s)</Button></DialogTrigger>
-        <DialogContent><DialogHeader><DialogTitle>Add Location</DialogTitle></DialogHeader><AddLocationDialog onCreated={()=>{setAddDialogOpen(false);queryClient.invalidateQueries({queryKey:['/api/agency/locations']});}}/></DialogContent></Dialog>
+        <DialogContent><DialogHeader><DialogTitle>Add Location</DialogTitle></DialogHeader><AddLocationDialog onCreated={()=>{setAddDialogOpen(false);refreshLocationLists();}}/></DialogContent></Dialog>
     </div>
-    {error&&<p role="alert">Location not found or access unavailable.</p>}
-    <AgencyWorkspace onOpen={id=>setLocationParam(String(id))}/>
+    {notFound&&<div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 p-3 text-sm" data-testid="alert-location-not-found">
+      <span>Location #{notFound} was not found, or you don't have access to it.</span>
+      <Button size="sm" variant="ghost" onClick={()=>setNotFound(null)}>Dismiss</Button>
+    </div>}
+    <AgencyWorkspace onOpen={id=>{setNotFound(null);showLocation(String(id));}}/>
     <GbpConnection/>
   </main>;
 }
@@ -78,7 +110,10 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
 
 
   const handleGoogleSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (searchQuery.trim().length < 2) {
+      toast({ title: "Type at least 2 characters", description: "Search by business name, address or a Google Maps link." });
+      return;
+    }
     setIsSearching(true);
     setSearchResults([]);
     try {
@@ -88,8 +123,8 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
       if (!data.results?.length) {
         toast({ title: "No results found", description: "Try a different search term." });
       }
-    } catch {
-      toast({ title: "Search failed", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Search failed", description: apiErrorMessage(err), variant: "destructive" });
     } finally {
       setIsSearching(false);
     }
@@ -115,7 +150,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
       onCreated();
     },
     onError: (err: Error) => {
-      toast({ title: "Failed to add location", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to add location", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -138,7 +173,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
       if (msg.includes("needsAuth") || msg.includes("not connected") || msg.includes("expired")) {
         setGbpError("connect");
       } else {
-        setGbpError(msg);
+        setGbpError(apiErrorMessage(err, "Failed to fetch locations"));
       }
     } finally {
       setGbpLoading(false);
@@ -157,7 +192,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
       toast({ title: `Imported ${data.imported} location${data.imported !== 1 ? "s" : ""}` });
       onCreated();
     } catch (err: any) {
-      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+      toast({ title: "Import failed", description: apiErrorMessage(err), variant: "destructive" });
     }
   };
 
@@ -299,13 +334,13 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
   );
 }
 
-function LocationDetail({ location, onBack, isPremiumPlus }: {
+function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
   location: BusinessLocation;
   onBack: () => void;
+  onDeleted: () => void;
   isPremiumPlus: boolean;
 }) {
   const [tabParam, setTabParam] = useUrlParam("tab");
-  const activeTab = tabParam || "insights";
   const setActiveTab = (tab: string) => setTabParam(tab);
 
   const tabItems = [
@@ -318,6 +353,10 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
     { value: "settings", label: "Settings", icon: Settings },
     { value: "citations", label: "Citations", icon: Globe },
   ];
+  // An unknown (?tab=reviews) or locked tab falls back to Insights instead of an empty pane.
+  const validTab = tabItems.some((t) => t.value === tabParam && !(t.value === "citations" && !isPremiumPlus));
+  const activeTab = validTab ? tabParam! : "insights";
+  useEffect(() => { if (tabParam && !validTab) setTabParam(null); }, [tabParam, validTab]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -366,7 +405,7 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
             {activeTab === "services" && <ServicesTab location={location} />}
             {activeTab === "photos" && <PhotosTab location={location} />}
             {activeTab === "social" && <SocialProfilesTab location={location} />}
-            {activeTab === "settings" && <SettingsTab location={location} />}
+            {activeTab === "settings" && <SettingsTab location={location} onDeleted={onDeleted} />}
             {activeTab === "citations" && <CitationsTab location={location} />}
           </div>
         </div>
@@ -397,9 +436,15 @@ const PERF_LABELS: Record<string, string> = {
 type PerfData = { available: boolean; metrics: string[]; rows: { date: string; metric: string; value: string; last_day: string }[];
   firstDate: string | null; lastDate: string | null; pendingAfter: string };
 
+const PERF_RANGES = ["30d", "90d", "6m", "12m", "18m", "all"];
+const PERF_GROUPS = ["day", "week", "month"] as const;
 function InsightsTab({ location }: { location: BusinessLocation }) {
-  const [range, setRange] = useState("90d");
-  const [group, setGroup] = useState<"day" | "week" | "month">("day");
+  const [rangeParam, setRangeParam] = useUrlParam("range");
+  const [groupParam, setGroupParam] = useUrlParam("group");
+  const range = rangeParam && PERF_RANGES.includes(rangeParam) ? rangeParam : "90d";
+  const group: (typeof PERF_GROUPS)[number] = PERF_GROUPS.find((g) => g === groupParam) ?? "day";
+  const setRange = (v: string) => setRangeParam(v === "90d" ? null : v);
+  const setGroup = (v: string) => setGroupParam(v === "day" ? null : v);
   const { data, error, isLoading } = useQuery<PerfData>({
     queryKey: [`/api/gbp/locations/${location.id}/performance?range=${range}&group=${group}`],
   });
@@ -430,7 +475,7 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
           <select className={select} value={range} onChange={(e) => setRange(e.target.value)} aria-label="Date range" data-testid="select-perf-range">
             {Object.entries(rangeLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <select className={select} value={group} onChange={(e) => setGroup(e.target.value as any)} aria-label="Group by" data-testid="select-perf-group">
+          <select className={select} value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Group by" data-testid="select-perf-group">
             <option value="day">By day</option><option value="week">By week</option><option value="month">By month</option>
           </select>
         </div>
@@ -469,15 +514,17 @@ function GoogleIcon() {
   );
 }
 
-function InfoRow({ label, value, fromGoogle }: { label: string; value: string | null | undefined; fromGoogle?: boolean }) {
+function InfoRow({ label, value, fromGoogle, href }: { label: string; value: string | null | undefined; fromGoogle?: boolean; href?: string | null }) {
   return (
-    <div className="flex items-start py-2.5 border-b border-border/30 last:border-0">
-      <div className="w-44 shrink-0 text-sm text-muted-foreground flex items-center gap-1.5">
+    <div className="flex items-start gap-2 py-2.5 border-b border-border/30 last:border-0">
+      <div className="w-28 sm:w-44 shrink-0 text-sm text-muted-foreground flex items-center gap-1.5">
         {fromGoogle && <GoogleIcon />}
         {label}
       </div>
-      <div className="flex-1 text-sm" data-testid={`info-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-        {value || <span className="text-muted-foreground italic">Not set</span>}
+      <div className="flex-1 min-w-0 text-sm break-words [overflow-wrap:anywhere]" data-testid={`info-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+        {!value ? <span className="text-muted-foreground italic">Not set</span>
+          : href ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">{value}</a>
+          : value}
       </div>
     </div>
   );
@@ -500,11 +547,13 @@ function LocationInfoTab({ location }: { location: BusinessLocation }) {
         description: result.syncWarnings?.join('; '), variant: result.syncWarnings?.length ? 'destructive' : 'default' });
     },
     onError: (err: Error) => {
-      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+      toast({ title: "Import failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
   const hoursDisplay = formatHours(location.hours);
+  // google_cid holds the Maps link Google returns (Places `url`, Business Profile `metadata.mapsUri`).
+  const mapsLink = location.googleCid && /^https:\/\//i.test(location.googleCid) ? location.googleCid : null;
 
   return (
     <Card>
@@ -525,8 +574,10 @@ function LocationInfoTab({ location }: { location: BusinessLocation }) {
         )}
       </CardHeader>
       <CardContent className="space-y-0">
-        <InfoRow label="Google Business Profile ID" value={location.placeId} fromGoogle={hasGoogle} />
-        <InfoRow label="Google CID" value={location.googleCid} fromGoogle={hasGoogle} />
+        <InfoRow label="Google Place ID" value={location.placeId} fromGoogle={hasGoogle} />
+        {mapsLink || !location.googleCid
+          ? <InfoRow label="Google Maps link" value={mapsLink} href={mapsLink} fromGoogle={hasGoogle} />
+          : <InfoRow label="Google CID" value={location.googleCid} fromGoogle={hasGoogle} />}
         <InfoRow label="Business Name" value={location.businessName} fromGoogle={hasGoogle} />
         <InfoRow label="Description" value={location.description} />
         <InfoRow label="Address" value={[location.address, location.city, location.state, location.zipCode].filter(Boolean).join(", ")} fromGoogle={hasGoogle} />
@@ -544,7 +595,8 @@ function LocationInfoTab({ location }: { location: BusinessLocation }) {
         <InfoRow label="Website" value={location.website} fromGoogle={hasGoogle} />
         <InfoRow label="Hours" value={hoursDisplay} fromGoogle={hasGoogle} />
         <InfoRow label="Opening Date" value={location.openingDate} />
-        <InfoRow label="Open Status" value={location.openStatus} />
+        {/* Only a Google Business Profile sync reports open/closed; anything else would be a guess. */}
+        <InfoRow label="Open Status" value={location.gbpLocationName ? location.openStatus : null} fromGoogle={!!location.gbpLocationName} />
       </CardContent>
     </Card>
   );
@@ -700,7 +752,7 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
       toast({ title: "Social profiles saved" });
     },
     onError: (err: Error) => {
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      toast({ title: "Save failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -738,18 +790,24 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
   );
 }
 
-function SettingsTab({ location }: { location: BusinessLocation }) {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDeleted: () => void }) {
   const { toast } = useToast();
-  const [useAccountSettings, setUseAccountSettings] = useState(true);
-  const [notificationEmail, setNotificationEmail] = useState(location.notificationEmail || "");
-  const [gbpEnabled, setGbpEnabled] = useState(location.gbpManagementEnabled || false);
+  const savedEmail = location.notificationEmail || "";
+  // The switch mirrors what is saved: no location email means the account email is used.
+  const [useAccountSettings, setUseAccountSettings] = useState(!savedEmail);
+  const [notificationEmail, setNotificationEmail] = useState(savedEmail);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+
+  const nextEmail = useAccountSettings ? null : notificationEmail.trim();
+  const emailInvalid = nextEmail !== null && !EMAIL_RE.test(nextEmail);
+  const dirty = (nextEmail ?? "") !== savedEmail;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PUT", `/api/locations/${location.id}`, {
-        notificationEmail,
-        gbpManagementEnabled: gbpEnabled,
-      });
+      const res = await apiRequest("PUT", `/api/locations/${location.id}`, { notificationEmail: nextEmail });
       return res.json();
     },
     onSuccess: () => {
@@ -757,7 +815,7 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
       toast({ title: "Settings saved" });
     },
     onError: (err: Error) => {
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      toast({ title: "Save failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -766,61 +824,57 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
       await apiRequest("DELETE", `/api/locations/${location.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      toast({ title: "Location deleted" });
-      window.location.href = "/locations";
+      setConfirmOpen(false);
+      toast({ title: "Location deleted", description: `${location.businessName} was removed from ConstructHUB. Your Google listing is unchanged.` });
+      onDeleted();
     },
     onError: (err: Error) => {
-      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+      toast({ title: "Delete failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
+
+  // A location linked to Google carries synced history; make that delete deliberate.
+  const mustTypeName = !!location.gbpLocationName;
+  const confirmReady = !mustTypeName || confirmName.trim() === location.businessName.trim();
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Local management preferences</CardTitle>
-          <p className="text-sm text-muted-foreground">These preferences are saved in ConstructHUB. Notification delivery and Google profile edits are not enabled here. Imported Google locations sync automatically every six hours while connected.</p>
+          <CardTitle className="text-base">Notification email</CardTitle>
+          <p className="text-sm text-muted-foreground">ConstructHUB does not send location notifications yet, so nothing is emailed to this address today. You can save one here for this location. Imported Google locations sync automatically every six hours while connected.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Use account-level settings</Label>
+          <div className="flex items-center justify-between gap-3">
+            <Label className="text-sm" htmlFor="switch-account-settings">Use account-level settings</Label>
             <Switch
+              id="switch-account-settings"
               checked={useAccountSettings}
               onCheckedChange={setUseAccountSettings}
               data-testid="switch-account-settings"
             />
           </div>
           {!useAccountSettings && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-sm">Notification Email</Label>
-                <Input
-                  value={notificationEmail}
-                  onChange={e => setNotificationEmail(e.target.value)}
-                  placeholder="email@example.com"
-                  data-testid="input-notification-email"
-                />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Only fields: {location.notifyFields?.join(", ") || "All fields"}
-                </p>
-              </div>
-            </>
+            <div className="space-y-1.5">
+              <Label className="text-sm" htmlFor="input-notification-email">Email for this location</Label>
+              <Input
+                id="input-notification-email"
+                type="email"
+                value={notificationEmail}
+                onChange={e => setNotificationEmail(e.target.value)}
+                placeholder="email@example.com"
+                aria-invalid={emailInvalid && notificationEmail.trim() !== ""}
+                data-testid="input-notification-email"
+              />
+              {emailInvalid && notificationEmail.trim() !== "" && (
+                <p className="text-xs text-destructive" data-testid="text-notification-email-error">Enter a full email address, like name@company.com.</p>
+              )}
+            </div>
           )}
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">GBP Management Enabled</Label>
-            <Switch
-              checked={gbpEnabled}
-              onCheckedChange={setGbpEnabled}
-              data-testid="switch-gbp-management"
-            />
-          </div>
           <Button
             className="w-full"
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || emailInvalid || !dirty}
             data-testid="button-save-settings"
           >
             {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
@@ -831,8 +885,8 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
 
       <Card className="border-destructive/30">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1">
                 <p className="text-sm font-medium text-destructive">Delete Location</p>
                 <InfoTip k="delete-location" />
@@ -842,7 +896,7 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => deleteMutation.mutate()}
+              onClick={() => { setConfirmName(""); setConfirmOpen(true); }}
               disabled={deleteMutation.isPending}
               data-testid="button-delete-location"
             >
@@ -852,16 +906,61 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => { if (!deleteMutation.isPending) setConfirmOpen(open); }}>
+        <AlertDialogContent data-testid="dialog-delete-location">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {location.businessName} from ConstructHUB?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Your listing on Google is not changed. ConstructHUB permanently removes its own copy:</p>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  <li>synced Google reviews, photos and performance stats</li>
+                  <li>Profile Guard settings and history</li>
+                  <li>AI reply settings, scheduled Google posts and photos</li>
+                  <li>Social Media connections, settings and posts for this business</li>
+                  <li>citation campaigns and their checklist marks</li>
+                </ul>
+                <p>This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {mustTypeName && (
+            <div className="space-y-1.5">
+              <Label htmlFor="input-confirm-location-name" className="text-sm">Type <strong>{location.businessName}</strong> to confirm</Label>
+              <Input id="input-confirm-location-name" value={confirmName} onChange={(e) => setConfirmName(e.target.value)} autoComplete="off" data-testid="input-confirm-location-name" />
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending} data-testid="button-cancel-delete-location">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!confirmReady || deleteMutation.isPending}
+              onClick={(e) => { e.preventDefault(); if (confirmReady) deleteMutation.mutate(); }}
+              data-testid="button-confirm-delete-location"
+            >
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Delete location
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+/** Campaign lists are keyed by their full URL (with the agency filter), so refresh every key under the path. */
+const invalidateCampaigns = () => queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/citations/campaigns") });
 
 function CitationsTab({ location }: { location: BusinessLocation }) {
   const f=useAgencyFilter();
   const { toast } = useToast();
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [campaignName, setCampaignName] = useState("");
-  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
+  const [campaignParam, setCampaignParam] = useUrlParam("campaign");
+  const selectedCampaignId = campaignParam && /^\d+$/.test(campaignParam) ? Number(campaignParam) : null;
+  const setSelectedCampaignId = (id: number | null) => setCampaignParam(id === null ? null : String(id));
+  const [pendingDelete, setPendingDelete] = useState<CitationCampaign | null>(null);
 
   const { data: campaigns, isLoading } = useQuery<CitationCampaign[]>({
     queryKey: [`/api/citations/campaigns?locationId=${location.id}&${f.params}`],
@@ -882,13 +981,13 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/citations/campaigns"] });
+      invalidateCampaigns();
       setCampaignName("");
       setShowNewCampaign(false);
       toast({ title: "Campaign created" });
     },
     onError: (err: Error) => {
-      toast({ title: "Failed", description: err.message, variant: "destructive" });
+      toast({ title: "Could not create campaign", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -897,11 +996,21 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
       await apiRequest("DELETE", `/api/citations/campaigns/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/citations/campaigns"] });
+      invalidateCampaigns();
+      setPendingDelete(null);
       setSelectedCampaignId(null);
       toast({ title: "Campaign deleted" });
     },
+    onError: (err: Error) => {
+      toast({ title: "Delete failed", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
+
+  // A ?campaign= that isn't one of this location's campaigns (deleted, or from another location) falls back to the list.
+  useEffect(() => {
+    if (selectedCampaignId !== null && campaigns && !locationCampaigns.some(c => c.id === selectedCampaignId)) setSelectedCampaignId(null);
+    else if (campaignParam && selectedCampaignId === null) setSelectedCampaignId(null);
+  }, [campaigns, selectedCampaignId, campaignParam]);
 
   if (selectedCampaignId) {
     const campaign = locationCampaigns.find(c => c.id === selectedCampaignId);
@@ -909,6 +1018,8 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
       return <CampaignDetail campaign={campaign} onBack={() => setSelectedCampaignId(null)} />;
     }
   }
+
+  const pendingMarks = pendingDelete ? (pendingDelete.citationsFound || 0) + (pendingDelete.opportunitiesFound || 0) : 0;
 
   return (
     <div className="space-y-4">
@@ -927,10 +1038,13 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
 
       {showNewCampaign && (
         <Card>
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-4">
+            <form className="space-y-3" onSubmit={e => { e.preventDefault(); if (!createMutation.isPending) createMutation.mutate(); }}>
             <div className="space-y-1.5">
-              <Label>Campaign Name</Label>
+              <Label htmlFor="input-campaign-name">Campaign Name</Label>
               <Input
+                id="input-campaign-name"
+                autoFocus
                 value={campaignName}
                 onChange={e => setCampaignName(e.target.value)}
                 placeholder="e.g. Spring 2026 listings check"
@@ -939,18 +1053,19 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
             </div>
             <div className="flex gap-2">
               <Button
+                type="submit"
                 size="sm"
-                onClick={() => createMutation.mutate()}
                 disabled={createMutation.isPending}
                 data-testid="button-create-campaign"
               >
                 {createMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
                 Create
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowNewCampaign(false)} data-testid="button-cancel-campaign">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowNewCampaign(false)} data-testid="button-cancel-campaign">
                 Cancel
               </Button>
             </div>
+            </form>
           </CardContent>
         </Card>
       )}
@@ -988,7 +1103,8 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={e => { e.stopPropagation(); deleteMutation.mutate(campaign.id); }}
+                      aria-label={`Delete campaign ${campaign.campaignName}`}
+                      onClick={e => { e.stopPropagation(); setPendingDelete(campaign); }}
                       data-testid={`button-delete-campaign-${campaign.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1000,6 +1116,29 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open && !deleteMutation.isPending) setPendingDelete(null); }}>
+        <AlertDialogContent data-testid="dialog-delete-campaign">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete campaign “{pendingDelete?.campaignName}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the campaign and its whole checklist{pendingMarks ? `, including ${pendingMarks} marked site${pendingMarks === 1 ? "" : "s"}` : ""} and any listing links you saved. Your listings on those sites are not affected. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => { e.preventDefault(); if (pendingDelete) deleteMutation.mutate(pendingDelete.id); }}
+              data-testid="button-confirm-delete-campaign"
+            >
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Delete campaign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1010,21 +1149,34 @@ function CampaignDetail({ campaign, onBack }: { campaign: CitationCampaign; onBa
   const { data, isLoading } = useQuery<{ campaign: CitationCampaign; citations: Citation[] }>({ queryKey: key });
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: key });
-    queryClient.invalidateQueries({ queryKey: ["/api/citations/campaigns"] });
+    invalidateCampaigns();
   };
 
   const buildMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/citations/campaigns/${campaign.id}/run`)).json(),
     onSuccess: () => { refresh(); toast({ title: "Checklist ready", description: "Use Search on each site, then mark what you find." }); },
-    onError: (err: Error) => toast({ title: "Could not build checklist", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Could not build checklist", description: apiErrorMessage(err), variant: "destructive" }),
   });
   type Status = "listed" | "wrong" | "missing" | "unchecked";
   const markMutation = useMutation({
     mutationFn: async (v: { id: number; status: Status; listingUrl?: string | null }) =>
       (await apiRequest("PATCH", `/api/citations/${v.id}`, { status: v.status, ...(v.listingUrl !== undefined ? { listingUrl: v.listingUrl } : {}) })).json(),
     onSuccess: refresh,
-    onError: (err: Error) => toast({ title: "Could not save", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Could not save", description: apiErrorMessage(err), variant: "destructive" }),
   });
+  const hasListing = (st: Status) => st === "listed" || st === "wrong";
+  // A link only means something for a site where the business is listed.
+  const setStatus = (c: Citation, status: Status) =>
+    markMutation.mutate({ id: c.id, status, ...(!hasListing(status) && c.listingUrl ? { listingUrl: null } : {}) });
+  const saveLink = (c: Citation, raw: string) => {
+    const v = raw.trim();
+    if (v === (c.listingUrl ?? "")) return;
+    if (!v) return markMutation.mutate({ id: c.id, status: statusOf(c), listingUrl: null });
+    let ok = false;
+    try { ok = new URL(v).protocol === "https:"; } catch { /* not a URL */ }
+    if (!ok) return toast({ title: "Check the link", description: "Enter the full link to your listing, starting with https://", variant: "destructive" });
+    markMutation.mutate({ id: c.id, status: statusOf(c), listingUrl: v });
+  };
 
   const rows = data?.citations ?? [];
   const statusOf = (c: Citation): Status =>
@@ -1111,7 +1263,7 @@ function CampaignDetail({ campaign, onBack }: { campaign: CitationCampaign; onBa
                       className="border rounded px-2 py-1 text-xs bg-background"
                       value={statusOf(c)}
                       disabled={markMutation.isPending}
-                      onChange={(e) => markMutation.mutate({ id: c.id, status: e.target.value as Status })}
+                      onChange={(e) => setStatus(c, e.target.value as Status)}
                       data-testid={`select-citation-${c.id}`}
                       aria-label={`Status on ${c.siteName}`}
                     >
@@ -1122,20 +1274,33 @@ function CampaignDetail({ campaign, onBack }: { campaign: CitationCampaign; onBa
                     </select>
                   </TableCell>
                   <TableCell>
-                    {c.listingUrl ? (
-                      <a href={c.listingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs inline-flex items-center gap-1" data-testid={`link-listing-${c.id}`}>
-                        View <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : statusOf(c) === "listed" || statusOf(c) === "wrong" ? (
-                      <Input
-                        className="h-7 text-xs"
-                        placeholder="Paste listing link (https://…)"
-                        onBlur={(e) => {
-                          const v = e.target.value.trim();
-                          if (v) markMutation.mutate({ id: c.id, status: statusOf(c), listingUrl: v });
-                        }}
-                        data-testid={`input-listing-${c.id}`}
-                      />
+                    {hasListing(statusOf(c)) ? (
+                      <div className="flex items-center gap-1.5 min-w-[12rem]">
+                        <Input
+                          key={`${c.id}:${c.listingUrl ?? ""}`}
+                          type="url"
+                          inputMode="url"
+                          className="h-7 text-xs"
+                          placeholder="Paste listing link (https://…)"
+                          defaultValue={c.listingUrl ?? ""}
+                          aria-label={`Your listing on ${c.siteName}`}
+                          onBlur={(e) => saveLink(c, e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
+                          data-testid={`input-listing-${c.id}`}
+                        />
+                        {c.listingUrl && (
+                          <>
+                            <a href={c.listingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs inline-flex items-center gap-1 shrink-0" data-testid={`link-listing-${c.id}`}>
+                              View <ExternalLink className="w-3 h-3" />
+                            </a>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={markMutation.isPending}
+                              aria-label={`Clear the ${c.siteName} link`} onClick={() => markMutation.mutate({ id: c.id, status: statusOf(c), listingUrl: null })}
+                              data-testid={`button-clear-listing-${c.id}`}>
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}

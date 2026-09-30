@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { filters, listLocations, accessFor, locationAccess }  from '../agency/access';
 import { queueSync } from '../agency/jobs';
 import { importVerifiedLocations } from './service';
-import { requireRecentAuth } from '../account-security';
+import { requireRecentAuth, RECENT_AUTH_MS } from '../account-security';
 import { notifyUser, logActivity } from '../account-events';
 import { decryptToken } from './token-crypto';
 import { rateLimit } from '../growth-limits';
@@ -23,11 +23,15 @@ import { discoverAll, importLocations, syncLocation, reply, publicError, autoLin
 declare module 'express-session' { interface SessionData { gbpOAuth?: {state:string;userId:number;expires:number;redirect:string} } }
 export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, options: { http?: typeof fetch; afterConnect?: (userId: number, subject: string) => Promise<unknown> } = {}) {
   app.use(['/api/gbp/connect', '/api/gbp/disconnect'], rateLimit('google-connections',10,30));
+  const recentlyVerified = (req: Request) => { const v=req.session?.recentAuth,u=req.user as any; return !!u && !!v && v.userId===u.id && v.at<=Date.now() && Date.now()-v.at<RECENT_AUTH_MS; };
   const route = (method: 'get'|'post'|'patch'|'delete',path: string,fn: (req: Request,res: Response,userId: number)=>Promise<any>) => {
     // Grants are invalidated per Google account where the failure happened (grants/service), never all at once here.
     app[method](path,async(req,res)=>{const user=auth(req,res);if(!user)return;try {await fn(req,res,user.id);}catch(e){res.status(e instanceof GoogleError?e.status:500).json(publicError(e));}});
   };
   route('get','/api/gbp/connect',async(req,res,userId)=>{
+    // A browser navigation (middle-click, new tab, typed URL, /api/auth/google?gbp=1) cannot answer the JSON
+    // re-auth challenge; send it to Locations, which asks for verification and then restarts this connect.
+    if (req.query.format!=='json' && !recentlyVerified(req) && (req.headers?.['sec-fetch-mode']==='navigate' || req.accepts?.(['json','html'])==='html')) return res.redirect('/locations?gbp=reauth');
     if (!requireRecentAuth(req,res)) return;
     const redirect=`${oauthBaseUrl(req)}/api/gbp/callback`,state=randomBytes(32).toString('hex');
     req.session.gbpOAuth={state,userId,redirect,expires:Date.now()+10*60*1000};
@@ -65,7 +69,10 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     // With a subject, disconnect that one Google account (and purge only its listings' Google data); without, all.
     const subject=typeof req.body?.subject==='string'?req.body.subject:null;
     const c=await pool.connect();let grants:any[]=[];
-    try {await c.query('BEGIN');({rows:grants}=await c.query('DELETE FROM gbp_grants WHERE user_id=$1 AND ($2::text IS NULL OR google_subject=$2) RETURNING refresh_token,access_token,email,google_subject',[id,subject]));await purgeGoogleData(id,subject,c as any);await c.query('COMMIT');}
+    try {await c.query('BEGIN');({rows:grants}=await c.query('DELETE FROM gbp_grants WHERE user_id=$1 AND ($2::text IS NULL OR google_subject=$2) RETURNING refresh_token,access_token,email,google_subject',[id,subject]));
+      // An unknown subject matched nothing: never purge (purgeGoogleData also covers unlinked legacy locations) or report success.
+      if(subject!==null&&!grants.length){await c.query('ROLLBACK');return res.status(404).json({message:'That Google account is not connected'});}
+      await purgeGoogleData(id,subject,c as any);await c.query('COMMIT');}
     catch(e){await c.query('ROLLBACK');throw e;} finally {c.release();}
     // Disconnect is immediate even if Google is unavailable. Report remote revocation failure.
     let revoked=true;

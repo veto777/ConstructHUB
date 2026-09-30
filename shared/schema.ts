@@ -333,7 +333,8 @@ export const businessLocations = pgTable("business_locations", {
   serviceAreas: text("service_areas").array(),
   hours: jsonb("hours"),
   openingDate: text("opening_date"),
-  openStatus: text("open_status").default("Open"),
+  // Only a Google sync knows whether a business is open; null means unknown (never assume "Open").
+  openStatus: text("open_status"),
   socialProfiles: jsonb("social_profiles"),
   tags: text("tags").array(),
   businessPhotoCount: integer("business_photo_count").default(0),
