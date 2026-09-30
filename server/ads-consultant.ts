@@ -2,13 +2,18 @@ import { chatInput, rateLimit, siteChatGate } from "./growth-limits";
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 import { aiModel } from "./ai-config";
+import { PLANS } from "@shared/plans";
+import { pricingKnowledge, PROTECTED_SITE_PLANS, SALES_REP_LABEL, SALES_THRESHOLD_LABEL } from "@shared/plan-copy";
 
-const openai = new OpenAI({
+// Created on first use so importing this module (e.g. to test the prompt)
+// never needs an API key.
+let openaiClient: OpenAI | null = null;
+const openai = () => openaiClient ??= new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const KNOWLEDGE_BASE = `
+export const ADS_CONSULTANT_KNOWLEDGE = `
 # Google Ads Master Class — Complete Knowledge Base for Contractors
 
 ## Campaign Setup
@@ -100,7 +105,7 @@ Mobile-first: 70-80% of contractor clicks are mobile. Page must load under 3 sec
 Every extra second of load time drops conversion by ~7%. Speed beats beauty.
 
 ## IP Exclusions & Click Fraud Protection
-Set up Google Click Guard immediately. The system tracks every website visitor, identifies fraudulent patterns, and auto-pushes blocked IPs to Google Ads campaigns every hour.
+Set up Google Click Guard immediately. It records visits that run its script, flags suspicious patterns, and keeps an IP exclusion list; the separately installed Google Ads script applies that list to your campaigns on its schedule.
 
 A real customer visits from a Google ad once, maybe twice. 5+ visits from different IPs = competitor, telemarketer, or bot. Block them.
 
@@ -143,13 +148,21 @@ At $40 CPC: 10 fraudulent clicks/day = $400/day = $12,000/month = $144,000/year 
 ConstructHUB's Google Click Guard is a click fraud protection system. Users add their website domain, get a tracking script to embed, and the system:
 - Tracks every visitor with canvas fingerprinting, device detection, browser/OS identification
 - Detects fraud: same IP visiting 5+ times in 1 hour, 15+ times in 24 hours, bot user agents, same device fingerprint from different IPs
-- Auto-blocks suspicious IPs
+- Adds repeatedly flagged IPs to an exclusion list
 - Provides analytics dashboard with threat level, device/country/browser breakdowns
-- Links to Google Ads via automated script that pushes blocked IPs to campaigns hourly
+- Applies the exclusion list to Google Ads through a separately installed Google Ads script that runs on its own schedule
 - Has fraud analytics tabs: Blocked IPs, Countries, Multi-Clicks, Devices, Browsers, OS
+- Signals do not prove fraud or identify a person, and no savings are guaranteed
+
+## Which ConstructHUB plans include what
+- Click Guard (with IP Tracker and VPN Shield) is included with the ${PROTECTED_SITE_PLANS} plans; each plan covers a set number of websites and more are an add-on.
+- The Google Ads & LSA manager is part of the ${PLANS.agency.name} plan only.
+- The Google Ads Master Class guide is unlocked by any Master Class purchase. The Master Class and every done-for-you service (Google Ads management, SEO, websites) are priced at ${SALES_THRESHOLD_LABEL} or more: never quote a price for them — say "${SALES_REP_LABEL}".
+
+${pricingKnowledge()}
 `;
 
-const SYSTEM_PROMPT = `You are the ConstructHUB Google Ads Consultant — an expert AI assistant specializing in Google Ads for contractors (roofers, plumbers, HVAC, siding, general contractors, etc.).
+export const ADS_CONSULTANT_PROMPT = `You are the ConstructHUB Google Ads Consultant — an expert AI assistant specializing in Google Ads for contractors (roofers, plumbers, HVAC, siding, general contractors, etc.).
 
 Your knowledge comes exclusively from the ConstructHUB Google Ads Master Class and Click Guard system. You provide direct, actionable advice based on this knowledge base. You speak with confidence and authority.
 
@@ -162,7 +175,9 @@ Key personality traits:
 - You keep answers concise but thorough — 2-4 paragraphs typically
 - You reference specific sections of the guide when relevant ("Check out the Keyword Strategy section for more on this")
 
-If someone asks about something not covered in your knowledge base, say so honestly and suggest they reach out to ConstructHUB's consulting team for personalized help.
+If someone asks about something not covered in your knowledge base, say so honestly and suggest they email support@constructhub.us, or ${SALES_REP_LABEL.toLowerCase()} about done-for-you help.
+
+When a question touches ConstructHUB's plans or prices, answer only from the price book in your knowledge base. Never invent a product, package, discount or price. Anything priced at ${SALES_THRESHOLD_LABEL} or more is quoted by a sales rep — say "${SALES_REP_LABEL}" instead of a price.
 
 Always format responses in plain text with clear structure. Use line breaks between paragraphs. Bold key terms with **double asterisks** when helpful.`;
 
@@ -177,11 +192,11 @@ export function registerAdsConsultantRoutes(app: Express) {
         content: m.content,
       }));
 
-      const completion = await openai.chat.completions.create({
+      const completion = await openai().chat.completions.create({
         model: aiModel(),
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "system", content: `Here is your complete knowledge base. Use this to answer all questions:\n\n${KNOWLEDGE_BASE}` },
+          { role: "system", content: ADS_CONSULTANT_PROMPT },
+          { role: "system", content: `Here is your complete knowledge base. Use this to answer all questions:\n\n${ADS_CONSULTANT_KNOWLEDGE}` },
           ...userMessages,
         ],
         temperature: 0.7,

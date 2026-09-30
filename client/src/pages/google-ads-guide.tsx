@@ -159,7 +159,7 @@ export default function GoogleAdsGuidePage() {
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-[#4285F4]/10 border border-[#4285F4]/20 rounded-full px-4 py-1.5 mb-4">
               <Lock className="h-4 w-4 text-[#4285F4]" />
-              <span className="text-sm text-[#4285F4] font-medium">Platinum & Master Class Subscribers Only</span>
+              <span className="text-sm text-[#4285F4] font-medium">Master Class Students Only</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3" data-testid="text-locked-title">
               Google Ads for Contractors:
@@ -189,7 +189,7 @@ export default function GoogleAdsGuidePage() {
                 </Button>
               </a>
               <p className="text-xs text-muted-foreground mt-3">
-                Platinum or Master Class purchase unlocks Google Ads content
+                Any Master Class purchase unlocks the Google Ads content
               </p>
             </CardContent>
           </Card>

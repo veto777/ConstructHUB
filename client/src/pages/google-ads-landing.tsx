@@ -18,6 +18,8 @@ import {
   TrendingUp, Users, Phone, Megaphone, Settings,
 } from "lucide-react";
 import googleAdsLogo from "@assets/google-ads-logo.png";
+import { PLANS } from "@shared/plans";
+import { PROTECTED_SITE_PLANS } from "@shared/plan-copy";
 
 function AdsAnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -571,6 +573,10 @@ export default function GoogleAdsLandingPage() {
           <p className="text-muted-foreground dark:text-white/40 mb-8 max-w-lg mx-auto">
             Set up Click Guard in minutes. Read the master class. Stop bleeding money on fraudulent clicks and
             Google's predatory default settings.
+          </p>
+          <p className="text-sm text-muted-foreground dark:text-white/50 -mt-4 mb-8 max-w-lg mx-auto" data-testid="text-ads-plans">
+            Click Guard is included with the {PROTECTED_SITE_PLANS} plans. The Google Ads &amp; LSA manager is part of
+            the {PLANS.agency.name} plan.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href={user ? "/google-ads" : "/auth?mode=signup"} data-testid="link-final-protect">

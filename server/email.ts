@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
+import { PLANS, LEGACY_PLAN_MAP } from "@shared/plans";
 
 export type EmailTheme = "navy-orange" | "green-black" | "blue-white" | "black-gold" | "red-white" | "purple-white" | "teal-white" | "white-gray" | "black-white";
 
@@ -487,6 +488,9 @@ ${unsubHtml}
   await sendWithFallback(reminderMailOptions, true);
 }
 
+/** Trial codes grant the legacy "platinum" row, whose entitlements are the Agency plan's. */
+export const TRIAL_CODE_PLAN_NAME = PLANS[LEGACY_PLAN_MAP.platinum].name;
+
 export async function sendTrialInviteEmail(to: string, recipientName: string, code: string, trialDays: number, baseUrl: string) {
   const settingsUrl = `${baseUrl}/settings`;
   const isUnlimited = trialDays <= 0;
@@ -500,11 +504,11 @@ export async function sendTrialInviteEmail(to: string, recipientName: string, co
       "X-Priority": "3",
       "Importance": "Normal",
     },
-    text: `Hi ${recipientName},\n\nYou've been invited to try ConstructHUB with ${isUnlimited ? "an unlimited free trial" : `a ${trialDays}-day free trial`} of our full Platinum plan.\n\nYour trial code: ${code}\n\nTo activate:\n1. Sign up or log in at ${baseUrl}\n2. Go to Settings > Account\n3. Enter your code: ${code}\n\nThis gives you full access to all 15+ tools including permit search, Google Business tools, Click Guard, IP Tracker, and more.\n\nThank you,\nConstructHUB Team`,
+    text: `Hi ${recipientName},\n\nYou've been invited to try ConstructHUB with ${isUnlimited ? "an unlimited free trial" : `a ${trialDays}-day free trial`} of our ${TRIAL_CODE_PLAN_NAME} plan.\n\nYour trial code: ${code}\n\nTo activate:\n1. Sign up or log in at ${baseUrl}\n2. Go to Settings > Account\n3. Enter your code: ${code}\n\nThis gives you every tool in the ${TRIAL_CODE_PLAN_NAME} plan, including permit search, Google Business tools, Click Guard, IP Tracker, and more.\n\nThank you,\nConstructHUB Team`,
     html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;">
 <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
 <p style="color:#111827;font-size:15px;line-height:1.7;margin:0 0 16px;">Hi ${recipientName},</p>
-<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 12px;">You've been invited to try <strong>ConstructHUB</strong> with ${isUnlimited ? `<strong>unlimited free access</strong>` : `a <strong>${trialDays}-day free trial</strong>`} to our full Platinum plan.</p>
+<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 12px;">You've been invited to try <strong>ConstructHUB</strong> with ${isUnlimited ? `<strong>unlimited free access</strong>` : `a <strong>${trialDays}-day free trial</strong>`} of our ${TRIAL_CODE_PLAN_NAME} plan.</p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">Your trial code:</p>
 <div style="background:#f3f4f6;border:2px dashed #d1d5db;border-radius:8px;padding:16px;text-align:center;margin:0 0 20px;">
 <code style="font-size:20px;font-weight:700;letter-spacing:2px;color:#111827;">${code}</code>
@@ -515,7 +519,7 @@ export async function sendTrialInviteEmail(to: string, recipientName: string, co
 <li>Go to Settings → Account</li>
 <li>Enter your code above</li>
 </ol>
-<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">This gives you full access to all 15+ tools including permit search, Google Business tools, Click Guard, IP Tracker, and more.</p>
+<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">This gives you every tool in the ${TRIAL_CODE_PLAN_NAME} plan, including permit search, Google Business tools, Click Guard, IP Tracker, and more.</p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 4px;">Thank you,</p>
 <p style="color:#111827;font-size:15px;line-height:1.7;margin:0;font-weight:600;">ConstructHUB Team</p>
 </div></body></html>`,

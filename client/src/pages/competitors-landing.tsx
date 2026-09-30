@@ -18,6 +18,7 @@ import {
   UserX, Ban, Flag, Monitor, Smartphone, Camera,
   MessageSquare, Award, Gauge, Fingerprint, Settings,
 } from "lucide-react";
+import { COMPETITOR_INTEL_PLANS } from "@shared/plan-copy";
 
 function CompetitorAnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -322,7 +323,7 @@ export default function CompetitorsLandingPage() {
           </div>
           <div className="animate-in-delay-1">
             <Badge className="mb-6 bg-[#EAB308]/10 text-[#EAB308] border-[#EAB308]/20 px-4 py-1.5 text-sm" data-testid="badge-hero">
-              <Shield className="h-3.5 w-3.5 mr-1.5" /> Gold & Platinum Competitive Intelligence
+              <Shield className="h-3.5 w-3.5 mr-1.5" /> Competitive Intelligence on {COMPETITOR_INTEL_PLANS}
             </Badge>
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] animate-in-delay-2" data-testid="text-hero-title">
@@ -364,7 +365,7 @@ export default function CompetitorsLandingPage() {
               </div>
             )}
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-red-400" /> Gold &amp; Platinum plans
+              <CheckCircle2 className="h-4 w-4 text-red-400" /> {COMPETITOR_INTEL_PLANS} plans
             </div>
           </div>
         </div>
@@ -465,7 +466,7 @@ export default function CompetitorsLandingPage() {
             </p>
           </div>
           <div className="space-y-5">
-            {/* Every tool lives in the Intel dashboard (Gold & Platinum); signed out,
+            {/* Every tool lives in the Intel dashboard (plans with Competitor Intel scans); signed out,
                 a card starts sign-up — the same targets as the hero CTA. */}
             {tools.map((tool, i) => (
               <Link key={tool.title} href={user ? "/competitors" : "/auth?mode=signup"} className="block rounded-xl" data-testid={`link-tool-${i}`}>
@@ -624,7 +625,7 @@ export default function CompetitorsLandingPage() {
             </span>
           </h2>
           <p className="text-muted-foreground dark:text-white/40 mb-8 max-w-lg mx-auto">
-            Competitor Intelligence is available to Gold and Platinum members.
+            Competitor Intelligence is included with the {COMPETITOR_INTEL_PLANS} plans, with a monthly number of scans on each.
             Explore public market information alongside your own business results.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -635,7 +636,7 @@ export default function CompetitorsLandingPage() {
             </Link>
             <Link href="/pricing" data-testid="link-final-pricing">
               <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white px-8 h-13 text-base">
-                <DollarSign className="h-4 w-4 mr-2" /> View Gold &amp; Platinum Pricing
+                <DollarSign className="h-4 w-4 mr-2" /> View Plans &amp; Pricing
               </Button>
             </Link>
           </div>

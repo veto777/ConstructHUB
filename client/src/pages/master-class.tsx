@@ -26,6 +26,9 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
+import { Link } from "wouter";
+import { showsPrice } from "@shared/plans";
+import { SALES_HREF, SALES_REP_LABEL, priceOrSalesRep } from "@shared/plan-copy";
 
 type CoursePurchase = {
   id: number;
@@ -50,7 +53,7 @@ function PaywallOverlay({ tabName, onGoToPricing }: { tabName: string; onGoToPri
           <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#4A6CF7]/10 flex items-center justify-center mx-auto mb-3 sm:mb-4">
             <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-[#4A6CF7]" />
           </div>
-          <h3 className="text-lg sm:text-xl font-bold mb-2" data-testid="text-paywall-title">Premium Content</h3>
+          <h3 className="text-lg sm:text-xl font-bold mb-2" data-testid="text-paywall-title">Enrolled Students Only</h3>
           <p className="text-muted-foreground mb-4 sm:mb-6 text-sm">
             This {tabName} content is available to enrolled students. Purchase the course to unlock the full detailed guide, step-by-step instructions, and expert tips.
           </p>
@@ -258,8 +261,12 @@ export default function MasterClassPage() {
     queryKey: ["/api/course-purchases"],
   });
 
+  // Anything at or above the sales threshold is "Talk to a sales rep" — no
+  // price and no checkout. Savings compare prices, so they need every price shown.
+  const bundlePriceShown = showsPrice(BUNDLE_PRICE_CENTS);
+  const allPricesShown = bundlePriceShown && !!modules?.length && modules.every(m => showsPrice(m.price));
   // One reference price everywhere: what the four modules cost bought separately.
-  const modulesTotalCents = modules?.length ? modules.reduce((sum, m) => sum + m.price, 0) : null;
+  const modulesTotalCents = allPricesShown ? modules!.reduce((sum, m) => sum + m.price, 0) : null;
   const bundleSavingsCents = modulesTotalCents !== null && modulesTotalCents > BUNDLE_PRICE_CENTS ? modulesTotalCents - BUNDLE_PRICE_CENTS : null;
   const bundleSavingsPct = bundleSavingsCents !== null ? Math.round((bundleSavingsCents / modulesTotalCents!) * 100) : null;
 
@@ -461,36 +468,40 @@ export default function MasterClassPage() {
                   {
                     module: "Module 1: Business Formation & Licensing",
                     color: "border-l-blue-500",
-                    price: "$1,500",
+                    category: "licensing",
                     desc: "The complete legal blueprint for getting your construction business up and running in any state — entity formation, licensing, bonding, insurance, and compliance.",
                     highlights: ["All 50 states covered with direct agency links", "Entity selection, licensing & bonding guides", "Insurance, workers comp & tax setup", "Subcontractor management & sales strategy"]
                   },
                   {
                     module: "Module 2: GMB Setup & Optimization",
                     color: "border-l-purple-500",
-                    price: "$2,000",
+                    category: "gmb",
                     desc: "Build a Google Business Profile that dominates local search, generates leads consistently, and withstands competitor attacks.",
                     highlights: ["Full GMB setup & verification system", "Review strategy & fake review defense", "Photo optimization & posting calendar", "Suspension prevention & recovery"]
                   },
                   {
                     module: "Module 3: Website & Online Presence",
                     color: "border-l-emerald-500",
-                    price: "$1,500",
+                    category: "website",
                     desc: "Build a contractor website that actually converts visitors into booked jobs — the same framework used by 7-figure contractors.",
                     highlights: ["High-converting website blueprint", "Service & location page strategy", "Lead capture & speed optimization", "Portfolio showcases & trust signals"]
                   },
                   {
                     module: "Module 4: SEO & Directory Domination",
                     color: "border-l-orange-500",
-                    price: "$1,500",
+                    category: "seo",
                     desc: "Get found everywhere your customers search — the complete local SEO, citation, content, and advertising playbook.",
                     highlights: ["Local SEO strategy for contractors", "Citation & link building systems", "Google Ads & LSA campaign setup", "Tracking, analytics & monthly maintenance"]
                   }
-                ].map((section, i) => (
+                ].map((section, i) => {
+                  const priceCents = modules?.find(m => m.category === section.category)?.price;
+                  return (
                   <div key={i} className={`border-l-4 ${section.color} pl-4`}>
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between gap-2 mb-1">
                       <h4 className="font-semibold text-sm">{section.module}</h4>
-                      <span className="text-xs font-bold text-[#4A6CF7]">{section.price}</span>
+                      {priceCents !== undefined && (
+                        <span className="text-xs font-bold text-[#4A6CF7] shrink-0" data-testid={`text-curriculum-price-${section.category}`}>{priceOrSalesRep(priceCents)}</span>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">{section.desc}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
@@ -502,7 +513,8 @@ export default function MasterClassPage() {
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
 
@@ -2534,6 +2546,7 @@ export default function MasterClassPage() {
                 const ModIcon = MODULE_ICONS[mod.category] || BookOpen;
                 const gradientClass = MODULE_COLORS[mod.category] || "from-gray-600 to-gray-800";
                 const isPurchased = hasBundle || purchasedModuleIds.has(mod.id);
+                const priceShown = showsPrice(mod.price);
                 return (
                   <Card key={mod.id} className={`overflow-hidden ${isPurchased ? "ring-2 ring-green-500/50" : ""}`} data-testid={`card-module-${mod.category}`}>
                     <div className={`bg-gradient-to-r ${gradientClass} p-4 sm:p-6 text-white relative`}>
@@ -2544,10 +2557,14 @@ export default function MasterClassPage() {
                       )}
                       <ModIcon className="h-8 w-8 mb-3 opacity-80" />
                       <h3 className="text-lg font-bold">{mod.title}</h3>
-                      <div className="flex items-baseline gap-1 mt-2">
-                        <span className="text-2xl sm:text-3xl font-bold">${(mod.price / 100).toLocaleString()}</span>
-                        <span className="text-xs sm:text-sm opacity-70">one-time</span>
-                      </div>
+                      {priceShown ? (
+                        <div className="flex items-baseline gap-1 mt-2">
+                          <span className="text-2xl sm:text-3xl font-bold">{usd(mod.price)}</span>
+                          <span className="text-xs sm:text-sm opacity-70">one-time</span>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm sm:text-base font-semibold opacity-90" data-testid={`text-module-sales-${mod.category}`}>{SALES_REP_LABEL}</p>
+                      )}
                     </div>
                     <CardContent className="p-3 sm:p-5">
                       <p className="text-sm text-muted-foreground mb-4">{mod.description}</p>
@@ -2569,6 +2586,12 @@ export default function MasterClassPage() {
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" /> Enrolled
                         </Button>
+                      ) : !priceShown ? (
+                        <Link href={SALES_HREF} className="block mt-5" data-testid={`link-module-sales-${mod.category}`}>
+                          <Button className="w-full bg-[#4A6CF7] hover:bg-[#3B5CE5]">
+                            <MessageSquare className="h-4 w-4 mr-1" /> {SALES_REP_LABEL}
+                          </Button>
+                        </Link>
                       ) : (
                         <div className="flex gap-2 mt-5">
                           <Button
@@ -2625,7 +2648,8 @@ export default function MasterClassPage() {
                   {modulesTotalCents !== null && modulesTotalCents > BUNDLE_PRICE_CENTS && (
                     <span className="text-xl sm:text-2xl font-bold text-muted-foreground line-through" data-testid="text-bundle-was">{usd(modulesTotalCents)}</span>
                   )}
-                  <span className="text-2xl sm:text-3xl font-bold text-[#F97316]">{usd(BUNDLE_PRICE_CENTS)}</span>
+                  {/* Quoted bundles skip the price slot: the button below says "Talk to a sales rep". */}
+                  {bundlePriceShown && <span className="text-2xl sm:text-3xl font-bold text-[#F97316]" data-testid="text-bundle-price">{usd(BUNDLE_PRICE_CENTS)}</span>}
                 </div>
                 {bundleSavingsCents !== null && (
                   <p className="text-xs text-muted-foreground mb-4" data-testid="text-bundle-savings">
@@ -2636,6 +2660,12 @@ export default function MasterClassPage() {
                   <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" disabled data-testid="button-enrolled-bundle">
                     <CheckCircle2 className="h-4 w-4 mr-2" /> Bundle Purchased
                   </Button>
+                ) : !bundlePriceShown ? (
+                  <Link href={SALES_HREF} data-testid="link-bundle-sales">
+                    <Button size="lg" className="w-full sm:w-auto bg-[#F97316] hover:bg-[#E86C0A] text-white">
+                      <MessageSquare className="h-4 w-4 mr-2" /> {SALES_REP_LABEL}
+                    </Button>
+                  </Link>
                 ) : (
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
                     <Button
@@ -2678,19 +2708,19 @@ export default function MasterClassPage() {
 
             <Card className="border-dashed">
               <CardContent className="p-4 sm:p-6">
-                <h3 className="text-base font-bold mb-3 text-center">What You're Getting for {usd(BUNDLE_PRICE_CENTS)}</h3>
+                <h3 className="text-base font-bold mb-3 text-center">What's in the Complete Bundle</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {[
-                    { value: "$1,500", label: "Business Formation & Licensing", desc: "All 50 states covered" },
-                    { value: "$2,000", label: "GMB Setup & Optimization", desc: "Dominate local search" },
-                    { value: "$1,500", label: "Website & Online Presence", desc: "Convert visitors to customers" },
-                    { value: "$1,500", label: "SEO & Directory Domination", desc: "Get found everywhere" },
-                    { value: "Free", label: "Vetting Contractors Guide", desc: "19 essential tips included" },
-                    { value: "Free", label: "Lifetime Access & Updates", desc: "Content updated regularly" },
+                    { label: "Business Formation & Licensing", desc: "All 50 states covered" },
+                    { label: "GMB Setup & Optimization", desc: "Dominate local search" },
+                    { label: "Website & Online Presence", desc: "Convert visitors to customers" },
+                    { label: "SEO & Directory Domination", desc: "Get found everywhere" },
+                    { label: "Vetting Contractors Guide", desc: "19 essential tips included" },
+                    { label: "Lifetime Access & Updates", desc: "Content updated regularly" },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
                       <div className="text-right shrink-0">
-                        <p className={`text-sm font-bold ${item.value === "Free" ? "text-green-500" : "text-[#4A6CF7]"}`}>{item.value}</p>
+                        <p className="text-sm font-bold text-green-500">Included</p>
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">{item.label}</p>
@@ -2703,7 +2733,13 @@ export default function MasterClassPage() {
                   {modulesTotalCents !== null && (
                     <p className="text-sm text-muted-foreground">Modules bought separately: <span className="font-bold line-through">{usd(modulesTotalCents)}</span></p>
                   )}
-                  <p className="text-lg font-bold text-[#F97316]">Bundle price: {usd(BUNDLE_PRICE_CENTS)}</p>
+                  {bundlePriceShown ? (
+                    <p className="text-lg font-bold text-[#F97316]">Bundle price: {usd(BUNDLE_PRICE_CENTS)}</p>
+                  ) : (
+                    <Link href={SALES_HREF} className="text-lg font-bold text-[#F97316] hover:underline" data-testid="link-bundle-summary-sales">
+                      {SALES_REP_LABEL} about the complete bundle
+                    </Link>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -2722,7 +2758,9 @@ export default function MasterClassPage() {
                     { q: "Is this specific to my state?", a: "Yes. Every state has its own guide to the formation, licensing, workers' comp and tax agencies you'll deal with. Detailed step-by-step walkthroughs are being added state by state." },
                     { q: "Can I purchase individual modules instead?", a: bundleSavingsCents !== null
                       ? `Yes, you can buy any module separately. The bundle saves you ${usd(bundleSavingsCents)} compared to buying all four individually.`
-                      : "Yes, you can buy any module separately, or all four together as the bundle." },
+                      : allPricesShown
+                        ? "Yes, you can buy any module separately, or all four together as the bundle."
+                        : `Yes. Each module is available on its own, or all four together as the bundle — ${SALES_REP_LABEL.toLowerCase()} to get started.` },
                     { q: "Who created this course?", a: "Several construction company owners who scaled from solo owner-operators to running multi-state operations with hundreds of employees. Real-world experience, not theory from consultants." },
                   ].map((item, i) => (
                     <div key={i} className="p-3 rounded-lg border bg-background/60">

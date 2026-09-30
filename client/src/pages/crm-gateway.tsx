@@ -1,11 +1,11 @@
 /**
  * CRM gateway — the pathway from the growth platform (constructhub.us) into
- * ConstructHub CRM (portal.constructhub.us). The CRM is a SEPARATE product on
- * a separate membership; this page is the bridge:
- *   - already a member  → "Open your CRM" jumps to the portal host
- *   - not a member yet  → what the CRM is + how to request access (there is
- *                         no self-serve CRM checkout, so no "plans" link)
- *   - signed out        → sign in (?next=/crm-app), then this page routes them
+ * ConstructHub CRM (portal.constructhub.us). The CRM is included in every
+ * plan (seats per plan, shared/plans.ts); this page is the bridge:
+ *   - already in a workspace → "Open your CRM" jumps to the portal host
+ *   - no workspace yet       → what the CRM is, the plans that include it, and
+ *                              how to have a workspace set up (on request)
+ *   - signed out             → sign in (?next=/crm-app), then this page routes them
  *
  * Membership is decided by /api/crm/me returning an org the user belongs to.
  */
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { portalUrl } from "@/lib/site";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
+import { CRM_SEATS_LINE } from "@shared/plan-copy";
 
 const CRM_ACCESS_MAILTO =
   "mailto:support@constructhub.us?subject=" + encodeURIComponent("ConstructHub CRM access request");
@@ -53,13 +54,14 @@ export default function CrmGatewayPage() {
       <div className="max-w-4xl mx-auto px-5 py-10 sm:py-14">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
-            <KanbanSquare className="h-3.5 w-3.5" /> Separate membership
+            <KanbanSquare className="h-3.5 w-3.5" /> Included with every plan
           </span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">ConstructHub CRM</h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl">
-          The contractor CRM — clients, estimates, invoices, pipeline, messaging and payments —
-          runs as its own product on its own subscription, separate from your growth tools.
+        <p className="text-muted-foreground mt-2 max-w-2xl" data-testid="text-crm-included">
+          The contractor CRM — clients, estimates, invoices, pipeline, messaging and payments — is
+          included with every ConstructHUB plan. Your plan sets the number of team seats:
+          {" "}{CRM_SEATS_LINE}.
         </p>
 
         {/* Primary action — member vs prospect. */}
@@ -115,18 +117,24 @@ export default function CrmGatewayPage() {
                     <Building2 className="h-5 w-5 text-primary" /> Get your CRM workspace
                   </div>
                   <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                    We couldn't find a CRM workspace for your account. CRM access is set up on
-                    request — email us and we'll get your company a brand-new, empty workspace.
+                    We couldn't find a CRM workspace for your account. The CRM comes with every
+                    plan, and workspaces are set up on request — email us and we'll get your
+                    company a brand-new, empty workspace.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <a href={CRM_ACCESS_MAILTO}>
                     <Button size="lg" data-testid="button-crm-get-access">
                       <Mail className="h-4 w-4 mr-2" /> Request access
                     </Button>
                   </a>
+                  <Link href="/pricing">
+                    <Button size="lg" variant="outline" data-testid="button-crm-plans">
+                      See plans <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </Link>
                   <a href={portalUrl("/crm")} target="_blank" rel="noopener noreferrer">
-                    <Button size="lg" variant="outline" data-testid="button-crm-preview">
+                    <Button size="lg" variant="ghost" data-testid="button-crm-preview">
                       Visit CRM <ExternalLink className="h-4 w-4 ml-2" />
                     </Button>
                   </a>
@@ -151,8 +159,8 @@ export default function CrmGatewayPage() {
         </div>
 
         <p className="text-xs text-muted-foreground mt-8">
-          Your growth-platform tools (permits, Google Business, Google Ads, IP Tracker) and the CRM
-          are billed separately. Signing in to one does not add the other.
+          One ConstructHUB plan covers both your growth tools (permits, Google Business, Google Ads,
+          IP Tracker) and the CRM. Extra CRM seats are an add-on.
         </p>
       </div>
       <PublicPageFooter />

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
 import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+import { STARTING_MONTHLY_CENTS, TRIAL_LABEL, formatUsd } from "@shared/plan-copy";
 
 const SECTION_LINKS = [
   { href: "#tools", label: "Tools", testId: "link-nav-tools" },
@@ -535,7 +536,7 @@ export default function PermitsLandingPage() {
           <div className="text-center mt-8 animate-in-delay-4">
             <Link href={searchHref} data-testid="link-pipeline-cta">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-8 h-12 shadow-lg shadow-blue-500/25">
-                <Search className="h-4 w-4 mr-2" /> Try It Now — Free
+                <Search className="h-4 w-4 mr-2" /> Try It Now
               </Button>
             </Link>
           </div>
@@ -641,10 +642,13 @@ export default function PermitsLandingPage() {
             Use {BRAND_NAME} to find new business, track your market, and stay ahead of the
             competition — all from public permit data.
           </p>
+          <p className="text-sm text-muted-foreground dark:text-white/50 -mt-4 mb-8" data-testid="text-permits-plans">
+            Permit search is included with every plan — from {formatUsd(STARTING_MONTHLY_CENTS)}/month, starting with a {TRIAL_LABEL}.
+          </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href={searchHref} data-testid="link-final-search">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-10 h-13 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
-                Search Permits Free <ArrowRight className="h-4 w-4 ml-2" />
+                Search Permits <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <Link href={user ? "/databases" : "/auth?mode=signup"} data-testid="link-final-directory">

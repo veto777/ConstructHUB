@@ -22,6 +22,27 @@ import {
   MessageSquare, Ban, CheckCircle2, XCircle, Megaphone,
   Plus, Smartphone, Monitor, Flag, Crosshair
 } from "lucide-react";
+import { PLANS, PLAN_KEYS, type PlanKey } from "@shared/plans";
+import { COMPETITOR_INTEL_PLANS } from "@shared/plan-copy";
+
+/**
+ * The server decides who may use Competitor Intel (server/entitlements.ts):
+ * a plan without it answers 402 { code: "plan_required", requiredPlan, message }.
+ * apiRequest/getQueryFn errors read "402: <json body>".
+ */
+function planRequiredFrom(err: unknown): { requiredPlan: PlanKey | null; message: string } | null {
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  const match = /^402:\s*(.*)$/s.exec(raw);
+  if (!match) return null;
+  try {
+    const body = JSON.parse(match[1]);
+    if (body?.code !== "plan_required") return null;
+    const requiredPlan = (PLAN_KEYS as readonly string[]).includes(body.requiredPlan) ? body.requiredPlan as PlanKey : null;
+    return { requiredPlan, message: typeof body.message === "string" ? body.message : "" };
+  } catch {
+    return null;
+  }
+}
 
 const INDUSTRIES = [
   "Roofing Contractor",
@@ -80,18 +101,13 @@ export default function CompetitorsPage() {
   const [radius, setRadius] = useState("25");
   const [expandedScan, setExpandedScan] = useState<number | null>(null);
 
-  const { data: subscription } = useQuery<{ plan: string; status: string }>({
-    queryKey: ["/api/stripe/subscription"],
-  });
-
-  const isPlatinum = ["gold", "platinum"].includes(subscription?.plan || "") && (subscription?.status === "active" || subscription?.status === "trialing");
-  const isDev = import.meta.env.DEV;
-
-  const { data: scans, isLoading: scansLoading } = useQuery<any[]>({
+  // No client-side plan check: the scans list answers 402 plan_required when
+  // the account's plan does not include Competitor Intel.
+  const { data: scans, isLoading: scansLoading, error: scansError } = useQuery<any[]>({
     queryKey: ["/api/competitors/scans"],
-    enabled: isPlatinum || isDev,
     refetchInterval: query => query.state.data?.some(scan => scan.status === "running") ? 1500 : false,
   });
+  const planRequired = planRequiredFrom(scansError);
 
   const scanMutation = useMutation({
     mutationFn: async (params: { industry: string; location: string; radius: number }) => {
@@ -127,7 +143,18 @@ export default function CompetitorsPage() {
     scanMutation.mutate({ industry, location: location.trim(), radius: parseInt(radius) });
   };
 
-  if (!isPlatinum && !isDev) {
+  // Wait for the server's answer so a plan without Competitor Intel never
+  // flashes the scan form first.
+  if (scansLoading) {
+    return (
+      <div className="flex justify-center py-16" data-testid="loader-competitors">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (planRequired) {
+    const requiredName = planRequired.requiredPlan ? PLANS[planRequired.requiredPlan].name : null;
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-16 text-center space-y-6">
@@ -138,16 +165,19 @@ export default function CompetitorsPage() {
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
             Index every competitor in your market, track their rankings, and use our heuristic BS Meter to find signals worth a closer look.
           </p>
-          <p className="text-muted-foreground">
-            This feature is available for <span className="text-yellow-500 font-bold">Gold and Platinum</span> members.
+          <p className="text-muted-foreground" data-testid="text-plan-required">
+            {planRequired.message || "Your plan does not include Competitor Intel."}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Competitor Intel is included with the <span className="text-yellow-500 font-bold">{COMPETITOR_INTEL_PLANS}</span> plans.
           </p>
           <Button
             className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-8"
             onClick={() => window.location.href = "/pricing"}
-            data-testid="button-upgrade-platinum"
+            data-testid="button-upgrade-plan"
           >
             <Shield className="w-4 h-4 mr-2" />
-            View Gold and Platinum plans
+            {requiredName ? `See the ${requiredName} plan` : "See plans"}
           </Button>
         </div>
       </div>

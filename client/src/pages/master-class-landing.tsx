@@ -9,6 +9,8 @@ import { CHLogo } from "@/components/ch-logo";
 import { LandingMobileMenu } from "@/components/landing-mobile-menu";
 import { copyrightNotice } from "@/lib/marketing";
 import { CartSheet } from "@/components/cart-sheet";
+import { showsPrice } from "@shared/plans";
+import { SALES_HREF, SALES_REP_LABEL, priceOrSalesRep } from "@shared/plan-copy";
 import {
   ArrowRight, CheckCircle2, Zap, ChevronRight,
   DollarSign, BarChart3, Globe, Award, MapPin,
@@ -167,12 +169,16 @@ const SIGNUP_TO_ENROLL = `/auth?mode=signup&next=${encodeURIComponent(ENROLL_PAT
 
 /** Complete-bundle price — server/catalog.ts COURSE_BUNDLE (cents). */
 const BUNDLE_PRICE_CENTS = 249900;
+/** At or above the sales threshold the bundle is "Talk to a sales rep": no price, no checkout. */
+const BUNDLE_PRICE_SHOWN = showsPrice(BUNDLE_PRICE_CENTS);
 const dollars = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 
-const stats = [
+const stats: { value: number; prefix?: string; suffix: string; label: string; sub: string }[] = [
   { value: 4, suffix: "", label: "Complete Modules", sub: "Formation to marketing" },
   { value: 50, suffix: "", label: "State Guides", sub: "Every state covered" },
-  { value: BUNDLE_PRICE_CENTS / 100, prefix: "$", suffix: "", label: "Complete Bundle", sub: "All 4 modules, one price" },
+  ...(BUNDLE_PRICE_SHOWN
+    ? [{ value: BUNDLE_PRICE_CENTS / 100, prefix: "$", suffix: "", label: "Complete Bundle", sub: "All 4 modules, one price" }]
+    : []),
 ];
 
 const modules = [
@@ -180,7 +186,7 @@ const modules = [
     icon: Building2,
     number: "01",
     title: "Business Formation & Licensing",
-    price: "$1,500",
+    category: "licensing",
     description: "The complete legal blueprint for getting your construction business up and running in any state. Entity formation, contractor licensing, bonding, insurance, workers comp, tax registration, and compliance — all 50 states covered with direct links to every agency you need.",
     gradient: "from-blue-500/20 to-indigo-500/20",
     border: "border-blue-500/20",
@@ -198,7 +204,7 @@ const modules = [
     icon: Camera,
     number: "02",
     title: "GMB Setup & Optimization",
-    price: "$2,000",
+    category: "gmb",
     description: "Build a Google Business Profile that dominates local search, generates leads consistently, and withstands competitor attacks. Everything from initial setup and verification to review strategy, photo optimization, and suspension prevention.",
     gradient: "from-purple-500/20 to-violet-500/20",
     border: "border-purple-500/20",
@@ -216,7 +222,7 @@ const modules = [
     icon: Monitor,
     number: "03",
     title: "Website & Online Presence",
-    price: "$1,500",
+    category: "website",
     description: "Build a contractor website that actually converts visitors into booked jobs. The same framework used by 7-figure contractors — from page structure and lead capture to speed optimization and trust signals that turn browsers into buyers.",
     gradient: "from-emerald-500/20 to-teal-500/20",
     border: "border-emerald-500/20",
@@ -234,7 +240,7 @@ const modules = [
     icon: TrendingUp,
     number: "04",
     title: "SEO & Directory Domination",
-    price: "$1,500",
+    category: "seo",
     description: "Rank your website on the first page of Google without paying for ads. Master local SEO, directory listings, citation building, and content strategy — the organic traffic system that compounds over time and delivers free leads month after month.",
     gradient: "from-orange-500/20 to-amber-500/20",
     border: "border-orange-500/20",
@@ -272,13 +278,22 @@ export default function MasterClassLandingPage() {
     queryKey: ["/api/auth/me"],
   });
   // Reference price = what the modules cost bought one by one, from the same
-  // table checkout prices them from. Until it loads, no comparison is shown.
-  const { data: courseModules } = useQuery<{ price: number }[]>({
+  // table checkout prices them from. Until it loads — or when any price is
+  // "Talk to a sales rep" — no comparison is shown.
+  const { data: courseModules } = useQuery<{ price: number; category: string }[]>({
     queryKey: ["/api/master-class-modules"],
   });
-  const modulesTotal = courseModules?.length
-    ? courseModules.reduce((sum, m) => sum + (Number(m.price) || 0), 0)
+  const allPricesShown = BUNDLE_PRICE_SHOWN && !!courseModules?.length && courseModules.every(m => showsPrice(Number(m.price) || 0));
+  const modulesTotal = allPricesShown
+    ? courseModules!.reduce((sum, m) => sum + (Number(m.price) || 0), 0)
     : null;
+  const modulePrice = (category: string) => {
+    const cents = courseModules?.find(m => m.category === category)?.price;
+    return cents === undefined ? null : priceOrSalesRep(Number(cents) || 0);
+  };
+  // Where "Enroll" goes: checkout when the bundle shows a price, the sales rep otherwise.
+  const enrollHref = BUNDLE_PRICE_SHOWN ? (user ? ENROLL_PATH : SIGNUP_TO_ENROLL) : SALES_HREF;
+  const enrollLabel = BUNDLE_PRICE_SHOWN ? "Enroll Now" : SALES_REP_LABEL;
   const bundleSaving = modulesTotal !== null && modulesTotal > BUNDLE_PRICE_CENTS
     ? modulesTotal - BUNDLE_PRICE_CENTS
     : null;
@@ -338,9 +353,9 @@ export default function MasterClassLandingPage() {
                     Sign In
                   </Button>
                 </Link>
-                <Link href={SIGNUP_TO_ENROLL} data-testid="link-masterclass-getstarted">
+                <Link href={BUNDLE_PRICE_SHOWN ? SIGNUP_TO_ENROLL : SALES_HREF} data-testid="link-masterclass-getstarted">
                   <Button size="sm" className="bg-[#F97316] hover:bg-[#EA580C] text-white shadow-lg shadow-orange-500/25">
-                    Enroll Now <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                    {enrollLabel} <ArrowRight className="h-3.5 w-3.5 ml-1" />
                   </Button>
                 </Link>
               </>
@@ -392,9 +407,9 @@ export default function MasterClassLandingPage() {
             consultants who've read about it.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
-            <Link href={user ? ENROLL_PATH : SIGNUP_TO_ENROLL} data-testid="link-hero-enroll">
+            <Link href={enrollHref} data-testid="link-hero-enroll">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-8 h-12 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
-                <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
+                <GraduationCap className="h-4 w-4 mr-2" /> {enrollLabel} <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <a href="#modules" data-testid="link-hero-explore">
@@ -428,7 +443,7 @@ export default function MasterClassLandingPage() {
               <span className="bg-gradient-to-r from-[#F97316] to-[#4A6CF7] bg-clip-text text-transparent"> In One Course</span>
             </h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className={`grid grid-cols-1 ${stats.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-5`}>
             {stats.map((stat, i) => (
               <Card key={stat.label} className={`bg-muted/50 dark:bg-white/[0.03] border-border dark:border-white/[0.06] p-6 text-center backdrop-blur-sm animate-in-delay-${i + 1}`} data-testid={`card-stat-${i}`}>
                 <div className="text-3xl sm:text-4xl font-extrabold text-foreground dark:text-white">
@@ -525,7 +540,9 @@ export default function MasterClassLandingPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1.5">
                       <span className="text-xs font-bold text-muted-foreground dark:text-white/30 tracking-widest">MODULE {mod.number}</span>
-                      <Badge className={`${mod.badgeColor} text-[10px] px-2 py-0`}>{mod.price}</Badge>
+                      {modulePrice(mod.category) && (
+                        <Badge className={`${mod.badgeColor} text-[10px] px-2 py-0`} data-testid={`badge-module-price-${mod.category}`}>{modulePrice(mod.category)}</Badge>
+                      )}
                     </div>
                     <h3 className="text-lg font-bold mb-2">{mod.title}</h3>
                     <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mb-4">{mod.description}</p>
@@ -549,7 +566,8 @@ export default function MasterClassLandingPage() {
               <h3 className="text-xl font-bold">Complete Bundle — All 4 Modules</h3>
             </div>
             <div className="flex items-center justify-center gap-4 mb-4">
-              <span className="text-3xl font-extrabold text-[#F97316]">{dollars(BUNDLE_PRICE_CENTS)}</span>
+              {/* Quoted bundles skip the price slot: the button below says "Talk to a sales rep". */}
+              {BUNDLE_PRICE_SHOWN && <span className="text-3xl font-extrabold text-[#F97316]" data-testid="text-bundle-price">{dollars(BUNDLE_PRICE_CENTS)}</span>}
               {modulesTotal !== null && bundleSaving !== null && (
                 <>
                   <span className="text-lg text-muted-foreground dark:text-white/30 line-through" data-testid="text-bundle-reference">{dollars(modulesTotal)}</span>
@@ -563,9 +581,9 @@ export default function MasterClassLandingPage() {
                 <> The modules cost {dollars(modulesTotal)} bought one at a time.</>
               )}
             </p>
-            <Link href={user ? ENROLL_PATH : SIGNUP_TO_ENROLL} data-testid="link-bundle-cta">
+            <Link href={enrollHref} data-testid="link-bundle-cta">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-10 h-12 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
-                <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
+                <GraduationCap className="h-4 w-4 mr-2" /> {enrollLabel} <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
           </Card>
@@ -748,7 +766,7 @@ export default function MasterClassLandingPage() {
             and the operating playbook. Stop guessing and start building on a solid foundation.
           </p>
           <div className="flex items-center justify-center gap-4 mb-8">
-            <span className="text-3xl font-extrabold text-[#F97316]">{dollars(BUNDLE_PRICE_CENTS)}</span>
+            {BUNDLE_PRICE_SHOWN && <span className="text-3xl font-extrabold text-[#F97316]">{dollars(BUNDLE_PRICE_CENTS)}</span>}
             {modulesTotal !== null && bundleSaving !== null && (
               <>
                 <span className="text-lg text-muted-foreground dark:text-white/30 line-through">{dollars(modulesTotal)}</span>
@@ -757,9 +775,9 @@ export default function MasterClassLandingPage() {
             )}
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href={user ? ENROLL_PATH : SIGNUP_TO_ENROLL} data-testid="link-final-enroll">
+            <Link href={enrollHref} data-testid="link-final-enroll">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-10 h-13 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
-                Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
+                {enrollLabel} <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-final-preview">
