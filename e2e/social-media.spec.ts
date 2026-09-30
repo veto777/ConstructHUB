@@ -10,6 +10,12 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
     posts: [],
   };
   const requests: any[] = [];
+  let uploadBytes = "";
+  await page.route("https://example.com/fixture-upload", async route => {
+    expect(route.request().method()).toBe("PUT");
+    uploadBytes = route.request().postData() || "";
+    await route.fulfill({ status: 200, body: "" });
+  });
   // Browser contract fixture: no key or publish request can reach Blotato or AI.
   await page.route("**/api/social**", async (route) => {
     const req = route.request(),
@@ -34,6 +40,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
         },
       ];
     else if (path === "/api/social/sources") result = [];
+    else if (path === "/api/social/uploads") result = { presignedUrl: "https://example.com/fixture-upload", publicUrl: "https://example.com/uploaded-fixture.jpg" };
     else if (path === "/api/social/posts") {
       const p = {
         id: crypto.randomUUID(),
@@ -100,6 +107,9 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   await page
     .getByLabel("Media Library", { exact: true })
     .selectOption("https://example.com/fixture.jpg");
+  await page.getByLabel("Upload media", { exact: true }).setInputFiles({ name: "fixture.jpg", mimeType: "image/jpeg", buffer: Buffer.from("explicit upload fixture bytes") });
+  await expect.poll(() => uploadBytes).toBe("explicit upload fixture bytes");
+  await expect(page.getByRole("button", { name: "Post now", exact: true })).toBeEnabled();
   await page
     .getByLabel("Schedule time", { exact: true })
     .fill("2030-10-05T10:00");
@@ -111,7 +121,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   ).toBeVisible();
   const post = requests.find((r) => r.path === "/api/social/posts").body;
   expect(post.destinations[0].accountId).toBe("fixture-x");
-  expect(post.mediaUrls).toEqual(["https://example.com/fixture.jpg"]);
+  expect(post.mediaUrls).toEqual(["https://example.com/fixture.jpg", "https://example.com/uploaded-fixture.jpg"]);
   expect(post.scheduledTime).toContain("2030-10-05");
   await page.getByRole("button", { name: "Auto mode", exact: true }).click();
   await page

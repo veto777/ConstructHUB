@@ -22,6 +22,8 @@ import {
 } from "./service";
 import {
   autoSchema,
+  platforms,
+  socialLimits,
   postPayload,
   destinationSchema,
   inBlackout,
@@ -140,6 +142,20 @@ describe("social validation and HTTP boundary", () => {
       isAiGenerated: true,
     });
   });
+  it.each(platforms)("enforces the %s text boundary and builds its target", (platform) => {
+    const d = destinationSchema.parse({ accountId: "fixture", platform, ...(platform === "facebook" ? { pageId: "page" } : {}), ...(platform === "pinterest" ? { boardId: "board" } : {}), title: "Fixture title" });
+    const media = ["https://example.com/fixture.mp4"];
+    expect(postPayload(d, "x".repeat(socialLimits[platform]), media).post.target.targetType).toBe(platform);
+    expect(() => postPayload(d, "x".repeat(socialLimits[platform] + 1), media)).toThrow("exceeds");
+    expect(() => postPayload(d, " ", media)).toThrow("required");
+    if (["instagram", "tiktok", "youtube", "pinterest"].includes(platform))
+      expect(() => postPayload(d, "Fixture", [])).toThrow("media");
+  });
+  it("keeps YouTube privacy and TikTok commercial disclosures explicit", () => {
+    expect(postPayload({ ...destination, platform: "youtube", title: "Title", privacy: "unlisted" }, "Fixture", ["https://example.com/video.mp4"], true).post.target).toMatchObject({ privacyStatus: "unlisted", containsSyntheticMedia: true });
+    expect(postPayload({ ...destination, platform: "tiktok", tiktokPublic: true, isBrandedContent: true, isYourBrand: true }, "Fixture", ["https://example.com/video.mp4"]).post.target).toMatchObject({ privacyLevel: "PUBLIC_TO_EVERYONE", isBrandedContent: true, isYourBrand: true });
+    expect(() => postPayload({ ...destination, platform: "pinterest" }, "Fixture", ["https://example.com/photo.jpg"])).toThrow("board");
+  });
   it("rejects private URL literals and overnight blackout handles timezone", () => {
     for (const url of [
       "http://example.com/a",
@@ -173,6 +189,18 @@ describe("social validation and HTTP boundary", () => {
       ["fixture-rate"],
     );
     expect(r.busy).toBe(true);
+  });
+  it("persists provider 429 cooldown across client instances without retrying HTTP", async () => {
+    const limited = vi.fn(async () => new Response("{}", { status: 429, headers: { "Retry-After": "120" } }));
+    const key = `fixture-rate-${crypto.randomUUID()}`;
+    const client = new BlotatoClient(key, limited);
+    try {
+      await expect(client.request("/posts", {})).rejects.toMatchObject({ status: 429 });
+      const cooldown = (await pool.query("SELECT next_at > now() + interval '110 seconds' AS active FROM social_rate WHERE key_hash=$1", [client.hash])).rows[0];
+      expect(cooldown.active).toBe(true);
+      await expect(new BlotatoClient(key, limited).request("/posts", {})).rejects.toMatchObject({ status: 429 });
+      expect(limited).toHaveBeenCalledTimes(1);
+    } finally { await pool.query("DELETE FROM social_rate WHERE key_hash=$1", [client.hash]); }
   });
   it("never retries a POST and never exposes provider bodies", async () => {
     const failed = vi.fn(async () => {
@@ -561,6 +589,25 @@ describe("route authentication, owner scope and key redaction", () => {
       expect(res.status).toHaveBeenCalledWith(401);
       expect(next).not.toHaveBeenCalled();
     }
+  });
+  it("discovers Pinterest boards and LinkedIn pages without crossing owners", async () => {
+    const discovery = vi.fn(async (url: any) => {
+      if (String(url).endsWith("/users/me/accounts")) return response({ items: [{ id: "pin", platform: "pinterest" }, { id: "li", platform: "linkedin" }] });
+      return response({ items: [{ id: "verified-target", name: "Fixture destination" }] });
+    });
+    const factory = (key: string) => new BlotatoClient(key, discovery, async () => {});
+    await connect(otherId, "fixture-discovery-key", null, factory);
+    for (const [accountId, platform, field] of [["pin", "pinterest", "boardId"], ["li", "linkedin", "pageId"]]) {
+      const d = { ...destination, accountId, platform, [field]: "verified-target" };
+      await expect(createPosts(otherId, request({ destinations: [d], mediaUrls: ["https://example.com/photo.jpg"], draft: true }))).rejects.toThrow("verified");
+      await discoverPages(otherId, accountId, factory);
+      const [p] = await createPosts(otherId, request({ destinations: [d], mediaUrls: ["https://example.com/photo.jpg"], draft: true }));
+      expect(p.payload.post.target[field]).toBe("verified-target");
+      await expect(changePost(userId, p.id, "cancel")).rejects.toMatchObject({ status: 404 });
+    }
+    expect(discovery.mock.calls.some(([url]) => String(url).endsWith("/social/pinterest/boards?accountId=pin"))).toBe(true);
+    await disconnect(otherId, null);
+    await pool.query("DELETE FROM social_posts WHERE user_id=$1", [otherId]);
   });
   it("returns no key and no other owner posts from the dashboard", async () => {
     const routes = new Map<string, any>();
