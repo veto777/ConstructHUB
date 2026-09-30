@@ -121,8 +121,11 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
             }
             await c.query('DELETE FROM gbp_media WHERE location_id=$1 AND source=$2 AND NOT (name = ANY($3::text[]))',[id,source,valid.map((m: any) => m.name)]);
           }
-          const media = counts.business !== undefined ? { totalMediaItemCount: counts.business } : null;
-          const customerMedia = counts.customer !== undefined ? { totalMediaItemCount: counts.customer } : null;
+          // Counts come from the de-duplicated stored gallery, so the tiles always match what the user sees.
+          const {rows:stored} = await c.query('SELECT source,count(*)::int n FROM gbp_media WHERE location_id=$1 GROUP BY source',[id]);
+          const storedCount = (src: string) => stored.find((r: any) => r.source === src)?.n ?? 0;
+          const media = counts.business !== undefined ? { totalMediaItemCount: storedCount('business') } : null;
+          const customerMedia = counts.customer !== undefined ? { totalMediaItemCount: storedCount('customer') } : null;
           const p = mapProfile(info, attrs);
           verified = !!info?.metadata?.hasVoiceOfMerchant;
           await c.query(`UPDATE business_locations SET business_name=COALESCE($2,business_name),phone=$3,website=$4,address=$5,city=$6,state=$7,zip_code=$8,country=COALESCE($9,country),
