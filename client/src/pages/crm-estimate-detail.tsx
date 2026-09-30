@@ -205,7 +205,10 @@ export default function CrmEstimateDetailPage() {
         taxRateBps: Math.round((parseFloat(taxPct) || 0) * 100),
         depositCents,
         divisionId: divisionId || null,
-        status,
+        // Only a status the person actually changed. An untouched select can
+        // hold a status nobody may set by hand (an imported "approved" row
+        // without a signature), which the PATCH would refuse outright.
+        status: status !== e?.status ? status : undefined,
         items: clean.map((l, idx) => ({
           kind: l.kind,
           name: l.name.trim(),
