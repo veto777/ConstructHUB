@@ -126,7 +126,13 @@ async function liveSubscription(userId: number) {
   const row = await subscriptionRowFor(userId);
   if (!row || !hasLiveStripeSubscription(row)) throw NO_SUBSCRIPTION();
   const sub = await stripe.subscriptions.retrieve(row.stripeSubscriptionId!);
-  if (!LIVE_STATUSES.has(sub.status)) throw NO_SUBSCRIPTION();
+  if (!LIVE_STATUSES.has(sub.status)) {
+    // The row missed the webhook that ended it. Record what Stripe says, so
+    // create-checkout stops answering has_subscription and the customer can
+    // start a new plan instead of being refused by both routes.
+    await db.update(subscriptions).set(subscriptionRowUpdate(sub)).where(eq(subscriptions.id, row.id));
+    throw NO_SUBSCRIPTION();
+  }
   return { row, sub, current: describeSubscription(sub.items.data) };
 }
 
@@ -265,12 +271,17 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
-  /** Existing subscriber sets add-on quantities ({ addons: { key: qty } }, 0 removes) on the current plan. */
+  /**
+   * Existing subscriber sets add-on quantities on the current plan (0 removes):
+   * { addons: { key: qty } }, or one add-on as { addon: key, quantity: qty }
+   * (the shape the Settings billing card sends).
+   */
   app.post("/api/stripe/addons", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
-      const requested = parseAddonQuantities(req.body?.addons);
+      const single = req.body?.addons === undefined && req.body?.addon !== undefined;
+      const requested = parseAddonQuantities(single ? { [String(req.body.addon)]: req.body.quantity } : req.body?.addons);
       if (!Object.keys(requested).length) {
         return res.status(400).json({ message: "Choose an add-on quantity to change." });
       }

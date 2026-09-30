@@ -441,6 +441,45 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     expect(legacy.body.code).toBe("legacy_plan");
     expect(mocks.update).toHaveBeenCalledTimes(1);
   });
+
+  it("add-ons: one add-on as { addon, quantity } (the Settings card's body) works like { addons }", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    const res = await request("/api/stripe/addons", { addon: "extra_seat", quantity: 2 });
+    expect(res.code).toBe(200);
+    expect(mocks.update.mock.calls[0][1].items).toEqual([{ price: "price_chub_v1_addon_extra_seat_month_1500", quantity: 2 }]);
+    expect(mocks.updates[0].addons).toEqual({ extra_seat: 2, texting_number: 1 });
+
+    mocks.rows.push([liveRow()]);
+    expect((await request("/api/stripe/addons", { addon: "texting_number", quantity: 0 })).code).toBe(200);
+    expect(mocks.update.mock.calls[1][1].items).toEqual([{ id: "si_text", deleted: true }]);
+
+    for (const body of [{ addon: "nope", quantity: 1 }, { addon: "extra_seat", quantity: -1 }, { addon: "extra_seat", quantity: "2" }]) {
+      expect((await request("/api/stripe/addons", body)).code).toBe(400);
+    }
+    expect(mocks.update).toHaveBeenCalledTimes(2);
+  });
+
+  it("GET /api/stripe/subscription also reports interval and locations (a yearly subscriber's change stays yearly)", async () => {
+    mocks.rows.push([liveRow({ plan: "agency", billingInterval: "year", agencyLocations: 25, addons: { extra_seat: 1 } })]);
+    const res = await request("GET /api/stripe/subscription");
+    expect(res.body).toMatchObject({
+      plan: "agency", effectivePlan: "agency", billingInterval: "year", interval: "year",
+      agencyLocations: 25, locations: 25, addons: { extra_seat: 1 },
+    });
+    mocks.rows.push([]);
+    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ plan: "free", interval: null, locations: null });
+  });
+
+  it("a row still marked live whose Stripe subscription ended is corrected, so checkout is no longer refused", async () => {
+    mocks.current = subscription([item("si_plan", "price_x", 1, { kind: "plan", key: "pro" })], { status: "canceled" });
+    mocks.rows.push([liveRow()]);
+    const res = await request("/api/stripe/change-plan", { plan: "growth" });
+    expect(res.code).toBe(409);
+    expect(res.body.code).toBe("no_subscription");
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.updates[0]).toMatchObject({ stripeSubscriptionId: "sub_live", status: "canceled" });
+  });
 });
 
 describe("webhook maps the subscription's items onto the row", () => {

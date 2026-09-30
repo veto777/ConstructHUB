@@ -96,16 +96,23 @@ export const canceledRowUpdate = (): SubscriptionSet => ({
   status: "canceled", plan: "free", addons: {}, agencyLocations: null, billingInterval: null,
 });
 
-/** What GET /api/stripe/subscription (and the change routes) report. */
+/**
+ * What GET /api/stripe/subscription (and the change routes) report.
+ * `interval` and `locations` repeat `billingInterval` and `agencyLocations`
+ * under the names the pricing/Settings client reads. Without them a yearly
+ * subscriber's plan or location change is sent as monthly.
+ */
 export function subscriptionSummary(row: Partial<SubscriptionRow> | null | undefined) {
-  if (!row) return { plan: "free", effectivePlan: null, status: "inactive", billingInterval: null, addons: {}, agencyLocations: null, currentPeriodEnd: null, stripeSubscriptionId: null };
+  if (!row) return { plan: "free", effectivePlan: null, status: "inactive", billingInterval: null, interval: null, addons: {}, agencyLocations: null, locations: null, currentPeriodEnd: null, stripeSubscriptionId: null };
   return {
     plan: row.plan ?? "free",
     effectivePlan: effectivePlanKey({ plan: row.plan, status: row.status }),
     status: row.status ?? "inactive",
     billingInterval: row.billingInterval ?? null,
+    interval: row.billingInterval ?? null,
     addons: row.addons ?? {},
     agencyLocations: row.agencyLocations ?? null,
+    locations: row.agencyLocations ?? null,
     currentPeriodEnd: row.currentPeriodEnd ?? null,
     stripeSubscriptionId: row.stripeSubscriptionId ?? null,
   };
