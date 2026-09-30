@@ -398,3 +398,105 @@ it("persists rollback intent before an ambiguous write and never replays it afte
   const [rollback] = await rollbackPreview(user, id);
   expect((await job(rollback)).status).toBe("previewing");
 });
+
+it("removes a saved registrar key behind step-up, keeps the domains and job history, and stops its queued work", async () => {
+  const { CONNECTION_REMOVED, CONNECTION_REMOVED_VERIFY } = await import("./service");
+  const removable = Number(
+    await saveConnection(user, "namecom", "I- removable key", "i-key", "i-secret"),
+  );
+  const discover = (
+    await pool.query(
+      "SELECT id FROM domain_jobs WHERE connection_id=$1 AND kind='discover'",
+      [removable],
+    )
+  ).rows[0].id;
+  const kept = Number(
+    (
+      await pool.query(
+        "UPDATE managed_domains SET connection_id=$2,registrar='namecom' WHERE user_id=$1 AND domain='fixture-0002.example.test' RETURNING id",
+        [user, removable],
+      )
+    ).rows[0].id,
+  );
+  // One change waiting for confirmation, one applied and still verifying, one finished (history).
+  const [waiting] = await preview(user, [kept], {
+    kind: "nameservers",
+    nameservers: ["i-a.example.test", "i-b.example.test"],
+  });
+  const verifying = crypto.randomUUID(),
+    done = crypto.randomUUID();
+  await pool.query(
+    "INSERT INTO domain_jobs(id,user_id,domain_id,connection_id,kind,status) VALUES($1,$3,$4,$5,'change','verifying'),($2,$3,$4,$5,'change','verified')",
+    [verifying, done, user, kept, removable],
+  );
+  // The list names each saved key without its secret; another account sees none of them.
+  const saved = await call("get", "/api/domains/saved-connections");
+  expect(saved.data.items).toEqual(
+    expect.arrayContaining([
+      { id: removable, provider: "namecom", label: "I- removable key" },
+    ]),
+  );
+  expect(JSON.stringify(saved.data)).not.toMatch(/i-secret|credentials/);
+  expect(
+    (await call("get", "/api/domains/saved-connections", {}, {}, other)).data,
+  ).toEqual({ items: [] });
+  // Step-up re-auth, owner scoping, and all-or-nothing ids.
+  expect(
+    (
+      await call("post", "/api/domains/disconnect", { ids: [removable] }, {}, user, false)
+    ).data,
+  ).toMatchObject({ reauth: true });
+  expect(
+    (await call("post", "/api/domains/disconnect", { ids: [removable] }, {}, other)).code,
+  ).toBe(404);
+  expect(
+    (await call("post", "/api/domains/disconnect", { ids: [removable, 2147483000] })).code,
+  ).toBe(404);
+  expect(
+    (await pool.query("SELECT 1 FROM domain_connections WHERE id=$1", [removable])).rowCount,
+  ).toBe(1);
+  const removed = await call("post", "/api/domains/disconnect", {
+    ids: [removable, removable],
+  });
+  expect(removed.code).toBe(200);
+  expect(removed.data.results).toHaveLength(1);
+  expect(removed.data.results[0].message).toContain(
+    "The key still works at Name.com until you delete it there (API token management).",
+  );
+  expect(removed.data.results[0].message).toContain(
+    "2 queued tasks for this key were stopped before reaching Name.com. 1 applied change is no longer verified here; check it at Name.com.",
+  );
+  expect(
+    (await pool.query("SELECT 1 FROM domain_connections WHERE id=$1", [removable])).rowCount,
+  ).toBe(0);
+  // The domain stays, without a connection; history stays; pending work is closed with a reason.
+  expect(
+    (await pool.query("SELECT connection_id FROM managed_domains WHERE id=$1", [kept])).rows[0]
+      .connection_id,
+  ).toBeNull();
+  const rows = Object.fromEntries(
+    (
+      await pool.query(
+        "SELECT id,status,error,connection_id FROM domain_jobs WHERE id=ANY($1::uuid[])",
+        [[discover, waiting, verifying, done]],
+      )
+    ).rows.map((r) => [r.id, r]),
+  );
+  expect(rows[discover]).toMatchObject({ status: "failed", error: CONNECTION_REMOVED, connection_id: null });
+  expect(rows[waiting]).toMatchObject({ status: "failed", error: CONNECTION_REMOVED, connection_id: null });
+  expect(rows[verifying]).toMatchObject({ status: "verification_failed", error: CONNECTION_REMOVED_VERIFY, connection_id: null });
+  expect(rows[done]).toMatchObject({ status: "verified", connection_id: null });
+  expect(logActivity).toHaveBeenCalledWith(expect.anything(), user, "domains.disconnected", {
+    provider: "namecom",
+    connectionId: removable,
+  });
+  expect(notifyUser).toHaveBeenCalledWith(
+    user,
+    "domains.disconnected",
+    expect.objectContaining({ title: "Registrar API key removed", body: "I- removable key" }),
+  );
+  // Without a key, the domain can't be changed from ConstructHUB any more.
+  await expect(
+    preview(user, [kept], { kind: "nameservers", nameservers: ["x.example.test", "y.example.test"] }),
+  ).rejects.toThrow("Manual domains");
+});

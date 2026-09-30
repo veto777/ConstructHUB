@@ -21,7 +21,7 @@ import {
 } from "@shared/schema";
 import { isThemeColorId } from "@shared/theme-colors";
 import { and, eq, desc, isNull, sql } from "drizzle-orm";
-import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage } from "./tenancy";
+import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage, seatLimitBody, withSeatLock, type SeatLock } from "./tenancy";
 import { registerCrmEntityRoutes } from "./entities";
 import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./portal";
 import { registerCrmPaymentRoutes } from "./payments";
@@ -774,24 +774,31 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (parsed.data.role === "pm" && ctx.member.role !== "owner" && ctx.member.role !== "admin") {
       return res.status(403).json({ message: "Only an owner or admin can grant the pm role" });
     }
-    // Re-activating a seat has to respect the plan limit.
-    if (parsed.data.status === "active" && target.status !== "active") {
-      const seats = await getSeatUsage(ctx.org);
-      if (!seats.canAddSeat) {
-        return res.status(402).json({ message: "Seat limit reached", seats });
-      }
-    }
     // A division scope must point at one of the org's own divisions.
     if (parsed.data.divisionId) {
       const div = await getDivision(ctx.org.id, parsed.data.divisionId);
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
 
-    const [row] = await db
+    const update = async (via: SeatLock["db"] = db) => (await via
       .update(crmMembers)
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(crmMembers.id, target.id))
-      .returning();
+      .returning())[0];
+    // Re-activating a seat has to respect the plan limit (checked and taken
+    // under the owner's seat lock, shared with the Agency team; all of it on
+    // the connection holding the lock).
+    const reactivating = parsed.data.status === "active" && target.status !== "active";
+    const outcome = reactivating
+      ? await withSeatLock(ctx.org.ownerUserId, async (lock) => {
+          // Someone already holding a seat (an invitation, or the owner's Agency team) takes no extra one.
+          const seats = await getSeatUsage(ctx.org, { userId: target.userId, email: target.email }, lock);
+          if (!seats.canAdd) return { refused: seatLimitBody(seats) };
+          return { row: await update(lock.db) };
+        })
+      : { row: await update() };
+    if ("refused" in outcome) return res.status(402).json(outcome.refused);
+    const { row } = outcome;
 
     // Owner's "account changed" notice when a member edits their OWN profile
     // through the team route — field names only. An admin editing someone
@@ -951,59 +958,65 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
 
-    const seats = await getSeatUsage(ctx.org);
-    if (!seats.canAddSeat) {
-      return res.status(402).json({
-        message: `Your ${seats.planName} plan includes ${seats.limit} seat${seats.limit === 1 ? "" : "s"} and ${seats.used} ${seats.used === 1 ? "is" : "are"} in use.`,
-        seats,
-      });
-    }
-
     const lower = email.toLowerCase();
-    const existing = await db
-      .select()
-      .from(crmMembers)
-      .where(and(eq(crmMembers.orgId, ctx.org.id), sql`lower(${crmMembers.email}) = ${lower}`))
-      .limit(1);
-    if (existing.length && existing[0].status !== "disabled") {
-      return res.status(409).json({ message: "That person is already on your team" });
-    }
-
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-    const [invite] = await db
-      .insert(crmInvitations)
-      .values({
-        orgId: ctx.org.id,
-        email: lower,
-        role,
-        permissions: permissions ?? null,
-        divisionId: divisionId ?? null,
-        token,
-        invitedByUserId: user.id,
-        expiresAt,
-      })
-      .returning();
+    // The seat check and the seat it allows happen under the owner's seat lock,
+    // shared with the Agency team (one pool), so concurrent additions can't
+    // pass the limit together. Everything under it runs on the connection
+    // holding the lock (lock.db), in one transaction.
+    const outcome = await withSeatLock(ctx.org.ownerUserId, async (lock) => {
+      const tx = lock.db;
+      // Someone already seated on the owner's Agency team takes no extra seat.
+      const seats = await getSeatUsage(ctx.org, { email }, lock);
+      if (!seats.canAdd) return { refused: 402, body: seatLimitBody(seats) as object };
 
-    // Hold the seat immediately so two invites can't race past the limit.
-    if (existing.length) {
-      await db
-        .update(crmMembers)
-        .set({ status: "invited", role, permissions: permissions ?? null, displayName: displayName ?? null, divisionId: divisionId ?? null, updatedAt: new Date() })
-        .where(eq(crmMembers.id, existing[0].id));
-    } else {
-      await db.insert(crmMembers).values({
-        orgId: ctx.org.id,
-        userId: null,
-        email: lower,
-        role,
-        status: "invited",
-        displayName: displayName ?? null,
-        divisionId: divisionId ?? null,
-        permissions: permissions ?? null,
-      });
-    }
+      const existing = await tx
+        .select()
+        .from(crmMembers)
+        .where(and(eq(crmMembers.orgId, ctx.org.id), sql`lower(${crmMembers.email}) = ${lower}`))
+        .limit(1);
+      if (existing.length && existing[0].status !== "disabled") {
+        return { refused: 409, body: { message: "That person is already on your team" } };
+      }
+
+      const [invite] = await tx
+        .insert(crmInvitations)
+        .values({
+          orgId: ctx.org.id,
+          email: lower,
+          role,
+          permissions: permissions ?? null,
+          divisionId: divisionId ?? null,
+          token,
+          invitedByUserId: user.id,
+          expiresAt,
+        })
+        .returning();
+
+      // Hold the seat immediately so two invites can't race past the limit.
+      if (existing.length) {
+        await tx
+          .update(crmMembers)
+          .set({ status: "invited", role, permissions: permissions ?? null, displayName: displayName ?? null, divisionId: divisionId ?? null, updatedAt: new Date() })
+          .where(eq(crmMembers.id, existing[0].id));
+      } else {
+        await tx.insert(crmMembers).values({
+          orgId: ctx.org.id,
+          userId: null,
+          email: lower,
+          role,
+          status: "invited",
+          displayName: displayName ?? null,
+          divisionId: divisionId ?? null,
+          permissions: permissions ?? null,
+        });
+      }
+      return { refused: 0, body: null, invite };
+    });
+    if (outcome.refused) return res.status(outcome.refused).json(outcome.body);
+    const invite = outcome.invite!;
 
     const link = `${getBaseUrl(req)}/crm/join?token=${token}`;
     const emailed = await sendInviteEmail(ctx.org.name, email, link);

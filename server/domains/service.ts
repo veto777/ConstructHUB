@@ -79,6 +79,96 @@ export async function saveConnection(
   await enqueue(userId, "discover", {}, undefined, c.id);
   return c.id;
 }
+/** Recorded on queued registrar work whose API key was removed before it ran. */
+export const CONNECTION_REMOVED =
+  "Not run: the registrar API key was removed from ConstructHUB.";
+/** A change already made at the registrar; only its follow-up DNS check stopped. */
+export const CONNECTION_REMOVED_VERIFY =
+  "Applied at the registrar, but verification stopped: the registrar API key was removed from ConstructHUB.";
+/** Where each registrar's own key management lives (see guides.ts). */
+const REGISTRAR_KEY_PAGE: Record<string, [string, string]> = {
+  porkbun: ["Porkbun", "Account → API Access"],
+  namecom: ["Name.com", "API token management"],
+};
+/**
+ * Delete a saved registrar API key (domain_connections) for its owner. The
+ * domain worker's lock is taken first, so no registrar call is in flight with
+ * these credentials. Domains stay listed (their connection is cleared by the
+ * foreign key) and keep DNS and website monitoring; queued registrar work that
+ * has not run is closed with CONNECTION_REMOVED; job history is kept. The key
+ * itself still works at the registrar until the owner deletes it there, and
+ * the message says so.
+ */
+export async function disconnectConnection(userId: number, id: number) {
+  const c = await pool.connect();
+  try {
+    await c.query("BEGIN");
+    await c.query("SET LOCAL lock_timeout = '15s'");
+    try {
+      await c.query("SELECT pg_advisory_xact_lock(8189,7)");
+    } catch (e: any) {
+      if (e?.code === "55P03")
+        throw new DomainError(
+          "A domain job is running. Try again in a minute.",
+          409,
+        );
+      throw e;
+    }
+    const {
+      rows: [conn],
+    } = await c.query(
+      "SELECT id,provider,label FROM domain_connections WHERE user_id=$1 AND id=$2 FOR UPDATE",
+      [userId, id],
+    );
+    if (!conn) throw new DomainError("Connection not found", 404);
+    const { rows: closed } = await c.query(
+      `UPDATE domain_jobs SET status=CASE WHEN status='verifying' THEN 'verification_failed' ELSE 'failed' END,
+         error=CASE WHEN status='verifying' THEN $4 ELSE $3 END,updated_at=now()
+       WHERE user_id=$1 AND connection_id=$2 AND kind<>'monitor' AND status IN ('queued','previewing','ready','working','verifying')
+       RETURNING status`,
+      [userId, id, CONNECTION_REMOVED, CONNECTION_REMOVED_VERIFY],
+    );
+    const stopped = closed.filter((j) => j.status === "failed").length,
+      unverified = closed.length - stopped;
+    // Keep every job's history: detach it before the connection row goes (the FK would cascade).
+    await c.query(
+      "UPDATE domain_jobs SET connection_id=NULL WHERE user_id=$1 AND connection_id=$2",
+      [userId, id],
+    );
+    await c.query(
+      "DELETE FROM domain_connections WHERE user_id=$1 AND id=$2",
+      [userId, id],
+    );
+    await c.query("COMMIT");
+    const [name, where] = REGISTRAR_KEY_PAGE[conn.provider] ?? [
+      "the registrar",
+      "its API settings",
+    ];
+    const notes = [
+      stopped
+        ? `${stopped} queued ${stopped === 1 ? "task for this key was" : "tasks for this key were"} stopped before reaching ${name}.`
+        : "",
+      unverified
+        ? `${unverified} applied ${unverified === 1 ? "change is" : "changes are"} no longer verified here; check ${unverified === 1 ? "it" : "them"} at ${name}.`
+        : "",
+    ].filter(Boolean);
+    return {
+      id: Number(conn.id),
+      provider: conn.provider as string,
+      label: conn.label as string,
+      message: [
+        `Removed "${conn.label}" from ConstructHUB. The key still works at ${name} until you delete it there (${where}).`,
+        "Your domains stay listed with DNS and website monitoring; registrar details are no longer refreshed and DNS changes need a connected key.",
+        ...notes,
+      ].join(" "),
+    };
+  } catch (e) {
+    await c.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    c.release();
+  }
+}
 export async function autoMapDomains(userId: number) {
   await pool.query(
     `WITH matches AS (

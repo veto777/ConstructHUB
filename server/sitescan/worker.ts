@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { takeBudget } from "../growth-limits";
+import { reserveQuotaFor, refundReservation, resetsAt, type QuotaReservation } from "../growth-quotas";
 import { notifyUser } from "../account-events";
 import {
   crawl,
@@ -303,14 +304,36 @@ export async function runSiteScanWorker(deps = workerDependencies) {
     clearInterval(heartbeat);
   }
 }
+/**
+ * Monthly scheduled scans. Each one spends a Site Scan from the owner's
+ * monthly plan allowance (Agency: per billed location), like a scan started by
+ * hand. A used-up month waits for the 1st (UTC); an account with no plan is
+ * looked at again the next day; the daily scan budget defers to the next day.
+ */
 export async function runSchedules() {
   const c = await pool.connect();
+  const held: QuotaReservation[] = [];
   try {
     await c.query("BEGIN");
     const { rows } = await c.query(
       "SELECT * FROM sitescan_schedules WHERE next_at<=now() FOR UPDATE SKIP LOCKED LIMIT 10",
     );
     for (const s of rows) {
+      const quota = await reserveQuotaFor(s.user_id, "siteScans", 1);
+      if (!quota.ok) {
+        await c.query(
+          "UPDATE sitescan_schedules SET next_at=$3 WHERE user_id=$1 AND url=$2",
+          [
+            s.user_id,
+            s.url,
+            quota.status === 403
+              ? resetsAt()
+              : new Date(Date.now() + 86400_000).toISOString(),
+          ],
+        );
+        continue;
+      }
+      held.push(quota.reservation);
       if (await takeBudget("sitescan:scan:" + s.user_id, 5, 1, 86400_000)) {
         const profile = s.location_id
             ? await profileFor(s.user_id, s.location_id)
@@ -332,11 +355,14 @@ export async function runSchedules() {
           "UPDATE sitescan_schedules SET next_at=now()+interval '1 month' WHERE user_id=$1 AND url=$2",
           [s.user_id, s.url],
         );
-      } else
+      } else {
+        // The daily budget said no: the monthly scan goes back until tomorrow's try.
+        await refundReservation(held.pop(), 1);
         await c.query(
           "UPDATE sitescan_schedules SET next_at=now()+interval '1 day' WHERE user_id=$1 AND url=$2",
           [s.user_id, s.url],
         );
+      }
     }
     await c.query(
       "UPDATE sitescan_jobs SET status='failed',error='Worker retry limit reached' WHERE status='running' AND lease_until<now() AND attempts>=5",
@@ -344,6 +370,8 @@ export async function runSchedules() {
     await c.query("COMMIT");
   } catch (e) {
     await c.query("ROLLBACK");
+    // Nothing was queued: give back the scans this tick reserved.
+    for (const r of held) await refundReservation(r, 1).catch(() => {});
     throw e;
   } finally {
     c.release();

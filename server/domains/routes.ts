@@ -1,12 +1,13 @@
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { pool } from "../db";
 import { rateLimit } from "../growth-limits";
 import { requireModule } from "../entitlements";
 import { requireRecentAuth } from "../account-security";
-import { logActivity } from "../account-events";
+import { logActivity, notifyUser } from "../account-events";
 import { domainName, changeInput, DomainError } from "./types";
 import {
+  disconnectConnection,
   saveConnection,
   preview,
   confirm,
@@ -34,11 +35,18 @@ export function registerDomainRoutes(
     res.setHeader("Cache-Control", "no-store");
     next();
   });
-  // Agency-only module: every /api/domains route answers 402 plan_required unless the plan includes it.
+  // Agency-only module: every /api/domains route answers 402 plan_required unless the plan includes it, except
+  // removing saved registrar API keys (list + disconnect), which an account without the plan must still be able
+  // to do (Settings → API keys and the plan_required card list them).
+  const gate = requireModule("domainsMailAlerts"),
+    removal = (req: Request) =>
+      (req.method === "GET" && req.path === "/saved-connections") ||
+      (req.method === "POST" && req.path === "/disconnect");
   app.use(
     "/api/domains",
     rateLimit("domains", 120, 300),
-    requireModule("domainsMailAlerts"),
+    (req: Request, res: Response, next: NextFunction) =>
+      removal(req) ? next() : gate(req, res, next),
   );
   const route = (
     method: "get" | "post",
@@ -100,6 +108,44 @@ export function registerDomainRoutes(
       [id, `%${p.q}%`, p.limit, (p.page - 1) * p.limit],
     );
     res.json({ items: rows });
+  });
+  // Only what identifies each saved registrar key (for Disconnect buttons); never the key itself.
+  route("get", "/saved-connections", async (_req, res, id) => {
+    const { rows } = await pool.query(
+      "SELECT id,provider,label FROM domain_connections WHERE user_id=$1 ORDER BY id LIMIT 100",
+      [id],
+    );
+    res.json({ items: rows.map((r) => ({ ...r, id: Number(r.id) })) });
+  });
+  route("post", "/disconnect", async (req, res, id) => {
+    const b = z.object({ ids: idsInput }).strict().parse(req.body);
+    if (!requireRecentAuth(req, res)) return;
+    const ids = [...new Set(b.ids)];
+    // All or nothing on ownership: an unknown id removes none of them.
+    const {
+      rows: [owned],
+    } = await pool.query(
+      "SELECT count(*)::int n FROM domain_connections WHERE user_id=$1 AND id=ANY($2::bigint[])",
+      [id, ids],
+    );
+    if (owned.n !== ids.length)
+      throw new DomainError("Connection not found", 404);
+    const results = [];
+    for (const connectionId of ids) {
+      const r = await disconnectConnection(id, connectionId);
+      await logActivity(req, id, "domains.disconnected", {
+        provider: r.provider,
+        connectionId: r.id,
+      });
+      await notifyUser(id, "domains.disconnected", {
+        title: "Registrar API key removed",
+        body: r.label,
+        link: "/settings?tab=security",
+        actionUrl: "/settings?tab=security",
+      });
+      results.push({ id: r.id, message: r.message });
+    }
+    res.json({ results });
   });
   route("get", "/connections", async (req, res, id) => {
     const p = pageInput.parse(req.query);

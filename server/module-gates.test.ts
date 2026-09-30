@@ -30,7 +30,7 @@ import { runDomainWorker, scheduleMonitors, DOMAINS_PLAN_PAUSED, DOMAINS_VERIFY_
 import { registerMailAlertRoutes } from './mail-alerts/routes';
 import { registerGmailOAuth, runMailWorker } from './mail-alerts/gmail';
 import { registerInboundMail } from './mail-alerts/inbound';
-import { ingest, hash as mailHash } from './mail-alerts/service';
+import { ingest, hash as mailHash, HELD_ALERT_NOTE } from './mail-alerts/service';
 import { encryptToken } from './gbp/token-crypto';
 import { MODULE_NAMES, PLANS, planForModule, type ModuleKey } from '@shared/plans';
 // Fixture platform admins are recognised by email prefix, so no real admin address is written to the DB.
@@ -145,23 +145,29 @@ describe('Saved credentials stay removable without the plan', () => {
     // A pasted Cloudflare token (not one ConstructHUB created), so disconnecting makes no provider call.
     const [cf, gsc] = (await pool.query("INSERT INTO edge_connections(user_id,provider,subject,email,token,method) VALUES($1,'cloudflare','p3-saved-cf','cf@example.invalid',$2,'paste'),($1,'gsc','p3-saved-gsc','gsc@example.invalid',$2,'oauth') RETURNING id", [user, encryptToken('fixture-token')])).rows.map(r => r.id);
     await pool.query("INSERT INTO mail_alert_grants(user_id,google_subject,email,access_token,refresh_token,expires_at) VALUES($1,'p3-saved-gmail','gmail@example.invalid',$2,$3,now()+interval '1 hour')", [user, encryptToken('fixture-access'), encryptToken('fixture-refresh')]);
+    const registrar = Number((await pool.query("INSERT INTO domain_connections(user_id,provider,label,credentials) VALUES($1,'porkbun','I- saved registrar',$2) RETURNING id", [user, encryptToken('{"key":"fixture","secret":"fixture"}')])).rows[0].id);
+    expect((await call(user, '/api/domains/saved-connections')).data).toEqual({ items: [{ id: registrar, provider: 'porkbun', label: 'I- saved registrar' }] });
     expect((await call(user, '/api/ads/saved-connection')).data).toEqual({ saved: true, managerId: '1112223334' });
     expect((await call(user, '/api/cloudflare/saved-connections')).data).toEqual({ items: [{ id: cf, label: 'cf@example.invalid' }] });
     expect((await call(user, '/api/gsc/saved-connections')).data).toEqual({ items: [{ id: gsc, label: 'gsc@example.invalid' }] });
     expect((await call(user, '/api/mail-alerts/oauth/saved-connections')).data).toEqual({ items: [{ subject: 'p3-saved-gmail', email: 'gmail@example.invalid' }] });
     // The module itself stays closed, and a signed-out caller gets nothing.
-    for (const path of ['/api/ads/status', '/api/cloudflare/connections?limit=1', '/api/gsc/assets', '/api/mail-alerts/settings'])
+    for (const path of ['/api/ads/status', '/api/cloudflare/connections?limit=1', '/api/gsc/assets', '/api/mail-alerts/settings', '/api/domains/connections'])
       expect((await call(user, path)).status, path).toBe(402);
-    for (const path of ['/api/ads/saved-connection', '/api/cloudflare/saved-connections', '/api/mail-alerts/oauth/saved-connections'])
+    for (const path of ['/api/ads/saved-connection', '/api/cloudflare/saved-connections', '/api/mail-alerts/oauth/saved-connections', '/api/domains/saved-connections'])
       expect((await call(null, path)).status, path).toBe(401);
     // Disconnecting still needs a recent sign-in.
     expect((await call(user, '/api/ads/disconnect', 'POST', { confirm: true })).data).toMatchObject({ reauth: true });
+    expect((await call(user, '/api/domains/disconnect', 'POST', { ids: [registrar] })).data).toMatchObject({ reauth: true });
     sessions.get(user).recentAuth = { userId: user, at: Date.now() };
     expect((await call(user, '/api/ads/disconnect', 'POST', { confirm: true })).status).toBe(200);
     expect((await call(user, '/api/cloudflare/disconnect', 'POST', { ids: [cf] })).status).toBe(200);
     expect((await call(user, '/api/gsc/disconnect', 'POST', { ids: [gsc] })).status).toBe(200);
     expect((await call(user, '/api/mail-alerts/oauth/disconnect', 'POST', { subject: 'p3-saved-gmail' })).status).toBe(200);
-    const left = (await pool.query('SELECT (SELECT count(*) FROM ads_grants WHERE user_id=$1)+(SELECT count(*) FROM edge_connections WHERE user_id=$1)+(SELECT count(*) FROM mail_alert_grants WHERE user_id=$1) n', [user])).rows[0].n;
+    const registrarRemoved = await call(user, '/api/domains/disconnect', 'POST', { ids: [registrar] });
+    expect(registrarRemoved.status).toBe(200);
+    expect(registrarRemoved.data.results[0].message).toContain('The key still works at Porkbun until you delete it there');
+    const left = (await pool.query('SELECT (SELECT count(*) FROM ads_grants WHERE user_id=$1)+(SELECT count(*) FROM edge_connections WHERE user_id=$1)+(SELECT count(*) FROM mail_alert_grants WHERE user_id=$1)+(SELECT count(*) FROM domain_connections WHERE user_id=$1) n', [user])).rows[0].n;
     expect(Number(left)).toBe(0);
     expect((await call(user, '/api/ads/saved-connection')).data).toEqual({ saved: false, managerId: null });
     delete sessions.get(user).recentAuth;
@@ -277,19 +283,33 @@ describe('Background workers skip owners whose plan no longer includes the modul
     await runDomainWorker({ adapter, onlyUser: users.lapsed });
     expect((await pool.query('SELECT status,error FROM domain_jobs WHERE id=$1', [applied])).rows[0]).toEqual({ status: 'verification_failed', error: DOMAINS_VERIFY_PAUSED });
   });
-  it('mail alerts: keeps no forwarded mail and runs no Gmail sync for a lapsed owner', async () => {
+  it('mail alerts: keeps forwarded mail for a lapsed owner for 30 days behind the plan gate, and runs no Gmail sync for them', async () => {
     const previousDomain = process.env.INBOUND_MAIL_DOMAIN, previousOauth = process.env.GMAIL_OAUTH_ENABLED;
     process.env.INBOUND_MAIL_DOMAIN = 'alerts.constructhub.test';
     process.env.GMAIL_OAUTH_ENABLED = 'true';
     try {
-      // The same recognised provider alert is kept for an Agency owner and dropped for the lapsed one.
+      // The same recognised provider alert is kept for an Agency owner and for the lapsed one: never dropped.
       for (const user of [users.lapsed, users.agency]) {
         const token = randomUUID().replace(/-/g, '').padEnd(48, 'a');
         await pool.query('INSERT INTO mail_alert_addresses(user_id,token_hash,token_cipher) VALUES($1,$2,$3)', [user, mailHash(token), encryptToken(token)]);
         await ingest(`From: forwarding-noreply@google.com\r\nTo: alerts+${token}@alerts.constructhub.test\r\nSubject: Gmail Forwarding Confirmation\r\n\r\nConfirmation code: 123456789\nhttps://mail.google.com/mail/vf-fixture`);
       }
-      expect((await pool.query('SELECT count(*)::int n FROM mail_alert_messages WHERE user_id=$1', [users.lapsed])).rows[0].n).toBe(0);
+      const kept = (await pool.query("SELECT subject,expires_at-received_at=interval '30 days' AS thirty FROM mail_alert_messages WHERE user_id=$1", [users.lapsed])).rows;
+      expect(kept).toEqual([{ subject: 'Gmail Forwarding Confirmation', thirty: true }]);
       expect((await pool.query('SELECT count(*)::int n FROM mail_alert_messages WHERE user_id=$1', [users.agency])).rows[0].n).toBe(1);
+      // The lapsed owner is told it arrived and where it will show; the list itself stays behind the plan gate.
+      const note = (await pool.query("SELECT title,body FROM user_notifications WHERE user_id=$1 AND kind='mail.alert'", [users.lapsed])).rows;
+      expect(note).toEqual([{ title: 'Provider email alert received', body: `forwarding alert. ${HELD_ALERT_NOTE}` }]);
+      expect((await call(users.lapsed, '/api/mail-alerts')).status).toBe(402);
+      // Once their plan includes the module, it is there (fixture plan change, put back below).
+      await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, planForModule('domainsMailAlerts')]);
+      try {
+        const shown = await call(users.lapsed, '/api/mail-alerts');
+        expect(shown.status).toBe(200);
+        expect(shown.data.items.map((m: any) => m.subject)).toEqual(['Gmail Forwarding Confirmation']);
+      } finally {
+        await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, PLANS.pro.key]);
+      }
       await pool.query("INSERT INTO mail_alert_grants(user_id,google_subject,email,access_token,refresh_token,expires_at,next_sync) VALUES($1,'p3-sub','p3@example.invalid',$2,$3,now()+interval '1 hour',now()-interval '1 minute')", [users.lapsed, encryptToken('fixture-access'), encryptToken('fixture-refresh')]);
       const http = vi.fn(async () => { throw Error('No Gmail calls expected for this owner'); });
       await runMailWorker(http as any, users.lapsed);
