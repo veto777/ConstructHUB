@@ -146,6 +146,9 @@ test("public lead magnet shows summary and email verification guidance", async (
     page.getByText("Check your email for the verification link"),
   ).toBeVisible();
   await expect(page.getByText("Missing title", { exact: false })).toBeVisible();
+  await expect(page.getByText("Preview shows up to five findings.", { exact: false })).toBeVisible();
+  await expect(page.getByText("No findings from available checks.")).toHaveCount(0);
+  await expect(page.getByText("0 URLs remain", { exact: false })).toHaveCount(0);
 });
 
 test("configured CAPTCHA can be solved again after a rejected submission", async ({ page }) => {

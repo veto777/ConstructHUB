@@ -34,7 +34,7 @@ function Copy({ text }: { text: string }) {
     </Button>
   );
 }
-export function ScanReport({ report, draft }: { report: any; draft?: string }) {
+export function ScanReport({ report, draft, summary = false }: { report: any; draft?: string; summary?: boolean }) {
   if (!report) return null;
   return (
     <div className="space-y-5">
@@ -56,9 +56,9 @@ export function ScanReport({ report, draft }: { report: any; draft?: string }) {
         ))}
       </div>
       <p className="text-sm text-muted-foreground">
-        {report.pages} pages checked. {report.remaining || 0} URLs remain
-        outside this report. Scores describe observed checks, not search
-        rankings.
+        {report.pages} pages checked. {summary
+          ? "Preview shows up to five findings. Verify your email for all findings and coverage details."
+          : `${report.remaining || 0} URLs remain outside this report.`} Scores describe observed checks, not search rankings.
       </p>
       {["technical", "performance", "local", "content", "ai-readiness"].map(
         (category) => (
@@ -107,18 +107,18 @@ export function ScanReport({ report, draft }: { report: any; draft?: string }) {
                 ))}
               {!report.findings.some((f: any) => f.category === category) && (
                 <p className="text-sm text-muted-foreground">
-                  No findings from available checks.
+                  {summary ? "Verify your email to see all findings in this category." : "No findings from available checks."}
                 </p>
               )}
             </div>
           </section>
         ),
       )}
-      <p className="text-sm text-muted-foreground">
+      {!summary && <p className="text-sm text-muted-foreground">
         {report.profile
           ? `GBP comparison: ${report.profile.business_name}; profile last synced ${new Date(report.profile.synced_at).toLocaleString()}.`
           : "No synced GBP profile: NAP, service and service-area comparisons were not assessed."}
-      </p>
+      </p>}
       {report.psi?.length > 0 && (
         <details>
           <summary>PageSpeed measurements and field data</summary>
@@ -580,7 +580,7 @@ export function FreeSiteScanPage() {
           Scan {data.status}. {data.error}
         </p>
       )}
-      {data?.summary && <ScanReport report={data.summary} />}
+      {data?.summary && <ScanReport report={data.summary} summary />}
       <ScanReport report={data?.report} />
     </main>
   );
