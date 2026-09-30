@@ -456,17 +456,17 @@ export const GOOGLE_ADS_GUIDE_SECTIONS: Record<string, GuideSection> = {
 
   "click-fraud": {
     title: "Click Fraud: The Hidden Budget Killer",
-    subtitle: "Up to 25-33% of all Google Ads clicks in the contractor space are fraudulent. This isn't paranoia — it's documented by multiple independent studies. Here's everything you need to know about who's stealing your ad budget and how to stop them.",
+    subtitle: "Some clicks on contractor ads come from bots, competitors and telemarketers rather than customers. Here's who they are, how to spot them and how to exclude them.",
     accentColor: "green",
     prevSection: { slug: "tracking", title: "Tracking & Measurement" },
     nextSection: { slug: "mistakes", title: "Costly Mistakes" },
     blocks: [
       { type: "heading", content: "Who's Actually Clicking Your Ads?" },
-      { type: "text", content: "Only about 10-25% of the people clicking your Google Ads are real potential customers. Let that sink in. For every $100 you spend, only $10-25 is going toward reaching real people who might actually hire you. The rest goes to:" },
+      { type: "text", content: "Not everyone who clicks your Google Ads is a potential customer. Common sources of wasted clicks:" },
       { type: "list", items: [
-        "Telemarketers (about 1/3 of fraud) — clicking your ad to get your phone number so they can sell you SEO services, marketing packages, insurance, or other garbage. They click, grab your number, and call you pretending to be a customer before pitching their service.",
-        "Competitors (about 1/3 of fraud) — deliberately clicking your ads to drain your daily budget so their ads show instead. At $40-50 per click, 3-5 daily clicks from competitors costs you $120-250/day. Some hire people overseas to do this systematically.",
-        "Bots and click farms (about 1/3 of fraud) — automated scripts and overseas workers clicking ads at scale. Some are targeting you specifically; others are part of larger click fraud operations that hit thousands of advertisers.",
+        "Telemarketers — clicking your ad to get your phone number so they can sell you SEO services, marketing packages, insurance, or other garbage. They click, grab your number, and call you pretending to be a customer before pitching their service.",
+        "Competitors — deliberately clicking your ads to drain your daily budget so their ads show instead. At contractor click prices, even a few clicks a day from a competitor add up quickly. Some hire people overseas to do this systematically.",
+        "Bots and click farms — automated scripts and overseas workers clicking ads at scale. Some are targeting you specifically; others are part of larger click fraud operations that hit thousands of advertisers.",
         "Accidental clicks — people who click your ad by mistake, realize they don't need a contractor, and immediately leave. You still pay full price for these clicks.",
       ] },
 
@@ -478,7 +478,7 @@ export const GOOGLE_ADS_GUIDE_SECTIONS: Record<string, GuideSection> = {
         "Multiple clicks from the same geographic area in a short time window",
         "Clicks from countries or cities where you don't operate",
         "Suspiciously high bounce rates — people clicking and immediately leaving",
-        "Google Ads showing 33-50% more clicks than your website analytics records as actual visitors",
+        "Google Ads reporting noticeably more clicks than your website analytics records as visitors",
         "Rapid budget depletion early in the day — your daily budget runs out by noon",
       ] },
 
@@ -495,11 +495,11 @@ export const GOOGLE_ADS_GUIDE_SECTIONS: Record<string, GuideSection> = {
       { type: "text", content: "Read the Google Ad Fraud section in the sidebar for a full investigation into Google's role in ad fraud — it's eye-opening." },
 
       { type: "heading", content: "The Real Cost of Click Fraud for Contractors" },
-      { type: "text", content: "At $30-50 per click (standard for contractor keywords like roofing, plumbing, HVAC), even modest click fraud is devastating:" },
+      { type: "text", content: "What a click costs depends on your trade and market — check your own average CPC in Google Ads (Campaigns → Keywords → Avg. CPC). Even a few wasted clicks a day add up. As an illustration only, assuming a $40 average CPC:" },
       { type: "list", items: [
-        "10 fraudulent clicks per day × $40 average CPC = $400/day wasted",
-        "$400/day × 30 days = $12,000 per month going straight to Google with zero return",
-        "$12,000/month × 12 months = $144,000 per year in pure waste",
+        "10 wasted clicks per day × $40 = $400/day",
+        "$400/day × 30 days = $12,000 per month",
+        "$12,000/month × 12 months = $144,000 per year",
       ] },
       { type: "text", content: "As an illustration only: if IP exclusions stopped 5 wasted clicks per day at $40/click, that would be $200/day. Actual results depend on your campaigns — compare your real ad costs and lead quality before and after, because exclusions can also block legitimate visitors and savings are not guaranteed." },
 
@@ -527,7 +527,7 @@ export const GOOGLE_ADS_GUIDE_SECTIONS: Record<string, GuideSection> = {
       { type: "warning", content: "We cannot stress this enough. This single checkbox can consume 90% of your budget on worthless traffic from random blogs, emails, and affiliate websites. Go to Campaign Settings → Networks → Uncheck 'Include Google search partners.' Do it right now." },
 
       { type: "heading", content: "Mistake #2: Using Broad Match Keywords" },
-      { type: "text", content: "Using the keyword 'roofer' or 'plumber' without quotes or brackets is the equivalent of setting your money on fire. Google will show your ad for every remotely related search — career searches, DIY tutorials, Reddit discussions, salary comparisons — and charge you $40+ for each useless click. Always use \"phrase match\" or [exact match]. This is the difference between paying for 'roofer jobs near me' (worthless) and 'roof repair contractor Seattle WA' (a real customer ready to hire)." },
+      { type: "text", content: "Using the keyword 'roofer' or 'plumber' without quotes or brackets is the equivalent of setting your money on fire. Google will show your ad for every remotely related search — career searches, DIY tutorials, Reddit discussions, salary comparisons — and charge you for each useless click. Always use \"phrase match\" or [exact match]. This is the difference between paying for 'roofer jobs near me' (worthless) and 'roof repair contractor Seattle WA' (a real customer ready to hire)." },
 
       { type: "heading", content: "Mistake #3: Letting Google's AI Control Anything" },
       { type: "text", content: "Auto-Apply recommendations, AI Max search term matching, automatically created assets, Smart Bidding on new campaigns, Performance Max — all of these features exist to increase Google's revenue by increasing your click volume. More clicks = more revenue for Google, regardless of whether those clicks become your customers." },

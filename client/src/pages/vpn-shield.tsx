@@ -467,7 +467,7 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
               <Button
                 size="icon"
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="!absolute top-2 right-2"
                 onClick={copyScript}
                 data-testid="button-copy-vpn-script"
               >

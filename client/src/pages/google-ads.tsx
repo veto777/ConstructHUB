@@ -722,7 +722,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <CardContent className="space-y-4">
               <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). Scheduled hourly, each run calls ConstructHUB's API, gets your latest blocked IPs, and adds them as IP exclusions on all your active campaigns. Google applies IP exclusions where supported; changing IPs and campaign limitations can reduce their effectiveness.
+                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). Scheduled hourly, each run calls ConstructHUB's API, gets your latest exclusion list, and adds any new IPs as IP exclusions on all your active campaigns. The script only adds exclusions; it never removes them, so an IP you later unblock or whitelist stays excluded in Google Ads until you remove it there. Google applies IP exclusions where supported; changing IPs and campaign limitations can reduce their effectiveness.
                 </p>
               </div>
 
@@ -816,7 +816,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 </div>
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-2" data-testid="text-exclusion-key-note">{PRIVATE_KEY_NOTE}</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  When you schedule it hourly, the Google Ads Script calls this URL on each run. It returns up to 500 blocked IPs in JSON format. You can also use this with Microsoft Ads or any other platform.
+                  When you schedule it hourly, the Google Ads Script calls this URL on each run. It returns your exclusion list in JSON format, up to the length set under Domain Settings (500 at most). You can also use this with Microsoft Ads or any other platform.
                 </p>
               </div>
             </CardContent>
@@ -1614,7 +1614,7 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
             <Button
               size="sm"
               variant="secondary"
-              className="absolute top-2 right-2"
+              className="!absolute top-2 right-2"
               onClick={copyScript}
               data-testid="button-copy-main-script"
             >
@@ -1705,7 +1705,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
 
   return (
     <div className="space-y-6">
-      <p className="rounded-md border p-4 text-sm text-muted-foreground" data-testid="text-settings-note">Detection preferences below are saved but do not yet change automatic detection or the exclusion list. The exclusion list contains only the IPs on the Blocked IPs tab (Traffic Signals). Use the Google Ads Script tab to apply it in Google Ads. VPN Shield has separate browser controls.</p>
+      <p className="rounded-md border p-4 text-sm text-muted-foreground" data-testid="text-settings-note">Detection preferences below are saved but do not yet change automatic detection. The exclusion list your Google Ads script downloads is built from Manually Exclude IPs and the Blocked IPs tab (Traffic Signals), minus Whitelist IPs, up to the Exclusion List Refresh Rate length. The script only adds exclusions in Google Ads; it never removes them. VPN Shield has separate browser controls.</p>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
           <Globe className="h-5 w-5 text-blue-500" /> Your Domains
@@ -2068,7 +2068,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground">Exclusion List Refresh Rate</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Saved preference only &mdash; not applied yet. The exclusion list URL always serves up to 500 IPs.
+                The exclusion list URL serves at most this many IPs (50&ndash;500). Manually excluded IPs come first, then the newest blocked IPs.
               </p>
               {exclusionRateError && <p className="mt-2 text-xs text-destructive" data-testid="text-exclusion-rate-error">{exclusionRateError}</p>}
             </div>
@@ -2104,7 +2104,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground">IP Range Exclusion</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Saved preference only &mdash; not applied to the exclusion list yet. Click Guard does not block IP ranges.
+                Saved preference only &mdash; this switch does not change the exclusion list. Automatic blocking lists single IPs; to exclude a range, add it under Manually Exclude IPs.
               </p>
             </div>
             <Switch
@@ -2120,7 +2120,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <h3 className="text-base font-semibold text-foreground">Manually Exclude IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Saved preference only &mdash; not applied to the exclusion list yet. To exclude an IP now, add it on the Blocked IPs tab under Traffic Signals.
+            Added first to the exclusion list your Google Ads script downloads. One IP, CIDR range or 1.2.3.* per line; invalid entries are skipped.
           </p>
           <Textarea
             value={manualExcludeIps}
@@ -2145,7 +2145,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <h3 className="text-base font-semibold text-foreground">Whitelist IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Saved preference only &mdash; not applied yet. IPs listed here are <strong className="text-foreground">not</strong> removed from the exclusion list or protected from automatic blocking; unblock an IP on the Blocked IPs tab instead.
+            Removed from the exclusion list your Google Ads script downloads (an IP inside a whitelisted range is removed too; a blocked range is removed only if the same range is whitelisted). Automatic blocking still records these IPs on the Blocked IPs tab. The script only adds exclusions, so an IP it already excluded in Google Ads stays excluded until you remove it there (campaign settings &rarr; IP exclusions).
           </p>
           <Textarea
             value={whitelistIps}

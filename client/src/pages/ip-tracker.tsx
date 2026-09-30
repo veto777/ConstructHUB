@@ -283,7 +283,7 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
             </p>
             <div className="relative">
               <pre className="bg-muted rounded-md p-3 pr-12 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap break-all" data-testid="text-tracking-snippet">{snippet}</pre>
-              <Button size="icon" variant="ghost" className="absolute top-1.5 right-1.5" onClick={copy} aria-label="Copy tracking code" data-testid="button-copy-tracking-snippet">
+              <Button size="icon" variant="ghost" className="!absolute top-1.5 right-1.5" onClick={copy} aria-label="Copy tracking code" data-testid="button-copy-tracking-snippet">
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
