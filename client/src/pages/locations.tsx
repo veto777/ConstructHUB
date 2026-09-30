@@ -1,3 +1,4 @@
+import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection, GbpLinkCell } from "@/components/gbp-connection";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -201,7 +202,7 @@ export default function LocationsPage() {
                       <span className="text-sm">Unavailable</span>
                     </TableCell>
                     <TableCell>
-                      <GbpLinkCell locationId={loc.id} />
+                      <GbpLinkCell locationId={loc.id} /><GuardStatus id={loc.id} />
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-muted-foreground" data-testid={`text-date-${loc.id}`}>
@@ -463,6 +464,7 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
 
   const tabItems = [
     { value: "insights", label: "Insights", icon: BarChart3 },
+    { value: "guard", label: "Profile Guard", icon: Lock },
     { value: "info", label: "Location Info", icon: Building2 },
     { value: "services", label: "Services", icon: Tag },
     { value: "photos", label: "Photos & Videos", icon: Image },
@@ -512,6 +514,7 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
 
           <div className="flex-1 min-w-0">
             {activeTab === "insights" && <InsightsTab location={location} />}
+            {activeTab === "guard" && <ProfileGuard locationId={location.id} linked={!!location.gbpLocationName} />}
             {activeTab === "info" && <LocationInfoTab location={location} />}
             {activeTab === "services" && <ServicesTab location={location} />}
             {activeTab === "photos" && <PhotosTab location={location} />}
