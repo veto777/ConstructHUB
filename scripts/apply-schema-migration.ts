@@ -39,30 +39,52 @@ const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Unive
  * sessions default to — no row is touched. If the default was another zone,
  * rows that defaultNow() filled under it keep that zone's wall time; any
  * correction is a per-column owner decision and is NOT done here.
+ *
+ * The check reads where this session's zone came from (pg_settings.source).
+ * A client override — PGOPTIONS="-c TimeZone=UTC" in the calling shell, as
+ * the test recipe uses — or a SET is not the database default, so it is never
+ * reported as one; the idempotent ALTER runs instead, and the result is read
+ * back from the catalog, which a client override cannot mask.
  */
 async function pinDatabaseTimeZone(pool: pg.Pool): Promise<void> {
-  const { rows: [{ tz }] } = await pool.query(`SELECT current_setting('TimeZone') AS tz`);
-  if (UTC_NAMES.test(tz)) {
-    console.log(`✓ database default TimeZone is already ${tz}`);
+  const { rows: [{ tz, source }] } = await pool.query(
+    `SELECT setting AS tz, source FROM pg_settings WHERE name = 'TimeZone'`);
+  const overridden = source === "client" || source === "session";
+  if (UTC_NAMES.test(tz) && !overridden) {
+    console.log(`✓ database default TimeZone is already ${tz} (source: ${source})`);
     return;
+  }
+  const was = overridden ? "the previous default" : tz;
+  if (overridden) {
+    console.log(`• this session's TimeZone ${tz} is a client override (PGOPTIONS?), not the database default — pinning UTC explicitly`);
   }
   try {
     await pool.query(
       `DO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET timezone = %L', current_database(), 'UTC'); END $$`);
   } catch (e: any) {
-    console.warn(`• skipped: ALTER DATABASE … SET timezone = 'UTC' (default is ${tz}) —`, e.message,
+    console.warn(`• skipped: ALTER DATABASE … SET timezone = 'UTC' (default is ${was}) —`, e.message,
       "\n  Run it as the database owner, or keep relying on the per-session pin in server/db.ts.");
     return;
   }
-  const check = new pg.Client({ connectionString: process.env.DATABASE_URL });
-  await check.connect();
-  const { rows: [{ tz: now }] } = await check.query(`SELECT current_setting('TimeZone') AS tz`);
-  await check.end();
-  console.log(`✓ database default TimeZone ${tz} → UTC for new sessions (a new session now reports ${now})`);
-  if (!UTC_NAMES.test(now)) {
-    console.warn(`  ! a role-level setting still wins (${now}); check ALTER ROLE … SET timezone for this user.`);
+  const { rows: [{ pinned, roleTz }] } = await pool.query(`
+    SELECT EXISTS (SELECT 1 FROM pg_db_role_setting s
+                    WHERE s.setdatabase = (SELECT oid FROM pg_database WHERE datname = current_database())
+                      AND s.setrole = 0 AND 'TimeZone=UTC' = ANY (s.setconfig)) AS pinned,
+           (SELECT substring(c FROM '^TimeZone=(.*)$')
+              FROM pg_db_role_setting s, unnest(s.setconfig) AS c
+             WHERE s.setrole = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+               AND s.setdatabase IN (0, (SELECT oid FROM pg_database WHERE datname = current_database()))
+               AND c LIKE 'TimeZone=%'
+             ORDER BY s.setdatabase DESC LIMIT 1) AS "roleTz"`);
+  if (!pinned) {
+    console.warn("• ALTER DATABASE ran, but pg_db_role_setting shows no database-level TimeZone=UTC; check it by hand.");
+    return;
   }
-  console.warn(`  ! rows that defaultNow() wrote while the default was ${tz} keep ${tz} wall time; ` +
+  console.log(`✓ database default TimeZone ${was} → UTC for new sessions`);
+  if (roleTz && !UTC_NAMES.test(roleTz)) {
+    console.warn(`  ! a role-level setting still wins for this user (TimeZone=${roleTz}); check ALTER ROLE … SET timezone.`);
+  }
+  console.warn(`  ! rows that defaultNow() wrote under ${was} keep that zone's wall time; ` +
     "nothing was rewritten — correcting them is a per-column owner decision.");
 }
 

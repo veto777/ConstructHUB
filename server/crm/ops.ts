@@ -39,6 +39,7 @@ import { getBaseUrl } from "../auth";
 import { computeApprovalTotals } from "./discounts";
 import { progressInvoiceItems } from "./invoice-math";
 import { lockDocNumbers, nextDocNumber } from "./doc-number";
+import { objectPolicy } from "./object-access";
 
 type GetUser = (req: any, res: any) => any;
 const tok = () => randomBytes(24).toString("hex");
@@ -1088,13 +1089,16 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
 
   /**
    * Load a daily log for an edit or delete: in the caller's org, on a project
-   * of that org, and written by the caller unless they can manage jobs (a
-   * crew member fixes their own typo; a PM or owner can fix anyone's).
+   * the caller can see, and written by the caller unless they can manage jobs
+   * (a crew member fixes their own typo; a PM or owner can fix anyone's).
+   * "daily-logs" is not an object family the route-template gate knows, so
+   * the project visibility check (division scope, assignment) runs here — a
+   * log on a hidden project looks absent, even to someone with manageJobs.
    */
   async function editableDailyLog(ctx: OrgContext, logId: string, res: any) {
     const [log] = await db.select().from(crmDailyLogs)
       .where(and(eq(crmDailyLogs.orgId, ctx.org.id), eq(crmDailyLogs.id, logId))).limit(1);
-    if (!log || !(await ownProject(ctx.org.id, log.projectId))) {
+    if (!log || !(await objectPolicy(ctx).visible("projects", log.projectId))) {
       res.status(404).json({ message: "Daily log not found" });
       return null;
     }

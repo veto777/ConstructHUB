@@ -2171,6 +2171,9 @@ export const CRM_WEBHOOK_EVENTS = [
   "payment.succeeded", "payment.failed",
   // An owner reversed a mistyped manual payment (POST /api/crm/payments/:id/reverse).
   "payment.reversed",
+  // Stripe reported a (partial) refund — emitted by the Connect webhook in
+  // server/crm/integrations.ts, which was unsubscribable while unlisted here.
+  "payment.refunded",
 ] as const;
 
 export type CrmInvoice = typeof crmInvoices.$inferSelect;

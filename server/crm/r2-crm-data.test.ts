@@ -246,6 +246,8 @@ describe("r2-crm-data against the dev server", () => {
     const list = await api("/api/crm/webhooks", {}, cookie);
     expect(list.status).toBe(200);
     expect(list.body.events).toContain("payment.reversed");
+    // The Stripe refund event integrations.ts already emits is subscribable too.
+    expect(list.body.events).toContain("payment.refunded");
 
     const badUrl = await send("POST", "/api/crm/webhooks", { url: "example.com/hook", events: ["invoice.paid"] }, cookie);
     expect(badUrl.status).toBe(400);
