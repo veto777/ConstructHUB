@@ -34,6 +34,10 @@ test('enrolls with QR, uses recovery sign-in, remembers/revokes device, and veri
  await page.getByRole('button',{name:'Generate new recovery codes'}).click();await expect(page.getByRole('heading',{name:'Verify your identity'})).toBeVisible();
  await page.getByLabel('Verification',{exact:true}).fill(totp.generate());await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.locator('pre')).toBeVisible();
  await page.getByRole('button',{name:'Revoke device'}).click();await expect(page.getByText('No remembered devices.')).toBeVisible();
+ await expect(page.getByLabel('Activity type').getByRole('option', { name: 'security.device_revoked', exact: true })).toHaveCount(1);
+ await page.getByLabel('Activity type').selectOption('security.device_revoked');
+ await expect(page.locator('strong').filter({hasText:'security.device_revoked'})).toBeVisible();
+ await page.getByLabel('Activity type').selectOption('');
  await page.getByTestId('button-settings-tab-notifications').click();const emailSwitch=page.getByRole('switch',{name:'A Google account was connected: Email',exact:true});await expect(emailSwitch).toBeDisabled();await expect(emailSwitch).toBeChecked();
  const inApp=page.getByRole('switch',{name:'A Google account was connected: In app',exact:true});await inApp.click();await expect(inApp).not.toBeChecked();await page.reload();await page.getByTestId('button-settings-tab-notifications').click();await expect(inApp).not.toBeChecked();
  await page.getByRole('button',{name:/Notifications \(/}).click();await expect(page.getByText('Two-factor sign-in was enabled',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Mark all read'}).click();await expect(page.getByRole('button',{name:'Notifications (0 unread)'})).toBeVisible();await page.keyboard.press('Escape');
@@ -54,4 +58,55 @@ test('Google security alert opens account remediation, step-up retries disconnec
  await pool.query(`UPDATE session SET sess=(sess::jsonb-'recentAuth')::json WHERE sess->'passport'->>'user'=$1`,[String(id)]);
  await page.route('https://accounts.google.com/**',r=>r.fulfill({contentType:'text/html',body:'<h1>Mock Google consent</h1>'}));
  await page.goto('/locations');await page.getByRole('link',{name:'Connect Google Business Profile',exact:true}).click();await expect(page.getByRole('heading',{name:'Verify your identity'})).toBeVisible();await page.getByLabel('Verification',{exact:true}).fill(password);await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.getByRole('heading',{name:'Mock Google consent'})).toBeVisible();
+});
+
+test('mobile notification preferences expose every kind and the bell fits the viewport', async ({ page }) => {
+ await page.setViewportSize({ width: 320, height: 740 });
+ await page.goto('/auth');
+ await page.getByTestId('input-login-email').fill(email);
+ await page.getByTestId('input-login-password').fill(password);
+ await Promise.all([page.waitForResponse(r => r.url().endsWith('/api/auth/login')), page.getByTestId('button-login').click()]);
+ await page.goto('/settings?tab=notifications');
+ for (const label of ['A Google post or photo failed', 'Site Scan completed', 'Site Scan score dropped or new critical issue']) {
+  const toggle = page.getByRole('switch', { name: `${label}: In app`, exact: true });
+  await expect(toggle).toBeVisible();
+  await toggle.click(); await expect(toggle).not.toBeChecked();
+ }
+ await page.reload();
+ await expect(page.getByRole('switch', { name: 'Site Scan completed: In app', exact: true })).not.toBeChecked();
+ await page.getByRole('button', { name: /Notifications \(/ }).click();
+ const panel = page.locator('[data-radix-popper-content-wrapper]');
+ await expect(panel).toBeVisible();
+ const box = await panel.boundingBox();
+ expect(box!.x).toBeGreaterThanOrEqual(0);
+ expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+ await expect(page.getByRole('button', { name: 'Mark all read' })).toBeVisible();
+});
+
+test('Google-only owner verifies an emailed code and retries authenticator enrollment', async ({ page }) => {
+ await page.goto('/auth');
+ await page.getByTestId('input-login-email').fill(email);
+ await page.getByTestId('input-login-password').fill(password);
+ await Promise.all([page.waitForResponse(r => r.url().endsWith('/api/auth/login')), page.getByTestId('button-login').click()]);
+ await pool.query('UPDATE users SET password_hash=NULL WHERE id=$1', [id]);
+ try {
+  await pool.query(`UPDATE session SET sess=(sess::jsonb-'recentAuth')::json WHERE sess->'passport'->>'user'=$1`, [String(id)]);
+  await page.goto('/settings?tab=security');
+  await page.getByTestId('button-enable-2fa').click();
+  await expect(page.getByRole('heading', { name: 'Verify your identity' })).toBeVisible();
+  await page.getByRole('button', { name: 'Email a verification code' }).click();
+  await expect(page.getByRole('button', { name: 'Code sent' })).toBeVisible();
+  const { readFile } = await import('node:fs/promises');
+  const mails = (await readFile('tmp/email-outbox.jsonl', 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+  const mail = mails.filter(mail => JSON.stringify(mail.to).includes(email)).at(-1);
+  const code = JSON.stringify(mail).match(/verification code is (\d{6})/)![1];
+  await page.getByLabel('Verification', { exact: true }).fill('000000');
+  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Verification failed' })).toBeVisible();
+  await page.getByLabel('Verification', { exact: true }).fill(code);
+  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  await expect(page.getByTestId('img-2fa-qr')).toBeVisible();
+ } finally {
+  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(password, 4), id]);
+ }
 });

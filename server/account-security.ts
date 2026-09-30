@@ -1,3 +1,4 @@
+import type { NotificationKind } from './notification-kinds';
 import type { Express, Request, Response, NextFunction } from 'express';
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -42,17 +43,34 @@ export function validTotp(secret: string, code: unknown): boolean {
   if (typeof code !== 'string' || !/^\d{6}$/.test(code)) return false;
   return new TOTP({ issuer: 'ConstructHUB', algorithm: 'SHA1', digits: 6, period: 30, secret: decryptToken(secret)! }).validate({ token: code, window: 1 }) !== null;
 }
-export async function replaceRecoveryCodes(userId: number) {
+async function writeRecoveryCodes(connection: Pick<typeof pool, 'query'>, userId: number) {
   const codes = Array.from({ length: 10 }, () => randomBytes(8).toString('hex'));
+  await connection.query('DELETE FROM account_recovery_codes WHERE user_id=$1', [userId]);
+  for (const code of codes) await connection.query('INSERT INTO account_recovery_codes VALUES($1,$2)', [userId, hash(code)]);
+  return codes;
+}
+export async function replaceRecoveryCodes(userId: number) {
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
     await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
-    await c.query('DELETE FROM account_recovery_codes WHERE user_id=$1', [userId]);
-    for (const code of codes) await c.query('INSERT INTO account_recovery_codes VALUES($1,$2)', [userId, hash(code)]);
+    const codes = await writeRecoveryCodes(c, userId);
     await c.query('COMMIT');
+    return codes;
   } catch(e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
-  return codes;
+}
+/** Bind activation to the exact seed verified, and commit its recovery codes together. */
+export async function activateTwoFactor(userId: number, verifiedSecret: string) {
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const changed = await c.query(`UPDATE users SET totp_enabled=true
+      WHERE id=$1 AND totp_enabled=false AND totp_secret=$2 RETURNING id`, [userId, verifiedSecret]);
+    if (!changed.rowCount) { await c.query('ROLLBACK'); return null; }
+    const codes = await writeRecoveryCodes(c, userId);
+    await c.query('COMMIT');
+    return codes;
+  } catch(e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
 export async function consumeRecoveryCode(userId: number, code: unknown) {
   if (typeof code !== 'string' || !/^[a-f0-9]{16}$/i.test(code)) return false;
@@ -80,7 +98,7 @@ export async function trustedDevice(req: Request, userId: number): Promise<boole
   return rows.length === 1;
 }
 export async function revokeDevices(userId: number) { await pool.query('DELETE FROM account_trusted_devices WHERE user_id=$1', [userId]); }
-export async function securityChanged(req: Request, userId: number, kind: string, title: string) {
+export async function securityChanged(req: Request, userId: number, kind: NotificationKind, title: string) {
   await logActivity(req, userId, kind, { title });
   await notifyUser(userId,kind,{ title, link:'/settings?tab=security', actionUrl:'/settings?tab=security' });
 }
@@ -123,14 +141,16 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
   app.delete('/api/auth/devices/:id',async(req,res)=>{
     const u=auth(req,res);if(!u)return;
     if(!/^[a-f0-9]{32}$/.test(String(req.params.id))) return res.status(400).json({message:'Invalid device'});
-    await pool.query('DELETE FROM account_trusted_devices WHERE id=$1 AND user_id=$2',[req.params.id,u.id]);
-    await logActivity(req,u.id,'security.device_revoked');res.json({ok:true});
+    const removed = await pool.query('DELETE FROM account_trusted_devices WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,u.id]);
+    if (!removed.rowCount) return res.status(404).json({message:'Remembered device not found'});
+    await logActivity(req,u.id,'security.device_revoked',{deviceId:req.params.id});res.json({ok:true});
   });
   app.post('/api/auth/2fa/recovery-codes',rateLimit('security-recovery',5,15),async(req,res)=>{
     const u=auth(req,res);if(!u || !requireRecentAuth(req,res))return;
     const {rows:[user]}=await pool.query('SELECT totp_enabled FROM users WHERE id=$1',[u.id]);
     if(!user.totp_enabled)return res.status(400).json({message:'Enable two-factor sign-in first.'});
-    res.json({codes:await replaceRecoveryCodes(u.id)});
+    const codes = await replaceRecoveryCodes(u.id);
     await logActivity(req,u.id,'security.recovery_codes_changed');
+    res.json({codes});
   });
 }

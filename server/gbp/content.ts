@@ -156,7 +156,6 @@ export async function enqueue(user: number, location: number, raw: unknown) {
     }
     return (await pool.query('SELECT * FROM gbp_content_jobs WHERE user_id=$1 AND location_id=$2 AND request_key=$3 ORDER BY item_index', [user, location, b.requestKey])).rows;
 }
-export const CONTENT_NOTIFICATION_KINDS = { 'gbp.post_failed': { label: 'A Google post or photo failed', inApp: true, email: false } };
 // One process at a time; a crash after dispatch is ambiguous, never automatically resent.
 export async function runContentWorker(make: typeof clientFor = clientFor) {
     const c = await pool.connect();

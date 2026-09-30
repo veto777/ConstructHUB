@@ -4,27 +4,15 @@
  *   notifyUser(userId, kind, msg)  — in-app row + optional email, per the user's per-kind preferences
  *   logActivity(req|null, userId, kind, detail) — who / when / from where, for the Activity log
  *
- * Kinds are open strings; KIND_DEFAULTS decides the default channels for a kind the user never
- * configured. Security kinds default to email ON so an intruder cannot act silently.
+ * Every emitted kind belongs to the shared registry; KIND_DEFAULTS supplies channels until
+ * the user configures them. Security kinds default to email ON so an intruder cannot act silently.
  */
 import type { Express } from "express";
 import { pool } from "./db";
 import { sendWithFallback } from "./email";
 
-export const KIND_DEFAULTS: Record<string, { label: string; inApp: boolean; email: boolean; security?: boolean }> = {
-  "google.connected": { label: "A Google account was connected", inApp: true, email: true, security: true },
-  "google.disconnected": { label: "A Google account was disconnected", inApp: true, email: true, security: true },
-  "security.2fa_changed": { label: "Two-factor sign-in was turned on or off", inApp: true, email: true, security: true },
-  "security.password_changed": { label: "Your password was changed", inApp: true, email: true, security: true },
-  "gbp.profile_change": { label: "Your Google Business Profile changed outside ConstructHUB", inApp: true, email: true },
-  "gbp.suggested_edit": { label: "Google or the public suggested an edit to your profile", inApp: true, email: true },
-  "gbp.change_reverted": { label: "Profile Guard reverted a change", inApp: true, email: true },
-  "gbp.new_review": { label: "A new Google review arrived", inApp: true, email: true },
-  "gbp.reply_posted": { label: "A reply was posted to Google", inApp: true, email: false },
-  "gbp.post_published": { label: "A scheduled post or photo was published", inApp: true, email: false },
-  "social.post_published": { label: "A social media post was published", inApp: true, email: false },
-  "social.post_failed": { label: "A social media post failed", inApp: true, email: true },
-};
+import { NOTIFICATION_KINDS, type NotificationDefaults, type NotificationKind } from "./notification-kinds";
+export const KIND_DEFAULTS: Record<NotificationKind, NotificationDefaults> = NOTIFICATION_KINDS;
 const fallback = { label: "Account notification", inApp: true, email: false };
 
 export async function ensureAccountEventsSchema() {
@@ -48,7 +36,7 @@ export async function ensureAccountEventsSchema() {
   `);
 }
 
-export async function channelsFor(userId: number, kind: string) {
+export async function channelsFor(userId: number, kind: NotificationKind) {
   const d = KIND_DEFAULTS[kind] ?? fallback;
   const { rows: [p] } = await pool.query("SELECT in_app, email FROM user_notification_prefs WHERE user_id=$1 AND kind=$2", [userId, kind]);
   // Security alerts can be muted in-app but always reach email: that is the point of them.
@@ -57,7 +45,7 @@ export async function channelsFor(userId: number, kind: string) {
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
-export async function notifyUser(userId: number, kind: string,
+export async function notifyUser(userId: number, kind: NotificationKind,
   msg: { title: string; body?: string; link?: string; severity?: "info" | "warning" | "critical"; actionLabel?: string; actionUrl?: string }) {
   const ch = await channelsFor(userId, kind);
   if (ch.inApp) {
@@ -100,13 +88,13 @@ export function registerAccountEventRoutes(app: Express, auth: (req: any, res: a
   });
   app.get("/api/notification-prefs", async (req, res) => {
     const u = auth(req, res); if (!u) return;
-    const prefs = await Promise.all(Object.entries(KIND_DEFAULTS).map(async ([kind, d]) => ({ kind, label: d.label, security: !!d.security, ...(await channelsFor(u.id, kind)) })));
+    const prefs = await Promise.all((Object.entries(KIND_DEFAULTS) as [NotificationKind, NotificationDefaults][]).map(async ([kind, d]) => ({ kind, label: d.label, security: !!d.security, ...(await channelsFor(u.id, kind)) })));
     res.json({ prefs });
   });
   app.put("/api/notification-prefs", async (req, res) => {
     const u = auth(req, res); if (!u) return;
     if (!Array.isArray(req.body?.prefs) || req.body.prefs.length > Object.keys(KIND_DEFAULTS).length || req.body.prefs.some((p: any) => !p || !Object.hasOwn(KIND_DEFAULTS,p.kind) || typeof p.inApp !== 'boolean' || typeof p.email !== 'boolean')) return res.status(400).json({ message: 'Invalid notification preferences' });
-    const list = req.body.prefs;
+    const list = req.body.prefs as { kind: NotificationKind; inApp: boolean; email: boolean }[];
     for (const p of list) {
       if (!KIND_DEFAULTS[p?.kind]) continue;
       await pool.query(`INSERT INTO user_notification_prefs(user_id,kind,in_app,email) VALUES($1,$2,$3,$4)

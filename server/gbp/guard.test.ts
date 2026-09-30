@@ -43,6 +43,23 @@ describe('Profile Guard with real lane Postgres and mocked Google',()=>{
     expect(()=>ownerProfileInput.parse({fields:{'openInfo.status':'not-a-status'}})).toThrow();
     expect(ownerProfileInput.parse({fields:{title:'Owner name','profile.description':null}}).fields.title).toBe('Owner name');
   });
+  it('records legacy Guard verification and attributes mode changes to the request', async () => {
+    const handlers = new Map<string, any>();
+    const app: any = {};
+    for (const method of ['get', 'post', 'put', 'patch']) app[method] = (path: string, fn: any) => handlers.set(`${method} ${path}`, fn);
+    registerProfileGuardRoutes(app, req => req.user);
+    const req: any = { user: { id: user }, ip: '192.0.2.8', headers: { 'user-agent': 'Audit fixture' }, session: {}, body: { password: 'test-password' } };
+    const res: any = { json: vi.fn(), status: vi.fn().mockReturnThis() };
+    await handlers.get('post /api/gbp/guard/reauth')(req, res);
+    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    req.params = { id: String(id) }; req.body = { mode: 'off', watched: ['title'] };
+    await handlers.get('put /api/gbp/locations/:id/guard')(req, res);
+    const { rows } = await pool.query('SELECT kind,ip,user_agent FROM account_activity WHERE user_id=$1', [user]);
+    expect(rows).toEqual(expect.arrayContaining([
+      { kind: 'security.reauthenticated', ip: '192.0.2.8', user_agent: 'Audit fixture' },
+      { kind: 'gbp.profile_change', ip: '192.0.2.8', user_agent: 'Audit fixture' },
+    ]));
+  });
   it('normalizes output-only category details and object ordering',()=>{
     const approved=snapshotOf({...live,title:'Accepted Google edit'});
     expect(differences(approved,['title'],live,{location:{...live,title:'Accepted Google edit'},diffMask:'title',pendingMask:'title'})).toEqual([]);

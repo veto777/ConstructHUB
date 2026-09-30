@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 export function NotificationBell() {
   const {data,error,isLoading}=useQuery<any>({queryKey:['/api/notifications'],refetchInterval:30000});
   const read=useMutation({mutationFn:async(ids?:number[])=>apiRequest('POST','/api/notifications/read',ids?{ids}:{}),onSuccess:()=>{queryClient.invalidateQueries({queryKey:['/api/notifications']});}});
-  return <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" aria-label={`Notifications (${data?.unread??0} unread)`}><Bell className="w-4 h-4"/>{!!data?.unread && <span>{data.unread}</span>}</Button></PopoverTrigger><PopoverContent className="w-96 max-h-[70vh] overflow-auto" align="end"><h2 className="font-semibold">Notifications</h2><Button variant="ghost" disabled={read.isPending} onClick={()=>read.mutate(undefined)}>Mark all read</Button>
+  return <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" aria-label={`Notifications (${data?.unread??0} unread)`}><Bell className="w-4 h-4"/>{!!data?.unread && <span>{data.unread}</span>}</Button></PopoverTrigger><PopoverContent className="w-96 max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-auto break-words" align="end"><h2 className="font-semibold">Notifications</h2><Button variant="ghost" disabled={read.isPending} onClick={()=>read.mutate(undefined)}>Mark all read</Button>
     {read.isError && <p role="alert">{apiErrorMessage(read.error)}</p>}
     {isLoading && <p>Loading notifications…</p>}{error && <p role="alert">Unable to load notifications.</p>}
     {data?.notifications?.length===0 && <p>No notifications yet.</p>}

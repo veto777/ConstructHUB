@@ -25,6 +25,12 @@ export async function apiRequest(
     res = await fetch(url, { method, headers: data ? { "Content-Type": "application/json" } : {}, body: data ? JSON.stringify(data) : undefined, credentials: "include" });
   }
   await throwIfResNotOk(res);
+  if (method.toUpperCase() !== "GET" && /^\/api\/(auth|gbp)(?:\/|$)/.test(url)) {
+    // Security panels otherwise retain their first response indefinitely.
+    for (const key of ['/api/account-activity', '/api/auth/devices', '/api/notifications']) {
+      void queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  }
   return res;
 }
 
