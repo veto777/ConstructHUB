@@ -71,6 +71,15 @@ describe('GBP content scheduling and validation', () => {
         expect(itemInput.safeParse({ ...post, event: { ...post.event, start: '2028-02-29T09:00', end: '2028-03-01T10:00' } }).success).toBe(true);
         expect(itemInput.safeParse({ ...post, event: { ...post.event, start: '2027-02-28T24:00' } }).success).toBe(false);
     });
+    it('schedules daily, weekly and explicit times and crosses the autumn DST weekend correctly', () => {
+        expect(scheduleTimes({start:'2027-01-04T09:00:00Z',everyMinutes:1440},2).map(d=>d.toISOString()))
+            .toEqual(['2027-01-04T09:00:00.000Z','2027-01-05T09:00:00.000Z']);
+        expect(scheduleTimes({start:'2027-01-04T09:00:00Z',everyMinutes:10080},2)[1].toISOString()).toBe('2027-01-11T09:00:00.000Z');
+        const custom=['2027-01-04T09:00:00Z','2027-01-10T12:00:00Z'];
+        expect(scheduleTimes({...due,custom},2).map(d=>d.toISOString())).toEqual(custom.map(d=>new Date(d).toISOString()));
+        expect(scheduleTimes({start:'2026-10-30T21:00:00Z',businessHours:true,timezone:'America/New_York'},1)[0].toISOString()).toBe('2026-11-02T14:00:00.000Z');
+        expect(()=>scheduleTimes({...due,custom:['2027-01-10T12:00:00Z'],businessHours:true},1)).toThrow('outside selected business hours');
+    });
     it('validates offers and CTA URLs and confines photo URLs to owned R2 keys', () => {
         expect(itemInput.safeParse({ kind: 'post', summary: 'Offer', topicType: 'OFFER' }).success).toBe(false);
         expect(itemInput.safeParse({ kind: 'post', summary: 'Text', callToAction: { actionType: 'BOOK', url: 'javascript:alert(1)' } }).success).toBe(false);
@@ -208,6 +217,34 @@ describe('real lane DB and mocked provider integration', () => {
             else
                 process.env.AI_INTEGRATIONS_OPENAI_API_KEY = old;
         }
+    });
+    it('accepts a 100-photo queue, rejects 101, and prevents publishing after a location is relinked', async () => {
+        const items=Array.from({length:100},(_,i)=>({kind:'photo',photoIds:[photo],summary:`Boundary fixture ${i}`}));
+        const jobs=await enqueue(user,location,{requestKey:randomUUID(),items,schedule:due});
+        expect(jobs).toHaveLength(100);
+        await pool.query("UPDATE gbp_content_jobs SET status='cancelled' WHERE id=ANY($1::bigint[])",[jobs.map(j=>j.id)]);
+        await expect(enqueue(user,location,{requestKey:randomUUID(),items:[...items,items[0]],schedule:due})).rejects.toThrow();
+        const [job]=await enqueue(user,location,{requestKey:randomUUID(),items:[items[0]],schedule:due});
+        await pool.query("UPDATE business_locations SET gbp_location_name='locations/relinked' WHERE id=$1",[location]);
+        try {
+            http.mockClear();await runContentWorker(make);expect(http).not.toHaveBeenCalled();
+            expect((await pool.query('SELECT status,error FROM gbp_content_jobs WHERE id=$1',[job.id])).rows[0]).toMatchObject({status:'failed',error:expect.stringContaining('linkage changed')});
+        } finally {await pool.query("UPDATE business_locations SET gbp_location_name='locations/content' WHERE id=$1",[location]);}
+    });
+    it('stores durable media references and mints their signed URL at delayed dispatch', async () => {
+        const saved=process.env.GBP_MEDIA_PUBLIC_BASE_URL;
+        delete process.env.GBP_MEDIA_PUBLIC_BASE_URL;
+        try {
+            const [job]=await enqueue(user,location,{requestKey:randomUUID(),items:[{kind:'photo',photoIds:[photo]}],schedule:due});
+            expect(job.payload.sourceUrl).toBe('r2:media/fixture.jpg');
+            const dispatchTime=Date.now()+2*86400000;
+            const now=vi.spyOn(Date,'now').mockReturnValue(dispatchTime);
+            try {
+                http.mockClear();await runContentWorker(make);
+                const payload=JSON.parse(http.mock.calls[0][1].body),url=new URL(payload.sourceUrl);
+                expect(Number(url.searchParams.get('exp'))).toBe(Math.floor(dispatchTime/1000)+3600);
+            } finally {now.mockRestore();}
+        } finally {if(saved!==undefined)process.env.GBP_MEDIA_PUBLIC_BASE_URL=saved;}
     });
     it('rejects malformed requests and enforces the daily AI budget before provider calls', async () => {
         expect((await call('/queue', { items: [] })).status).toBe(400);
