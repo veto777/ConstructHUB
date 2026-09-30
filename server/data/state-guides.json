@@ -25,7 +25,12 @@
     "specialty_bond_amount": "$10,000",
     "insurance_notes": "General liability insurance required. Workers comp through private insurance carriers.",
     "payroll_notes": "Register for unemployment insurance with Alaska Department of Labor. Can use third-party payroll services.",
-    "overview": "Alaska requires contractor registration and licensing. No state income tax or sales tax, but local sales taxes may apply. Workers comp through private insurance."
+    "overview": "Alaska requires contractor registration and licensing. No state income tax or sales tax, but local sales taxes may apply. Workers comp through private insurance.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "unconfirmed",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "AL",
@@ -53,7 +58,12 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "General liability and workers comp insurance required. Obtain through private insurers.",
     "payroll_notes": "Register with Alabama Department of Labor for unemployment insurance. Can use third-party payroll services like Intuit.",
-    "overview": "Alabama requires contractor licensing for projects over $50,000. The state has both a General Contractors board and a Home Builders Licensure Board. No sales tax on labor. Workers comp through private insurance."
+    "overview": "Alabama requires contractor licensing for projects over $50,000. The state has both a General Contractors board and a Home Builders Licensure Board. No sales tax on labor. Workers comp through private insurance.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "AR",
@@ -81,7 +91,12 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "General liability and workers comp insurance required through private carriers.",
     "payroll_notes": "Register with AR Division of Workforce Services for unemployment insurance.",
-    "overview": "Arkansas requires contractor licensing for projects over $20,000. Sales tax applies to materials but not labor for real property improvements. Workers comp through private insurance."
+    "overview": "Arkansas requires contractor licensing for projects over $20,000. Sales tax applies to materials but not labor for real property improvements. Workers comp through private insurance.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "AZ",
@@ -110,7 +125,12 @@
     "specialty_bond_amount": "$2,500",
     "insurance_notes": "General liability insurance required. Workers comp through private insurance.",
     "payroll_notes": "Register with AZ Department of Economic Security for unemployment tax. File quarterly.",
-    "overview": "Arizona has a robust contractor licensing system through the Registrar of Contractors. Both residential and commercial licenses available. Transaction Privilege Tax (TPT) applies to contracting."
+    "overview": "Arizona has a robust contractor licensing system through the Registrar of Contractors. Both residential and commercial licenses available. Transaction Privilege Tax (TPT) applies to contracting.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "unconfirmed",
+    "workers_comp_url_status": "unconfirmed",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "CA",
@@ -139,7 +159,12 @@
     "specialty_bond_amount": "$15,000",
     "insurance_notes": "General liability required. Workers comp available through State Compensation Insurance Fund or private carriers.",
     "payroll_notes": "Register with EDD for payroll taxes (income tax withholding, unemployment, disability, paid family leave). Can use third-party payroll.",
-    "overview": "California has one of the most comprehensive contractor licensing systems in the country through the CSLB. All contractors need a license for work over $500. The state has over 40 specialty classifications."
+    "overview": "California has one of the most comprehensive contractor licensing systems in the country through the CSLB. All contractors need a license for work over $500. The state has over 40 specialty classifications.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "CO",
@@ -167,7 +192,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability recommended. Workers comp through private carriers required if you have employees.",
     "payroll_notes": "Register with CO Department of Labor for unemployment insurance. State income tax withholding required.",
-    "overview": "Colorado is one of the more contractor-friendly states — no state contractor license required except for electrical and plumbing. Check local city/county requirements as many require local registration."
+    "overview": "Colorado is one of the more contractor-friendly states — no state contractor license required except for electrical and plumbing. Check local city/county requirements as many require local registration.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "CT",
@@ -195,7 +225,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability and workers comp through private carriers.",
     "payroll_notes": "Register with CT Department of Labor for unemployment insurance. State income tax withholding required.",
-    "overview": "Connecticut requires home improvement contractor registration. Trade-specific licenses for electrical, plumbing, and HVAC. No general contractor license at the state level."
+    "overview": "Connecticut requires home improvement contractor registration. Trade-specific licenses for electrical, plumbing, and HVAC. No general contractor license at the state level.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "unconfirmed",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "DE",
@@ -214,7 +249,7 @@
     "licensing_notes": "Delaware does NOT require a state contractor license. Some trades (electrical, plumbing, HVAC) may require local licensing. Business licenses may be required by Division of Revenue.",
     "workers_comp_type": "private",
     "workers_comp_agency": "Delaware Office of Workers Compensation",
-    "workers_comp_url": "https://dia.delawareworks.com/workers-comp/",
+    "workers_comp_url": "https://labor.delaware.gov/divisions/industrial-affairs/workers-comp/",
     "tax_board_name": "Delaware Division of Revenue",
     "tax_board_url": "https://revenue.delaware.gov/",
     "sales_tax_on_labor": false,
@@ -224,7 +259,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability and workers comp through private carriers.",
     "payroll_notes": "Register with Delaware Division of Unemployment Insurance.",
-    "overview": "Delaware is known for business-friendly incorporation laws. No state contractor license required, but local jurisdictions may have requirements. No sales tax in Delaware."
+    "overview": "Delaware is known for business-friendly incorporation laws. No state contractor license required, but local jurisdictions may have requirements. No sales tax in Delaware.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "workers_comp_url",
+        "previous": "https://dia.delawareworks.com/workers-comp/",
+        "previous_reason": "ENOTFOUND",
+        "source": "linked from https://labor.delaware.gov/ (Learn More about Worker's Compensation)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "FL",
@@ -253,7 +302,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability required. Workers comp through private insurance carriers. FL does NOT have state-controlled workers comp. Exemptions available for sole owners in construction (must apply through DFS).",
     "payroll_notes": "Register with FL Department of Revenue for reemployment tax. No state income tax in Florida. No sales tax on labor — only on materials. Can use third-party payroll services.",
-    "overview": "Florida uses Sunbiz.org for entity formation. You can form an LLC or register a fictitious name (DBA), which is unique to FL. Contractor licensing through DBPR — certified licenses are statewide, registered licenses are county-specific. No sales tax on labor (only materials). No state income tax. Workers comp through private carriers with exemptions available for owners."
+    "overview": "Florida uses Sunbiz.org for entity formation. You can form an LLC or register a fictitious name (DBA), which is unique to FL. Contractor licensing through DBPR — certified licenses are statewide, registered licenses are county-specific. No sales tax on labor (only materials). No state income tax. Workers comp through private carriers with exemptions available for owners.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "GA",
@@ -281,7 +335,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability and workers comp through private carriers.",
     "payroll_notes": "Register with GA Department of Labor for unemployment insurance. State income tax withholding required.",
-    "overview": "Georgia requires contractor licensing for residential and general contractors. The licensing process involves passing a trade exam. Separate licenses needed for electrical, plumbing, and HVAC trades."
+    "overview": "Georgia requires contractor licensing for residential and general contractors. The licensing process involves passing a trade exam. Separate licenses needed for electrical, plumbing, and HVAC trades.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "unconfirmed",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "HI",
@@ -309,13 +368,18 @@
     "specialty_bond_amount": "$10,000",
     "insurance_notes": "General liability and workers comp through private carriers. Hawaii has unique TDI (Temporary Disability Insurance) requirement.",
     "payroll_notes": "Register with HI Department of Labor for unemployment and TDI. General excise tax applies to all services.",
-    "overview": "Hawaii requires all contractors to be licensed. Unique general excise tax (GET) applies to all services including construction labor. TDI required for all employers."
+    "overview": "Hawaii requires all contractors to be licensed. Unique general excise tax (GET) applies to all services including construction labor. TDI required for all employers.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "IA",
     "state_name": "Iowa",
     "sos_name": "Secretary of State",
-    "sos_url": "https://sos.iowa.gov/business/",
+    "sos_url": "https://sos.iowa.gov/business-services",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -337,7 +401,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability recommended. Workers comp through private carriers.",
     "payroll_notes": "Register with Iowa Workforce Development for unemployment insurance.",
-    "overview": "Iowa does not require a state general contractor license. Electrical and plumbing trades need state licensing. Check local city/county requirements."
+    "overview": "Iowa does not require a state general contractor license. Electrical and plumbing trades need state licensing. Check local city/county requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://sos.iowa.gov/business/",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://sos.iowa.gov/ (Business Services Main Page)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "ID",
@@ -365,7 +443,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through State Insurance Fund or private carriers. General liability recommended.",
     "payroll_notes": "Register with Idaho Department of Labor for unemployment. State income tax withholding required.",
-    "overview": "Idaho has limited state contractor licensing — mainly for public works, electrical, HVAC, and plumbing. Private residential general contracting does not require a state license. Workers comp through State Insurance Fund or private carriers."
+    "overview": "Idaho has limited state contractor licensing — mainly for public works, electrical, HVAC, and plumbing. Private residential general contracting does not require a state license. Workers comp through State Insurance Fund or private carriers.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "IL",
@@ -393,7 +476,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability and workers comp through private carriers.",
     "payroll_notes": "Register with Illinois Department of Employment Security (IDES) for unemployment insurance. State income tax withholding required.",
-    "overview": "Illinois does not require a state general contractor license, but roofing contractors must register and electrical/plumbing contractors need licenses. Check local city requirements — Chicago has its own licensing system."
+    "overview": "Illinois does not require a state general contractor license, but roofing contractors must register and electrical/plumbing contractors need licenses. Check local city requirements — Chicago has its own licensing system.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "IN",
@@ -421,13 +509,18 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability recommended. Workers comp through private carriers required with employees.",
     "payroll_notes": "Register with Indiana Department of Workforce Development for unemployment insurance.",
-    "overview": "Indiana is contractor-friendly — no state general contractor license required. Electrical and plumbing need state licensing. Check local requirements."
+    "overview": "Indiana is contractor-friendly — no state general contractor license required. Electrical and plumbing need state licensing. Check local requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "KS",
     "state_name": "Kansas",
     "sos_name": "Secretary of State",
-    "sos_url": "https://www.sos.ks.gov/business/",
+    "sos_url": "https://sos.ks.gov/businesses/businesses.html",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -449,7 +542,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with Kansas Department of Labor for unemployment insurance.",
-    "overview": "Kansas does not have a state contractor licensing requirement. Check with local cities for registration requirements."
+    "overview": "Kansas does not have a state contractor licensing requirement. Check with local cities for registration requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://www.sos.ks.gov/business/",
+        "previous_reason": "soft 404",
+        "source": "linked from https://sos.ks.gov/ (Businesses)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "KY",
@@ -477,13 +584,18 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with KY Office of Employment and Training for unemployment insurance.",
-    "overview": "Kentucky does not require a state general contractor license. HVAC and electrical trades need licensing. Check local requirements."
+    "overview": "Kentucky does not require a state general contractor license. HVAC and electrical trades need licensing. Check local requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "LA",
     "state_name": "Louisiana",
     "sos_name": "Secretary of State",
-    "sos_url": "https://sos.la.gov/businessservices/",
+    "sos_url": "https://www.sos.la.gov/business-services",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -505,7 +617,21 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "General liability and workers comp through private carriers.",
     "payroll_notes": "Register with Louisiana Workforce Commission for unemployment insurance.",
-    "overview": "Louisiana requires state contractor licensing for work over $50,000. Both residential and commercial classifications available. Must demonstrate financial responsibility."
+    "overview": "Louisiana requires state contractor licensing for work over $50,000. Both residential and commercial classifications available. Must demonstrate financial responsibility.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://sos.la.gov/businessservices/",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.sos.la.gov/ (Business Services)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "MA",
@@ -533,7 +659,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability required.",
     "payroll_notes": "Register with MA Department of Unemployment Assistance. State income tax withholding required.",
-    "overview": "Massachusetts requires Construction Supervisor License for residential work and home improvement contractor registration. Trade licenses for electrical, plumbing, and sheet metal."
+    "overview": "Massachusetts requires Construction Supervisor License for residential work and home improvement contractor registration. Trade licenses for electrical, plumbing, and sheet metal.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "MD",
@@ -561,13 +692,18 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Minimum insurance requirements: $50,000 property damage, $100,000 personal injury. Workers comp through private carriers.",
     "payroll_notes": "Register with MD Division of Unemployment Insurance. State income tax withholding required.",
-    "overview": "Maryland requires home improvement contractor licensing through MHIC. Commercial contractors have separate requirements. Must carry minimum insurance levels."
+    "overview": "Maryland requires home improvement contractor licensing through MHIC. Commercial contractors have separate requirements. Must carry minimum insurance levels.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "ME",
     "state_name": "Maine",
     "sos_name": "Secretary of State",
-    "sos_url": "https://www.maine.gov/sos/cec/corp/",
+    "sos_url": "https://www.maine.gov/sos/corporations-commissions/corporations-business-services",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -589,7 +725,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with Maine Department of Labor for unemployment insurance.",
-    "overview": "Maine does not require a state general contractor license. Trade-specific licenses for plumbing and electrical. Relatively simple business formation process."
+    "overview": "Maine does not require a state general contractor license. Trade-specific licenses for plumbing and electrical. Relatively simple business formation process.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://www.maine.gov/sos/cec/corp/",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.maine.gov/sos/ (Corporations-Business Services)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "MI",
@@ -617,7 +767,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with Michigan UIA for unemployment insurance.",
-    "overview": "Michigan requires residential builder licensing. Commercial work may not require state license but check local requirements. Trade licenses for electrical and plumbing."
+    "overview": "Michigan requires residential builder licensing. Commercial work may not require state license but check local requirements. Trade licenses for electrical and plumbing.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "MN",
@@ -635,7 +790,7 @@
     "licensing_notes": "Residential contractors must be licensed by DLI. Must pass exam and carry insurance. Commercial contractors need separate licensing in some categories. Electrical and plumbing need separate licenses.",
     "workers_comp_type": "private",
     "workers_comp_agency": "Minnesota Department of Labor and Industry",
-    "workers_comp_url": "https://www.dli.mn.gov/workers-compensation",
+    "workers_comp_url": "https://www.dli.mn.gov/business/workers-compensation",
     "tax_board_name": "Minnesota Department of Revenue",
     "tax_board_url": "https://www.revenue.state.mn.us/",
     "sales_tax_on_labor": false,
@@ -645,7 +800,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Minimum insurance: $100,000 liability required for residential contractor license. Workers comp through private carriers.",
     "payroll_notes": "Register with MN Department of Employment and Economic Development for unemployment insurance.",
-    "overview": "Minnesota requires residential contractor licensing through the Department of Labor and Industry. Must carry minimum liability insurance to get licensed."
+    "overview": "Minnesota requires residential contractor licensing through the Department of Labor and Industry. Must carry minimum liability insurance to get licensed.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "workers_comp_url",
+        "previous": "https://www.dli.mn.gov/workers-compensation",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.dli.mn.gov/ (Workers' Compensation)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "MO",
@@ -673,7 +842,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with MO Division of Employment Security for unemployment insurance.",
-    "overview": "Missouri does not have a state contractor licensing requirement. Check local city and county requirements, especially in Kansas City and St. Louis."
+    "overview": "Missouri does not have a state contractor licensing requirement. Check local city and county requirements, especially in Kansas City and St. Louis.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "MS",
@@ -701,7 +875,12 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with Mississippi Department of Employment Security for unemployment insurance.",
-    "overview": "Mississippi requires contractor licensing for projects over $50,000. Bond required. Both residential and commercial classifications available."
+    "overview": "Mississippi requires contractor licensing for projects over $50,000. Bond required. Both residential and commercial classifications available.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "MT",
@@ -729,7 +908,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through Montana State Fund (state-run). General liability recommended.",
     "payroll_notes": "Register with MT Department of Labor for unemployment insurance. No state sales tax.",
-    "overview": "Montana does not require a state contractor license. Workers comp through the state-run Montana State Fund. No sales tax."
+    "overview": "Montana does not require a state contractor license. Workers comp through the state-run Montana State Fund. No sales tax.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "unconfirmed",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "NC",
@@ -757,7 +941,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with NC Division of Employment Security for unemployment insurance.",
-    "overview": "North Carolina requires contractor licensing for work over $30,000. Must pass exam. Separate trade licenses for electrical, plumbing, fire sprinkler, and HVAC."
+    "overview": "North Carolina requires contractor licensing for work over $30,000. Must pass exam. Separate trade licenses for electrical, plumbing, fire sprinkler, and HVAC.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "unconfirmed",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "ND",
@@ -770,7 +959,7 @@
       "LP"
     ],
     "licensing_board_name": "North Dakota Secretary of State - Contractor Licensing",
-    "licensing_board_url": "https://sos.nd.gov/business/contractor-licensing",
+    "licensing_board_url": "https://www.sos.nd.gov/business/licensing-registration/contractors",
     "licensing_required": true,
     "licensing_notes": "Contractors must register with the Secretary of State. Must carry workers comp and general liability insurance. Separate licenses for electrical and plumbing.",
     "workers_comp_type": "state_fund",
@@ -785,7 +974,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through Workforce Safety and Insurance (state-run monopoly). General liability required for registration.",
     "payroll_notes": "Register with Job Service North Dakota for unemployment insurance. State income tax withholding required.",
-    "overview": "North Dakota requires contractor registration. Workers comp through the state-run Workforce Safety and Insurance (monopoly). No choice of private carriers for workers comp."
+    "overview": "North Dakota requires contractor registration. Workers comp through the state-run Workforce Safety and Insurance (monopoly). No choice of private carriers for workers comp.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "licensing_board_url",
+        "previous": "https://sos.nd.gov/business/contractor-licensing",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.sos.nd.gov/ (Contractors)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "NE",
@@ -813,13 +1016,18 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with Nebraska Department of Labor for unemployment insurance.",
-    "overview": "Nebraska does not have a state contractor licensing requirement. Electrical contractors need state licensing. Check Omaha and Lincoln for local requirements."
+    "overview": "Nebraska does not have a state contractor licensing requirement. Electrical contractors need state licensing. Check Omaha and Lincoln for local requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "unconfirmed",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "NH",
     "state_name": "New Hampshire",
     "sos_name": "Secretary of State",
-    "sos_url": "https://www.sos.nh.gov/corporation-division",
+    "sos_url": "https://www.sos.nh.gov/corporations-0",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -831,7 +1039,7 @@
     "licensing_notes": "New Hampshire does NOT require a state general contractor license. Electrical and plumbing contractors need state licenses. Local permits required for construction.",
     "workers_comp_type": "private",
     "workers_comp_agency": "New Hampshire Department of Labor",
-    "workers_comp_url": "https://www.nh.gov/labor/",
+    "workers_comp_url": "https://www.dol.nh.gov/workers-compensation",
     "tax_board_name": "New Hampshire Department of Revenue",
     "tax_board_url": "https://www.revenue.nh.gov/",
     "sales_tax_on_labor": false,
@@ -841,7 +1049,28 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with NH Employment Security for unemployment insurance. No state income tax on wages.",
-    "overview": "New Hampshire does not require a state contractor license. No sales tax and no state income tax on wages. Check local requirements."
+    "overview": "New Hampshire does not require a state contractor license. No sales tax and no state income tax on wages. Check local requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://www.sos.nh.gov/corporation-division",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.sos.nh.gov/ (Corporations)",
+        "checked_at": "2026-09-30"
+      },
+      {
+        "field": "workers_comp_url",
+        "previous": "https://www.nh.gov/labor/",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.dol.nh.gov/ (State of New Hampshire Department of Labor; www.nh.gov/labor/ now 404s)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "NJ",
@@ -869,7 +1098,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Minimum insurance required for HIC registration. Workers comp through private carriers.",
     "payroll_notes": "Register with NJ Department of Labor for unemployment and disability insurance. State income tax withholding required.",
-    "overview": "New Jersey requires home improvement contractor registration. Must carry insurance to register. Separate licenses for electrical and plumbing trades."
+    "overview": "New Jersey requires home improvement contractor registration. Must carry insurance to register. Separate licenses for electrical and plumbing trades.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "unconfirmed",
+    "workers_comp_url_status": "unconfirmed",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "NM",
@@ -897,7 +1131,12 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "Workers comp through private carriers. General liability required.",
     "payroll_notes": "Register with NM Department of Workforce Solutions for unemployment insurance. Gross receipts tax applies to construction services.",
-    "overview": "New Mexico requires all contractors to be licensed by the Construction Industries Division. Gross receipts tax applies to construction services (similar to sales tax on labor)."
+    "overview": "New Mexico requires all contractors to be licensed by the Construction Industries Division. Gross receipts tax applies to construction services (similar to sales tax on labor).",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "NV",
@@ -925,7 +1164,12 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with NV Employment Security Division for unemployment insurance. No state income tax.",
-    "overview": "Nevada requires all contractors to be licensed by the State Contractors Board. Must pass exams and provide financial statements. No state income tax."
+    "overview": "Nevada requires all contractors to be licensed by the State Contractors Board. Must pass exams and provide financial statements. No state income tax.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "NY",
@@ -953,7 +1197,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through NY State Insurance Fund or private carriers. General liability recommended. NYC requires specific insurance levels.",
     "payroll_notes": "Register with NY Department of Labor for unemployment insurance. State and local income tax withholding required.",
-    "overview": "New York does not have a state-level contractor license. NYC has its own robust licensing system through the Department of Buildings. Check local requirements for other cities. Workers comp through State Insurance Fund or private carriers."
+    "overview": "New York does not have a state-level contractor license. NYC has its own robust licensing system through the Department of Buildings. Check local requirements for other cities. Workers comp through State Insurance Fund or private carriers.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "OH",
@@ -971,7 +1220,7 @@
     "licensing_notes": "Ohio does NOT require a state general contractor license. HVAC, plumbing, and electrical contractors need state or local licenses. Many cities have local contractor registration requirements.",
     "workers_comp_type": "state_fund",
     "workers_comp_agency": "Ohio Bureau of Workers Compensation",
-    "workers_comp_url": "https://www.bwc.ohio.gov/",
+    "workers_comp_url": "https://info.bwc.ohio.gov/",
     "tax_board_name": "Ohio Department of Taxation",
     "tax_board_url": "https://tax.ohio.gov/",
     "sales_tax_on_labor": false,
@@ -981,7 +1230,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through Ohio BWC (state-run monopoly). General liability recommended.",
     "payroll_notes": "Register with Ohio Department of Job and Family Services for unemployment insurance.",
-    "overview": "Ohio does not require a state general contractor license. Workers comp through the state-run Bureau of Workers Compensation. Check local city requirements — many Ohio cities have their own licensing."
+    "overview": "Ohio does not require a state general contractor license. Workers comp through the state-run Bureau of Workers Compensation. Check local city requirements — many Ohio cities have their own licensing.",
+    "sos_url_status": "unconfirmed",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "workers_comp_url",
+        "previous": "https://www.bwc.ohio.gov/",
+        "previous_reason": "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+        "source": "https://www.bwc.ohio.gov/ redirects (302) to https://info.bwc.ohio.gov; the old host fails browser-grade TLS validation",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "OK",
@@ -1009,7 +1272,12 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "Workers comp through private carriers. General liability required for registration.",
     "payroll_notes": "Register with Oklahoma Employment Security Commission for unemployment insurance.",
-    "overview": "Oklahoma requires contractor registration through the Construction Industries Board. Trade licenses for electrical, plumbing, and mechanical. Bond required for registration."
+    "overview": "Oklahoma requires contractor registration through the Construction Industries Board. Trade licenses for electrical, plumbing, and mechanical. Bond required for registration.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "OR",
@@ -1037,7 +1305,12 @@
     "specialty_bond_amount": "$15,000",
     "insurance_notes": "Workers comp through SAIF Corporation (state) or private carriers. General liability and bond required for CCB license.",
     "payroll_notes": "Register with Oregon Employment Department for unemployment insurance. No sales tax in Oregon.",
-    "overview": "Oregon requires all contractors to be licensed by the CCB. Must have insurance, bond, and workers comp. No sales tax in Oregon. Workers comp through SAIF or private carriers."
+    "overview": "Oregon requires all contractors to be licensed by the CCB. Must have insurance, bond, and workers comp. No sales tax in Oregon. Workers comp through SAIF or private carriers.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "PA",
@@ -1050,7 +1323,7 @@
       "LP"
     ],
     "licensing_board_name": "Pennsylvania Attorney General - Home Improvement",
-    "licensing_board_url": "https://www.attorneygeneral.gov/protect-yourself/home-improvement/",
+    "licensing_board_url": "https://www.attorneygeneral.gov/businesses-and-organizations/home-improvement-contractor-registration/",
     "licensing_required": true,
     "licensing_notes": "Home improvement contractors must register with the Attorney General. PA has a Home Improvement Consumer Protection Act. Electrical and plumbing need local licenses. No state GC license.",
     "workers_comp_type": "private",
@@ -1065,7 +1338,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers or State Workers Insurance Fund. General liability recommended.",
     "payroll_notes": "Register with PA Department of Labor for unemployment insurance.",
-    "overview": "Pennsylvania requires home improvement contractor registration with the Attorney General. No state GC license, but home improvement registration is mandatory. Check local requirements for trade licenses."
+    "overview": "Pennsylvania requires home improvement contractor registration with the Attorney General. No state GC license, but home improvement registration is mandatory. Check local requirements for trade licenses.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "licensing_board_url",
+        "previous": "https://www.attorneygeneral.gov/protect-yourself/home-improvement/",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.attorneygeneral.gov/ (Home Improvement Contractor Registration)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "RI",
@@ -1093,13 +1380,18 @@
     "specialty_bond_amount": null,
     "insurance_notes": "General liability required for registration. Workers comp through private carriers.",
     "payroll_notes": "Register with RI Department of Labor and Training for unemployment insurance.",
-    "overview": "Rhode Island requires contractor registration through the Contractors Registration Board. Must carry insurance. Sales tax applies to tangible personal property but generally not to construction labor."
+    "overview": "Rhode Island requires contractor registration through the Contractors Registration Board. Must carry insurance. Sales tax applies to tangible personal property but generally not to construction labor.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "unconfirmed",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "unconfirmed",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "SC",
     "state_name": "South Carolina",
     "sos_name": "Secretary of State",
-    "sos_url": "https://www.sos.sc.gov/business-filings",
+    "sos_url": "https://www.sos.sc.gov/online-filings/business-entities",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -1121,7 +1413,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with SC Department of Employment and Workforce for unemployment insurance.",
-    "overview": "South Carolina requires contractor licensing for work over $5,000. Tiered license system based on maximum project value. Must pass exam."
+    "overview": "South Carolina requires contractor licensing for work over $5,000. Tiered license system based on maximum project value. Must pass exam.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://www.sos.sc.gov/business-filings",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.sos.sc.gov/ (Business Entities)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "SD",
@@ -1149,7 +1455,12 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with SD Department of Labor for unemployment insurance. No state income tax.",
-    "overview": "South Dakota is very business-friendly — no state contractor license, no state income tax. Check local requirements. One of the easiest states to start a construction business."
+    "overview": "South Dakota is very business-friendly — no state contractor license, no state income tax. Check local requirements. One of the easiest states to start a construction business.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "TN",
@@ -1162,12 +1473,12 @@
       "LP"
     ],
     "licensing_board_name": "Tennessee Board for Licensing Contractors",
-    "licensing_board_url": "https://www.tn.gov/commerce/regboards/contractor-licensing.html",
+    "licensing_board_url": "https://www.tn.gov/commerce/regboards/contractors.html",
     "licensing_required": true,
     "licensing_notes": "Contractors performing work over $25,000 must be licensed. Must pass exam and demonstrate financial responsibility. Separate classifications for general, mechanical, electrical, and specialty contractors.",
     "workers_comp_type": "private",
     "workers_comp_agency": "Tennessee Bureau of Workers Compensation",
-    "workers_comp_url": "https://www.tn.gov/workforce/injuries-at-work/workers-compensation.html",
+    "workers_comp_url": "https://www.tn.gov/workforce/injuries-at-work.html",
     "tax_board_name": "Tennessee Department of Revenue",
     "tax_board_url": "https://www.tn.gov/revenue.html",
     "sales_tax_on_labor": false,
@@ -1177,13 +1488,34 @@
     "specialty_bond_amount": "$5,000",
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with TN Department of Labor for unemployment insurance. No state income tax on wages.",
-    "overview": "Tennessee requires contractor licensing for work over $25,000. No state income tax on wages. Bond required for licensing."
+    "overview": "Tennessee requires contractor licensing for work over $25,000. No state income tax on wages. Bond required for licensing.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "licensing_board_url",
+        "previous": "https://www.tn.gov/commerce/regboards/contractor-licensing.html",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.tn.gov/commerce/regboards.html (Contractors & Home Improvement)",
+        "checked_at": "2026-09-30"
+      },
+      {
+        "field": "workers_comp_url",
+        "previous": "https://www.tn.gov/workforce/injuries-at-work/workers-compensation.html",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.tn.gov/workforce.html (Injuries at Work — Bureau of Workers' Compensation)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "TX",
     "state_name": "Texas",
     "sos_name": "Secretary of State",
-    "sos_url": "https://www.sos.state.tx.us/corp/",
+    "sos_url": "https://www.sos.state.tx.us/corp/index.shtml",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -1206,7 +1538,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp is OPTIONAL in Texas for most employers (unique among states). General liability recommended.",
     "payroll_notes": "Register with Texas Workforce Commission for unemployment insurance. No state income tax.",
-    "overview": "Texas is unique — no state contractor license required and workers comp is optional. No state income tax. Check local city requirements. Electrical and plumbing need TDLR licenses."
+    "overview": "Texas is unique — no state contractor license required and workers comp is optional. No state income tax. Check local city requirements. Electrical and plumbing need TDLR licenses.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://www.sos.state.tx.us/corp/",
+        "previous_reason": "HTTP 403 not-found page",
+        "source": "Texas SOS Corporations Section index page; the bare /corp/ path returns a 403 'requested file was not found' page",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "UT",
@@ -1234,13 +1580,18 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with Utah Department of Workforce Services for unemployment insurance.",
-    "overview": "Utah requires contractor licensing through DOPL for general and specialty contractors. Must pass trade exam. Relatively straightforward licensing process."
+    "overview": "Utah requires contractor licensing through DOPL for general and specialty contractors. Must pass trade exam. Relatively straightforward licensing process.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "VA",
     "state_name": "Virginia",
     "sos_name": "State Corporation Commission",
-    "sos_url": "https://www.scc.virginia.gov/pages/Business-Entity-Search",
+    "sos_url": "https://www.scc.virginia.gov/businesses/",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -1262,13 +1613,27 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability required for licensing.",
     "payroll_notes": "Register with Virginia Employment Commission for unemployment insurance.",
-    "overview": "Virginia has a tiered contractor licensing system (Class A, B, C) based on project value and number of employees. Very well-organized system through DPOR."
+    "overview": "Virginia has a tiered contractor licensing system (Class A, B, C) based on project value and number of employees. Very well-organized system through DPOR.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://www.scc.virginia.gov/pages/Business-Entity-Search",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://www.scc.virginia.gov/ (Business Home)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "VT",
     "state_name": "Vermont",
     "sos_name": "Secretary of State",
-    "sos_url": "https://sos.vermont.gov/corporations/",
+    "sos_url": "https://sos.vermont.gov/business-services",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -1290,7 +1655,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with VT Department of Labor for unemployment insurance.",
-    "overview": "Vermont does not require a state contractor license for general contracting. One of the simpler states for starting a construction business. Electrical needs state licensing."
+    "overview": "Vermont does not require a state contractor license for general contracting. One of the simpler states for starting a construction business. Electrical needs state licensing.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://sos.vermont.gov/corporations/",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://sos.vermont.gov/ (Business Services)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "WA",
@@ -1319,13 +1698,18 @@
     "specialty_bond_amount": "$6,000",
     "insurance_notes": "Workers comp through L&I (state-run monopoly). General liability insurance required. L&I manages industrial insurance for all workers.",
     "payroll_notes": "Register with Employment Security Department (ESD) for unemployment insurance and worker reporting. Can use Intuit Online Payroll or similar services to handle ESD, L&I, and DOR reporting. B&O tax and retail sales tax apply to construction services including painting and flooring.",
-    "overview": "Washington has a comprehensive system: SOS (UBI#) → DOR (tax accounts) → L&I (contractor license, workers comp, bond). L&I is a state-run monopoly for workers comp. B&O tax and retail sales tax apply to ALL construction work including painting and flooring. Citations for unlicensed contracting."
+    "overview": "Washington has a comprehensive system: SOS (UBI#) → DOR (tax accounts) → L&I (contractor license, workers comp, bond). L&I is a state-run monopoly for workers comp. B&O tax and retail sales tax apply to ALL construction work including painting and flooring. Citations for unlicensed contracting.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   },
   {
     "state_code": "WI",
     "state_name": "Wisconsin",
     "sos_name": "Department of Financial Institutions",
-    "sos_url": "https://www.wdfi.org/corporations/",
+    "sos_url": "https://dfi.wi.gov/Pages/BusinessServices/BusinessEntities/GeneralInformation.aspx",
     "entity_types": [
       "LLC",
       "Corporation",
@@ -1347,7 +1731,21 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with WI Department of Workforce Development for unemployment insurance.",
-    "overview": "Wisconsin requires dwelling contractor registration with DSPS and completion of an education course. Commercial work has fewer state requirements. Check local city requirements."
+    "overview": "Wisconsin requires dwelling contractor registration with DSPS and completion of an education course. Commercial work has fewer state requirements. Check local city requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "sos_url",
+        "previous": "https://www.wdfi.org/corporations/",
+        "previous_reason": "ENOTFOUND",
+        "source": "linked from https://dfi.wi.gov/ (Business Entities — General Information); wdfi.org no longer resolves",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "WV",
@@ -1360,7 +1758,7 @@
       "LP"
     ],
     "licensing_board_name": "West Virginia Division of Labor - Contractor Licensing Board",
-    "licensing_board_url": "https://labor.wv.gov/Pages/default.aspx",
+    "licensing_board_url": "https://www.wvclboard.wv.gov/",
     "licensing_required": true,
     "licensing_notes": "Contractors performing work over $2,500 must be licensed. Must pass exam and carry insurance. Separate licenses for electrical, plumbing, HVAC, and fire protection.",
     "workers_comp_type": "private",
@@ -1375,7 +1773,21 @@
     "specialty_bond_amount": "$2,500",
     "insurance_notes": "Workers comp through private carriers (BrickStreet was formerly state-run, now privatized). General liability required.",
     "payroll_notes": "Register with WV Division of Employment Security (WorkForce WV) for unemployment insurance.",
-    "overview": "West Virginia requires contractor licensing for work over $2,500, which is one of the lower thresholds nationwide. Bond required. Workers comp now through private carriers."
+    "overview": "West Virginia requires contractor licensing for work over $2,500, which is one of the lower thresholds nationwide. Bond required. Workers comp now through private carriers.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "verified",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30",
+    "link_replacements": [
+      {
+        "field": "licensing_board_url",
+        "previous": "https://labor.wv.gov/Pages/default.aspx",
+        "previous_reason": "HTTP 404",
+        "source": "linked from https://labor.wv.gov/licensing (Contractor Licensing Board)",
+        "checked_at": "2026-09-30"
+      }
+    ]
   },
   {
     "state_code": "WY",
@@ -1403,6 +1815,11 @@
     "specialty_bond_amount": null,
     "insurance_notes": "Workers comp through private carriers. General liability recommended.",
     "payroll_notes": "Register with WY Department of Workforce Services for unemployment insurance. No state income tax. No sales tax on services.",
-    "overview": "Wyoming is one of the most business-friendly states — no state contractor license, no state income tax, no sales tax on services. Minimal regulation. Check local city requirements."
+    "overview": "Wyoming is one of the most business-friendly states — no state contractor license, no state income tax, no sales tax on services. Minimal regulation. Check local city requirements.",
+    "sos_url_status": "verified",
+    "licensing_board_url_status": "none",
+    "workers_comp_url_status": "verified",
+    "tax_board_url_status": "verified",
+    "links_checked_at": "2026-09-30"
   }
 ]
