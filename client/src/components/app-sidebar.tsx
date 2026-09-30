@@ -150,6 +150,7 @@ const googleGroups: NavGroup[] = [
     logoComponent: GoogleBusinessIcon,
     landingUrl: "/google-business",
     children: [
+      { title: "Agency", url: "/agency", icon: Users },
       { title: "Locations", url: "/locations", icon: MapPin },
       { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
       { title: "GBP Monitor", url: "/gmb-monitor", icon: Eye },

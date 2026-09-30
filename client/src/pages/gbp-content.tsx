@@ -1,3 +1,4 @@
+import { AgencyWorkspace, useAgencyFilter } from "@/components/agency-workspace";
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
@@ -9,11 +10,12 @@ import { useUrlParam } from '@/hooks/use-url-param';
 
 type Photo={id:number;name:string;url:string};
 export default function GbpContentPage(){
-  const {data:locations=[],error:locationsError}=useQuery<any[]>({queryKey:['/api/locations']});
+  const f=useAgencyFilter();
+  const {data:locations=[],error:locationsError}=useQuery<any[]>({queryKey:[`/api/locations?${f.params}`]});
   const [locationParam,setLocationParam]=useUrlParam('location');
   const location=locationParam??'',setLocation=(v:string)=>setLocationParam(v||null);
   return <main className="p-6 max-w-6xl mx-auto space-y-5"><h1 className="text-3xl font-bold">Posts &amp; Photos</h1><p>Publish approved content to your Google Business Profile.</p>
-    {locationsError&&<p role="alert">Unable to load locations. Please reload the page.</p>}
+    <AgencyWorkspace compact/>{locationsError&&<p role="alert">Unable to load locations. Please reload the page.</p>}
     <label className="block">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={location} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{locations.filter(l=>l.gbpLocationName).map(l=><option key={l.id} value={l.id}>{l.businessName}</option>)}</select></label>
     {!location?<GbpConnection/>:<Editor key={location} location={location}/>}</main>;
 }

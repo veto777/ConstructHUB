@@ -145,7 +145,7 @@ export async function registerRoutes(
 
   function getDevUser(req: any, res: any): any {
     const user = req.user;
-    if (user) return user;
+    if (user) return res.locals.agencyOwner ? { ...user, id: res.locals.agencyOwner } : user;
     res.status(401).json({ message: "Not authenticated" });
     return null;
   }
@@ -155,6 +155,12 @@ export async function registerRoutes(
   registerAccountEventRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
+  const { ensureAgencySchema } = await import("./agency/schema");
+  await ensureAgencySchema();
+  const { registerAgencyAccess } = await import("./agency/middleware");
+  registerAgencyAccess(app);
+  const { registerAgencyRoutes } = await import("./agency/routes");
+  registerAgencyRoutes(app);
   const { ensureGbpTokenEncryption } = await import("./gbp/token-crypto");
   await ensureGbpTokenEncryption();
   const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");
@@ -183,7 +189,10 @@ export async function registerRoutes(
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
   const { startGbpWorker } = await import("./gbp/service");
-  startGbpWorker();
+  const { startAgencyWorker } = await import("./agency/jobs");
+  const { startOnboardingWorker } = await import("./agency/onboarding");
+  startAgencyWorker();
+  startOnboardingWorker();
   const { ensureSocialSchema } = await import("./social/schema");
   await ensureSocialSchema();
   const { registerSocialRoutes } = await import("./social/routes");
@@ -2679,7 +2688,7 @@ Rules:
   app.post("/api/citations/campaigns", async (req, res) => {
     if (!(await requirePremiumPlus(req, res))) return;
     try {
-      const user = (req as any).user;
+      const user = getDevUser(req, res);
       const parsed = insertCitationCampaignSchema.parse({ ...req.body, userId: user.id });
       const [campaign] = await db.insert(citationCampaigns).values(parsed as any).returning();
       res.json(campaign);

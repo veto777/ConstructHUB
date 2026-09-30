@@ -1,53 +1,71 @@
-# Lane a1 — account security
+# Lane a1 — Agency workspace and GBP onboarding
 
-Built on `lane/a1`, from main `7d2f1d4`. All work and tests use local port 8129 and `constructhub_dev_a1`. No deployment, push, production access, real Google writes, paid AI calls, or SMTP delivery.
+Implemented locally in `/home/veto/ConstructHUB-a1`. No deployment or push. All fixture data is labelled test data and removed after tests; no real Google, Blotato, OpenAI, Stripe or SMTP writes were made. Lane server: 8129; database: `constructhub_dev_a1`.
 
-## What changed / where to use it
+## What is available
 
-- Growth app header: notification bell, unread count, recent notifications, individual/all mark-read, and destination links. Uses the existing `/api/notifications` service.
-- **Settings → Notifications** (`/settings?tab=notifications`): real persisted per-kind in-app/email preferences. Security email is visibly always on and cannot be disabled. Malformed preference/read requests are rejected. `KIND_DEFAULTS` is unchanged; no new notification kinds.
-- **Settings → Security & activity** (`/settings?tab=security`): password change, easy authenticator enrollment with QR, recovery codes, remembered-device revocation, and the newest 200 activity records with event-type/date filters, time, IP, and device. Removed the inert “sign out all other sessions” control rather than presenting it as functional.
-- Every successfully saved GBP callback grant and each account actually disconnected generates the existing `google.connected` / `google.disconnected` notification plus activity record. Alerts include account email, UTC time, request IP, and device. **Wasn't you?** links to `/settings?tab=security&google=<subject>`. A deliberate button disconnects that account (with step-up), then prompts password reset; loading the link itself has no side effects. Google-only users are also prompted to secure their Google identity.
-- Activity covers password and Google sign-in success, known-account password/2FA failures, password change/reset, 2FA enable/disable, GBP connect/disconnect, confirmed GBP reply publish/delete, reauthentication, recovery-code replacement, and device revocation. Unknown-account failures cannot be assigned to an owner and are not put in another user's log. Profile Guard/social lanes can continue calling the existing `logActivity`; their events appear automatically in the activity list/filter.
-- Sensitive actions require verification within 12 hours: GBP connect/disconnect and 2FA disable. Verification uses TOTP when enabled, otherwise the account password, otherwise a short-lived emailed six-digit code. Codes have an attempt limit and use the local email sink in tests. Login with a remembered device or a recovery code does not grant fresh step-up verification. Recovery codes restore sign-in; changing protected settings still requires the configured verification method. Replies/posts do not require step-up.
-- `apiRequest` detects `403 {reauth:true}`, opens the growth-app verification modal, then retries the original request once. Google connect links use JSON preflight before navigating to Google consent.
-- Two-factor sign-in now has an actual challenge screen for password and Google sign-in. Pending challenges expire in 10 minutes. Ten random, hashed, one-time recovery codes are shown once at enrollment/replacement; atomic deletion prevents concurrent reuse. A signed, httpOnly, SameSite=Lax cookie can remember a device for 30 days; database ownership/expiry/revocation is checked each time. Password changes/resets and disabling 2FA revoke remembered devices. Device revocation requires 2FA on subsequent sign-in, but does not terminate an already authenticated session.
-- Google sign-in's existing 2FA branch now fails closed on errors instead of swallowing them and continuing.
+- **Agency** in the growth sidebar (`/agency`): client records with contact email, notes, tags and optional folder; editable client records; workspace switching; team membership; onboarding; durable job progress.
+- **Locations** now reads 50 rows per request. Search matches business/client name, address, city, state and Place ID. Client and status filters run in SQL. The dashboard counts locations that are synced, need reconnect, are unlinked, have pending Guard alerts, unanswered reviews or failed GBP content. Counts drill into the matching locations. A linked location without a successful sync is not counted as synced.
+- Shared client/search/status controls and bulk location tools on Locations, its Guard/Insights/Citations detail screens, Google Profile Reviews/AI replies, Posts & Photos, Social and Site Scan. Select the current page or all matching locations. Changing search/client/status clears the effective selection. All-matching selections are frozen into job rows at submission, not expanded in the browser.
+- Bulk sync, cached link-and-sync, unlink, client assignment, Guard mode, future AI reply settings, approved post/photo batches, and Site Scans. CSV streams matching or selected locations in bounded chunks and escapes spreadsheet formulas.
+- Profile review statistics are computed for the full matching set. Reviews, scans, citation campaigns and social post lists page on the server at 50 rows. Social posts may be assigned to a client; the owner first assigns permitted destinations to that client in Social. Scoped members cannot publish to an unassigned social destination.
+- Roles: owner (implicit, cannot be overwritten), admin, manager, viewer. Members can have all-client access or explicit client assignments. Viewers cannot mutate. Managers can operate accessible clients/locations. Admins can create clients with all-client access and inspect the team. Only the owner grants/revokes membership, configures invitation auto-accept-all and assigns social destinations.
+- Every delegated legacy object route is checked against its actual location/client before passing owner identity to the existing handler. Unknown delegated routes fail closed with 404. Credentials, global automation and the owner-wide media library are not delegated. Queued jobs recheck membership and client access immediately before execution.
 
-## Encryption and owner configuration
+## Client email onboarding
 
-`GBP_TOKEN_KEY` must contain exactly 32 random bytes encoded as base64. Generate it once in the target environment:
+1. Save a client with its contact email.
+2. Connect the agency's Google account using the existing GBP connection. Agency → Settings exposes the connection and background discovery controls.
+3. Agency → Onboarding: choose the client and connected agency Google email, enter the exact business name and an address or (preferably) Place ID, then email manager instructions.
+4. A worker sends a ConstructHUB email containing the exact connected Google email, Google's help link and a copyable, expiring instructions link. The client adds that email as **Manager** in Business Profile → Business Profile settings → People and access. No client OAuth is needed.
+5. The worker polls connected accounts, records invitations, accepts an unambiguous pending-request match, discovers the newly accessible listing, assigns it to the client and queues the first sync. Existing listings assigned to another client are not silently moved. A notification uses `notifyUser`; activity uses `logActivity`.
 
-```sh
-openssl rand -base64 32
-```
+Status evidence: `sent` after delivery (`sent_at`; UI says “Email queued” before delivery), `opened` when the instructions link is visited, `invitation received`, `accepted`, `linked`, `expired`. “Opened” is a link visit, not proof a person read an email. Reminders are eligible after three days, at most two automatically; links expire after 30 days. A manual reminder is limited to one/day. Acceptance timeouts/crashes are recorded as uncertain and are not blindly retried.
 
-Store the result securely in the environment as `GBP_TOKEN_KEY`; do not commit it. Keep it with encrypted backups and retain it across restarts. Production boot fails if it is missing or invalid. Development can derive a key from `SESSION_SECRET`, with a loud warning; this is only a development fallback. Do not rotate either key casually: encrypted records need explicit decrypt/re-encrypt migration under the old/new keys. There is no automated key-rotation workflow in this lane.
+Google endpoints verified against official docs on 2026-09-29:
 
-GBP access/refresh tokens and existing authenticator secrets use AES-256-GCM with random 12-byte IVs and authentication tags (`v1:` envelope). Boot migrates existing plaintext with compare-and-swap updates and validates existing ciphertext; repeating boot does not re-encrypt rows. Grant access, refresh, and revocation decrypt only at the provider boundary. Token status responses never expose credentials. Auth/consent response bodies are excluded from request logs so QR enrollment seeds and recovery codes cannot leak through logging. The enrollment seed must be delivered once to the authenticated user's authenticator setup UI; stored secrets are never included in general account responses.
+- [List invitations](https://developers.google.com/my-business/reference/accountmanagement/rest/v1/accounts.invitations/list): `GET https://mybusinessaccountmanagement.googleapis.com/v1/accounts/{account}/invitations`. This method does **not** accept pageSize/pageToken; Google documents a maximum of 1,000 invitations per response.
+- [Accept invitation](https://developers.google.com/my-business/reference/accountmanagement/rest/v1/accounts.invitations/accept): `POST https://mybusinessaccountmanagement.googleapis.com/v1/accounts/{account}/invitations/{id}:accept`, empty JSON body.
+- [Google manager instructions](https://support.google.com/business/answer/3403100).
 
-Schema additions are solely `ensureAccountSecuritySchema()` in `server/account-security.ts`, registered at boot next to `ensureGbpSchema`; GBP migration is `ensureGbpTokenEncryption()` in `server/gbp/token-crypto.ts`. No drizzle push. Tables: `account_recovery_codes`, `account_trusted_devices`.
+Matching prefers exact Place ID. Otherwise it requires normalized name **and** address. Conflicting Place IDs do not fall back to names. Ambiguous matches do not choose a client arbitrarily. Auto-accept-all is off by default and accepts location invitations without guessing client assignments; unmatched listings are available through the discovery cache for explicit linking/import.
 
-## Integration contract for lane a2
+## Queue and scale
 
-```ts
-import { requireRecentAuth } from './account-security';
-// After authenticating and before changing Profile Guard mode:
-if (!requireRecentAuth(req, res)) return;
-// Also supports Express middleware usage with next().
-```
+`server/agency/schema.ts` owns idempotent schema ensures, registered beside `ensureGbpSchema`. No Drizzle schema push. The existing GBP project limiter (201 ms request spacing, shared database budget) remains the sole Google limiter.
 
-The gate binds the verification timestamp to `req.user.id` and rejects expired/future timestamps. Client code using the existing `apiRequest` already gets the modal/retry behavior in the growth app. A reusable hook is exported from `client/src/hooks/use-recent-auth.ts`: `useRecentAuth().request` is that request helper, and `.verify()` explicitly opens verification. Continue using `logActivity(req, userId, kind, detail)` directly for Profile Guard approval/rejection and social publishing; this lane adds no competing event API.
+The agency worker replaces the booted periodic inline sync sweep with persisted per-location jobs. It replenishes up to 500 scheduled jobs/tick, deduplicates active syncs, rotates by the least recently served agency, prioritizes explicit work over routine syncs and ages older jobs. Cross-process advisory locking prevents concurrent dispatch/recovery. Transient failures retry with backoff; quota deferrals stay queued without exhausting attempts. Bulk admission caps pending work at 20,000 per owner and payload expansion at 64 MiB per submission. CSV and UI never fetch all locations into browser memory.
 
-## Validation
+GBP account/listing and linkage GETs read an owner-scoped discovery cache instead of calling Google. Import verifies a fresh (24-hour) cached Google identity and queues sync. OAuth completion queues background discovery. Manual refresh is available in Agency settings. Existing direct service APIs remain available to workers and mocked tests.
 
-- Focused real-Postgres tests cover random-IV round trips, tamper detection, required production key, idempotent plaintext migration, 12-hour/owner binding, concurrent recovery-code consumption, remembered-device signing/expiry/owner isolation/revocation, password/TOTP step-up, Google-only email-code consumption/replay denial, and the Google callback's 2FA and trusted-device branches.
-- Existing GBP integration tests continue using injected/mocked Google fetch, including callback, grant refresh, disconnect, reply publish/delete, and sync. Assertions now expect encrypted persistence.
-- Playwright (`playwright.security.config.ts`), with bypass OFF: QR enrollment → recovery-code sign-in → remember/revoke device → expired-session TOTP modal and automatic retry → persisted preferences → bell/read state → activity filters → 2FA disable; a second flow follows the Google security alert through password step-up, account disconnect, reset prompt, and mocked Google consent.
-- Email remains in `tmp/email-outbox.jsonl` through `EMAIL_FORCE_SINK=1`. GBP background sync is disabled while testing. Fixtures are isolated and cleaned up. OAuth consent/provider writes are mocked; no real Google consent/account was exercised.
+## Tests
 
-Final validation: `npm run check` — 0 errors. `CRM_TEST_SINGLE_PORT=true npx vitest run` — 83 files passed, 2 files skipped; 791 tests passed, 43 skipped (existing single-port/conditional suites). `E2E_PORT=8129 E2E_DB=constructhub_dev_a1 npx playwright test --config=playwright.security.config.ts` — 2 flows passed, including a separate actual TOTP sign-in and rejection of a consumed recovery code. Browser runs require `DEV_AUTH_BYPASS_USER1=false`, `VITE_FORCE_PORTAL=false`, `GBP_SYNC_DISABLED=true`, and `EMAIL_FORCE_SINK=1`; the full Vitest server uses the lane's normal dev bypass. All environment variables are exported from the lane `.env` with Node 20 before launching.
+Final verification (Node 20.19.6, exported lane environment):
 
-## Limits
+- `npm run check`: exit 0, no TypeScript errors.
+- `CRM_TEST_SINGLE_PORT=true npx vitest run`: **91 files passed, 2 skipped; 955 tests passed, 43 skipped**, 91.98 seconds. Existing single-port/optional integration skips are reported, not counted as passes.
+- `E2E_PORT=8129 E2E_DB=constructhub_dev_a1 npx playwright test --config=playwright.agency.config.ts`: **3 passed**. Growth browser server uses `VITE_FORCE_PORTAL=false`; CRM HTTP integrations still target this lane's DB and port.
+- Targeted agency + Google client boundary run: **28 passed**, including Google's empty 200 accept-invitation response.
+- `git diff --check`: clean.
 
-The activity view filters its most recent 200 records; it is not an archival export. IP/device strings are request metadata, not a verified physical location or device identity. Existing sessions are not globally revoked by a remembered-device revocation. Google-only users must secure their Google account at Google; the ConstructHUB reset endpoint deliberately does not add a password to those accounts. Production requires the persistent encryption key, existing session secret, normal email delivery configuration, and existing Google OAuth credentials/callback configuration. No external configuration was changed by this lane.
+Test coverage includes:
+
+- Idempotent schema ensure; 5,000-location SQL paging/search/status counts and 1,000 explicitly assigned locations.
+- 1,000 each of profile reviews, scans, citation campaigns and social posts: pagination and hidden-client isolation.
+- HTTP handler validation, scoped legacy deep links, 404 isolation, viewer/admin/owner rules, frozen all-matching selection, idempotency, access revocation before job execution, worker fairness and priority.
+- Guard snapshot prerequisites and reauthentication; AI drafts; content queue idempotency; Site Scan enqueue; unlink using existing services, all without external calls.
+- Mocked Google invitation list/accept/discovery, exact agency-email instructions, token encryption, linking, sync queueing and non-replayed acceptance.
+- Playwright: 1,000 locations, search, page two, select-all matching, bulk queue, CSV, deep link, client create/edit, scoped team assignment and email onboarding instructions/link-open status.
+
+## Configuration and honest limits
+
+- The local server is deliberately started with `GBP_SYNC_DISABLED=true`, `GBP_CONTENT_WORKER_ENABLED=false`, `SITESCAN_WORKER_DISABLED=true`, `SOCIAL_WORKER_DISABLED=true`, and `EMAIL_FORCE_SINK=1`. Thus browser-created work queues but does not call providers. Worker tests use injected Google clients and email functions.
+- Deployment is outside this lane. To operate later, configure a persistent `GBP_TOKEN_KEY` (32-byte base64 AES-256-GCM key), Google OAuth and approved/enabled GBP APIs, `APP_URL`, and email delivery. Invitation link tokens are encrypted at rest and only hashes are used for lookup; agency responses and token paths are omitted/redacted in request logs.
+- Keep the existing publishing and AI budgets. Site Scans remain limited to five/day/owner; content publishing remains 100/day/owner, AI replies 50/day/owner. Bulk actions queue under those limits rather than bypassing them.
+- Bulk Guard enablement requires each location's existing approved snapshot. Locations without one fail with an explicit prerequisite, retaining the original security and approval flow. Bulk AI settings apply to future reviews; historical backfill retains its individual preview/confirm flow.
+- Team members need an existing ConstructHUB login. Team membership does not invite/create a login by email; the email onboarding feature here is specifically Google manager access.
+- Global Social automation and shared media/source libraries remain owner-controlled. Client filtering applies to mapped social posts and permitted destinations; existing unmapped posts belong to the all-client/owner view. This does not silently repurpose agency-wide automation for an individual client.
+- Discovery and invitation polling are background tasks using the existing fully paged Google client. Very large multi-account discoveries can take several ticks' worth of wall time while sharing quota with other workers. No Google listing results or profile statistics are invented when discovery is incomplete.
+- Google invitations missing both usable Place ID and address require agency review. Uncertain acceptance requires checking Google; there is no automatic re-accept button. Auto-accepted unmatched invitations are not automatically assigned to a guessed client.
+- The profile-review tab uses agency filtering; the separate legacy customer review-request/template workflow is still personal-account functionality, not a client-delegated email campaign system.
+- Existing provider APIs and schema modules are reused. **No new notification kind was introduced**, and `KIND_DEFAULTS` was not changed.

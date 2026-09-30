@@ -1,3 +1,4 @@
+import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { GoogleReport } from "@/components/profile-guard";
 import { AiReplySettings } from "@/components/ai-review-replies";
 import { GbpConnection } from "@/components/gbp-connection";
@@ -1801,6 +1802,8 @@ export default function GoogleReviewsPage() {
 }
 
 function GoogleProfileReviewsTab() {
+  const f=useAgencyFilter();
+  const [reviewOffset,setReviewOffset]=useState(0);
   const { data: gbp } = useQuery<any>({ queryKey: ["/api/gbp/status"] });
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -1816,21 +1819,23 @@ function GoogleProfileReviewsTab() {
   const [locationSearch, setLocationSearch] = useState("");
 
   const { data: locations = [] } = useQuery<any[]>({
-    queryKey: ["/api/locations"],
+    queryKey: [`/api/locations?${f.params}`],
   });
 
   const { data: templates = [] } = useQuery<any[]>({
     queryKey: ["/api/review-templates"],
   });
 
-  const queryParams = new URLSearchParams();
+  const queryParams = new URLSearchParams(f.params);
+  queryParams.set("paged","true");
+  queryParams.set("offset",String(reviewOffset));
   if (locationFilter !== "all") queryParams.set("locationId", locationFilter);
   if (ratingFilter !== "all") queryParams.set("rating", ratingFilter);
   if (responseFilter !== "all") queryParams.set("response", responseFilter);
   if (searchQuery.trim()) queryParams.set("search", searchQuery.trim());
   const qs = queryParams.toString();
 
-  const { data: reviews = [], isLoading } = useQuery<any[]>({
+  const { data: reviewData, isLoading } = useQuery<any>({
     queryKey: ["/api/google-profile-reviews", qs],
     queryFn: async () => {
       const res = await fetch(`/api/google-profile-reviews${qs ? `?${qs}` : ""}`, { credentials: "include" });
@@ -1876,13 +1881,14 @@ function GoogleProfileReviewsTab() {
     },
   });
 
-  const totalReviews = reviews.length;
-  const unanswered = reviews.filter(r => !r.replyComment).length;
-  const avgRating = totalReviews > 0 ? (reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews) : 0;
+  const reviews:any[]=reviewData?.items??[];
+  const totalReviews = reviewData?.total??0;
+  const unanswered = reviewData?.unanswered??0;
+  const avgRating = reviewData?.average??0;
   const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
     star,
-    count: reviews.filter((r: any) => r.rating === star).length,
-    pct: totalReviews > 0 ? Math.round((reviews.filter((r: any) => r.rating === star).length / totalReviews) * 100) : 0,
+    count: reviewData?.distribution?.[5-star]??0,
+    pct: totalReviews > 0 ? Math.round((reviewData?.distribution?.[5-star]??0) / totalReviews * 100) : 0,
   }));
 
   const clearFilters = () => {
@@ -1922,6 +1928,8 @@ function GoogleProfileReviewsTab() {
 
   return (
     <div className="space-y-6 relative z-10">
+      <AgencyWorkspace compact/>
+      <Pager offset={reviewOffset} total={totalReviews} onChange={setReviewOffset}/>
       <GbpConnection />
       <AiReplySettings locations={locations} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2036,7 +2044,7 @@ function GoogleProfileReviewsTab() {
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground font-medium">Reviews</p>
           <p className="text-3xl font-bold" data-testid="stat-total-profile-reviews">{totalReviews}</p>
-          <p className="text-xs text-muted-foreground">Showing statistics for all time</p>
+          <p className="text-xs text-muted-foreground">Statistics for all matching reviews</p>
         </div>
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground font-medium">Unanswered</p>

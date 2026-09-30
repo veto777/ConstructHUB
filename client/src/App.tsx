@@ -1,3 +1,4 @@
+import AgencyPage from "@/pages/agency";
 import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
 import SocialMediaPage from "@/pages/social-media";
@@ -110,6 +111,7 @@ function DashboardRouter() {
       <Route path="/ranking-grid" component={RankingGridPage} />
       <Route path="/pricing" component={PricingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
+      <Route path="/agency" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/social-media" component={SocialMediaPage} />
@@ -163,6 +165,7 @@ function PublicRouter() {
       <Route path="/property" component={PropertyPage} />
       <Route path="/photos" component={PhotosPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/agency" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
       {/* Signed-out visitors get the free public scan; the full tool needs an account. */}

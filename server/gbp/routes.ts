@@ -1,3 +1,7 @@
+import { z } from 'zod';
+import { filters, listLocations, accessFor, locationAccess }  from '../agency/access';
+import { queueSync } from '../agency/jobs';
+import { importVerifiedLocations } from './service';
 import { requireRecentAuth } from '../account-security';
 import { notifyUser, logActivity } from '../account-events';
 import { decryptToken } from './token-crypto';
@@ -44,14 +48,15 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
       await saveGrant(userId,who,tokens);
       await connectionAlert(req,userId,'google.connected',who);
       // Fill the Locations pages without further clicks; failures show per location in sync status.
-      void (options.afterConnect ?? autoLinkAndSync)(userId,who.sub).catch(()=>console.error('GBP auto-link after connect failed'));
+      void (options.afterConnect ?? (async(userId:number,subject:string)=>{await pool.query(`INSERT INTO agency_poll_grants(user_id,subject,next_at,refresh_requested) VALUES($1,$2,now(),true) ON CONFLICT(user_id,subject) DO UPDATE SET next_at=now(),refresh_requested=true`,[userId,subject]);}))(userId,who.sub).catch(()=>console.error('GBP discovery queue failed'));
       res.redirect('/locations?gbp=connected');
     }catch {res.redirect('/locations?gbp=consent-failed');}
   });
   route('get','/api/gbp/status',async(_req,res,id)=>{
+    const visible=_req.query.locationId ? {items:[await locationAccess(await accessFor(id),z.coerce.number().int().positive().parse(_req.query.locationId))]} : await listLocations(await accessFor(id),filters.parse(_req.query));
     const {rows:locations}=await pool.query(`SELECT l.id,l.business_name AS name,g.email AS account_email,s.kind,s.last_success,s.last_attempt,s.last_error FROM business_locations l
       LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject
-      LEFT JOIN gbp_sync_status s ON s.location_id=l.id WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL ORDER BY l.id,s.kind`,[id]);
+      LEFT JOIN gbp_sync_status s ON s.location_id=l.id WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL AND l.id=ANY($2::int[]) ORDER BY l.id,s.kind`,[id,visible.items.map(l=>l.id)]);
     res.json({...await grantStatus(id),locations});
   });
   route('post','/api/gbp/disconnect',async(req,res,id)=>{
@@ -71,30 +76,36 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     for (const grant of grants) await connectionAlert(req,id,'google.disconnected',grant);
     res.json({...await grantStatus(id),revoked,message:revoked?'Disconnected':'Disconnected locally. Remove ConstructHUB access in your Google Account to finish revocation.'});
   });
-  route('get','/api/gbp/accounts',async(_req,res,id)=>res.json({accounts:(await discoverAll(id)).accounts}));
-  route('get','/api/gbp/locations',async(_req,res,id)=>res.json(await discoverAll(id)));
+  const cached=async(req:Request,res:Response,id:number)=>{
+    const status=await grantStatus(id);if(!status.connected)throw new GoogleError('auth','Google Business Profile not connected',401);
+    const f=filters.parse(req.query);
+    const {rows}=await pool.query(`SELECT d.*,g.email FROM agency_discovery d JOIN gbp_grants g ON g.user_id=d.user_id AND g.google_subject=d.subject AND NOT g.reconnect_required WHERE d.user_id=$1 AND d.data->>'businessName' ILIKE $2 ORDER BY d.subject,d.account,d.location LIMIT 50 OFFSET $3`,[id,`%${f.q}%`,f.offset]);
+    res.json({accounts:status.accounts,locations:rows.map(r=>({...r.data,grantSubject:r.subject,grantEmail:r.email})),errors:[],cached:true});
+  };
+  route('get','/api/gbp/accounts',cached);
+  route('get','/api/gbp/locations',cached);
   // Per-location answer to "which Google account is this synced through, and which still need one?"
-  route('get','/api/gbp/linkage',async(_req,res,id)=>{
+  route('get','/api/gbp/linkage',async(req,res,id)=>{
+    const page=await listLocations(await accessFor(id),filters.parse(req.query));
     const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.gbp_location_name,l.gbp_unlinked_by_user,g.email AS account_email,(g.google_subject IS NOT NULL AND NOT g.reconnect_required) AS account_ok,
       (SELECT max(last_success) FROM gbp_sync_status s WHERE s.location_id=l.id) AS last_success,
       (SELECT string_agg(last_error,'; ') FROM gbp_sync_status s WHERE s.location_id=l.id AND last_error IS NOT NULL) AS last_error
-      FROM business_locations l LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject WHERE l.user_id=$1 ORDER BY l.id`,[id]);
-    const status=await grantStatus(id);
-    let found:any[]=[],errors:any[]=[];
-    if(status.connected && locations.some(l=>!l.gbp_location_name)) ({locations:found,errors}=await discoverAll(id));
-    res.json({accounts:status.accounts,errors,locations:locations.map(l=>{
-      if(l.gbp_location_name) return {id:l.id,state:l.account_ok?'synced':'reconnect',accountEmail:l.account_email,lastSuccess:l.last_success,lastError:l.last_error};
-      const match=l.place_id?found.find((f:any)=>f.placeId===l.place_id):null;
-      return match?{id:l.id,state:'available',unlinkedByUser:l.gbp_unlinked_by_user,accountEmail:match.grantEmail,listing:{accountResource:match.accountResource,gbpName:match.gbpName,grantSubject:match.grantSubject}}
-        :{id:l.id,state:'unlinked'};
+      FROM business_locations l LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject WHERE l.user_id=$1 AND l.id=ANY($2::int[]) ORDER BY l.id`,[id,page.items.map(l=>l.id)]);
+    const {rows:found}=await pool.query(`SELECT d.data,d.subject,g.email FROM agency_discovery d JOIN gbp_grants g ON g.user_id=d.user_id AND g.google_subject=d.subject AND NOT g.reconnect_required WHERE d.user_id=$1 AND d.seen_at>now()-interval '24 hours' AND d.data->>'placeId'=ANY($2::text[])`,[id,locations.map(l=>l.place_id).filter(Boolean)]);
+    res.json({accounts:(await grantStatus(id)).accounts,errors:[],total:page.total,locations:locations.map(l=>{
+      if(l.gbp_location_name)return {id:l.id,state:l.account_ok?'synced':'reconnect',accountEmail:l.account_email,lastSuccess:l.last_success,lastError:l.last_error};
+      const match=found.find(f=>f.data.placeId===l.place_id);
+      return match?{id:l.id,state:'available',unlinkedByUser:l.gbp_unlinked_by_user,accountEmail:match.email,listing:{accountResource:match.data.accountResource,gbpName:match.data.gbpName,grantSubject:match.subject}}:{id:l.id,state:'unlinked'};
     })});
   });
   route('post','/api/gbp/import',async(req,res,id)=>{
-    const result=await importLocations(id,req.body.locations);
-    // Linking = a full first sync (profile, reviews, performance) before answering.
-    const synced:Record<number,unknown>={};
-    for(const l of result.locations) synced[l.id]=await syncLocation(id,l.id).catch(e=>publicError(e));
-    res.json({...result,synced});
+    if(!(await grantStatus(id)).connected)throw new GoogleError('auth','Google Business Profile not connected',401);
+    const requested=z.array(z.object({accountResource:z.string().max(300),gbpName:z.string().max(300),grantSubject:z.string().max(255)})).min(1).max(100).safeParse(req.body.locations);
+    if(!requested.success)return res.status(400).json({message:'Select 1–100 valid listings'});
+    const {rows:cached}=await pool.query(`SELECT d.* FROM agency_discovery d JOIN gbp_grants g ON g.user_id=d.user_id AND g.google_subject=d.subject AND NOT g.reconnect_required WHERE d.user_id=$1 AND d.location=ANY($2::text[]) AND d.seen_at>now()-interval '24 hours'`,[id,requested.data.map(r=>r.gbpName)]);
+    const selected=requested.data.map(r=>{const c=cached.find(c=>c.account===r.accountResource&&c.location===r.gbpName&&c.subject===r.grantSubject);if(!c)throw new GoogleError('invalid','Refresh Google listings from Agency settings before importing',409);return {...c.data,grantSubject:c.subject};});
+    const result=await importVerifiedLocations(id,selected);for(const l of result.locations)await queueSync(id,l.id);
+    res.status(202).json({...result,queued:true,synced:{}});
   });
   route('get','/api/gbp/locations/:id/media',async(req,res,userId)=>{
     const id=Number(req.params.id),source=req.query.source==='customer'?'customer':'business';
@@ -107,7 +118,7 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     res.json({total:t.n,syncedAt:t.synced,items:rows});
   });
   route('post','/api/gbp/locations/:id/unlink',async(req,res,id)=>res.json(await unlinkLocation(id,Number(req.params.id))));
-  route('post','/api/gbp/locations/:id/sync',async(req,res,id)=>res.json(await syncLocation(id,Number(req.params.id))));
+  route('post','/api/gbp/locations/:id/sync',async(req,res,id)=>{const location=Number(req.params.id);await locationAccess(await accessFor(id),location);if(!(await grantStatus(id)).connected)return res.json(await syncLocation(id,location));await queueSync(id,location);res.status(202).json({queued:true,message:'Sync queued'});});
   route('patch','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),req.body.replyComment,req.body.action==='publish'?'publish':'draft',undefined,{req})));
   route('delete','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),'','delete',undefined,{req})));
   route('get','/api/gbp/locations/:id/performance',async(req,res,userId)=>{

@@ -44,6 +44,10 @@ export async function importLocations(userId: number, requested: any[], client?:
     if (!found) throw new GoogleError('permission','Selected location could not be verified with Google. Refresh the list.',403);
     return {...found, grantSubject: found.grantSubject ?? r.grantSubject ?? null};
   });
+  return {...await importVerifiedLocations(userId,selected),errors:discovered.errors};
+}
+/** Internal only. Caller supplies listings verified by Google discovery (live or a fresh owner-scoped cache). */
+export async function importVerifiedLocations(userId:number,selected:any[]) {
   const imported = [];
   for (const l of selected) {
     // A location the contractor added by Places search (same place, not yet linked) is linked in place
@@ -52,6 +56,7 @@ export async function importLocations(userId: number, requested: any[], client?:
     const {rows:[already]} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name=$2 ORDER BY id LIMIT 1',[userId,l.gbpName]);
     if (already) {
       await pool.query('UPDATE business_locations SET gbp_account_name=$2,gbp_google_subject=$3,gbp_unlinked_by_user=false,updated_at=now() WHERE id=$1',[already.id,l.accountResource,l.grantSubject]);
+      imported.push(already); continue;
     }
     if (!already && l.placeId) {
       const {rows:[linked]} = await pool.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,gbp_google_subject=$6,gbp_unlinked_by_user=false,updated_at=now()
@@ -65,7 +70,7 @@ export async function importLocations(userId: number, requested: any[], client?:
       [userId,l.businessName,l.accountResource,l.gbpName,l.address,l.city,l.state,l.zipCode,l.country,l.phone,l.website,l.placeId,l.grantSubject]);
     imported.push(row);
   }
-  return { imported:imported.length, locations:imported, errors:discovered.errors };
+  return { imported:imported.length, locations:imported };
 }
 export async function ownedLocation(userId: number, id: number) {
   const {rows:[l]} = await pool.query('SELECT * FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);
