@@ -147,6 +147,13 @@ describe("social validation and HTTP boundary", () => {
       "https://192.168.0.1/a",
       "https://user:pass@example.com/a",
       "https://[::1]/a",
+      "https://0.0.0.0/a",
+      "https://100.100.100.200/a",
+      "https://2130706433/a",
+      "https://0x7f000001/a",
+      "https://printer.localhost/a",
+      "https://printer.home.arpa/a",
+      "https://example.com:8443/a",
     ])
       expect(publicMediaUrl.safeParse(url).success).toBe(false);
     const s = autoSchema.parse({ timezone: "America/New_York" });

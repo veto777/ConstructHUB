@@ -39,11 +39,13 @@ export const publicMediaUrl = z
         !u.username &&
         !u.password &&
         !u.hostname.includes(":") &&
+        (!u.port || u.port === "443") &&
+        !/^\d+\.\d+\.\d+\.\d+$/.test(u.hostname) &&
         !/^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
           u.hostname,
         ) &&
         u.hostname.includes(".") &&
-        !/\.(local|internal)$/.test(u.hostname)
+        !/\.(local|internal|localhost|home\.arpa)\.?$/.test(u.hostname)
       );
     } catch {
       return false;
