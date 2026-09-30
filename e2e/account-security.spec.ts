@@ -82,3 +82,31 @@ test('mobile notification preferences expose every kind and the bell fits the vi
  expect(box!.x + box!.width).toBeLessThanOrEqual(320);
  await expect(page.getByRole('button', { name: 'Mark all read' })).toBeVisible();
 });
+
+test('Google-only owner verifies an emailed code and retries authenticator enrollment', async ({ page }) => {
+ await page.goto('/auth');
+ await page.getByTestId('input-login-email').fill(email);
+ await page.getByTestId('input-login-password').fill(password);
+ await Promise.all([page.waitForResponse(r => r.url().endsWith('/api/auth/login')), page.getByTestId('button-login').click()]);
+ await pool.query('UPDATE users SET password_hash=NULL WHERE id=$1', [id]);
+ try {
+  await pool.query(`UPDATE session SET sess=(sess::jsonb-'recentAuth')::json WHERE sess->'passport'->>'user'=$1`, [String(id)]);
+  await page.goto('/settings?tab=security');
+  await page.getByTestId('button-enable-2fa').click();
+  await expect(page.getByRole('heading', { name: 'Verify your identity' })).toBeVisible();
+  await page.getByRole('button', { name: 'Email a verification code' }).click();
+  await expect(page.getByRole('button', { name: 'Code sent' })).toBeVisible();
+  const { readFile } = await import('node:fs/promises');
+  const mails = (await readFile('tmp/email-outbox.jsonl', 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+  const mail = mails.filter(mail => JSON.stringify(mail.to).includes(email)).at(-1);
+  const code = JSON.stringify(mail).match(/verification code is (\d{6})/)![1];
+  await page.getByLabel('Verification', { exact: true }).fill('000000');
+  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Verification failed' })).toBeVisible();
+  await page.getByLabel('Verification', { exact: true }).fill(code);
+  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  await expect(page.getByTestId('img-2fa-qr')).toBeVisible();
+ } finally {
+  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(password, 4), id]);
+ }
+});
