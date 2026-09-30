@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
-import { Mail, MessageSquare, CheckCircle, Star, Heart, ArrowRight } from "lucide-react";
+import { Mail, CheckCircle, ArrowRight } from "lucide-react";
 
 function FloatingParticles() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,7 +67,7 @@ export default function ReviewUnsubscribePage() {
   const { token } = useParams<{ token: string }>();
   const [info, setInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<"convince" | "feedback" | "done">("convince");
+  const [step, setStep] = useState<"confirm" | "done">("confirm");
   const [feedback, setFeedback] = useState("");
   const [resubscribed, setResubscribed] = useState(false);
   const [actionError, setActionError] = useState("");
@@ -82,11 +82,12 @@ export default function ReviewUnsubscribePage() {
 
   async function handleUnsubscribe() {
     setSubmitting(true);
+    setActionError("");
     try {
-      await apiRequest("POST", `/api/review/${token}/unsubscribe`, { feedback: feedback || undefined });
+      await apiRequest("POST", `/api/review/${token}/unsubscribe`, { feedback: feedback.trim() || undefined });
       setStep("done");
     } catch {
-      setActionError("Unable to save. Please try again.");
+      setActionError("We couldn’t unsubscribe you just now. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -124,7 +125,7 @@ export default function ReviewUnsubscribePage() {
             <h2 className="text-2xl font-bold" data-testid="text-unsubscribed">{resubscribed ? "You have resubscribed" : "You’ve been unsubscribed"}</h2>
             <p className="text-muted-foreground">
               {resubscribed ? `You can receive future review requests from ${info.companyName}. Previous requests will stay stopped.` : `You won’t receive future review requests or reminders from ${info.companyName}.`}
-              {feedback && " Thank you for sharing your feedback — it truly helps us improve."}
+              {feedback.trim() && ` Thank you — ${info.companyName} will see your note.`}
             </p>
             {!resubscribed && <Button variant="outline" disabled={submitting} onClick={async () => {
               setSubmitting(true); setActionError("");
@@ -139,111 +140,57 @@ export default function ReviewUnsubscribePage() {
     );
   }
 
-  if (step === "feedback") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950 p-4">
-        <FloatingParticles />
-        <Card className="max-w-lg w-full relative z-10">
-          <CardContent className="p-8 space-y-6">
-            <div className="text-center space-y-2">
-              <MessageSquare className="h-12 w-12 text-gray-400 mx-auto" />
-              <h2 className="text-2xl font-bold">Before you go...</h2>
-              <p className="text-muted-foreground">
-                Could you share a quick note about your experience with {info.companyName}? This is completely private and helps us improve.
-              </p>
-            </div>
-
-            <Textarea
-              value={feedback}
-              onChange={e => setFeedback(e.target.value)}
-              placeholder="What could we have done better? Any suggestions or concerns..."
-              rows={4}
-              className="resize-none"
-              data-testid="input-unsubscribe-feedback"
-            />
-
-            <div className="space-y-3">
-              <Button
-                onClick={handleUnsubscribe}
-                disabled={submitting}
-                className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 dark:text-gray-900 text-white"
-                data-testid="button-submit-feedback-unsubscribe"
-              >
-                {submitting ? "Processing..." : feedback ? "Submit Feedback & Unsubscribe" : "Unsubscribe Without Feedback"}
-              </Button>
-
-              <button
-                onClick={() => setStep("convince")}
-                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-                data-testid="button-back-to-convince"
-              >
-                Go Back
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
+  // One screen, one action: unsubscribing never requires a detour through a
+  // feedback form. The note is optional and rating the job is a side link.
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950 p-4">
       <FloatingParticles />
       <Card className="max-w-lg w-full relative z-10">
         <CardContent className="p-8 space-y-6">
-          <div className="text-center space-y-3">
+          <div className="text-center space-y-2">
             <Mail className="h-12 w-12 text-gray-400 mx-auto" />
-            <h2 className="text-2xl font-bold">
-              {info.clientName}, wait!
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              {info.companyName} values your opinion
+            <h2 className="text-2xl font-bold" data-testid="text-unsubscribe-heading">Unsubscribe from review requests</h2>
+            <p className="text-muted-foreground">
+              {info.clientName ? `${info.clientName}, you` : "You"}’ll stop receiving review requests and reminders from {info.companyName}.
             </p>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-              <Star className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">Your feedback matters</p>
-                <p className="text-sm text-muted-foreground">Good or bad — your honest experience helps us deliver better results for future clients.</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-              <Heart className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">It takes less than 2 minutes</p>
-                <p className="text-sm text-muted-foreground">Just rate your experience from 1-10. That's it. No lengthy forms or obligations.</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-              <MessageSquare className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">100% private</p>
-                <p className="text-sm text-muted-foreground">Private feedback is shared with the company. Every customer can also choose to leave a public Google review, regardless of rating.</p>
-              </div>
-            </div>
+          <div className="space-y-2">
+            <label htmlFor="unsubscribe-feedback" className="text-sm font-medium block">
+              Anything you’d like {info.companyName} to know? <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <Textarea
+              id="unsubscribe-feedback"
+              value={feedback}
+              onChange={e => setFeedback(e.target.value)}
+              placeholder="What could they have done better?"
+              rows={3}
+              className="resize-none"
+              data-testid="input-unsubscribe-feedback"
+            />
+            <p className="text-xs text-muted-foreground">Private to {info.companyName}. It is not posted anywhere.</p>
           </div>
 
-          <a
-            href={`/review/${token}`}
-            className="flex items-center justify-center gap-2 w-full py-3 px-6 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 dark:text-gray-900 text-white font-semibold text-lg transition-colors"
-            data-testid="link-leave-feedback"
+          <Button
+            onClick={handleUnsubscribe}
+            disabled={submitting}
+            className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 dark:text-gray-900 text-white"
+            data-testid="button-submit-feedback-unsubscribe"
           >
-            Leave Quick Feedback
-            <ArrowRight className="h-5 w-5" />
-          </a>
+            {submitting ? "Processing..." : feedback.trim() ? "Send Note & Unsubscribe" : "Unsubscribe"}
+          </Button>
+          {actionError && <p role="alert" className="text-sm text-destructive text-center">{actionError}</p>}
 
-          <div className="pt-4 border-t text-center">
-            <button
-              onClick={() => setStep("feedback")}
-              className="text-sm text-muted-foreground hover:text-foreground underline transition-colors"
-              data-testid="button-still-unsubscribe"
+          <div className="pt-4 border-t text-center space-y-1">
+            <p className="text-sm text-muted-foreground">Changed your mind? You can still rate your experience.</p>
+            <a
+              href={`/review/${token}`}
+              className="inline-flex items-center gap-1 text-sm font-medium underline"
+              data-testid="link-leave-feedback"
             >
-              I still want to unsubscribe
-            </button>
+              Leave quick feedback instead
+              <ArrowRight className="h-4 w-4" />
+            </a>
           </div>
         </CardContent>
       </Card>

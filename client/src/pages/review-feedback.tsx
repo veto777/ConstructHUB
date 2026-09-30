@@ -111,8 +111,14 @@ export default function ReviewFeedbackPage() {
   const [skippedDescribe, setSkippedDescribe] = useState(false);
   const isHighRating = rating >= 9;
   const isCompleted = step === "done" || step === "bonus_reviews";
+  const restored = useRef(false);
+  const skipTrackStep = useRef<Step | null>(null);
 
   useEffect(() => {
+    if (skipTrackStep.current === step) {
+      skipTrackStep.current = null;
+      return;
+    }
     if (token && step !== "rating") {
       fetch(`/api/review/${token}/track-step`, {
         method: "POST",
@@ -151,6 +157,35 @@ export default function ReviewFeedbackPage() {
     enabled: !!token,
   });
 
+  // A reload (or a second visit) resumes after the rating that was already
+  // saved instead of asking for it again.
+  useEffect(() => {
+    if (restored.current || !reviewData) return;
+    restored.current = true;
+    const saved = Number(reviewData.feedbackRating);
+    if (!Number.isInteger(saved) || saved < 1 || saved > 10) return;
+    const next: Step = reviewData.lastStep === "done" || reviewData.lastStep === "bonus_reviews"
+      ? "done"
+      : saved >= 9 ? (reviewData.referralOffer ? "referral" : "describe") : "improvement";
+    setRating(saved);
+    skipTrackStep.current = next;
+    setStep(next);
+  }, [reviewData]);
+
+  const postFeedback = async () => {
+    const res = await fetch(`/api/review/${token}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rating,
+        categories: selectedCategories.length > 0 ? selectedCategories : undefined,
+        comments: comments || undefined,
+      }),
+    });
+    if (!res.ok) throw new Error("Unable to save your request. Please try again.");
+    return res.json();
+  };
+
   const feedbackMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/review/${token}/feedback`, {
@@ -175,21 +210,17 @@ export default function ReviewFeedbackPage() {
   });
 
   const improvementMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/review/${token}/feedback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rating,
-          categories: selectedCategories.length > 0 ? selectedCategories : undefined,
-          comments: comments || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
-      return res.json();
-    },
+    mutationFn: postFeedback,
     onSuccess: () => {
       setStep("done");
+    },
+  });
+
+  // "Help me draft my honest review" keeps the private notes already typed.
+  const saveImprovementMutation = useMutation({
+    mutationFn: postFeedback,
+    onSuccess: () => {
+      setStep("describe");
     },
   });
 
@@ -203,13 +234,24 @@ export default function ReviewFeedbackPage() {
           highlights: highlights || undefined,
         }),
       });
-      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
+      if (!res.ok) {
+        // 4xx carry a reason worth showing (e.g. the draft limit); a 5xx doesn't.
+        const body = res.status < 500 ? await res.json().catch(() => null) : null;
+        const reason = String(body?.message || "AI help is unavailable right now.");
+        throw new Error(/[.!?]$/.test(reason) ? reason : `${reason}.`);
+      }
       return res.json();
     },
     onSuccess: (data) => {
       setGeneratedReview(data.review);
     },
   });
+
+  const acceptOwnWords = () => {
+    generateMutation.reset();
+    setGeneratedReview(highlights);
+    fetch(`/api/review/${token}/track-review-method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: "own" }) }).catch(() => {});
+  };
 
   const completeFlowMutation = useMutation({
     mutationFn: async () => {
@@ -367,7 +409,7 @@ export default function ReviewFeedbackPage() {
             <p className="text-xs text-muted-foreground">Everyone is welcome to review. No private feedback or referral participation is required, and no reward is offered for a review.</p>
           </div>
         )}
-        {[feedbackMutation.error, improvementMutation.error, generateMutation.error, completeFlowMutation.error].some(Boolean) && (
+        {[feedbackMutation.error, improvementMutation.error, saveImprovementMutation.error, completeFlowMutation.error].some(Boolean) && (
           <p role="alert" className="mb-4 text-sm text-destructive">Unable to save your request. Please try again.</p>
         )}
 
@@ -525,7 +567,14 @@ export default function ReviewFeedbackPage() {
                 Your feedback is completely confidential
               </p>
 
-              <Button variant="outline" className="w-full" onClick={() => setStep("describe")} data-testid="button-improvement-draft">
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={saveImprovementMutation.isPending}
+                onClick={() => (selectedCategories.length > 0 || comments.trim()) ? saveImprovementMutation.mutate() : setStep("describe")}
+                data-testid="button-improvement-draft"
+              >
+                {saveImprovementMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Help me draft my honest review
               </Button>
 
@@ -595,7 +644,7 @@ export default function ReviewFeedbackPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-extrabold text-lg">Referral Offer</p>
-                        <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wider">Earn Cash</span>
+                        <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wider">Referral reward</span>
                       </div>
                       <p className="text-sm text-muted-foreground leading-relaxed">{reviewData.referralOffer}</p>
                     </div>
@@ -603,7 +652,7 @@ export default function ReviewFeedbackPage() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500 transition-colors cursor-pointer" onClick={() => setReferralOptIn(!referralOptIn)}>
+              <label htmlFor="referralOptIn" className="flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500 transition-colors cursor-pointer" data-testid="row-referral-optin">
                 <Checkbox
                   id="referralOptIn"
                   checked={referralOptIn}
@@ -611,16 +660,16 @@ export default function ReviewFeedbackPage() {
                   className="mt-0.5"
                   data-testid="checkbox-referral-optin"
                 />
-                <Label htmlFor="referralOptIn" className="text-sm leading-relaxed cursor-pointer font-medium">
+                <span className="text-sm leading-relaxed font-medium">
                   Yes, I'm interested in the referral program! Send me details on how to earn.
-                </Label>
-              </div>
+                </span>
+              </label>
 
               <div className="flex gap-3">
                 <Button
                   variant="outline"
                   className="flex-1 h-12 border-2 text-muted-foreground"
-                  onClick={() => setStep("referral_feedback")}
+                  onClick={() => { setReferralOptIn(false); setStep("referral_feedback"); }}
                   data-testid="button-skip-review"
                 >
                   Maybe Later
@@ -817,6 +866,12 @@ export default function ReviewFeedbackPage() {
                 </div>
               )}
 
+              {!generatedReview && !generateMutation.isPending && generateMutation.error && (
+                <p role="alert" className="text-sm text-destructive text-center" data-testid="text-generate-error">
+                  {generateMutation.error.message} You can use your own words below instead.
+                </p>
+              )}
+
               {!generatedReview && !generateMutation.isPending && (
                 <div className="space-y-4">
                   {skippedDescribe ? (
@@ -835,10 +890,7 @@ export default function ReviewFeedbackPage() {
                       <div className="flex gap-2">
                         <Button
                           className="flex-1 h-12 text-base font-bold bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white"
-                          onClick={() => {
-                            setGeneratedReview(highlights);
-                            fetch(`/api/review/${token}/track-review-method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: "own" }) }).catch(() => {});
-                          }}
+                          onClick={acceptOwnWords}
                           disabled={!highlights.trim()}
                           data-testid="button-use-own-review"
                         >
@@ -868,15 +920,27 @@ export default function ReviewFeedbackPage() {
                         className="border-2"
                         data-testid="input-review-highlights-fallback"
                       />
-                      <Button
-                        className="w-full h-12 text-base font-bold bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white"
-                        onClick={() => generateMutation.mutate()}
-                        disabled={!highlights.trim()}
-                        data-testid="button-generate-review-retry"
-                      >
-                        <Sparkles className="w-5 h-5 mr-2" />
-                        Generate Review
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 h-12 text-base font-bold bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white"
+                          onClick={acceptOwnWords}
+                          disabled={!highlights.trim()}
+                          data-testid="button-use-own-review"
+                        >
+                          <PenLine className="w-5 h-5 mr-2" />
+                          Use My Review
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 h-12 text-base font-bold border-2"
+                          onClick={() => generateMutation.mutate()}
+                          disabled={!highlights.trim()}
+                          data-testid="button-generate-review-retry"
+                        >
+                          <Sparkles className="w-5 h-5 mr-2" />
+                          {generateMutation.error ? "Try AI Again" : "Generate Review"}
+                        </Button>
+                      </div>
                     </>
                   )}
                 </div>
