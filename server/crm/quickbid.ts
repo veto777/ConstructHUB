@@ -20,11 +20,12 @@ import { db } from "../db";
 import {
   crmCustomers, crmEstimates, crmEstimateItems, crmMeasurements, crmPbItems,
 } from "@shared/schema";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { resolveEstimateTaxRate } from "./tax";
 import { logEvent, presentEstimate, presentEstimateItem, recalcEstimate } from "./entities";
 import { inferSqftMetric, quickBidLine, type SqftMetric } from "./quickbid-math";
+import { nextDocNumber } from "./doc-number";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -131,21 +132,26 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
     // (the tax.ts hook only fires on POST /api/crm/estimates, so do it here).
     const tax = await resolveEstimateTaxRate(ctx.org.id, { customerId: cust.id });
 
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEstimates)
-      .where(eq(crmEstimates.orgId, ctx.org.id));
     const names = lines.map((l) => l.item.name);
     const title = (p.data.title?.trim() || `Quick Bid — ${names.join(" + ")}`).slice(0, 200);
 
-    const [est] = await db.insert(crmEstimates).values({
-      orgId: ctx.org.id, customerId: cust.id, projectId: null,
-      number: `E-${1000 + n + 1}`, title,
-      introText: null, termsText: ctx.org.termsAndConditions ?? null,
-      taxRateBps: tax.bps, publicToken: token(), createdByMemberId: ctx.member.id,
-      customFields: {
-        quickBid: { measurementId: m.id, provider: m.provider, itemIds: p.data.itemIds },
-        taxSource: { source: tax.source, bps: tax.bps, matchedCity: tax.matchedCity ?? null },
-      },
-    } as any).returning();
+    // Numbered and inserted in one transaction under the org's estimate-number
+    // lock (doc-number.ts) — the same series and lock as every other estimate
+    // create, never count(*)+1, which repeats after a delete and races.
+    const est = await db.transaction(async (tx) => {
+      const number = await nextDocNumber(tx, "E", ctx.org.id);
+      const [row] = await tx.insert(crmEstimates).values({
+        orgId: ctx.org.id, customerId: cust.id, projectId: null,
+        number, title,
+        introText: null, termsText: ctx.org.termsAndConditions ?? null,
+        taxRateBps: tax.bps, publicToken: token(), createdByMemberId: ctx.member.id,
+        customFields: {
+          quickBid: { measurementId: m.id, provider: m.provider, itemIds: p.data.itemIds },
+          taxSource: { source: tax.source, bps: tax.bps, matchedCity: tax.matchedCity ?? null },
+        },
+      } as any).returning();
+      return row;
+    });
 
     await db.insert(crmEstimateItems).values(lines.map((l, idx) => ({
       orgId: ctx.org.id, estimateId: est.id, sortOrder: idx,
