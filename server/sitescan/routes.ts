@@ -195,18 +195,30 @@ export function registerSiteScanRoutes(
     if (body.locationId && !(await profileFor(user, body.locationId)))
       return res.status(404).json({ message: "Synced profile not found" });
     if (body.enabled) {
-      const {
-        rows: [n],
-      } = await pool.query(
-        "SELECT count(*)::int n FROM sitescan_schedules WHERE user_id=$1",
-        [user],
-      );
-      if (n.n >= 10)
-        return res.status(409).json({ message: "Maximum 10 scheduled sites" });
-      await pool.query(
-        "INSERT INTO sitescan_schedules(user_id,url,location_id,page_cap,psi_pages) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,url) DO UPDATE SET location_id=$3,page_cap=$4,psi_pages=$5",
-        [user, url, body.locationId ?? null, body.pageCap, body.psiPages],
-      );
+      const c = await pool.connect();
+      try {
+        await c.query("BEGIN");
+        // Serialize this owner's limit check and insert, including new URLs.
+        await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+        const { rows: [n] } = await c.query(
+          "SELECT count(*)::int n, bool_or(url=$2) AS existing FROM sitescan_schedules WHERE user_id=$1",
+          [user, url],
+        );
+        if (n.n >= 10 && !n.existing) {
+          await c.query("ROLLBACK");
+          return res.status(409).json({ message: "Maximum 10 scheduled sites" });
+        }
+        await c.query(
+          "INSERT INTO sitescan_schedules(user_id,url,location_id,page_cap,psi_pages) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,url) DO UPDATE SET location_id=$3,page_cap=$4,psi_pages=$5",
+          [user, url, body.locationId ?? null, body.pageCap, body.psiPages],
+        );
+        await c.query("COMMIT");
+      } catch (e) {
+        await c.query("ROLLBACK");
+        throw e;
+      } finally {
+        c.release();
+      }
     } else
       await pool.query(
         "DELETE FROM sitescan_schedules WHERE user_id=$1 AND url=$2",

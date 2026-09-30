@@ -291,3 +291,18 @@ it("reserves monthly schedules once across competing ticks and notifies a score 
     expect.anything(),
   );
 });
+
+it("serializes schedule caps while allowing updates at the limit", async () => {
+  await pool.query("DELETE FROM sitescan_schedules WHERE user_id=1");
+  const schedule = (i: number, pageCap = 1) => call("post", "/api/sitescan/schedule", {
+    body: { url: `https://sitescan-cap-${i}.test/`, enabled: true, pageCap, psiPages: 0 },
+  });
+  for (let i = 0; i < 9; i++) expect((await schedule(i)).status).toBe(200);
+  const results = await Promise.all([schedule(9), schedule(10)]);
+  expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+  expect((await schedule(0, 20)).status).toBe(200);
+  const { rows } = await pool.query("SELECT page_cap FROM sitescan_schedules WHERE user_id=1");
+  expect(rows).toHaveLength(10);
+  expect(rows.some(r => r.page_cap === 20)).toBe(true);
+  await pool.query("DELETE FROM sitescan_schedules WHERE url LIKE 'https://sitescan-cap-%'");
+});
