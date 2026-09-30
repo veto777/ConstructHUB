@@ -153,10 +153,23 @@ export function evalFormula(src: string, symbols: Record<string, number> = {}): 
   return r;
 }
 
-/** Syntax-check without values — used to validate on save. */
-export function validateFormula(src: string): { ok: true } | { ok: false; error: string } {
-  try { evalFormula(src, {}); return { ok: true }; }
+/**
+ * Syntax-check without values — used to validate on save.
+ *
+ * With `known`, a symbol outside that list is an error too: evalFormula treats
+ * an unknown symbol as 0 (Leap's behaviour), so a typo like [SQAURES] in a
+ * saved SKU would otherwise quietly price the line at a quantity of 0.
+ */
+export function validateFormula(
+  src: string, known?: readonly string[],
+): { ok: true } | { ok: false; error: string } {
+  try { evalFormula(src, {}); }
   catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+  if (known) {
+    const unknown = unknownSymbols(src, known);
+    if (unknown.length) return { ok: false, error: unknownSymbolMessage(unknown, known) };
+  }
+  return { ok: true };
 }
 
 /** Symbols referenced by a formula, so the UI can prompt for them. */
@@ -164,4 +177,15 @@ export function formulaSymbols(src: string): string[] {
   try {
     return [...new Set(tokenize(src ?? "").filter((t) => t.t === "sym").map((t: any) => t.v))];
   } catch { return []; }
+}
+
+/** Referenced symbols that aren't in `known` (tokens are upper-cased, so compare that way). */
+export function unknownSymbols(src: string, known: readonly string[]): string[] {
+  const k = new Set(known.map((s) => s.trim().toUpperCase()));
+  return formulaSymbols(src).filter((s) => !k.has(s));
+}
+
+export function unknownSymbolMessage(unknown: string[], known: readonly string[]): string {
+  const list = (xs: readonly string[]) => xs.map((s) => `[${s.toUpperCase()}]`).join(" ");
+  return `Unknown symbol${unknown.length > 1 ? "s" : ""} ${list(unknown)}. Available: ${list(known)}`;
 }

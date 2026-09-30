@@ -21,7 +21,9 @@ import {
 import { and, eq, asc, desc, ilike, or, sql } from "drizzle-orm";
 import { requireOrg, requireOwnerRole, requirePermission, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
-import { evalFormula, validateFormula, formulaSymbols, FormulaError } from "./formula";
+import {
+  evalFormula, validateFormula, formulaSymbols, unknownSymbols, unknownSymbolMessage, FormulaError,
+} from "./formula";
 import { priceFloorLockOf } from "./price-floor";
 
 type GetUser = (req: any, res: any) => any;
@@ -227,21 +229,55 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     res.json(rows.map((l) => presentLabor(l, ctx)));
   });
 
+  const laborSchema = z.object({
+    name: z.string().trim().min(1).max(120),
+    hourlyCostCents: z.number().int().min(0).max(100_000_00).default(0),
+    hourlyPriceCents: z.number().int().min(0).max(100_000_00).default(0),
+    isDefault: z.boolean().default(false),
+  });
+
   app.post("/api/crm/pricebook/labor-rates", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "managePriceBook");
     if (!ctx) return;
-    const p = z.object({
-      name: z.string().min(1).max(120),
-      hourlyCostCents: z.number().int().min(0).max(100_000_00).default(0),
-      hourlyPriceCents: z.number().int().min(0).max(100_000_00).default(0),
-      isDefault: z.boolean().default(false),
-    }).safeParse(req.body);
+    const p = laborSchema.safeParse(req.body);
     if (!p.success) return res.status(400).json({ message: "Invalid labor rate", issues: p.error.issues });
     if (p.data.isDefault) {
       await db.update(crmPbLaborRates).set({ isDefault: false }).where(eq(crmPbLaborRates.orgId, ctx.org.id));
     }
     const [row] = await db.insert(crmPbLaborRates).values({ ...p.data, orgId: ctx.org.id } as any).returning();
     res.status(201).json(presentLabor(row, ctx));
+  });
+
+  app.patch("/api/crm/pricebook/labor-rates/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "managePriceBook");
+    if (!ctx) return;
+    const p = laborSchema.partial().safeParse(req.body);
+    if (!p.success) return res.status(400).json({ message: "Invalid labor rate", issues: p.error.issues });
+    const [cur] = await db.select().from(crmPbLaborRates)
+      .where(and(eq(crmPbLaborRates.orgId, ctx.org.id), eq(crmPbLaborRates.id, req.params.id),
+        eq(crmPbLaborRates.active, true))).limit(1);
+    if (!cur) return res.status(404).json({ message: "Labor rate not found" });
+    if (!Object.keys(p.data).length) return res.json(presentLabor(cur, ctx));
+    if (p.data.isDefault) {
+      await db.update(crmPbLaborRates).set({ isDefault: false }).where(eq(crmPbLaborRates.orgId, ctx.org.id));
+    }
+    const [row] = await db.update(crmPbLaborRates).set(p.data as any)
+      .where(eq(crmPbLaborRates.id, cur.id)).returning();
+    res.json(presentLabor(row, ctx));
+  });
+
+  /**
+   * Soft delete, same rule as items: assembly parts reference the rate by id
+   * and expandItem doesn't filter on active, so SKUs built on it keep pricing.
+   */
+  app.delete("/api/crm/pricebook/labor-rates/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "managePriceBook");
+    if (!ctx) return;
+    const [row] = await db.update(crmPbLaborRates).set({ active: false, isDefault: false })
+      .where(and(eq(crmPbLaborRates.orgId, ctx.org.id), eq(crmPbLaborRates.id, req.params.id),
+        eq(crmPbLaborRates.active, true))).returning({ id: crmPbLaborRates.id });
+    if (!row) return res.status(404).json({ message: "Labor rate not found" });
+    res.json({ ok: true });
   });
 
   // ── Materials ─────────────────────────────────────────────────────────────
@@ -259,7 +295,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
   });
 
   const materialSchema = z.object({
-    name: z.string().min(1).max(200),
+    name: z.string().trim().min(1).max(200),
     sku: z.string().max(80).nullable().optional(),
     description: z.string().max(2000).nullable().optional(),
     categoryId: z.string().max(64).nullable().optional(),
@@ -295,6 +331,17 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     res.json(presentMaterial(row, ctx));
   });
 
+  /** Soft delete — assembly parts reference materials by id, same rule as items. */
+  app.delete("/api/crm/pricebook/materials/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "managePriceBook");
+    if (!ctx) return;
+    const [row] = await db.update(crmPbMaterials).set({ active: false, updatedAt: new Date() })
+      .where(and(eq(crmPbMaterials.orgId, ctx.org.id), eq(crmPbMaterials.id, req.params.id),
+        eq(crmPbMaterials.active, true))).returning({ id: crmPbMaterials.id });
+    if (!row) return res.status(404).json({ message: "Material not found" });
+    res.json({ ok: true });
+  });
+
   /** Bulk price/cost adjustment — HCP's "Service Price Adjuster". */
   app.post("/api/crm/pricebook/materials/adjust", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "managePriceBook");
@@ -327,8 +374,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
   // ── Assemblies ────────────────────────────────────────────────────────────
 
   const itemSchema = z.object({
-    name: z.string().min(1).max(200),
-    code: z.string().max(60).nullable().optional(),
+    name: z.string().trim().min(1).max(200),
+    code: z.string().trim().max(60).nullable().optional(),
     description: z.string().max(4000).nullable().optional(),
     categoryId: z.string().max(64).nullable().optional(),
     unit: z.enum(CRM_PB_UNITS as unknown as [string, ...string[]]).default("ea"),
@@ -359,6 +406,47 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     })).max(200).optional(),
   });
 
+  /** Symbols a SKU's formulas may use: the built-ins plus its own placeholders. */
+  const knownSymbolsFor = (placeholders?: { symbol?: string }[] | null): string[] => [
+    ...CRM_PB_SYMBOLS,
+    ...(Array.isArray(placeholders) ? placeholders : [])
+      .map((x) => String(x?.symbol ?? "").trim().toUpperCase()).filter(Boolean),
+  ];
+
+  /**
+   * First formula problem on an item body — its own qty formula, then each
+   * part's — or null. Checked before any write so a bad part formula can't
+   * leave a half-saved SKU behind, and a typo'd [SYMBOL] can't quietly price
+   * a line at a quantity of 0.
+   */
+  const itemFormulaError = (
+    qtyFormula: string | null | undefined,
+    parts: { qtyFormula?: string | null }[] | undefined,
+    known: string[],
+  ): string | null => {
+    if (qtyFormula) {
+      const v = validateFormula(qtyFormula, known);
+      if (!v.ok) return `Formula error: ${v.error}`;
+    }
+    for (const x of parts ?? []) {
+      if (!x.qtyFormula) continue;
+      const v = validateFormula(x.qtyFormula, known);
+      if (!v.ok) return `Part formula error in "${x.qtyFormula}": ${v.error}`;
+    }
+    return null;
+  };
+
+  /** Another active SKU in this org already using `code` (case-insensitive)? */
+  const codeTakenBy = async (orgId: string, code: string, exceptId?: string) => {
+    const [dupe] = await db.select({ id: crmPbItems.id, name: crmPbItems.name }).from(crmPbItems)
+      .where(and(
+        eq(crmPbItems.orgId, orgId), eq(crmPbItems.active, true),
+        sql`lower(${crmPbItems.code}) = lower(${code})`,
+        exceptId ? sql`${crmPbItems.id} <> ${exceptId}` : sql`true`,
+      )).limit(1);
+    return dupe ?? null;
+  };
+
   app.get("/api/crm/pricebook/items", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -382,16 +470,18 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!ctx) return;
     const p = itemSchema.safeParse(req.body);
     if (!p.success) return res.status(400).json({ message: "Invalid item", issues: p.error.issues });
-    // Validate the formula before it can poison an estimate.
-    if (p.data.qtyFormula) {
-      const v = validateFormula(p.data.qtyFormula);
-      if (!v.ok) return res.status(400).json({ message: `Formula error: ${v.error}` });
-    }
+    // Validate the formulas before they can poison an estimate.
+    const formulaErr = itemFormulaError(p.data.qtyFormula, p.data.parts, knownSymbolsFor(p.data.placeholders));
+    if (formulaErr) return res.status(400).json({ message: formulaErr });
     const { parts, ...item } = p.data;
     // SKU number: absent a typed code, assign the org's next sequential number
-    // (1, 2, 3…). Custom text codes are left exactly as entered.
+    // (1, 2, 3…). Custom text codes are kept as entered, but must be unique
+    // among the org's active SKUs — a code is how a SKU is found on estimates.
     let code = item.code?.trim() || null;
-    if (!code) {
+    if (code) {
+      const dupe = await codeTakenBy(ctx.org.id, code);
+      if (dupe) return res.status(409).json({ message: `That code is already used by "${dupe.name}".` });
+    } else {
       const [r] = await db.select({ n: sql<number>`coalesce(max(${crmPbItems.code}::int), 0)` })
         .from(crmPbItems)
         .where(and(eq(crmPbItems.orgId, ctx.org.id), sql`${crmPbItems.code} ~ '^[0-9]{1,9}$'`));
@@ -399,8 +489,6 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     }
     const [row] = await db.insert(crmPbItems).values({ ...item, code, orgId: ctx.org.id } as any).returning();
     if (parts?.length) {
-      const bad = parts.find((x) => x.qtyFormula && !validateFormula(x.qtyFormula).ok);
-      if (bad) return res.status(400).json({ message: `Part formula error in "${bad.qtyFormula}"` });
       await db.insert(crmPbItemParts).values(parts.map((x, i) => ({
         ...x, orgId: ctx.org.id, itemId: row.id, sortOrder: i,
       })) as any);
@@ -434,20 +522,27 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!ctx) return;
     const p = itemSchema.partial().safeParse(req.body);
     if (!p.success) return res.status(400).json({ message: "Invalid item", issues: p.error.issues });
-    // Validate the formula before it can poison an estimate.
-    if (p.data.qtyFormula) {
-      const v = validateFormula(p.data.qtyFormula);
-      if (!v.ok) return res.status(400).json({ message: `Formula error: ${v.error}` });
+    const [cur] = await db.select().from(crmPbItems)
+      .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, req.params.id))).limit(1);
+    if (!cur) return res.status(404).json({ message: "Item not found" });
+    // Validate the formulas before they can poison an estimate.
+    const formulaErr = itemFormulaError(p.data.qtyFormula, p.data.parts,
+      knownSymbolsFor(p.data.placeholders !== undefined ? p.data.placeholders : cur.placeholders as any));
+    if (formulaErr) return res.status(400).json({ message: formulaErr });
+    // Only a CHANGED code is checked, so editing a SKU that already shares a
+    // code with another (older data) isn't blocked for an unrelated field.
+    const newCode = p.data.code?.trim() || null;
+    if (newCode && newCode.toLowerCase() !== (cur.code ?? "").toLowerCase()) {
+      const dupe = await codeTakenBy(ctx.org.id, newCode, cur.id);
+      if (dupe) return res.status(409).json({ message: `That code is already used by "${dupe.name}".` });
     }
     const { parts, ...patch } = p.data;
     const [row] = await db.update(crmPbItems).set({ ...patch, updatedAt: new Date() } as any)
-      .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, req.params.id))).returning();
+      .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, cur.id))).returning();
     if (!row) return res.status(404).json({ message: "Item not found" });
     // Parts are replaced wholesale when supplied — a partial merge of "the
     // shingles line" against "the underlayment line" would be guesswork.
     if (parts) {
-      const bad = parts.find((x) => x.qtyFormula && !validateFormula(x.qtyFormula).ok);
-      if (bad) return res.status(400).json({ message: `Part formula error in "${bad.qtyFormula}"` });
       await db.delete(crmPbItemParts)
         .where(and(eq(crmPbItemParts.orgId, ctx.org.id), eq(crmPbItemParts.itemId, row.id)));
       if (parts.length) {
@@ -562,9 +657,16 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!p.success) return res.status(400).json({ message: "Invalid request" });
     const v = validateFormula(p.data.formula);
     if (!v.ok) return res.status(400).json({ ok: false, error: v.error });
+    // An unknown symbol evaluates to 0. The tester doesn't know a SKU's own
+    // placeholders, so it warns rather than refuses; saving a SKU refuses.
+    const known = [...CRM_PB_SYMBOLS, ...Object.keys(p.data.symbols)];
+    const unknown = unknownSymbols(p.data.formula, known);
+    const warnings = unknown.length
+      ? [`${unknownSymbolMessage(unknown, CRM_PB_SYMBOLS)} — unknown symbols count as 0 unless the SKU defines them as placeholders.`]
+      : [];
     try {
       res.json({ ok: true, result: evalFormula(p.data.formula, p.data.symbols),
-                 symbols: formulaSymbols(p.data.formula) });
+                 symbols: formulaSymbols(p.data.formula), warnings });
     } catch (e: any) {
       res.status(400).json({ ok: false, error: String(e?.message || e) });
     }

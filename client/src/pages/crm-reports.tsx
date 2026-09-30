@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   Ruler, Upload, Loader2, FileText, Download, ClipboardPaste, UserPlus, Link2,
 } from "lucide-react";
@@ -17,7 +17,9 @@ import {
 
 /**
  * Measurement report imports. Upload a HOVER PDF or paste the report text —
- * the parse is previewed first and NOTHING is created until you confirm.
+ * the parse is stored as a draft and previewed first; no client is created
+ * until you confirm, and Discard deletes the draft. A draft left behind (a
+ * refresh mid-review) can be reopened or discarded from the list.
  * Confirming dedupe-matches (or creates) the client and files the report
  * where the client portal can show it.
  */
@@ -43,6 +45,10 @@ interface ReportRow {
   status: string;
   date: string | null;
   customerId: string | null;
+  /** The linked client's current name — the parsed contact name can differ after a dedupe match. */
+  customerName?: string | null;
+  /** Drafts only: the stored parse, so a review can be reopened after a refresh. */
+  parsed?: ParsedReport | null;
   fileName: string | null;
   contact: ParsedReport["contact"] | null;
   addressLine1: string | null;
@@ -55,6 +61,7 @@ interface ReportRow {
 }
 
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
+const PAGE = 25;
 const fmt = (v: number | null | undefined, suffix = "") =>
   v === null || v === undefined ? "—" : `${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}${suffix}`;
 
@@ -117,8 +124,63 @@ export default function CrmReportsPage() {
       });
     },
     onError: (e: any) =>
-      toast({ title: "Couldn't confirm the report", description: String(e.message ?? e), variant: "destructive" }),
+      toast({ title: "Couldn't confirm the report", description: apiErrorMessage(e), variant: "destructive" }),
   });
+
+  // Parse already stored a draft row server-side, so Discard deletes it —
+  // clearing the preview alone left an orphan "draft" in the list.
+  const discard = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/crm/reports/${id}`)).json(),
+    onSuccess: (_d, id) => {
+      if (draft?.id === id) setDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/reports"] });
+      toast({ title: "Draft discarded" });
+    },
+    onError: (e: any) =>
+      toast({ title: "Couldn't discard the draft", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
+  // Reopening a draft's review from the list scrolls it into view (the page
+  // scrolls inside <main>, so window.scrollTo wouldn't).
+  const previewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (draft) previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [draft?.id]);
+
+  const [shown, setShown] = useState(PAGE);
+
+  const reportWhere = (r: ReportRow) =>
+    `${r.provider} · ${[r.addressLine1, r.city, r.state].filter(Boolean).join(", ") || "no address"}`;
+  // The link reads as the client it points to; the parsed name is the fallback.
+  const clientCell = (r: ReportRow, tid: string) => r.customerId ? (
+    <Link href={`/crm/clients/${r.customerId}`} className="text-primary hover:underline" data-testid={`${tid}report-client-${r.id}`}>
+      {r.customerName || r.contact?.name || "Client"}
+    </Link>
+  ) : (
+    <span className="text-muted-foreground">{r.contact?.name ?? "—"}</span>
+  );
+  const rowActions = (r: ReportRow, tid: string, justify: string) => (
+    <div className={`flex flex-wrap items-center gap-3 ${justify}`}>
+      {r.status === "draft" && canManage && r.parsed && (
+        <button type="button" className="text-sm text-primary hover:underline" data-testid={`${tid}report-review-${r.id}`}
+          onClick={() => { setConfirmed(null); setDraft({ id: r.id, parsed: r.parsed! }); }}>
+          Review
+        </button>
+      )}
+      {r.status === "draft" && canManage && (
+        <button type="button" className="text-sm text-destructive hover:underline disabled:opacity-50"
+          disabled={discard.isPending} data-testid={`${tid}report-discard-${r.id}`}
+          onClick={() => { if (window.confirm("Discard this unconfirmed import? Nothing was filed from it.")) discard.mutate(r.id); }}>
+          Discard
+        </button>
+      )}
+      {r.downloadUrl && (
+        <a href={r.downloadUrl} className="inline-flex items-center gap-1 text-sm text-primary hover:underline" data-testid={`${tid}report-download-${r.id}`}>
+          <Download className="h-3.5 w-3.5" /> Text
+        </a>
+      )}
+    </div>
+  );
 
   if (isError) {
     return <ErrorCard title="Couldn't load reports" description="Check your connection and refresh the page." />;
@@ -195,7 +257,7 @@ export default function CrmReportsPage() {
 
       {/* ── Preview before anything is created ──────────────────────────── */}
       {draft && p && (
-        <Card className="border-primary/40" data-testid="report-preview">
+        <Card ref={previewRef} className="border-primary/40 scroll-mt-4" data-testid="report-preview">
           <CardHeader>
             <SectionTitle
               icon={FileText}
@@ -233,7 +295,9 @@ export default function CrmReportsPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDraft(null)} data-testid="button-discard-report">
+              <Button variant="outline" onClick={() => discard.mutate(draft.id)} disabled={discard.isPending}
+                data-testid="button-discard-report">
+                {discard.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Discard
               </Button>
               <Button onClick={() => confirm.mutate()} disabled={confirm.isPending} data-testid="button-confirm-report">
@@ -274,53 +338,69 @@ export default function CrmReportsPage() {
               description="Upload a HOVER PDF or paste a report above — the parsed client lands on your Clients page." />
           </Card>
         ) : (
-          <div className={crmTable.wrapper}>
-            <table className={crmTable.table}>
-              <thead className={crmTable.thead}>
-                <tr>
-                  <th className={crmTable.th}>Report</th>
-                  <th className={crmTable.th}>Client</th>
-                  <th className={crmTable.th}>Status</th>
-                  <th className={crmTable.th}>Date</th>
-                  <th className={crmTable.thRight}>Squares</th>
-                  <th className={crmTable.thRight}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {reports.map((r) => (
-                  <tr key={r.id} className={crmTable.tr} data-testid={`report-row-${r.id}`}>
-                    <td className={crmTable.td}>
-                      <div className="font-medium">{r.fileName ?? "Pasted report"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {r.provider} · {[r.addressLine1, r.city, r.state].filter(Boolean).join(", ") || "no address"}
+          <>
+            {/* Phones get stacked cards; the table starts at sm. `m-` test ids
+                keep the two layouts' ids unique. */}
+            <div className="space-y-2 sm:hidden">
+              {reports.slice(0, shown).map((r) => (
+                <Card key={r.id} data-testid={`report-card-${r.id}`}>
+                  <CardContent className="p-4 space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium break-words">{r.fileName ?? "Pasted report"}</div>
+                        <div className="text-xs text-muted-foreground">{reportWhere(r)}</div>
                       </div>
-                    </td>
-                    <td className={crmTable.td}>
-                      {r.customerId ? (
-                        <Link href={`/crm/clients/${r.customerId}`} className="text-primary hover:underline" data-testid={`report-client-${r.id}`}>
-                          {r.contact?.name ?? "Client"}
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">{r.contact?.name ?? "—"}</span>
-                      )}
-                    </td>
-                    <td className={crmTable.td}>
-                      <StatusPill tone={statusTone(r.status)} data-testid={`report-status-${r.id}`}>{r.status}</StatusPill>
-                    </td>
-                    <td className={crmTable.td}>{day(r.date)}</td>
-                    <td className={crmTable.tdRight}>{fmt(r.squares)}</td>
-                    <td className={crmTable.tdRight}>
-                      {r.downloadUrl && (
-                        <a href={r.downloadUrl} className="inline-flex items-center gap-1 text-sm text-primary hover:underline" data-testid={`report-download-${r.id}`}>
-                          <Download className="h-3.5 w-3.5" /> Text
-                        </a>
-                      )}
-                    </td>
+                      <StatusPill tone={statusTone(r.status)}>{r.status}</StatusPill>
+                    </div>
+                    <div className="text-sm">{clientCell(r, "m-")}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {day(r.date)} · {fmt(r.squares)} squares
+                    </div>
+                    {rowActions(r, "m-", "justify-start")}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className={`${crmTable.wrapper} hidden sm:block`}>
+              <table className={crmTable.table}>
+                <thead className={crmTable.thead}>
+                  <tr>
+                    <th className={crmTable.th}>Report</th>
+                    <th className={crmTable.th}>Client</th>
+                    <th className={crmTable.th}>Status</th>
+                    <th className={crmTable.th}>Date</th>
+                    <th className={crmTable.thRight}>Squares</th>
+                    <th className={crmTable.thRight}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {reports.slice(0, shown).map((r) => (
+                    <tr key={r.id} className={crmTable.tr} data-testid={`report-row-${r.id}`}>
+                      <td className={crmTable.td}>
+                        <div className="font-medium">{r.fileName ?? "Pasted report"}</div>
+                        <div className="text-xs text-muted-foreground">{reportWhere(r)}</div>
+                      </td>
+                      <td className={crmTable.td}>{clientCell(r, "")}</td>
+                      <td className={crmTable.td}>
+                        <StatusPill tone={statusTone(r.status)} data-testid={`report-status-${r.id}`}>{r.status}</StatusPill>
+                      </td>
+                      <td className={crmTable.td}>{day(r.date)}</td>
+                      <td className={crmTable.tdRight}>{fmt(r.squares)}</td>
+                      <td className={crmTable.tdRight}>{rowActions(r, "", "justify-end")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {reports.length > shown && (
+              <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
+                <span data-testid="text-report-count">Showing {shown} of {reports.length}</span>
+                <Button variant="outline" size="sm" onClick={() => setShown((n) => n + PAGE)} data-testid="button-more-reports">
+                  Show {Math.min(PAGE, reports.length - shown)} more
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </CrmPage>

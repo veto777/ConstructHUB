@@ -1,60 +1,150 @@
 import { governmentLinkNotice } from "@shared/government-links";
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiIssueMessage } from "@/lib/api-issue-message";
 import {
-  ArrowLeft, Loader2, Plus, DollarSign, FileDiff,
-  ClipboardCheck, NotebookPen, Palette, FileBadge, TrendingUp, TrendingDown,
+  ArrowLeft, Loader2, Plus, DollarSign, FileDiff, ClipboardCheck, ClipboardCopy, NotebookPen,
+  Palette, FileBadge, TrendingUp, TrendingDown, Send, Check, RotateCcw, Pencil,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
 
+// Cents → "$1,250.50" / "-$200.00": currency style puts the sign before the $.
 const money = (c?: number | null) =>
-  c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  c === null || c === undefined ? "—" : (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
+const cents = (v: string) => Math.round((parseFloat(v) || 0) * 100);
+
+const TABS = ["costing", "change-orders", "punch", "logs", "selections", "permits"] as const;
+const SELECTION_STATUSES = ["pending", "chosen", "ordered", "installed"] as const;
+
+/** Server field keys → the words on these forms, for validation toasts. */
+const FIELD_LABELS: Record<string, string> = {
+  title: "Title", amountCents: "Amount", scheduleImpactDays: "+Days", location: "Location",
+  workCompleted: "Work completed", weather: "Weather", crewCount: "Crew", name: "Selection",
+  category: "Category", allowanceCents: "Allowance", actualCents: "Actual cost",
+  chosenOptionName: "Chosen option", budgetCents: "Amount", costCodeId: "Cost code", description: "Description",
+};
+
+/** The costing form's entry kinds → the route each one posts to. */
+const COST_ENTRY_KINDS: { value: string; label: string; noun: string; done: string }[] = [
+  { value: "budget", label: "Budget", noun: "budget line", done: "Budget line added" },
+  { value: "commitment", label: "Committed — PO / subcontract", noun: "commitment", done: "Commitment added" },
+  { value: "vendor_bill", label: "Actual — vendor bill", noun: "cost", done: "Cost posted" },
+  { value: "labor", label: "Actual — labor", noun: "cost", done: "Cost posted" },
+  { value: "expense", label: "Actual — expense", noun: "cost", done: "Cost posted" },
+];
 
 export default function CrmProjectPage() {
   const [, params] = useRoute("/crm/projects/:id");
   const id = params?.id;
   const { toast } = useToast();
-  const [tab, setTab] = useState("costing");
+  // The tab lives in ?tab= so a reload (or a shared link) lands on the same one.
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const tabParam = new URLSearchParams(search).get("tab");
+  const tab = (TABS as readonly string[]).includes(tabParam ?? "") ? tabParam! : "costing";
+  const setTab = (t: string) => navigate(`/crm/projects/${id}?tab=${t}`, { replace: true });
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
-  const seeCosts = me?.permissions?.seeCosts === true;
+  const perms = me?.permissions ?? {};
+  const seeCosts = perms.seeCosts === true;
+  const canManageJobs = perms.manageJobs === true;
+  const canSendCo = perms.approveChangeOrders === true;
 
   const { data: projects, isLoading, isError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
   const project = projects?.projects?.find((p: any) => p.id === id);
+  // Children only load once the project is known to exist (and be visible) —
+  // a bad id renders "Project not found" without six 404s behind it.
+  const ready = !!project;
 
   const { data: costing, isError: costingError } = useQuery<any>({
-    queryKey: [`/api/crm/projects/${id}/costing`], enabled: !!id && seeCosts, retry: false,
+    queryKey: [`/api/crm/projects/${id}/costing`], enabled: ready && seeCosts, retry: false,
   });
-  const { data: cos, isLoading: cosLoading, isError: cosError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/change-orders`], enabled: !!id });
-  const { data: punch, isError: punchError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/punch-items`], enabled: !!id });
-  const { data: logs, isError: logsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/daily-logs`], enabled: !!id });
-  const { data: sels, isError: selsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/selections`], enabled: !!id });
-  const { data: permits, isError: permitsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/permits/suggest`], enabled: !!id });
+  const { data: costCodes } = useQuery<any[]>({ queryKey: ["/api/crm/cost-codes"], enabled: ready && seeCosts });
+  const { data: cos, isLoading: cosLoading, isError: cosError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/change-orders`], enabled: ready });
+  const { data: punch, isError: punchError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/punch-items`], enabled: ready });
+  const { data: logs, isError: logsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/daily-logs`], enabled: ready });
+  const { data: sels, isError: selsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/selections`], enabled: ready });
+  const { data: permits, isError: permitsError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/permits/suggest`], enabled: ready });
 
-  const post = (path: string, body: any, label: string, key: string) =>
-    apiRequest("POST", `/api/crm/projects/${id}/${path}`, body).then(async (r) => {
-      if (!r.ok) throw new Error(await r.text());
+  /** POST a project child. Resolves true on success so a form resets only then. */
+  const post = (path: string, body: any, noun: string, done: string, key: string): Promise<boolean> =>
+    apiRequest("POST", `/api/crm/projects/${id}/${path}`, body).then(() => {
       queryClient.invalidateQueries({ queryKey: [key] });
-      toast({ title: label });
-      return r.json();
-    }).catch((e) => toast({ title: `Could not add ${label}`, description: String(e.message ?? e), variant: "destructive" }));
+      toast({ title: done });
+      return true;
+    }).catch((e) => {
+      toast({ title: `Could not add ${noun}`, description: apiIssueMessage(e, FIELD_LABELS), variant: "destructive" });
+      return false;
+    });
+
+  /** PATCH a punch item / selection (the routes projectChild registers). */
+  const patchChild = (path: string, childId: string, body: any, noun: string, done: string, key: string): Promise<boolean> =>
+    apiRequest("PATCH", `/api/crm/${path}/${childId}`, body).then(() => {
+      queryClient.invalidateQueries({ queryKey: [key] });
+      toast({ title: done });
+      return true;
+    }).catch((e) => {
+      toast({ title: `Could not update ${noun}`, description: apiIssueMessage(e, FIELD_LABELS), variant: "destructive" });
+      return false;
+    });
+
+  /** Copy a CO's client link; if the clipboard is unavailable, show the link to copy by hand. */
+  const copyLink = async (link: string, copied: string, manual: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: copied, description: "Share it with the homeowner — they approve or decline on that page." });
+    } catch {
+      toast({ title: manual, description: link });
+    }
+  };
+  const [sendingCo, setSendingCo] = useState<string | null>(null);
+  const sendCo = (coId: string) => {
+    setSendingCo(coId);
+    apiRequest("POST", `/api/crm/change-orders/${coId}/send`, {})
+      .then((r) => r.json())
+      .then((r) => {
+        queryClient.invalidateQueries({ queryKey: [`/api/crm/projects/${id}/change-orders`] });
+        return copyLink(r.link, "Marked sent — client link copied", "Marked sent — copy the client link below");
+      })
+      .catch((e) => toast({ title: "Could not send change order", description: apiIssueMessage(e), variant: "destructive" }))
+      .finally(() => setSendingCo(null));
+  };
 
   const [co, setCo] = useState({ title: "", amount: "", days: "0" });
   const [pu, setPu] = useState({ title: "", location: "" });
   const [lg, setLg] = useState({ workCompleted: "", weather: "", crewCount: "" });
   const [se, setSe] = useState({ name: "", category: "", allowance: "" });
+  const [ce, setCe] = useState({ kind: "vendor_bill", costCodeId: "", amount: "", description: "" });
+  // Selection being edited inline: its id + the draft values.
+  const [selEdit, setSelEdit] = useState<{ id: string; chosen: string; actual: string; status: string } | null>(null);
+
+  const addCostEntry = () => {
+    const kind = COST_ENTRY_KINDS.find((k) => k.value === ce.kind)!;
+    const amountCents = cents(ce.amount);
+    const description = ce.description.trim() || null;
+    const [path, body] = ce.kind === "budget"
+      ? ["budget-lines", { costCodeId: ce.costCodeId, budgetCents: amountCents, notes: description }]
+      : ce.kind === "commitment"
+        ? ["commitments", { costCodeId: ce.costCodeId, amountCents, description }]
+        : ["costs", { costCodeId: ce.costCodeId, amountCents, description, source: ce.kind }];
+    post(path as string, body, kind.noun, kind.done, `/api/crm/projects/${id}/costing`)
+      .then((ok) => ok && setCe({ ...ce, amount: "", description: "" }));
+  };
 
   if (!id) return null;
   if (isLoading) {
@@ -76,6 +166,7 @@ export default function CrmProjectPage() {
   }
 
   const t = costing?.totals;
+  const kindOptions = COST_ENTRY_KINDS.filter((k) => k.value !== "budget" || canManageJobs);
 
   return (
     <CrmPage wide>
@@ -112,18 +203,27 @@ export default function CrmProjectPage() {
             <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gross profit</div>
-                <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums flex items-center gap-2">
-                  {money(t.grossProfitCents)}
-                  {t.marginBps >= 0
-                    ? <TrendingUp className="h-5 w-5 text-emerald-600" />
-                    : <TrendingDown className="h-5 w-5 text-destructive" />}
-                  <span className="text-base font-normal text-muted-foreground">
-                    {(t.marginBps / 100).toFixed(1)}% margin
-                  </span>
-                </div>
+                {/* With nothing posted, "profit" would just be the contract at a
+                    100% margin — say what's missing instead of claiming that. */}
+                {t.actualCents > 0 ? (
+                  <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums flex items-center gap-2"
+                    data-testid="text-gross-profit">
+                    {money(t.grossProfitCents)}
+                    {t.grossProfitCents >= 0
+                      ? <TrendingUp className="h-5 w-5 text-emerald-600" />
+                      : <TrendingDown className="h-5 w-5 text-destructive" />}
+                    <span className="text-base font-normal text-muted-foreground">
+                      {t.revisedContractCents > 0 ? `${(t.marginBps / 100).toFixed(1)}% margin` : "no contract value set"}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-base text-muted-foreground" data-testid="text-gross-profit">
+                    No costs posted yet — profit and margin show once bills or labor are recorded.
+                  </div>
+                )}
               </div>
               <p className="text-xs text-muted-foreground max-w-sm">
-                Budget vs committed vs actual, per cost code. Neither Housecall Pro nor Leap can produce this.
+                Revised contract minus actual cost posted so far. Budget vs committed vs actual, per cost code, is below.
               </p>
             </CardContent>
           </Card>
@@ -148,7 +248,56 @@ export default function CrmProjectPage() {
                 description="Committed = POs placed. Actual = vendor bills and labor posted."
               />
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {seeCosts && !costingError && (
+                costCodes && !costCodes.length ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3">
+                    <p className="text-sm text-muted-foreground">
+                      No cost codes yet — budget and costs are tracked per cost code.
+                      {!perms.manageSettings && " Ask an account admin to add the starter set here."}
+                    </p>
+                    {perms.manageSettings && (
+                      <Button size="sm" variant="outline" data-testid="button-seed-cost-codes"
+                        onClick={() => apiRequest("POST", "/api/crm/cost-codes/seed", {}).then((r) => r.json()).then((r) => {
+                          queryClient.invalidateQueries({ queryKey: ["/api/crm/cost-codes"] });
+                          toast({ title: `Added ${r.added} starter cost codes` });
+                        }).catch((e) => toast({ title: "Could not add cost codes", description: apiIssueMessage(e), variant: "destructive" }))}>
+                        <Plus className="h-4 w-4 mr-1" /> Add starter cost codes
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-12 items-end rounded-lg border bg-muted/30 p-3" data-testid="form-cost-entry">
+                    <div className="sm:col-span-3"><Label className="text-xs">Entry</Label>
+                      <Select value={ce.kind} onValueChange={(v) => setCe({ ...ce, kind: v })}>
+                        <SelectTrigger data-testid="select-cost-kind"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {kindOptions.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select></div>
+                    <div className="sm:col-span-3"><Label className="text-xs">Cost code</Label>
+                      <Select value={ce.costCodeId} onValueChange={(v) => setCe({ ...ce, costCodeId: v })}>
+                        <SelectTrigger data-testid="select-cost-code"><SelectValue placeholder="Pick a cost code" /></SelectTrigger>
+                        <SelectContent>
+                          {costCodes?.map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>{c.code} · {c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select></div>
+                    <div className="sm:col-span-3"><Label className="text-xs">{ce.kind === "budget" ? "Notes" : "Vendor / description"}</Label>
+                      <Input value={ce.description} maxLength={2000}
+                        onChange={(e) => setCe({ ...ce, description: e.target.value })} data-testid="input-cost-desc" /></div>
+                    <div className="sm:col-span-2"><Label className="text-xs">Amount $</Label>
+                      <Input type="number" min={0} step="0.01" value={ce.amount}
+                        onChange={(e) => setCe({ ...ce, amount: e.target.value })} data-testid="input-cost-amount" /></div>
+                    <Button className="sm:col-span-1" data-testid="button-add-cost"
+                      disabled={!ce.costCodeId || ce.amount === "" || !(parseFloat(ce.amount) >= 0)}
+                      onClick={addCostEntry}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )
+              )}
               {!seeCosts ? (
                 <p className="text-sm text-muted-foreground">You don't have permission to see costs.</p>
               ) : costingError ? (
@@ -199,35 +348,55 @@ export default function CrmProjectPage() {
               <div className="grid gap-2 sm:grid-cols-4 items-end rounded-lg border bg-muted/30 p-3">
                 <div className="sm:col-span-2">
                   <Label className="text-xs">Title</Label>
-                  <Input value={co.title} onChange={(e) => setCo({ ...co, title: e.target.value })}
+                  <Input value={co.title} maxLength={200} onChange={(e) => setCo({ ...co, title: e.target.value })}
                     placeholder="Add cedar trim to gable" data-testid="input-co-title" />
                 </div>
                 <div><Label className="text-xs">Amount $</Label>
-                  <Input type="number" value={co.amount} onChange={(e) => setCo({ ...co, amount: e.target.value })} /></div>
+                  <Input type="number" step="0.01" value={co.amount} onChange={(e) => setCo({ ...co, amount: e.target.value })} /></div>
                 <div className="flex gap-2">
                   <div><Label className="text-xs">+Days</Label>
-                    <Input type="number" value={co.days} onChange={(e) => setCo({ ...co, days: e.target.value })} /></div>
-                  <Button className="self-end" data-testid="button-add-co"
-                    onClick={() => co.title && post("change-orders", {
-                      title: co.title, amountCents: Math.round((parseFloat(co.amount) || 0) * 100),
+                    <Input type="number" min={-365} max={365} value={co.days} onChange={(e) => setCo({ ...co, days: e.target.value })} /></div>
+                  <Button className="self-end" data-testid="button-add-co" disabled={!co.title.trim()}
+                    onClick={() => post("change-orders", {
+                      title: co.title.trim(), amountCents: cents(co.amount),
                       scheduleImpactDays: parseInt(co.days) || 0,
-                    }, "Change order added", `/api/crm/projects/${id}/change-orders`).then(() => setCo({ title: "", amount: "", days: "0" }))}>
+                    }, "change order", "Change order added", `/api/crm/projects/${id}/change-orders`)
+                      .then((ok) => ok && setCo({ title: "", amount: "", days: "0" }))}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               {cos?.map((c: any) => (
-                <div key={c.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                  <div>
+                <div key={c.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2"
+                  data-testid={`co-row-${c.id}`}>
+                  <div className="min-w-0">
                     <div className="font-medium">{c.number} · {c.title}</div>
                     <div className="text-sm text-muted-foreground tabular-nums">
                       {c.amountCents != null && money(c.amountCents)}
-                      {c.scheduleImpactDays ? ` · +${c.scheduleImpactDays} days` : ""}
+                      {c.scheduleImpactDays ? ` · ${c.scheduleImpactDays > 0 ? "+" : ""}${c.scheduleImpactDays} days` : ""}
+                      {c.sentAt ? ` · sent ${day(c.sentAt)}` : ""}
+                      {c.sentAt && !c.approvedAt && !c.declinedAt ? (c.firstViewedAt ? " · opened" : " · not opened yet") : ""}
                     </div>
                   </div>
-                  <StatusPill tone={c.approvedAt ? "success" : c.declinedAt ? "danger" : statusTone(c.status)}>
-                    {c.status}
-                  </StatusPill>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {c.status === "draft" && canSendCo && (
+                      <Button size="sm" variant="outline" disabled={sendingCo === c.id} onClick={() => sendCo(c.id)}
+                        title="Marks it sent and copies the client's approval link for you to share"
+                        data-testid={`button-send-co-${c.id}`}>
+                        {sendingCo === c.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+                        Mark sent & copy link
+                      </Button>
+                    )}
+                    {c.status !== "draft" && c.publicPath && (
+                      <Button size="sm" variant="ghost" data-testid={`button-copy-co-${c.id}`}
+                        onClick={() => copyLink(window.location.origin + c.publicPath, "Client link copied", "Copy the client link below")}>
+                        <ClipboardCopy className="h-4 w-4 mr-1" /> Copy client link
+                      </Button>
+                    )}
+                    <StatusPill tone={c.approvedAt ? "success" : c.declinedAt ? "danger" : statusTone(c.status)}>
+                      {c.status}
+                    </StatusPill>
+                  </div>
                 </div>
               ))}
               {cosLoading ? (
@@ -245,23 +414,36 @@ export default function CrmProjectPage() {
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
                 <div className="flex-1 min-w-[200px]"><Label className="text-xs">Item</Label>
-                  <Input value={pu.title} onChange={(e) => setPu({ ...pu, title: e.target.value })}
+                  <Input value={pu.title} maxLength={300} onChange={(e) => setPu({ ...pu, title: e.target.value })}
                     placeholder="Touch up paint at north corner" data-testid="input-punch-title" /></div>
                 <div><Label className="text-xs">Location</Label>
-                  <Input value={pu.location} onChange={(e) => setPu({ ...pu, location: e.target.value })} /></div>
-                <Button data-testid="button-add-punch"
-                  onClick={() => pu.title && post("punch-items", { title: pu.title, location: pu.location || null },
-                    "Punch item added", `/api/crm/projects/${id}/punch-items`).then(() => setPu({ title: "", location: "" }))}>
+                  <Input value={pu.location} maxLength={200} onChange={(e) => setPu({ ...pu, location: e.target.value })} /></div>
+                <Button data-testid="button-add-punch" disabled={!pu.title.trim()}
+                  onClick={() => post("punch-items", { title: pu.title.trim(), location: pu.location.trim() || null },
+                    "punch item", "Punch item added", `/api/crm/projects/${id}/punch-items`)
+                    .then((ok) => ok && setPu({ title: "", location: "" }))}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
               {punch?.map((p: any) => (
-                <div key={p.id} className="rounded-lg border px-4 py-3 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="font-medium">{p.title}</div>
+                <div key={p.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2"
+                  data-testid={`punch-row-${p.id}`}>
+                  <div className="min-w-0">
+                    <div className={`font-medium ${p.status === "done" ? "line-through text-muted-foreground" : ""}`}>{p.title}</div>
                     {p.location && <div className="text-sm text-muted-foreground">{p.location}</div>}
                   </div>
-                  <StatusPill tone={p.status === "done" ? "success" : "neutral"}>{p.status}</StatusPill>
+                  <div className="flex items-center gap-2">
+                    {canManageJobs && (
+                      <Button size="sm" variant="outline" data-testid={`button-toggle-punch-${p.id}`}
+                        onClick={() => patchChild("punch-items", p.id, { status: p.status === "done" ? "open" : "done" },
+                          "punch item", p.status === "done" ? "Reopened" : "Marked done", `/api/crm/projects/${id}/punch-items`)}>
+                        {p.status === "done"
+                          ? <><RotateCcw className="h-4 w-4 mr-1" /> Reopen</>
+                          : <><Check className="h-4 w-4 mr-1" /> Done</>}
+                      </Button>
+                    )}
+                    <StatusPill tone={p.status === "done" ? "success" : "neutral"}>{p.status}</StatusPill>
+                  </div>
                 </div>
               ))}
               {punchError ? (
@@ -278,18 +460,19 @@ export default function CrmProjectPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                <Textarea rows={2} value={lg.workCompleted} placeholder="What got done today?"
+                <Textarea rows={2} value={lg.workCompleted} placeholder="What got done today?" maxLength={20000}
                   onChange={(e) => setLg({ ...lg, workCompleted: e.target.value })} data-testid="input-log-work" />
                 <div className="flex flex-wrap gap-2 items-end">
                   <div><Label className="text-xs">Weather</Label>
-                    <Input value={lg.weather} onChange={(e) => setLg({ ...lg, weather: e.target.value })} /></div>
+                    <Input value={lg.weather} maxLength={100} onChange={(e) => setLg({ ...lg, weather: e.target.value })} /></div>
                   <div><Label className="text-xs">Crew</Label>
-                    <Input type="number" value={lg.crewCount} onChange={(e) => setLg({ ...lg, crewCount: e.target.value })} /></div>
-                  <Button data-testid="button-add-log"
-                    onClick={() => lg.workCompleted && post("daily-logs", {
-                      workCompleted: lg.workCompleted, weather: lg.weather || null,
-                      crewCount: parseInt(lg.crewCount) || null,
-                    }, "Log filed", `/api/crm/projects/${id}/daily-logs`).then(() => setLg({ workCompleted: "", weather: "", crewCount: "" }))}>
+                    <Input type="number" min={0} max={500} value={lg.crewCount} onChange={(e) => setLg({ ...lg, crewCount: e.target.value })} /></div>
+                  <Button data-testid="button-add-log" disabled={!lg.workCompleted.trim()}
+                    onClick={() => post("daily-logs", {
+                      workCompleted: lg.workCompleted.trim(), weather: lg.weather.trim() || null,
+                      crewCount: lg.crewCount === "" ? null : parseInt(lg.crewCount),
+                    }, "daily log", "Log filed", `/api/crm/projects/${id}/daily-logs`)
+                      .then((ok) => ok && setLg({ workCompleted: "", weather: "", crewCount: "" }))}>
                     <Plus className="h-4 w-4 mr-1" /> File log
                   </Button>
                 </div>
@@ -320,33 +503,76 @@ export default function CrmProjectPage() {
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
                 <div className="flex-1 min-w-[180px]"><Label className="text-xs">Selection</Label>
-                  <Input value={se.name} onChange={(e) => setSe({ ...se, name: e.target.value })}
+                  <Input value={se.name} maxLength={200} onChange={(e) => setSe({ ...se, name: e.target.value })}
                     placeholder="Front door" data-testid="input-sel-name" /></div>
                 <div><Label className="text-xs">Category</Label>
-                  <Input value={se.category} onChange={(e) => setSe({ ...se, category: e.target.value })} /></div>
+                  <Input value={se.category} maxLength={100} onChange={(e) => setSe({ ...se, category: e.target.value })} /></div>
                 <div><Label className="text-xs">Allowance $</Label>
-                  <Input type="number" value={se.allowance} onChange={(e) => setSe({ ...se, allowance: e.target.value })} /></div>
-                <Button data-testid="button-add-sel"
-                  onClick={() => se.name && post("selections", {
-                    name: se.name, category: se.category || null,
-                    allowanceCents: Math.round((parseFloat(se.allowance) || 0) * 100),
-                  }, "Selection added", `/api/crm/projects/${id}/selections`).then(() => setSe({ name: "", category: "", allowance: "" }))}>
+                  <Input type="number" min={0} step="0.01" value={se.allowance} onChange={(e) => setSe({ ...se, allowance: e.target.value })} /></div>
+                <Button data-testid="button-add-sel" disabled={!se.name.trim()}
+                  onClick={() => post("selections", {
+                    name: se.name.trim(), category: se.category.trim() || null,
+                    allowanceCents: cents(se.allowance),
+                  }, "selection", "Selection added", `/api/crm/projects/${id}/selections`)
+                    .then((ok) => ok && setSe({ name: "", category: "", allowance: "" }))}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
               {sels?.map((s: any) => {
                 const over = s.actualCents != null && s.actualCents > s.allowanceCents;
+                const editing = selEdit?.id === s.id ? selEdit : null;
                 return (
-                  <div key={s.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="font-medium">{s.name}{s.category ? ` · ${s.category}` : ""}</div>
-                      <div className="text-sm text-muted-foreground tabular-nums">
-                        Allowance {money(s.allowanceCents)}
-                        {s.actualCents != null && ` · actual ${money(s.actualCents)}`}
-                        {over && <span className="text-destructive font-medium"> · over by {money(s.actualCents - s.allowanceCents)}</span>}
+                  <div key={s.id} className="rounded-lg border px-4 py-3 space-y-3" data-testid={`sel-row-${s.id}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium">{s.name}{s.category ? ` · ${s.category}` : ""}</div>
+                        {s.chosenOptionName && <div className="text-sm">Chosen: {s.chosenOptionName}</div>}
+                        <div className="text-sm text-muted-foreground tabular-nums">
+                          Allowance {money(s.allowanceCents)}
+                          {s.actualCents != null && ` · actual ${money(s.actualCents)}`}
+                          {over && <span className="text-destructive font-medium"> · over by {money(s.actualCents - s.allowanceCents)}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {canManageJobs && !editing && (
+                          <Button size="sm" variant="ghost" data-testid={`button-edit-sel-${s.id}`}
+                            onClick={() => setSelEdit({
+                              id: s.id, chosen: s.chosenOptionName ?? "", status: s.status,
+                              actual: s.actualCents != null ? (s.actualCents / 100).toString() : "",
+                            })}>
+                            <Pencil className="h-4 w-4 mr-1" /> Update
+                          </Button>
+                        )}
+                        <StatusPill tone={statusTone(s.status)}>{s.status}</StatusPill>
                       </div>
                     </div>
-                    <StatusPill tone={statusTone(s.status)}>{s.status}</StatusPill>
+                    {editing && (
+                      <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
+                        <div className="flex-1 min-w-[180px]"><Label className="text-xs">Chosen option</Label>
+                          <Input value={editing.chosen} maxLength={200} placeholder="Therma-Tru fiberglass, black"
+                            onChange={(e) => setSelEdit({ ...editing, chosen: e.target.value })} data-testid="input-sel-chosen" /></div>
+                        <div><Label className="text-xs">Actual cost $</Label>
+                          <Input type="number" min={0} step="0.01" value={editing.actual}
+                            onChange={(e) => setSelEdit({ ...editing, actual: e.target.value })} data-testid="input-sel-actual" /></div>
+                        <div><Label className="text-xs">Status</Label>
+                          <Select value={editing.status} onValueChange={(v) => setSelEdit({ ...editing, status: v })}>
+                            <SelectTrigger className="w-32" data-testid="select-sel-status"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {SELECTION_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                            </SelectContent>
+                          </Select></div>
+                        <Button size="sm" variant="ghost" onClick={() => setSelEdit(null)}>Cancel</Button>
+                        <Button size="sm" data-testid="button-save-sel"
+                          onClick={() => patchChild("selections", s.id, {
+                            chosenOptionName: editing.chosen.trim() || null,
+                            actualCents: editing.actual === "" ? null : cents(editing.actual),
+                            status: editing.status,
+                          }, "selection", "Selection updated", `/api/crm/projects/${id}/selections`)
+                            .then((ok) => ok && setSelEdit(null))}>
+                          Save
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -362,7 +588,7 @@ export default function CrmProjectPage() {
             <CardHeader>
               <SectionTitle
                 title="Permits & inspections"
-                description="Verified portals matched to this project's jurisdiction — every URL is liveness-checked. No competitor can do this."
+                description="Official permit portals on file for this project's jurisdiction, with each link's check status shown."
               />
             </CardHeader>
             <CardContent className="space-y-2">
