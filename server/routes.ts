@@ -154,6 +154,12 @@ export async function registerRoutes(
   registerAccountEventRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
+  const { ensureAdsSchema } = await import("./ads/schema");
+  await ensureAdsSchema();
+  const { registerAdsRoutes } = await import("./ads/routes");
+  registerAdsRoutes(app, getDevUser);
+  const { startAdsWorker } = await import("./ads/worker");
+  startAdsWorker();
   const { ensureGbpTokenEncryption } = await import("./gbp/token-crypto");
   await ensureGbpTokenEncryption();
   const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");

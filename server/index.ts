@@ -16,6 +16,7 @@ declare module "http" {
 
 // Bound public AI/photo JSON before the general parser; Stripe raw-body stays intact.
 app.use(["/api/site-assistant", "/api/ads-consultant", "/api/review", "/api/photos", "/api/gmb/review-response"], express.json({ limit: "32kb" }));
+app.use("/api/ads", express.json({ limit: "512kb" }));
 app.use(
   express.json({
     limit: "50mb",
@@ -55,7 +56,7 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       // Auth/consent bodies (QR seeds, recovery codes) and social bodies (signed upload URLs) never reach logs.
-      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social")) {
+      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
