@@ -59,7 +59,7 @@ test.describe("pricing page", () => {
     for (const k of PLAN_KEYS) {
       await expect(page.getByTestId(`card-plan-${k}`)).toBeVisible();
       await expect(page.getByTestId(`text-price-${k}`)).toHaveText(`${usd(PLANS[k].monthlyCents)}/mo`);
-      await expect(page.getByTestId(`button-subscribe-${k}`)).toHaveText(`Start ${TRIAL_DAYS}-day free trial`);
+      await expect(page.getByTestId(`button-subscribe-${k}`)).toHaveText(`Choose ${PLANS[k].name}`);
     }
     await expect(page.locator('[data-testid="card-plan-free"]')).toHaveCount(0);
     await expect(page.getByText(/Gold|Platinum/)).toHaveCount(0);

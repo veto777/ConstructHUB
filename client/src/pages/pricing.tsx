@@ -193,7 +193,9 @@ export default function PricingPage() {
   };
 
   /** The trial is for an account's first subscription only (the server decides; this mirrors it). */
-  const startLabel = (plan: PlanKey) => (view.firstSubscription ? `Start ${TRIAL_DAYS}-day free trial` : `Choose ${PLANS[plan].name}`);
+  // The server decides trial eligibility (one per customer), so the button never promises it;
+  // the line under the plans explains the trial for new accounts.
+  const startLabel = (plan: PlanKey) => `Choose ${PLANS[plan].name}`;
   /** An Agency subscriber keeps the location count they are billed for unless they pick another. */
   const currentAgencyLocations = view.planKey === "agency" && !view.isLegacy && view.locations ? view.locations : AGENCY_INCLUDED_LOCATIONS;
 

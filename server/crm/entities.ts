@@ -927,7 +927,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (!ctx) return;
     const where = [eq(crmJobs.orgId, ctx.org.id)];
     if (req.query.projectId) where.push(eq(crmJobs.projectId, String(req.query.projectId)));
-    const rows = await db.select().from(crmJobs).where(and(...where)).orderBy(asc(crmJobs.createdAt)).limit(500);
+    const rows = await db.select().from(crmJobs).where(and(...where)).orderBy(desc(crmJobs.createdAt)).limit(500);
     let visible = ctx.permissions.viewAllJobs
       ? rows
       : rows.filter((j) => (j.assignedMemberIds || []).includes(ctx.member.id));

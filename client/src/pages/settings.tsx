@@ -1572,7 +1572,7 @@ function BillingSection() {
                   <p className="text-xs text-muted-foreground" data-testid="text-plan-inactive">
                     {view.storedPlan
                       ? `Your ${view.displayName} subscription is ${(STATUS_LABELS[status] || status).toLowerCase()}.`
-                      : `No subscription on this account. Every plan starts with a ${TRIAL_DAYS}-day free trial.`}
+                      : `No subscription on this account. New customers start any plan with a ${TRIAL_DAYS}-day free trial.`}
                   </p>
                 </>
               )}

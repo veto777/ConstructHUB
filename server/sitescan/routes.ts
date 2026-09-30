@@ -319,13 +319,13 @@ export function registerSiteScanRoutes(
         .json({ message: "Daily rescan budget reached (5)." });
     }
     const profile = j.profile?.id ? await profileFor(user, j.profile.id) : null;
-    const id = await enqueue(
-      user,
-      j.url,
-      j.page_cap,
-      Math.max(1, j.psi_pages),
-      profile,
-    );
+    let id;
+    try {
+      id = await enqueue(user, j.url, j.page_cap, Math.max(1, j.psi_pages), profile);
+    } catch (e) {
+      await refundReservation(reservation, 1); // the rescan never started
+      throw e;
+    }
     await logActivity(req, user, "sitescan.started", { id, retryOf: j.id });
     res.status(202).json({ id });
   });
@@ -389,7 +389,13 @@ export function registerSiteScanRoutes(
         .status(429)
         .json({ message: "Daily scan budget reached (5)." });
     }
-    const id = await enqueue(user, url, body.pageCap, body.psiPages, profile);
+    let id;
+    try {
+      id = await enqueue(user, url, body.pageCap, body.psiPages, profile);
+    } catch (e) {
+      await refundReservation(reservation, 1); // the scan never started
+      throw e;
+    }
     await logActivity(req, user, "sitescan.started", { id, url });
     res.status(202).json({ id });
   });

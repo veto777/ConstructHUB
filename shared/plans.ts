@@ -138,7 +138,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     features: [
       "10 client locations included, then per-location pricing",
       "Agency workspace: client workspaces, bulk actions, email onboarding",
-      "Team roles — owner, admin, manager, viewer (10 seats)",
+      "Team roles — owner, admin, manager, viewer (10 seats, shared with the CRM team)",
       "Google Ads & LSA manager (manager account, IP exclusions)",
       "Cloudflare + Google Search Console",
       "Domains + Gmail alert forwarding",

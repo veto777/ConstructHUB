@@ -1,3 +1,4 @@
+import { ACCESS_STATUSES } from "@shared/plans";
 import { SiteScanLeads } from "./site-scan";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -96,7 +97,7 @@ const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—"
 
 function PlanPill({ plan, beta }: { plan: { plan: string; status: string }; beta?: boolean }) {
   if (beta) return <StatusPill tone="violet" data-testid="pill-beta">Beta</StatusPill>;
-  const active = plan.status === "active" || plan.status === "trialing";
+  const active = ACCESS_STATUSES.includes(plan.status);
   return (
     <StatusPill tone={active ? "success" : "neutral"}>
       {active ? plan.plan : "free"}
