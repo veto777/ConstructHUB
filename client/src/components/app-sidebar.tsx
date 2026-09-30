@@ -135,8 +135,10 @@ function scrollToFragment(url: string) {
   let tries = 0;
   const tick = () => {
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    else if (tries++ < 30) setTimeout(tick, 100);
+    if (!el) { if (tries++ < 30) setTimeout(tick, 100); return; }
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Content above it (plan cards) loads async and pushes it down: settle once more.
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: "start" }), 900);
   };
   setTimeout(tick, 0);
 }
