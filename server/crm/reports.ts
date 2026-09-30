@@ -296,6 +296,16 @@ function measurementColumns(m: ParsedReportMeasurements) {
   };
 }
 
+/**
+ * Download name for a report's stored text: the original name (sanitised)
+ * with a trailing .pdf or .txt swapped for a single .txt — "pasted-report.txt"
+ * stays "pasted-report.txt", never "pasted-report.txt.txt".
+ */
+export function reportTextFileName(fileName: unknown, id: string): string {
+  const name = String(fileName || `report-${id}`).replace(/[^\w.\-]+/g, "_");
+  return `${name.replace(/\.(pdf|txt)$/i, "")}.txt`;
+}
+
 /** One summary shape for list endpoints and the client portal. */
 function presentReport(r: typeof crmMeasurements.$inferSelect, downloadBase: string) {
   const raw = (r.rawPayload ?? {}) as any;
@@ -525,21 +535,54 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
       .limit(500);
     // A report outlives its customer (clients can be deleted) — never link to
     // a customer row that isn't there.
+    // The link text is the LINKED client's name, not the name parsed from the
+    // report — a dedupe match can file "Jane B." under the existing "Jane Bell".
     const ids = [...new Set(rows.map((r) => r.customerId).filter(Boolean))] as string[];
-    const live = new Set<string>();
+    const live = new Map<string, string | null>();
     if (ids.length) {
       const custs = await db
-        .select({ id: crmCustomers.id })
+        .select({ id: crmCustomers.id, displayName: crmCustomers.displayName })
         .from(crmCustomers)
         .where(and(eq(crmCustomers.orgId, ctx.org.id), inArray(crmCustomers.id, ids)));
-      for (const c of custs) live.add(c.id);
+      for (const c of custs) live.set(c.id, c.displayName ?? null);
     }
     res.json(
-      (await objectPolicy(ctx).filter("reports", rows)).map((r) => ({
-        ...presentReport(r, "/api/crm/reports"),
-        customerId: r.customerId && live.has(r.customerId) ? r.customerId : null,
-      })),
+      (await objectPolicy(ctx).filter("reports", rows)).map((r) => {
+        const linked = r.customerId && live.has(r.customerId) ? r.customerId : null;
+        return {
+          ...presentReport(r, "/api/crm/reports"),
+          customerId: linked,
+          customerName: linked ? live.get(linked) ?? null : null,
+          // A draft carries its parse so the list can reopen the review after
+          // a refresh (the preview itself only lives in page state).
+          parsed: r.status === "draft" ? (r.rawPayload as any)?.parsed ?? null : undefined,
+        };
+      }),
     );
+  });
+
+  /**
+   * Discard a parsed-but-unconfirmed import. Only drafts: a confirmed report
+   * is linked to a client (and their portal) and is not removed from here.
+   */
+  app.delete("/api/crm/reports/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageCustomers");
+    if (!ctx) return;
+    const [report] = await db
+      .select({ id: crmMeasurements.id, status: crmMeasurements.status, rawPayload: crmMeasurements.rawPayload })
+      .from(crmMeasurements)
+      .where(and(eq(crmMeasurements.id, req.params.id), eq(crmMeasurements.orgId, ctx.org.id)))
+      .limit(1);
+    if (!report || !(report.rawPayload as any)?.importSource) return res.status(404).json({ message: "Report not found" });
+    if (report.status !== "draft") {
+      return res.status(409).json({ message: "Only an unconfirmed draft can be discarded — this report is already filed." });
+    }
+    const gone = await db
+      .delete(crmMeasurements)
+      .where(and(eq(crmMeasurements.id, report.id), eq(crmMeasurements.orgId, ctx.org.id), eq(crmMeasurements.status, "draft")))
+      .returning({ id: crmMeasurements.id });
+    if (!gone.length) return res.status(409).json({ message: "That report was just confirmed — refresh to see it." });
+    res.json({ ok: true, deleted: report.id });
   });
 
   /** Re-download the stored report text (the "file reference"). */
@@ -555,9 +598,8 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
     if (!row || typeof raw.sourceText !== "string" || !raw.sourceText) {
       return res.status(404).json({ message: "No stored report file" });
     }
-    const name = String(raw.fileName || `report-${row.id}.txt`).replace(/[^\w.\-]+/g, "_");
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${name.replace(/\.pdf$/i, "")}.txt"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${reportTextFileName(raw.fileName, row.id)}"`);
     res.send(raw.sourceText);
   });
 
@@ -702,9 +744,8 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
     if (typeof raw.sourceText !== "string" || !raw.sourceText) {
       return res.status(404).json({ message: "No stored report file" });
     }
-    const name = String(raw.fileName || `report-${row.id}.txt`).replace(/[^\w.\-]+/g, "_");
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${name.replace(/\.pdf$/i, "")}.txt"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${reportTextFileName(raw.fileName, row.id)}"`);
     res.send(raw.sourceText);
   });
 }

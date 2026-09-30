@@ -9,7 +9,7 @@
  * has grown an attack surface.
  */
 import { describe, it, expect } from "vitest";
-import { evalFormula, validateFormula, formulaSymbols, FormulaError } from "./formula";
+import { evalFormula, validateFormula, formulaSymbols, unknownSymbols, FormulaError } from "./formula";
 
 describe("evalFormula — arithmetic", () => {
   it("1: plain addition", () => expect(evalFormula("1+2")).toBe(3));
@@ -83,4 +83,29 @@ describe("validateFormula / formulaSymbols", () => {
     expect(formulaSymbols("[SQ]*2+[WASTE]+[SQ]")).toEqual(["SQ", "WASTE"]));
   it("formulaSymbols returns [] for garbage instead of throwing", () =>
     expect(formulaSymbols("eval('1')")).toEqual([]));
+});
+
+describe("validateFormula with a known-symbol list", () => {
+  const KNOWN = ["QTY", "SQUARES", "WASTE"];
+  it("accepts formulas that only use known symbols (case-insensitive)", () => {
+    expect(validateFormula("ceil([squares] * (1 + [WASTE]/100))", KNOWN)).toEqual({ ok: true });
+    expect(validateFormula("[QTY]*2", ["qty"])).toEqual({ ok: true });
+  });
+  it("rejects a typo'd symbol instead of letting it evaluate to 0", () => {
+    const r = validateFormula("[FOO] * 2", KNOWN);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toMatch(/Unknown symbol \[FOO\]/);
+      expect(r.error).toMatch(/Available: \[QTY\] \[SQUARES\] \[WASTE\]/);
+    }
+  });
+  it("still reports syntax errors first", () => {
+    const r = validateFormula("[FOO] + *", KNOWN);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).not.toMatch(/Unknown symbol/);
+  });
+  it("unknownSymbols lists only the unknown ones", () =>
+    expect(unknownSymbols("[SQUARES] + [FOO] + [BAR] + [FOO]", KNOWN)).toEqual(["FOO", "BAR"]));
+  it("without a list, validation stays syntax-only", () =>
+    expect(validateFormula("[FOO] * 2")).toEqual({ ok: true }));
 });

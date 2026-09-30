@@ -93,4 +93,77 @@ describe("pricebook item PATCH/DELETE (dev server)", () => {
       await pool.end().catch(() => {});
     }
   });
+
+  // API only (no SQL): everything it makes is soft-deleted through the app.
+  it("guards codes, formula symbols and blank names; edits and soft-deletes labor and materials", async () => {
+    const run = Date.now().toString(36);
+    const me = await api("/api/crm/me");
+    if (me.status !== 200) throw new Error(`dev server not reachable at ${BASE}`);
+    const cookie = me.cookie;
+    const post = (path: string, body: any) => api(path, { method: "POST", body: JSON.stringify(body) }, cookie);
+    const items: string[] = [];
+    try {
+      // A typed code is unique among the org's active SKUs, case-insensitively.
+      const a = await post("/api/crm/pricebook/items", {
+        name: `Vitest code ${run}`, code: `VTC-${run}`, pricingMode: "flat", flatPriceCents: 100,
+      });
+      expect(a.status).toBe(201);
+      items.push(a.body.id);
+      const dupe = await post("/api/crm/pricebook/items", {
+        name: `Vitest code dupe ${run}`, code: `vtc-${run}`, pricingMode: "flat", flatPriceCents: 100,
+      });
+      expect(dupe.status).toBe(409);
+      expect(dupe.body.message).toMatch(/already used/);
+      // Re-saving a SKU with its own code is fine.
+      const keep = await api(`/api/crm/pricebook/items/${a.body.id}`, {
+        method: "PATCH", body: JSON.stringify({ code: `VTC-${run}`, flatPriceCents: 150 }),
+      }, cookie);
+      expect(keep.status).toBe(200);
+
+      // A spaces-only name is not a name.
+      expect((await post("/api/crm/pricebook/items", { name: "   ", pricingMode: "flat", flatPriceCents: 1 })).status).toBe(400);
+
+      // A typo'd symbol would evaluate to 0 — refused on save; a declared placeholder is fine.
+      const typo = await post("/api/crm/pricebook/items", {
+        name: `Vitest typo ${run}`, pricingMode: "formula", qtyFormula: "[SQAURES] * 2",
+      });
+      expect(typo.status).toBe(400);
+      expect(typo.body.message).toMatch(/Unknown symbol \[SQAURES\]/);
+      const ph = await post("/api/crm/pricebook/items", {
+        name: `Vitest placeholder ${run}`, pricingMode: "formula", qtyFormula: "[BAYS] * 2",
+        placeholders: [{ symbol: "bays", label: "Garage bays" }],
+      });
+      expect(ph.status).toBe(201);
+      items.push(ph.body.id);
+      // The tester warns instead of refusing (it can't know a SKU's placeholders).
+      const t = await post("/api/crm/pricebook/formula/test", { formula: "[FOO] * 2", symbols: {} });
+      expect(t.status).toBe(200);
+      expect(t.body.warnings?.[0]).toMatch(/Unknown symbol \[FOO\]/);
+
+      // Labor rates: PATCH + soft DELETE.
+      const lab = await post("/api/crm/pricebook/labor-rates", {
+        name: `Vitest crew ${run}`, hourlyCostCents: 4000, hourlyPriceCents: 8000,
+      });
+      expect(lab.status).toBe(201);
+      const labPatch = await api(`/api/crm/pricebook/labor-rates/${lab.body.id}`, {
+        method: "PATCH", body: JSON.stringify({ hourlyPriceCents: 9000 }),
+      }, cookie);
+      expect(labPatch.status).toBe(200);
+      expect(labPatch.body.hourlyPriceCents).toBe(9000);
+      expect(labPatch.body.hourlyCostCents).toBe(4000);
+      expect((await api(`/api/crm/pricebook/labor-rates/${lab.body.id}`, { method: "DELETE" }, cookie)).status).toBe(200);
+      expect((await api(`/api/crm/pricebook/labor-rates/${lab.body.id}`, { method: "DELETE" }, cookie)).status).toBe(404);
+      const labs = await api("/api/crm/pricebook/labor-rates", {}, cookie);
+      expect((labs.body as any[]).some((l) => l.id === lab.body.id)).toBe(false);
+
+      // Materials: soft DELETE leaves the active list.
+      const mat = await post("/api/crm/pricebook/materials", { name: `Vitest mat ${run}`, unit: "sq" });
+      expect(mat.status).toBe(201);
+      expect((await api(`/api/crm/pricebook/materials/${mat.body.id}`, { method: "DELETE" }, cookie)).status).toBe(200);
+      const mats = await api("/api/crm/pricebook/materials", {}, cookie);
+      expect((mats.body as any[]).some((m) => m.id === mat.body.id)).toBe(false);
+    } finally {
+      for (const id of items) await api(`/api/crm/pricebook/items/${id}`, { method: "DELETE" }, cookie).catch(() => {});
+    }
+  });
 });

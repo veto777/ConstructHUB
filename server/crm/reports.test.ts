@@ -24,10 +24,10 @@ const DATABASE_URL =
   process.env.DATABASE_URL ?? "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
 const ALPINE_ORG = "1e3050c1-3cfd-4d9b-ba5a-1c19ce074897";
 
-let parseMeasurementReport: any, parseHasContent: any, extractPdfText: any;
+let parseMeasurementReport: any, parseHasContent: any, extractPdfText: any, reportTextFileName: any;
 
 beforeAll(async () => {
-  ({ parseMeasurementReport, parseHasContent, extractPdfText } = await import("./reports"));
+  ({ parseMeasurementReport, parseHasContent, extractPdfText, reportTextFileName } = await import("./reports"));
 });
 
 // ── Pure: the parser ────────────────────────────────────────────────────────
@@ -137,6 +137,14 @@ describe("extractPdfText — minimal no-dependency extraction", () => {
   });
 });
 
+describe("reportTextFileName — the stored text's download name", () => {
+  it("swaps .pdf for .txt", () => expect(reportTextFileName("Hover Report.PDF", "x")).toBe("Hover_Report.txt"));
+  it("never doubles .txt", () => expect(reportTextFileName("pasted-report.txt", "x")).toBe("pasted-report.txt"));
+  it("falls back to the report id", () => expect(reportTextFileName(null, "abc")).toBe("report-abc.txt"));
+  it("sanitises anything header-unsafe", () =>
+    expect(reportTextFileName('a"b\r\nc.pdf', "x")).toBe("a_b_c.txt"));
+});
+
 // ── Server: dedupe on confirm, webhook key auth ─────────────────────────────
 
 const api = async (path: string, opts: RequestInit = {}) => {
@@ -185,6 +193,25 @@ describe("report import (dev server)", () => {
     // A draft cannot be confirmed twice.
     const again = await api(`/api/crm/reports/${up1.body.id}/confirm`, { method: "POST", body: "{}" });
     expect(again.status).toBe(409);
+  });
+
+  it("Discard deletes a draft only; a confirmed report can't be discarded", async () => {
+    const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const text = `Prepared for: Dana Discard\n9 Test Ln\nSarasota, FL 34236\ne2e-discard-${stamp}@example.com\nTotal Roof Area: 1,500 SF`;
+    const draft = await api("/api/crm/reports/upload", { method: "POST", body: JSON.stringify({ text }) });
+    expect(draft.status).toBe(201);
+    // The list carries the draft's parse so its review can be reopened.
+    const list = await api("/api/crm/reports");
+    const row = list.body.find((r: any) => r.id === draft.body.id);
+    expect(row.status).toBe("draft");
+    expect(row.parsed?.contact?.name).toBe("Dana Discard");
+    const del = await api(`/api/crm/reports/${draft.body.id}`, { method: "DELETE" });
+    expect(del.status).toBe(200);
+    expect((await api(`/api/crm/reports/${draft.body.id}`, { method: "DELETE" })).status).toBe(404);
+
+    const kept = await api("/api/crm/reports/upload", { method: "POST", body: JSON.stringify({ text }) });
+    await api(`/api/crm/reports/${kept.body.id}/confirm`, { method: "POST", body: "{}" });
+    expect((await api(`/api/crm/reports/${kept.body.id}`, { method: "DELETE" })).status).toBe(409);
   });
 
   it("rejects an upload with nothing parseable", async () => {
