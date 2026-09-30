@@ -8,6 +8,10 @@ import { createServer } from "http";
 const app = express();
 app.set("trust proxy", 1);
 const httpServer = createServer(app);
+import { registerInboundMail } from "./mail-alerts/inbound";
+registerInboundMail(app);
+import { registerPrivateIntegrationParsers } from "./domains/private-http";
+registerPrivateIntegrationParsers(app);
 
 declare module "http" {
   interface IncomingMessage {
@@ -50,7 +54,7 @@ app.use((req, res, next) => {
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
-    if (!isSiteScan) capturedJsonResponse = bodyJson;
+    if (!isSiteScan && !req.path.startsWith("/api/domains") && !req.path.startsWith("/api/mail-alerts")) capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 

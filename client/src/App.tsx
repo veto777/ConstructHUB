@@ -36,6 +36,8 @@ import RankingGridPage from "@/pages/ranking-grid";
 import PricingPage from "@/pages/pricing";
 import CompetitorsPage from "@/pages/competitors";
 import GbpContentPage from "@/pages/gbp-content";
+import DomainsPage from "@/pages/domains";
+import MailAlertsPage from "@/pages/mail-alerts";
 import LocationsPage from "@/pages/locations";
 import MasterClassPage from "@/pages/master-class";
 import ReinstatementPage from "@/pages/reinstatement";
@@ -115,6 +117,8 @@ function DashboardRouter() {
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/agency" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/domains" component={DomainsPage} />
+      <Route path="/mail-alerts" component={MailAlertsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/social-media" component={SocialMediaPage} />
       <Route path="/guides" component={GuidesPage} />
@@ -172,6 +176,8 @@ function PublicRouter() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/agency" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/domains" component={DomainsPage} />
+      <Route path="/mail-alerts" component={MailAlertsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
       {/* Signed-out visitors get the free public scan; the full tool needs an account. */}
       <Route path="/site-scan" component={FreeSiteScanPage} />

@@ -5,7 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Zap, Star,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight,
+  KanbanSquare, ArrowRight, Bell,
 } from "lucide-react";
 import permitsLogo from "@assets/Permits_1772157993497.png";
 import masterclassLogo from "@assets/Masterclass_1772158106209.png";
@@ -176,6 +176,8 @@ const googleGroups: NavGroup[] = [
     children: [
       { title: "Agency", url: "/agency", icon: Users },
       { title: "Locations", url: "/locations", icon: MapPin },
+      { title: "Domains", url: "/domains", icon: Globe },
+      { title: "Mail alerts", url: "/mail-alerts", icon: Bell },
       { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
       { title: "GBP Monitor", url: "/gmb-monitor", icon: Eye },
       { title: "Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },

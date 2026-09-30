@@ -131,9 +131,12 @@ export async function discoverZones(
     const {
       rows: [a],
     } = await pool.query(
-      `INSERT INTO edge_assets(user_id,connection_id,provider,external_id,name,domain,account_id,status)
-      VALUES($1,$2,'cloudflare',$3,$4,$5,$6,$7) ON CONFLICT(connection_id,external_id) DO UPDATE SET name=$4,domain=$5,status=$7 RETURNING id`,
-      [c.user_id, c.id, z.id, z.name, domain(z.name), z.account?.id, z.status],
+      `INSERT INTO edge_assets(user_id,connection_id,provider,external_id,name,domain,account_id,status,data)
+      VALUES($1,$2,'cloudflare',$3,$4,$5,$6,$7,jsonb_build_object('nameServers',$8::jsonb))
+      ON CONFLICT(connection_id,external_id) DO UPDATE SET name=$4,domain=$5,status=$7,
+        data=coalesce(edge_assets.data,'{}'::jsonb)||jsonb_build_object('nameServers',$8::jsonb) RETURNING id`,
+      [c.user_id, c.id, z.id, z.name, domain(z.name), z.account?.id, z.status,
+        JSON.stringify(Array.isArray(z.name_servers) ? z.name_servers.filter((n: unknown) => typeof n === "string").slice(0, 4) : [])],
     );
     await mapLocations(c.user_id, a.id, z.name);
   }
