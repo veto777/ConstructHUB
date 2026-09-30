@@ -50,7 +50,7 @@ export class GoogleClient {
         });
       } catch (e) {
         if (e instanceof GoogleError) throw e;
-        if (attempt >= 3) throw new GoogleError('transient', 'Google request timed out. Try again.', 503);
+        if (method === 'POST' || attempt >= 3) throw new GoogleError('transient', 'Google request timed out. Try again.', 503);
         await this.wait(1000 * 2 ** attempt); continue;
       }
       let data: any;
@@ -61,7 +61,15 @@ export class GoogleClient {
         return data;
       }
       const error = classify(response.status, data, service);
-      if (!['transient','quota'].includes(error.kind) || attempt >= 3) throw error;
+      // Preserve actionable provider validation details without reflecting credentials.
+      if (typeof data?.error?.message === 'string') {
+        const detail = (token ? data.error.message.split(token).join('[redacted]') : data.error.message)
+          .replace(/Bearer\s+\S+|ya29\.[\w.-]+/gi, '[redacted]')
+          .replace(/(access_token|refresh_token|api_key|key|client_secret)=([^\s&]+)/gi, '$1=[redacted]')
+          .slice(0, 500);
+        error.message += ` Google: ${detail}`;
+      }
+      if (method === 'POST' || !['transient','quota'].includes(error.kind) || attempt >= 3) throw error;
       const retry = response.headers.get('retry-after');
       const retryMs = retry ? (Number.isFinite(Number(retry)) ? Number(retry)*1000 : Date.parse(retry)-Date.now()) : 0;
       // Do not shorten a provider-requested long delay: hand it back to the scheduler.

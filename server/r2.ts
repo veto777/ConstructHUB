@@ -16,9 +16,11 @@ export async function uploadToR2(
   buffer: Buffer,
   contentType: string,
   folder: string,
-  extension: string = "jpg"
+  extension: string = "jpg",
+  fileName?: string
 ): Promise<string> {
-  const key = `${folder}/${randomUUID()}.${extension}`;
+  if (fileName && !/^[A-Za-z0-9-]+\.jpg$/.test(fileName)) throw new Error("Invalid media filename");
+  const key = fileName ? `${folder}/${randomUUID()}/${fileName}` : `${folder}/${randomUUID()}.${extension}`;
 
   await s3.send(new PutObjectCommand({
     Bucket: BUCKET,
