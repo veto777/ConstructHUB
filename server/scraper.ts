@@ -1,10 +1,16 @@
+import { existsSync } from "fs";
 import { canScrapeGovernmentPortal } from "@shared/government-links";
 import { chromium, type Browser, type Page, type BrowserContext } from "playwright-core";
 import * as cheerio from "cheerio";
 import { storage } from "./storage";
 import { log } from "./index";
+import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
 
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+// CHROMIUM_PATH wins. The Replit-era Nix build is used only where it exists;
+// anywhere else playwright-core launches its own managed headless build (the
+// one script/deploy-vb11.sh installs) instead of failing on a missing path.
+const REPLIT_CHROMIUM = "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || (existsSync(REPLIT_CHROMIUM) ? REPLIT_CHROMIUM : undefined);
 
 let browserInstance: Browser | null = null;
 let browserLaunchPromise: Promise<Browser> | null = null;
@@ -252,13 +258,19 @@ export async function startLiveSearch(
         jobId
       );
 
-      dbEntry.status = "completed";
+      // Every adapter catches its own failure (browser launch, timeout, portal
+      // change, login wall), records it on its scrape job and returns what it
+      // had so far — usually []. Read that outcome back: a portal that was never
+      // actually searched must not be reported as "Found 0 results".
+      const outcome = liveSearchOutcome(scrapeResults.length, scrapeJobs.get(jobId));
+      dbEntry.status = outcome.status;
       dbEntry.resultsFound = scrapeResults.length;
-      dbEntry.message = `Found ${scrapeResults.length} results`;
+      dbEntry.message = outcome.message;
       job.totalResultsFound = job.databases.reduce((sum, d) => sum + d.resultsFound, 0);
+      if (outcome.status === "error") log(`Live search error on ${db.name}: ${outcome.message}`, "scraper");
     } catch (err: any) {
       dbEntry.status = "error";
-      dbEntry.message = err.message?.substring(0, 100) || "Scrape failed";
+      dbEntry.message = `Not searched: ${scrapeFailureReason(err?.message)}`;
       log(`Live search error on ${db.name}: ${err.message}`, "scraper");
     }
 

@@ -55,6 +55,52 @@ async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: 
   }
 }
 
+export type RefreshTokenCheck =
+  | { ok: true; accessToken: string; expiresAt: Date }
+  | { ok: false; reason: "not_configured" | "rejected" | "client_rejected" | "unavailable"; message: string };
+
+/** Why Google's token endpoint refused a refresh-token exchange, in words an admin can act on. */
+export function classifyTokenRefreshFailure(status: number, body: unknown): Extract<RefreshTokenCheck, { ok: false }> {
+  const code = typeof (body as any)?.error === "string" ? (body as any).error as string : "";
+  if (code === "invalid_grant") {
+    return { ok: false, reason: "rejected", message: "Google rejected this refresh token (it is invalid, expired or revoked). Nothing was saved." };
+  }
+  if (code === "invalid_client" || code === "unauthorized_client") {
+    return { ok: false, reason: "client_rejected", message: "Google rejected this server's OAuth client (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET), so the refresh token could not be verified. Nothing was saved." };
+  }
+  if (status >= 500 || status === 429) {
+    return { ok: false, reason: "unavailable", message: "Google's token service did not answer, so the refresh token could not be verified. Nothing was saved; try again shortly." };
+  }
+  return { ok: false, reason: "rejected", message: `Google did not accept this refresh token${code ? ` (${code})` : ""}. Nothing was saved.` };
+}
+
+/** Exchange a manager refresh token once, so a connection is only saved when Google accepts it. */
+export async function verifyManagerRefreshToken(refreshToken: string): Promise<RefreshTokenCheck> {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return { ok: false, reason: "not_configured", message: "Google OAuth isn't configured on this server (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET), so a refresh token can't be verified. Nothing was saved." };
+  }
+  let res: Response;
+  try {
+    res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: clientId, client_secret: clientSecret }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e: any) {
+    console.error("[lsa-manager] Refresh token check could not reach Google:", e?.message || e);
+    return { ok: false, reason: "unavailable", message: "Couldn't reach Google to verify the refresh token. Nothing was saved; try again shortly." };
+  }
+  const body: any = await res.json().catch(() => null);
+  if (res.ok && typeof body?.access_token === "string") {
+    const expiresIn = Number(body.expires_in) || 3600;
+    return { ok: true, accessToken: body.access_token, expiresAt: new Date(Date.now() + (expiresIn - 60) * 1000) };
+  }
+  return classifyTokenRefreshFailure(res.status, body);
+}
+
 export async function getManagerConnection() {
   const [conn] = await db.select().from(lsaManagerConnection).orderBy(desc(lsaManagerConnection.connectedAt)).limit(1);
   return conn || null;

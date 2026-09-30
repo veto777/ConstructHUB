@@ -254,6 +254,21 @@ export default function PhotosPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const categoryBtnRef = useRef<HTMLButtonElement>(null);
 
+  // The category list is a custom portal popover: Escape closes it, like the
+  // app's other menus, and hands focus back to its button.
+  useEffect(() => {
+    if (!categoryDropdownOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setCategoryDropdownOpen(false);
+      setCategorySearch("");
+      categoryBtnRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [categoryDropdownOpen]);
+
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [watermarkText, setWatermarkText] = useState("");
   const [watermarkType, setWatermarkType] = useState<"text" | "image">("text");
@@ -1914,6 +1929,8 @@ export default function PhotosPage() {
               <button
                 ref={categoryBtnRef}
                 type="button"
+                aria-haspopup="dialog"
+                aria-expanded={categoryDropdownOpen}
                 onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
                 className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
@@ -2301,10 +2318,13 @@ export default function PhotosPage() {
                         className="w-full h-full object-cover rounded-md"
                         style={getFilterStyle(file.id)}
                       />
+                      {/* Remove/expand: always visible on touch screens (no hover); revealed on hover/focus with a mouse. */}
                       <button
                         type="button"
                         onClick={e => { e.stopPropagation(); removeFile(file.id); if (isSelected) setSelectedPhotoId(null); }}
-                        className="absolute top-1 right-1 p-0.5 rounded-full bg-background/80 text-foreground invisible group-hover:visible transition-opacity"
+                        aria-label={`Remove ${file.name}`}
+                        title="Remove photo"
+                        className="absolute top-1 right-1 p-1 rounded-full bg-background/80 text-foreground opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                         data-testid={`button-remove-photo-${file.id}`}
                       >
                         <X className="h-3 w-3" />
@@ -2316,7 +2336,9 @@ export default function PhotosPage() {
                         <button
                           type="button"
                           onClick={e => { e.stopPropagation(); setSelectedPhotoId(file.id); }}
-                          className="p-0.5 rounded-full bg-black/50 text-white invisible group-hover:visible transition-opacity hover:bg-black/70"
+                          aria-label={`Open ${file.name} in the editor`}
+                          title="Open editor"
+                          className="p-1 rounded-full bg-black/50 text-white opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-black/70"
                           data-testid={`button-expand-photo-${file.id}`}
                         >
                           <Maximize2 className="h-2.5 w-2.5" />

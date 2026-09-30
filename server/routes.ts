@@ -292,8 +292,18 @@ export async function registerRoutes(
         // Only portals with a verified live link AND a live-search adapter — the
         // ones a search or a refresh schedule can actually run against (the
         // Schedules picker asks with ?scrapable=true; the full list is ~14 MB).
+        // ?stateCode=FL narrows it to one state — the Search page's count and
+        // picker, which a paged ?filtered=true list (100 rows max) under-counted.
+        const rawState = req.query.stateCode;
+        if (rawState !== undefined && (typeof rawState !== "string" || !/^[A-Za-z]{2}$/.test(rawState.trim()))) {
+          return res.status(400).json({ message: "stateCode must be a two-letter state code" });
+        }
+        const stateCode = typeof rawState === "string" ? rawState.trim().toUpperCase() : null;
+        const stateCountyIds = stateCode
+          ? new Set((await storage.getCounties()).filter(c => c.stateCode === stateCode).map(c => c.id))
+          : null;
         const databases = (await storage.getDatabases())
-          .filter(d => governmentLinksAvailable(d) && canScrapeGovernmentPortal(d))
+          .filter(d => governmentLinksAvailable(d) && canScrapeGovernmentPortal(d) && (!stateCountyIds || stateCountyIds.has(d.countyId)))
           .sort((a, b) => a.name.localeCompare(b.name));
         res.json(databases.map(governmentPermitForDisplay));
       } else {
@@ -5800,6 +5810,10 @@ function main() {
         return res.status(400).json({ message: "Image too large (max 2MB)" });
       }
 
+      // Without storage credentials the upload can only fail; say why instead of a generic 500.
+      if (!(process.env.R2_ENDPOINT && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY)) {
+        return res.status(503).json({ message: "Image storage isn't configured on this server, so images can't be uploaded right now." });
+      }
       const folder = type === "avatar" ? "avatars" : type === "gmb-logo" ? "logos/gmb" : "logos/company";
       const key = await uploadToR2(buffer, `image/${match[1]}`, folder, ext);
       const url = getR2Url(key);
@@ -5869,7 +5883,7 @@ function main() {
     }
   });
 
-  const { getManagerConnection, fetchCampaigns, mutateCampaignBudget, mutateCampaignStatus, mutateCampaignSettings, createManagerLinkInvitation, listChildAccounts, detectLsaEnrollment, fetchAndStoreLeads, startManagerLeadSync } = await import("./lsa-manager");
+  const { getManagerConnection, fetchCampaigns, mutateCampaignBudget, mutateCampaignStatus, mutateCampaignSettings, createManagerLinkInvitation, listChildAccounts, detectLsaEnrollment, fetchAndStoreLeads, startManagerLeadSync, verifyManagerRefreshToken } = await import("./lsa-manager");
   const { sendLsaCampaignPausedAlert } = await import("./email");
   startManagerLeadSync();
 
@@ -5924,14 +5938,25 @@ function main() {
       if (!/^\d+$/.test(cleanId)) {
         return res.status(400).json({ message: "managerId must contain digits only" });
       }
+      // Only a refresh token Google accepts becomes an "active" connection;
+      // a rejected one used to be saved and shown as connected.
+      const check = await verifyManagerRefreshToken(String(refreshToken).trim());
+      if (!check.ok) {
+        await auditLog((req.user as any).id, (req.user as any).email, "manager_connect", cleanId, null, { managerId: cleanId }, "error", check.message);
+        const status = check.reason === "rejected" ? 400 : check.reason === "unavailable" ? 502 : 503;
+        return res.status(status).json({ message: check.message });
+      }
       const conn = await storage.upsertLsaManagerConnection({
         managerId: cleanId,
-        refreshToken,
+        refreshToken: String(refreshToken).trim(),
         developerToken: developerToken || undefined,
         status: "active",
+        accessToken: check.accessToken,
+        tokenExpiry: check.expiresAt,
+        lastRefreshedAt: new Date(),
       });
       await auditLog((req.user as any).id, (req.user as any).email, "manager_connect", cleanId, null, { managerId: cleanId }, "success");
-      res.json({ ok: true, managerId: conn.managerId, connectedAt: conn.connectedAt });
+      res.json({ ok: true, managerId: conn.managerId, connectedAt: conn.connectedAt, tokenVerified: true });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

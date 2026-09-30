@@ -85,6 +85,8 @@ export default function AuthPage() {
       toast({ title: "Link expired", description: "The verification link has expired. Please request a new one.", variant: "destructive" });
     } else if (errorParam === "google-failed") {
       toast({ title: "Google login failed", description: "Could not sign in with Google. Please try again.", variant: "destructive" });
+    } else if (errorParam === "google-unavailable") {
+      toast({ title: "Google sign-in isn't available", description: "Google sign-in isn't set up on this server. Sign in with your email and password instead.", variant: "destructive" });
     } else if (errorParam === "verification-failed") {
       toast({ title: "Verification failed", description: "We couldn't finish verifying your email. Try the link again, or sign in to request a new one.", variant: "destructive" });
     }
