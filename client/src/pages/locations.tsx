@@ -826,6 +826,8 @@ function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDe
   const nextEmail = useAccountSettings ? null : notificationEmail.trim();
   const emailInvalid = nextEmail !== null && !EMAIL_RE.test(nextEmail);
   const dirty = (nextEmail ?? "") !== savedEmail;
+  // Only a location tied to Google (Place ID or a linked Business Profile) has a listing to reassure about.
+  const hasGoogleListing = !!(location.placeId || location.gbpLocationName);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -847,8 +849,7 @@ function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDe
     },
     onSuccess: () => {
       setConfirmOpen(false);
-      // Only a location tied to Google (Place ID or a linked Business Profile) has a listing to reassure about.
-      const googleNote = location.placeId || location.gbpLocationName ? " Your Google listing is unchanged." : "";
+      const googleNote = hasGoogleListing ? " Your Google listing is unchanged." : "";
       toast({ title: "Location deleted", description: `${location.businessName} was removed from ConstructHUB.${googleNote}` });
       onDeleted();
     },
@@ -937,7 +938,9 @@ function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDe
             <AlertDialogTitle>Delete {location.businessName} from ConstructHUB?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Your listing on Google is not changed. ConstructHUB permanently removes its own copy:</p>
+                <p>{hasGoogleListing
+                  ? "Your listing on Google is not changed. ConstructHUB permanently removes its own copy:"
+                  : "ConstructHUB permanently removes this location and its data:"}</p>
                 <ul className="list-disc pl-5 space-y-0.5">
                   <li>synced Google reviews, photos and performance stats</li>
                   <li>Profile Guard settings and history</li>
