@@ -1,0 +1,554 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// Plan billing on the shared price book (shared/plans.ts), with a mocked
+// Stripe client and database: checkout (plans, annual, Agency bands, add-ons,
+// refusals), change-plan / add-ons on the SAME subscription, webhook mapping,
+// and the $1,000 "talk to sales" threshold. No real Stripe call is made.
+process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_mocked_stripe";
+
+const mocks = vi.hoisted(() => ({
+  rows: [] as any[][],
+  updates: [] as any[],
+  inserts: [] as any[],
+  prices: new Map<string, any>(),
+  pricesList: vi.fn(),
+  pricesCreate: vi.fn(),
+  checkout: vi.fn(),
+  openSessions: vi.fn(),
+  expire: vi.fn(),
+  customers: vi.fn(),
+  retrieve: vi.fn(),
+  update: vi.fn(),
+  verify: vi.fn(),
+  recentAuth: true,
+  /** The subscription Stripe "has": retrieve returns it, update applies item changes to it. */
+  current: null as any,
+}));
+vi.mock("stripe", () => ({ default: class {
+  prices = { list: mocks.pricesList, create: mocks.pricesCreate };
+  checkout = { sessions: { create: mocks.checkout, list: mocks.openSessions, expire: mocks.expire } };
+  customers = { create: mocks.customers };
+  subscriptions = { retrieve: mocks.retrieve, update: mocks.update };
+  webhooks = { constructEvent: mocks.verify };
+} }));
+vi.mock("./db", () => {
+  const next = () => mocks.rows.shift() || [];
+  const where = () => ({ limit: async () => next(), then: (ok: any, fail: any) => Promise.resolve(next()).then(ok, fail) });
+  return {
+    db: {
+      select: () => ({ from: () => ({ where }) }),
+      update: () => ({ set: (set: any) => ({ where: async () => { mocks.updates.push(set); } }) }),
+      insert: () => ({ values: async (values: any) => { mocks.inserts.push(values); } }),
+    },
+    pool: { query: async () => ({ rows: [{}, {}, {}] }) },
+  };
+});
+vi.mock("./auth", () => ({ getBaseUrl: () => "http://127.0.0.1:8251" }));
+vi.mock("./crm/beta", () => ({ isBetaUser: async () => false }));
+vi.mock("./account-security", () => ({
+  requireRecentAuth: (_req: any, res: any) => {
+    if (mocks.recentAuth) return true;
+    res.status(403).json({ reauth: true, message: "Please verify your identity to continue." });
+    return false;
+  },
+}));
+
+import { registerStripeRoutes, PLANS as COMPAT_PLANS } from "./stripe";
+import { resetPriceCache } from "./billing/prices";
+import { COURSE_BUNDLE, DFY_CATALOG } from "./catalog";
+import { PLANS, ADDONS, AGENCY_LOCATION_BANDS, TRIAL_DAYS, agencyMonthlyCents } from "@shared/plans";
+
+const routes = new Map<string, Function>();
+registerStripeRoutes({
+  get: (path: string, handler: Function) => routes.set(`GET ${path}`, handler),
+  post: (path: string, handler: Function) => routes.set(path, handler),
+} as any);
+
+async function request(path: string, body: any = {}, extra: any = {}) {
+  const res: any = { code: 200, status(n: number) { this.code = n; return this; }, json(data: any) { this.body = data; return this; }, send(data: any) { this.body = data; return this; } };
+  await routes.get(path)!({ user: { id: 42, email: "billing@example.invalid" }, body, headers: {}, session: {}, ...extra }, res);
+  return res;
+}
+
+/** The Stripe Price params a line item / subscription item points at. */
+const priceOf = (id: string) => mocks.prices.get(id);
+const lineItems = () => mocks.checkout.mock.calls[0][0].line_items as { price: string; quantity: number }[];
+
+/** A subscription item on a price WE created (role metadata), or a legacy one (no metadata). */
+function item(id: string, priceId: string, quantity = 1, role?: { kind: string; key?: string }, interval = "month") {
+  return {
+    id, quantity,
+    price: { id: priceId, recurring: { interval }, metadata: role ? { chub_kind: role.kind, chub_key: role.key ?? "", chub_interval: interval } : {} },
+  };
+}
+function subscription(items: any[], extra: any = {}) {
+  return { id: "sub_live", customer: "cus_test", status: "active", items: { data: items.map((i) => ({ current_period_end: 1893456000, ...i })) }, ...extra };
+}
+const customerRow = (extra: any = {}) => ({ id: 5, userId: 42, stripeCustomerId: "cus_test", stripeSubscriptionId: null, plan: "free", status: "inactive", ...extra });
+const liveRow = (extra: any = {}) => customerRow({ stripeSubscriptionId: "sub_live", plan: "pro", status: "active", ...extra });
+
+beforeEach(() => {
+  mocks.rows.length = 0;
+  mocks.updates.length = 0;
+  mocks.inserts.length = 0;
+  mocks.prices.clear();
+  mocks.recentAuth = true;
+  resetPriceCache();
+  mocks.pricesList.mockReset().mockImplementation(async ({ lookup_keys }: any) => ({
+    data: [...mocks.prices.values()].filter((p) => lookup_keys.includes(p.lookup_key)).map((p) => ({ ...p, recurring: p.recurring ?? null })),
+  }));
+  mocks.pricesCreate.mockReset().mockImplementation(async (params: any) => {
+    const id = `price_${params.lookup_key}`;
+    mocks.prices.set(id, { id, ...params });
+    return { id };
+  });
+  mocks.checkout.mockReset().mockResolvedValue({ url: "https://checkout.example.invalid/session" });
+  mocks.openSessions.mockReset().mockResolvedValue({ data: [] });
+  mocks.expire.mockReset().mockResolvedValue({});
+  mocks.customers.mockReset().mockResolvedValue({ id: "cus_new" });
+  mocks.current = null;
+  mocks.retrieve.mockReset().mockImplementation(async () => mocks.current);
+  mocks.update.mockReset().mockImplementation(async (id: string, params: any) => {
+    const onPrice = (itemId: string, priceId: string, quantity: number) => {
+      const p = mocks.prices.get(priceId);
+      return item(itemId, priceId, quantity, { kind: p.metadata.chub_kind, key: p.metadata.chub_key }, p.recurring.interval);
+    };
+    let items = [...mocks.current.items.data];
+    params.items.forEach((change: any, n: number) => {
+      if (change.deleted) items = items.filter((i) => i.id !== change.id);
+      else if (change.id) items = items.map((i) => i.id === change.id ? onPrice(i.id, change.price, change.quantity) : i);
+      else items.push(onPrice(`si_new_${n}`, change.price, change.quantity));
+    });
+    return subscription(items, { id });
+  });
+  mocks.verify.mockReset();
+});
+
+describe("GET /api/stripe/plans", () => {
+  it("returns the shared price book — four plans, add-ons, Agency bands, a 1-day trial; no free or retired plans", async () => {
+    const res = await request("GET /api/stripe/plans");
+    expect(res.body.plans.map((p: any) => p.key)).toEqual(["starter", "pro", "growth", "agency"]);
+    expect(res.body.plans.map((p: any) => [p.monthlyCents, p.annualCents])).toEqual([[2900, 29000], [7900, 79000], [19900, 199000], [34900, 349000]]);
+    expect(res.body.addons.map((a: any) => a.key)).toEqual(Object.keys(ADDONS));
+    expect(res.body.agency).toEqual({ includedLocations: 10, bands: AGENCY_LOCATION_BANDS, selfServeMaxLocations: 500 });
+    expect(res.body.trialDays).toBe(1);
+    expect(res.body.salesThresholdCents).toBe(100000);
+    expect(JSON.stringify(res.body)).not.toMatch(/platinum|gold|"free"/i);
+  });
+});
+
+describe("POST /api/stripe/create-checkout", () => {
+  it("Pro monthly: one Stripe Price from the price book, created once by lookup key, 1-day trial", async () => {
+    mocks.rows.push([customerRow()]);
+    const res = await request("/api/stripe/create-checkout", { plan: "pro", interval: "month", price: 1 });
+    expect(res.code).toBe(200);
+    const args = mocks.checkout.mock.calls[0][0];
+    expect(args.mode).toBe("subscription");
+    expect(args.customer).toBe("cus_test");
+    expect(args.subscription_data.trial_period_days).toBe(TRIAL_DAYS);
+    expect(args.metadata).toMatchObject({ userId: "42", type: "plan", plan: "pro", interval: "month" });
+    expect(lineItems()).toEqual([{ price: "price_chub_v1_plan_pro_month_7900", quantity: 1 }]);
+    const [params, options] = mocks.pricesCreate.mock.calls[0];
+    expect(params).toMatchObject({ currency: "usd", unit_amount: 7900, recurring: { interval: "month" }, lookup_key: "chub_v1_plan_pro_month_7900", transfer_lookup_key: true, metadata: { chub_kind: "plan", chub_key: "pro" } });
+    expect(options.idempotencyKey).toBe("chub-price-chub_v1_plan_pro_month_7900");
+  });
+
+  it("reuses an existing Stripe Price instead of creating another", async () => {
+    mocks.rows.push([customerRow()], [customerRow()]);
+    await request("/api/stripe/create-checkout", { plan: "pro" });
+    resetPriceCache(); // a restart: the price is found by lookup key in Stripe
+    await request("/api/stripe/create-checkout", { plan: "pro" });
+    expect(mocks.pricesCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.checkout.mock.calls[1][0].line_items[0].price).toBe("price_chub_v1_plan_pro_month_7900");
+  });
+
+  it("annual billing is 10x monthly on a yearly price", async () => {
+    mocks.rows.push([customerRow()]);
+    expect((await request("/api/stripe/create-checkout", { plan: "growth", interval: "year" })).code).toBe(200);
+    expect(priceOf(lineItems()[0].price)).toMatchObject({ unit_amount: PLANS.growth.annualCents, recurring: { interval: "year" } });
+  });
+
+  it("Agency with 25 locations: base + a graduated band price, quantity = locations above 10", async () => {
+    mocks.rows.push([customerRow()]);
+    expect((await request("/api/stripe/create-checkout", { plan: "agency", interval: "month", locations: 25 })).code).toBe(200);
+    const [base, band] = lineItems();
+    expect(priceOf(base.price).unit_amount).toBe(PLANS.agency.monthlyCents);
+    expect(band.quantity).toBe(15);
+    expect(priceOf(band.price)).toMatchObject({
+      billing_scheme: "tiered", tiers_mode: "graduated", recurring: { interval: "month" },
+      tiers: [{ up_to: 40, unit_amount: 1500 }, { up_to: 240, unit_amount: 1000 }, { up_to: "inf", unit_amount: 700 }],
+      metadata: { chub_kind: "agency_locations" },
+    });
+    // $349 + 15 × $15 = $574 — the price book's own number.
+    expect(PLANS.agency.monthlyCents + 15 * 1500).toBe(agencyMonthlyCents(25));
+  });
+
+  it("Agency annual uses the yearly band price (10x each band)", async () => {
+    mocks.rows.push([customerRow()]);
+    await request("/api/stripe/create-checkout", { plan: "agency", interval: "year", locations: 60 });
+    const [base, band] = lineItems();
+    expect(priceOf(base.price).unit_amount).toBe(PLANS.agency.annualCents);
+    expect(band.quantity).toBe(50);
+    expect(priceOf(band.price).tiers).toEqual([{ up_to: 40, unit_amount: 15000 }, { up_to: 240, unit_amount: 10000 }, { up_to: "inf", unit_amount: 7000 }]);
+  });
+
+  it("Agency at or under 10 locations bills the base only", async () => {
+    mocks.rows.push([customerRow()]);
+    await request("/api/stripe/create-checkout", { plan: "agency", locations: 4 });
+    expect(lineItems()).toHaveLength(1);
+    expect(mocks.checkout.mock.calls[0][0].metadata.locations).toBe("10");
+  });
+
+  it("Agency above 500 locations is talk-to-sales, before any Stripe call", async () => {
+    const res = await request("/api/stripe/create-checkout", { plan: "agency", locations: 501 });
+    expect(res.code).toBe(409);
+    expect(res.body.code).toBe("talk_to_sales");
+    expect(res.body.message).toMatch(/sales rep/);
+    expect(mocks.pricesList).not.toHaveBeenCalled();
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("add-ons ride the plan as recurring items; the texting number's setup fee is one-time", async () => {
+    mocks.rows.push([customerRow()]);
+    const res = await request("/api/stripe/create-checkout", { plan: "pro", addons: { extra_seat: 2, texting_number: 1, protected_site: 1, competitor_pack: 0 } });
+    expect(res.code).toBe(200);
+    const lines = lineItems().map((l) => ({ ...l, p: priceOf(l.price) }));
+    expect(lines.map((l) => [l.p.metadata.chub_kind, l.p.metadata.chub_key, l.quantity])).toEqual([
+      ["plan", "pro", 1],
+      ["addon", "extra_seat", 2],
+      ["addon", "protected_site", 1],
+      ["addon", "texting_number", 1],
+      ["setup", "texting_number", 1],
+    ]);
+    expect(lines[1].p).toMatchObject({ unit_amount: ADDONS.extra_seat.monthlyCents, recurring: { interval: "month" } });
+    const setup = lines[4].p;
+    expect(setup.unit_amount).toBe(ADDONS.texting_number.setupCents);
+    expect(setup.recurring).toBeUndefined();
+    expect(JSON.parse(mocks.checkout.mock.calls[0][0].metadata.addons)).toEqual({ extra_seat: 2, texting_number: 1, protected_site: 1 });
+  });
+
+  it.each([
+    [{ plan: "starter", addons: { protected_site: 1 } }, 400, /isn't available on the Starter plan/],
+    [{ plan: "growth", addons: { texting_number: 1 } }, 400, /already includes a client-texting number/],
+    [{ plan: "agency", addons: { extra_location: 1 } }, 400, /billed by location count/],
+    [{ plan: "starter", addons: { extra_location: 9 } }, 400, /Agency plan/],
+    [{ plan: "pro", addons: { nope: 1 } }, 400, /Unknown add-on/],
+    [{ plan: "pro", addons: { extra_seat: -1 } }, 400, /whole number/],
+    [{ plan: "pro", addons: { extra_seat: 1.5 } }, 400, /whole number/],
+    [{ plan: "pro", addons: { extra_seat: 101 } }, 409, /sales rep/],
+    [{ plan: "platinum" }, 400, /no longer sold/],
+    [{ plan: "free" }, 400, /Invalid plan/],
+    [{ plan: "pro", interval: "week" }, 400, /month.*year/],
+    [{ plan: "agency", locations: 0 }, 400, /whole number/],
+  ])("refuses %j before contacting Stripe", async (body, code, message) => {
+    const res = await request("/api/stripe/create-checkout", body);
+    expect(res.code).toBe(code);
+    expect(res.body.message).toMatch(message);
+    expect(mocks.pricesList).not.toHaveBeenCalled();
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("allows extra locations up to 9 in all on a non-Agency plan", async () => {
+    mocks.rows.push([customerRow()]);
+    expect((await request("/api/stripe/create-checkout", { plan: "starter", addons: { extra_location: 8 } })).code).toBe(200);
+  });
+
+  it("an existing live subscription is never sent to a second checkout", async () => {
+    for (const status of ["active", "trialing", "past_due"]) {
+      mocks.rows.push([liveRow({ status })]);
+      const res = await request("/api/stripe/create-checkout", { plan: "growth" });
+      expect(res.code).toBe(409);
+      expect(res.body.code).toBe("has_subscription");
+    }
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("a past-due subscriber is pointed at Manage billing, not a second checkout", async () => {
+    mocks.rows.push([liveRow({ status: "past_due" })]);
+    const res = await request("/api/stripe/create-checkout", { plan: "pro" });
+    expect(res.code).toBe(409);
+    expect(res.body.message).toMatch(/Manage billing/);
+  });
+
+  it("expires another open plan checkout for the customer first (two tabs can't start two subscriptions)", async () => {
+    mocks.rows.push([customerRow()]);
+    mocks.openSessions.mockResolvedValue({ data: [{ id: "cs_other_tab", mode: "subscription" }, { id: "cs_cart", mode: "payment" }] });
+    expect((await request("/api/stripe/create-checkout", { plan: "pro" })).code).toBe(200);
+    expect(mocks.openSessions).toHaveBeenCalledWith({ customer: "cus_test", status: "open", limit: 10 });
+    expect(mocks.expire.mock.calls).toEqual([["cs_other_tab"]]);
+    expect(mocks.expire.mock.invocationCallOrder[0]).toBeLessThan(mocks.checkout.mock.invocationCallOrder[0]);
+  });
+
+  it("one trial per account: a customer who had a subscription before checks out without one", async () => {
+    mocks.rows.push([liveRow({ status: "canceled", plan: "free" })]);
+    expect((await request("/api/stripe/create-checkout", { plan: "pro" })).code).toBe(200);
+    expect(mocks.checkout.mock.calls[0][0].subscription_data.trial_period_days).toBeUndefined();
+  });
+
+  it("creates the Stripe customer when the user has none", async () => {
+    mocks.rows.push([]);
+    expect((await request("/api/stripe/create-checkout", { plan: "starter" })).code).toBe(200);
+    expect(mocks.customers).toHaveBeenCalledWith({ email: "billing@example.invalid", metadata: { userId: "42" } });
+    expect(mocks.inserts[0]).toMatchObject({ userId: 42, stripeCustomerId: "cus_new", plan: "free", status: "inactive" });
+    expect(mocks.checkout.mock.calls[0][0].customer).toBe("cus_new");
+  });
+});
+
+describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscription)", () => {
+  async function seedProSubscription(extraItems: any[] = [], interval = "month") {
+    // Create the prices the current subscription is on, as checkout would have.
+    mocks.rows.push([customerRow()]);
+    await request("/api/stripe/create-checkout", { plan: "pro", interval, addons: { texting_number: 1 } });
+    mocks.checkout.mockClear();
+    mocks.pricesCreate.mockClear();
+    const planPrice = `price_chub_v1_plan_pro_${interval}_${interval === "year" ? 79000 : 7900}`;
+    const textPrice = `price_chub_v1_addon_texting_number_${interval}_${interval === "year" ? 29000 : 2900}`;
+    mocks.current = subscription([
+      item("si_plan", planPrice, 1, { kind: "plan", key: "pro" }, interval),
+      item("si_text", textPrice, 1, { kind: "addon", key: "texting_number" }, interval),
+      ...extraItems,
+    ]);
+    return mocks.current;
+  }
+
+  it("Pro → Growth updates the existing subscription's items with proration; no checkout", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    const res = await request("/api/stripe/change-plan", { plan: "growth", addons: { texting_number: 0 } });
+    expect(res.code).toBe(200);
+    expect(res.body.changed).toBe(true);
+    expect(mocks.checkout).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    const [id, params] = mocks.update.mock.calls[0];
+    expect(id).toBe("sub_live");
+    expect(params.proration_behavior).toBe("always_invoice");
+    expect(params.payment_behavior).toBe("error_if_incomplete");
+    expect(params.items).toEqual([
+      { id: "si_plan", price: "price_chub_v1_plan_growth_month_19900", quantity: 1 },
+      { id: "si_text", deleted: true },
+    ]);
+    expect(mocks.updates[0]).toMatchObject({ plan: "growth", stripeSubscriptionId: "sub_live", billingInterval: "month", addons: {}, agencyLocations: null });
+    expect(res.body.subscription).toMatchObject({ plan: "growth", effectivePlan: "growth" });
+  });
+
+  it("refuses to carry an add-on the new plan doesn't offer (Growth includes a texting number)", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    const res = await request("/api/stripe/change-plan", { plan: "growth" });
+    expect(res.code).toBe(400);
+    expect(res.body.code).toBe("addon_unavailable");
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("month → year reprices every item to its yearly price", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    expect((await request("/api/stripe/change-plan", { plan: "pro", interval: "year" })).code).toBe(200);
+    expect(mocks.update.mock.calls[0][1].items).toEqual([
+      { id: "si_plan", price: "price_chub_v1_plan_pro_year_79000", quantity: 1 },
+      { id: "si_text", price: "price_chub_v1_addon_texting_number_year_29000", quantity: 1 },
+    ]);
+    expect(mocks.update.mock.calls[0][1].add_invoice_items).toBeUndefined(); // no second setup fee
+  });
+
+  it("switching to Agency adds the band item for the requested locations", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    expect((await request("/api/stripe/change-plan", { plan: "agency", locations: 30 })).code).toBe(200);
+    const items = mocks.update.mock.calls[0][1].items;
+    expect(items).toContainEqual({ id: "si_plan", price: "price_chub_v1_plan_agency_month_34900", quantity: 1 });
+    expect(items).toContainEqual({ price: expect.stringMatching(/^price_chub_v1_agencyloc_month_/), quantity: 20 });
+    expect(mocks.updates[0]).toMatchObject({ plan: "agency", agencyLocations: 30, addons: { texting_number: 1 } });
+  });
+
+  it("an unchanged order touches nothing", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    const res = await request("/api/stripe/change-plan", { plan: "pro" });
+    expect(res.body.changed).toBe(false);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("a legacy subscription (old ad-hoc price) is moved onto the new plan in place", async () => {
+    mocks.current = subscription([item("si_old", "price_legacy_premium"), item("si_old2", "price_legacy_extra")]);
+    mocks.rows.push([liveRow({ plan: "premium" })]);
+    expect((await request("/api/stripe/change-plan", { plan: "pro" })).code).toBe(200);
+    expect(mocks.update.mock.calls[0][1].items).toEqual([
+      { id: "si_old", price: "price_chub_v1_plan_pro_month_7900", quantity: 1 },
+      { id: "si_old2", deleted: true },
+    ]);
+  });
+
+  it("without a live subscription it's a 409 — and never a Stripe call", async () => {
+    mocks.rows.push([customerRow()]);
+    const res = await request("/api/stripe/change-plan", { plan: "growth" });
+    expect(res.code).toBe(409);
+    expect(res.body.code).toBe("no_subscription");
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("asks for step-up verification before changing what the saved card pays", async () => {
+    mocks.recentAuth = false;
+    const res = await request("/api/stripe/change-plan", { plan: "growth" });
+    expect(res.code).toBe(403);
+    expect(res.body.reauth).toBe(true);
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+  });
+
+  it("a declined card leaves the plan unchanged and says so (402 payment_failed)", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    mocks.update.mockRejectedValue(Object.assign(new Error("Your card was declined."), { type: "StripeCardError", statusCode: 402 }));
+    const res = await request("/api/stripe/change-plan", { plan: "agency" });
+    expect(res.code).toBe(402);
+    expect(res.body.code).toBe("payment_failed");
+    expect(mocks.updates).toHaveLength(0);
+  });
+
+  it("add-ons: set quantities on the current plan; a new texting number adds its one-time setup fee", async () => {
+    const sub = await seedProSubscription();
+    // Drop the texting item so adding it is new.
+    sub.items.data = sub.items.data.filter((i: any) => i.id !== "si_text");
+    mocks.rows.push([liveRow()]);
+    const res = await request("/api/stripe/addons", { addons: { extra_seat: 2, texting_number: 1 } });
+    expect(res.code).toBe(200);
+    const params = mocks.update.mock.calls[0][1];
+    expect(params.items).toEqual([
+      { price: "price_chub_v1_addon_extra_seat_month_1500", quantity: 2 },
+      { price: "price_chub_v1_addon_texting_number_month_2900", quantity: 1 },
+    ]);
+    expect(params.add_invoice_items).toEqual([{ price: "price_chub_v1_setup_texting_number_2900", quantity: 1 }]);
+    expect(mocks.checkout).not.toHaveBeenCalled();
+    expect(mocks.updates[0].addons).toEqual({ extra_seat: 2, texting_number: 1 });
+  });
+
+  it("add-ons: 0 removes one; unavailable ones and legacy plans are refused", async () => {
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    expect((await request("/api/stripe/addons", { addons: { texting_number: 0 } })).code).toBe(200);
+    expect(mocks.update.mock.calls[0][1].items).toEqual([{ id: "si_text", deleted: true }]);
+
+    mocks.current = subscription([item("si_plan", "price_x", 1, { kind: "plan", key: "starter" })]);
+    mocks.rows.push([liveRow({ plan: "starter" })]);
+    const refused = await request("/api/stripe/addons", { addons: { protected_site: 1 } });
+    expect(refused.code).toBe(400);
+    expect(refused.body.message).toMatch(/Starter/);
+
+    mocks.current = subscription([item("si_old", "price_legacy_premium")]);
+    mocks.rows.push([liveRow({ plan: "premium" })]);
+    const legacy = await request("/api/stripe/addons", { addons: { extra_seat: 1 } });
+    expect(legacy.code).toBe(409);
+    expect(legacy.body.code).toBe("legacy_plan");
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("webhook maps the subscription's items onto the row", () => {
+  async function webhook(event: any) {
+    const prior = process.env.STRIPE_WEBHOOK_SECRET;
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_local_mock";
+    try {
+      mocks.verify.mockReturnValue(event);
+      return await request("/api/stripe/webhook", {}, { headers: { "stripe-signature": "t=1,v1=mock" }, rawBody: Buffer.from("{}") });
+    } finally {
+      if (prior === undefined) delete process.env.STRIPE_WEBHOOK_SECRET; else process.env.STRIPE_WEBHOOK_SECRET = prior;
+    }
+  }
+  const agencyYearly = (id = "sub_new", status = "trialing") => subscription([
+    item("si_plan", "price_agency_y", 1, { kind: "plan", key: "agency" }, "year"),
+    item("si_band", "price_band_y", 15, { kind: "agency_locations" }, "year"),
+    item("si_seat", "price_seat_y", 3, { kind: "addon", key: "extra_seat" }, "year"),
+  ], { id, status });
+
+  it("checkout.session.completed records plan, interval, add-ons, Agency locations and the real status", async () => {
+    mocks.current = agencyYearly();
+    const res = await webhook({ type: "checkout.session.completed", data: { object: { id: "cs_1", subscription: "sub_new", metadata: { userId: "42", type: "plan", plan: "starter" } } } });
+    expect(res.body).toEqual({ received: true });
+    expect(mocks.updates[0]).toEqual({
+      stripeSubscriptionId: "sub_new", status: "trialing", currentPeriodEnd: new Date(1893456000 * 1000), billingInterval: "year",
+      plan: "agency", stripePriceId: "price_agency_y", addons: { extra_seat: 3 }, agencyLocations: 25,
+    });
+  });
+
+  it("customer.subscription.updated follows a plan change made anywhere (e.g. the billing portal)", async () => {
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_new", "active") } });
+    expect(mocks.updates[0]).toMatchObject({ plan: "agency", status: "active", agencyLocations: 25 });
+  });
+
+  it("ignores events for a subscription the account isn't on (the old double-billing leftover)", async () => {
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_live" })]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_stray", "active") } });
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_live" })]);
+    await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_stray", customer: "cus_test" } } });
+    expect(mocks.updates).toHaveLength(0);
+  });
+
+  it("deleting the tracked subscription ends the plan", async () => {
+    mocks.rows.push([liveRow()]);
+    await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_live", customer: "cus_test" } } });
+    expect(mocks.updates[0]).toEqual({ status: "canceled", plan: "free", addons: {}, agencyLocations: null, billingInterval: null });
+  });
+
+  it("a legacy subscription keeps its stored plan (no role metadata to read)", async () => {
+    mocks.rows.push([liveRow({ plan: "premium" })]);
+    await webhook({ type: "customer.subscription.updated", data: { object: subscription([item("si_old", "price_legacy")], { status: "past_due" }) } });
+    expect(mocks.updates[0]).toMatchObject({ status: "past_due", billingInterval: "month", stripePriceId: "price_legacy" });
+    expect(mocks.updates[0].plan).toBeUndefined();
+  });
+
+  it("still fails closed without a signature", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_local_mock";
+    try {
+      const res = await request("/api/stripe/webhook", {}, { rawBody: Buffer.from("{}") });
+      expect(res.code).toBe(400);
+      expect(mocks.verify).not.toHaveBeenCalled();
+    } finally { delete process.env.STRIPE_WEBHOOK_SECRET; }
+  });
+});
+
+describe("$1,000 and up is talk-to-sales: never a checkout", () => {
+  it.each(Object.entries(DFY_CATALOG))("cart refuses %s", async (id) => {
+    const res = await request("/api/stripe/create-cart-checkout", { items: [{ id, type: id === "dfy_bundle" ? "dfy_bundle" : "dfy_service", price: 1 }] });
+    expect(res.code).toBe(409);
+    expect(res.body).toMatchObject({ code: "talk_to_sales", items: [DFY_CATALOG[id].name] });
+    expect(res.body.message).toMatch(/Talk to a sales rep/);
+  });
+
+  it("cart refuses the $2,499 course bundle and $1,000+ modules, but sells a module under $1,000", async () => {
+    expect((await request("/api/stripe/create-cart-checkout", { items: [{ type: "course_bundle" }] })).code).toBe(409);
+    mocks.rows.push([{ id: 1, title: "Formation", price: 150000 }]);
+    expect((await request("/api/stripe/create-cart-checkout", { items: [{ type: "course_module", moduleId: 1 }] })).code).toBe(409);
+    mocks.rows.push([{ id: 9, title: "Short course", price: 49900 }], [customerRow()]);
+    expect((await request("/api/stripe/create-cart-checkout", { items: [{ type: "course_module", moduleId: 9 }] })).code).toBe(200);
+    expect(mocks.checkout).toHaveBeenCalledTimes(1);
+    expect(mocks.checkout.mock.calls[0][0].line_items[0].price_data.unit_amount).toBe(49900);
+  });
+
+  it("course checkout refuses the bundle and a $1,000+ module", async () => {
+    expect(COURSE_BUNDLE.priceCents).toBeGreaterThanOrEqual(100000);
+    expect((await request("/api/stripe/create-course-checkout", { bundle: true })).code).toBe(409);
+    mocks.rows.push([{ id: 2, title: "GMB Setup", price: 200000 }]);
+    const res = await request("/api/stripe/create-course-checkout", { moduleId: 2 });
+    expect(res.code).toBe(409);
+    expect(res.body.items).toEqual(["Master Class — GMB Setup"]);
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("$999.99 still checks out; $1,000.00 does not", async () => {
+    mocks.rows.push([{ id: 3, title: "Edge", price: 99999 }], [customerRow()]);
+    expect((await request("/api/stripe/create-cart-checkout", { items: [{ type: "course_module", moduleId: 3 }] })).code).toBe(200);
+    mocks.rows.push([{ id: 4, title: "Edge", price: 100000 }]);
+    expect((await request("/api/stripe/create-cart-checkout", { items: [{ type: "course_module", moduleId: 4 }] })).code).toBe(409);
+  });
+});
+
+describe("compatibility PLANS export (growth-quotas / tenancy) is derived from the price book", () => {
+  it("maps current and legacy keys onto the new plans", () => {
+    expect(COMPAT_PLANS.pro).toEqual({ name: "Pro", limits: { searches: 500, photos: -1, rankings: 15, users: 3 } });
+    expect(COMPAT_PLANS.platinum.name).toBe("Agency");
+    expect(COMPAT_PLANS.platinum.limits.users).toBe(PLANS.agency.limits.crmSeats);
+    expect(COMPAT_PLANS.standard.name).toBe("Starter");
+    expect(COMPAT_PLANS.gold.name).toBe("Growth");
+  });
+});

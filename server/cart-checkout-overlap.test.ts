@@ -14,7 +14,20 @@ vi.mock("./db", () => {
   const next = () => mocks.rows.shift() || [];
   // .where() is awaited directly (course bundle) or through .limit(1).
   const where = () => ({ limit: async () => next(), then: (ok: any, fail: any) => Promise.resolve(next()).then(ok, fail) });
-  return { db: { select: () => ({ from: () => ({ where }) }) } };
+  return { db: { select: () => ({ from: () => ({ where }) }) }, pool: { query: async () => ({ rows: [{}, {}, {}] }) } };
+});
+// Today every done-for-you service and the course bundle cost $1,000+, which
+// checkout refuses as "talk to sales" before these checks run (covered in
+// stripe-billing.test.ts). Price the fixtures under the threshold so the
+// duplicate/bundle-overlap guard stays covered for anything sold online.
+vi.mock("./catalog", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./catalog")>();
+  const under = <T extends { priceCents: number }>(item: T): T => ({ ...item, priceCents: 49900 });
+  return {
+    ...real,
+    DFY_CATALOG: Object.fromEntries(Object.entries(real.DFY_CATALOG).map(([id, item]) => [id, under(item)])),
+    COURSE_BUNDLE: under(real.COURSE_BUNDLE),
+  };
 });
 vi.mock("./auth", () => ({ getBaseUrl: () => "http://127.0.0.1:8225" }));
 vi.mock("./crm/beta", () => ({ isBetaUser: async () => false }));
@@ -29,7 +42,7 @@ async function request(path: string, body: any) {
   return res;
 }
 const customer = () => mocks.rows.push([{ stripeCustomerId: "cus_test" }]);
-const moduleRow = (id: number) => mocks.rows.push([{ id, title: `Fixture module ${id}`, price: 150000 }]);
+const moduleRow = (id: number) => mocks.rows.push([{ id, title: `Fixture module ${id}`, price: 14900 }]);
 const cart = (items: any[]) => request("/api/stripe/create-cart-checkout", { items });
 
 beforeEach(() => {
@@ -90,7 +103,7 @@ describe("cart checkout charges each thing once", () => {
     ]);
     expect(res.code).toBe(200);
     const amounts = mocks.checkout.mock.calls[0][0].line_items.map((x: any) => x.price_data.unit_amount);
-    expect(amounts).toEqual([DFY_CATALOG.dfy_bundle.priceCents, 150000]);
+    expect(amounts).toEqual([DFY_CATALOG.dfy_bundle.priceCents, 14900]);
   });
 });
 

@@ -14,6 +14,7 @@
 import pg from "pg";
 import { STATE_GUIDES_LINK_STATUS_DDL } from "../server/state-guides-schema";
 import { ensureDocNumberUniqueIndexes } from "../server/crm/doc-number";
+import { BILLING_SUBSCRIPTION_DDL } from "../server/billing/schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -27,6 +28,9 @@ const STATEMENTS = [
   `ALTER TABLE permit_databases   ADD COLUMN IF NOT EXISTS last_verified_at timestamp`,
   // State guides: per-agency link status + last-checked date; sos_url nullable.
   ...STATE_GUIDES_LINK_STATUS_DDL,
+  // Plan billing: interval, add-on quantities and billed Agency locations on
+  // each subscription (server/billing/schema.ts also runs these at boot).
+  ...BILLING_SUBSCRIPTION_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

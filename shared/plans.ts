@@ -226,3 +226,54 @@ export const MODULE_NAMES: Record<ModuleKey, string> = {
   cloudflareSearchConsole: "Cloudflare + Search Console",
   domainsMailAlerts: "Domains + Gmail alerts",
 };
+
+// ---------------------------------------------------------------------------
+// Billing helpers (checkout, the Stripe sync, the pricing page). Everything
+// below is derived from the tables above — no price lives here twice.
+
+export const BILLING_INTERVALS: readonly BillingInterval[] = ["month", "year"];
+export const ADDON_KEYS = Object.keys(ADDONS) as AddonKey[];
+/** Annual billing is this many months of the monthly price — plans, add-ons and Agency bands alike. */
+export const ANNUAL_MONTHS = 10;
+/** The most of one add-on a self-serve order may hold; a bigger order is a sales conversation. */
+export const ADDON_MAX_QUANTITY = 100;
+/**
+ * `code` on the server's 409 refusal for anything sold only through a sales rep
+ * (price at or above SALES_THRESHOLD_CENTS, Agency above 500 locations, very
+ * large add-on orders). The client shows "Talk to a sales rep" + the inquiry form.
+ */
+export const TALK_TO_SALES_CODE = "talk_to_sales";
+
+export const isPlanKey = (value: unknown): value is PlanKey =>
+  typeof value === "string" && (PLAN_KEYS as readonly string[]).includes(value);
+export const isAddonKey = (value: unknown): value is AddonKey =>
+  typeof value === "string" && (ADDON_KEYS as readonly string[]).includes(value);
+export const isBillingInterval = (value: unknown): value is BillingInterval =>
+  value === "month" || value === "year";
+
+export const planPriceCents = (plan: PlanKey, interval: BillingInterval) =>
+  interval === "year" ? PLANS[plan].annualCents : PLANS[plan].monthlyCents;
+export const addonPriceCents = (addon: AddonKey, interval: BillingInterval) =>
+  interval === "year" ? ADDONS[addon].annualCents : ADDONS[addon].monthlyCents;
+export const addonAvailableOn = (addon: AddonKey, plan: PlanKey) => ADDONS[addon].availableOn.includes(plan);
+
+/** Agency locations above the included ones — what the per-location band item bills. */
+export function agencyExtraLocations(locations: number): number {
+  return Math.max(0, Math.floor(locations) - PLANS.agency.limits.locations);
+}
+
+/** Agency bill per interval for a location count (base + graduated bands); null above self-serve. */
+export function agencyPriceCents(locations: number, interval: BillingInterval): number | null {
+  const monthly = agencyMonthlyCents(locations);
+  if (monthly === null) return null;
+  return interval === "year" ? monthly * ANNUAL_MONTHS : monthly;
+}
+
+/**
+ * The most extra-location add-ons a non-Agency plan can hold: 10 or more
+ * locations is the Agency plan (see ADDONS.extra_location).
+ */
+export function maxExtraLocations(plan: PlanKey): number {
+  if (plan === "agency") return 0;
+  return Math.max(0, PLANS.agency.limits.locations - 1 - PLANS[plan].limits.locations);
+}
