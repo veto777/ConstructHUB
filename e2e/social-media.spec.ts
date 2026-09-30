@@ -150,6 +150,22 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
     "AI review replies",
     "Posts & Photos scheduling and AI captions",
     "Security",
+    "Site Scan",
   ])
     await expect(page.getByText(title, { exact: true }).last()).toBeVisible();
+});
+
+test("guides match shipped approval controls and link to every walkthrough", async ({ page }) => {
+  await page.goto("/guides");
+  const main = page.getByRole("region", { name: "Guides walkthroughs" });
+  for (const [label, href] of [
+    ["Open Locations", "/locations"], ["Open Google Reviews", "/google-reviews"],
+    ["Open Posts & Photos", "/gbp-content"], ["Open Security & activity", "/settings?tab=security"],
+    ["Open Site Scan", "/site-scan"],
+  ]) await expect(main.getByRole("link", { name: label, exact: true })).toHaveAttribute("href", href);
+  for (const text of ["Approve snapshot and save settings", "Confirm backfill", "Approve & queue photos", "Verify & Enable", "Revoke share link"])
+    await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
+  await expect(main).not.toContainText("labels may vary");
+  await main.getByRole("link", { name: "Open Site Scan", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Site Scan", exact: true })).toBeVisible();
 });
