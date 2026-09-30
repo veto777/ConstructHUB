@@ -6,6 +6,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CHLogo } from "@/components/ch-logo";
+import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+import { copyrightNotice } from "@/lib/marketing";
 import { CartSheet } from "@/components/cart-sheet";
 import {
   ArrowRight, Shield, ShieldCheck, ShieldAlert, Zap,
@@ -155,11 +157,11 @@ function CountUp({ end, suffix = "", prefix = "", duration = 2000 }: { end: numb
   return <span ref={ref}>{prefix}{count}{suffix}</span>;
 }
 
-const fraudStats = [
-  { value: 25, suffix: "%+", label: "Clicks Are Fraudulent", sub: "Industry average for contractors" },
-  { value: 42, prefix: "$", suffix: "", label: "Average CPC", sub: "Contractor keyword costs" },
-  { value: 90, suffix: "%", label: "Lose Money on Ads", sub: "Contractors using default settings" },
-  { value: 3, suffix: "x", label: "ROI Improvement", sub: "After proper campaign setup" },
+const fraudStats: { value: number; prefix?: string; suffix: string; label: string; sub: string }[] = [
+  { value: 12, suffix: "", label: "Campaign Guide Sections", sub: "Setup, keywords, bidding, landing pages" },
+  { value: 10, suffix: "", label: "Ad Fraud Exposé Sections", sub: "How default settings spend your budget" },
+  { value: 8, suffix: "", label: "LSA Guide Sections", sub: "Verification to business bio" },
+  { value: 500, suffix: "", label: "IP Exclusions per Campaign", sub: "Google's limit — Click Guard helps you choose" },
 ];
 
 const tools = [
@@ -186,7 +188,7 @@ const tools = [
   {
     icon: ShieldAlert,
     title: "Ad Fraud Exposé",
-    description: "The truth Google doesn't want you to know. 9 investigative sections revealing how default settings drain your budget — with evidence and data.",
+    description: "The truth Google doesn't want you to know. 10 investigative sections revealing how default settings drain your budget — with evidence and data.",
     gradient: "from-[#FBBC05]/20 to-[#F9AB00]/20",
     border: "border-[#FBBC05]/20",
     link: "/google-ad-fraud",
@@ -244,11 +246,11 @@ export default function GoogleAdsLandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-clip">
       <AdsAnimatedBackground />
       <AdsFloatingOrbs />
 
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      <nav className={`sticky top-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/landing" data-testid="link-ads-home">
             <CHLogo height={40} />
@@ -268,7 +270,7 @@ export default function GoogleAdsLandingPage() {
               </Link>
             )}
             <div className="text-white"><CartSheet /></div>
-            <div className="text-white"><ThemeToggle /></div>
+            <div className="text-white hidden sm:block"><ThemeToggle /></div>
             {user ? (
               <Link href="/google-ads" data-testid="link-nav-click-guard">
                 <Button size="sm" className="bg-[#4285F4] hover:bg-[#3367D6] text-white shadow-lg shadow-blue-500/25">
@@ -277,7 +279,7 @@ export default function GoogleAdsLandingPage() {
               </Link>
             ) : (
               <>
-                <Link href="/auth" data-testid="link-ads-signin">
+                <Link href="/auth" className="hidden sm:block" data-testid="link-ads-signin">
                   <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10" size="sm">
                     Sign In
                   </Button>
@@ -289,11 +291,20 @@ export default function GoogleAdsLandingPage() {
                 </Link>
               </>
             )}
+            <LandingMobileMenu
+              signInHref={user ? undefined : "/auth"}
+              links={[
+                { href: "#tools", label: "Tools" },
+                { href: "#how-it-works", label: "How It Works" },
+                { href: "#playbook", label: "Playbook" },
+                { href: "#get-started", label: "Get Started" },
+              ]}
+            />
           </div>
         </div>
       </nav>
 
-      <section className="relative z-10 pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-16 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto text-center">
           <div className="animate-in">
             <img src={googleAdsLogo} alt="Google Ads" className="h-16 w-16 rounded-xl object-contain mx-auto mb-6 animate-float" />
@@ -313,8 +324,9 @@ export default function GoogleAdsLandingPage() {
             </span>
           </h1>
           <p className="mt-6 text-lg sm:text-xl text-muted-foreground dark:text-white/50 max-w-2xl mx-auto leading-relaxed animate-in-delay-3">
-            25% of your ad clicks are fraudulent. Google's default settings are designed to drain your budget.
-            Our tools protect your campaigns and show you exactly how to set up ads that actually generate leads.
+            Some of your ad clicks come from bots, competitors, and people who will never hire you, and
+            Google's default settings tend to spend more than a contractor needs to. Our tools help you spot
+            suspicious traffic and show you exactly how to set up ads that actually generate leads.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
             <Link href={user ? "/google-ads" : "/auth?mode=signup"} data-testid="link-hero-protect">
@@ -349,11 +361,11 @@ export default function GoogleAdsLandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-10">
             <Badge className="mb-4 bg-red-500/10 text-red-400 border-red-500/20">
-              <AlertTriangle className="h-3 w-3 mr-1" /> The Problem
+              <BarChart3 className="h-3 w-3 mr-1" /> What's Inside
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Contractors Are Losing
-              <span className="bg-gradient-to-r from-[#FBBC05] to-red-400 bg-clip-text text-transparent"> Thousands Every Month</span>
+              Know Where Your
+              <span className="bg-gradient-to-r from-[#FBBC05] to-red-400 bg-clip-text text-transparent"> Ad Budget Goes</span>
             </h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
@@ -420,7 +432,8 @@ export default function GoogleAdsLandingPage() {
               <span className="bg-gradient-to-r from-[#4285F4] to-[#34A853] bg-clip-text text-transparent"> Protects You</span>
             </h2>
             <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-xl mx-auto">
-              Set up in minutes. Protection starts immediately. No coding required.
+              Set up in minutes. Traffic signals appear as soon as the script records visits; IP exclusions
+              apply when the separate Google Ads script runs. No coding required.
             </p>
           </div>
           <div className="space-y-6">
@@ -510,7 +523,7 @@ export default function GoogleAdsLandingPage() {
                     <AlertTriangle className="h-4 w-4" /> Without Protection
                   </h3>
                   {[
-                    "25%+ budget wasted on fraud",
+                    "Invalid clicks go unnoticed",
                     "Competitors clicking your ads",
                     "Bots draining daily budget",
                     "VPN users triggering clicks",
@@ -531,7 +544,7 @@ export default function GoogleAdsLandingPage() {
                     "IP fingerprinting & device tracking",
                     "Heuristic traffic signals",
                     "Real-time traffic source analytics",
-                    "Direct Google Ads exclusion sync",
+                    "Exclusion list applied by the separate Google Ads script on its schedule",
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/50">
                       <CheckCircle2 className="h-3.5 w-3.5 text-[#34A853] shrink-0" />
@@ -585,7 +598,7 @@ export default function GoogleAdsLandingPage() {
               <span className="text-white/20">|</span>
               <a href="/privacy" className="hover:text-white/70 transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
             </div>
-            <p className="text-xs text-white/20">&copy; 2025 Construction Hub. All rights reserved.</p>
+            <p className="text-xs text-white/20">{copyrightNotice()}</p>
           </div>
         </div>
       </footer>

@@ -15,8 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ShieldAlert, PhoneOff, MapPinOff, StarOff, CheckCircle2,
   AlertTriangle, ArrowRight, Loader2, Shield, Search, Wrench,
-  FileCheck, MessageCircle, Clock, Users, Award, Building2,
+  FileCheck, MessageCircle, Clock, Building2,
 } from "lucide-react";
+import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 
 const SUSPENSION_REASONS = [
   { icon: AlertTriangle, title: "Business name keyword stuffing", desc: "Adding extra keywords or location names to your business name that don't reflect your real-world name." },
@@ -39,11 +40,14 @@ const CONSEQUENCES = [
   { icon: StarOff, title: "Your reviews disappear", desc: "Years of hard-earned reviews and star ratings go invisible. The social proof you've built — gone from sight when you need it most." },
 ];
 
+// Only claims this page can stand behind: what the service does. Track-record
+// figures (years, businesses helped, staff credentials) stay off until the
+// owner supplies ones that can be backed up.
 const TRUST_POINTS = [
-  { icon: Award, title: "GBP Product Experts on staff", desc: "Our team includes recognized Google Business Profile specialists with deep knowledge of Google's internal workflows." },
-  { icon: Clock, title: "Years of local search expertise", desc: "We've been working in local search and have optimized thousands of profiles and seen every kind of suspension." },
-  { icon: Shield, title: "Robust, foundational approach", desc: "We don't just appeal — we fix the root cause. Our approach ensures your profile is built on a compliant foundation so it stays reinstated." },
-  { icon: Users, title: "Hundreds of businesses supported", desc: "From single-location shops to enterprise clients, we've helped hundreds of businesses get back on the map with our reinstatement service." },
+  { icon: FileCheck, title: "Guideline-first review", desc: "Every case is checked against Google's published Business Profile guidelines before anything is submitted." },
+  { icon: Search, title: "Honest case assessment", desc: "We review your situation first and tell you whether we think we can help before taking the case." },
+  { icon: Shield, title: "Robust, foundational approach", desc: "We don't just appeal — we fix the root cause, so your profile is built on a compliant foundation." },
+  { icon: MessageCircle, title: "Communication until resolved", desc: "We handle the appeal and keep you updated until Google makes its decision. Google alone decides whether a profile is reinstated." },
 ];
 
 export default function ReinstatementPage() {
@@ -81,6 +85,7 @@ export default function ReinstatementPage() {
 
   return (
     <div className="h-full overflow-y-auto">
+      <PublicPageHeader next="/reinstatement" />
       <div className="bg-gradient-to-b from-[#1a1f3d] to-[#2d1f4e] text-white py-16 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -94,18 +99,18 @@ export default function ReinstatementPage() {
               <p className="text-white/70 text-lg mb-6">
                 We get it — it's devastating. Your phones go quiet, customers can't find you, and revenue drops overnight. We'll work tirelessly to get your listing back on the map.
               </p>
-              <div className="flex gap-8 mt-8">
+              <div className="flex gap-8 mt-8" data-testid="reinstatement-facts">
                 <div>
-                  <p className="text-3xl font-bold text-[#4A6CF7]">15+</p>
-                  <p className="text-sm text-white/60">Years in<br />local search</p>
+                  <p className="text-3xl font-bold text-[#4A6CF7]">4</p>
+                  <p className="text-sm text-white/60">Step<br />process</p>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-[#4A6CF7]">100K+</p>
-                  <p className="text-sm text-white/60">Businesses<br />supported</p>
+                  <p className="text-3xl font-bold text-[#4A6CF7]">1–2</p>
+                  <p className="text-sm text-white/60">Business days<br />to review your case</p>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-[#4A6CF7]">2</p>
-                  <p className="text-sm text-white/60">GBP Product<br />Experts on staff</p>
+                  <p className="text-3xl font-bold text-[#4A6CF7]">$599</p>
+                  <p className="text-sm text-white/60">Per<br />project</p>
                 </div>
               </div>
             </div>
@@ -170,7 +175,7 @@ export default function ReinstatementPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             <div>
               <h2 className="text-3xl font-bold mb-3" data-testid="text-process-title">How we get you back on the map</h2>
-              <p className="text-muted-foreground mb-8">Our proven 4-step reinstatement process is handled by experienced GBP Product Experts.</p>
+              <p className="text-muted-foreground mb-8">Our 4-step reinstatement process, from first review to appeal.</p>
               <div className="space-y-6">
                 {PROCESS_STEPS.map(step => (
                   <div key={step.num} className="flex gap-4" data-testid={`process-step-${step.num}`}>
@@ -226,7 +231,7 @@ export default function ReinstatementPage() {
       <div className="bg-muted/30 py-16 px-6">
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-3" data-testid="text-trust-title">Why trust ConstructHUB with your GBP</h2>
-          <p className="text-muted-foreground mb-10">We've been helping businesses succeed in local search since before the local 3-pack even existed.</p>
+          <p className="text-muted-foreground mb-10">A compliance-first approach built on Google's own Business Profile guidelines.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {TRUST_POINTS.map((point, i) => (
               <Card key={i} className="text-left" data-testid={`card-trust-${i}`}>
@@ -348,6 +353,7 @@ export default function ReinstatementPage() {
           </div>
         </div>
       </div>
+      <PublicPageFooter />
     </div>
   );
 }

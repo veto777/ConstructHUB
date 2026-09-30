@@ -4,13 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Search, Database, Building2, Camera, Eye, Grid3X3, Shield,
-  ShieldOff, Fingerprint, Crosshair, GraduationCap, Megaphone,
-  ArrowRight, Zap, Star, Globe, TrendingUp, Users, Sparkles,
-  Target, BadgeCheck, BarChart3, Bot, Clock, Lock, MapPin,
-  FileText, Briefcase, ChevronRight, Crown, Award,
+  Database, Zap, Globe, Target, MapPin, ChevronRight, Crown, Award,
 } from "lucide-react";
-import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
+import { GROWTH_TOOLS } from "@/lib/growth-tools";
+import { formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
 
 function FloatingParticles({ color = "#d4d4d8" }: { color?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,120 +58,12 @@ function FloatingParticles({ color = "#d4d4d8" }: { color?: string }) {
   return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />;
 }
 
-interface ToolShowcase {
-  title: string;
-  tagline: string;
-  description: string;
-  whyItMatters: string;
-  icon: any;
-  url: string;
-  stats?: string;
-}
-
-const TOOLS: ToolShowcase[] = [
-  {
-    title: "Permit Database Search",
-    tagline: "Find every permit before your competitors do",
-    description: "Search 32,864+ permit databases across all 50 states and 3,139 counties. Find new construction projects, renovation permits, and building activity in any city or county in the country — instantly.",
-    whyItMatters: "While your competitors wait for word of mouth, you're identifying new construction projects the day permits are filed. Every permit is a warm lead — a homeowner who already committed to spending money on construction.",
-    icon: Search,
-    url: "/search",
-    stats: "32,864+ databases",
-  },
-  {
-    title: "Database Directory",
-    tagline: "Every permit source in America, mapped",
-    description: "Browse the most complete directory of construction permit databases ever assembled. Every county, every city, organized by state with direct links to official government portals.",
-    whyItMatters: "No more Googling for hours trying to find where a county keeps their permits. We've already found and verified every single permit database in the country so you don't have to.",
-    icon: Database,
-    url: "/databases",
-    stats: "3,139 counties",
-  },
-  {
-    title: "Property Records",
-    tagline: "Know the property before you knock on the door",
-    description: "Access property appraiser records across all 3,139 counties. Look up ownership details, property values, building characteristics, and assessment history for any address.",
-    whyItMatters: "When you know a property's value, square footage, and owner before making contact, you walk in with confidence. You can tailor your pitch, estimate accurately, and close faster because you already did your homework.",
-    icon: Building2,
-    url: "/property",
-    stats: "3,139 counties",
-  },
-  {
-    title: "GMB Monitor",
-    tagline: "Never miss a change to your Google profile",
-    description: "Real-time monitoring of your Google Business Profile. Get alerted when anything changes — name, address, photos, hours, categories. Includes an AI-powered review response generator that crafts professional replies in seconds.",
-    whyItMatters: "Google can change your business profile without telling you. Anyone can suggest edits. One wrong change to your hours or address and you lose customers without knowing why. This tool watches your profile 24/7.",
-    icon: Eye,
-    url: "/gmb-monitor",
-  },
-  {
-    title: "GMB Ranking Grid",
-    tagline: "See exactly where you rank on Google Maps",
-    description: "Generate visual ranking grid reports showing your Google Business position across your entire service area. Track how you rank for specific keywords at every point in your coverage zone.",
-    whyItMatters: "You might rank #1 at your office but #15 two miles away. Most contractors have no idea their rankings drop off a cliff outside their immediate area. This tool shows you the blind spots so you can fix them.",
-    icon: Grid3X3,
-    url: "/ranking-grid",
-  },
-  {
-    title: "SEO Photo Optimizer",
-    tagline: "Turn job site photos into ranking fuel",
-    description: "Optimize your Google Business photos with geo-tagging, EXIF metadata injection, AI-generated descriptions, and SEO-friendly filenames. Every photo becomes a local ranking signal.",
-    whyItMatters: "Google uses photo metadata to verify where your business operates. Properly optimized photos with GPS coordinates and relevant descriptions tell Google you're active and legitimate in your service area. Most contractors upload photos with zero metadata — you won't.",
-    icon: Camera,
-    url: "/photos",
-  },
-  {
-    title: "Google Click Guard",
-    tagline: "Stop competitors from draining your ad budget",
-    description: "Review script-observed visits and unusual traffic patterns. Build an IP exclusion list and apply it with the separate Google Ads script; signals do not prove fraud or identify a person.",
-    whyItMatters: "Studies show 14-20% of all Google Ads clicks are fraudulent. For construction companies spending $2,000-$10,000/month on ads, that's hundreds to thousands of dollars going to competitors clicking your ads, bots, and click farms. Use observed traffic patterns to investigate possible waste; detection and savings are not guaranteed.",
-    icon: Shield,
-    url: "/google-ads",
-  },
-  {
-    title: "IP Tracker",
-    tagline: "Understand script-observed website visits",
-    description: "Real-time visitor tracking with device fingerprinting, geo-location, traffic source analysis, browser/OS detection, and detailed visitor activity timelines. A modern replacement for TraceMyIP, built for contractors.",
-    whyItMatters: "Your website is your digital storefront. Knowing who visits, where they came from, and what pages they viewed gives you intelligence most contractors never have.",
-    icon: Fingerprint,
-    url: "/ip-tracker",
-  },
-  {
-    title: "VPN Shield",
-    tagline: "Review possible proxy traffic",
-    description: "Flag possible proxy traffic using browser reports and a limited IP-prefix list. Optional page overlays or redirects run after load and can be bypassed.",
-    whyItMatters: "VPN use can be legitimate, and heuristic signals can produce false positives. User-agent crawler exemptions are not identity verification.",
-    icon: ShieldOff,
-    url: "/vpn-shield",
-  },
-  {
-    title: "Competitor Intelligence",
-    tagline: "Understand your local market",
-    description: "Research public Google Business profiles in your market, find signals worth a closer look in sampled reviews with our BS Meter, and run market scans to benchmark your own presence.",
-    whyItMatters: "Knowing where you stand in your market helps you invest in the right things. Public business listings and selected review samples provide context. The BS Meter highlights signals worth a closer look; it cannot establish review authenticity.",
-    icon: Crosshair,
-    url: "/competitors",
-  },
-  {
-    title: "Master Class",
-    tagline: "The complete guide to building a construction business",
-    description: "State-by-state guides for LLC formation, licensing, bonding, and insurance. Plus expert modules on subcontractor management, sales strategies, hiring, branding, website & SEO, and vetting other contractors.",
-    whyItMatters: "Starting a construction business without proper licensing, bonding, or insurance can get you fined, sued, or shut down. Every state has different rules. This is the playbook that shows you exactly what to do in your state, step by step.",
-    icon: GraduationCap,
-    url: "/master-class",
-  },
-  {
-    title: "Google Ads Master Class",
-    tagline: "Stop wasting money on Google Ads",
-    description: "12 detailed sections covering everything from campaign setup to click fraud protection. Learn which Google features to avoid, how to write ads that convert, proper bidding strategies, and the costly mistakes most contractors make.",
-    whyItMatters: "Most contractors lose 40-60% of their Google Ads budget to bad settings, wrong keywords, and features Google pushes that don't work for local businesses. This guide was written by someone who's managed millions in construction ad spend.",
-    icon: Megaphone,
-    url: "/google-ads-guide",
-  },
-];
-
 export default function HomePage() {
   const [, setLocation] = useLocation();
+  const { data: counts } = usePermitDirectoryCounts();
+  const toolCount = GROWTH_TOOLS.length;
+  // Directory numbers come from the database; "—" until they load (never a guess).
+  const count = (n: number | undefined) => (typeof n === "number" ? formatCount(n) : "—");
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-12 relative">
@@ -194,10 +83,12 @@ export default function HomePage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 relative z-10">
         {[
-          { label: "Permit Databases", value: "32,864+", icon: Database },
-          { label: "Counties Covered", value: "3,139", icon: MapPin },
+          { label: "Jurisdictions Listed", value: count(counts?.total), icon: Database },
+          typeof counts?.verifiedPortals === "number"
+            ? { label: "Verified Portal Links", value: count(counts.verifiedPortals), icon: MapPin }
+            : { label: "County Offices Listed", value: count(counts?.county), icon: MapPin },
           { label: "All 50 States + DC", value: "51", icon: Globe },
-          { label: "Pro Tools", value: "15+", icon: Zap },
+          { label: "Pro Tools", value: String(toolCount), icon: Zap },
         ].map((stat) => (
           <Card key={stat.label} className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50" data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}>
             <CardContent className="p-4 text-center">
@@ -217,7 +108,7 @@ export default function HomePage() {
         </div>
 
         <div className="space-y-5">
-          {TOOLS.filter((tool) => SHOW_COMPETITOR_INTEL || tool.title !== "Competitor Intelligence").map((tool, index) => (
+          {GROWTH_TOOLS.map((tool, index) => (
             <Link key={tool.title} href={tool.url} className="block no-underline" data-testid={`card-tool-${index}`}>
             <Card
               className="group border-border/50 hover:border-border transition-all hover:shadow-md cursor-pointer"
@@ -267,7 +158,7 @@ export default function HomePage() {
           <Award className="w-10 h-10 text-muted-foreground mx-auto" />
           <h2 className="text-2xl font-extrabold">Ready to Get the Advantage?</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            These 12 tools used separately would cost over $500/month. Bundle them all together starting at $15/month,
+            Plans start at $15/month, with more of these {toolCount} tools unlocked on each tier —
             or go all-in with our Gold and Platinum plans for complete market domination.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">

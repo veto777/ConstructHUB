@@ -16,6 +16,16 @@ import {
   Megaphone, Package,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
+import { GROWTH_TOOLS } from "@/lib/growth-tools";
+import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
+import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+
+const SECTION_LINKS = [
+  { href: "#services", label: "Services" },
+  { href: "#consulting", label: "Consulting" },
+  { href: "#stats", label: "Results" },
+  { href: "#coverage", label: "Coverage" },
+] as const;
 
 function AnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -146,14 +156,14 @@ function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: 
     return () => observer.disconnect();
   }, [end, duration]);
 
-  return <span ref={ref}>{count}{suffix}</span>;
+  return <span ref={ref}>{count.toLocaleString("en-US")}{suffix}</span>;
 }
 
 const services = [
   {
     icon: Search,
     title: "Nationwide Permit Search",
-    description: "Search 32,864+ permit databases across all 50 states from a single interface. Find permits by address, contractor, or company name — county and city level.",
+    description: "Find the permit office for any county or city we list in all 50 states and DC, and search the government portals we support by address, contractor, or company name.",
     gradient: "from-orange-500/20 to-amber-500/20",
     border: "border-orange-500/20",
   },
@@ -209,39 +219,15 @@ const services = [
   {
     icon: Users,
     title: "Expert Consulting",
-    description: "Work 1-on-1 with industry consultants who specialize in construction. Get personalized strategies for SEO, GMB, lead generation, and scaling.",
+    description: "Platinum members work 1-on-1 with industry consultants who specialize in construction. Get personalized strategies for SEO, GMB, lead generation, and scaling.",
     gradient: "from-cyan-500/20 to-sky-500/20",
     border: "border-cyan-500/20",
   },
 ];
 
-const stats = [
-  { value: 32864, suffix: "+", label: "Permit Databases" },
-  { value: 50, suffix: "", label: "States Covered" },
-  { value: 3139, suffix: "+", label: "Counties Tracked" },
-  { value: 12, suffix: "", label: "Pro Tools Built In" },
-];
-
-const testimonials = [
-  {
-    quote: "Construction Hub transformed how we find leads. We went from manually checking 12 different permit portals to one search — and it works across every state.",
-    name: "Mike R.",
-    role: "Roofing Contractor, Washington",
-    stars: 5,
-  },
-  {
-    quote: "The GMB photo optimizer alone paid for itself in the first month. Our Google listing views tripled.",
-    name: "Sarah T.",
-    role: "General Contractor, Florida",
-    stars: 5,
-  },
-  {
-    quote: "Being able to track who's pulling permits in our area gives us a massive competitive advantage.",
-    name: "James L.",
-    role: "Siding Contractor, Texas",
-    stars: 5,
-  },
-];
+// Testimonials were removed: the three 5-star quotes came in with the Replit
+// import (the same one whose government data was fabricated) and nobody could
+// vouch for them. Add quotes back only with a real, consenting customer.
 
 export default function LandingPage() {
   const [navVisible, setNavVisible] = useState(true);
@@ -249,6 +235,16 @@ export default function LandingPage() {
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
+  const { data: counts } = usePermitDirectoryCounts();
+  const hasVerified = typeof counts?.verifiedPortals === "number";
+  const stats: { value: number | undefined; suffix?: string; label: string }[] = [
+    { value: counts?.total, label: "Jurisdictions Listed" },
+    hasVerified
+      ? { value: counts?.verifiedPortals, label: "Verified Portal Links" }
+      : { value: counts?.county, label: "County Offices Listed" },
+    { value: 51, label: "States + DC Listed" },
+    { value: GROWTH_TOOLS.length, label: "Pro Tools Built In" },
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -267,19 +263,18 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-clip">
       <AnimatedBackground />
       <FloatingOrbs />
 
       {/* Nav */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      <nav className={`sticky top-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <CHLogo height={40} />
           <div className="hidden md:flex items-center gap-6 text-sm text-white/70">
-            <a href="#services" className="hover:text-white transition-colors" data-testid="link-nav-services">Services</a>
-            <a href="#consulting" className="hover:text-white transition-colors" data-testid="link-nav-consulting">Consulting</a>
-            <a href="#stats" className="hover:text-white transition-colors" data-testid="link-nav-stats">Results</a>
-            <a href="#coverage" className="hover:text-white transition-colors" data-testid="link-nav-coverage">Coverage</a>
+            {SECTION_LINKS.map((link) => (
+              <a key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
+            ))}
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
             {user && (
@@ -290,7 +285,7 @@ export default function LandingPage() {
               </Link>
             )}
             <div className="text-white"><CartSheet /></div>
-            <div className="text-white"><ThemeToggle /></div>
+            <div className="text-white hidden sm:block"><ThemeToggle /></div>
             {user ? (
               <Link href="/" data-testid="link-nav-dashboard">
                 <Button size="sm" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white shadow-lg shadow-blue-500/25">
@@ -299,7 +294,7 @@ export default function LandingPage() {
               </Link>
             ) : (
               <>
-                <Link href="/auth" data-testid="link-nav-signin">
+                <Link href="/auth" className="hidden sm:block" data-testid="link-nav-signin">
                   <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10" size="sm">
                     Sign In
                   </Button>
@@ -311,12 +306,13 @@ export default function LandingPage() {
                 </Link>
               </>
             )}
+            <LandingMobileMenu signInHref={user ? undefined : "/auth"} links={[...SECTION_LINKS]} />
           </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative z-10 pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-16 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto text-center">
           <div className="animate-in">
             <Badge className="mb-6 bg-blue-500/10 text-blue-400 border-blue-500/20 px-4 py-1.5 text-sm">
@@ -325,7 +321,7 @@ export default function LandingPage() {
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] animate-in-delay-1">
             <span className="bg-gradient-to-r from-foreground via-foreground to-foreground/60 dark:from-white dark:via-white dark:to-white/60 bg-clip-text text-transparent">
-              Construction <span className="font-extrabold">HUB</span> —
+              Construct<span className="font-extrabold">HUB</span> —
             </span>
             <br />
             <span className="bg-gradient-to-r from-[#4A6CF7] via-[#6B8CFF] to-[#F07C22] bg-clip-text text-transparent">
@@ -338,7 +334,7 @@ export default function LandingPage() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-3">
             <Link href="/auth?mode=signup" data-testid="link-hero-signup">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-8 h-12 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
-                Start Free Trial <ArrowRight className="h-4 w-4 ml-2" />
+                Create a Free Account <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <Link href="/free-site-scan" className="underline font-semibold">Free 60-second website scan</Link>
@@ -350,7 +346,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground dark:text-white/40 animate-in-delay-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> No credit card required
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> No card needed to sign up
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Setup in minutes
@@ -371,7 +367,7 @@ export default function LandingPage() {
           {stats.map((stat, i) => (
             <Card key={stat.label} className={`bg-muted/50 dark:bg-white/[0.03] border-border dark:border-white/[0.06] p-6 text-center backdrop-blur-sm animate-in-delay-${i + 1}`}>
               <div className="text-3xl sm:text-4xl font-extrabold text-foreground dark:text-white">
-                <CountUp end={stat.value} suffix={stat.suffix} />
+                {typeof stat.value === "number" ? <CountUp end={stat.value} suffix={stat.suffix} /> : "—"}
               </div>
               <p className="text-sm text-muted-foreground dark:text-white/50 mt-1">{stat.label}</p>
             </Card>
@@ -472,7 +468,6 @@ export default function LandingPage() {
             <div className="relative z-10">
               <div className="flex items-center justify-center gap-3 mb-3 flex-wrap">
                 <h3 className="text-2xl sm:text-3xl font-extrabold">Complete Business Build</h3>
-                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Save ~30%</Badge>
               </div>
               <div className="text-4xl font-extrabold text-foreground dark:text-white mb-3">$29,999</div>
               <p className="text-muted-foreground dark:text-white/40 max-w-xl mx-auto mb-6">
@@ -496,7 +491,7 @@ export default function LandingPage() {
             <div className="relative z-10 flex flex-col lg:flex-row items-center gap-8">
               <div className="flex-1 text-center lg:text-left">
                 <Badge className="mb-4 bg-orange-500/10 text-orange-400 border-orange-500/20">
-                  <Star className="h-3 w-3 mr-1" /> Premium Service
+                  <Star className="h-3 w-3 mr-1" /> Platinum Benefit
                 </Badge>
                 <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
                   Talk With a Professional
@@ -520,12 +515,14 @@ export default function LandingPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
                   <div className="text-center sm:text-left">
-                    <div className="text-4xl font-extrabold text-foreground dark:text-white">$500<span className="text-lg font-normal text-muted-foreground dark:text-white/40">/30 min</span></div>
-                    <p className="text-xs text-muted-foreground dark:text-white/30 mt-1">In-person or virtual</p>
+                    <div className="text-4xl font-extrabold text-foreground dark:text-white">$250<span className="text-lg font-normal text-muted-foreground dark:text-white/40"> first session</span></div>
+                    <p className="text-xs text-muted-foreground dark:text-white/30 mt-1" data-testid="text-consulting-terms">
+                      Platinum members only · 30 minutes · $500 per session after the first · In-person or virtual
+                    </p>
                   </div>
-                  <Link href="/auth?mode=signup" data-testid="link-consulting-book">
+                  <Link href="/pricing" data-testid="link-consulting-book">
                     <Button size="lg" className="bg-[#F07C22] hover:bg-[#E06B15] text-white px-8 shadow-lg shadow-orange-500/25">
-                      Book a Session <ArrowRight className="h-4 w-4 ml-2" />
+                      See the Platinum Plan <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
                 </div>
@@ -570,41 +567,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold tracking-tight">
-              Trusted by <span className="text-[#4A6CF7]">Contractors</span>
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {testimonials.map((t, i) => (
-              <Card key={i} className={`bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] p-6 backdrop-blur-sm animate-in-delay-${i + 1}`}>
-                <div className="flex gap-0.5 mb-3">
-                  {Array.from({ length: t.stars }).map((_, j) => (
-                    <Star key={j} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground dark:text-white/60 leading-relaxed mb-4">"{t.quote}"</p>
-                <div>
-                  <p className="text-sm font-semibold">{t.name}</p>
-                  <p className="text-xs text-muted-foreground dark:text-white/40">{t.role}</p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Coverage Map */}
       <section id="coverage" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl font-extrabold tracking-tight mb-3">
             Nationwide <span className="text-[#4A6CF7]">Coverage</span>
           </h2>
-          <p className="text-muted-foreground dark:text-white/40 mb-10 max-w-xl mx-auto">
-            32,864+ permit databases across 3,139 counties in all 50 states — and growing every week.
+          <p className="text-muted-foreground dark:text-white/40 mb-10 max-w-xl mx-auto" data-testid="text-coverage-summary">
+            {counts ? `${formatCount(counts.total)} county and city jurisdictions` : "County and city jurisdictions"} listed
+            across all 50 states and DC{hasVerified ? `, ${formatCount(counts!.verifiedPortals!)} with a verified permit portal link` : ""}.
+            Portal links are added only after they pass our link checks.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {[
@@ -619,7 +591,7 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <p className="mt-4 text-xs text-muted-foreground/50 dark:text-white/25">All 50 states covered &mdash; 32,864+ databases &amp; counting</p>
+          <p className="mt-4 text-xs text-muted-foreground/50 dark:text-white/25">All 50 states + DC listed &mdash; portal links shown only once checked</p>
         </div>
       </section>
 
@@ -631,12 +603,12 @@ export default function LandingPage() {
             Ready to Build Your Business?
           </h2>
           <p className="text-muted-foreground dark:text-white/40 mb-8 max-w-lg mx-auto">
-            Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, Construction HUB has you covered.
+            Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/auth?mode=signup" data-testid="link-cta-signup">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-10 h-13 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
-                Get Started Free <ArrowRight className="h-4 w-4 ml-2" />
+                Create Your Free Account <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <a href="#consulting" data-testid="link-cta-consulting">
@@ -660,7 +632,7 @@ export default function LandingPage() {
               <span className="text-white/20">|</span>
               <a href="/privacy" className="hover:text-white/70 transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
             </div>
-            <p className="text-xs text-white/20">&copy; 2025 Construction Hub. All rights reserved.</p>
+            <p className="text-xs text-white/20">{copyrightNotice()}</p>
           </div>
         </div>
       </footer>
