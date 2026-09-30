@@ -19,6 +19,17 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🧩 Features shipped 2026-09-30 (security, Profile Guard, AI replies, Posts & Photos, Social, Guides)
+Reports: `analysis/FEATURE-a1.md` (security), `-a2` (Profile Guard + AI review replies), `-a3` (Posts & Photos),
+`-a4` (Social via Blotato + Guides). Pre-deploy dump: vb11 `backups/pre-features-20260930T002817Z.dump`.
+**Production keys in vb11 `~/ConstructHUB-live/.env` — back them up; losing one forces reconnects:**
+`GBP_TOKEN_KEY` (32B base64; encrypts Google tokens AND authenticator secrets — lose it = all 2FA + Google
+connections reset), `SOCIAL_ENCRYPTION_KEY` (64 hex; customer Blotato keys). `GBP_CONTENT_WORKER_ENABLED=true`
+(publishes scheduled posts/photos). Photos reach Google via 1-hour HMAC-signed `/api/public/gbp-media` links
+(no public bucket). Honest limits: Google can't be blocked from edits (Lockdown auto-reverts); no API to report
+edits/reviews (we prefill Google's form); Google strips EXIF (geotags cosmetic). Blotato = customer's own paid
+subscription + API key.
+
 ## 🔍 Full audit 2026-09-28 (deployed 09-29 00:17 UTC)
 Summary + owner actions + ranked next work: `analysis/AUDIT-SUMMARY-2026-09-28.md` (lane reports
 AUDIT-a1/a2-gbp/a3/a4 beside it). Pre-deploy DB dump on vb11: `backups/pre-audit-deploy-20260929T001714Z.dump`.
