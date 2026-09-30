@@ -20,12 +20,44 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import {
   Loader2, Paperclip, Download, Trash2, Camera, MessageSquare, FileText, Image as ImageIcon,
 } from "lucide-react";
 import { SectionTitle, EmptyState } from "@/components/crm-ui";
+
+/** One confirm step before a delete — every remove here is permanent and client-visible. */
+function ConfirmDelete({
+  open, onOpenChange, title, description, confirmLabel, onConfirm, testId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  testId: string;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent data-testid={testId}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid={`${testId}-cancel`}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} data-testid={`${testId}-confirm`}>{confirmLabel}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 const kb = (n?: number | null) =>
   n === null || n === undefined ? "" : n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
@@ -227,9 +259,13 @@ export function OrgPamphlets() {
       const r = await fetch(`/api/crm/attachments/${id}`, { method: "DELETE", credentials: "same-origin" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Delete failed");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      toast({ title: "Pamphlet removed", description: "It's gone from every client's portal." });
+    },
     onError: (e: any) => toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" }),
   });
+  const [confirming, setConfirming] = useState<any | null>(null);
 
   return (
     <Card data-testid="section-pamphlet-manager">
@@ -271,14 +307,24 @@ export function OrgPamphlets() {
                 <a href={p.downloadUrl} className="font-medium hover:underline truncate block">{p.fileName}</a>
                 <div className="text-xs text-muted-foreground">{kb(p.sizeBytes)} · {day(p.createdAt)}</div>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => remove.mutate(p.id)}
-                disabled={remove.isPending} data-testid={`button-delete-pamphlet-${p.id}`}>
+              <Button size="sm" variant="ghost" onClick={() => setConfirming(p)}
+                disabled={remove.isPending} data-testid={`button-delete-pamphlet-${p.id}`}
+                aria-label={`Delete ${p.fileName}`} title="Delete pamphlet">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))
         )}
       </CardContent>
+      <ConfirmDelete
+        open={!!confirming}
+        onOpenChange={(o) => { if (!o) setConfirming(null); }}
+        title={`Delete ${confirming?.fileName ?? "this pamphlet"}?`}
+        description="Pamphlets are company-wide — this removes it from every client's portal. This can't be undone."
+        confirmLabel="Delete pamphlet"
+        onConfirm={() => { if (confirming) remove.mutate(confirming.id); setConfirming(null); }}
+        testId="dialog-delete-pamphlet"
+      />
     </Card>
   );
 }
@@ -305,9 +351,13 @@ export function EstimateAttach({ estimateId, canManage }: { estimateId: string; 
       const r = await fetch(`/api/crm/attachments/${id}`, { method: "DELETE", credentials: "same-origin" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Delete failed");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      toast({ title: "Attachment removed", description: "It no longer shows on the client's estimate page." });
+    },
     onError: (e: any) => toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" }),
   });
+  const [confirming, setConfirming] = useState<any | null>(null);
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid={`estimate-attachments-${estimateId}`}>
@@ -321,7 +371,8 @@ export function EstimateAttach({ estimateId, canManage }: { estimateId: string; 
               type="button"
               aria-label={`Remove ${a.fileName}`}
               className="text-muted-foreground hover:text-destructive"
-              onClick={() => remove.mutate(a.id)}
+              onClick={() => setConfirming(a)}
+              disabled={remove.isPending}
               data-testid={`button-remove-attachment-${a.id}`}
             >
               <Trash2 className="h-3 w-3" />
@@ -348,6 +399,15 @@ export function EstimateAttach({ estimateId, canManage }: { estimateId: string; 
             {upload.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Paperclip className="h-4 w-4 mr-1.5" />}
             Attach
           </Button>
+          <ConfirmDelete
+            open={!!confirming}
+            onOpenChange={(o) => { if (!o) setConfirming(null); }}
+            title={`Remove ${confirming?.fileName ?? "this file"}?`}
+            description="The client will no longer see it on their estimate page. This can't be undone."
+            confirmLabel="Remove file"
+            onConfirm={() => { if (confirming) remove.mutate(confirming.id); setConfirming(null); }}
+            testId={`dialog-remove-attachment-${estimateId}`}
+          />
         </>
       )}
     </div>
@@ -374,7 +434,12 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
   const uploadFiles = async (files: FileList) => {
     setBusy(true);
     let ok = 0, failed = 0;
-    for (const f of Array.from(files).slice(0, 20)) {
+    // The server's reason ("JPEG, PNG or HEIC photos only", "File too large")
+    // is the useful part of a failure — keep each distinct one for the toast.
+    const reasons = new Set<string>();
+    const picked = Array.from(files);
+    if (picked.length > 20) reasons.add(`Only the first 20 of ${picked.length} photos were uploaded`);
+    for (const f of picked.slice(0, 20)) {
       try {
         const fd = new FormData();
         fd.append("kind", "photo");
@@ -384,13 +449,20 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
         const r = await fetch("/api/crm/attachments", { method: "POST", body: fd, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || `Upload failed (${r.status})`);
         ok++;
-      } catch { failed++; }
+      } catch (e: any) {
+        failed++;
+        reasons.add(`${f.name}: ${String(e?.message || "upload failed")}`);
+      }
     }
     setBusy(false);
     queryClient.invalidateQueries({ queryKey: qk });
+    const why = Array.from(reasons).slice(0, 4).join(" · ");
     toast(failed
-      ? { title: `${ok} uploaded, ${failed} failed`, variant: "destructive" }
-      : { title: `${ok} photo${ok === 1 ? "" : "s"} added`, description: "The client can see them in their portal too." });
+      ? { title: `${ok} uploaded, ${failed} failed`, description: why, variant: "destructive" }
+      : {
+        title: `${ok} photo${ok === 1 ? "" : "s"} added`,
+        description: why || "The client can see them in their portal too.",
+      });
   };
 
   const del = useMutation({
@@ -398,9 +470,13 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
       const r = await fetch(`/api/crm/attachments/${id}`, { method: "DELETE", credentials: "same-origin" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Failed");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      toast({ title: "Photo deleted", description: "It's gone from the client's portal too." });
+    },
     onError: (e: any) => toast({ title: "Could not delete", description: String(e.message ?? e), variant: "destructive" }),
   });
+  const [confirming, setConfirming] = useState<any | null>(null);
 
   return (
     <Card data-testid="section-customer-photos">
@@ -422,7 +498,8 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
                 <option value="progress">In progress</option>
                 <option value="finished">Finished</option>
               </select>
-              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+              {/* Matches the server's photo types exactly (PHOTO_MIMES) — no GIF. */}
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp" multiple className="hidden"
                 data-testid="input-project-photos"
                 onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ""; }} />
               <Button size="sm" onClick={() => fileRef.current?.click()} disabled={busy}
@@ -460,11 +537,16 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
                     </span>
                   )}
                   {canUpload && (
+                    // Always shown on touch screens (no hover there); revealed
+                    // on hover/keyboard focus where a pointer can hover.
                     <button
-                      className="absolute top-1 right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded bg-black/60 text-white"
-                      onClick={() => del.mutate(p.id)}
+                      type="button"
+                      className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded bg-black/60 text-white transition-opacity [@media(hover:hover)]:h-5 [@media(hover:hover)]:w-5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100"
+                      onClick={() => setConfirming(p)}
+                      disabled={del.isPending}
                       data-testid={`button-delete-photo-${p.id}`}
-                      aria-label="Delete photo"
+                      aria-label={`Delete photo ${String(p.fileName ?? "").replace(/^(progress|finished)--/, "")}`.trim()}
+                      title="Delete photo"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
@@ -475,6 +557,15 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
           </div>
         )}
       </CardContent>
+      <ConfirmDelete
+        open={!!confirming}
+        onOpenChange={(o) => { if (!o) setConfirming(null); }}
+        title="Delete this photo?"
+        description="The client will no longer see it in their portal. This can't be undone."
+        confirmLabel="Delete photo"
+        onConfirm={() => { if (confirming) del.mutate(confirming.id); setConfirming(null); }}
+        testId="dialog-delete-photo"
+      />
     </Card>
   );
 }
@@ -484,7 +575,16 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
 export function CustomerComments({ customerId }: { customerId: string }) {
   const { toast } = useToast();
   const qk = [`/api/crm/customers/${customerId}/client-comments`];
-  const { data: comments } = useQuery<any[]>({ queryKey: qk });
+  const { data: rows } = useQuery<any[]>({ queryKey: qk });
+  // This card is the client's side only; the endpoint also returns the
+  // team's own replies (authorMemberId set). The two-way thread the page
+  // already loads (managers only — never fetched from here) marks which
+  // ones are ours, so they never read as "notes this client sent".
+  const { data: thread } = useQuery<any>({ queryKey: [`/api/crm/inbox/${customerId}`], enabled: false });
+  const ours = new Set<string>(
+    (thread?.messages ?? []).filter((m: any) => m.fromClient === false).map((m: any) => m.id),
+  );
+  const comments = (rows ?? []).filter((c: any) => !c.authorMemberId && !ours.has(c.id));
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
@@ -495,7 +595,7 @@ export function CustomerComments({ customerId }: { customerId: string }) {
     onError: (e: any) => toast({ title: "Could not mark read", description: String(e.message ?? e), variant: "destructive" }),
   });
 
-  const unread = (comments ?? []).filter((c: any) => !c.readAt).length;
+  const unread = comments.filter((c: any) => !c.readAt).length;
 
   return (
     <Card data-testid="section-customer-comments">
@@ -507,7 +607,7 @@ export function CustomerComments({ customerId }: { customerId: string }) {
         />
       </CardHeader>
       <CardContent className="space-y-2">
-        {!comments?.length ? (
+        {!comments.length ? (
           <EmptyState compact icon={MessageSquare} title="No comments yet"
             description="Questions the client sends from their portal show up here." />
         ) : (
