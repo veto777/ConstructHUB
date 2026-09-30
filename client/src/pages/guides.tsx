@@ -8,8 +8,8 @@ const guides = [
       "Visit Blotato and create your own account. Blotato is a separate subscription you buy from Blotato; creating an API key activates its paid subscription.",
       "Connect your social accounts inside Blotato. For Facebook, grant access to the Pages you manage.",
       "In Blotato Settings, open API and create/copy an API key. Never send the key to anyone else.",
-      "Open Social Media in ConstructHUB, paste the key into Blotato API key, and choose Connect Blotato. Your connected platforms appear.",
-      "In Compose, select accounts. Use Refresh pages or boards, then select the destination. Disconnect stops local queued posts and auto mode; manage already-submitted posts and billing in Blotato.",
+      "Open Social Media, search for a business / Google profile, and select it. Choose Agency shared key or This business only, paste the Blotato API key, and choose Connect Blotato. A business without its own key falls back to the agency key.",
+      "Open Map accounts and pages to this business. Search accounts, discover pages or boards, choose the verified destinations, and Save business mapping. These become composer defaults and bulk destinations. Disconnect stops local queued posts and auto mode; manage already-submitted posts and billing in Blotato.",
     ],
   },
   {
@@ -17,7 +17,7 @@ const guides = [
     href: "/social-media",
     steps: [
       "Open Social Media → Compose. Select accounts/pages and enter Post text.",
-      "Use each platform’s text tweak and character counter. Add public media URLs, attach a Media Library photo, or Upload through Blotato.",
+      "Use each platform’s text tweak and character counter. Add public media URLs, attach a synced business photo, or Upload through Blotato.",
       "For YouTube, supply a title, video and privacy choice. TikTok defaults to private; choose public explicitly and set any business/paid partnership disclosures.",
       "Choose Post now, or enter Schedule time in your browser’s local timezone and choose Schedule post. Save draft keeps the post for approval.",
       "Open Calendar & queue. Each destination has its own status. Approve & queue a draft, or cancel before submission. Follow View published post or Open Blotato status.",
@@ -28,12 +28,23 @@ const guides = [
     title: "Auto mode",
     href: "/social-media",
     steps: [
-      "Add your business details in Locations. Add public project photos to Media Library and sync Google reviews if you want those content sources.",
+      "Add your business details in Locations. Sync that location’s Google business photos and reviews if you want those content sources.",
       "In Social Media → Compose, select the accounts/pages to use. Open Auto mode and choose Use accounts selected in Compose.",
-      "Choose cadence, content mix, timezone, blackout hours, business instructions, writing examples, and daily AI budget. Add factual offers under Content sources. Use Sync recent GBP updates to import live standard updates from linked Google locations; auto mode refreshes them before cross-posting.",
-      "Start with Approval queue, enable auto mode and Save auto settings. Generate draft from saved settings lets you preview without publishing.",
+      "Choose cadence, content mix, timezone, blackout hours, business instructions, writing examples, and daily AI budget. Add factual offers under Content sources. Use Sync recent GBP updates to import live standard updates from linked Google locations; refresh is queued in the background and only imports the selected business. Check the refresh status; generation uses recent stored sources.",
+      "Start with Approval queue, enable auto mode and Save auto settings. Generate draft from saved settings queues a preview without publishing; results appear in the calendar after the worker runs.",
       "Review AI-generated drafts in Calendar & queue; edit the text and choose Approve & queue.",
       "Only choose Fully automatic if you authorize generated posts to publish without review. Disabling auto mode returns pending automatic posts to drafts. Missing source material is reported instead of invented. Remove expired offers promptly.",
+    ],
+  },
+  {
+    title: "Agency social workflows",
+    href: "/social-media",
+    steps: [
+      "The business selector searches saved Locations and remembers the selected business in the URL. Switching businesses resets the composer and settings editor.",
+      "Open Bulk actions, select businesses across search pages, and write one update using {business}, {city}, and {phone}. Create bulk drafts for review or explicitly Queue bulk posts. Missing facts or invalid destinations produce per-business failures in Bulk results.",
+      "Expand Per-business cadence to set each selected business’s frequency. Approval drafts is the default; choosing automatic publishing explicitly authorizes all selected businesses. You can also disable auto modes, refresh GBP sources, or generate drafts in bulk.",
+      "Open All-clients calendar to search business names/post text and filter dates, status, and platform. Select drafts for bulk approval or cancel unsent posts. A single bulk action handles up to 100 posts.",
+      "Mapping edits pause auto mode. After changing a key, review and save each affected business mapping before enabling auto mode again. Legacy global automation is paused; unassigned history remains in the all-clients calendar.",
     ],
   },
   {

@@ -4,11 +4,11 @@ import { clientFor } from "../gbp/service";
 import { resource } from "../gbp/client";
 import { publicMediaUrl } from "../../shared/social";
 import { SocialError } from "./client";
-export async function syncGbpSources(userId: number, make = clientFor) {
+export async function syncGbpSources(userId: number, make = clientFor, businessId: number | null = null) {
   const { rows: locations } = await pool.query(
     `SELECT l.* FROM business_locations l JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject
-    WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL AND NOT g.reconnect_required AND 'https://www.googleapis.com/auth/business.manage'=ANY(g.scopes) ORDER BY l.id LIMIT 20`,
-    [userId],
+    WHERE l.user_id=$1 AND ($2::int IS NULL OR l.id=$2) AND l.gbp_location_name IS NOT NULL AND NOT g.reconnect_required AND 'https://www.googleapis.com/auth/business.manage'=ANY(g.scopes) ORDER BY l.id LIMIT 20`,
+    [userId,businessId],
   );
   if (!locations.length)
     throw new SocialError(
@@ -45,13 +45,14 @@ export async function syncGbpSources(userId: number, make = clientFor) {
           .filter((url: any) => publicMediaUrl.safeParse(url).success)
           .slice(0, 10);
         await c.query(
-          `INSERT INTO social_sources(user_id,kind,text,media_urls,external_key,created_at) VALUES($1,'gbp',$2,$3,$4,$5)`,
+          `INSERT INTO social_sources(user_id,kind,text,media_urls,external_key,created_at,business_id) VALUES($1,'gbp',$2,$3,$4,$5,$6)`,
           [
             userId,
             p.summary,
             JSON.stringify(media),
             p.name,
             new Date(p.createTime),
+            businessId,
           ],
         );
         imported++;

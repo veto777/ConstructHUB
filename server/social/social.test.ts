@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { pool } from "../db";
 import { ensureGrowthSchema } from "../growth-schema";
+import { ensureGbpSchema } from "../gbp/schema";
 import { ensureSocialSchema } from "./schema";
 import { ensureAccountEventsSchema } from "../account-events";
 import {
@@ -93,6 +94,7 @@ beforeAll(async () => {
     throw new Error("a4 local database required");
   process.env.SOCIAL_ENCRYPTION_KEY = "ab".repeat(32);
   await ensureGrowthSchema();
+  await ensureGbpSchema();
   await ensureSocialSchema();
   await ensureSocialSchema();
   await ensureAccountEventsSchema();

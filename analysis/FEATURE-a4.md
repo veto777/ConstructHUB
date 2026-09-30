@@ -1,3 +1,63 @@
+# Feature lane a4 — Round 4: business and agency Social Media
+
+Implemented locally in `/home/veto/ConstructHUB-a4`, using port **8159** and database **constructhub_dev_a4** only. No push, deployment, production access, real provider publication, paid AI call, or live email delivery. Earlier-round notes are retained below; this section supersedes their global-account workflow.
+
+## What changed and where
+
+Open **Social Media** (`/social-media`) from the growth sidebar.
+
+- Search saved **businesses / Google profiles** by name, city or phone; filter Google linkage and page through results. The selection lives in `?business=<location ID>` via `use-url-param`. Switching businesses remounts the editor, preventing old text, destinations or auto settings from carrying over.
+- **Blotato connection → Key to manage** supports an agency shared key plus optional overrides per business. A missing business key falls back to the agency key. Keys remain AES-256-GCM encrypted with owner-bound authentication and never appear in API responses or logs.
+- **Map accounts and pages to this business** searches cached accounts, discovers verified pages/boards, and saves up to 20 destinations. These are composer defaults and bulk destinations. Page/board identity is enforced on the server, including in the publishing worker. Mapping changes pause that business’s auto mode and hold unapproved automatic posts as drafts.
+- Composer, calendar, settings, sources, source refresh status, and AI generation are business-scoped. Photos come from that location’s synced GBP business media; review generation uses only its synced reviews. Offers and manually supplied published updates are stored against the selected business. Explicit HTTPS attachments and Blotato uploads remain available.
+- **Bulk actions** retains selected businesses across search pages. Select up to 1,000, write one update with `{business}`, `{city}`, `{phone}`, and create approval drafts or explicitly queue publication. Missing facts fail that business visibly rather than inventing data. Destinations and connection fingerprints are captured when work is queued; later mapping/key changes cannot silently redirect a queued request.
+- Bulk-enable or disable auto mode, set each business’s cadence, choose approval/explicit automatic mode, queue GBP source refreshes, or generate approval drafts. **Bulk results** is searchable and paginated with per-business outcomes. Newer manual settings cancel older queued automation changes; disconnect cancels dependent pending bulk work.
+- **All-clients calendar** searches post text/business names and filters day, platform, and status. It displays business names, supports pagination, and permits bulk approval/cancellation of up to 100 selected posts. Date filtering uses the browser’s timezone on the server.
+- Updated **Guides**, including the agency workflow and asynchronous source refresh/generation behavior.
+
+## How to use
+
+1. Add/import the clients in **Locations**. In Social Media, search and select a business.
+2. Save an **Agency shared key**, or select **This business only** to override it. Business keys are optional.
+3. Open **Map accounts and pages to this business**, select verified destinations, and save. Repeat for each client; the agency key does not imply that every social account belongs to every client.
+4. Compose, review, and schedule normally. For auto mode, select destinations, choose cadence/content mix/blackout hours and AI budget, then save. Approval is the default; fully automatic mode is explicit publishing permission for that business.
+5. Queue **Sync recent GBP updates** and inspect its status. GBP photos/reviews are read from the existing location sync. Generation uses recent cached factual sources; it never fetches every Google profile in an HTTP request.
+6. For bulk work, open **Bulk actions**, select clients across pages, fill the update or cadence settings, and submit. Inspect **Bulk results**, then review drafts in **All-clients calendar**.
+
+## Implementation and safety
+
+- `server/social/agency.ts`: paged business queries, exact destination mappings, variable expansion, owner validation, idempotent bulk queue, bounded background batches, source refresh queue.
+- `server/social/service.ts`: business-scoped connections/settings/posts/AI context and worker execution; connection-change handling; existing uncertain-state behavior, owner locks, provider rate gate, approval/blackout checks, and notification delivery retained.
+- `server/social/routes.ts`: authenticated, owner-scoped, Zod-validated endpoints with the existing growth mutation gate. List reads use SQL search/filter/pagination. Keys and internal fingerprints are excluded from route responses.
+- `server/social/schema.ts`: idempotent additions within the existing `ensureSocialSchema()`, already registered beside GBP initialization in `server/routes.ts`. Business foreign keys, scoped unique indexes, `social_business_config`, and `social_bulk_jobs`; no drizzle-kit operation. PostgreSQL 15+ supports the NULLS NOT DISTINCT indexes (the project uses PostgreSQL 16).
+- Existing `notifyUser` uses `social.post_published` / `social.post_failed`; `logActivity` records connection, settings, mapping, and bulk actions. **No new notification kinds and no KIND_DEFAULTS edits.**
+- Blotato’s existing database gate remains shared by API-key fingerprint (2.1-second spacing, persistent 429 cooldown). Source refreshes use the existing GBP multi-account client and project quota limiter. Worker batches are bounded: 20 bulk rows, 10 source refreshes, and 30 due business scopes per tick.
+- A changed key or interrupted publication remains **uncertain**, never automatically reposted. A worker interrupted during paid draft generation leaves a visible generation record and does not automatically repeat the paid call.
+
+## Configuration and honest limits
+
+- Keep `SOCIAL_ENCRYPTION_KEY` persistent (64 hex characters). Losing it requires reconnecting all Blotato keys. Business overrides and the agency key use the same existing encryption configuration.
+- Enable the social worker by leaving `SOCIAL_WORKER_DISABLED` unset/false outside the lane. The lane server runs with it true, GBP workers disabled, blank Stripe keys, and `EMAIL_FORCE_SINK=1`.
+- Existing OpenAI configuration is required for generation. Per-business daily budget remains 0–20. A shared owner ceiling defaults to **20 generations/day**; the operator can explicitly configure `SOCIAL_AI_OWNER_DAILY_BUDGET` (0–100000) for an agency’s cost allowance. Failed attempts may consume reserved budget.
+- Legacy global automation is paused on migration and unapproved global automatic queue entries become drafts. No historical post/source/settings row is guessed into a business. Legacy posts remain visible as unassigned in the all-clients calendar; configure each business explicitly. New post/settings HTTP writes require a business.
+- Bulk posts share the supplied text/HTTPS media attachments and use each business’s saved destination defaults. Missing media, required titles or other platform requirements fail visibly. Single-business composition additionally supports platform-specific text tweaks. Blotato acceptance is not claimed as publication.
+- Source refresh is explicit/queued (single or bulk), not a continuously refreshed copy of all Google posts. Only recent LIVE/STANDARD GBP updates are imported. Existing GBP photo/review sync must already have populated the selected location. General unassigned Media Library photos are not silently used as client-specific AI evidence.
+- Existing provider-approved submissions must be inspected in Blotato after disconnect or key replacement. Local cancellation cannot recall them.
+- Test fixtures are clearly labelled and cleaned up. No real Blotato/Google/OpenAI integration was exercised; external boundaries are injected/mocked.
+
+## Validation
+
+**Final check results:** TypeScript 0 errors; full Vitest 91 passed / 2 skipped files, **959 passed / 43 skipped tests**; Social Media Playwright **5 passed**. The skipped tests are existing lane/environment skips, not new feature skips.
+
+- `npm run check`: 0 errors.
+- Full lane Vitest command: Node 20, exported `.env`, `CRM_TEST_DATABASE_URL=$DATABASE_URL`, `CRM_TEST_BASE_URL=http://127.0.0.1:8159`, `CRM_TEST_SINGLE_PORT=true`.
+- `server/social/agency.test.ts`: real PostgreSQL with 1,000 seeded business locations; 1,000 cached accounts, pages, photos, calendar rows, sources and queued bulk rows. Covers pagination/search, tenant and business isolation, agency/client-key fallback, request deduplication, snapshot protection, scoped AI context, queued source/generation work, bulk cadence and approvals, and legacy migration.
+- Playwright: `E2E_PORT=8159 E2E_DB=constructhub_dev_a4 npx playwright test --config playwright.social.config.ts`. Growth UI uses `VITE_FORCE_PORTAL=false`; CRM browser specs require true. Includes real API/Postgres flow across 1,000 businesses, URL reload, source isolation and bulk enqueueing, plus mocked provider compose/approval flow and phone layout checks.
+
+---
+
+## Earlier-round implementation record
+
 # Feature lane a4 — Social Media and Guides
 
 Built on `lane/a4` from main `7d2f1d4`, in `/home/veto/ConstructHUB-a4`. Only local port **8159** and database **constructhub_dev_a4** were used. No deploy, push, production access, real social publication, paid AI call, or live email delivery was performed.
