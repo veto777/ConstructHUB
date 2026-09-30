@@ -14,10 +14,9 @@ const BASE = `https://${CANONICAL_HOST}`;
 
 // Public, indexable routes (marketing + legal). App/dashboard routes are
 // deliberately excluded — they render behind auth and shouldn't be indexed.
-const PUBLIC_ROUTES = [
+export const PUBLIC_ROUTES = [
   "/",
   "/pricing",
-  "/individual-pricing",
   "/google-ads-landing",
   "/google-ads-guide",
   "/google-ad-fraud",
@@ -38,7 +37,16 @@ function canonicalPath(reqPath: string): string {
   return p;
 }
 
-function buildSitemap(): string {
+/**
+ * Retired pages and where they live now (301, so search engines move the old
+ * URL's standing to the new one). Single tools are no longer sold on their own
+ * — they are add-ons to a plan (shared/plans.ts ADDONS).
+ */
+export const RETIRED_ROUTES: Record<string, string> = {
+  "/individual-pricing": "/pricing#add-ons",
+};
+
+export function buildSitemap(): string {
   const urls = PUBLIC_ROUTES.map(
     (r) => `  <url><loc>${BASE}${r === "/" ? "/" : r}</loc></url>`,
   ).join("\n");
@@ -84,6 +92,10 @@ export function serveStatic(app: Express) {
       .type("text/plain")
       .send(`User-agent: *\nAllow: /\nSitemap: ${BASE}/sitemap.xml\n`);
   });
+
+  for (const [from, to] of Object.entries(RETIRED_ROUTES)) {
+    app.get(from, (_req, res) => res.redirect(301, to));
+  }
 
   app.get("/sitemap.xml", (req, res) => {
     if (isPortalHost(requestHost(req)) || isClientHost(requestHost(req))) return res.status(404).type("text/plain").send("Not found");

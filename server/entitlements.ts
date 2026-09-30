@@ -14,14 +14,16 @@
  * A subscription row without a Stripe subscription is a grant (a trial code, or
  * a manual grant). It stops counting once its current_period_end has passed; a
  * grant with no end date stays open until an admin ends it. Stripe-managed rows
- * follow their Stripe status only (the webhook keeps it current).
+ * follow their Stripe status only (the webhook keeps it current): active,
+ * trialing and past_due (Stripe still retrying the card) have access —
+ * ACCESS_STATUSES in shared/plans.ts.
  */
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "./db";
 import { isPlatformAdminEmail } from "./admin";
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, effectivePlanKey, planForModule, MODULE_NAMES,
-  type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey,
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
+  type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
 } from "@shared/plans";
 
 export type Entitlements = {
@@ -51,20 +53,23 @@ export const TOP_PLAN: PlanKey = PLAN_KEYS[PLAN_KEYS.length - 1];
 export const PER_LOCATION_PLAN: PlanKey = "agency";
 
 /** Numeric limits an add-on can raise. */
-export type CountLimit = { [K in keyof PlanLimits]: PlanLimits[K] extends number ? K : never }[keyof PlanLimits];
+export type CountLimit = CountLimitKey;
 
 /**
- * What one unit of each add-on adds to the plan's limits (matches ADDONS'
- * descriptions; server/entitlements.test.ts keeps the two in step). The texting
- * number is a carrier number, not a count limit: the texting gate is the plan's.
+ * What one unit of each add-on adds to the plan's limits: the price book's own
+ * `grants` (shared/plans.ts), so the two can't drift. The texting number is a
+ * carrier number, not a count limit: the texting gate is the plan's.
  */
-export const ADDON_GRANTS: Record<AddonKey, Partial<Record<CountLimit, number>>> = {
-  extra_location: { locations: 1 },
-  extra_seat: { crmSeats: 1 },
-  protected_site: { protectedSites: 1 },
-  competitor_pack: { competitorScans: 10 },
-  texting_number: {},
-};
+export const ADDON_GRANTS: Record<AddonKey, Partial<Record<CountLimit, number>>> = Object.fromEntries(
+  (Object.keys(ADDONS) as AddonKey[]).map((key) => [key, ADDONS[key].grants]),
+) as Record<AddonKey, Partial<Record<CountLimit, number>>>;
+
+/**
+ * The subscription row that decides an account's plan: one row per account is
+ * the norm; if there are several, one with access wins, then the newest.
+ * `$1` is the user id (or ids, with ANY), `$2` ACCESS_STATUSES.
+ */
+const SUBSCRIPTION_ORDER = "ORDER BY (x.status = ANY($2::text[])) DESC, x.id DESC LIMIT 1";
 
 type SubscriptionRow = {
   plan?: string | null;
@@ -112,15 +117,13 @@ export function allowancesFor(plan: PlanKey, addons: Partial<Record<AddonKey, nu
 }
 
 export async function getEntitlements(userId: number, now = new Date()): Promise<Entitlements> {
-  // One subscription row per account is the norm; if there are several, an
-  // active one wins. s.* also picks up subscriptions.addons once billing adds it.
+  // s.* includes subscriptions.addons (the billing columns).
   const { rows: [row] } = await pool.query(
     `SELECT u.email, s.* FROM users u
        LEFT JOIN LATERAL (
-         SELECT * FROM subscriptions x WHERE x.user_id = u.id
-          ORDER BY (x.status IN ('active','trialing')) DESC, x.id DESC LIMIT 1
+         SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
        ) s ON true
-      WHERE u.id = $1`, [userId]);
+      WHERE u.id = $1`, [userId, ACCESS_STATUSES]);
   const admin = isPlatformAdminEmail(row?.email);
   const plan = activePlanKey(row, now);
   const accessPlan = admin ? TOP_PLAN : plan;
@@ -262,7 +265,7 @@ export async function redeemTrialCode(userId: number, code: { id: number; trialD
     await c.query("BEGIN");
     await c.query("SELECT pg_advisory_xact_lock(7170, $1)", [userId]);
     const { rows: [sub] } = await c.query(
-      "SELECT * FROM subscriptions WHERE user_id=$1 ORDER BY (status IN ('active','trialing')) DESC, id DESC LIMIT 1", [userId]);
+      `SELECT * FROM subscriptions x WHERE x.user_id=$1 ${SUBSCRIPTION_ORDER}`, [userId, ACCESS_STATUSES]);
     const refuse = async (refused: string, status: 400 | 409) => { await c.query("ROLLBACK"); return { refused, status }; };
     if (sub?.stripe_subscription_id && !STRIPE_ENDED.has(sub.status)) {
       return await refuse("Your account already has a paid plan, so a trial code can't be applied. Your plan stays as it is.", 409);
@@ -278,9 +281,12 @@ export async function redeemTrialCode(userId: number, code: { id: number; trialD
     const currentEnd = liveGrant ? new Date(sub.current_period_end) : null;
     const end = currentEnd && currentEnd > trialEnd ? currentEnd : trialEnd;
     if (sub) {
-      // An ended Stripe subscription's ids go with it (the customer id stays for a later checkout).
+      // An ended Stripe subscription's ids go with it (the customer id stays for a
+      // later checkout), and so do its add-ons, interval and billed locations:
+      // the trial grants the plan as published, not what the old subscription bought.
       await c.query(
-        "UPDATE subscriptions SET plan=$2, status='trialing', current_period_end=$3, stripe_subscription_id=NULL, stripe_price_id=NULL WHERE id=$1",
+        `UPDATE subscriptions SET plan=$2, status='trialing', current_period_end=$3, stripe_subscription_id=NULL, stripe_price_id=NULL,
+                addons='{}'::jsonb, billing_interval=NULL, agency_locations=NULL WHERE id=$1`,
         [sub.id, TRIAL_CODE_PLAN, end]);
     } else {
       await c.query("INSERT INTO subscriptions(user_id, plan, status, current_period_end) VALUES ($1, $2, 'trialing', $3)", [userId, TRIAL_CODE_PLAN, end]);
@@ -322,7 +328,7 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
     await c.query("BEGIN");
     await c.query("SELECT pg_advisory_xact_lock(7170, $1)", [userId]);
     const { rows: [sub] } = await c.query(
-      "SELECT * FROM subscriptions WHERE user_id=$1 ORDER BY (status IN ('active','trialing')) DESC, id DESC LIMIT 1", [userId]);
+      `SELECT * FROM subscriptions x WHERE x.user_id=$1 ${SUBSCRIPTION_ORDER}`, [userId, ACCESS_STATUSES]);
     const grantEnd = sub && !sub.stripe_subscription_id && sub.current_period_end != null && ["trialing", "active"].includes(sub.status)
       ? new Date(sub.current_period_end) : null;
     if (!grantEnd || grantEnd <= now || grantEnd.getTime() > ownEnd.getTime() + TRIAL_END_SLACK_MS) {
@@ -353,6 +359,38 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
     c.release();
   }
 }
+
+/** Does the account's plan (or platform-admin access) include this module? */
+export async function hasModule(userId: number, module: ModuleKey): Promise<boolean> {
+  return (await getEntitlements(userId)).modules[module];
+}
+
+/**
+ * Of these accounts, the ones whose plan (or platform-admin access) includes
+ * the module — one query for a whole batch, for schedulers that would
+ * otherwise call getEntitlements once per owner. Same rules as getEntitlements:
+ * the deciding subscription row, legacy keys mapped, expired grants dropped.
+ */
+export async function usersWithModule(userIds: readonly number[], module: ModuleKey, now = new Date()): Promise<Set<number>> {
+  const ids = [...new Set(userIds.filter((id) => Number.isSafeInteger(id)))];
+  const out = new Set<number>();
+  if (!ids.length) return out;
+  const { rows } = await pool.query(
+    `SELECT u.id AS account_id, u.email, s.plan, s.status, s.stripe_subscription_id, s.current_period_end FROM users u
+       LEFT JOIN LATERAL (
+         SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
+       ) s ON true
+      WHERE u.id = ANY($1::int[])`, [ids, ACCESS_STATUSES]);
+  for (const row of rows) {
+    const plan = activePlanKey(row, now);
+    if (isPlatformAdminEmail(row.email) || (plan && PLANS[plan].modules[module])) out.add(Number(row.account_id));
+  }
+  return out;
+}
+
+/** The note a worker records when it skips a job because the owner's plan lacks the module. */
+export const planPausedMessage = (module: ModuleKey) =>
+  `Not run: ${MODULE_NAMES[module]} is included with the ${PLANS[planForModule(module)].name} plan.`;
 
 /** Express middleware for a whole module's routes. Expects req.user (session auth). */
 export function requireModule(module: ModuleKey) {

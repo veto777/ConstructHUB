@@ -88,6 +88,12 @@ process.on("unhandledRejection", (reason) => {
     await seedDatabase();
     const { ensureGrowthSchema } = await import("./growth-schema");
     await ensureGrowthSchema();
+    // shared/schema.ts `subscriptions` lists the billing columns, so every
+    // drizzle select of it (routes, CRM tenancy, admin) needs them to exist
+    // before the first request. registerStripeRoutes starts this step; boot
+    // waits for it here.
+    const { billingSchemaReady } = await import("./billing/sync");
+    await billingSchemaReady();
     await setupAuth(app);
     await registerRoutes(httpServer, app);
 

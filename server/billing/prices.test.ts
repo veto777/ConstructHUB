@@ -6,7 +6,7 @@ import {
   agencyLocationTiers, tieredAmountCents, planPriceSpec, addonPriceSpec, addonSetupPriceSpec, agencyLocationsPriceSpec,
   resolvePriceId, resetPriceCache, describeSubscription, roleOfPrice,
 } from "./prices";
-import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL } from "./schema";
+import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS } from "./schema";
 import { PLANS, ADDONS, ANNUAL_MONTHS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
 
 describe("Agency location bands in Stripe", () => {
@@ -116,7 +116,7 @@ describe("describeSubscription", () => {
 
 describe("ensureBillingSchema", () => {
   it("only reads the catalog when the columns exist, and adds them idempotently when not", async () => {
-    const present = { query: vi.fn(async () => ({ rows: [{}, {}, {}] })) };
+    const present = { query: vi.fn(async () => ({ rows: BILLING_COLUMNS.map(() => ({})) })) };
     await ensureBillingSchema(present);
     expect(present.query).toHaveBeenCalledTimes(1);
 
@@ -124,5 +124,7 @@ describe("ensureBillingSchema", () => {
     await ensureBillingSchema(missing);
     expect(missing.query.mock.calls.slice(1).map((c) => c[0])).toEqual([...BILLING_SUBSCRIPTION_DDL]);
     for (const ddl of BILLING_SUBSCRIPTION_DDL) expect(ddl).toMatch(/^ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS /);
+    // One statement per checked column, so a routine boot never re-runs DDL.
+    expect(BILLING_SUBSCRIPTION_DDL.map((ddl) => ddl.split(" ")[8])).toEqual([...BILLING_COLUMNS]);
   });
 });

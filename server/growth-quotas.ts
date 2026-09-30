@@ -14,7 +14,7 @@ import {
   getEntitlements, cheapestPlanWhere, raiseHint, plural, billedLocationCount, TOP_PLAN,
   type Entitlements, type CountLimit,
 } from "./entitlements";
-import { PLANS, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
+import { PLANS, gridCreditCost, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
 
 export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos";
 
@@ -40,15 +40,8 @@ export const METERS: Record<MeteredFeature, Meter> = {
   photos: { what: "The Photo Optimizer", unit: ["photo"] },
 };
 
-/**
- * Ranking-grid credits a grid costs: one credit per 25 grid points, rounded up
- * (3x3 and 5x5 = 1, 7x7 = 2, 9x9 = 4, 11x11 = 5, 13x13 = 7, 15x15 = 9). The
- * Places cost of a grid grows with its points, so credits do too.
- */
-export function gridCreditCost(gridSize: number): number {
-  const size = Math.max(1, Math.floor(Number(gridSize) || 3));
-  return Math.ceil((size * size) / 25);
-}
+/** Ranking-grid credits a grid costs (one per 25 grid points), from the price book so the client shows the same number. */
+export { gridCreditCost };
 
 /** Does this plan's allowance include the feature at all? */
 const includes = (meter: Meter) => (l: PlanLimits) =>

@@ -18,16 +18,22 @@ const mocks = vi.hoisted(() => ({
   customers: vi.fn(),
   retrieve: vi.fn(),
   update: vi.fn(),
+  /** The customer's subscriptions as Stripe lists them (create-checkout asks). */
+  history: vi.fn(),
   verify: vi.fn(),
   recentAuth: true,
   /** The subscription Stripe "has": retrieve returns it, update applies item changes to it. */
   current: null as any,
+  /** Plain-SQL statements (the cancellation columns). */
+  sql: [] as { text: string; values: any[] }[],
+  /** What the cancellation columns hold for the row GET /subscription reads. */
+  cancelRow: {} as Record<string, unknown>,
 }));
 vi.mock("stripe", () => ({ default: class {
   prices = { list: mocks.pricesList, create: mocks.pricesCreate };
   checkout = { sessions: { create: mocks.checkout, list: mocks.openSessions, expire: mocks.expire } };
   customers = { create: mocks.customers };
-  subscriptions = { retrieve: mocks.retrieve, update: mocks.update };
+  subscriptions = { retrieve: mocks.retrieve, update: mocks.update, list: mocks.history };
   webhooks = { constructEvent: mocks.verify };
 } }));
 vi.mock("./db", () => {
@@ -39,7 +45,14 @@ vi.mock("./db", () => {
       update: () => ({ set: (set: any) => ({ where: async () => { mocks.updates.push(set); } }) }),
       insert: () => ({ values: async (values: any) => { mocks.inserts.push(values); } }),
     },
-    pool: { query: async () => ({ rows: [{}, {}, {}] }) },
+    pool: {
+      query: async (text: string, values: any[] = []) => {
+        if (/information_schema\.columns/.test(text)) return { rows: [{}, {}, {}, {}, {}] };
+        mocks.sql.push({ text, values });
+        if (/SELECT cancel_at_period_end/.test(text)) return { rows: [mocks.cancelRow] };
+        return { rows: [] };
+      },
+    },
   };
 });
 vi.mock("./auth", () => ({ getBaseUrl: () => "http://127.0.0.1:8251" }));
@@ -52,7 +65,9 @@ vi.mock("./account-security", () => ({
   },
 }));
 
-import { registerStripeRoutes, PLANS as COMPAT_PLANS } from "./stripe";
+import * as stripeModule from "./stripe";
+import { registerStripeRoutes } from "./stripe";
+import { cancellationOf, withBillingLock } from "./billing/sync";
 import { resetPriceCache } from "./billing/prices";
 import { COURSE_BUNDLE, DFY_CATALOG } from "./catalog";
 import { PLANS, ADDONS, AGENCY_LOCATION_BANDS, TRIAL_DAYS, agencyMonthlyCents } from "@shared/plans";
@@ -120,8 +135,14 @@ beforeEach(() => {
     });
     return subscription(items, { id });
   });
+  mocks.history.mockReset().mockResolvedValue({ data: [] });
   mocks.verify.mockReset();
+  mocks.sql.length = 0;
+  mocks.cancelRow = {};
 });
+
+/** The plain-SQL cancellation writes, as [where value, cancel_at_period_end, cancel_at]. */
+const cancellationWrites = () => mocks.sql.filter((q) => /SET cancel_at_period_end/.test(q.text)).map((q) => q.values);
 
 describe("GET /api/stripe/plans", () => {
   it("returns the shared price book — four plans, add-ons, Agency bands, a 1-day trial; no free or retired plans", async () => {
@@ -284,6 +305,75 @@ describe("POST /api/stripe/create-checkout", () => {
     expect(mocks.checkout.mock.calls[0][0].subscription_data.trial_period_days).toBeUndefined();
   });
 
+  it("one trial per account even after a trial code cleared the row's subscription id (Stripe's own history decides)", async () => {
+    // A trial-code grant that ran out, on a customer whose old subscription ended.
+    mocks.rows.push([customerRow({ plan: "agency", status: "trialing", currentPeriodEnd: new Date("2026-01-01T00:00:00Z") })]);
+    mocks.history.mockResolvedValue({ data: [{ id: "sub_old", status: "canceled" }] });
+    expect((await request("/api/stripe/create-checkout", { plan: "pro" })).code).toBe(200);
+    expect(mocks.history).toHaveBeenCalledWith({ customer: "cus_test", status: "all", limit: 20 });
+    expect(mocks.checkout.mock.calls[0][0].subscription_data.trial_period_days).toBeUndefined();
+  });
+
+  it("a live trial-code grant (no Stripe subscription) may buy a plan, and still gets the trial when Stripe has no history", async () => {
+    mocks.rows.push([customerRow({ plan: "agency", status: "trialing", currentPeriodEnd: new Date(Date.now() + 86400_000) })]);
+    const res = await request("/api/stripe/create-checkout", { plan: "growth" });
+    expect(res.code).toBe(200);
+    expect(mocks.checkout.mock.calls[0][0].subscription_data.trial_period_days).toBe(TRIAL_DAYS);
+  });
+
+  it("a subscription Stripe has but the row doesn't know yet (webhook still on its way) is never joined by a second one", async () => {
+    for (const status of ["active", "past_due"]) {
+      mocks.rows.push([customerRow()]);
+      mocks.history.mockResolvedValue({ data: [subscription([item("si_plan", "price_x", 1, { kind: "plan", key: "growth" })], { id: "sub_just_paid", status })] });
+      const res = await request("/api/stripe/create-checkout", { plan: "pro" });
+      expect(res.code).toBe(409);
+      expect(res.body.code).toBe("has_subscription");
+      expect(res.body.message).toMatch(status === "past_due" ? /Manage billing/ : /updates it in place/);
+      // The row records it now (as the webhook will), so Pricing can change it in place.
+      expect(mocks.updates.at(-1)).toMatchObject({ stripeSubscriptionId: "sub_just_paid", status, plan: "growth" });
+    }
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("a brand-new customer is not looked up in Stripe's history (there is none)", async () => {
+    mocks.rows.push([]);
+    expect((await request("/api/stripe/create-checkout", { plan: "starter" })).code).toBe(200);
+    expect(mocks.history).not.toHaveBeenCalled();
+    expect(mocks.checkout.mock.calls[0][0].subscription_data.trial_period_days).toBe(TRIAL_DAYS);
+  });
+
+  it("two checkouts started at the same moment run one after the other, so the second expires the first", async () => {
+    const open: any[] = [];
+    let n = 0;
+    mocks.checkout.mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      const session = { id: `cs_${++n}`, mode: "subscription", url: `https://checkout.example.invalid/${n}` };
+      open.push(session);
+      return session;
+    });
+    mocks.openSessions.mockImplementation(async () => ({ data: [...open] }));
+    mocks.expire.mockImplementation(async (id: string) => { open.splice(open.findIndex((s) => s.id === id), 1); return {}; });
+    mocks.rows.push([customerRow()], [customerRow()]);
+    const [a, b] = await Promise.all([
+      request("/api/stripe/create-checkout", { plan: "pro" }),
+      request("/api/stripe/create-checkout", { plan: "growth" }),
+    ]);
+    expect([a.code, b.code]).toEqual([200, 200]);
+    expect(mocks.expire.mock.calls).toEqual([["cs_1"]]);
+    expect(open.map((s) => s.id)).toEqual(["cs_2"]); // one open checkout, so at most one subscription
+  });
+
+  it("the per-account billing lock serializes work for one account and not across accounts", async () => {
+    const order: string[] = [];
+    const slow = (tag: string, ms: number) => async () => { order.push(`${tag}+`); await new Promise((r) => setTimeout(r, ms)); order.push(`${tag}-`); };
+    await Promise.all([withBillingLock(1, slow("a1", 10)), withBillingLock(1, slow("a2", 1)), withBillingLock(2, slow("b", 1))]);
+    expect(order.indexOf("a1-")).toBeLessThan(order.indexOf("a2+"));
+    expect(order.indexOf("b+")).toBeLessThan(order.indexOf("a1-"));
+    // A failure releases the lock.
+    await expect(withBillingLock(1, async () => { throw new Error("boom"); })).rejects.toThrow("boom");
+    expect(await withBillingLock(1, async () => "next")).toBe("next");
+  });
+
   it("creates the Stripe customer when the user has none", async () => {
     mocks.rows.push([]);
     expect((await request("/api/stripe/create-checkout", { plan: "starter" })).code).toBe(200);
@@ -368,14 +458,60 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
-  it("a legacy subscription (old ad-hoc price) is moved onto the new plan in place", async () => {
-    mocks.current = subscription([item("si_old", "price_legacy_premium"), item("si_old2", "price_legacy_extra")]);
+  it("a legacy subscription (one old ad-hoc plan price) is moved onto the new plan in place", async () => {
+    mocks.current = subscription([item("si_old", "price_legacy_premium")]);
     mocks.rows.push([liveRow({ plan: "premium" })]);
-    expect((await request("/api/stripe/change-plan", { plan: "pro" })).code).toBe(200);
+    expect((await request("/api/stripe/change-plan", { plan: "pro", interval: "year" })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1].items).toEqual([
-      { id: "si_old", price: "price_chub_v1_plan_pro_month_7900", quantity: 1 },
-      { id: "si_old2", deleted: true },
+      { id: "si_old", price: "price_chub_v1_plan_pro_year_79000", quantity: 1 },
     ]);
+  });
+
+  it("never removes an item a sales rep added: it's kept, and a change it can't ride along with is talk-to-sales", async () => {
+    const custom = item("si_custom", "price_quoted_setup_retainer");
+    await seedProSubscription([custom]);
+    mocks.rows.push([liveRow()]);
+    expect((await request("/api/stripe/change-plan", { plan: "growth", addons: { texting_number: 0 } })).code).toBe(200);
+    const items = mocks.update.mock.calls[0][1].items;
+    expect(items).toEqual([
+      { id: "si_plan", price: "price_chub_v1_plan_growth_month_19900", quantity: 1 },
+      { id: "si_text", deleted: true },
+    ]);
+    expect(items.some((i: any) => i.id === "si_custom")).toBe(false);
+
+    // Moving to yearly would leave the monthly custom item on another interval: refused, nothing changed.
+    mocks.update.mockClear();
+    mocks.rows.push([liveRow()]);
+    const yearly = await request("/api/stripe/change-plan", { plan: "pro", interval: "year" });
+    expect(yearly.code).toBe(409);
+    expect(yearly.body.code).toBe("talk_to_sales");
+    expect(mocks.update).not.toHaveBeenCalled();
+
+    // No plan item of ours and several foreign items: which one is the plan is unclear — refused.
+    mocks.current = subscription([item("si_old", "price_legacy_premium"), item("si_old2", "price_quoted")]);
+    mocks.rows.push([liveRow({ plan: "premium" })]);
+    const unclear = await request("/api/stripe/change-plan", { plan: "pro" });
+    expect(unclear.code).toBe(409);
+    expect(unclear.body.message).toMatch(/sales rep set up/);
+    expect(mocks.update).not.toHaveBeenCalled();
+
+    // One custom price and no plan item of ours, on an account that was never sold a legacy plan
+    // (e.g. a sales-quoted Agency above 500 locations): not repriced to a self-serve plan — refused.
+    for (const plan of ["free", "agency", null]) {
+      mocks.current = subscription([item("si_quoted", "price_quoted_agency_800_locations")]);
+      mocks.rows.push([liveRow({ plan })]);
+      const quoted = await request("/api/stripe/change-plan", { plan: "agency", locations: 10 });
+      expect(quoted.code, String(plan)).toBe(409);
+      expect(quoted.body.code).toBe("talk_to_sales");
+    }
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("a duplicate item on one of our own prices is removed", async () => {
+    await seedProSubscription([item("si_dup", "price_chub_v1_plan_pro_month_7900", 1, { kind: "plan", key: "pro" })]);
+    mocks.rows.push([liveRow()]);
+    expect((await request("/api/stripe/change-plan", { plan: "pro", addons: { texting_number: 0 } })).code).toBe(200);
+    expect(mocks.update.mock.calls[0][1].items).toEqual([{ id: "si_dup", deleted: true }, { id: "si_text", deleted: true }]);
   });
 
   it("without a live subscription it's a 409 — and never a Stripe call", async () => {
@@ -462,13 +598,57 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
 
   it("GET /api/stripe/subscription also reports interval and locations (a yearly subscriber's change stays yearly)", async () => {
     mocks.rows.push([liveRow({ plan: "agency", billingInterval: "year", agencyLocations: 25, addons: { extra_seat: 1 } })]);
+    mocks.cancelRow = { cancel_at_period_end: false, cancel_at: null };
     const res = await request("GET /api/stripe/subscription");
     expect(res.body).toMatchObject({
       plan: "agency", effectivePlan: "agency", billingInterval: "year", interval: "year",
-      agencyLocations: 25, locations: 25, addons: { extra_seat: 1 },
+      agencyLocations: 25, locations: 25, addons: { extra_seat: 1 }, cancelAtPeriodEnd: false, cancelAt: null,
     });
     mocks.rows.push([]);
-    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ plan: "free", interval: null, locations: null });
+    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ plan: "free", interval: null, locations: null, cancelAtPeriodEnd: null });
+  });
+
+  it("GET /api/stripe/subscription says when a subscription is set to end (cancelAtPeriodEnd), and null before it was ever synced", async () => {
+    mocks.rows.push([liveRow({ currentPeriodEnd: new Date("2026-11-01T00:00:00Z") })]);
+    mocks.cancelRow = { cancel_at_period_end: true, cancel_at: new Date("2026-11-01T00:00:00Z") };
+    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ status: "active", cancelAtPeriodEnd: true, cancelAt: new Date("2026-11-01T00:00:00Z") });
+    mocks.rows.push([liveRow()]);
+    mocks.cancelRow = { cancel_at_period_end: null, cancel_at: null };
+    expect((await request("GET /api/stripe/subscription")).body.cancelAtPeriodEnd).toBeNull();
+  });
+
+  it("GET /api/stripe/subscription reports an expired trial-code grant as inactive, a live one as its plan", async () => {
+    const grant = (end: Date) => customerRow({ stripeCustomerId: null, plan: "agency", status: "trialing", currentPeriodEnd: end });
+    mocks.rows.push([grant(new Date(Date.now() - 60_000))]);
+    const expired = (await request("GET /api/stripe/subscription")).body;
+    expect(expired).toMatchObject({ plan: "agency", status: "inactive", effectivePlan: null, cancelAtPeriodEnd: null });
+    mocks.rows.push([grant(new Date(Date.now() + 86400_000))]);
+    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ status: "trialing", effectivePlan: "agency" });
+    // A revoked trial keeps saying so.
+    mocks.rows.push([{ ...grant(new Date(Date.now() - 60_000)), status: "canceled" }]);
+    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ status: "canceled", effectivePlan: null });
+    // No cancellation lookup for a grant: it isn't a Stripe subscription.
+    expect(mocks.sql.some((q) => /SELECT cancel_at_period_end/.test(q.text))).toBe(false);
+  });
+
+  it("a past-due subscription keeps its plan while Stripe retries the card; unpaid or canceled do not", async () => {
+    mocks.rows.push([liveRow({ status: "past_due" })]);
+    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ status: "past_due", effectivePlan: "pro" });
+    for (const status of ["unpaid", "canceled", "incomplete_expired", "incomplete"]) {
+      mocks.rows.push([liveRow({ status })]);
+      expect((await request("GET /api/stripe/subscription")).body.effectivePlan, status).toBeNull();
+    }
+  });
+
+  it("a plan change records the subscription's cancellation state with the row", async () => {
+    await seedProSubscription();
+    mocks.current.cancel_at_period_end = true;
+    mocks.rows.push([liveRow()]);
+    const res = await request("/api/stripe/change-plan", { plan: "pro", addons: { extra_seat: 1 } });
+    expect(res.code).toBe(200);
+    // The mocked update returns a fresh subscription (not set to cancel).
+    expect(cancellationWrites()).toEqual([[5, false, null]]);
+    expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: false });
   });
 
   it("a row still marked live whose Stripe subscription ended is corrected, so checkout is no longer refused", async () => {
@@ -527,6 +707,31 @@ describe("webhook maps the subscription's items onto the row", () => {
     mocks.rows.push([liveRow()]);
     await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_live", customer: "cus_test" } } });
     expect(mocks.updates[0]).toEqual({ status: "canceled", plan: "free", addons: {}, agencyLocations: null, billingInterval: null });
+    expect(cancellationWrites()).toEqual([[5, null, null]]);
+  });
+
+  it("records a cancellation set in Stripe's portal (cancel at period end) with the row", async () => {
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
+    const sub = agencyYearly("sub_new", "active") as any;
+    sub.cancel_at_period_end = true;
+    await webhook({ type: "customer.subscription.updated", data: { object: sub } });
+    expect(cancellationWrites()).toEqual([[5, true, new Date(1893456000 * 1000)]]);
+    // Resumed in the portal: the flag clears.
+    mocks.sql.length = 0;
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_new", "active") } });
+    expect(cancellationWrites()).toEqual([[5, false, null]]);
+  });
+
+  it("a late event for an ended subscription never ends a live trial-code grant; a live subscription replaces it", async () => {
+    const grant = () => customerRow({ plan: "agency", status: "trialing", currentPeriodEnd: new Date(Date.now() + 86400_000) });
+    mocks.rows.push([grant()]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_old", "canceled") } });
+    expect(mocks.updates).toHaveLength(0);
+
+    mocks.rows.push([grant()]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_paid", "active") } });
+    expect(mocks.updates[0]).toMatchObject({ stripeSubscriptionId: "sub_paid", status: "active", plan: "agency" });
   });
 
   it("a legacy subscription keeps its stored plan (no role metadata to read)", async () => {
@@ -582,12 +787,21 @@ describe("$1,000 and up is talk-to-sales: never a checkout", () => {
   });
 });
 
-describe("compatibility PLANS export (growth-quotas / tenancy) is derived from the price book", () => {
-  it("maps current and legacy keys onto the new plans", () => {
-    expect(COMPAT_PLANS.pro).toEqual({ name: "Pro", limits: { searches: 500, photos: -1, rankings: 15, users: 3 } });
-    expect(COMPAT_PLANS.platinum.name).toBe("Agency");
-    expect(COMPAT_PLANS.platinum.limits.users).toBe(PLANS.agency.limits.crmSeats);
-    expect(COMPAT_PLANS.standard.name).toBe("Starter");
-    expect(COMPAT_PLANS.gold.name).toBe("Growth");
+describe("plan limits are read through getEntitlements, not a second table here", () => {
+  it("server/stripe.ts no longer exports the deprecated PLANS limits view (photos read unlimited there)", () => {
+    expect("PLANS" in stripeModule).toBe(false);
+  });
+});
+
+describe("cancellationOf", () => {
+  const periodEnd = 1893456000;
+  const sub = (extra: any) => subscription([item("si_plan", "price_x", 1, { kind: "plan", key: "pro" })], extra) as any;
+  it("reads cancel_at_period_end, and a cancel_at on or before the period end, as ending at period end", () => {
+    expect(cancellationOf(sub({ cancel_at_period_end: true }))).toEqual({ cancelAtPeriodEnd: true, cancelAt: new Date(periodEnd * 1000) });
+    expect(cancellationOf(sub({ cancel_at: periodEnd }))).toEqual({ cancelAtPeriodEnd: true, cancelAt: new Date(periodEnd * 1000) });
+    expect(cancellationOf(sub({}))).toEqual({ cancelAtPeriodEnd: false, cancelAt: null });
+  });
+  it("a cancel date after this period still renews once: not 'at period end', but the date is kept", () => {
+    expect(cancellationOf(sub({ cancel_at: periodEnd + 30 * 86400 }))).toEqual({ cancelAtPeriodEnd: false, cancelAt: new Date((periodEnd + 30 * 86400) * 1000) });
   });
 });
