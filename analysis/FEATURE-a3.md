@@ -1,66 +1,96 @@
-# Lane a3 — Google Business Posts & Photos
+# Lane a3, round 4 — agency Google Ads / LSA MCC manager
 
-Implemented in `/home/veto/ConstructHUB-a3`, branch `lane/a3`, using only the a3 database and development server on port 8149. No deploy, push, production access, real Google publishing, R2 upload, SMTP delivery, or paid AI calls were performed.
+Built in `/home/veto/ConstructHUB-a3` for `constructhub_dev_a3`, port **8149**. No deployment, push, production access, real Google writes, SMTP delivery, or paid calls. All new Google/OAuth calls were tested through injected mock clients; browser invitation email goes to `EMAIL_FORCE_SINK=1`.
 
-## UI and usage
+The previous Posts & Photos report is preserved as `analysis/FEATURE-a3-round3-posts.md`.
 
-Open **Google Business → Posts & Photos** (`/gbp-content`). Choose an existing linked location; unlinked locations use the existing GBP connection controls.
+## What was built and where to find it
 
-1. Select library photos or choose up to 100 JPEG, PNG, or WebP files. Uploads run sequentially, at most 15 MB per request. Set a filename pattern (`{business}`, `{city}`, `{n}`), EXIF title and optional GPS pair. Existing-library processing creates copies rather than overwriting originals. New R2 objects preserve the SEO filename after a random directory component.
-2. Supply instructions and/or example descriptions, then generate AI caption drafts. Each selected image is sent to the vision model. Captions are editable; caption generation never queues or publishes anything. The browser requests one caption at a time and retains completed captions if a later request fails.
-3. Compose a STANDARD, EVENT, or OFFER update manually or generate a draft using the stored business profile, services, instructions, examples and saved style. Attach up to ten selected photos. Event and offer dates are entered in the location's local time. Add distinct posts to the editable draft batch for cadence publishing.
-4. **Learn from past updates** retrieves every local-post page and generates themes, tone, length and CTA guidance. Large histories use bounded chunks and hierarchical summaries. Edit and explicitly save this guidance before it is used in new generations. No source posts means an honest empty result, not invented guidance.
-5. Set the first publish time (blank means now), items per day/week or one custom timestamp per item. Optionally select a timezone, weekdays and opening/closing hours. These publishing hours are explicitly entered, not inferred from Google. Approve the photo set or post batch to create durable queue rows.
-6. Queue/history shows per-item status, Google resource/state, errors, retry and cancel controls. The calendar is a date-grouped agenda. **Refresh Google status** retrieves current states for the latest 100 submitted local posts. A Google API acceptance does not itself guarantee public visibility.
+Open **Google Ads → Agency Ads & LSA**, `/ads-manager`, on the growth application (not the CRM portal).
 
-## Server and persistence
+- **Agency connection:** one encrypted MCC grant per owning ConstructHUB user. The separate agency module does not use the legacy global administrator MCC. OAuth requests `https://www.googleapis.com/auth/adwords`, binds a single-use, expiring state to the authenticated owner and session, requires recent authentication, and queues verification that the selected customer is a manager. Tokens use the existing AES-256-GCM GBP key. Reconnect changes the connection ID, cancels old queued work, expires pending previews, and clears stale account caches. Disconnect deletes local credentials and caches; Google grant revocation remains an explicit Google Account action.
+- **Client discovery:** queued, paged `customer_client` queries import the complete reachable hierarchy. Per-client audit jobs identify `LOCAL_SERVICES` campaigns. An unchecked account displays “LSA not checked”; it is never assumed to be an LSA account. Only a completed discovery marks missing accounts unlinked.
+- **Access invitations:** paste up to 1,000 `customer ID,email` pairs, preview recipients and acceptance instructions, then confirm. Each job validates and creates a Google `PENDING` manager link. ConstructHUB emails the supplied client after Google acknowledges the invitation. Polling maps `PENDING → pending`, `ACTIVE → accepted`, `REFUSED → rejected`, and `CANCELED/INACTIVE → cancelled`. Polls run every 15 minutes when the worker is enabled, with a manual queued poll button. Pending cancellations also have a bulk action. Delivery status is separate from Google invitation status.
+- **Protections:** select clients across pages or all active clients matching the server search/LSA filter. Queue per-client previews, review their old values, changes and warnings, explicitly confirm selected previews, and watch Queue. Applied changes have a bulk **Preview reversal** action which also requires confirmation.
+- **Read-only health audits:** conversion actions, call conversion actions, zero-conversion search terms with spend, budget-lost impression share, disapproved ads, presence targeting, schedules, LSA service areas/job types/budget and charged unrated lead review opportunities. Failed checks show unavailable. Fix buttons prepare a protection preview or open the relevant Google/LSA workflow; they do not silently publish.
+- **Playbook insertion point:** `server/ads/playbook.ts` exports typed, versioned `OptimizationStep` entries whose `ProtectionInput` actions can feed the same bulk queue. It explicitly labels the generic presence step and leaves the owner-approved Alpine playbook pending. No owner recommendations were invented and no AI text is generated by this module.
 
-- `server/gbp/content.ts`: boot migration, input validation, owner-scoped routes, AI adapter, scheduler, queue, worker, history learning, status refresh, and additional notification-kind map.
-- `server/gbp/content-upload.ts`: authenticated upload/processing routes and SEO names, reusing `server/photo-processor.ts`.
-- `server/r2.ts`: backward-compatible optional safe JPEG filename argument.
-- `server/gbp/client.ts`: non-idempotent POST requests are never silently retried. Actionable Google error text is bounded and bearer credentials are redacted.
-- `server/routes.ts`: registers `ensureGbpContentSchema`, routes, uploads and optional worker next to existing GBP boot setup.
-- `client/src/pages/gbp-content.tsx`, sidebar and application routes: page and navigation.
+## Protection behavior
 
-`ensureGbpContentSchema()` creates `gbp_content_jobs` and `gbp_content_style`, plus indexes and an idempotent schedule column ensure. No drizzle-kit push. No new credentials or tokens are persisted or returned.
+| Control | Behavior and reversal |
+| --- | --- |
+| Click Guard IP exclusions | Map each client to its own owner-scoped Click Guard domain (bulk mapping supported). Read its latest 500 active, valid flagged IPs. For supported Search/Display campaigns, add missing blocks and rotate the oldest observed non-selected blocks to stay at 500/campaign. Preview and undo include removed IPs. Google does not provide creation dates: age is first observed by ConstructHUB, with resource-name tie breaking at first import. |
+| Shared negative lists | Editable contractor starter words: jobs, careers, salary, training, DIY, tutorial, free, cheap. Create/reuse a named shared list and attach it to supported Search/Display campaigns. Default is additive; explicit “replace contents” previews removals too. Phrase match is used for new entries. Existing match types are preserved in reversal. Warns that “free” can suppress “free estimate” and a shared list affects already-attached campaigns. |
+| Placement exclusions | Uses `CustomerNegativeCriterion` at account level, including supported Display/PMax inventory. The preview explicitly warns that it affects the entire client account. |
+| Location sanity | Changes supported Search/Display/PMax positive geo targeting to `PRESENCE`, with the previous setting saved for reversal. Unavailable/unknown old values fail closed. |
+| Ad schedule | Replaces supported Search/Display/PMax schedules in each account’s timezone, using non-overlapping 15-minute intervals, at most six/day. Existing bid modifiers are saved for reversal. |
 
-The queue snapshots the Google account/location/subject. Relinking prevents old jobs from publishing to a different target. Per-user submission keys and an advisory transaction lock deduplicate requests; attempts to reuse a key with different content are rejected. A database advisory worker lock and conditional claims serialize dispatch across processes. Jobs survive restarts. Business hours are checked again at dispatch, so late jobs do not publish outside the configured window.
+All writes are constructed from server-read Google resource names, validated with `validateOnly`, and sent atomically per account using `partialFailure:false`. The worker compares a fresh settings fingerprint with the reviewed preview before writing. Returned Google resource names resolve inverse operations and the expected post-write snapshot. Reversal stops if that snapshot differs from Google. Removed criteria are recreated with new IDs; this restores settings, not historical resource identities.
 
-Google's create APIs have no documented idempotency key. A timeout, invalid successful response or process interruption becomes `uncertain`, never an automatic resend. The UI requires acknowledgement that the user checked Google before retrying. This avoids claiming impossible remote exactly-once semantics. Definitive errors are `failed`; Google moderation rejection at create time is `rejected` and requires corrected content.
+## Scale, authorization and failure handling
 
-Quotas use existing `takeBudget` and the GBP database project limiter: 100 publish attempts/user/UTC day, 100 AI calls/user/UTC day, 100 processed photos/user/hour, and 180 content mutations/user/10 minutes. AI synthesis calls also consume budget. Exhausted publish budgets defer queued work to the next UTC day; business hours still apply. Google quota errors require explicit retry.
+- Accounts, invitations, jobs, plans, findings, campaigns and domain lookups paginate/search/filter on the server. Plan operation details are paginated too. Single-client and bulk actions use the same endpoints.
+- At most 1,000 clients per submitted batch; up to 100 campaigns/client preview and 9,000 mutation operations/account. Larger selections must be narrowed or split. Query snapshots fail closed above 50,000 rows/query or 100 pagination continuations.
+- Durable Postgres jobs survive restarts. Queued writes bind to the exact connection ID and immutable saved preview. Batch request IDs and per-plan dedupe keys prevent duplicate confirmation/enqueue.
+- Database advisory locks serialize worker execution and each agency’s connect/disconnect/edit operations. Polls and confirmed writes take priority over audits; discovery and previews also run before bulk audit backlogs.
+- Every Ads API request, including validation-only calls, takes a database-shared **250 ms** reservation (at most **240 QPM** for this module). This is separate from GBP’s existing quota table. Reads retry quota/transient failures with persistent backoff, up to five attempts.
+- Shared growth helpers enforce HTTP limits and **5,000 queued items/owner/hour**. All new routes authenticate, owner-scope and validate input. IDs from another owner cannot be used in selections, domain mappings, plans or reversals.
+- Possible external write outcomes are **unknown**, never blindly replayed. Interrupted writes and email sends also stop for reconciliation. A provider acknowledgement is persisted before follow-up email/audit jobs. A network timeout cannot be represented honestly as “not sent.”
+- Previews expire after 24 hours to accommodate agency queue sizes; confirmation and execution both check expiry. Account drift requires a fresh preview regardless of expiry.
+- Uses `logActivity` for connections, queued batches, confirmation, write start/result, link status changes, mapping and failures. Uses the existing `google.connected` and `google.disconnected` notification kinds through `notifyUser`. **No notification registry changes or new notification kinds.** `ads.*` names are activity-log events only.
+- New schema lives only in idempotent `ensureAdsSchema()` in `server/ads/schema.ts`, registered beside `ensureGbpSchema()`. No drizzle push. New tables: `ads_grants`, `ads_accounts`, `ads_invitations`, `ads_plans`, `ads_jobs`, `ads_findings`, `ads_ip_age`, `ads_request_budget`.
+- Ads API response bodies are excluded from request logging; token/provider error payloads never reach client responses or logs.
 
-Successful submissions call `notifyUser('gbp.post_published')` and `logActivity`. Failures/interrupted work call `notifyUser('gbp.post_failed')`. New kind `gbp.post_failed` is declared only in exported `CONTENT_NOTIFICATION_KINDS` in this module. `KIND_DEFAULTS` is unchanged. It uses the existing notification system's fallback (in-app on, email off); the current global preference editor does not list this additional kind.
+## Owner setup — current Google requirements
 
-## Owner configuration
+**The requested developer-token application procedure changed.** Google’s current documentation states developer tokens were sunset on **September 9, 2026**. New access applications now go through the OAuth client’s **Google Cloud project**, rather than the MCC API Center. Existing token headers remain accepted but ignored during the transition. Follow [Google’s migration and access guidance](https://developers.google.com/google-ads/api/docs/api-policy/developer-token), not older API Center instructions. This module supports both an explicitly enabled project-access path and the requested legacy environment variable.
 
-- Enable the approved Google My Business API and link the correct Google account/location using the existing flow.
-- Configure `GBP_MEDIA_PUBLIC_BASE_URL` as a public HTTPS origin that serves R2 `media/` keys anonymously. The application's existing file proxy/private S3 endpoint is not used as Google's source URL. Configured public URLs are also used for library previews, including legacy two-segment R2 keys. Configure public access deliberately for publication assets; do not expose unrelated private bucket prefixes. Missing public-base configuration prevents photo queueing and vision generation.
-- Existing `R2_*` credentials are needed for upload and metadata processing.
-- Existing `AI_INTEGRATIONS_OPENAI_API_KEY` and optional base URL configure AI. `GBP_CONTENT_AI_MODEL` defaults to `gpt-4o-mini` and can be changed to a compatible vision/chat-completions model. AI is optional for manually composed content.
-- Set `GBP_CONTENT_WORKER_ENABLED=true` only in the intended publishing environment. Default is disabled, visibly reported by the UI; enabled workers poll every 15 seconds. The development lane remains disabled. Email testing uses `EMAIL_FORCE_SINK=1`.
+1. Create/use the agency’s Google Ads manager account. The signing-in Google user must be able to administer the intended manager and request client links.
+2. Enable Google Ads API and obtain the appropriate access level for the Cloud project that owns the OAuth client. Production customers require production access; a test-only project is insufficient. Agency volume may require a higher access level. Complete the applicable OAuth consent/brand verification steps in Google Cloud.
+3. Configure an OAuth web client, the `adwords` scope, and the **exact** callback URL. Default callback is `${APP_URL}/api/ads/callback` (fallback `https://constructhub.us/api/ads/callback`); set `GOOGLE_ADS_REDIRECT_URI` explicitly for local or alternate-domain use. This is separate from the existing `/api/lsa/oauth/callback`.
+4. Configure secrets only through the owner’s environment/secret store:
 
-## Validation
+   ```text
+   GOOGLE_ADS_CLIENT_ID=<OAuth web client ID>
+   GOOGLE_ADS_CLIENT_SECRET=<OAuth client secret>
+   GOOGLE_ADS_PROJECT_ACCESS_ENABLED=true
+   GOOGLE_ADS_LOGIN_CUSTOMER_ID=<optional default MCC digits>
+   GOOGLE_ADS_REDIRECT_URI=https://constructhub.us/api/ads/callback
+   GOOGLE_ADS_API_VERSION=v25
+   GBP_TOKEN_KEY=<persistent 32-byte base64 AES key>
+   GOOGLE_ADS_WORKER_ENABLED=true
+   ```
 
-All external boundaries in feature tests are mocked. JPEG/EXIF processing and SQL persistence are real.
+   `GOOGLE_ADS_PROJECT_ACCESS_ENABLED=true` means the owner has configured project access; the API still verifies permission. For an existing integration, `GOOGLE_ADS_DEVELOPER_TOKEN` remains supported instead of that flag. Do not invent a token for a new project. The manager environment value only prefills the UI; each agency’s verified MCC is stored in its own grant and supplies the `login-customer-id` header. Keep the worker **false** in feature lanes. Production must have a persistent `GBP_TOKEN_KEY`; losing it requires reconnecting grants.
+5. Sign in to ConstructHUB, connect the MCC, enable the worker when approved, and review its verification/discovery jobs. Production email uses existing ConstructHUB mail configuration; local work keeps `EMAIL_FORCE_SINK=1`.
+6. Clients accept in Google Ads as a client administrator: **Admin → Access and security → Managers**, review the MCC ID, then accept. Google’s invitation goes to account administrators; ConstructHUB’s explanation goes to the explicit address supplied by the agency. [Google’s client acceptance instructions](https://support.google.com/google-ads/answer/7459601?hl=en).
 
-- `npm run check`: zero TypeScript errors.
-- `EMAIL_FORCE_SINK=1 CRM_TEST_SINGLE_PORT=true npx vitest run`: **796 passed, 43 skipped**, 83 passing files / 2 skipped files. The skips are existing suite behavior, including auxiliary-port suites disabled by the required single-port setting.
-- `E2E_PORT=8149 E2E_DB=constructhub_dev_a3 npx playwright test --config playwright.content.config.ts`: **3 flows**: real API cadence/reload/cancellation; bulk-upload/caption/style approval with provider fixtures; AI-post editing, explicit approval and retry after Google failure.
-- Thirteen focused unit/integration cases include DST/weekend scheduling, custom-time validation, owner isolation, submission deduplication, concurrent workers, restart ambiguity, cancellation/retry, real EXIF bytes, Google payloads, paginated learning, daily AI budgets, local event times, dispatch-time hours, error redaction and mocked vision HTTP payloads. Route handlers run in process without another listening port; browser HTTP uses 8149.
+Verified contracts: [manager/client linking and PENDING](https://developers.google.com/google-ads/api/docs/account-management/linking-manager-accounts), [singular CustomerClientLink operation](https://developers.google.com/google-ads/api/reference/rpc/v22/MutateCustomerClientLinkRequest), [500 IPs/campaign](https://developers.google.com/google-ads/api/reference/rpc/v22/IpBlockInfo), [supported criterion levels](https://developers.google.com/google-ads/api/docs/targeting/criteria), [PMax account-level placement exclusions](https://support.google.com/google-ads/answer/7331110?hl=en), [shared sets](https://developers.google.com/google-ads/api/docs/targeting/shared-sets), [Local Services campaign settings](https://developers.google.com/google-ads/api/docs/campaigns/local-service-campaigns).
 
-## Limits and honest caveats
+## Evidence
 
-- Google strips EXIF; GPS/title metadata is cosmetic, with no ranking benefit promised. Google does not accept cover-photo descriptions, and the API cannot edit media descriptions after creation. Both are explained in the UI.
-- Google may reject photo dimensions, content, location eligibility or permissions; errors are preserved per item. Real provider acceptance remains unverified by design in this lane.
-- Cadence means elapsed spacing; closed hours move items later and may reduce the count within a particular calendar day/week. Business hours support one same-day window; no overnight/split windows or holiday calendar. No infinite recurring content generation: a batch contains up to 100 explicitly approved items.
-- Composition/caption drafts and unsaved learned guidance live in the current browser page; reloading loses unsaved drafts. Approved queue items and saved guidance are durable. Changing queued content requires canceling and submitting a corrected draft.
-- The library and queue show the latest 1,000 records. Status refresh covers the latest 100 locally submitted posts. External historical posts are used for learning rather than imported as editable queue jobs.
-- Learning very large histories and processing 100 existing-library copies can take a long request; AI budgets stop excess work with an explicit error. Uploading 100 files is bounded/sequential, not one giant buffered multipart request.
-- Notification/activity delivery is best effort after the durable result is saved; notification failure does not retry an already successful Google write.
+- Type checking: `npm run check` — **0 errors**.
+- New Ads unit/integration suite: **29 passing tests**, real lane Postgres with injected Google/OAuth clients and mocked mail. Covers encrypted OAuth grants and single-use state, route authentication/ownership, paginated 1,000-account discovery, 1,000-account bulk enqueue/dedupe, shared quotas, protected domains, all protection planners, stale/expired/reconnected previews, atomic confirmation, apply/undo, invitation polling, recovery and uncertain writes.
+- Seeded **1,000 business locations** plus **1,001 client accounts** in integration tests. Browser tests separately seed **1,000 business locations and 1,000 client accounts**, then clean them up.
+- Browser suite: `E2E_PORT=8149 E2E_DB=constructhub_dev_a3 npx playwright test -c playwright.ads.config.ts` — **4 passing flows**, real HTTP/API/database and injected Google worker:
+  1. 1,000-client pagination, search/LSA filter, queued audit and fix links.
+  2. Preview → explicit confirmation → worker apply → preview reversal → confirmation → restored setting.
+  3. Invitation preview/confirmation → Google mock → local email sink → poll → cancellation.
+  4. Shared negatives, account placements, schedules, and mapped Click Guard IPs preview and apply through the UI.
+- Final full Vitest suite: **91 files passed, 2 files skipped; 973 tests passed, 43 skipped** (89.72 seconds). The skips include the explicitly disabled auxiliary-port suites under `CRM_TEST_SINGLE_PORT=true`.
+- `npm run build` passes. Existing non-fatal warnings remain for outdated Browserslist data, a PostCSS plugin `from` option, and large bundle chunks.
+- Final browser rerun: **4 passed in 10.9 seconds**. No real Google or SMTP writes were made.
 
-## Verified provider references
+Reproduce using Node 20, exported `.env`, `CRM_TEST_SINGLE_PORT=true`, `CRM_TEST_BASE_URL=http://127.0.0.1:8149`, and `CRM_TEST_DATABASE_URL=$DATABASE_URL`. Browser Ads tests need the **growth** UI (`VITE_FORCE_PORTAL=false`, `DEV_AUTH_BYPASS_USER1=true`). CRM browser specs instead need `VITE_FORCE_PORTAL=true`. Keep GBP/content/social/site-scan workers disabled and use the email sink during lane verification.
 
-- [Google media resource](https://developers.google.com/my-business/reference/rest/v4/accounts.locations.media): public source URL, category, descriptions, cover restriction.
-- [Google local-post create](https://developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts/create) and [local-post resource](https://developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts): v4 endpoint and post payload/state.
-- [Official OpenAI GPT-4o mini documentation](https://developers.openai.com/api/docs/models/gpt-4o-mini) and [vision inputs](https://developers.openai.com/api/docs/guides/images-vision): vision-capable text generation and image URL content parts. Checked using the OpenAI Docs skill; no API calls were made for documentation verification.
+## Honest limits
+
+- No live Ads credentials or production account validation were available. Passing mocks verify contracts and behavior; they do not establish API approval, campaign eligibility or Google policy acceptance. `validateOnly` can still reject a preview when an account/campaign is unsupported.
+- One owner/user represents one agency MCC in this module; sharing an MCC across CRM team-member identities is not implemented.
+- The legacy admin MCC and legacy LSA OAuth/token storage are not migrated by this lane. New agency grants are separate and encrypted. LSA dispute opportunities link to the existing manual LSA Leads workflow; that workflow still needs its own connection/account discovery and legacy configuration. This lane does **not** automatically dispute leads, bridge credentials into the legacy store, promise refunds, or manage Google billing.
+- Conversion/call action presence does not prove a tag fires correctly. Search-term candidates are not proven waste; conversion lag/privacy filtering applies. Budget checks use only returned metrics. LSA areas, job types and budgets require business-specific review in Google when no supported automatic fix is offered.
+- Ads changes are atomic per client, not across an entire agency batch. Failures remain visible per job/account. Cross-account transactions and rollback of already-spent ad budget are not possible.
+- Google has no compare-and-swap for these mutations. Fresh-state checks minimize, but cannot eliminate, a Google-side edit racing the final write. Reversal conservatively stops if any captured protection settings changed; reconcile unknown outcomes in Google before retrying.
+- Recreated exclusions/schedules have new resource IDs. A reversed plan is terminal; create a fresh normal preview to reapply it. Unknown outcomes deliberately have no automatic “retry write” button.
+- Quota coordination is database-wide for the new module. Legacy LSA/admin integrations have their existing workers and are not folded into this queue; before enabling multiple production Ads integrations, coordinate their combined Google quota usage.
+- The Alpine playbook remains explicitly pending owner-reviewed content. The generic starter list is editable guidance, not a claim about the owner’s strategy.

@@ -139,6 +139,7 @@ const googleGroups: NavGroup[] = [
     logoComponent: GoogleAdsIcon,
     landingUrl: "/google-ads-landing",
     children: [
+      { title: "Agency Ads & LSA", url: "/ads-manager", icon: Megaphone, badge: "new" as BadgeType },
       { title: "Click Guard", url: "/google-ads", icon: ShieldCheck, badge: "hot" as BadgeType },
       { title: "Ad Fraud", url: "/google-ad-fraud", icon: Skull },
       { title: "Ads Guide", url: "/google-ads-guide", icon: Megaphone },
