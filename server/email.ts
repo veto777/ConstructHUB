@@ -388,6 +388,15 @@ export async function sendContractEmail(to: string, token: string, packageName: 
   });
 }
 
+// RFC 8058 one-click unsubscribe. The URL accepts the mailbox provider's POST
+// (POST /review/:token/unsubscribe) and serves the unsubscribe page on GET.
+function oneClickUnsubscribeHeaders(unsubscribeUrl: string): Record<string, string> {
+  return {
+    "List-Unsubscribe": `<${unsubscribeUrl}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
+}
+
 export async function sendReviewRequestEmail(to: string, clientName: string, companyName: string, companyLogoUrl: string | null, token: string, baseUrl: string, themeName?: string, personalMessage?: string, bccEmail?: string) {
   const feedbackUrl = `${baseUrl}/api/review/${token}/click`;
   const theme = getTheme(themeName);
@@ -409,6 +418,7 @@ export async function sendReviewRequestEmail(to: string, clientName: string, com
     headers: {
       "X-Priority": "3",
       "Importance": "Normal",
+      ...oneClickUnsubscribeHeaders(`${baseUrl}/review/${token}/unsubscribe`),
     },
     text: `Hi ${clientName},\n\n${bodyText}\n\n${feedbackUrl}\n\nThank you,\n${companyName}`,
     html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;">
@@ -451,7 +461,7 @@ export async function sendReviewReminderEmail(to: string, clientName: string, co
   const headers: Record<string, string> = {
     "X-Priority": "3",
     "Importance": "Normal",
-    "List-Unsubscribe": `<${unsubscribeUrl}>`,
+    ...oneClickUnsubscribeHeaders(unsubscribeUrl),
   };
 
   const reminderMailOptions: any = {

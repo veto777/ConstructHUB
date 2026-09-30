@@ -288,7 +288,7 @@ export async function runSiteScanWorker(deps = workerDependencies) {
           title: regressed
             ? "Site Scan needs attention"
             : "Site Scan completed",
-          body: `${state.pages.length} pages checked. Overall score: ${scores.overall ?? "unavailable"}.`,
+          body: `${state.pages.length} ${state.pages.length === 1 ? "page" : "pages"} checked. Overall score: ${scores.overall ?? "unavailable"}.`,
           link: "/site-scan",
           severity: regressed ? "warning" : "info",
         },

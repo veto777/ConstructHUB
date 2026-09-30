@@ -7,6 +7,8 @@ import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-ana
 import { competitorPlaces, placesResponse } from "./competitor-provider";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
 import { ownedBy } from "./ownership";
+import { buildExclusionList } from "./click-guard-exclusions";
+import { GOOGLE_ADS_GUIDE_SECTIONS, GOOGLE_ADS_GUIDE_ORDER } from "./google-ads-guide-content";
 import { escapeHtml, oneLine, firstZodMessage, visitorIp, edgeGeo, normalizeBlockedIp, isPublicIpv4, safeRedirectUrl, normalizeTrackedDomain, clickGuardSettingsInput, exclusionListKey, exclusionKeyMatches, placeStreetLine, SOCIAL_PROFILE_KEYS, locationUpdateInput, isOwnerPreview, GOOGLE_REVIEW_LINK_MESSAGE, googleReviewLink } from "./route-guards";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
@@ -286,9 +288,10 @@ export async function registerRoutes(
         };
         const result = await storage.getDatabasesFiltered(params);
         res.json({ ...result, databases: result.databases.map(governmentPermitForDisplay) });
-      } else if (req.query.searchable === "true") {
+      } else if (req.query.searchable === "true" || req.query.scrapable === "true") {
         // Only portals with a verified live link AND a live-search adapter — the
-        // ones a search or a refresh schedule can actually run against.
+        // ones a search or a refresh schedule can actually run against (the
+        // Schedules picker asks with ?scrapable=true; the full list is ~14 MB).
         const databases = (await storage.getDatabases())
           .filter(d => governmentLinksAvailable(d) && canScrapeGovernmentPortal(d))
           .sort((a, b) => a.name.localeCompare(b.name));
@@ -304,8 +307,13 @@ export async function registerRoutes(
   });
 
   app.get("/api/databases/counts", async (_req, res) => {
-    const counts = await storage.getDatabaseCounts();
-    res.json(counts);
+    try {
+      const counts = await storage.getDatabaseCounts();
+      res.json(counts);
+    } catch (err) {
+      console.error("Error counting permit databases:", err);
+      res.status(500).json({ message: "Could not load permit directory counts. Please try again." });
+    }
   });
 
   app.get("/api/databases/county/:countyId", async (req, res) => {
@@ -577,17 +585,28 @@ export async function registerRoutes(
     isActive: z.boolean().default(true),
   });
   // A schedule can only run against a portal with a verified live link and a live-search adapter.
+  const findPortal = async (databaseId: number) =>
+    (await db.select().from(permitDatabases).where(eq(permitDatabases.id, databaseId)))[0] ?? null;
+  const isSchedulable = (portal: typeof permitDatabases.$inferSelect) =>
+    governmentLinksAvailable(portal) && canScrapeGovernmentPortal(portal);
   async function schedulablePortal(databaseId: number) {
-    const [portal] = await db.select().from(permitDatabases).where(eq(permitDatabases.id, databaseId));
-    return portal && governmentLinksAvailable(portal) && canScrapeGovernmentPortal(portal) ? portal : null;
+    const portal = await findPortal(databaseId);
+    return portal && isSchedulable(portal) ? portal : null;
   }
   const NOT_SCHEDULABLE = "This portal does not support automated search. Choose a portal from the searchable list.";
+  // Sends the 404/400 and returns true when a schedule may not target this portal.
+  async function rejectScheduleTarget(res: any, databaseId: number): Promise<boolean> {
+    const portal = await findPortal(databaseId);
+    if (!portal) { res.status(404).json({ message: "That permit portal no longer exists. Choose another portal." }); return true; }
+    if (!isSchedulable(portal)) { res.status(400).json({ message: NOT_SCHEDULABLE }); return true; }
+    return false;
+  }
 
   app.post("/api/scrape-schedules", async (req, res) => {
     try {
       const parsed = scheduleInput.safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
-      if (!(await schedulablePortal(parsed.data.databaseId))) return res.status(400).json({ message: NOT_SCHEDULABLE });
+      if (await rejectScheduleTarget(res, parsed.data.databaseId)) return;
       const schedule = await storage.createScrapeSchedule({ ...parsed.data, nextRunAt: new Date() });
       res.json(schedule);
     } catch (err: any) {
@@ -605,9 +624,7 @@ export async function registerRoutes(
       const changes: Partial<typeof parsed.data> = {};
       for (const [key, value] of Object.entries(parsed.data)) if (key in (req.body ?? {})) (changes as any)[key] = value;
       if (Object.keys(changes).length === 0) return res.status(400).json({ message: "Nothing to update" });
-      if (changes.databaseId !== undefined && !(await schedulablePortal(changes.databaseId))) {
-        return res.status(400).json({ message: NOT_SCHEDULABLE });
-      }
+      if (changes.databaseId !== undefined && (await rejectScheduleTarget(res, changes.databaseId))) return;
       const updated = await storage.updateScrapeSchedule(id, changes);
       if (!updated) {
         return res.status(404).json({ message: "Schedule not found" });
@@ -800,9 +817,9 @@ export async function registerRoutes(
 
   app.post("/api/photos/business-search", async (req, res) => {
     try {
-      const { query, pageToken } = req.body;
-      if (!query || query.trim().length < 2) {
-        return res.status(400).json({ message: "Search query is required" });
+      const { query, pageToken } = req.body ?? {};
+      if (typeof query !== "string" || query.trim().length < 2) {
+        return res.status(400).json({ message: "Enter at least 2 characters." });
       }
 
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
@@ -1945,11 +1962,13 @@ Rules:
         max_tokens: 300,
       });
 
-      const generatedResponse = response.choices[0]?.message?.content || "Thank you for your feedback. We value your business and strive to provide the best service possible.";
+      // An empty completion is a failure, not a reason to present canned text as the AI's draft.
+      const generatedResponse = response.choices[0]?.message?.content?.trim();
+      if (!generatedResponse) throw new Error("The AI returned an empty response");
       res.json({ response: generatedResponse });
     } catch (err: any) {
       console.error("Review response generation failed:", err);
-      res.status(500).json({ message: "Failed to generate response" });
+      res.status(503).json({ message: "AI responses are unavailable right now — please try again later." });
     }
   });
 
@@ -2449,7 +2468,11 @@ Rules:
     try {
       const found = await competitorPlaces(industry, location, radius, apiKey);
       const allPlaces = found.places;
-      await db.update(competitorScans).set({ lat: String(found.center.lat), lon: String(found.center.lng), errorMessage: null }).where(eq(competitorScans.id, scanId));
+      // A partly paged result is still real data; say it may be incomplete (shown as a note on the completed scan).
+      await db.update(competitorScans).set({
+        lat: String(found.center.lat), lon: String(found.center.lng),
+        errorMessage: found.complete ? null : "Google's later results pages could not be loaded, so this list may be incomplete. Run the scan again for the full list.",
+      }).where(eq(competitorScans.id, scanId));
 
       for (const place of allPlaces) {
         let detailReviews: any[] = [];
@@ -2578,6 +2601,9 @@ Rules:
         const campaignIds = tx.select({ id: citationCampaigns.id }).from(citationCampaigns).where(eq(citationCampaigns.locationId, id));
         await tx.delete(citations).where(inArray(citations.campaignId, campaignIds));
         await tx.delete(citationCampaigns).where(eq(citationCampaigns.locationId, id));
+        // Synced Google reviews have no FK to the location either; the delete dialog promises they go too.
+        // (gbp_review_automation rows cascade from google_profile_reviews.)
+        await tx.delete(googleProfileReviews).where(and(eq(googleProfileReviews.userId, user.id), eq(googleProfileReviews.locationId, id)));
         await tx.delete(businessLocations).where(eq(businessLocations.id, id));
       });
       res.json({ success: true });
@@ -2588,8 +2614,10 @@ Rules:
     const user = getDevUser(req, res);
     if (!user) return;
     try {
-      const { query } = req.body;
-      if (!query || query.trim().length < 2) return res.status(400).json({ message: "Search query is required" });
+      const { query } = req.body ?? {};
+      if (typeof query !== "string" || query.trim().length < 2) {
+        return res.status(400).json({ message: "Type at least 2 characters (business name, address or Google Maps link)." });
+      }
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
       if (!apiKey) return res.status(500).json({ message: "Google Places API key not configured" });
 
@@ -3007,7 +3035,8 @@ Rules:
       const id = parseInt(req.params.id);
       const body = z.object({
         status: z.enum(["listed", "wrong", "missing", "unchecked"]),
-        listingUrl: z.string().trim().max(500).url().refine(u => /^https:\/\//i.test(u), "Use an https link").nullable().optional(),
+        listingUrl: z.string().trim().max(500, "Links must be under 500 characters").url("Enter a full link starting with https://")
+          .refine(u => /^https:\/\//i.test(u), "Enter a full link starting with https://").nullable().optional(),
       }).parse(req.body);
       const [row] = await db.select({ c: citations, owner: citationCampaigns.userId }).from(citations)
         .innerJoin(citationCampaigns, eq(citationCampaigns.id, citations.campaignId)).where(eq(citations.id, id));
@@ -3049,6 +3078,31 @@ Rules:
     if (!user) return res.json([]);
     const purchases = await db.select().from(coursePurchases).where(eq(coursePurchases.userId, user.id));
     res.json(purchases);
+  });
+
+  // The paid Google Ads playbook, one section at a time. Same entitlement rule as the guide
+  // index: any course purchase unlocks it (dev bypass mirrors the client's dev preview).
+  app.get("/api/google-ads-guide/:slug", async (req, res) => {
+    try {
+      const slug = String(req.params.slug);
+      const section = Object.hasOwn(GOOGLE_ADS_GUIDE_SECTIONS, slug) ? GOOGLE_ADS_GUIDE_SECTIONS[slug] : undefined;
+      if (!section) return res.status(404).json({ message: "Guide section not found" });
+      const user = req.user ? getDevUser(req, res) : null;
+      const purchased = !!user && (await db.select({ id: coursePurchases.id }).from(coursePurchases)
+        .where(eq(coursePurchases.userId, user.id)).limit(1)).length > 0;
+      // The title is public (it is listed on the guide index); the section text is not.
+      if (!purchased && !DEV_AUTH_BYPASS) return res.status(403).json({ message: "Purchase required", title: section.title });
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json({
+        slug,
+        ...section,
+        sectionNumber: GOOGLE_ADS_GUIDE_ORDER.indexOf(slug) + 1,
+        totalSections: GOOGLE_ADS_GUIDE_ORDER.length,
+      });
+    } catch (err) {
+      console.error("Error loading Google Ads guide section:", err);
+      res.status(500).json({ message: "Could not load this guide section. Please try again." });
+    }
   });
 
   app.post("/api/admin/test-email", async (req, res) => {
@@ -3565,12 +3619,13 @@ Rules:
         return res.status(403).json({ message: "This exclusion-list link is missing its key or is out of date. Copy the Google Ads script again from ConstructHUB → Google Ads → Click Guard." });
       }
       const blocked = await storage.getBlockedIps(domain.id);
-      const ipList = blocked
-        .filter(b => b.isActive)
-        .map(b => normalizeBlockedIp(b.ipAddress))
-        .filter((ip): ip is string => !!ip)
-        .slice(0, 500);
-      
+      // Applies the saved Click Guard settings: manual exclusions added, whitelisted IPs
+      // removed, capped at the chosen list length (50-500).
+      const ipList = buildExclusionList(
+        blocked.filter(b => b.isActive).map(b => b.ipAddress),
+        domain.settings as Record<string, unknown> | null,
+      );
+
       const format = req.query.format;
       if (format === "json") {
         res.setHeader("Access-Control-Allow-Origin", "*");
@@ -5163,6 +5218,8 @@ function main() {
         status: request.status,
         feedbackRating: request.feedbackRating,
         reviewSubmitted: request.reviewSubmitted,
+        // Lets a reopened link resume on the finished step instead of the rating form.
+        lastStep: request.lastStep,
         referralOffer: await getReferralSettings(request.userId).then(s => s.enabled ? s.offer : null),
         preview,
       });
@@ -5549,6 +5606,22 @@ function main() {
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to unsubscribe" });
+    }
+  });
+
+  // RFC 8058 one-click unsubscribe: the mailbox provider POSTs
+  // "List-Unsubscribe=One-Click" (form-encoded) to the email's List-Unsubscribe URL.
+  // GET on the same path keeps serving the unsubscribe page.
+  app.post("/review/:token/unsubscribe", async (req, res) => {
+    try {
+      const request = await storage.getReviewRequestByToken(String(req.params.token));
+      if (!request) return res.status(404).end();
+      await unsubscribeRecipient(request.userId, request.clientEmail);
+      await storage.updateReviewRequest(request.id, { unsubscribed: true, nextReminderAt: null });
+      res.status(200).end();
+    } catch (err: any) {
+      console.error("One-click unsubscribe failed:", err);
+      res.status(500).end();
     }
   });
 

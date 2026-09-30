@@ -1,5 +1,6 @@
 import { isReviewSuppressed, normalizeRecipient } from "./review-suppression";
 import { ownedBy, type OwnerScope } from "./ownership";
+import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import {
   type County, type InsertCounty,
   type PermitDatabase, type InsertPermitDatabase,
@@ -36,6 +37,21 @@ import {
 import { db } from "./db";
 import { eq, desc, or, ilike, inArray, and, sql, gte, lte, lt, isNull, isNotNull, count, countDistinct } from "drizzle-orm";
 
+/**
+ * Permit directory totals. `total`/`county`/`city` count listed jurisdictions, not portals.
+ * `withPortal`: rows whose portal link is shown (live, verified, or labelled unconfirmed).
+ * `verifiedPortals`: rows whose link passed a check (live or verified only).
+ * `searchable`: rows the live permit search can actually query.
+ */
+export interface PermitDirectoryCounts {
+  total: number;
+  county: number;
+  city: number;
+  withPortal: number;
+  verifiedPortals: number;
+  searchable: number;
+}
+
 export interface IStorage {
   getCounties(): Promise<County[]>;
   createCounty(data: InsertCounty): Promise<County>;
@@ -50,7 +66,7 @@ export interface IStorage {
     page?: number;
     limit?: number;
   }): Promise<{ databases: PermitDatabase[]; total: number }>;
-  getDatabaseCounts(): Promise<{ total: number; county: number; city: number }>;
+  getDatabaseCounts(): Promise<PermitDirectoryCounts>;
   createDatabase(data: InsertPermitDatabase): Promise<PermitDatabase>;
   updateDatabase(id: number, data: Partial<InsertPermitDatabase>): Promise<PermitDatabase | undefined>;
 
@@ -255,23 +271,44 @@ export class DatabaseStorage implements IStorage {
     return { databases, total: Number(countResult.count) };
   }
 
-  async getDatabaseCounts(): Promise<{ total: number; county: number; city: number }> {
+  async getDatabaseCounts(): Promise<PermitDirectoryCounts> {
+    // An empty string is no link, as in the display helpers' truthiness checks.
+    const link = sql`coalesce(nullif(${permitDatabases.searchUrl}, ''), nullif(${permitDatabases.portalUrl}, ''))`;
     const results = await db
       .select({
         jurisdictionType: permitDatabases.jurisdictionType,
         count: sql<number>`count(*)`,
+        withPortal: sql<number>`count(*) filter (where ${permitDatabases.isActive} and ${permitDatabases.linkStatus} in ('live', 'verified', 'unconfirmed') and ${link} is not null)`,
+        verifiedPortals: sql<number>`count(*) filter (where ${permitDatabases.isActive} and ${permitDatabases.linkStatus} in ('live', 'verified') and ${link} is not null)`,
       })
       .from(permitDatabases)
       .groupBy(permitDatabases.jurisdictionType);
 
-    let total = 0, county = 0, city = 0;
+    let total = 0, county = 0, city = 0, withPortal = 0, verifiedPortals = 0;
     for (const r of results) {
       const c = Number(r.count);
       total += c;
+      withPortal += Number(r.withPortal);
+      verifiedPortals += Number(r.verifiedPortals);
       if (r.jurisdictionType === "county") county = c;
       if (r.jurisdictionType === "city") city = c;
     }
-    return { total, county, city };
+
+    // "Searchable" follows the platform adapter rules in @shared/government-links, so
+    // only the rows that could qualify are read and the shared check decides.
+    const candidates = await db
+      .select({
+        isActive: permitDatabases.isActive,
+        linkStatus: permitDatabases.linkStatus,
+        platform: permitDatabases.platform,
+        searchUrl: permitDatabases.searchUrl,
+        portalUrl: permitDatabases.portalUrl,
+      })
+      .from(permitDatabases)
+      .where(and(eq(permitDatabases.isActive, true), isNotNull(permitDatabases.platform), sql`${link} is not null`));
+    const searchable = candidates.filter(row => governmentLinksAvailable(row) && canScrapeGovernmentPortal(row)).length;
+
+    return { total, county, city, withPortal, verifiedPortals, searchable };
   }
 
   async createDatabase(data: InsertPermitDatabase): Promise<PermitDatabase> {
@@ -613,9 +650,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTrackedDomain(id: number): Promise<void> {
-    await db.delete(blockedIps).where(eq(blockedIps.domainId, id));
-    await db.delete(clickVisits).where(eq(clickVisits.domainId, id));
-    await db.delete(trackedDomains).where(eq(trackedDomains.id, id));
+    // blocked_ips, click_visits and vpn_visits have no foreign key to the site: remove them with it.
+    await db.transaction(async (tx) => {
+      await tx.delete(blockedIps).where(eq(blockedIps.domainId, id));
+      await tx.delete(clickVisits).where(eq(clickVisits.domainId, id));
+      await tx.delete(vpnVisits).where(eq(vpnVisits.domainId, id));
+      await tx.delete(trackedDomains).where(eq(trackedDomains.id, id));
+    });
   }
 
   async getClickVisits(domainId: number, startDate?: Date, endDate?: Date): Promise<ClickVisit[]> {
