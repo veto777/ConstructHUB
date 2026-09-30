@@ -122,7 +122,7 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
       {report.psi?.length > 0 && (
         <details>
           <summary>PageSpeed measurements and field data</summary>
-          <pre className="text-xs whitespace-pre-wrap">
+          <pre className="text-xs whitespace-pre-wrap break-all">
             {JSON.stringify(report.psi, null, 2)}
           </pre>
         </details>
@@ -137,7 +137,7 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
           </CardHeader>
           <CardContent>
             <Copy text={JSON.stringify(report.jsonLdDraft, null, 2)} />
-            <pre className="whitespace-pre-wrap text-xs mt-3">
+            <pre className="whitespace-pre-wrap break-all text-xs mt-3">
               {JSON.stringify(report.jsonLdDraft, null, 2)}
             </pre>
           </CardContent>
@@ -156,7 +156,7 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
           </CardHeader>
           <CardContent>
             <Copy text={draft} />
-            <pre className="whitespace-pre-wrap font-sans text-sm mt-3">
+            <pre className="whitespace-pre-wrap break-all font-sans text-sm mt-3">
               {draft}
             </pre>
           </CardContent>
@@ -333,6 +333,7 @@ export default function SiteScanPage() {
           {data?.jobs.map((j: any, index: number) => (
             <Button
               variant={selected === j.id ? "default" : "outline"}
+              className="h-auto max-w-full whitespace-normal break-all text-left"
               key={j.id}
               onClick={() => {
                 setSelected(j.id);

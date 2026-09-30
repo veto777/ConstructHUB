@@ -186,3 +186,22 @@ test("configured CAPTCHA can be solved again after a rejected submission", async
   await submit.click();
   await expect.poll(() => attempts).toBe(2);
 });
+
+test("account history and reports fit a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const url = "https://sitescan-mobile.test/" + "long-path-".repeat(30);
+  await page.route("**/api/sitescan", r => r.fulfill({ json: {
+    locations: [], schedules: [], jobs: [{ id: "fixture-mobile", url, created_at: "2026-09-29", status: "completed", scores: { overall: 80 } }],
+  } }));
+  await page.route("**/api/sitescan/jobs/fixture-mobile", r => r.fulfill({ json: {
+    url, status: "completed", pages: 1, pageCap: 1, aiDraft: url,
+    report: { pages: 1, scores: { overall: 80, categories: { technical: 80 } }, findings: [], jsonLdDraft: { url } },
+  } }));
+  await page.goto("/site-scan");
+  await page.getByRole("button", { name: /sitescan-mobile/ }).click();
+  await expect(page.getByRole("heading", { name: "AI fix plan — draft" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const history = await page.getByRole("button", { name: /sitescan-mobile/ }).boundingBox();
+  expect(history!.x + history!.width).toBeLessThanOrEqual(390);
+  expect(await page.locator("pre").evaluateAll(nodes => nodes.every(n => n.scrollWidth <= n.clientWidth))).toBe(true);
+});
