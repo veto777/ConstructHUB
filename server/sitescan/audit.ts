@@ -278,8 +278,17 @@ export async function crawl(
             "Redirect leaves the selected origin; destination excluded from audit.",
         });
       } else {
+        // Several discovered aliases can redirect to the same page. Count the
+        // destination once so aliases cannot fabricate duplicate-content findings.
+        if (state.pages.some((p) => p.url === r.url)) {
+          state.queue.shift();
+          await checkpoint(state);
+          continue;
+        }
         const page = parsePage(r);
         state.pages.push(page);
+        visited.add(r.url);
+        for (const redirect of r.redirects) visited.add(redirect);
         if (!page.nofollow)
           for (const link of page.links)
             if (

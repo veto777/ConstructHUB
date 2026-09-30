@@ -266,3 +266,24 @@ it("allows ordinary public IPv4/IPv6 hosting while excluding reserved /24 ranges
   for (const ip of ["192.0.0.1", "192.0.2.1", "192.88.99.1"])
     expect(publicIP(ip)).toBe(false);
 });
+
+it("counts redirected aliases once without false duplicate-content findings", async () => {
+  const state = emptyState("https://fixture.test/");
+  state.initialized = true;
+  state.queue.push("https://fixture.test/alias", "https://fixture.test/final");
+  const http = vi.fn(async (url: string) => ({
+    ...response(url.endsWith("alias") ? "https://fixture.test/final" : url,
+      url.endsWith("/") ? "<title>Home</title>" : "<title>Service</title>"),
+    redirects: url.endsWith("alias") ? [url] : [],
+  }));
+  await crawl("https://fixture.test/", 5, state, undefined, http, async () => {});
+  expect(state.pages.map(p => p.url)).toEqual(["https://fixture.test/", "https://fixture.test/final"]);
+  expect(http).toHaveBeenCalledTimes(2);
+  expect(findingsFor(state).some(f => f.id === "duplicate-title")).toBe(false);
+
+  // An alias encountered after its destination must also be deduplicated.
+  state.queue.push("https://fixture.test/alias-two");
+  await crawl("https://fixture.test/", 5, state, undefined,
+    async () => response("https://fixture.test/final", "<title>Service</title>"), async () => {});
+  expect(state.pages).toHaveLength(2);
+});
