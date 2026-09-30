@@ -44,6 +44,8 @@ export const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.g
 export const isoDay = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 export const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+/** Picker id for "linked to a client we only know by name": keep it as is. */
+const KEEP_CUSTOMER = "__keep__";
 
 // ── Appointment create/edit dialog ──────────────────────────────────────────
 
@@ -80,7 +82,14 @@ export function AppointmentForm({
       : { id: initial.projectId, label: initial.projectName ?? "Linked project", detail: initial.projectNumber };
   });
   const [customer, setCustomer] = useState<PickOption | null>(() => {
-    if (!initial?.customerId) return null;
+    if (!initial?.customerId) {
+      // The agenda feed (/api/crm/schedule) names the client but sends no
+      // customerId. Show the name and leave the link alone on save; sending
+      // null would silently unlink the visit from its client.
+      return initial && initial.customerId === undefined && initial.customerName
+        ? { id: KEEP_CUSTOMER, label: initial.customerName }
+        : null;
+    }
     const c = customers?.find((x) => x.id === initial.customerId);
     return { id: initial.customerId, label: c?.displayName ?? initial.customerName ?? "Linked client" };
   });
@@ -146,7 +155,8 @@ export function AppointmentForm({
       allDay,
       notes: notes.trim() || null,
       projectId: project?.id ?? null,
-      customerId: customer?.id ?? null,
+      // Unchanged link whose id we never had → omit it (PATCH keeps it).
+      ...(customer?.id === KEEP_CUSTOMER ? {} : { customerId: customer?.id ?? null }),
       dispatchedMemberIds: crew,
     });
   };
