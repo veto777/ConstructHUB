@@ -1,3 +1,4 @@
+import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -27,9 +28,11 @@ type Account = {
   boards?: { id: string; name: string }[];
 };
 export default function SocialMediaPage() {
+  const f=useAgencyFilter();
   const { toast } = useToast();
   const { data, error, isLoading } = useQuery<any>({
-    queryKey: ["/api/social"],
+    queryKey: ["/api/social",f.params.toString()],
+    queryFn:()=>apiRequest("GET","/api/social?"+f.params).then(r=>r.json()),
     refetchInterval: 15000,
   });
   const { data: media = [] } = useQuery<any[]>({
@@ -61,7 +64,7 @@ export default function SocialMediaPage() {
       path: string;
       body?: unknown;
       method?: string;
-    }) => (await apiRequest(method, `/api/social${path}`, body)).json(),
+    }) => (await apiRequest(method, f.client&&path.startsWith('/posts') ? `/api/agency/social${path}` : `/api/social${path}`, f.client&&path==='/posts'?{clientId:Number(f.client),post:body}:body)).json(),
     onSuccess: () => {
       refresh();
       queryClient.invalidateQueries({ queryKey: ["/api/social/sources"] });
@@ -156,6 +159,10 @@ export default function SocialMediaPage() {
   }
   return (
     <div className="h-full overflow-y-auto">
+      <AgencyWorkspace compact/>
+      <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
+      {f.client&&<Button variant="outline" onClick={async()=>{try{await apiRequest('PUT',`/api/agency/clients/${f.client}/social-destinations`,{destinations});toast({title:'Client social destinations saved'});}catch(e){toast({title:'Could not assign destinations',description:String(e),variant:'destructive'});}}}>Owner: assign selected destinations to this client</Button>}
+
       <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6">
         <header className="flex justify-between gap-4 items-start">
           <div>

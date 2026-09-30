@@ -8,13 +8,15 @@ export function useUrlParam(key: string, fallback: string | null = null): [strin
   useEffect(() => {
     const onPop = () => setValue(read());
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    window.addEventListener("urlparamchange", onPop);
+    return () => { window.removeEventListener("popstate", onPop); window.removeEventListener("urlparamchange", onPop); };
   }, [key]);
   const update = (next: string | null, push = false) => {
     const url = new URL(window.location.href);
     if (next === null || next === "") url.searchParams.delete(key); else url.searchParams.set(key, next);
     window.history[push ? "pushState" : "replaceState"](window.history.state, "", url.toString());
     setValue(next === "" ? null : next);
+    window.dispatchEvent(new Event("urlparamchange"));
   };
   return [value, update];
 }

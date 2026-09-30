@@ -10,7 +10,7 @@ type Linkage = {
   locations: { id: number; state: 'synced'|'reconnect'|'available'|'unlinked'; unlinkedByUser?: boolean; accountEmail?: string; lastSuccess?: string|null; lastError?: string|null;
     listing?: { accountResource: string; gbpName: string; grantSubject: string } }[];
 };
-const refreshAll = () => ['/api/gbp/status','/api/gbp/linkage','/api/locations','/api/google-profile-reviews','/api/gbp/locations','/api/auth/me']
+const refreshAll = () => ['/api/agency/locations','/api/agency/dashboard','/api/gbp/status','/api/gbp/linkage','/api/locations','/api/google-profile-reviews','/api/gbp/locations','/api/auth/me']
   .forEach(k => queryClient.invalidateQueries({ queryKey: [k] }));
 
 export function useGbpLinkage() {
@@ -37,7 +37,7 @@ function useLinkLocations() {
       }
       toast({ title: `Linked ${r.imported} location${r.imported === 1 ? '' : 's'}`,
         description: issues.length ? `Some Google data could not sync: ${[...new Set(issues)].join('; ')}`
-          : 'Profile, services, hours, social links, photos, reviews and performance synced from Google.',
+          : 'First sync is queued. Check Agency jobs for progress.',
         variant: issues.length ? 'destructive' : 'default' });
     },
     onError: (e: Error) => toast({ title: 'Could not link location', description: e.message, variant: 'destructive' }),
@@ -89,7 +89,7 @@ export function GbpLinkCell({ locationId }: { locationId: number }) {
 
 export function GbpConnection({locationId}:{locationId?:number}) {
   const {toast}=useToast();
-  const {data,error}=useQuery<any>({queryKey:['/api/gbp/status'],refetchInterval:30000});
+  const {data,error}=useQuery<any>({queryKey:['/api/gbp/status',locationId??'all'],queryFn:()=>apiRequest('GET','/api/gbp/status'+(locationId?'?locationId='+locationId:'')).then(r=>r.json()),refetchInterval:30000});
   const {data:linkage}=useGbpLinkage();
   const link = useLinkLocations();
   const mutation=useMutation({mutationFn:async({path,body}:{path:string;body?:unknown})=>{const r=await apiRequest('POST',path,body);return r.json();},onSuccess:(result)=>{

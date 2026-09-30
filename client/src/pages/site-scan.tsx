@@ -1,3 +1,4 @@
+import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,7 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
   );
 }
 export default function SiteScanPage() {
+  const f=useAgencyFilter();
   const cache = useQueryClient();
   const [scanParam, setScanParam] = useUrlParam("scan");
   const selected = scanParam ?? "", setSelected = (v: string | number) => setScanParam(v === "" ? null : String(v), true);
@@ -181,7 +183,8 @@ export default function SiteScanPage() {
     [busy, setBusy] = useState(false),
     [share, setShare] = useState("");
   const { data } = useQuery<any>({
-    queryKey: ["/api/sitescan"],
+    queryKey: ["/api/sitescan",f.params.toString()],
+    queryFn:()=>api("GET","/api/sitescan?"+f.params),
     refetchInterval: (q) =>
       q.state.data?.jobs?.some((j: any) =>
         ["queued", "running"].includes(j.status),
@@ -219,6 +222,9 @@ export default function SiteScanPage() {
   };
   return (
     <main className="max-w-6xl mx-auto p-6 space-y-6">
+      <AgencyWorkspace compact/>
+      <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
+
       <div>
         <h1 className="text-3xl font-bold">Site Scan</h1>
         <p className="text-muted-foreground mt-2">

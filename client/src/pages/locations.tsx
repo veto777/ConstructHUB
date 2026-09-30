@@ -1,3 +1,4 @@
+import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection, GbpLinkCell } from "@/components/gbp-connection";
 import { InfoTip } from "@/components/info-tip";
@@ -47,184 +48,19 @@ const SOCIAL_PLATFORMS = [
 
 
 export default function LocationsPage() {
-  const { toast } = useToast();
   const [locationParam, setLocationParam] = useUrlParam("location");
-  const selectedLocationId = locationParam ? Number(locationParam) : null;
-  const setSelectedLocationId = (id: number | null) => {
-    if (id === null) { const u = new URL(window.location.href); u.searchParams.delete("tab"); window.history.replaceState(window.history.state, "", u.toString()); }
-    setLocationParam(id === null ? null : String(id), id !== null);
-  };
-  const [searchFilter, setSearchFilter] = useState("");
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-
-  const { data: subscription } = useQuery<{ plan: string; status: string }>({
-    queryKey: ["/api/stripe/subscription"],
-  });
-
-  const isPlatinum = subscription?.plan === "platinum" && (subscription?.status === "active" || subscription?.status === "trialing");
-  const isPremiumPlus = (subscription?.plan === "premium" || subscription?.plan === "platinum") && (subscription?.status === "active" || subscription?.status === "trialing");
-  const isDev = import.meta.env.DEV;
-
-  const { data: locations, isLoading } = useQuery<BusinessLocation[]>({
-    queryKey: ["/api/locations"],
-  });
-
-  const selectedLocation = locations?.find(l => l.id === selectedLocationId) ?? null;
-
-  if (selectedLocation) {
-    return (
-      <LocationDetail
-        location={selectedLocation}
-        onBack={() => setSelectedLocationId(null)}
-        isPremiumPlus={isPremiumPlus || isDev}
-      />
-    );
-  }
-
-  const filtered = locations?.filter(l =>
-    !searchFilter ||
-    l.businessName.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    (l.address && l.address.toLowerCase().includes(searchFilter.toLowerCase()))
-  ) ?? [];
-
-  return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <GbpConnection />
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-locations-title">
-              <MapPin className="w-6 h-6 text-primary" />
-              GMB Locations
-            </h1>
-            <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
-            <p className="text-muted-foreground text-sm mt-1 max-w-lg">
-              Manage business locations, sync Google reviews and performance, and run citation campaigns.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                className="pl-9 w-56"
-                placeholder="Search locations..."
-                value={searchFilter}
-                onChange={e => setSearchFilter(e.target.value)}
-                data-testid="input-search-locations"
-              />
-            </div>
-            {(isPlatinum || isDev) ? (
-              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-add-location">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Location(s)
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto top-[5%] translate-y-0">
-                  <DialogHeader>
-                    <DialogTitle>Add Location</DialogTitle>
-                  </DialogHeader>
-                  <AddLocationDialog
-                    onCreated={() => {
-                      setAddDialogOpen(false);
-                      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-            ) : (
-              <Button variant="outline" disabled data-testid="button-add-location-locked">
-                <Lock className="w-4 h-4 mr-2" />
-                Platinum Required
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground space-y-3">
-            <Building2 className="w-12 h-12 mx-auto opacity-40" />
-            <p className="text-lg font-medium">No locations yet</p>
-            <p className="text-sm">Add your first business location to get started.</p>
-          </div>
-        ) : (
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-center">Listings</TableHead>
-                  <TableHead className="text-center">Reviews</TableHead>
-                  <TableHead className="text-center">Performance</TableHead>
-                  <TableHead className="text-center">Avg. Rank</TableHead>
-                  <TableHead>Google account</TableHead>
-                  <TableHead>Date Added</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map(loc => (
-                  <TableRow
-                    key={loc.id}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedLocationId(loc.id)}
-                    data-testid={`row-location-${loc.id}`}
-                  >
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        <p className="font-medium text-sm" data-testid={`text-location-name-${loc.id}`}>{loc.businessName}</p>
-                        {loc.placeId && (
-                          <p className="text-[10px] text-muted-foreground font-mono truncate max-w-xs">{loc.placeId}</p>
-                        )}
-                        {loc.address && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {loc.address}{loc.city ? `, ${loc.city}` : ""}{loc.state ? `, ${loc.state}` : ""} {loc.zipCode || ""}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-sm font-medium" data-testid={`text-listings-${loc.id}`}>
-                        Unavailable
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-medium" data-testid={`text-reviews-${loc.id}`}>
-                          See reviews
-                        </span>
-
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-sm font-medium" data-testid={`text-monthly-views-${loc.id}`}>
-                        Open insights
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-sm">Unavailable</span>
-                    </TableCell>
-                    <TableCell>
-                      <GbpLinkCell locationId={loc.id} /><GuardStatus id={loc.id} />
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-muted-foreground" data-testid={`text-date-${loc.id}`}>
-                        {loc.createdAt ? new Date(loc.createdAt).toLocaleDateString() : "-"}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
-      </div>
+  const [addDialogOpen,setAddDialogOpen]=useState(false);
+  const {data:selectedLocation,error}=useQuery<BusinessLocation>({queryKey:["/api/locations",locationParam],enabled:!!locationParam});
+  if(locationParam&&selectedLocation)return <LocationDetail location={selectedLocation} onBack={()=>setLocationParam(null)} isPremiumPlus={true}/>;
+  return <main className="max-w-7xl mx-auto p-6 space-y-5">
+    <div className="flex justify-between"><h1 className="text-2xl font-bold" data-testid="text-locations-title">GMB Locations</h1>
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}><DialogTrigger asChild><Button data-testid="button-add-location">Add Location(s)</Button></DialogTrigger>
+        <DialogContent><DialogHeader><DialogTitle>Add Location</DialogTitle></DialogHeader><AddLocationDialog onCreated={()=>{setAddDialogOpen(false);queryClient.invalidateQueries({queryKey:['/api/agency/locations']});}}/></DialogContent></Dialog>
     </div>
-  );
+    {error&&<p role="alert">Location not found or access unavailable.</p>}
+    <AgencyWorkspace onOpen={id=>setLocationParam(String(id))}/>
+    <GbpConnection/>
+  </main>;
 }
 
 function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void; hasGbpAccess?: boolean }) {
@@ -485,6 +321,7 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
+        <AgencyWorkspace compact/>
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-to-list">
             <ArrowLeft className="w-5 h-5" />
@@ -1019,13 +856,14 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
 }
 
 function CitationsTab({ location }: { location: BusinessLocation }) {
+  const f=useAgencyFilter();
   const { toast } = useToast();
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [campaignName, setCampaignName] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
 
   const { data: campaigns, isLoading } = useQuery<CitationCampaign[]>({
-    queryKey: ["/api/citations/campaigns"],
+    queryKey: [`/api/citations/campaigns?locationId=${location.id}&${f.params}`],
   });
 
   const locationCampaigns = campaigns?.filter(c => c.locationId === location.id) ?? [];
