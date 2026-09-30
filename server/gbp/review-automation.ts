@@ -77,7 +77,8 @@ export async function notifyNewReviews(userId:number,id:number) {
     ON CONFLICT DO NOTHING RETURNING review_id`,[userId,id]);
   // Existing rows with a backfill/report record still need their first notification.
   const {rows:pending}=await pool.query(`SELECT r.id,r.rating,r.reviewer_name FROM google_profile_reviews r JOIN gbp_review_automation a ON a.review_id=r.id
-    WHERE r.user_id=$1 AND r.location_id=$2 AND a.notified_at IS NULL AND NOT r.google_deleted`,[userId,id]);
+    WHERE r.user_id=$1 AND r.location_id=$2 AND a.notified_at IS NULL AND NOT r.google_deleted
+    AND r.google_review_id LIKE 'accounts/%/locations/%/reviews/%'`,[userId,id]);
   for(const r of pending) {
     await notifyUser(userId,'gbp.new_review',{title:'New Google review',body:`${r.reviewer_name}: ${r.rating} stars.`,link:'/google-reviews',actionUrl:'/google-reviews'});
     await pool.query('UPDATE gbp_review_automation SET notified_at=now() WHERE user_id=$1 AND review_id=$2',[userId,r.id]);
@@ -92,6 +93,7 @@ export async function processReplies(userId:number,id:number,generate=generateRe
     const s=replySettingsSchema.parse(config.settings);
     const {rows}=await pool.query(`SELECT r.*,a.backfill FROM google_profile_reviews r JOIN gbp_review_automation a ON a.review_id=r.id
       WHERE r.user_id=$1 AND r.location_id=$2 AND NOT r.google_deleted AND r.reply_comment IS NULL AND r.reply_draft IS NULL
+      AND r.google_review_id LIKE 'accounts/%/locations/%/reviews/%'
       AND a.ai_status IS NULL AND (r.review_date>=$3 OR (a.backfill AND $4)) ORDER BY r.id LIMIT 20`,[userId,id,config.future_since,s.scope==='existing']);
     for(const r of rows) {
       if(!await takeBudget(`gbp-ai-reply:user:${userId}`,50,1,86400_000))break;

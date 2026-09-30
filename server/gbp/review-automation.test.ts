@@ -92,6 +92,18 @@ describe('AI reply settings and queue with injected AI/publisher',()=>{
     expect((await state(r)).ai_status).toBe('needs-review');
     expect((await pool.query('SELECT reply_comment,reply_draft FROM google_profile_reviews WHERE id=$1',[r])).rows[0]).toEqual({reply_comment:null,reply_draft:'Thank you for your positive review.'});
   });
+  it('does not notify or generate AI replies for a local review with a report receipt', async () => {
+    const r=await add();
+    await pool.query("UPDATE google_profile_reviews SET google_review_id='local-fixture-'||id WHERE id=$1",[r]);
+    await pool.query('INSERT INTO gbp_review_automation(user_id,review_id,reported_at) VALUES($1,$2,now())',[user,r]);
+    const before=(await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND kind='gbp.new_review'",[user])).rows[0].n;
+    await notifyNewReviews(user,id);
+    const generator=vi.fn(async()=> 'Fixture reply');
+    await processReplies(user,id,generator,publish as any);
+    expect((await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND kind='gbp.new_review'",[user])).rows[0].n).toBe(before);
+    expect(generator).not.toHaveBeenCalled();
+    expect((await state(r)).ai_status).toBeNull();
+  });
   it('rejects overlong AI content and enforces the per-user daily budget',async()=>{
     const r=await add();await notifyNewReviews(user,id);await processReplies(user,id,async()=> 'x'.repeat(1000),publish as any);expect((await state(r)).ai_status).toBe('needs-review');
     const next=await add();await notifyNewReviews(user,id);
