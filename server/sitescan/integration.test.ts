@@ -387,3 +387,23 @@ it("admin lead capture is restricted to platform admins and the configured gate"
     }
   } finally { await pool.query("DELETE FROM users WHERE id=$1", [user.id]); }
 });
+
+it("an exhausted user cannot drain the global PageSpeed budget without provider calls", async () => {
+  const { takeBudget } = await import("../growth-limits");
+  const { parsePage } = await import("./audit");
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE 'sitescan:psi:%'");
+  await takeBudget("sitescan:psi:1", 20, 20, 86400_000);
+  await pool.query("UPDATE sitescan_jobs SET status='failed' WHERE status='queued' AND url LIKE 'https://sitescan-%'");
+  const url = "https://sitescan-psi-quota.test/";
+  const id = await enqueue(1, url, 1, 1);
+  const state = emptyState(url);
+  state.pages = [parsePage({ url, status: 200, body: "<title>Fixture</title>", headers: {}, redirects: [], bytes: 22 })];
+  state.queue = [];
+  const pageSpeed = vi.fn();
+  await runSiteScanWorker({ crawl: async () => state, http: vi.fn(), pageSpeed });
+  expect(pageSpeed).not.toHaveBeenCalled();
+  expect((await pool.query("SELECT used FROM growth_budgets WHERE key='sitescan:psi:global'")).rows).toHaveLength(0);
+  const { rows: [job] } = await pool.query("SELECT report FROM sitescan_jobs WHERE id=$1", [id]);
+  expect(job.report.psi).toHaveLength(2);
+  expect(job.report.scores.categories.performance).toBeNull();
+});

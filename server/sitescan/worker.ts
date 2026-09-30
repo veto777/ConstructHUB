@@ -146,8 +146,8 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       .slice(0, job.psi_pages))
       for (const strategy of ["mobile", "desktop"] as const) {
         if (
-          !(await takeBudget("sitescan:psi:global", 100, 1, 86400_000)) ||
-          !(await takeBudget("sitescan:psi:" + job.user_id, 20, 1, 86400_000))
+          !(await takeBudget("sitescan:psi:" + job.user_id, 20, 1, 86400_000)) ||
+          !(await takeBudget("sitescan:psi:global", 100, 1, 86400_000))
         ) {
           psi.push({
             url: p.url,
