@@ -609,6 +609,40 @@ describe("route authentication, owner scope and key redaction", () => {
     await disconnect(otherId, null);
     await pool.query("DELETE FROM social_posts WHERE user_id=$1", [otherId]);
   });
+  it("scopes library and source routes and returns only safe upload URLs", async () => {
+    const uploadHttp = vi.fn(async () => response({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://example.com/fixture-put?signature=fixture" }));
+    const factory = (key: string) => new BlotatoClient(key, uploadHttp, async () => {});
+    await connect(otherId, "fixture-upload-key", null, make);
+    const routes = new Map<string, any>();
+    const app: any = {};
+    for (const method of ["get", "post", "put", "delete"])
+      app[method] = (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+    registerSocialRoutes(app, () => true, factory);
+    const call = async (method: string, path: string, owner: number, body = {}, params = {}) => {
+      const res: any = { setHeader: vi.fn(), status: vi.fn().mockReturnThis(), json: vi.fn() };
+      await routes.get(`${method} /api/social${path}`)({ user: { id: owner }, body, params }, res);
+      return { body: res.json.mock.calls[0][0], status: res.status.mock.calls[0]?.[0] ?? 200 };
+    };
+    try {
+      await pool.query("INSERT INTO media_photos(user_id,folder_id,name,url) VALUES($1,0,'Private fixture','https://127.0.0.1/a'),($1,0,'Public fixture','https://example.com/library.jpg'),($2,0,'Other owner fixture','https://example.com/other.jpg')", [otherId, userId]);
+      expect((await call("get", "/media", otherId)).body.map((p: any) => p.name)).toEqual(["Public fixture"]);
+      const source = await call("post", "/sources", otherId, { kind: "offers", text: "Fixture offer" });
+      expect(source.status).toBe(201);
+      expect((await call("delete", "/sources/:id", userId, {}, { id: source.body.id })).status).toBe(404);
+      expect((await call("get", "/sources", otherId)).body).toHaveLength(1);
+      expect((await call("delete", "/sources/:id", otherId, {}, { id: source.body.id })).status).toBe(200);
+      const upload = await call("post", "/uploads", otherId, { filename: "fixture.jpg" });
+      expect(upload.body).toEqual({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://example.com/fixture-put?signature=fixture" });
+      expect(JSON.stringify(upload.body)).not.toContain("fixture-upload-key");
+      expect((await call("post", "/uploads", otherId, { filename: "../fixture.exe" })).status).toBe(400);
+      expect(uploadHttp).toHaveBeenCalledTimes(1);
+      uploadHttp.mockResolvedValueOnce(response({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://0.0.0.0/upload" }));
+      expect((await call("post", "/uploads", otherId, { filename: "fixture.jpg" })).status).toBe(400);
+    } finally {
+      await pool.query("DELETE FROM media_photos WHERE user_id=ANY($1)", [[userId, otherId]]);
+      await disconnect(otherId, null);
+    }
+  });
   it("returns no key and no other owner posts from the dashboard", async () => {
     const routes = new Map<string, any>();
     const app: any = {};
