@@ -37,6 +37,13 @@ export async function ensureGbpSchema() {
       kind text NOT NULL, last_success timestamptz, last_attempt timestamptz, last_error text, cursor_date date,
       PRIMARY KEY(location_id,kind)
     );
+    CREATE TABLE IF NOT EXISTS gbp_media (
+      location_id integer NOT NULL REFERENCES business_locations(id) ON DELETE CASCADE,
+      name text NOT NULL, source text NOT NULL, media_format text, category text, google_url text, thumbnail_url text,
+      width integer, height integer, description text, attribution text, create_time timestamptz,
+      synced_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(location_id, name)
+    );
+    CREATE INDEX IF NOT EXISTS gbp_media_location_idx ON gbp_media(location_id, source, create_time DESC);
     CREATE TABLE IF NOT EXISTS gbp_daily_metrics (
       location_id integer REFERENCES business_locations(id) ON DELETE CASCADE,
       date date NOT NULL, metric text NOT NULL, value bigint NOT NULL,

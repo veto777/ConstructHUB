@@ -96,6 +96,16 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     for(const l of result.locations) synced[l.id]=await syncLocation(id,l.id).catch(e=>publicError(e));
     res.json({...result,synced});
   });
+  route('get','/api/gbp/locations/:id/media',async(req,res,userId)=>{
+    const id=Number(req.params.id),source=req.query.source==='customer'?'customer':'business';
+    const {rows:[l]}=await pool.query('SELECT id FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);
+    if(!l) throw new GoogleError('invalid','Location not found',404);
+    const limit=Math.min(Math.max(Number(req.query.limit)||60,1),600),offset=Math.max(Number(req.query.offset)||0,0);
+    const {rows}=await pool.query(`SELECT name,media_format,category,google_url,thumbnail_url,width,height,description,attribution,create_time FROM gbp_media
+      WHERE location_id=$1 AND source=$2 ORDER BY create_time DESC NULLS LAST LIMIT $3 OFFSET $4`,[id,source,limit,offset]);
+    const {rows:[t]}=await pool.query('SELECT count(*)::int n, max(synced_at) synced FROM gbp_media WHERE location_id=$1 AND source=$2',[id,source]);
+    res.json({total:t.n,syncedAt:t.synced,items:rows});
+  });
   route('post','/api/gbp/locations/:id/unlink',async(req,res,id)=>res.json(await unlinkLocation(id,Number(req.params.id))));
   route('post','/api/gbp/locations/:id/sync',async(req,res,id)=>res.json(await syncLocation(id,Number(req.params.id))));
   route('patch','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),req.body.replyComment,req.body.action==='publish'?'publish':'draft',undefined,{req})));

@@ -103,8 +103,26 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           const info = await client.request('information',`/v1/${l.gbp_location_name}?readMask=${PROFILE_READ_MASK}`);
           const attrs = await client.request('information',`/v1/${l.gbp_location_name}/attributes`).then(r => r.attributes || []).catch(() => []);
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
-          const media = await client.request('reviews',`/v4/${parent}/media?pageSize=1`).catch(() => null);
-          const customerMedia = await client.request('reviews',`/v4/${parent}/media/customers?pageSize=1`).catch(() => null);
+          // Every photo/video on the listing (paged), not a sample. A failed list keeps the previous gallery.
+          const businessItems = await client.pages('reviews',`/v4/${parent}/media`,'mediaItems').catch(() => null);
+          const customerItems = await client.pages('reviews',`/v4/${parent}/media/customers`,'mediaItems').catch(() => null);
+          const counts: Record<string, number> = {};
+          for (const [source, items] of [['business', businessItems], ['customer', customerItems]] as const) {
+            if (!items) continue;
+            const valid = items.filter((m: any) => typeof m?.name === 'string' && m.name.startsWith(`${parent}/media/`));
+            counts[source] = valid.length;
+            for (const m of valid) {
+              const https = (u: unknown) => typeof u === 'string' && /^https:\/\//.test(u) ? u : null;
+              await c.query(`INSERT INTO gbp_media(location_id,name,source,media_format,category,google_url,thumbnail_url,width,height,description,attribution,create_time,synced_at)
+                VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now()) ON CONFLICT(location_id,name) DO UPDATE SET source=$3,media_format=$4,category=$5,google_url=$6,
+                thumbnail_url=$7,width=$8,height=$9,description=$10,attribution=$11,create_time=$12,synced_at=now()`,
+                [id,m.name,source,m.mediaFormat||null,m.locationAssociation?.category||null,https(m.googleUrl),https(m.thumbnailUrl),
+                 m.dimensions?.widthPixels??null,m.dimensions?.heightPixels??null,m.description||null,m.attribution?.profileName||null,m.createTime||null]);
+            }
+            await c.query('DELETE FROM gbp_media WHERE location_id=$1 AND source=$2 AND NOT (name = ANY($3::text[]))',[id,source,valid.map((m: any) => m.name)]);
+          }
+          const media = counts.business !== undefined ? { totalMediaItemCount: counts.business } : null;
+          const customerMedia = counts.customer !== undefined ? { totalMediaItemCount: counts.customer } : null;
           const p = mapProfile(info, attrs);
           verified = !!info?.metadata?.hasVoiceOfMerchant;
           await c.query(`UPDATE business_locations SET business_name=COALESCE($2,business_name),phone=$3,website=$4,address=$5,city=$6,state=$7,zip_code=$8,country=COALESCE($9,country),

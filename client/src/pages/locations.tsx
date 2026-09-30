@@ -674,49 +674,68 @@ function ServicesTab({ location }: { location: BusinessLocation }) {
 }
 
 function PhotosTab({ location }: { location: BusinessLocation }) {
+  const [source, setSource] = useState<"business" | "customer">("business");
+  const [limit, setLimit] = useState(60);
+  const linked = !!location.gbpLocationName;
+  const { data, isLoading } = useQuery<{ total: number; syncedAt: string | null; items: any[] }>({
+    queryKey: [`/api/gbp/locations/${location.id}/media?source=${source}&limit=${limit}`],
+    enabled: linked,
+  });
+  const tile = (n: number | null | undefined, label: string, which: "business" | "customer") => (
+    <button type="button" onClick={() => { setSource(which); setLimit(60); }}
+      className={`rounded-lg border p-4 text-center transition-colors ${source === which ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+      data-testid={`tab-photos-${which}`}>
+      <p className="text-2xl font-bold" data-testid={`text-${which}-photo-count`}>{n || 0}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </button>
+  );
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold" data-testid="text-business-photo-count">{location.businessPhotoCount || 0}</p>
-            <p className="text-xs text-muted-foreground">Business uploads</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold" data-testid="text-customer-photo-count">{location.customerPhotoCount || 0}</p>
-            <p className="text-xs text-muted-foreground">Customer uploads</p>
-          </CardContent>
-        </Card>
+        {tile(location.businessPhotoCount, "Business photos & videos", "business")}
+        {tile(location.customerPhotoCount, "Customer photos & videos", "customer")}
       </div>
 
-      <Card className="border-blue-500/20 bg-blue-500/5">
-        <CardContent className="p-4">
-          <p className="text-sm text-muted-foreground">
-            Due to limitations imposed by Google, we do not currently support photo uploads. To upload photos, we suggest using{" "}
-            <a
-              href="https://business.google.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 underline"
-              data-testid="link-google-upload"
-            >
-              Google's built-in interface
-            </a>.
+      {!linked ? (
+        <Card><CardContent className="p-4 text-sm text-muted-foreground">
+          Link this location to your Google Business Profile (Locations → Link &amp; sync) to see every photo on your listing here.
+        </CardContent></Card>
+      ) : isLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+      ) : !data?.items.length ? (
+        <Card><CardContent className="p-4 text-sm text-muted-foreground">
+          No {source} photos synced yet. Use <strong>Sync now</strong> on the Locations page — photos sync along with reviews and performance.
+        </CardContent></Card>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Showing {data.items.length} of {data.total} {source} photos and videos from Google{data.syncedAt ? ` · synced ${new Date(data.syncedAt).toLocaleString()}` : ""}. Click one to open it on Google.
           </p>
-        </CardContent>
-      </Card>
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2" data-testid="gbp-media-grid">
+            {data.items.map((m) => (
+              <a key={m.name} href={m.google_url || undefined} target="_blank" rel="noopener noreferrer"
+                className="group relative block aspect-square overflow-hidden rounded-md border bg-muted" title={m.description || m.attribution || m.category || ""}>
+                {m.thumbnail_url || m.google_url
+                  ? <img src={m.thumbnail_url || m.google_url} alt={m.description || `${source} photo`} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                  : <span className="flex h-full items-center justify-center text-xs text-muted-foreground">{m.media_format || "Media"}</span>}
+                {(m.category || m.media_format === "VIDEO") && (
+                  <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+                    {m.media_format === "VIDEO" ? "Video" : String(m.category).toLowerCase().replace(/_/g, " ")}
+                  </span>
+                )}
+              </a>
+            ))}
+          </div>
+          {data.items.length < data.total && (
+            <Button variant="outline" className="w-full" onClick={() => setLimit((l) => Math.min(l + 120, 600))} data-testid="button-more-photos">
+              Show more ({data.total - data.items.length} more)
+            </Button>
+          )}
+        </>
+      )}
 
-      <Button
-        variant="outline"
-        className="w-full gap-2"
-        onClick={() => window.location.href = "/photos"}
-        data-testid="button-photo-optimizer"
-      >
-        <Image className="w-4 h-4" />
-        Upload via Photo Optimizer
-        <ExternalLink className="w-3 h-3" />
+      <Button variant="outline" className="w-full gap-2" onClick={() => (window.location.href = "/gbp-content")} data-testid="button-posts-photos">
+        <Image className="w-4 h-4" /> Add or schedule photos in Posts &amp; Photos
       </Button>
     </div>
   );
