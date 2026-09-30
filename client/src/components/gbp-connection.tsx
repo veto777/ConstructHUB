@@ -25,7 +25,21 @@ function useLinkLocations() {
       const r = await apiRequest('POST', '/api/gbp/import', { locations: listings });
       return r.json();
     },
-    onSuccess: (r) => { refreshAll(); toast({ title: `Linked ${r.imported} location${r.imported === 1 ? '' : 's'}`, description: 'Profile, services, hours, social links, photos, reviews and performance synced from Google.' }); },
+    onSuccess: (r) => {
+      refreshAll();
+      const issues: string[] = [];
+      for (const result of Object.values(r.synced || {}) as any[]) {
+        if (result?.message) issues.push(result.message);
+        for (const part of Object.values(result || {}) as any[]) {
+          if (part?.message) issues.push(part.message);
+          if (Array.isArray(part?.warnings)) issues.push(...part.warnings);
+        }
+      }
+      toast({ title: `Linked ${r.imported} location${r.imported === 1 ? '' : 's'}`,
+        description: issues.length ? `Some Google data could not sync: ${[...new Set(issues)].join('; ')}`
+          : 'Profile, services, hours, social links, photos, reviews and performance synced from Google.',
+        variant: issues.length ? 'destructive' : 'default' });
+    },
     onError: (e: Error) => toast({ title: 'Could not link location', description: e.message, variant: 'destructive' }),
   });
 }

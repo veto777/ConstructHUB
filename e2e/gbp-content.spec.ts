@@ -109,3 +109,13 @@ test('linked profile without a public Place ID can import and surfaces partial s
     await expect(page.getByText('Google data partially imported', { exact: true })).toBeVisible();
     await expect(page.getByText('Social profiles: Google denied permission.', { exact: true })).toBeVisible();
 });
+
+test('Link & sync reports a partial Google failure instead of claiming every field synced', async ({ page }) => {
+    const fixture = { id: 99882, businessName: 'Link audit fixture', placeId: 'fixture-place' };
+    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], errors: [], locations: [{ id: fixture.id, state: 'available', listing: { accountResource: 'accounts/fixture', gbpName: 'locations/fixture', grantSubject: 'fixture' } }] } }));
+    await page.route('**/api/gbp/import', route => route.fulfill({ json: { imported: 1, synced: { [fixture.id]: { profile: { warnings: ['Social profiles unavailable'] }, reviews: { kind: 'permission', message: 'Google denied reviews access' } } } } }));
+    await page.goto('/locations');
+    await page.getByTestId('button-link-gbp-99882').click();
+    await expect(page.getByText('Some Google data could not sync: Social profiles unavailable; Google denied reviews access', { exact: true })).toBeVisible();
+});
