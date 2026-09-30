@@ -47,7 +47,7 @@ import {
   crmNotificationChannel,
 } from "@shared/schema";
 import { notifyMembers } from "./notify";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, requireClient } from "./client-auth";
 import { requireDocSession } from "./portal";
@@ -432,14 +432,23 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Only what the CLIENT sent from their portal (authorMemberId null). The
+    // team's own replies live in the two-way inbox thread, not on this card.
     const rows = await db
       .select()
       .from(crmClientComments)
-      .where(and(eq(crmClientComments.customerId, req.params.id), eq(crmClientComments.orgId, ctx.org.id)))
+      .where(and(
+        eq(crmClientComments.customerId, req.params.id),
+        eq(crmClientComments.orgId, ctx.org.id),
+        isNull(crmClientComments.authorMemberId),
+      ))
       .orderBy(desc(crmClientComments.createdAt))
       .limit(200);
+    // Same per-object policy as the inbox thread: a note tied to an estimate
+    // this seat can't see stays hidden here too.
     res.json(
-      rows.map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt, readAt: c.readAt })),
+      (await objectPolicy(ctx).filter("client-comments", rows))
+        .map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt, readAt: c.readAt })),
     );
   });
 

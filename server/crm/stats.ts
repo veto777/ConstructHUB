@@ -2,7 +2,10 @@
  * Home-page numbers and the org-wide Team Activity feed.
  *
  * /api/crm/stats     — the four headline cards (open estimates, jobs won,
- *                      unscheduled jobs, open invoices), count + dollars each.
+ *                      unscheduled jobs, open invoices), count + dollars each,
+ *                      plus the open pipeline (every project not cancelled or
+ *                      paid) and the active client count — real totals, not
+ *                      bounded by the capped list endpoints the page loads.
  * /api/crm/team-activity — "Mike sent a bid", "Andrey moved Job 62 to
  *                      Scheduled": crm_team_activity rows (written at action
  *                      sites) merged with the estimate-event trail and
@@ -16,7 +19,7 @@ import {
   crmMembers, crmEstimateEvents, crmTeamActivity,
   CRM_PROJECT_STAGE_META,
 } from "@shared/schema";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { objectPolicy } from "./object-access";
 import { divisionScopeOf } from "./divisions";
 import { requireOrg, requirePermission } from "./tenancy";
@@ -52,6 +55,9 @@ export function projectStageLabel(status: string): string {
 
 const OPEN_ESTIMATE = ["sent", "viewed"] as const;
 const OPEN_INVOICE = ["sent", "partial"] as const;
+// The open book: every live project except the closed stages (the home
+// page's "Pipeline value" — summing closed jobs made it grow forever).
+const CLOSED_PROJECT = ["cancelled", "paid"] as const;
 // Only these estimate-event types render in the team feed (see the loop
 // below); filtering in SQL keeps the limit*2 fetch budget for renderable rows.
 const FEED_EVENT_TYPES = ["sent", "viewed", "approved", "declined", "shared"] as const;
@@ -72,12 +78,16 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       const estimates = await access.filter("estimates", await db.select().from(crmEstimates).where(eq(crmEstimates.orgId, orgId)));
       const projects = await access.filter("projects", await db.select().from(crmProjects).where(eq(crmProjects.orgId, orgId)));
       const invoices = await access.filter("invoices", await db.select().from(crmInvoices).where(eq(crmInvoices.orgId, orgId)));
+      const customers = await access.filter("customers", await db.select().from(crmCustomers)
+        .where(and(eq(crmCustomers.orgId, orgId), isNull(crmCustomers.archivedAt))));
       const sum = <T,>(rows: T[], value: (r: T) => number) => ({ count: rows.length, totalCents: rows.reduce((n, r) => n + value(r), 0) });
       return res.json({
         openEstimates: sum(estimates.filter(e => (OPEN_ESTIMATE as readonly string[]).includes(e.status)), e => e.totalCents),
         jobsWon: sum(estimates.filter(e => e.status === "approved"), e => e.approvedTotalCents ?? e.totalCents),
         unscheduledJobs: sum(projects.filter(p => p.status === "approved" && !p.archivedAt), p => p.contractValueCents ?? 0),
         openInvoices: sum(invoices.filter(i => (OPEN_INVOICE as readonly string[]).includes(i.status)), i => Math.max(0, i.totalCents - i.paidCents)),
+        openPipeline: sum(projects.filter(p => !p.archivedAt && !(CLOSED_PROJECT as readonly string[]).includes(p.status)), p => p.contractValueCents ?? 0),
+        clients: { count: customers.length },
       });
     }
 
@@ -117,6 +127,19 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       inArray(crmInvoices.status, [...OPEN_INVOICE]),
     ));
 
+    const [pipeline] = await db.select({
+      count: sql<number>`count(*)::int`,
+      totalCents: sql<number>`coalesce(sum(coalesce(${crmProjects.contractValueCents}, 0)), 0)::bigint`,
+    }).from(crmProjects).where(and(
+      eq(crmProjects.orgId, orgId),
+      isNull(crmProjects.archivedAt),
+      notInArray(crmProjects.status, [...CLOSED_PROJECT]),
+    ));
+
+    const [cl] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, orgId), isNull(crmCustomers.archivedAt)));
+
     const num = (r: { count: number; totalCents: unknown }) =>
       ({ count: r.count, totalCents: Number(r.totalCents) });
     res.json({
@@ -124,6 +147,8 @@ export function registerCrmStatsRoutes(app: Express, getDevUser: GetUser): void 
       jobsWon: num(won),
       unscheduledJobs: num(unscheduled),
       openInvoices: num(openInv),
+      openPipeline: num(pipeline),
+      clients: { count: cl.count },
     });
   });
 
