@@ -16,6 +16,15 @@ import {
   Layers, HardHat, Landmark, Eye,
   BookOpen, Filter, Download, RefreshCw,
 } from "lucide-react";
+import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
+import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+
+const SECTION_LINKS = [
+  { href: "#tools", label: "Tools", testId: "link-nav-tools" },
+  { href: "#how-it-works", label: "How It Works", testId: "link-nav-how" },
+  { href: "#use-cases", label: "Use Cases", testId: "link-nav-cases" },
+  { href: "#get-started", label: "Get Started", testId: "link-nav-start" },
+] as const;
 
 function PermitsAnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -152,76 +161,58 @@ function CountUp({ end, suffix = "", prefix = "", duration = 2000 }: { end: numb
     return () => observer.disconnect();
   }, [end, duration]);
 
-  return <span ref={ref}>{prefix}{count}{suffix}</span>;
+  return <span ref={ref}>{prefix}{count.toLocaleString("en-US")}{suffix}</span>;
 }
-
-const stats = [
-  { value: 50, suffix: "", label: "States Covered", sub: "Complete nationwide directory" },
-  { value: 32864, suffix: "+", label: "Permit Databases", sub: "County & city portals indexed" },
-  { value: 3139, suffix: "+", label: "Counties Mapped", sub: "Every US county accessible" },
-  { value: 10, suffix: "x", label: "Time Saved", sub: "vs. manual portal searching" },
-];
 
 const tools = [
   {
     icon: Search,
     title: "Cross-Database Search",
-    description: "Search for permits across every database in a county or state with a single query. No more visiting 5 different government portals to find one permit.",
+    description: "Search the government permit portals we support in a county or state with a single query, instead of visiting each portal one at a time.",
     gradient: "from-blue-500/20 to-indigo-500/20",
     border: "border-blue-500/20",
-    link: "/",
+    link: "/search",
     badge: "Search",
     badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    features: ["Address & parcel search", "Multi-database results", "Real-time scraping"],
+    features: ["Address & parcel search", "Multi-portal results", "Live queries of supported portals"],
   },
   {
     icon: Database,
     title: "Database Directory",
-    description: "Browse the complete directory of permit databases organized by state and county. Every portal link, phone number, and platform type documented.",
+    description: "Browse county and city permit offices organized by state. A portal link appears once we've found one from a real source, shown with its check status — never a guessed URL.",
     gradient: "from-amber-500/20 to-orange-500/20",
     border: "border-amber-500/20",
     link: "/databases",
     badge: "Directory",
     badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    features: ["Filter by state & county", "Portal links included", "Platform identification"],
+    features: ["Filter by state & county", "Checked portal links", "Search shortcut when no link is on record"],
   },
   {
     icon: Building,
     title: "Property Records",
-    description: "Access county assessor and property appraiser data. Look up ownership, assessed values, tax records, and sales history for any property in your service area.",
+    description: "Find the county assessor or property appraiser office for your service area, with a link to its official records site where we've checked one. Ownership, values and sales history are looked up there.",
     gradient: "from-teal-500/20 to-emerald-500/20",
     border: "border-teal-500/20",
     link: "/property",
     badge: "Records",
     badgeColor: "bg-teal-500/10 text-teal-400 border-teal-500/20",
-    features: ["Ownership lookups", "Value assessments", "Tax & sales history"],
-  },
-  {
-    icon: Clock,
-    title: "Scrape Schedules",
-    description: "Set up automated scraping schedules to monitor permits on a recurring basis. Get fresh data without lifting a finger — daily, weekly, or custom intervals.",
-    gradient: "from-violet-500/20 to-purple-500/20",
-    border: "border-violet-500/20",
-    link: "/schedules",
-    badge: "Automation",
-    badgeColor: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-    features: ["Recurring schedules", "Auto-scrape new permits", "Custom intervals"],
+    features: ["Assessor & appraiser offices", "Official records links", "Link check status shown"],
   },
   {
     icon: FileText,
     title: "Search History",
-    description: "Every search you run is saved with full results. Revisit past queries, track permit status changes over time, and build your own research database.",
+    description: "Every search you run is saved with its results. Revisit past queries and build up your own research log.",
     gradient: "from-rose-500/20 to-pink-500/20",
     border: "border-rose-500/20",
     link: "/history",
     badge: "History",
     badgeColor: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-    features: ["Full result archives", "Status change tracking", "Export capabilities"],
+    features: ["Saved result archives", "Past queries in one list", "Delete what you don't need"],
   },
 ];
 
 const pipeline = [
-  { step: "01", title: "Search Any Address or Parcel", desc: "Enter an address, parcel number, or permit number. Our engine queries every relevant permit database in the county simultaneously — no more visiting government websites one at a time.", icon: Search, color: "from-[#4A6CF7] to-[#3B5DE7]" },
+  { step: "01", title: "Search an Address or Parcel", desc: "Enter an address, parcel number, or permit number. We query the supported government portals in that county for you — no more visiting government websites one at a time.", icon: Search, color: "from-[#4A6CF7] to-[#3B5DE7]" },
   { step: "02", title: "Get Unified Results", desc: "Results from multiple databases are deduplicated and presented in a clean, searchable format. See permit type, status, contractor, dates, and full details at a glance.", icon: Layers, color: "from-[#F59E0B] to-[#D97706]" },
   { step: "03", title: "Act on the Data", desc: "Use permit data to find new customers, verify competitor activity, track construction trends in your market, or check property history before bidding a job.", icon: Target, color: "from-[#14B8A6] to-[#0D9488]" },
 ];
@@ -241,6 +232,17 @@ export default function PermitsLandingPage() {
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
+  const { data: counts } = usePermitDirectoryCounts();
+  const hasVerified = typeof counts?.verifiedPortals === "number";
+  const searchHref = user ? "/search" : "/auth?mode=signup";
+  const stats: { value: number | undefined; suffix?: string; label: string; sub: string }[] = [
+    { value: 51, label: "States + DC", sub: "Every state has jurisdictions listed" },
+    { value: counts?.total, label: "Jurisdictions Listed", sub: "County & city permit offices" },
+    { value: counts?.county, label: "County Offices", sub: "County-level permit jurisdictions" },
+    hasVerified
+      ? { value: counts?.verifiedPortals, label: "Verified Portal Links", sub: "Links that passed our checks" }
+      : { value: counts?.city, label: "City Offices", sub: "City-level permit jurisdictions" },
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -259,20 +261,19 @@ export default function PermitsLandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-clip">
       <PermitsAnimatedBackground />
       <PermitsFloatingOrbs />
 
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      <nav className={`sticky top-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/landing" data-testid="link-permits-home">
+          <Link href="/" data-testid="link-permits-home">
             <CHLogo height={40} />
           </Link>
           <div className="hidden md:flex items-center gap-6 text-sm text-white/70">
-            <a href="#tools" className="hover:text-white transition-colors" data-testid="link-nav-tools">Tools</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors" data-testid="link-nav-how">How It Works</a>
-            <a href="#use-cases" className="hover:text-white transition-colors" data-testid="link-nav-cases">Use Cases</a>
-            <a href="#get-started" className="hover:text-white transition-colors" data-testid="link-nav-start">Get Started</a>
+            {SECTION_LINKS.map((link) => (
+              <a key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={link.testId}>{link.label}</a>
+            ))}
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
             {user && (
@@ -283,16 +284,16 @@ export default function PermitsLandingPage() {
               </Link>
             )}
             <div className="text-white"><CartSheet /></div>
-            <div className="text-white"><ThemeToggle /></div>
+            <div className="text-white hidden sm:block"><ThemeToggle /></div>
             {user ? (
-              <Link href="/" data-testid="link-nav-search">
+              <Link href="/search" data-testid="link-nav-search">
                 <Button size="sm" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white shadow-lg shadow-blue-500/25">
                   <Search className="h-3.5 w-3.5 mr-1.5" /> Search Permits
                 </Button>
               </Link>
             ) : (
               <>
-                <Link href="/auth" data-testid="link-permits-signin">
+                <Link href="/auth" className="hidden sm:block" data-testid="link-permits-signin">
                   <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10" size="sm">
                     Sign In
                   </Button>
@@ -304,11 +305,12 @@ export default function PermitsLandingPage() {
                 </Link>
               </>
             )}
+            <LandingMobileMenu signInHref={user ? undefined : "/auth"} links={SECTION_LINKS.map(({ href, label }) => ({ href, label }))} />
           </div>
         </div>
       </nav>
 
-      <section className="relative z-10 pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-16 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto text-center">
           <div className="animate-in">
             <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-[#4A6CF7] to-[#F59E0B] flex items-center justify-center mx-auto mb-6 animate-float">
@@ -322,20 +324,21 @@ export default function PermitsLandingPage() {
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] animate-in-delay-2" data-testid="text-hero-title">
             <span className="bg-gradient-to-r from-foreground via-foreground to-foreground/60 dark:from-white dark:via-white dark:to-white/60 bg-clip-text text-transparent">
-              Every Permit.
+              Permit Research,
             </span>
             <br />
             <span className="bg-gradient-to-r from-[#4A6CF7] via-[#F59E0B] to-[#14B8A6] bg-clip-text text-transparent animate-gradient-text">
-              Every County. One Search.
+              Without the Portal Hunt.
             </span>
           </h1>
           <p className="mt-6 text-lg sm:text-xl text-muted-foreground dark:text-white/50 max-w-2xl mx-auto leading-relaxed animate-in-delay-3">
-            Stop visiting dozens of government websites to find permits. Construction Hub aggregates
-            permit databases from all 50 states into one powerful search engine — built specifically
-            for contractors who need permit data to find customers, track competitors, and grow their business.
+            Stop visiting dozens of government websites to find permits. {BRAND_NAME} lists county and
+            city permit offices across all 50 states and DC and searches the government portals it
+            supports — built specifically for contractors who need permit data to find customers, track
+            competitors, and grow their business.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
-            <Link href={user ? "/" : "/auth?mode=signup"} data-testid="link-hero-search">
+            <Link href={searchHref} data-testid="link-hero-search">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-8 h-12 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
                 <Search className="h-4 w-4 mr-2" /> Search Permits Now <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
@@ -348,16 +351,20 @@ export default function PermitsLandingPage() {
           </div>
           <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground dark:text-white/40 animate-in-delay-5">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> All 50 states covered
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> All 50 states + DC listed
             </div>
+            {counts && (
+              <div className="flex items-center gap-2" data-testid="text-hero-jurisdictions">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" /> {formatCount(counts.total)} jurisdictions listed
+              </div>
+            )}
+            {hasVerified && (
+              <div className="flex items-center gap-2" data-testid="text-hero-verified-portals">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" /> {formatCount(counts!.verifiedPortals!)} verified portal links
+              </div>
+            )}
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 32,864+ permit portals indexed
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Property records included
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-amber-400" /> Automated scrape schedules
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Assessor offices by county
             </div>
           </div>
         </div>
@@ -370,15 +377,15 @@ export default function PermitsLandingPage() {
               <BarChart3 className="h-3 w-3 mr-1" /> By the Numbers
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              The Most Comprehensive
-              <span className="bg-gradient-to-r from-[#4A6CF7] to-[#F59E0B] bg-clip-text text-transparent"> Permit Platform</span>
+              What's in the
+              <span className="bg-gradient-to-r from-[#4A6CF7] to-[#F59E0B] bg-clip-text text-transparent"> Permit Directory</span>
             </h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {stats.map((stat, i) => (
               <Card key={stat.label} className={`bg-muted/50 dark:bg-white/[0.03] border-border dark:border-white/[0.06] p-6 text-center backdrop-blur-sm animate-in-delay-${i + 1}`} data-testid={`card-stat-${i}`}>
                 <div className="text-3xl sm:text-4xl font-extrabold text-foreground dark:text-white">
-                  <CountUp end={stat.value} suffix={stat.suffix} />
+                  {typeof stat.value === "number" ? <CountUp end={stat.value} suffix={stat.suffix} /> : "—"}
                 </div>
                 <p className="text-sm text-muted-foreground dark:text-white/60 mt-1 font-medium">{stat.label}</p>
                 <p className="text-[10px] text-muted-foreground dark:text-white/30 mt-0.5">{stat.sub}</p>
@@ -451,7 +458,7 @@ export default function PermitsLandingPage() {
               <span className="bg-gradient-to-r from-[#4A6CF7] to-[#14B8A6] bg-clip-text text-transparent"> Leverage Permit Data</span>
             </h2>
             <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-xl mx-auto">
-              From searching and browsing to scheduling and tracking — a complete toolkit for construction professionals.
+              From searching and browsing to saving and revisiting results — a toolkit for construction professionals.
             </p>
           </div>
           <div className="space-y-5">
@@ -526,7 +533,7 @@ export default function PermitsLandingPage() {
             ))}
           </div>
           <div className="text-center mt-8 animate-in-delay-4">
-            <Link href={user ? "/" : "/auth?mode=signup"} data-testid="link-pipeline-cta">
+            <Link href={searchHref} data-testid="link-pipeline-cta">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-8 h-12 shadow-lg shadow-blue-500/25">
                 <Search className="h-4 w-4 mr-2" /> Try It Now — Free
               </Button>
@@ -574,7 +581,7 @@ export default function PermitsLandingPage() {
               <div className="text-center mb-8">
                 <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
                   Manual Research vs.
-                  <span className="text-[#14B8A6]"> Construction Hub</span>
+                  <span className="text-[#14B8A6]"> {BRAND_NAME}</span>
                 </h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -597,14 +604,14 @@ export default function PermitsLandingPage() {
                 </div>
                 <div className="space-y-3">
                   <h3 className="text-sm font-bold text-[#14B8A6] uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" /> With Construction Hub
+                    <CheckCircle2 className="h-4 w-4" /> With {BRAND_NAME}
                   </h3>
                   {[
-                    "One search across all databases",
-                    "Unified interface for every county",
-                    "Automated schedules track new permits",
-                    "Results in seconds, not hours",
-                    "Property records and ownership included",
+                    "One search across supported portals",
+                    "One directory for every listed county and city",
+                    "Saved search history to revisit results",
+                    "Less time lost in clunky portals",
+                    "Assessor office links alongside permits",
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/50">
                       <CheckCircle2 className="h-3.5 w-3.5 text-[#14B8A6] shrink-0" />
@@ -631,11 +638,11 @@ export default function PermitsLandingPage() {
             </span>
           </h2>
           <p className="text-muted-foreground dark:text-white/40 mb-8 max-w-lg mx-auto">
-            Join contractors across all 50 states who use Construction Hub to find new business,
-            track their market, and stay ahead of the competition — all from public permit data.
+            Use {BRAND_NAME} to find new business, track your market, and stay ahead of the
+            competition — all from public permit data.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href={user ? "/" : "/auth?mode=signup"} data-testid="link-final-search">
+            <Link href={searchHref} data-testid="link-final-search">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-10 h-13 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
                 Search Permits Free <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
@@ -660,7 +667,7 @@ export default function PermitsLandingPage() {
               <span className="text-white/20">|</span>
               <a href="/privacy" className="hover:text-white/70 transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
             </div>
-            <p className="text-xs text-white/20">&copy; 2025 Construction Hub. All rights reserved.</p>
+            <p className="text-xs text-white/20">{copyrightNotice()}</p>
           </div>
         </div>
       </footer>

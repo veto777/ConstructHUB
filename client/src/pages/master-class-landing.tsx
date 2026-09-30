@@ -6,6 +6,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CHLogo } from "@/components/ch-logo";
+import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+import { copyrightNotice } from "@/lib/marketing";
 import { CartSheet } from "@/components/cart-sheet";
 import {
   ArrowRight, CheckCircle2, Zap, ChevronRight,
@@ -156,14 +158,18 @@ function CountUp({ end, suffix = "", prefix = "", duration = 2000 }: { end: numb
     return () => observer.disconnect();
   }, [end, duration]);
 
-  return <span ref={ref}>{prefix}{count}{suffix}</span>;
+  return <span ref={ref}>{prefix}{count.toLocaleString("en-US")}{suffix}</span>;
 }
+
+/** Complete-bundle price — server/catalog.ts COURSE_BUNDLE (cents). */
+const BUNDLE_PRICE_CENTS = 249900;
+const dollars = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 
 const stats = [
   { value: 4, suffix: "", label: "Complete Modules", sub: "Formation to marketing" },
   { value: 50, suffix: "", label: "State Guides", sub: "Every state covered" },
   { value: 100, suffix: "+", label: "Action Steps", sub: "Detailed checklists" },
-  { value: 50, suffix: "%", label: "Off Right Now", sub: "Limited time pricing" },
+  { value: BUNDLE_PRICE_CENTS / 100, prefix: "$", suffix: "", label: "Complete Bundle", sub: "All 4 modules, one price" },
 ];
 
 const modules = [
@@ -262,6 +268,17 @@ export default function MasterClassLandingPage() {
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
+  // Reference price = what the modules cost bought one by one, from the same
+  // table checkout prices them from. Until it loads, no comparison is shown.
+  const { data: courseModules } = useQuery<{ price: number }[]>({
+    queryKey: ["/api/master-class-modules"],
+  });
+  const modulesTotal = courseModules?.length
+    ? courseModules.reduce((sum, m) => sum + (Number(m.price) || 0), 0)
+    : null;
+  const bundleSaving = modulesTotal !== null && modulesTotal > BUNDLE_PRICE_CENTS
+    ? modulesTotal - BUNDLE_PRICE_CENTS
+    : null;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -280,11 +297,11 @@ export default function MasterClassLandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-clip">
       <MasterClassBackground />
       <MasterClassOrbs />
 
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      <nav className={`sticky top-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/landing" data-testid="link-masterclass-home">
             <CHLogo height={40} />
@@ -304,7 +321,7 @@ export default function MasterClassLandingPage() {
               </Link>
             )}
             <div className="text-white"><CartSheet /></div>
-            <div className="text-white"><ThemeToggle /></div>
+            <div className="text-white hidden sm:block"><ThemeToggle /></div>
             {user ? (
               <Link href="/master-class" data-testid="link-nav-course">
                 <Button size="sm" className="bg-[#F97316] hover:bg-[#EA580C] text-white shadow-lg shadow-orange-500/25">
@@ -313,7 +330,7 @@ export default function MasterClassLandingPage() {
               </Link>
             ) : (
               <>
-                <Link href="/auth" data-testid="link-masterclass-signin">
+                <Link href="/auth" className="hidden sm:block" data-testid="link-masterclass-signin">
                   <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10" size="sm">
                     Sign In
                   </Button>
@@ -325,11 +342,20 @@ export default function MasterClassLandingPage() {
                 </Link>
               </>
             )}
+            <LandingMobileMenu
+              signInHref={user ? undefined : "/auth"}
+              links={[
+                { href: "#modules", label: "Modules" },
+                { href: "#how-it-works", label: "How It Works" },
+                { href: "#who", label: "Who It's For" },
+                { href: "#enroll", label: "Enroll" },
+              ]}
+            />
           </div>
         </div>
       </nav>
 
-      <section className="relative z-10 pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-16 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto text-center">
           <div className="animate-in">
             <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-[#F97316] to-[#4A6CF7] flex items-center justify-center mx-auto mb-6 animate-float">
@@ -338,9 +364,11 @@ export default function MasterClassLandingPage() {
           </div>
           <div className="animate-in-delay-1">
             <div className="inline-flex items-center gap-3 mb-6">
-              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 px-4 py-1.5 text-sm animate-pulse" data-testid="badge-sale">
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" /> 50% OFF — Limited Time
-              </Badge>
+              {bundleSaving !== null && (
+                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 px-4 py-1.5 text-sm" data-testid="badge-sale">
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Bundle saves {dollars(bundleSaving)}
+                </Badge>
+              )}
               <Badge className="bg-[#F97316]/10 text-[#F97316] border-[#F97316]/20 px-4 py-1.5 text-sm" data-testid="badge-hero">
                 <Trophy className="h-3.5 w-3.5 mr-1.5" /> Construction Master Class
               </Badge>
@@ -363,7 +391,7 @@ export default function MasterClassLandingPage() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
             <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-hero-enroll">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-8 h-12 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
-                <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now — 50% Off <ArrowRight className="h-4 w-4 ml-2" />
+                <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <a href="#modules" data-testid="link-hero-explore">
@@ -404,7 +432,7 @@ export default function MasterClassLandingPage() {
             {stats.map((stat, i) => (
               <Card key={stat.label} className={`bg-muted/50 dark:bg-white/[0.03] border-border dark:border-white/[0.06] p-6 text-center backdrop-blur-sm animate-in-delay-${i + 1}`} data-testid={`card-stat-${i}`}>
                 <div className="text-3xl sm:text-4xl font-extrabold text-foreground dark:text-white">
-                  <CountUp end={stat.value} suffix={stat.suffix} />
+                  <CountUp end={stat.value} suffix={stat.suffix} prefix={stat.prefix} />
                 </div>
                 <p className="text-sm text-muted-foreground dark:text-white/60 mt-1 font-medium">{stat.label}</p>
                 <p className="text-[10px] text-muted-foreground dark:text-white/30 mt-0.5">{stat.sub}</p>
@@ -521,17 +549,23 @@ export default function MasterClassLandingPage() {
               <h3 className="text-xl font-bold">Complete Bundle — All 4 Modules</h3>
             </div>
             <div className="flex items-center justify-center gap-4 mb-4">
-              <span className="text-3xl font-extrabold text-[#F97316]">$2,499</span>
-              <span className="text-lg text-muted-foreground dark:text-white/30 line-through">$4,999</span>
-              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 animate-pulse">SAVE 50%</Badge>
+              <span className="text-3xl font-extrabold text-[#F97316]">{dollars(BUNDLE_PRICE_CENTS)}</span>
+              {modulesTotal !== null && bundleSaving !== null && (
+                <>
+                  <span className="text-lg text-muted-foreground dark:text-white/30 line-through" data-testid="text-bundle-reference">{dollars(modulesTotal)}</span>
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30">SAVE {dollars(bundleSaving)}</Badge>
+                </>
+              )}
             </div>
             <p className="text-sm text-muted-foreground dark:text-white/40 max-w-lg mx-auto mb-6">
               Get everything — all 4 modules, all 50 state guides, 100+ action steps, and lifetime access.
-              The bundle saves you over $2,500 compared to buying modules individually.
+              {modulesTotal !== null && bundleSaving !== null && (
+                <> The modules cost {dollars(modulesTotal)} bought one at a time.</>
+              )}
             </p>
             <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-bundle-cta">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-10 h-12 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
-                <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now — 50% Off <ArrowRight className="h-4 w-4 ml-2" />
+                <GraduationCap className="h-4 w-4 mr-2" /> Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
           </Card>
@@ -710,18 +744,22 @@ export default function MasterClassLandingPage() {
             </span>
           </h2>
           <p className="text-muted-foreground dark:text-white/40 mb-4 max-w-lg mx-auto">
-            Join contractors across all 50 states who used this exact system to start, grow,
-            and scale their businesses. Stop guessing and start building on a proven foundation.
+            One system to start, grow, and scale your business — state-by-state setup, marketing,
+            and the operating playbook. Stop guessing and start building on a solid foundation.
           </p>
           <div className="flex items-center justify-center gap-4 mb-8">
-            <span className="text-3xl font-extrabold text-[#F97316]">$2,499</span>
-            <span className="text-lg text-muted-foreground dark:text-white/30 line-through">$4,999</span>
-            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 animate-pulse">50% OFF</Badge>
+            <span className="text-3xl font-extrabold text-[#F97316]">{dollars(BUNDLE_PRICE_CENTS)}</span>
+            {modulesTotal !== null && bundleSaving !== null && (
+              <>
+                <span className="text-lg text-muted-foreground dark:text-white/30 line-through">{dollars(modulesTotal)}</span>
+                <Badge className="bg-red-500/20 text-red-400 border-red-500/30">SAVE {dollars(bundleSaving)}</Badge>
+              </>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-final-enroll">
               <Button size="lg" className="bg-[#F97316] hover:bg-[#EA580C] text-white px-10 h-13 text-base shadow-2xl shadow-orange-500/30 landing-glow-btn">
-                Enroll Now — 50% Off <ArrowRight className="h-4 w-4 ml-2" />
+                Enroll Now <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <Link href={user ? "/master-class" : "/auth?mode=signup"} data-testid="link-final-preview">
@@ -744,7 +782,7 @@ export default function MasterClassLandingPage() {
               <span className="text-white/20">|</span>
               <a href="/privacy" className="hover:text-white/70 transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
             </div>
-            <p className="text-xs text-white/20">&copy; 2025 Construction Hub. All rights reserved.</p>
+            <p className="text-xs text-white/20">{copyrightNotice()}</p>
           </div>
         </div>
       </footer>

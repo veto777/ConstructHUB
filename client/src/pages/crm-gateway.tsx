@@ -3,8 +3,9 @@
  * ConstructHub CRM (portal.constructhub.us). The CRM is a SEPARATE product on
  * a separate membership; this page is the bridge:
  *   - already a member  → "Open your CRM" jumps to the portal host
- *   - not a member yet  → what the CRM is + how to get access (separate plan)
- *   - signed out        → sign in, then this page routes them
+ *   - not a member yet  → what the CRM is + how to request access (there is
+ *                         no self-serve CRM checkout, so no "plans" link)
+ *   - signed out        → sign in (?next=/crm-app), then this page routes them
  *
  * Membership is decided by /api/crm/me returning an org the user belongs to.
  */
@@ -14,9 +15,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   KanbanSquare, ArrowRight, Loader2, Check, Users, FileText, MessageSquare,
-  CreditCard, Camera, Building2, ExternalLink,
+  CreditCard, Camera, Building2, ExternalLink, LogIn, Mail,
 } from "lucide-react";
 import { portalUrl } from "@/lib/site";
+import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
+
+const CRM_ACCESS_MAILTO =
+  "mailto:support@constructhub.us?subject=" + encodeURIComponent("ConstructHub CRM access request");
 
 const FEATURES = [
   { icon: Users, label: "Clients & their own portals", desc: "Every client gets a branded portal the moment you add them." },
@@ -28,17 +33,23 @@ const FEATURES = [
 ];
 
 export default function CrmGatewayPage() {
-  const { data, isLoading } = useQuery<any>({
+  const { data: user, isLoading: userLoading } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data, isLoading: crmLoading, error } = useQuery<any>({
     queryKey: ["/api/crm/me"],
     retry: false,
+    enabled: !!user,
   });
 
-  const isMember = !!data?.org?.id;
+  // Query errors read "401: …" — a lapsed session counts as signed out.
+  const signedOut = (!userLoading && !user) || /^401\b/.test(String((error as any)?.message ?? ""));
+  const isLoading = userLoading || (!!user && crmLoading);
+  const isMember = !signedOut && !!data?.org?.id;
   const orgName = data?.org?.name as string | undefined;
   const openCrm = () => { window.location.href = portalUrl("/crm"); };
 
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/30">
+      <PublicPageHeader next="/crm-app" />
       <div className="max-w-4xl mx-auto px-5 py-10 sm:py-14">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
@@ -57,6 +68,30 @@ export default function CrmGatewayPage() {
             {isLoading ? (
               <div className="flex items-center gap-3 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" /> Checking your access…
+              </div>
+            ) : signedOut ? (
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <LogIn className="h-5 w-5 text-primary" /> Sign in to open your CRM
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                    Sign in with your ConstructHUB account and we'll check whether your company has a
+                    CRM workspace.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href={`/auth?next=${encodeURIComponent("/crm-app")}`}>
+                    <Button size="lg" data-testid="button-crm-signin">
+                      Sign in <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </Link>
+                  <Link href={`/auth?mode=signup&next=${encodeURIComponent("/crm-app")}`}>
+                    <Button size="lg" variant="outline" data-testid="button-crm-signup">
+                      Create an account
+                    </Button>
+                  </Link>
+                </div>
               </div>
             ) : isMember ? (
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -80,16 +115,16 @@ export default function CrmGatewayPage() {
                     <Building2 className="h-5 w-5 text-primary" /> Get your CRM workspace
                   </div>
                   <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                    The CRM isn't part of your current plan. Start a CRM membership to get a
-                    brand-new, empty workspace for your company.
+                    We couldn't find a CRM workspace for your account. CRM access is set up on
+                    request — email us and we'll get your company a brand-new, empty workspace.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Link href="/pricing">
+                  <a href={CRM_ACCESS_MAILTO}>
                     <Button size="lg" data-testid="button-crm-get-access">
-                      See CRM plans <ArrowRight className="h-4 w-4 ml-2" />
+                      <Mail className="h-4 w-4 mr-2" /> Request access
                     </Button>
-                  </Link>
+                  </a>
                   <a href={portalUrl("/crm")} target="_blank" rel="noopener noreferrer">
                     <Button size="lg" variant="outline" data-testid="button-crm-preview">
                       Visit CRM <ExternalLink className="h-4 w-4 ml-2" />
@@ -120,6 +155,7 @@ export default function CrmGatewayPage() {
           are billed separately. Signing in to one does not add the other.
         </p>
       </div>
+      <PublicPageFooter />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { CHLogo } from "@/components/ch-logo";
 import { CrmLogo } from "@/components/crm-logo";
-import { isPortal } from "@/lib/site";
+import { CRM_NAME, isPortal } from "@/lib/site";
+import { BRAND_NAME } from "@/lib/marketing";
 
 type AuthMode = "2fa" | "login" | "signup" | "forgot-password" | "reset-password";
 
@@ -62,6 +63,21 @@ export default function AuthPage() {
   const [message, setMessage] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Keep ?mode= in step with the screen (a refresh used to drop forgot-password
+  // back to sign-in). next/beta ride along; a stale error/token never does.
+  const changeMode = (next: AuthMode) => {
+    setMode(next);
+    setMessage("");
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("error");
+      url.searchParams.delete("token");
+      if (next === "login") url.searchParams.delete("mode");
+      else url.searchParams.set("mode", next);
+      window.history.replaceState(window.history.state, "", url.pathname + url.search);
+    } catch { /* URL sync is cosmetic */ }
+  };
+
   useEffect(() => {
     if (errorParam === "invalid-token") {
       toast({ title: "Invalid link", description: "The verification link is invalid or has already been used.", variant: "destructive" });
@@ -69,6 +85,8 @@ export default function AuthPage() {
       toast({ title: "Link expired", description: "The verification link has expired. Please request a new one.", variant: "destructive" });
     } else if (errorParam === "google-failed") {
       toast({ title: "Google login failed", description: "Could not sign in with Google. Please try again.", variant: "destructive" });
+    } else if (errorParam === "verification-failed") {
+      toast({ title: "Verification failed", description: "We couldn't finish verifying your email. Try the link again, or sign in to request a new one.", variant: "destructive" });
     }
   }, [errorParam]);
 
@@ -115,7 +133,7 @@ export default function AuthPage() {
         password,
       });
       const result = await res.json();
-      if(result.requires2FA) { setMode("2fa"); return; }
+      if (result.requires2FA) { changeMode("2fa"); return; }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation(nextParam ?? "/");
     } catch (err: any) {
@@ -124,6 +142,33 @@ export default function AuthPage() {
         setMessage(msg);
       }
       toast({ title: "Login failed", description: msg, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const backToSignIn = () => {
+    setCode("");
+    changeMode("login");
+  };
+
+  const handleTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await apiRequest("POST", "/api/auth/2fa/login", { code: code.trim(), rememberDevice });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setLocation(nextParam ?? "/");
+    } catch (err: any) {
+      const msg = apiErrorMessage(err, "Verification failed");
+      // 400 "…Please start over." — the 10-minute pending sign-in lapsed (or the
+      // session was lost), so no code can work any more: go back to sign-in.
+      if (/^400\b/.test(String(err?.message ?? "")) && /start over/i.test(msg)) {
+        backToSignIn();
+        toast({ title: "Your sign-in expired", description: "Sign in again to get a new verification prompt.", variant: "destructive" });
+      } else {
+        toast({ title: msg, variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }
@@ -160,7 +205,7 @@ export default function AuthPage() {
       const res = await apiRequest("POST", "/api/auth/reset-password", { token: tokenParam, password });
       const data = await res.json();
       toast({ title: "Password reset!", description: data.message });
-      setMode("login");
+      changeMode("login");
       setPassword("");
       setConfirmPassword("");
     } catch (err: any) {
@@ -182,6 +227,9 @@ export default function AuthPage() {
       setLoading(false);
     }
   };
+
+  const termsHref = isPortal() ? "/crm-terms" : "/terms";
+  const privacyHref = isPortal() ? "/crm-privacy" : "/privacy";
 
   // All hooks above are unconditional; this early return is hooks-safe.
   if (user && betaParam) {
@@ -227,7 +275,7 @@ export default function AuthPage() {
           <div className="flex justify-center">
             {isPortal()
               ? <CrmLogo height={40} />
-              : <CHLogo height={50} />}
+              : <Link href="/" aria-label={`${BRAND_NAME} home`} data-testid="link-auth-logo-home"><CHLogo height={50} /></Link>}
           </div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-auth-title">
             {isPortal()
@@ -240,10 +288,51 @@ export default function AuthPage() {
         </div>
 
         <Card className="p-6 space-y-5" style={{ boxShadow: "var(--shadow-sm)" }}>
-          {mode === "2fa" && <form className="space-y-4" onSubmit={async e=>{e.preventDefault();setLoading(true);try {await apiRequest('POST','/api/auth/2fa/login',{code,rememberDevice});queryClient.invalidateQueries({queryKey:['/api/auth/me']});setLocation(nextParam??'/');}catch(e){toast({title:apiErrorMessage(e),variant:'destructive'});}finally{setLoading(false);}}}>
-            <h1 className="text-xl font-semibold">Two-factor sign-in</h1><Label htmlFor="two-factor-code">Authenticator or recovery code</Label><Input id="two-factor-code" value={code} onChange={e=>setCode(e.target.value)} autoComplete="one-time-code" maxLength={16}/>
-            <label className="flex gap-2"><input type="checkbox" checked={rememberDevice} onChange={e=>setRememberDevice(e.target.checked)}/>Remember this device for 30 days</label><Button disabled={loading||!code}>Verify sign-in</Button>
-          </form>}
+          {mode === "2fa" && (
+            <>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={backToSignIn}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
+                  data-testid="button-2fa-back"
+                >
+                  <ArrowLeft className="h-3 w-3" /> Back to sign in
+                </button>
+                <h2 className="text-lg font-semibold" data-testid="text-form-title">Two-factor sign-in</h2>
+                <p className="text-sm text-muted-foreground">
+                  Enter the code from your authenticator app, or one of your recovery codes.
+                </p>
+              </div>
+              <form className="space-y-4" onSubmit={handleTwoFactor}>
+                <div className="space-y-2">
+                  <Label htmlFor="two-factor-code" className="text-xs">Authenticator or recovery code</Label>
+                  <Input
+                    id="two-factor-code"
+                    value={code}
+                    onChange={e => setCode(e.target.value)}
+                    autoComplete="one-time-code"
+                    maxLength={16}
+                    data-testid="input-2fa-code"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={rememberDevice} onChange={e => setRememberDevice(e.target.checked)} className="accent-primary" />
+                  Remember this device for 30 days
+                </label>
+                <Button type="submit" className="w-full" disabled={loading || !code.trim()} data-testid="button-2fa-verify">
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Verify sign-in
+                </Button>
+              </form>
+              <p className="text-center text-xs text-muted-foreground">
+                Wrong account, or want to use Google instead?{" "}
+                <button type="button" onClick={backToSignIn} className="text-primary hover:underline" data-testid="link-2fa-start-over">
+                  Start over
+                </button>
+              </p>
+            </>
+          )}
           {mode === "login" && (
             <>
               <div className="space-y-1">
@@ -325,7 +414,7 @@ export default function AuthPage() {
               <div className="flex items-center justify-between text-xs">
                 <button
                   type="button"
-                  onClick={() => { setMode("forgot-password"); setMessage(""); }}
+                  onClick={() => changeMode("forgot-password")}
                   className="text-primary hover:underline"
                   data-testid="link-forgot-password"
                 >
@@ -333,7 +422,7 @@ export default function AuthPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMode("signup"); setMessage(""); }}
+                  onClick={() => changeMode("signup")}
                   className="text-primary hover:underline"
                   data-testid="link-goto-signup"
                 >
@@ -347,7 +436,7 @@ export default function AuthPage() {
             <>
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold" data-testid="text-form-title">Create your account</h2>
-                <p className="text-sm text-muted-foreground">Get started with Construction HUB</p>
+                <p className="text-sm text-muted-foreground">Get started with {isPortal() ? CRM_NAME : BRAND_NAME}</p>
               </div>
 
               {betaParam && (
@@ -458,7 +547,7 @@ export default function AuthPage() {
                   </div>
                   <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
                     <input type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} className="mt-0.5 accent-primary" data-testid="checkbox-agree-terms" />
-                    <span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-signup-terms">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-signup-privacy">Privacy Policy</a></span>
+                    <span>I agree to the <a href={termsHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-signup-terms">Terms of Use</a> and <a href={privacyHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-signup-privacy">Privacy Policy</a></span>
                   </label>
                   <Button type="submit" className="w-full" disabled={loading || !agreedToTerms} data-testid="button-signup">
                     {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -470,7 +559,7 @@ export default function AuthPage() {
               <div className="text-center text-xs">
                 <button
                   type="button"
-                  onClick={() => { setMode("login"); setMessage(""); }}
+                  onClick={() => changeMode("login")}
                   className="text-primary hover:underline"
                   data-testid="link-goto-login"
                 >
@@ -485,7 +574,7 @@ export default function AuthPage() {
               <div className="space-y-1">
                 <button
                   type="button"
-                  onClick={() => { setMode("login"); setMessage(""); }}
+                  onClick={() => changeMode("login")}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
                 >
                   <ArrowLeft className="h-3 w-3" /> Back to login
@@ -583,9 +672,22 @@ export default function AuthPage() {
           )}
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground">
-          By signing up, you agree to our terms of service and privacy policy.
-        </p>
+        {mode === "signup" && (
+          <p className="text-center text-xs text-muted-foreground" data-testid="text-signup-agreement">
+            By signing up — including with Google — you agree to our{" "}
+            <a href={termsHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Terms of Use</a>
+            {" "}and{" "}
+            <a href={privacyHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy</a>.
+          </p>
+        )}
+
+        {!isPortal() && (
+          <p className="text-center text-xs">
+            <Link href="/" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground" data-testid="link-auth-home">
+              <ArrowLeft className="h-3 w-3" /> Back to {BRAND_NAME} home
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );

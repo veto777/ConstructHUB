@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
 import { analyticsPath } from "@shared/analytics-path";
+import { isClientPortal, isPortal } from "@/lib/site";
 
 function readCookie(name: string): string | null {
   for (const part of document.cookie.split(";")) {
@@ -71,6 +72,10 @@ export function CookieConsent() {
     setSaving(false);
   };
 
+  // Each product face links its own policy: the CRM and client portal hosts
+  // serve /crm-privacy; the marketing site's policy is /privacy.
+  const privacyHref = isPortal() || isClientPortal() ? "/crm-privacy" : "/privacy";
+
   // In normal document flow: consent must never cover an action or a footer.
   return (
     <div
@@ -83,7 +88,7 @@ export function CookieConsent() {
           <p className="text-sm text-muted-foreground">
             We use cookies to understand how ConstructHUB is used — pages visited, general
             location, and device info — so we can improve the product. See our{" "}
-            <a href="/crm-privacy" className="underline hover:text-foreground">Privacy Policy</a>.
+            <a href={privacyHref} className="underline hover:text-foreground" data-testid="link-cookies-privacy">Privacy Policy</a>.
           </p>
         </div>
         <div className="flex gap-2 shrink-0">

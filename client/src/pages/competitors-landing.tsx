@@ -7,6 +7,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CHLogo } from "@/components/ch-logo";
+import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+import { copyrightNotice } from "@/lib/marketing";
 import { CartSheet } from "@/components/cart-sheet";
 import {
   ArrowRight, Search, Shield, Eye, CheckCircle2,
@@ -156,7 +158,7 @@ const stats = [
   { value: 20, suffix: "+", label: "Industries Covered", sub: "Roofing, HVAC, plumbing & more" },
   { value: 100, suffix: "+", label: "Competitors Per Scan", sub: "Complete market indexing" },
   { value: 0, suffix: "–100", label: "Heuristic Signal Score", sub: "Signals worth a closer look" },
-  { value: 24, suffix: "/7", label: "Ad Monitoring", sub: "Track competitor campaigns" },
+  ...(SHOW_AD_ACTIVITY ? [{ value: 24, suffix: "/7", label: "Ad Monitoring", sub: "Track competitor campaigns" }] : []),
 ];
 
 const tools = [
@@ -222,7 +224,7 @@ const pipeline = [
 
 const insights = [
   { icon: ThumbsDown, color: "text-red-400", title: "Review Sample Patterns", desc: "Our BS Meter highlights common phrases and other signals worth a closer look; these are not evidence of wrongdoing." },
-  { icon: Megaphone, color: "text-blue-400", title: "What Ads They're Running", desc: "Public ad activity is unavailable until a verified ad-data provider is connected." },
+  ...(SHOW_AD_ACTIVITY ? [{ icon: Megaphone, color: "text-blue-400", title: "What Ads They're Running", desc: "See the public Google Ads running for your keywords." }] : []),
   { icon: MapPin, color: "text-emerald-400", title: "Underserved Areas", desc: "Identify neighborhoods and zip codes where competitors have low density — the easiest markets to dominate." },
   { icon: Star, color: "text-yellow-400", title: "Reputation Gaps", desc: "Find competitors with low ratings or few reviews. These are markets where strong service and honest reviews can win you more customers." },
   { icon: DollarSign, color: "text-violet-400", title: "Pricing Intelligence", desc: "Compare competitor positioning, service offerings, and how they present themselves. Spot pricing gaps you can exploit." },
@@ -253,11 +255,11 @@ export default function CompetitorsLandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-clip">
       <CompetitorAnimatedBackground />
       <CompetitorFloatingOrbs />
 
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#1e2a4a] ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      <nav className={`sticky top-0 z-50 transition-all duration-300 bg-[#1e2a4a] ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/landing" data-testid="link-competitors-home">
             <CHLogo height={40} />
@@ -277,7 +279,7 @@ export default function CompetitorsLandingPage() {
               </Link>
             )}
             <div className="text-white"><CartSheet /></div>
-            <div className="text-white"><ThemeToggle /></div>
+            <div className="text-white hidden sm:block"><ThemeToggle /></div>
             {user ? (
               <Link href="/competitors" data-testid="link-nav-intel">
                 <Button size="sm" className="bg-[#EAB308] hover:bg-[#CA8A04] text-black shadow-lg shadow-yellow-500/25">
@@ -286,7 +288,7 @@ export default function CompetitorsLandingPage() {
               </Link>
             ) : (
               <>
-                <Link href="/auth" data-testid="link-competitors-signin">
+                <Link href="/auth" className="hidden sm:block" data-testid="link-competitors-signin">
                   <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10" size="sm">
                     Sign In
                   </Button>
@@ -298,11 +300,20 @@ export default function CompetitorsLandingPage() {
                 </Link>
               </>
             )}
+            <LandingMobileMenu
+              signInHref={user ? undefined : "/auth"}
+              links={[
+                { href: "#tools", label: "Tools" },
+                { href: "#how-it-works", label: "How It Works" },
+                { href: "#insights", label: "Insights" },
+                { href: "#get-started", label: "Get Started" },
+              ]}
+            />
           </div>
         </div>
       </nav>
 
-      <section className="relative z-10 pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-16 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto text-center">
           <div className="animate-in">
             <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-[#EAB308] to-[#EF4444] flex items-center justify-center mx-auto mb-6 animate-float">
@@ -353,7 +364,7 @@ export default function CompetitorsLandingPage() {
               </div>
             )}
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-red-400" /> Platinum exclusive
+              <CheckCircle2 className="h-4 w-4 text-red-400" /> Gold &amp; Platinum plans
             </div>
           </div>
         </div>
@@ -370,7 +381,7 @@ export default function CompetitorsLandingPage() {
               <span className="bg-gradient-to-r from-[#EAB308] to-[#EF4444] bg-clip-text text-transparent"> Visibility</span>
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          <div className={`grid grid-cols-2 ${stats.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"} gap-5`}>
             {stats.map((stat, i) => (
               <Card key={stat.label} className={`bg-muted/50 dark:bg-white/[0.03] border-border dark:border-white/[0.06] p-6 text-center backdrop-blur-sm animate-in-delay-${i + 1}`} data-testid={`card-stat-${i}`}>
                 <div className="text-3xl sm:text-4xl font-extrabold text-foreground dark:text-white">
@@ -421,7 +432,7 @@ export default function CompetitorsLandingPage() {
                     <Shield className="h-4 w-4" /> With Competitor Intel
                   </h3>
                   {[
-                    "See every ad your competitors are running",
+                    ...(SHOW_AD_ACTIVITY ? ["See the public ads competitors run for your keywords"] : []),
                     "BS Meter highlights patterns for further research",
                     "Identify gaps and underserved neighborhoods",
                     "Target keywords competitors aren't using",
@@ -448,7 +459,9 @@ export default function CompetitorsLandingPage() {
               <span className="bg-gradient-to-r from-[#EAB308] to-[#4A6CF7] bg-clip-text text-transparent"> Dominate Your Market</span>
             </h2>
             <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-xl mx-auto">
-              From scanning and profiling to ad monitoring and reporting — a complete competitive intelligence platform.
+              {SHOW_AD_ACTIVITY
+                ? "From scanning and profiling to ad monitoring and reporting — a complete competitive intelligence platform."
+                : "From scanning and profiling to market reports — a complete competitive intelligence platform."}
             </p>
           </div>
           <div className="space-y-5">
@@ -619,7 +632,7 @@ export default function CompetitorsLandingPage() {
             </Link>
             <Link href="/pricing" data-testid="link-final-pricing">
               <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white px-8 h-13 text-base">
-                <DollarSign className="h-4 w-4 mr-2" /> View Platinum Pricing
+                <DollarSign className="h-4 w-4 mr-2" /> View Gold &amp; Platinum Pricing
               </Button>
             </Link>
           </div>
@@ -637,7 +650,7 @@ export default function CompetitorsLandingPage() {
               <span className="text-white/20">|</span>
               <a href="/privacy" className="hover:text-white/70 transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
             </div>
-            <p className="text-xs text-white/20">&copy; 2025 Construction Hub. All rights reserved.</p>
+            <p className="text-xs text-white/20">{copyrightNotice()}</p>
           </div>
         </div>
       </footer>

@@ -19,15 +19,19 @@ function LegalShell({ title, children, testid }: { title: string; children: Reac
   return (
     <div className="min-h-screen bg-background text-foreground" data-testid={testid}>
       <div className="max-w-3xl mx-auto px-4 py-10">
-        <CrmLogo height={26} />
+        <a href="/" aria-label="Home" data-testid="link-legal-home">
+          <CrmLogo height={26} />
+        </a>
         <h1 className="text-3xl font-bold mt-6 mb-2">{title}</h1>
         <p className="text-sm text-muted-foreground mb-8">Effective Date: {EFFECTIVE}</p>
         {children}
         <div className="border-t mt-10 pt-6 text-sm text-muted-foreground space-y-1">
           <p>
-            Questions? <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a> — email is the only channel we use.
+            Questions? <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a> — support is by email only.
           </p>
           <p>
+            <a href="/" className="text-primary hover:underline" data-testid="link-legal-footer-home">Home</a>
+            {" · "}
             <a href="/crm-terms" className="text-primary hover:underline">Terms of Service</a>
             {" · "}
             <a href="/crm-privacy" className="text-primary hover:underline">Privacy Policy</a>
@@ -87,12 +91,16 @@ export function CrmTermsPage() {
         been compromised.
       </P>
 
-      <H>3. How we contact you — email only</H>
+      <H>3. How we contact you</H>
       <P>
-        We will only ever contact you by email, from a constructhub.us address. We will never call
-        you, text you, or reach out through social media, and we will never ask for your password, a
-        verification code, or payment outside the product. If someone contacts you any other way
-        claiming to be ConstructHUB, it is not us — do not respond, and forward it to
+        We contact you by email, from a constructhub.us address. The only other messages come from
+        features someone switched on: account-notification texts to a Contractor who opted in to them
+        in Settings, and — if a Contractor enables it — a short automated call telling a Client that
+        an estimate is in their email (see the Privacy Policy, §5). Texts a Contractor sends from their
+        own connected number come from that Contractor, not from us. We will never make sales calls,
+        send marketing texts, or reach out through social media, and we will never ask for your
+        password, a verification code, or payment outside the product. If someone contacts you any
+        other way claiming to be ConstructHUB, it is not us — do not respond, and forward it to
         support@constructhub.us.
       </P>
 
@@ -225,9 +233,9 @@ export function CrmPrivacyPage() {
         service is for — and to no other contractor. A Contractor's business data (price books,
         margins, costs) is visible only to their own team, under the permission levels they set. We
         share data outside the service only with the infrastructure providers that run it — hosting,
-        Cloudflare (network security and delivery), Stripe (payments), and email delivery — each
-        only receiving what their function requires; and when the law genuinely compels us. That's
-        the whole list.
+        Cloudflare (network security and delivery), Stripe (payments), email delivery, and SignalWire
+        (delivery of the text messages and automated calls described in §5) — each only receiving
+        what their function requires; and when the law genuinely compels us. That's the whole list.
       </P>
 
       <H>5. SMS / Text Messaging</H>
@@ -283,8 +291,15 @@ export function CrmPrivacyPage() {
 
       <H>7. Cookies and tracking</H>
       <P>
-        We use essential cookies only — the session cookie that keeps you signed in. No advertising
-        cookies, no third-party trackers, no analytics that follow you around the web.
+        We use an essential session cookie that keeps you signed in. Our cookie banner asks before
+        anything else: if you choose <strong>Accept</strong>, we set a first-party analytics cookie
+        (<code>ch_vid</code>, a random visitor id) and record the pages you view on our own sites,
+        the referring page, your browser and device type, and a shortened IP address that shows only
+        general location. If you are signed in, those page views are also linked to your account.
+        We use it to understand how the product is used. Your answer is remembered
+        in a <code>ch_consent</code> cookie for a year; if you choose <strong>Decline</strong>, no
+        analytics cookie is set and nothing is recorded. No advertising cookies, no third-party
+        trackers, no analytics that follow you around the web.
       </P>
 
       <H>8. Retention and your rights</H>
@@ -308,7 +323,7 @@ export function CrmPrivacyPage() {
       <H>10. Changes</H>
       <P>
         If this policy changes, the effective date above changes with it, and material changes will
-        be announced by email — the only way we ever contact you.
+        be announced by email. We never announce policy changes by text or phone.
       </P>
     </LegalShell>
   );
