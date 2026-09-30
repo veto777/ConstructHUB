@@ -20,7 +20,7 @@ const api:AdsApi={search:async(id,q)=>{
 },link:async(_manager,op,validate)=>{if(validate)return {};const id=op.create?.clientCustomer.split('/')[1]||op.update.resourceName.split('/')[3].split('~')[0];links.set(id,op.create?'PENDING':'CANCELED');return {result:{resourceName:`customers/${manager}/customerClientLinks/${id}~42`}};}};
 const tick=()=>runAdsWorker({make:async()=>api,onlyUser:1});
 test.beforeAll(async()=>{
-  const u=new URL(process.env.DATABASE_URL!);if(u.pathname!=='/constructhub_dev_a3'||!['localhost','127.0.0.1'].includes(u.hostname))throw new Error('Lane a3 only');process.env.EMAIL_FORCE_SINK='1';
+  const u=new URL(process.env.DATABASE_URL!);if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(u.pathname)||!['localhost','127.0.0.1'].includes(u.hostname))throw new Error('Lane a3 only');process.env.EMAIL_FORCE_SINK='1';
   if((await pool.query('SELECT 1 FROM ads_grants WHERE user_id=1')).rowCount)throw new Error('Browser fixture requires a disconnected Ads user 1');
   await pool.query('INSERT INTO ads_grants(user_id,manager_id,refresh_token,verified) VALUES(1,$1,$2,true)',[manager,encryptToken('browser-fixture-not-a-real-token')]);
   seeded=true;

@@ -270,9 +270,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const [anyOffer] = await db.select({ id: crmEstimateDiscounts.id }).from(crmEstimateDiscounts)
       .where(and(eq(crmEstimateDiscounts.orgId, ctx.org.id), eq(crmEstimateDiscounts.estimateId, est.id))).limit(1);
     const defaults = (ctx.org.customFields as any)?.discountDefaults;
-    if (!anyOffer && Array.isArray(defaults) && defaults.length) {
-      await db.insert(crmEstimateDiscounts).values(
-        defaults
+    // Every default may be switched off: build the rows first, insert only if any
+    // remain, and never let seeding block the send (Drizzle throws on an empty insert).
+    const seed = !anyOffer && Array.isArray(defaults)
+      ? defaults
           .filter((o: any) => o && o.enabled !== false && o.code && o.label)
           .slice(0, 20)
           .map((o: any, idx: number) => ({
@@ -281,8 +282,14 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
             percentBps: Math.max(0, Math.min(10_000, Math.round(Number(o.percentBps) || 0))),
             conditions: o.conditions ? String(o.conditions).slice(0, 1000) : null,
             enabled: true, sortOrder: idx,
-          })),
-      ).catch((e: any) => console.error("[crm] default discounts seed failed:", e?.message || e));
+          }))
+      : [];
+    if (seed.length) {
+      try {
+        await db.insert(crmEstimateDiscounts).values(seed);
+      } catch (e: any) {
+        console.error("[crm] default discounts seed failed:", e?.message || e);
+      }
     }
 
     // First-open pass: clicking from the inbox proves inbox possession, so the

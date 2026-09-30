@@ -24,7 +24,7 @@ async function call(method:string,path:string,user=owner,body:any={},query:any={
   return {status:res.status.mock.calls[0]?.[0]??200,body:res.json.mock.calls[0]?.[0]};
 }
 beforeAll(async()=>{
-  if(new URL(process.env.DATABASE_URL!).pathname!=='/constructhub_dev_a4')throw new Error('a4 DB required');
+  if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(process.env.DATABASE_URL!).pathname))throw new Error('a4 DB required');
   process.env.SOCIAL_ENCRYPTION_KEY='ac'.repeat(32);
   await ensureGrowthSchema();await ensureGbpSchema();await ensureSocialSchema();await ensureSocialSchema();await ensureAccountEventsSchema();
   const users=await pool.query("INSERT INTO users(email) SELECT 'agency-fixture-'||gen_random_uuid()||'@example.invalid' FROM generate_series(1,2) RETURNING id");

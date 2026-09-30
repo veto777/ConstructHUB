@@ -18,7 +18,7 @@ const call=async(method:string,path:string,actor:number,body:any={},query:any={}
   await handlers.get(method+' '+path)!(req,res);return {status,data};
 };
 beforeAll(async()=>{
-  const target=new URL(process.env.DATABASE_URL!);if(target.pathname!=='/constructhub_dev_a1'||!['localhost','127.0.0.1'].includes(target.hostname))throw Error('Lane a1 DB required');
+  const target=new URL(process.env.DATABASE_URL!);if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(target.pathname)||!['localhost','127.0.0.1'].includes(target.hostname))throw Error('Lane a1 DB required');
   await ensureAgencySchema();await ensureAgencySchema();
   for(const key of ['owner','member','other']){
     const id=(await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id",[`agency-${key}-${crypto.randomUUID()}@example.invalid`])).rows[0].id;

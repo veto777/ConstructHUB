@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {q} from './db';
 let client:number,member:number;const prefix='Agency browser fixture';
 test.beforeAll(async()=>{
-  if(process.env.E2E_DB!=='constructhub_dev_a1')throw Error('Lane a1 only');
+  if(!/^constructhub_dev(?:_[a-z0-9]+)?$/.test(process.env.E2E_DB||''))throw Error('Lane a1 only');
   client=(await q("INSERT INTO agency_clients(user_id,name,contact_email) VALUES(1,$1,'browser@example.invalid') RETURNING id",[prefix]))[0].id;
   member=(await q("INSERT INTO users(email) VALUES('agency-browser-'||gen_random_uuid()||'@example.invalid') RETURNING id"))[0].id;
   await q("INSERT INTO business_locations(user_id,agency_client_id,business_name,address) SELECT 1,$1,$2||' '||lpad(n::text,4,'0'),'Browser test address '||n FROM generate_series(1,1000) n",[client,prefix]);

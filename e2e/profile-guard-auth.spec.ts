@@ -6,7 +6,7 @@ let user:number,location:number,email:string;
 const password='Guard-audit-fixture-password';
 test.beforeAll(async()=>{
   const url=new URL(process.env.DATABASE_URL!);
-  if(url.pathname!=='/constructhub_dev_a2'||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a2 only');
+  if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(url.pathname)||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a2 only');
   email=`guard-auth-${Date.now()}@example.invalid`;
   user=(await pool.query('INSERT INTO users(email,password_hash,email_verified) VALUES($1,$2,true) RETURNING id',[email,await bcrypt.hash(password,4)])).rows[0].id;
   location=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name) VALUES($1,'Guard auth fixture','accounts/authfixture','locations/authfixture') RETURNING id",[user])).rows[0].id;

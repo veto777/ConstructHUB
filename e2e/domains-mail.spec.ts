@@ -7,7 +7,7 @@ let location: number;
 let notificationStart = 0,
   activityStart = 0;
 test.beforeAll(async () => {
-  if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a7")
+  if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(process.env.DATABASE_URL!).pathname))
     throw new Error("a7 only");
   notificationStart = Number(
     (

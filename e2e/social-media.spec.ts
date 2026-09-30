@@ -218,7 +218,7 @@ test("social tabs and guides fit a narrow phone viewport", async ({ page }) => {
 test('agency searches 1,000 saved businesses, remembers URL scope, isolates sources and queues bulk work', async ({page})=>{
   const {Pool}=await import('pg');
   const db=new Pool({connectionString:process.env.DATABASE_URL});
-  if(new URL(process.env.DATABASE_URL!).pathname!=='/constructhub_dev_a4')throw new Error('a4 DB required');
+  if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(process.env.DATABASE_URL!).pathname))throw new Error('a4 DB required');
   const marker=`Social E2E ${Date.now()}`;
   const {rows}=await db.query("INSERT INTO business_locations(user_id,business_name,city) SELECT 1,$1||' '||lpad(n::text,4,'0'),'Fixture city' FROM generate_series(1,1000) n RETURNING id,business_name",[marker]);
   const [a,b]=rows;

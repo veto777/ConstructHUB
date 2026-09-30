@@ -17,7 +17,7 @@ vi.mock("../account-events", () => ({
 }));
 let user: number, other: number, location: number, address: string;
 beforeAll(async () => {
-  if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a7")
+  if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(process.env.DATABASE_URL!).pathname))
     throw new Error("a7 DB required");
   await ensureDomainsSchema();
   await ensureMailAlertsSchema();

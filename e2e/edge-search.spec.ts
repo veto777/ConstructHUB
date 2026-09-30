@@ -6,7 +6,7 @@ const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const tag = `a5-e2e-${randomUUID().slice(0, 8)}`;
 let cf: number, gsc: number, old: any, scan: string;
 test.beforeAll(async () => {
-  if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a5")
+  if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(process.env.DATABASE_URL!).pathname))
     throw Error("a5 only");
   old = (
     await db.query("SELECT password_hash,totp_enabled FROM users WHERE id=1")

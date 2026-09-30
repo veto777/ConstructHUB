@@ -190,7 +190,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
         id: r.note.id,
         body: r.note.body,
         authorMemberId: r.note.authorMemberId,
-        authorName: r.authorName ?? r.authorEmail ?? null,
+        authorName: r.authorName || r.authorEmail || null,
         createdAt: r.note.createdAt,
       })),
     );
@@ -220,7 +220,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       id: row.id,
       body: row.body,
       authorMemberId: row.authorMemberId,
-      authorName: ctx.member.displayName ?? ctx.member.email ?? null,
+      authorName: ctx.member.displayName || ctx.member.email || null,
       createdAt: row.createdAt,
     });
   });

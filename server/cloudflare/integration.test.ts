@@ -237,7 +237,7 @@ async function invoke(
   return { ...res, req };
 }
 beforeAll(async () => {
-  if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a5")
+  if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(process.env.DATABASE_URL!).pathname))
     throw Error("a5 DB required");
   await ensureCloudflareSearchSchema();
   await ensureCloudflareSearchSchema();

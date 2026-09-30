@@ -48,7 +48,7 @@ const call=async(path:string,body?:any,method=body?'POST':'GET',owner=user,extra
 async function tick(){return runAdsWorker({make,mail,onlyUser:user});}
 async function planPresence(){const r=await call('/bulk',{kind:'preview',selection:{ids:[cid]},action:{kind:'presence'},requestId:randomUUID()});expect(r.statusCode).toBe(202);await tick();return (await pool.query('SELECT * FROM ads_plans WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1',[user])).rows[0];}
 beforeAll(async()=>{
-  const u=new URL(process.env.DATABASE_URL!);if(u.pathname!=='/constructhub_dev_a3'||!['localhost','127.0.0.1'].includes(u.hostname))throw new Error('Lane a3 DB required');
+  const u=new URL(process.env.DATABASE_URL!);if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(u.pathname)||!['localhost','127.0.0.1'].includes(u.hostname))throw new Error('Lane a3 DB required');
   process.env.EMAIL_FORCE_SINK='1';
   await ensureGrowthSchema();await ensureAccountEventsSchema();await ensureAdsSchema();await ensureAdsSchema();
   [user,other]=(await pool.query("INSERT INTO users(email) VALUES('ads-'||gen_random_uuid()||'@example.invalid'),('ads-'||gen_random_uuid()||'@example.invalid') RETURNING id")).rows.map(r=>r.id);
