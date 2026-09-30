@@ -103,6 +103,19 @@ describe('Profile Guard with real lane Postgres and mocked Google',()=>{
     await pool.query("UPDATE gbp_guard SET last_attempt=now()-interval '16 minutes' WHERE location_id=$1",[id]);await runGuardWorker(check);expect(check).toHaveBeenCalledWith(user,id);
     await configureGuard(user,id,'off',['title']);http.mockClear();await checkGuard(user,id,client);expect(http).not.toHaveBeenCalled();
   });
+  it('preserves pending evidence when a field is unwatched, then retires it only after observing restoration', async () => {
+    await configureGuard(user,id,'notify',['title']);
+    live.title='Still changed';
+    await checkGuard(user,id,client);
+    const change=(await changes()).at(-1)!;
+    await configureGuard(user,id,'notify',['websiteUri']);
+    await checkGuard(user,id,client);
+    expect((await changes()).find(c=>c.id===change.id).status).toBe('pending');
+    await configureGuard(user,id,'notify',['title']);
+    live.title='Outside edit';
+    await checkGuard(user,id,client);
+    expect((await changes()).find(c=>c.id===change.id).status).toBe('no-longer-observed');
+  });
   it('generates factual reports with official links and enforces report ownership',async()=>{
     const c=(await changes())[0];const report=await reportFor(user,'changes',c.id);expect(report.text).toContain('Approved fixture');expect(report.text).toContain('Outside edit');expect(report.formUrl).toContain('business_redressal_form');expect(report.listingUrl).toContain('query_place_id=fixture-place');expect(report.reportedAt).toBeNull();
     await expect(reportFor(other,'changes',c.id)).rejects.toMatchObject({status:404});

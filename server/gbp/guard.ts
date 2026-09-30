@@ -122,8 +122,8 @@ export async function checkGuard(userId:number,id:number,client?:GoogleClient) {
         const {rows:[change]}=await pool.query(`INSERT INTO gbp_guard_changes(user_id,location_id,field,old_value,new_value,source,evidence) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[userId,id,d.field,JSON.stringify(d.old),JSON.stringify(d.new),d.source,JSON.stringify(d.evidence)]);
         await notifyUser(userId,d.source==='Google update'?'gbp.suggested_edit':'gbp.profile_change',{title:'Business Profile change detected',body:`${l.business_name}: ${d.field} changed. Source: ${d.source}.`,link:'/locations',actionUrl:'/locations'});
       }
-      // Retire pending records when the field is no longer different.
-      await pool.query("UPDATE gbp_guard_changes SET status='no-longer-observed',resolved_at=now() WHERE user_id=$1 AND location_id=$2 AND status='pending' AND NOT(field=ANY($3::text[]))",[userId,id,diffs.map(d=>d.field)]);
+      // Only checked fields can be confirmed restored. Unwatching must not resolve evidence.
+      await pool.query("UPDATE gbp_guard_changes SET status='no-longer-observed',resolved_at=now() WHERE user_id=$1 AND location_id=$2 AND status='pending' AND field=ANY($4::text[]) AND NOT(field=ANY($3::text[]))",[userId,id,diffs.map(d=>d.field),g.watched]);
       if(g.mode==='lockdown') {
         const {rows}=await pool.query("SELECT * FROM gbp_guard_changes WHERE user_id=$1 AND location_id=$2 AND status='pending' AND field=ANY($3) ORDER BY id",[userId,id,g.watched]);
         for(const change of rows) try { await resolveLocked(userId,l,g,change,'auto-revert',client); }
