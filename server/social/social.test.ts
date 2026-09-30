@@ -546,6 +546,42 @@ describe("real Postgres, mocked Blotato publishing", () => {
     await expect(changePost(userId, p.id, "approve", "x".repeat(281))).rejects.toMatchObject({ status: 400, message: "twitter: text exceeds 280 characters" });
     expect((await rows()).find(row => row.id === p.id).state).toBe("draft");
   });
+  it("uses project photos and synced review comments as distinct factual sources", async () => {
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    const location = (await pool.query("SELECT id FROM business_locations WHERE user_id=$1 LIMIT 1", [userId])).rows[0].id;
+    const generate = vi.fn(async (_context: any) => "Factual fixture draft");
+    try {
+      await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["project"], aiDailyBudget: 5 }));
+      await expect(userLock(userId, c => generateDue(c, userId, generate, true))).rejects.toThrow("No public project photos");
+      await pool.query("INSERT INTO media_photos(user_id,folder_id,name,url) VALUES($1,0,'Fixture project source','https://example.com/project.jpg')", [userId]);
+      const photos = await userLock(userId, c => generateDue(c, userId, generate, true));
+      expect(photos?.[0].payload.post.content.mediaUrls).toEqual(["https://example.com/project.jpg"]);
+      expect(generate.mock.calls[0][0].source).toBe("Fixture project source");
+      await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["reviews"], aiDailyBudget: 5 }));
+      await expect(userLock(userId, c => generateDue(c, userId, generate, true))).rejects.toThrow("No synced Google reviews");
+      await pool.query("INSERT INTO google_profile_reviews(user_id,location_id,google_review_id,reviewer_name,rating,comment,review_date) VALUES($1,$2,'accounts/fixture/locations/fixture/reviews/fixture','Fixture reviewer',5,'Explicit fixture review source',now())", [userId, location]);
+      await userLock(userId, c => generateDue(c, userId, generate, true));
+      expect(generate.mock.calls[1][0].source).toBe("Explicit fixture review source");
+      expect(generate).toHaveBeenCalledTimes(2);
+    } finally {
+      await pool.query("DELETE FROM media_photos WHERE user_id=$1", [userId]);
+      await pool.query("DELETE FROM google_profile_reviews WHERE user_id=$1", [userId]);
+    }
+  });
+  it("rechecks blackout on queued automatic work while allowing a manual post", async () => {
+    const hour = new Date().getUTCHours();
+    await saveSettings(userId, autoSchema.parse({ enabled: true, mode: "automatic", destinations: [destination], timezone: "UTC", blackoutStart: hour, blackoutEnd: (hour + 1) % 24 }));
+    await pool.query("UPDATE social_settings SET next_at=now()+interval '1 day' WHERE user_id=$1", [userId]);
+    const [automatic] = await createPosts(userId, request());
+    const [manual] = await createPosts(userId, request());
+    await pool.query("UPDATE social_posts SET auto_generated=true WHERE id=$1", [automatic.id]);
+    const generate = vi.fn(async () => "Never generated in blackout");
+    await workerUser(userId, make, generate);
+    expect((await rows()).find(p => p.id === automatic.id).state).toBe("queued");
+    expect((await rows()).find(p => p.id === manual.id).state).toBe("submitted");
+    expect(generate).not.toHaveBeenCalled();
+    await saveSettings(userId, autoSchema.parse({ destinations: [destination] }));
+  });
   it("disconnect cancels unsent work, disables generation, deletes the encrypted key, and logs activity", async () => {
     await disconnect(userId, null);
     expect(
