@@ -17,5 +17,12 @@ describe('Business Profile → location fields', () => {
     expect(p.openStatus).toBe('Temporarily closed'); expect(p.openingDate).toBe('2003-02');
     expect(p.social).toEqual({ instagram: 'https://www.instagram.com/a/' });
   });
+  it('carries overnight opening hours into the next weekday, including the week boundary', () => {
+    const p = mapProfile({regularHours:{periods:[
+      {openDay:'MONDAY',openTime:{hours:20},closeDay:'TUESDAY',closeTime:{hours:4}},
+      {openDay:'SUNDAY',openTime:{hours:22},closeDay:'MONDAY',closeTime:{hours:2}},
+    ]}});
+    expect(p.hours).toMatchObject({Monday:'12:00 AM – 2:00 AM, 8:00 PM – 12:00 AM',Tuesday:'12:00 AM – 4:00 AM',Sunday:'10:00 PM – 12:00 AM',Wednesday:'Closed'});
+  });
   it('leaves hours null when Google has none', () => { expect(mapProfile({ title: 'Y' }).hours).toBeNull(); });
 });

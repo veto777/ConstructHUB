@@ -144,12 +144,24 @@ export function mapProfile(loc: any, attributes: any[] = []) {
   ).filter(Boolean) as string[])];
   let hours: Record<string,string> | null = null;
   if (loc.regularHours?.periods?.length) {
-    hours = {};
-    for (const day of DAYS) {
-      const ps = loc.regularHours.periods.filter((p: any) => p.openDay === day);
-      hours[cap(day)] = !ps.length ? 'Closed' : ps.map((p: any) =>
-        (!p.openTime?.hours && !p.openTime?.minutes && Number(p.closeTime?.hours) === 24) ? 'Open 24 hours' : `${clock(p.openTime)} – ${clock(p.closeTime)}`).join(', ');
+    const ranges: Record<string, { from: number; to: number }[]> = Object.fromEntries(DAYS.map(day => [day, []]));
+    const minuteClock = (minutes: number) => clock({ hours: Math.floor(minutes / 60), minutes: minutes % 60 });
+    for (const period of loc.regularHours.periods) {
+      const first = DAYS.indexOf(period.openDay);
+      const last = DAYS.indexOf(period.closeDay || period.openDay);
+      if (first < 0 || last < 0) continue;
+      const span = (last - first + 7) % 7;
+      const start = Number(period.openTime?.hours || 0) * 60 + Number(period.openTime?.minutes || 0);
+      const end = span * 1440 + Number(period.closeTime?.hours || 0) * 60 + Number(period.closeTime?.minutes || 0);
+      for (let offset = 0; offset <= span; offset++) {
+        const from = offset === 0 ? start : 0, to = Math.min(1440, end - offset * 1440);
+        if (to <= from) continue;
+        ranges[DAYS[(first + offset) % 7]].push({ from, to });
+      }
     }
+    hours = Object.fromEntries(DAYS.map(day => [cap(day), ranges[day].sort((a,b) => a.from - b.from)
+      .map(({from,to}) => from === 0 && to === 1440 ? 'Open 24 hours' : `${minuteClock(from)} – ${minuteClock(to)}`)
+      .join(', ') || 'Closed']));
   }
   const a = loc.storefrontAddress || {};
   const od = loc.openInfo?.openingDate;
