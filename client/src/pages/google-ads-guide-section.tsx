@@ -146,13 +146,13 @@ export default function GoogleAdsGuideSection() {
             <CardContent className="p-8 text-center">
               <div className="inline-flex items-center gap-2 bg-[#4285F4]/10 border border-[#4285F4]/20 rounded-full px-4 py-1.5 mb-4">
                 <Lock className="h-4 w-4 text-[#4285F4]" />
-                <span className="text-sm text-[#4285F4] font-medium">Platinum & Master Class Subscribers Only</span>
+                <span className="text-sm text-[#4285F4] font-medium">Master Class Students Only</span>
               </div>
               <h2 className="text-xl font-bold text-foreground mb-2" data-testid="text-section-locked-title">
                 {result.title || "Google Ads Playbook"}
               </h2>
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                This section of the Google Ads playbook is included with a Platinum or Master Class purchase.
+                This section of the Google Ads playbook is included with any Master Class purchase.
               </p>
               <a href="/master-class" data-testid="link-master-class">
                 <Button className="bg-gradient-to-r from-[#4285F4] to-[#34A853] hover:from-[#3367D6] hover:to-[#2D9A46] text-white px-8 h-11">

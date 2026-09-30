@@ -46,7 +46,10 @@ test("Terms list the new plans, add-ons, trial and sales-rep services", async ({
   await expect(page.getByTestId("section-add-ons")).toContainText("Extra seat — $15/month");
   await expect(page.getByTestId("section-done-for-you")).toContainText("$1,000 or more");
   await expect(page.getByTestId("section-done-for-you")).toContainText(SALES_REP_LABEL);
-  await expect(page.getByTestId("section-consulting")).not.toContainText("$250");
+  // Consulting sessions are no longer sold (owner decision 2026-09-30); custom work is quoted.
+  await expect(page.getByTestId("section-consulting")).toHaveCount(0);
+  await expect(page.getByTestId("section-custom-work")).toContainText("quoted by a sales rep");
+  expect(await page.locator("main, body").first().innerText()).not.toMatch(/consulting session/i);
 });
 
 test("landing: plans from the price book, services go to a sales rep", async ({ page }) => {
@@ -62,10 +65,14 @@ test("landing: plans from the price book, services go to a sales rep", async ({ 
 test("Master Class: modules and bundle at $1,000+ are sold through a sales rep", async ({ page }) => {
   await page.goto("/master-class?tab=pricing");
   await expect(page.getByTestId("text-bundle-price")).toHaveCount(0);
-  await expect(page.getByTestId("link-bundle-sales")).toHaveAttribute("href", "/pricing#services");
-  await expect(page.locator('[data-testid^="link-module-sales-"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid^="button-module-sales-"]').first()).toBeVisible();
   await expect(page.locator('[data-testid^="button-add-cart-"]')).toHaveCount(0);
   await expect(page.locator('[data-testid^="button-enroll-"]')).toHaveCount(0);
+  // No saving to show, so no "best value" claim.
+  await expect(page.getByTestId("badge-bundle-best-value")).toHaveCount(0);
+  // The inquiry form names what they asked about.
+  await page.getByTestId("button-bundle-sales").click();
+  await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText("Master Class — Complete Bundle");
   await page.goto("/master-class-landing");
   await expect(page.getByTestId("link-hero-enroll")).toHaveAttribute("href", "/pricing#services");
   await expect(page.getByTestId("link-hero-enroll")).toContainText(SALES_REP_LABEL);

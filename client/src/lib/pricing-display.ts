@@ -7,7 +7,7 @@
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
   MODULE_NAMES, agencyMonthlyCents, effectivePlanKey, showsPrice,
-  type Addon, type AddonKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey,
+  type Addon, type AddonKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "@shared/plans";
 
 // ── Money ───────────────────────────────────────────────────────────────────
@@ -102,6 +102,66 @@ export function agencyQuote(locationsInput: number): AgencyQuote {
     prev = band.upTo;
   }
   return { sales: false, locations, monthlyCents, annualCents: Math.round(monthlyCents * AGENCY_ANNUAL_MULTIPLE), lines };
+}
+
+// ── Ranking-grid credits ────────────────────────────────────────────────────
+
+/**
+ * Ranking-grid credits one grid costs: one per 25 grid points, rounded up
+ * (3x3 and 5x5 = 1, 7x7 = 2, 9x9 = 4, 11x11 = 5, 13x13 = 7, 15x15 = 9). Mirrors
+ * the server's gridCreditCost (server/growth-quotas.ts), which is what is
+ * charged; server/pricing-display.test.ts keeps the two equal.
+ */
+export function gridCreditCost(gridSize: number): number {
+  const size = Math.max(1, Math.floor(Number(gridSize) || 3));
+  return Math.ceil((size * size) / 25);
+}
+
+/** "1 credit" / "4 credits". */
+export const creditsLabel = (n: number) => `${n.toLocaleString("en-US")} credit${n === 1 ? "" : "s"}`;
+
+// ── Monthly usage (GET /api/entitlements) ───────────────────────────────────
+
+/** One monthly meter as the server reports it: limit -1 = unlimited (fair use), 0 = not in the plan. */
+export type UsageMeter = { used: number; limit: number };
+
+export type UsageKey = "searches" | "rankings" | "siteScans" | "competitorScans";
+
+/** GET /api/entitlements — the fields the client reads. */
+export type EntitlementsInfo = {
+  plan: PlanKey | null;
+  storedPlan: string | null;
+  accessPlan: PlanKey | null;
+  planName: string | null;
+  isPlatformAdmin: boolean;
+  grantEndsAt: string | null;
+  allowances: PlanLimits | null;
+  modules: Record<ModuleKey, boolean>;
+  addons: Partial<Record<AddonKey, number>>;
+  locations: UsageMeter;
+  usage: Partial<Record<UsageKey, UsageMeter>>;
+  resetsAt: string;
+};
+
+/** The monthly meters Settings → Billing shows, in display order. */
+export const USAGE_METERS: readonly { key: UsageKey; label: string }[] = [
+  { key: "searches", label: "Permit searches" },
+  { key: "rankings", label: "Ranking-grid credits" },
+  { key: "siteScans", label: "Site Scans" },
+  { key: "competitorScans", label: "Competitor Intel scans" },
+];
+
+/** "12 of 100 used", "3 used · fair use", or null when the plan doesn't include it. */
+export function usageLine(meter: UsageMeter | undefined): string | null {
+  if (!meter || meter.limit === 0) return null;
+  const used = Math.max(0, meter.used).toLocaleString("en-US");
+  return meter.limit < 0 ? `${used} used · fair use` : `${used} of ${meter.limit.toLocaleString("en-US")} used`;
+}
+
+/** Share of a finite meter used, 0–100 (null when unlimited or not included). */
+export function usagePercent(meter: UsageMeter | undefined): number | null {
+  if (!meter || meter.limit <= 0) return null;
+  return Math.min(100, Math.round((Math.max(0, meter.used) / meter.limit) * 100));
 }
 
 // ── Plan comparison (generated from limits + modules) ───────────────────────

@@ -27,7 +27,9 @@ import {
   normalizeLocations, isSalesOnlyService, DFY_SERVICES, AGENCY_INCLUDED_LOCATIONS, PAYMENT_PROBLEM_STATUSES,
   type CompareCell, type SubscriptionInfo,
 } from "@/lib/pricing-display";
-import { TalkToSalesButton } from "@/components/talk-to-sales";
+import { TalkToSalesButton, TalkToSalesDialog } from "@/components/talk-to-sales";
+import { ToastAction } from "@/components/ui/toast";
+import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 
@@ -121,15 +123,47 @@ export default function PricingPage() {
     window.history.replaceState({}, "", `/pricing${qs ? `?${qs}` : ""}${window.location.hash}`);
   }, [toast]);
 
-  const showError = (title: string) => (err: unknown) => {
+  const portalMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/stripe/create-portal", {})).json(),
+    onSuccess: (data) => { if (data?.url) window.location.href = data.url; },
+    onError: (err) => showError("Couldn't open billing")(err),
+  });
+
+  /** A request the server says only a sales rep can sell (409 talk_to_sales) opens the inquiry form. */
+  const [salesTopic, setSalesTopic] = useState<string | null>(null);
+  const requestTopic = (r: PlanRequest) =>
+    r.plan === "agency" ? `${PLANS.agency.name} plan — ${(r.locations ?? AGENCY_INCLUDED_LOCATIONS).toLocaleString("en-US")} locations` : `${PLANS[r.plan].name} plan`;
+
+  const showError = (title: string, opts: { portal?: boolean } = {}) => (err: unknown) => {
     if (err instanceof VerificationCancelled) return;
-    toast({ title, description: apiErrorMessage(err), variant: "destructive" });
+    // A declined card changes nothing; the fix is a new card in Stripe's portal.
+    const manageBilling = opts.portal || apiErrorCode(err) === "payment_failed" ? (
+      <ToastAction altText="Manage billing" onClick={() => portalMutation.mutate()} data-testid="button-toast-manage-billing">Manage billing</ToastAction>
+    ) : undefined;
+    toast({ title, description: apiErrorMessage(err), variant: "destructive", action: manageBilling });
+  };
+
+  /** Refusals that have a next step of their own; anything else is a toast. */
+  const handlePlanError = (title: string, r: PlanRequest, err: unknown) => {
+    const code = apiErrorCode(err);
+    if (code === "talk_to_sales") { setSalesTopic(requestTopic(r)); return; }
+    // The page's idea of the subscription was stale: reload it so the buttons say what will happen.
+    if (code === "no_subscription") void queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription"] });
+    showError(title)(err);
   };
 
   const checkoutMutation = useMutation({
     mutationFn: async (r: PlanRequest) => (await apiRequest("POST", "/api/stripe/create-checkout", planBody(r))).json(),
     onSuccess: (data) => { if (data?.url) window.location.href = data.url; },
-    onError: showError("Couldn't start checkout"),
+    onError: async (err, r) => {
+      if (apiErrorCode(err) !== "has_subscription") return handlePlanError("Couldn't start checkout", r, err);
+      // Already subscribed (another tab, or a webhook this page hadn't seen): change the one
+      // subscription in place instead, unless its last payment failed, which the portal fixes.
+      await queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription"] });
+      const fresh = queryClient.getQueryData<SubscriptionInfo>(["/api/stripe/subscription"]);
+      if (fresh && describeSubscription(fresh).changesInPlace && !PAYMENT_PROBLEM_STATUSES.includes(fresh.status)) setConfirm(r);
+      else showError("Couldn't start checkout", { portal: true })(err);
+    },
   });
 
   const changePlanMutation = useMutation({
@@ -141,13 +175,7 @@ export default function PricingPage() {
       void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       toast({ title: "Plan changed", description: `You're now on ${PLANS[r.plan].name}, billed ${intervalWord(r.interval)}.` });
     },
-    onError: (err) => { setConfirm(null); showError("Couldn't change your plan")(err); },
-  });
-
-  const portalMutation = useMutation({
-    mutationFn: async () => (await apiRequest("POST", "/api/stripe/create-portal", {})).json(),
-    onSuccess: (data) => { if (data?.url) window.location.href = data.url; },
-    onError: showError("Couldn't open billing"),
+    onError: (err, r) => { setConfirm(null); handlePlanError("Couldn't change your plan", r, err); },
   });
 
   // Wait for the account and its subscription before any plan button works: a
@@ -177,9 +205,9 @@ export default function PricingPage() {
     return `Switch to ${PLANS[plan].name}`;
   };
 
-  // Deep links such as /pricing#done-for-you (the landing hero, the sidebar's
-  // "SEO Services", the empty cart's "Services") or /pricing#add-ons (the old
-  // individual-tools page) land on that section. The browser's own hash jump
+  // Deep links such as /pricing#services (every "Talk to a sales rep" link, the
+  // sidebar's "SEO Services", the empty cart's "Services"; #done-for-you still
+  // works) or /pricing#add-ons (the old individual-tools page) land on that section. The browser's own hash jump
   // misses it: the page mounts behind the sign-in check and an in-app link
   // changes the URL without a page load. So jump once the subscription has
   // settled (loaded or failed), and again on each later in-app navigation to a
@@ -565,8 +593,10 @@ export default function PricingPage() {
           )}
         </section>
 
-        <section id="done-for-you" className="space-y-6 scroll-mt-16" aria-labelledby="dfy-heading">
-          <div className="text-center space-y-2">
+        {/* #services is where every "Talk to a sales rep" link lands (SALES_HREF in
+            shared/plan-copy.ts); #done-for-you is the older anchor the same section kept. */}
+        <section id="services" className="space-y-6 scroll-mt-16" aria-labelledby="dfy-heading">
+          <div id="done-for-you" className="text-center space-y-2 scroll-mt-16">
             <Badge className="bg-[#F97316]/10 text-[#F97316] border-[#F97316]/20">
               <Briefcase className="w-3.5 h-3.5 mr-1.5" /> Done for you
             </Badge>
@@ -575,6 +605,8 @@ export default function PricingPage() {
               We quote these for your business. Tell a sales rep what you need and we'll scope it with you —
               the only thing we can't do is take your licensing exams for you.
             </p>
+            {/* The inquiry form for anyone sent here by a "Talk to a sales rep" link elsewhere on the site. */}
+            <TalkToSalesButton topic="Done-for-you services" className="mt-2 border-0 bg-[#F97316] hover:bg-[#ea6c10] text-white" data-testid="button-services-sales" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {DFY_SERVICES.map((service) => (
@@ -620,6 +652,12 @@ export default function PricingPage() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <TalkToSalesDialog
+      open={salesTopic !== null}
+      onOpenChange={(open) => { if (!open) setSalesTopic(null); }}
+      topic={salesTopic ?? ""}
+    />
     </>
   );
 }

@@ -209,15 +209,15 @@ export default function GoogleReviewsPage() {
     queryKey: ["/api/auth/me"],
   });
 
-  const { data: subscription } = useQuery<any>({
-    queryKey: ["/api/stripe/subscription"],
+  // The allowance the server checks when a template is saved (allowances.reviewTemplates:
+  // -1 unlimited, 0 not in the plan). null while it loads — the server still has the final say.
+  const { data: entitlements } = useQuery<{ allowances: { reviewTemplates: number } | null }>({
+    queryKey: ["/api/entitlements"],
+    enabled: !!user,
   });
-
-  const planLimits: Record<string, number> = {
-    free: 1, standard: 1, professional: 5, business: 5, premium: 20, gold: 20, platinum: 20
-  };
-  const currentPlan = subscription?.plan || "free";
-  const maxTemplates = planLimits[currentPlan] || 1;
+  const templateLimit: number | null = entitlements ? (entitlements.allowances?.reviewTemplates ?? 0) : null;
+  const atTemplateLimit = templateLimit !== null && templateLimit >= 0 && templates.length >= templateLimit;
+  const templateCount = templateLimit === null || templateLimit < 0 ? `${templates.length}` : `${templates.length}/${templateLimit}`;
 
   const filteredReviews = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -617,7 +617,7 @@ export default function GoogleReviewsPage() {
                             {t.name} {t.isDefault ? "(Default)" : ""}
                           </SelectItem>
                         ))}
-                        {templates.length < maxTemplates && (
+                        {!atTemplateLimit && (
                           <SelectItem value="__create__">
                             <span className="flex items-center gap-1 text-primary">
                               <Plus className="w-3.5 h-3.5" /> Add another profile...
@@ -1241,13 +1241,13 @@ export default function GoogleReviewsPage() {
             <div className="flex items-center gap-2 text-base">
               <Building2 className="w-4 h-4" />
               GMB Profiles & Templates
-              <Badge variant="outline" className="text-xs" data-testid="badge-template-count">{templates.length}/{maxTemplates}</Badge>
+              <Badge variant="outline" className="text-xs" data-testid="badge-template-count">{templateCount}</Badge>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={openNewTemplate}
-              disabled={templates.length >= maxTemplates}
+              disabled={atTemplateLimit}
               data-testid="button-new-template"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
@@ -1339,9 +1339,11 @@ export default function GoogleReviewsPage() {
                   </div>
                 </div>
               ))}
-              {templates.length >= maxTemplates && (
-                <p className="text-xs text-muted-foreground text-center pt-2">
-                  Template limit reached ({maxTemplates}). <a href="/pricing" className="underline text-amber-600">Upgrade your plan</a> for more templates.
+              {atTemplateLimit && (
+                <p className="text-xs text-muted-foreground text-center pt-2" data-testid="text-template-limit">
+                  {templateLimit === 0
+                    ? <>Saving templates is included with every plan. <a href="/pricing" className="underline text-amber-600">See plans</a>.</>
+                    : <>Template limit reached ({templateLimit}). <a href="/pricing" className="underline text-amber-600">See plans</a> for more templates.</>}
                 </p>
               )}
             </div>

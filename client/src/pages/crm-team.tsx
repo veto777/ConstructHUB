@@ -53,12 +53,22 @@ interface Division {
 }
 
 interface Seats {
+  /** The owner's plan key, "beta", or "none" when the owner has no plan. */
   plan: string;
   planName: string;
   limit: number;
   used: number;
   remaining: number;
   canAddSeat: boolean;
+  /** The server's own sentence (server/crm/tenancy.ts), including how to get more seats. */
+  message?: string;
+}
+
+/** What the seats card says: the server's message, or one built from the counts for an older server. */
+function seatsSummary(seats: Seats): string {
+  if (seats.message) return seats.message;
+  const count = seats.limit < 0 ? "unlimited seats" : `${seats.limit} seat${seats.limit === 1 ? "" : "s"}`;
+  return seats.plan === "none" ? `Without a plan the owner keeps ${count}.` : `Your ${seats.planName} plan includes ${count}.`;
 }
 
 interface Org {
@@ -722,9 +732,7 @@ export default function CrmTeamPage() {
             <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
               <SectionTitle
                 title="Seats"
-                description={`Your ${seats.planName} plan includes ${
-                  seats.limit < 0 ? "unlimited seats" : `${seats.limit} seat${seats.limit === 1 ? "" : "s"}`
-                }. Deactivated members don't use a seat.`}
+                description={`${seatsSummary(seats)} Deactivated members don't use a seat.`}
               />
               <StatusPill tone={seats.canAddSeat ? "success" : "danger"} data-testid="badge-seats">
                 {seats.used} of {seats.limit < 0 ? "unlimited" : seats.limit} used
@@ -786,10 +794,12 @@ export default function CrmTeamPage() {
                 <p className="text-xs text-muted-foreground">{ROLE_BLURB[inviteRole]}</p>
                 {!seats.canAddSeat && (
                   <p className="text-sm text-destructive" data-testid="text-seat-limit">
-                    You've used every seat on the {seats.planName} plan.{" "}
+                    {seats.plan === "none"
+                      ? "Inviting your team needs a plan."
+                      : `You've used every seat on the ${seats.planName} plan.`}{" "}
                     {/* Plans live on the main site — the portal host has no /pricing route. */}
                     <a href={marketingUrl("/pricing")} className="underline font-medium" data-testid="link-seat-upgrade">
-                      Upgrade to add more
+                      {seats.plan === "none" ? "Choose a plan" : "See plans and add-ons"}
                     </a>
                     .
                   </p>

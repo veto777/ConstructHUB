@@ -29,6 +29,7 @@ import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chr
 import { Link } from "wouter";
 import { showsPrice } from "@shared/plans";
 import { SALES_HREF, SALES_REP_LABEL, priceOrSalesRep } from "@shared/plan-copy";
+import { TalkToSalesButton } from "@/components/talk-to-sales";
 
 type CoursePurchase = {
   id: number;
@@ -64,7 +65,7 @@ function PaywallOverlay({ tabName, onGoToPricing }: { tabName: string; onGoToPri
             data-testid="button-paywall-unlock"
           >
             <Lock className="h-4 w-4 mr-2" />
-            View Course Pricing
+            How to enroll
           </Button>
         </div>
       </div>
@@ -385,7 +386,7 @@ export default function MasterClassPage() {
               {!isTabUnlocked("vetting") && <Lock className="h-3 w-3 text-amber-500" />}
             </TabsTrigger>
             <TabsTrigger value="pricing" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3" data-testid="tab-pricing">
-              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Course Pricing</span><span className="sm:hidden">Pricing</span>
+              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span>Enroll</span>
             </TabsTrigger>
           </TabsList>
 
@@ -432,7 +433,7 @@ export default function MasterClassPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button className="bg-[#F97316] hover:bg-[#E86C0A] text-white" onClick={() => setActiveTab("pricing")} data-testid="button-overview-enroll">
-                    View Course Pricing <ArrowRight className="h-4 w-4 ml-1" />
+                    How to enroll <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
                   <Button variant="outline" onClick={() => setActiveTab("state-guide")} data-testid="button-overview-preview">
                     Preview State Guide
@@ -2592,11 +2593,12 @@ export default function MasterClassPage() {
                           <CheckCircle2 className="h-4 w-4 mr-1" /> Enrolled
                         </Button>
                       ) : !priceShown ? (
-                        <Link href={SALES_HREF} className="block mt-5" data-testid={`link-module-sales-${mod.category}`}>
-                          <Button className="w-full bg-[#4A6CF7] hover:bg-[#3B5CE5]">
-                            <MessageSquare className="h-4 w-4 mr-1" /> {SALES_REP_LABEL}
-                          </Button>
-                        </Link>
+                        // No price and no checkout at or above the sales threshold: the inquiry form names the module.
+                        <TalkToSalesButton
+                          topic={`Master Class — ${mod.title}`}
+                          className="w-full mt-5 bg-[#4A6CF7] hover:bg-[#3B5CE5]"
+                          data-testid={`button-module-sales-${mod.category}`}
+                        />
                       ) : (
                         <div className="flex gap-2 mt-5">
                           <Button
@@ -2640,9 +2642,12 @@ export default function MasterClassPage() {
             </div>
 
             <Card className={`border-[#F97316]/30 bg-gradient-to-br from-[#F97316]/10 via-[#F97316]/5 to-transparent overflow-hidden relative ${hasBundle ? "ring-2 ring-green-500/50" : ""}`}>
-              <div className="absolute top-3 right-3">
-                <Badge className="bg-red-600 text-white text-xs px-2 py-0.5">BEST VALUE</Badge>
-              </div>
+              {/* "Best value" only when the page can show the saving that backs it. */}
+              {bundleSavingsCents !== null && (
+                <div className="absolute top-3 right-3">
+                  <Badge className="bg-red-600 text-white text-xs px-2 py-0.5" data-testid="badge-bundle-best-value">BEST VALUE</Badge>
+                </div>
+              )}
               <CardContent className="p-4 sm:p-6 text-center">
                 <Star className="h-8 w-8 text-[#F97316] mx-auto mb-3" />
                 <h3 className="text-lg sm:text-xl font-bold mb-2">Complete Master Class Bundle</h3>
@@ -2666,11 +2671,12 @@ export default function MasterClassPage() {
                     <CheckCircle2 className="h-4 w-4 mr-2" /> Bundle Purchased
                   </Button>
                 ) : !bundlePriceShown ? (
-                  <Link href={SALES_HREF} data-testid="link-bundle-sales">
-                    <Button size="lg" className="w-full sm:w-auto bg-[#F97316] hover:bg-[#E86C0A] text-white">
-                      <MessageSquare className="h-4 w-4 mr-2" /> {SALES_REP_LABEL}
-                    </Button>
-                  </Link>
+                  <TalkToSalesButton
+                    topic="Master Class — Complete Bundle"
+                    size="lg"
+                    className="w-full sm:w-auto bg-[#F97316] hover:bg-[#E86C0A] text-white"
+                    data-testid="button-bundle-sales"
+                  />
                 ) : (
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
                     <Button
@@ -2741,9 +2747,14 @@ export default function MasterClassPage() {
                   {bundlePriceShown ? (
                     <p className="text-lg font-bold text-[#F97316]">Bundle price: {usd(BUNDLE_PRICE_CENTS)}</p>
                   ) : (
-                    <Link href={SALES_HREF} className="text-lg font-bold text-[#F97316] hover:underline" data-testid="link-bundle-summary-sales">
+                    <TalkToSalesButton
+                      topic="Master Class — Complete Bundle"
+                      variant="link"
+                      className="text-lg font-bold text-[#F97316] h-auto p-0 whitespace-normal"
+                      data-testid="button-bundle-summary-sales"
+                    >
                       {SALES_REP_LABEL} about the complete bundle
-                    </Link>
+                    </TalkToSalesButton>
                   )}
                 </div>
               </CardContent>

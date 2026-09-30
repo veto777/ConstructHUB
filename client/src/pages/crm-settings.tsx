@@ -27,6 +27,7 @@ import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
 } from "@/components/crm-ui";
 import { CRM_THEME_COLORS, resolveOrgTheme } from "@shared/theme-colors";
+import { TEXTING_PLANS } from "@shared/plan-copy";
 
 /**
  * Org settings — company profile, document defaults, notification switches,
@@ -1391,9 +1392,10 @@ export default function CrmSettingsPage() {
             <div className="min-w-0 flex-1">
               {smsStatus?.planAllowsSms === false ? (
                 <>
-                  <div className="font-medium" data-testid="text-sms-plan">Texting is a Premium, Gold and Platinum feature</div>
+                  <div className="font-medium" data-testid="text-sms-plan">Texting is included with the {TEXTING_PLANS} plans</div>
                   <div className="text-xs text-muted-foreground">
-                    {smsStatus.planMessage} Includes text reminders to clients, quick texts, and a text to you when a bid is
+                    {/* The heading names the plans from the same price book the server's gate reads (server/crm/sms.ts). */}
+                    Upgrade in Pricing to turn it on. Texting covers reminders to clients, quick texts, and a text to you when a bid is
                     signed, money lands, or a client re-opens their estimate. Emails keep working on every plan.
                   </div>
                   {/* The portal host has no /pricing route (it would fall

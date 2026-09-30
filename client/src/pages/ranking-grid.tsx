@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Grid3X3, Search, Loader2, Trash2, Target, TrendingUp, ChevronDown, ChevronUp, Building, ZoomIn, ZoomOut, RotateCcw, FileText, BarChart3, Trophy, MapPin, ArrowLeft, Printer } from "lucide-react";
 import type { RankingGridScan, RankingGridResult } from "@shared/schema";
+import { creditsLabel, gridCreditCost, usageLine, type EntitlementsInfo } from "@/lib/pricing-display";
 
 interface BusinessResult {
   placeId: string;
@@ -571,15 +572,11 @@ function SummaryRow({ label, value, highlight }: { label: string; value: string;
   );
 }
 
-const GRID_SIZES = [
-  { value: "3", label: "3×3 (9 points)" },
-  { value: "5", label: "5×5 (25 points)" },
-  { value: "7", label: "7×7 (49 points)" },
-  { value: "9", label: "9×9 (81 points)" },
-  { value: "11", label: "11×11 (121 points)" },
-  { value: "13", label: "13×13 (169 points)" },
-  { value: "15", label: "15×15 (225 points)" },
-];
+// Each size's cost in ranking-grid credits, as the server charges it (gridCreditCost).
+const GRID_SIZES = [3, 5, 7, 9, 11, 13, 15].map((n) => ({
+  value: String(n),
+  label: `${n}×${n} (${n * n} points) · ${creditsLabel(gridCreditCost(n))}`,
+}));
 
 const DISTANCE_OPTIONS = [
   { value: "0.5", label: "0.5 miles" },
@@ -612,6 +609,9 @@ export default function RankingGridPage() {
     queryKey: ["/api/ranking-grid/scans"],
     refetchInterval: 5000,
   });
+  // This month's ranking-grid credits, as the server counts them.
+  const { data: entitlements } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
+  const creditsUsage = usageLine(entitlements?.usage?.rankings);
 
   const searchBusinessMutation = useMutation({
     mutationFn: async (query: string) => {
@@ -674,6 +674,7 @@ export default function RankingGridPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ranking-grid/scans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       setExpandedScan(data.id);
       toast({ title: "Scan started", description: `Checking "${keyword}" across ${gridSize}×${gridSize} grid` });
     },
@@ -835,6 +836,10 @@ export default function RankingGridPage() {
                 This scan will check <strong>{parseInt(gridSize) * parseInt(gridSize)} grid points</strong> in a {gridSize}×{gridSize} pattern,
                 with <strong>{gridDistance} mile spacing</strong> between each point.
                 Total coverage: ~{((parseInt(gridSize) - 1) * parseFloat(gridDistance)).toFixed(1)} miles across.
+              </p>
+              <p className="mt-1.5" data-testid="text-grid-credits">
+                Uses <strong>{creditsLabel(gridCreditCost(parseInt(gridSize)))}</strong> of your monthly ranking-grid credits
+                {creditsUsage ? ` (${creditsUsage} this month)` : ""}.
               </p>
             </div>
 
