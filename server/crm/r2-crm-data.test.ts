@@ -174,29 +174,39 @@ describe("r2-crm-data against the dev server", () => {
       expect(r.status).toBe(201);
       return r.body.number as string;
     };
+    // Other lanes may create documents in this org concurrently, so assert
+    // "past everything that existed" and "unique", never an exact value.
+    const maxOf = (table: string, prefix: string) => q(
+      `select coalesce(max((substring(number from '^${prefix}-([0-9]+)$'))::bigint), 0)::int as n from ${table} where org_id = $1`,
+      [orgId]).then((r) => r[0].n as number);
+    const copies = (table: string, number: string) => q(
+      `select count(*)::int as n from ${table} where org_id = $1 and number = $2`, [orgId, number]).then((r) => r[0].n as number);
+
+    const coBefore = await maxOf("crm_change_orders", "CO");
     const [co1, co2] = [await co(`${RUN} CO a`), await co(`${RUN} CO b`)];
     expect(co1).toMatch(/^CO-\d+$/);
-    expect(seq(co2)).toBe(seq(co1) + 1);
-    const [maxCo] = await q(`select max((substring(number from '^CO-([0-9]+)$'))::bigint)::int as n from crm_change_orders where org_id = $1`, [orgId]);
-    expect(seq(co2)).toBe(maxCo.n);
+    expect(seq(co1)).toBeGreaterThan(coBefore);
+    expect(seq(co2)).toBeGreaterThan(seq(co1));
+    expect(await copies("crm_change_orders", co2)).toBe(1);
 
+    const poBefore = await maxOf("crm_commitments", "PO");
     const [po1, po2] = [await po(), await po()];
     expect(po1).toMatch(/^PO-\d+$/);
-    expect(seq(po2)).toBe(seq(po1) + 1);
-    const [dupPo] = await q(`select count(*)::int as n from crm_commitments where org_id = $1 and number = $2`, [orgId, po2]);
-    expect(dupPo.n).toBe(1);
+    expect(seq(po1)).toBeGreaterThan(poBefore);
+    expect(seq(po2)).toBeGreaterThan(seq(po1));
+    expect(await copies("crm_commitments", po2)).toBe(1);
 
     // Concurrent creates still get distinct numbers.
     const burst = await Promise.all([1, 2, 3, 4].map((i) => co(`${RUN} CO burst ${i}`)));
     expect(new Set(burst).size).toBe(4);
   });
 
-  it("estimates share one allocator: a new estimate is one past the org's highest E- number", async () => {
+  it("estimates share one allocator: a new estimate is past the org's highest E- number", async () => {
     const cust = await makeCustomer("estimate-number");
+    const [before] = await q(`select coalesce(max((substring(number from '^E-([0-9]+)$'))::bigint), 0)::int as n from crm_estimates where org_id = $1`, [orgId]);
     const r = await send("POST", "/api/crm/estimates", { customerId: cust.id, title: `${RUN} est`, items: [] }, cookie);
     expect(r.status).toBe(201);
-    const [max] = await q(`select max((substring(number from '^E-([0-9]+)$'))::bigint)::int as n from crm_estimates where org_id = $1`, [orgId]);
-    expect(seq(r.body.number)).toBe(max.n);
+    expect(seq(r.body.number)).toBeGreaterThan(before.n);
     const [dup] = await q(`select count(*)::int as n from crm_estimates where org_id = $1 and number = $2`, [orgId, r.body.number]);
     expect(dup.n).toBe(1);
   });
