@@ -514,7 +514,7 @@ export default function CrmSettingsPage() {
   // Honest configuration state: the server names the missing env vars; the
   // test-text control only lights up when texting can actually work.
   const canIntegrations = me?.permissions?.manageIntegrations === true;
-  const { data: smsStatus } = useQuery<any>({
+  const { data: smsStatus, isPending: smsStatusPending } = useQuery<any>({
     queryKey: ["/api/crm/sms/status"],
     enabled: allowed,
   });
@@ -531,9 +531,10 @@ export default function CrmSettingsPage() {
   // that card. The page renders behind a spinner until the org loads, so the
   // browser's own hash jump finds nothing — scroll once the settings (and the
   // SMS status that sizes the card) are on screen. Once only: never yank a
-  // user who has already scrolled away.
+  // user who has already scrolled away. "Settled", not "has data": a failed
+  // status call still renders the card, and must not block the jump.
   const hashScrolled = useRef(false);
-  const settingsRendered = allowed && !!org && smsStatus !== undefined;
+  const settingsRendered = allowed && !!org && !smsStatusPending;
   useEffect(() => {
     if (!settingsRendered || hashScrolled.current) return;
     let id = "";

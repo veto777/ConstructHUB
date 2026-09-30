@@ -1076,10 +1076,16 @@ export default function CrmClientPage() {
                 const invN = (invoices ?? []).length;
                 // The server always deletes the client's calendar visits with
                 // them (their own, and any booked against their projects) —
-                // name them. Counted from this page's calendar window.
+                // name them. The server deletes EVERY such visit, whatever the
+                // date, but this page only loads 30 days back to a year ahead,
+                // so the count is labelled with that window, never passed off
+                // as the total.
                 const projIds = new Set((data.projects ?? []).map((p: any) => p.id));
                 const visitN = (apptData?.appointments ?? []).filter((a: any) =>
                   a.customerId === id || (a.projectId && projIds.has(a.projectId))).length;
+                const visits = visitN > 0
+                  ? `every calendar visit booked for them (${visitN} scheduled visit(s) from the last 30 days through the next year)`
+                  : "any calendar visits booked for them";
                 const hasDocs = estN + projN + invN > 0;
                 return (
                   <AlertDialog open={delOpen} onOpenChange={setDelOpen}>
@@ -1095,11 +1101,9 @@ export default function CrmClientPage() {
                         <AlertDialogDescription>
                           {hasDocs
                             ? `This permanently deletes ${c.displayName} AND their entire tree: ` +
-                              `${estN} estimate(s), ${invN} invoice(s), ${projN} project(s) and ${visitN} scheduled visit(s), ` +
+                              `${estN} estimate(s), ${invN} invoice(s), ${projN} project(s) and ${visits}, ` +
                               `with all line items, payments and history. This cannot be undone.`
-                            : visitN > 0
-                              ? `This permanently deletes ${c.displayName} and their ${visitN} scheduled visit(s). This cannot be undone.`
-                              : `This permanently deletes ${c.displayName}. This cannot be undone.`}
+                            : `This permanently deletes ${c.displayName} and ${visits}. This cannot be undone.`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

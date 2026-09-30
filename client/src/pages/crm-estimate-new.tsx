@@ -271,6 +271,12 @@ export default function CrmEstimateNewPage() {
     writeDraft(done || (!customer && !lines.length) ? null : { step, customer, lines, title, intro });
   }, [done, step, customer, lines, title, intro]);
 
+  // The draft only has to survive a reload of THIS builder (a reload never
+  // unmounts). Leaving the builder in-app discards it, so the next "New
+  // estimate" — often for a different client — starts clean instead of
+  // reopening the last client's cart at step 2.
+  useEffect(() => () => writeDraft(null), []);
+
   // A restored client may have been edited (an email added) or deleted since
   // — refresh it once from the server rather than trust the stored copy.
   useEffect(() => {
