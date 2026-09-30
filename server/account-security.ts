@@ -148,7 +148,8 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
     const u=auth(req,res);if(!u || !requireRecentAuth(req,res))return;
     const {rows:[user]}=await pool.query('SELECT totp_enabled FROM users WHERE id=$1',[u.id]);
     if(!user.totp_enabled)return res.status(400).json({message:'Enable two-factor sign-in first.'});
-    res.json({codes:await replaceRecoveryCodes(u.id)});
+    const codes = await replaceRecoveryCodes(u.id);
     await logActivity(req,u.id,'security.recovery_codes_changed');
+    res.json({codes});
   });
 }

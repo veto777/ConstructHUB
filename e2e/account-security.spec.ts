@@ -34,6 +34,10 @@ test('enrolls with QR, uses recovery sign-in, remembers/revokes device, and veri
  await page.getByRole('button',{name:'Generate new recovery codes'}).click();await expect(page.getByRole('heading',{name:'Verify your identity'})).toBeVisible();
  await page.getByLabel('Verification',{exact:true}).fill(totp.generate());await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.locator('pre')).toBeVisible();
  await page.getByRole('button',{name:'Revoke device'}).click();await expect(page.getByText('No remembered devices.')).toBeVisible();
+ await expect(page.getByLabel('Activity type').getByRole('option', { name: 'security.device_revoked', exact: true })).toHaveCount(1);
+ await page.getByLabel('Activity type').selectOption('security.device_revoked');
+ await expect(page.locator('strong').filter({hasText:'security.device_revoked'})).toBeVisible();
+ await page.getByLabel('Activity type').selectOption('');
  await page.getByTestId('button-settings-tab-notifications').click();const emailSwitch=page.getByRole('switch',{name:'A Google account was connected: Email',exact:true});await expect(emailSwitch).toBeDisabled();await expect(emailSwitch).toBeChecked();
  const inApp=page.getByRole('switch',{name:'A Google account was connected: In app',exact:true});await inApp.click();await expect(inApp).not.toBeChecked();await page.reload();await page.getByTestId('button-settings-tab-notifications').click();await expect(inApp).not.toBeChecked();
  await page.getByRole('button',{name:/Notifications \(/}).click();await expect(page.getByText('Two-factor sign-in was enabled',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Mark all read'}).click();await expect(page.getByRole('button',{name:'Notifications (0 unread)'})).toBeVisible();await page.keyboard.press('Escape');
