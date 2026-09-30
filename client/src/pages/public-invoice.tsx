@@ -9,6 +9,7 @@ import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
 import { DocGateChallenge } from "@/components/doc-gate";
 import { orgThemeStyle } from "@/lib/org-theme";
+import { apiErrorMessage } from "@/lib/queryClient";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -52,19 +53,42 @@ export default function PublicInvoicePage() {
   if (isLoading) return <div className="flex justify-center p-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   if (error) {
-    const msg = String((error as Error).message ?? "");
+    // apiRequest errors read "STATUS: {json}" — split them, never show raw JSON.
+    const raw = String((error as Error).message ?? "");
+    const status = Number(raw.match(/^(\d{3}):/)?.[1] ?? 0);
+    let body: any = null;
+    try { body = JSON.parse(raw.replace(/^\d{3}:\s*/, "")); } catch { /* plain-text body */ }
     // 401 requiresVerification = the email gate.
-    if (msg.startsWith("401:")) {
-      try {
-        const j = JSON.parse(msg.slice(msg.indexOf(":") + 1));
-        if (j?.requiresVerification) {
-          return <DocGateChallenge docType="invoice" token={token!} />;
-        }
-      } catch { /* fall through to the generic error card */ }
+    if (status === 401 && body?.requiresVerification) {
+      // A sign-in link that was already used or had expired lands back here
+      // with ?auth=expired (the verify route) — say so above the gate.
+      const expired = new URLSearchParams(window.location.search).get("auth") === "expired";
+      return (
+        <>
+          {expired && (
+            <div className="bg-amber-500/10 border-b border-amber-500/40 px-4 py-3 text-center text-sm"
+              role="status" data-testid="notice-link-expired">
+              That sign-in link expired or was already used — enter your email below to get a new one.
+            </div>
+          )}
+          <DocGateChallenge docType="invoice" token={token!} />
+        </>
+      );
     }
+    // 410 = the contractor voided the invoice: nothing is owed on it.
+    const company = body?.company?.name as string | undefined;
+    const contact = [body?.company?.phone, body?.company?.email].filter(Boolean).join(" · ");
     return (
       <div className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
-        <ErrorCard title="This link isn't valid" description={String((error as Error).message)} />
+        {status === 410 ? (
+          <ErrorCard
+            title="This invoice was cancelled"
+            description={`${company ?? "The company that sent it"} cancelled this invoice, so there is nothing to pay on it. ` +
+              `If you have questions, contact ${company ?? "them"} directly${contact ? ` (${contact})` : ""}.`}
+          />
+        ) : (
+          <ErrorCard title="This link isn't valid" description={apiErrorMessage(error, "This invoice link couldn't be opened.")} />
+        )}
       </div>
     );
   }
@@ -78,6 +102,9 @@ export default function PublicInvoicePage() {
   // itself is trivially forgeable, so it must never render as "Paid".
   const settled = Boolean(inv.paidAt);
   const processing = !settled && new URLSearchParams(window.location.search).get("paid") === "1";
+  // Only a LOADED pay-info can say no rail is offered; while it loads (or if
+  // it fails) the plain Pay button stays and the server answers honestly.
+  const noOnlineRail = Boolean(payInfo) && !payInfo.cardAvailable && !payInfo.achAvailable;
 
   return (
     <main className="min-h-screen bg-muted/40 py-10 px-4" style={themeStyle} data-testid="public-invoice-root">
@@ -261,11 +288,32 @@ export default function PublicInvoicePage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2"><Landmark className="h-5 w-5" /> Pay this invoice</CardTitle>
               <CardDescription>
-                Paid directly to {company.name}. Bank transfer (ACH) is the cheapest option.
+                {noOnlineRail
+                  ? `Pay ${company.name} directly.`
+                  : `Paid directly to ${company.name}. Bank transfer (ACH) is the cheapest option.`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {payInfo?.cardFee && (payInfo.achAvailable || payInfo.cardAvailable) ? (
+              {noOnlineRail ? (
+                // pay-info already says neither card nor bank is offered — no
+                // button that can only fail; tell the client how to pay instead.
+                <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1.5" data-testid="text-online-pay-unavailable">
+                  <p>
+                    Online payment isn't available for this invoice. To pay the {money(inv.dueCents)} due,
+                    contact {company.name}{company.phone || company.email ? ":" : " directly."}
+                  </p>
+                  {company.phone && (
+                    <a href={`tel:${company.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                      <Phone className="h-3.5 w-3.5" />{company.phone}
+                    </a>
+                  )}
+                  {company.email && (
+                    <a href={`mailto:${company.email}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                      <Mail className="h-3.5 w-3.5" />{company.email}
+                    </a>
+                  )}
+                </div>
+              ) : payInfo?.cardFee && (payInfo.achAvailable || payInfo.cardAvailable) ? (
                 <>
                   {/* The fee is stated BEFORE the client chooses a rail. */}
                   <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1" data-testid="text-card-fee-notice">

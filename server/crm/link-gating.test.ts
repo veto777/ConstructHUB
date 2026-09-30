@@ -241,12 +241,27 @@ describe("verified session (the recipient's browser)", () => {
     const again = await api(`/api/client/auth/verify?token=${raw}`);
     expect(again.status).toBe(302);
     expect(again.location).toBe("/?auth=invalid");
+    // A reused document-gate link goes back to ITS document, flagged, so the
+    // gate can say the link expired — not to the portal home.
+    const againDoc = await api(
+      `/api/client/auth/verify?token=${raw}&next=${encodeURIComponent(`/e/${publicToken}`)}`,
+    );
+    expect(againDoc.status).toBe(302);
+    expect(againDoc.location).toBe(`/e/${publicToken}?auth=expired`);
+    expect(againDoc.cookie ?? "").not.toMatch(/^crm_client=/);
+    // An unsafe next is never honoured, on failure either.
+    const offsite = await api(`/api/client/auth/verify?token=${raw}&next=${encodeURIComponent("//evil.example/x")}`);
+    expect(offsite.location).toBe("/?auth=invalid");
 
     // Expired tokens are refused the same way.
     const expired = await makeToken([customerId], email, { expired: true });
     const dead = await api(`/api/client/auth/verify?token=${expired}`);
     expect(dead.status).toBe(302);
     expect(dead.location).toBe("/?auth=invalid");
+    const deadDoc = await api(
+      `/api/client/auth/verify?token=${expired}&next=${encodeURIComponent(`/e/${publicToken}`)}`,
+    );
+    expect(deadDoc.location).toBe(`/e/${publicToken}?auth=expired`);
   });
 
   it("a session for a DIFFERENT customer does not open this document", async () => {

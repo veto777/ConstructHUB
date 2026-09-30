@@ -29,7 +29,7 @@ import { db } from "../db";
 import {
   crmPaymentAccounts, crmPayments, crmEstimates, crmInvoices, crmCustomers, crmOrgs,
 } from "@shared/schema";
-import { and, eq, isNull, desc, sql } from "drizzle-orm";
+import { and, eq, isNull, desc, sql, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { requireDocSession } from "./portal";
 import { logActivity } from "./activity";
@@ -331,7 +331,29 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (req.query.invoiceId) where.push(eq(crmPayments.invoiceId, String(req.query.invoiceId)));
     const rows = await db.select().from(crmPayments)
       .where(and(...where)).orderBy(desc(crmPayments.createdAt)).limit(200);
-    res.json(await paymentRefundTotals(ctx.org.id, await objectPolicy(ctx).filter("payments", rows)));
+    const visible = await paymentRefundTotals(ctx.org.id, await objectPolicy(ctx).filter("payments", rows));
+    // Who paid and for what — a bare "$1,750.00 · check" row is unreadable on
+    // the org-wide list. Names/numbers come from this org's own rows only.
+    const customerIds = [...new Set(visible.map((p) => p.customerId))];
+    const invoiceIds = [...new Set(visible.map((p) => p.invoiceId).filter(Boolean) as string[])];
+    const estimateIds = [...new Set(visible.map((p) => p.estimateId).filter(Boolean) as string[])];
+    const [custs, invs, ests] = await Promise.all([
+      customerIds.length ? db.select({ id: crmCustomers.id, name: crmCustomers.displayName }).from(crmCustomers)
+        .where(and(eq(crmCustomers.orgId, ctx.org.id), inArray(crmCustomers.id, customerIds))) : [],
+      invoiceIds.length ? db.select({ id: crmInvoices.id, number: crmInvoices.number }).from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), inArray(crmInvoices.id, invoiceIds))) : [],
+      estimateIds.length ? db.select({ id: crmEstimates.id, number: crmEstimates.number }).from(crmEstimates)
+        .where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.id, estimateIds))) : [],
+    ]);
+    const custName = new Map(custs.map((c) => [c.id, c.name]));
+    const invNumber = new Map(invs.map((i) => [i.id, i.number]));
+    const estNumber = new Map(ests.map((e) => [e.id, e.number]));
+    res.json(visible.map((p) => ({
+      ...p,
+      customerName: custName.get(p.customerId) ?? null,
+      invoiceNumber: p.invoiceId ? invNumber.get(p.invoiceId) ?? null : null,
+      estimateNumber: p.estimateId ? estNumber.get(p.estimateId) ?? null : null,
+    })));
   });
 
   // ── Contractor: take a payment — hosted checkout link ─────────────────────

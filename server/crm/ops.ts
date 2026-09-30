@@ -21,7 +21,7 @@ import {
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
   crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers, counties,
-  crmNotificationChannel, crmEngagementSessions, crmCustomerNotes,
+  crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
   CRM_LINE_ITEM_KINDS,
@@ -38,6 +38,7 @@ import { notifyMembers } from "./notify";
 import { getBaseUrl } from "../auth";
 import { computeApprovalTotals } from "./discounts";
 import { progressInvoiceItems } from "./invoice-math";
+import { lockDocNumbers, nextDocNumber } from "./doc-number";
 
 type GetUser = (req: any, res: any) => any;
 const tok = () => randomBytes(24).toString("hex");
@@ -48,22 +49,50 @@ const METHOD_LABELS: Record<string, string> = {
   ach: "bank transfer (ACH)", card: "card", other: "another method",
 };
 
+/** "$1,750.00" — the same formatting the UI uses, for server messages. */
+const usd = (cents: number) =>
+  `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 /**
  * Why an invoice may NOT be hard-deleted, or null when it can. A paid invoice
  * — or one with ANY payment row recorded against it — is a money trail and is
  * never deletable (voiding is the audit-preserving path for unpaid ones).
+ * A partly paid invoice is told apart from a paid one: "has been paid" on a
+ * $101-of-$300 invoice reads as if the balance were settled.
  */
 export function invoiceDeleteRefusal(
   inv: { status: string; paidCents: number | null; paidAt: Date | null },
   paymentCount: number,
 ): string | null {
-  if (inv.status === "paid" || (inv.paidCents ?? 0) > 0 || inv.paidAt) {
+  if (inv.status === "paid" || inv.paidAt) {
     return "This invoice has been paid — paid money trails are never deletable.";
+  }
+  if ((inv.paidCents ?? 0) > 0) {
+    return `Payments have been recorded against this invoice (${usd(inv.paidCents ?? 0)} so far) — money trails are never deletable.`;
   }
   if (paymentCount > 0) {
     return "Payments have been recorded against this invoice; it cannot be deleted.";
   }
   return null;
+}
+
+/**
+ * How much of an approved estimate its live (non-void) invoices already bill,
+ * in basis points. Invoices made by the estimate→invoice route record their
+ * draw (custom_fields.progressBps); older or hand-built ones are measured by
+ * money against the estimate's signed total. A zero-total estimate counts any
+ * live invoice as billing it in full.
+ */
+export function estimateBilledBps(
+  invoices: { totalCents: number; customFields: unknown }[],
+  fullTotalCents: number,
+): number {
+  return invoices.reduce((sum, inv) => {
+    const recorded = Number((inv.customFields as Record<string, unknown> | null)?.progressBps);
+    if (Number.isInteger(recorded) && recorded > 0 && recorded <= 10000) return sum + recorded;
+    if (fullTotalCents <= 0) return sum + 10000;
+    return sum + Math.round((inv.totalCents * 10000) / fullTotalCents);
+  }, 0);
 }
 
 /** Tell the org owner money landed on an invoice (manual entry). Best-effort:
@@ -212,18 +241,22 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
         .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, d.estimateId))).limit(1);
       if (!estimate) return res.status(400).json({ message: "Estimate not found in this organization" });
     }
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmInvoices)
-      .where(eq(crmInvoices.orgId, ctx.org.id));
-    const [inv] = await db.insert(crmInvoices).values({
-      orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
-      estimateId: d.estimateId ?? null, number: `INV-${1000 + n + 1}`, title: d.title,
-      taxRateBps: d.taxRateBps, retainageBps: d.retainageBps, notes: d.notes ?? null,
-      publicToken: tok(), dueAt: new Date(Date.now() + d.dueInDays * 86400000),
-    } as any).returning();
-    if (d.items.length) {
-      await db.insert(crmInvoiceItems).values(
-        d.items.map((it, i) => ({ ...it, orgId: ctx.org.id, invoiceId: inv.id, sortOrder: i })) as any);
-    }
+    // Number + insert in one transaction: the allocation lock is held until
+    // this invoice exists, so no two invoices in the org share a number.
+    const inv = await db.transaction(async (tx) => {
+      const number = await nextDocNumber(tx, "INV", ctx.org.id);
+      const [row] = await tx.insert(crmInvoices).values({
+        orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
+        estimateId: d.estimateId ?? null, number, title: d.title,
+        taxRateBps: d.taxRateBps, retainageBps: d.retainageBps, notes: d.notes ?? null,
+        publicToken: tok(), dueAt: new Date(Date.now() + d.dueInDays * 86400000),
+      } as any).returning();
+      if (d.items.length) {
+        await tx.insert(crmInvoiceItems).values(
+          d.items.map((it, i) => ({ ...it, orgId: ctx.org.id, invoiceId: row.id, sortOrder: i })) as any);
+      }
+      return row;
+    });
     logActivity(ctx, "invoice.created", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number },
@@ -248,15 +281,6 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const items = await db.select().from(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, est.id)))
       .orderBy(asc(crmEstimateItems.sortOrder));
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmInvoices)
-      .where(eq(crmInvoices.orgId, ctx.org.id));
-    const [inv] = await db.insert(crmInvoices).values({
-      orgId: ctx.org.id, customerId: est.customerId, projectId: est.projectId ?? null,
-      estimateId: est.id, number: `INV-${1000 + n + 1}`,
-      title: pct < 10000 ? `${est.title} — progress billing` : est.title,
-      taxRateBps: est.taxRateBps, retainageBps, publicToken: tok(),
-      dueAt: new Date(Date.now() + 30 * 86400000),
-    } as any).returning();
     // Use the immutable selections accepted with the signature, not today's
     // editable offer definitions. The full invoice must honor that concession.
     const selected = Array.isArray(est.selectedDiscounts)
@@ -264,11 +288,57 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       : [];
     const approval = computeApprovalTotals(items, est.taxRateBps ?? 0, selected);
     const lines = progressInvoiceItems(items, pct, approval.optionalDiscountCents);
-    if (lines.length) await db.insert(crmInvoiceItems).values(lines.map((i, idx) => ({
-      orgId: ctx.org.id, invoiceId: inv.id, sortOrder: idx, kind: i.kind, name: i.name,
-      description: i.description, unit: i.unit, unitPriceCents: i.unitPriceCents,
-      quantityMilli: i.quantityMilli, taxable: i.taxable,
-    })) as any);
+
+    // Progress billing may split an estimate across several invoices, but
+    // never past 100% of it: a second click on "Create invoice" must not bill
+    // the whole job again. The check runs under the numbering lock, so two
+    // concurrent clicks cannot both pass it.
+    const result = await db.transaction(async (tx) => {
+      // Lock first, allocate only once the draw is allowed — a refused click
+      // must not burn an invoice number.
+      await lockDocNumbers(tx, "INV", ctx.org.id);
+      const prior = await tx.select({
+        id: crmInvoices.id, number: crmInvoices.number,
+        totalCents: crmInvoices.totalCents, customFields: crmInvoices.customFields,
+      }).from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.estimateId, est.id),
+          isNull(crmInvoices.voidedAt)))
+        .orderBy(asc(crmInvoices.createdAt));
+      const billedBps = estimateBilledBps(prior, approval.totalCents);
+      if (prior.length && billedBps + pct > 10000) {
+        const numbers = prior.map((p) => p.number ?? "an invoice").join(", ");
+        const remainingBps = Math.max(0, 10000 - billedBps);
+        return { error: {
+          status: 409,
+          message: remainingBps === 0
+            ? `This estimate is already invoiced in full as ${numbers}. Open that invoice, or void it before billing again.`
+            : `${numbers} already bill ${billedBps / 100}% of this estimate — only ${remainingBps / 100}% is left to invoice.`,
+          invoices: prior.map((p) => ({ id: p.id, number: p.number })),
+          billedBps: Math.min(10000, billedBps), remainingBps,
+        } };
+      }
+      const number = await nextDocNumber(tx, "INV", ctx.org.id);
+      const [row] = await tx.insert(crmInvoices).values({
+        orgId: ctx.org.id, customerId: est.customerId, projectId: est.projectId ?? null,
+        estimateId: est.id, number,
+        title: pct < 10000 ? `${est.title} — progress billing` : est.title,
+        taxRateBps: est.taxRateBps, retainageBps, publicToken: tok(),
+        dueAt: new Date(Date.now() + 30 * 86400000),
+        // The draw this invoice bills, so the next one knows what is left.
+        customFields: { progressBps: pct },
+      } as any).returning();
+      if (lines.length) await tx.insert(crmInvoiceItems).values(lines.map((i, idx) => ({
+        orgId: ctx.org.id, invoiceId: row.id, sortOrder: idx, kind: i.kind, name: i.name,
+        description: i.description, unit: i.unit, unitPriceCents: i.unitPriceCents,
+        quantityMilli: i.quantityMilli, taxable: i.taxable,
+      })) as any);
+      return { inv: row };
+    });
+    if (result.error) {
+      const { status, ...body } = result.error;
+      return res.status(status).json(body);
+    }
+    const { inv } = result;
     logActivity(ctx, "invoice.created", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number, fromEstimate: est.number ?? est.id },
@@ -307,7 +377,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       if (parsed.data.amountCents > outstanding) {
         return { error: {
           status: 400,
-          message: `Only $${(outstanding / 100).toFixed(2)} is outstanding on this invoice.`,
+          message: `Only ${usd(outstanding)} is outstanding on this invoice.`,
           outstandingCents: outstanding,
         } };
       }
@@ -345,11 +415,95 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     // And email the client their receipt-to-date (honors paymentReceipt).
     autoSendPaymentReceipt(ctx.org.id, inv.id)
       .catch((e: any) => console.error("[crm] auto-receipt failed:", e?.message || e));
+    // Say whether that receipt will actually go out — the same two gates
+    // autoSendPaymentReceipt applies — so the UI never promises one it skips.
+    const [receiptTo] = await db.select({ email: crmCustomers.email }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, inv.customerId))).limit(1);
+    const receiptSkippedReason = !crmNotificationEnabled(ctx.org.customFields, "paymentReceipt")
+      ? "receipts_off" : !receiptTo?.email ? "no_email" : null;
     logActivity(ctx, "payment.recorded", {
       entityType: "payment", entityId: pay.id, customerId: inv.customerId,
       meta: { amountCents: pay.amountCents, method: pay.method, number: inv.number, invoiceId: inv.id },
     });
-    res.status(201).json({ payment: pay, invoice: row });
+    res.status(201).json({
+      payment: pay, invoice: row,
+      receiptQueued: receiptSkippedReason === null, receiptSkippedReason,
+    });
+  });
+
+  /**
+   * Reverse a mistyped MANUAL payment — OWNER only (role, not a permission
+   * flag), with a stated reason. Nothing is deleted: the payment row keeps
+   * its amount, method, note and date and is marked "reversed" (which every
+   * succeeded-only total, receipt and report already excludes), the invoice
+   * balance is restored under the same row lock the record route takes, and
+   * the reversal lands on the client's notes and the audit log. Stripe
+   * payments are never reversed here — their refunds come from Stripe.
+   */
+  app.post("/api/crm/payments/:id/reverse", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (ctx.member.role !== "owner") {
+      return res.status(403).json({ message: "Only the account owner can reverse a payment." });
+    }
+    const parsed = z.object({ reason: z.string().trim().min(3).max(500) }).safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Say why the payment is being reversed (for example, \"typed $1,000 instead of $100\")." });
+    }
+    const reason = parsed.data.reason;
+
+    const result = await db.transaction(async (tx) => {
+      const [pay] = await tx.select().from(crmPayments)
+        .where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.id, req.params.id)))
+        .limit(1).for("update");
+      if (!pay) return { error: { status: 404, message: "Payment not found" } };
+      if (pay.provider !== "manual") {
+        return { error: { status: 409, message: "Only manually recorded payments can be reversed here. Refund online payments from your Stripe dashboard." } };
+      }
+      if (pay.status === "reversed") return { error: { status: 409, message: "This payment has already been reversed." } };
+      if (pay.status !== "succeeded") return { error: { status: 409, message: "Only a recorded payment can be reversed." } };
+
+      let invoice: typeof crmInvoices.$inferSelect | null = null;
+      if (pay.invoiceId) {
+        const [inv] = await tx.select().from(crmInvoices)
+          .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, pay.invoiceId)))
+          .limit(1).for("update");
+        if (inv) {
+          const paid = Math.max(0, (inv.paidCents ?? 0) - pay.amountCents);
+          const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0));
+          const status = inv.voidedAt ? "void"
+            : paid > 0 && paid >= due ? "paid"
+            : paid > 0 ? "partial"
+            : inv.sentAt ? "sent" : "draft";
+          [invoice] = await tx.update(crmInvoices).set({
+            paidCents: paid, status,
+            paidAt: status === "paid" ? inv.paidAt ?? new Date() : null, updatedAt: new Date(),
+          }).where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, inv.id))).returning();
+        }
+      }
+      const [row] = await tx.update(crmPayments).set({
+        status: "reversed",
+        failureReason: `Reversed by the account owner: ${reason}`,
+        updatedAt: new Date(),
+      }).where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.id, pay.id),
+        eq(crmPayments.status, "succeeded"))).returning();
+      return { pay: row, invoice };
+    });
+    if (result.error) return res.status(result.error.status).json({ message: result.error.message });
+    const { pay, invoice } = result;
+
+    const when = (pay.paidAt ?? pay.createdAt ?? new Date()).toLocaleDateString("en-US");
+    const via = METHOD_LABELS[pay.method ?? ""] ?? pay.method ?? "manual entry";
+    await db.insert(crmCustomerNotes).values({
+      orgId: ctx.org.id, customerId: pay.customerId, authorMemberId: ctx.member.id,
+      body: `A ${usd(pay.amountCents)} payment (${via}, recorded ${when})` +
+        `${invoice?.number ? ` on invoice ${invoice.number}` : ""} was reversed by the account owner. Reason: ${reason}`,
+    }).catch(() => {});
+    logActivity(ctx, "invoice.updated", {
+      entityType: "payment", entityId: pay.id, customerId: pay.customerId,
+      meta: { number: invoice?.number ?? null, change: `payment of ${usd(pay.amountCents)} reversed`, invoiceId: pay.invoiceId },
+    });
+    res.json({ payment: pay, invoice });
   });
 
   /** Void an unpaid invoice. Paid invoices keep their audit trail. */
@@ -499,16 +653,21 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const changeOrders = await db.select().from(crmChangeOrders)
       .where(and(eq(crmChangeOrders.orgId, ctx.org.id), eq(crmChangeOrders.projectId, proj.id)));
 
+    // Money with no cost code is still money spent: it lands in one
+    // "Unassigned" line instead of vanishing from every total.
+    const UNASSIGNED = "__unassigned";
+    const keyOf = (id: string | null | undefined) => id || UNASSIGNED;
     const keys = new Set<string>([
-      ...budgets.map((b) => b.costCodeId),
-      ...commitments.map((c) => c.costCodeId).filter(Boolean) as string[],
-      ...actuals.map((a) => a.costCodeId).filter(Boolean) as string[],
+      ...budgets.map((b) => keyOf(b.costCodeId)),
+      ...commitments.map((c) => keyOf(c.costCodeId)),
+      ...actuals.map((a) => keyOf(a.costCodeId)),
     ]);
-    const lines = [...keys].map((ccId) => {
-      const budget = budgets.filter((b) => b.costCodeId === ccId).reduce((s, b) => s + b.budgetCents, 0);
-      const committed = commitments.filter((c) => c.costCodeId === ccId).reduce((s, c) => s + c.amountCents, 0);
-      const actual = actuals.filter((a) => a.costCodeId === ccId).reduce((s, a) => s + a.amountCents, 0);
-      const cc = codeById.get(ccId);
+    const lines = [...keys].map((key) => {
+      const budget = budgets.filter((b) => keyOf(b.costCodeId) === key).reduce((s, b) => s + b.budgetCents, 0);
+      const committed = commitments.filter((c) => keyOf(c.costCodeId) === key).reduce((s, c) => s + c.amountCents, 0);
+      const actual = actuals.filter((a) => keyOf(a.costCodeId) === key).reduce((s, a) => s + a.amountCents, 0);
+      const ccId = key === UNASSIGNED ? null : key;
+      const cc = ccId ? codeById.get(ccId) : undefined;
       return {
         costCodeId: ccId, code: cc?.code ?? "—", name: cc?.name ?? "Unassigned",
         division: cc?.division ?? null,
@@ -921,17 +1080,26 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (!state) {
       return res.json({ portals: [], appraisers: [], message: "Add a state to the project first so offices can be matched safely." });
     }
+    // A portal's state is the ", ST" on its own jurisdiction ("Bentonville, AR").
+    // Its county_id cannot be trusted for this: the city seed copied ids from
+    // another database, so hundreds of city rows point at a county in a
+    // different state (Bentonville AR → Denver CO) and matched the wrong state.
+    let stateCode = /^[A-Za-z]{2}$/.test(state) ? state.toUpperCase() : null;
+    if (!stateCode) {
+      const [byName] = await db.select({ code: counties.stateCode }).from(counties)
+        .where(sql`lower(${counties.state}) = lower(${state})`).limit(1);
+      stateCode = byName?.code ? byName.code.toUpperCase() : null;
+    }
     // HARD RULE: only real, verified, liveness-checked rows. Never synthesise.
-    const portals = await db.select({
+    const portals = !stateCode ? [] : await db.select({
       id: permitDatabases.id, name: permitDatabases.name,
       jurisdiction: permitDatabases.jurisdiction, portalUrl: permitDatabases.portalUrl,
       searchUrl: permitDatabases.searchUrl, phone: sql<string | null>`null`, // legacy contacts have no current source evidence
       linkStatus: permitDatabases.linkStatus,
       lastVerifiedAt: permitDatabases.lastVerifiedAt,
     }).from(permitDatabases)
-      .innerJoin(counties, eq(permitDatabases.countyId, counties.id))
       .where(and(
-        sql`(lower(${counties.stateCode}) = lower(${state}) or lower(${counties.state}) = lower(${state}))`,
+        sql`upper(right(trim(${permitDatabases.jurisdiction}), 4)) = ${`, ${stateCode}`}`,
         eq(permitDatabases.isActive, true),
         sql`${permitDatabases.linkStatus} in ('live', 'verified', 'unconfirmed')`,
         city ? ilike(permitDatabases.jurisdiction, `%${city}%`) : sql`true`,

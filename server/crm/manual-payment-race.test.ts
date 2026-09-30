@@ -29,7 +29,7 @@ beforeAll(async () => {
   expect((await api("/api/crm/org/switch", { orgId: own })).status).toBe(200);
 });
 afterAll(async () => {
-  for (const table of ["crm_payments", "crm_invoice_items", "crm_invoices", "crm_estimate_items", "crm_estimate_events", "crm_estimates", "crm_jobs", "crm_projects", "crm_customer_notes", "crm_team_activity", "crm_customers", "crm_members", "crm_orgs"]) {
+  for (const table of ["crm_payments", "crm_invoice_items", "crm_invoices", "crm_estimate_items", "crm_estimate_events", "crm_estimates", "crm_jobs", "crm_projects", "crm_customer_notes", "crm_team_activity", "crm_activity_log", "crm_customers", "crm_members", "crm_orgs"]) {
     await pool.query(`delete from ${table} where ${table === "crm_orgs" ? "id" : "org_id"} = any($1::varchar[])`, [[own, foreign]]);
   }
   await pool.end();
@@ -77,6 +77,48 @@ describe("audit money regressions", () => {
     } else {
       expect([404, 409]).toContain(pay.status);
       expect(mutation.status).toBe(200);
+    }
+  });
+  it("formats the over-balance refusal like the UI and says whether a receipt goes out", async () => {
+    const inv = await api("/api/crm/invoices", { customerId: customers[0], items: [{ name: "Work", unitPriceCents: 175000 }] });
+    expect(inv.status).toBe(201);
+    const over = await api(`/api/crm/invoices/${inv.body.id}/payments`, { amountCents: 999999, method: "check" });
+    expect(over.status).toBe(400);
+    expect(over.body.message).toBe("Only $1,750.00 is outstanding on this invoice.");
+    // The fixture client has no email address, so no receipt can be sent.
+    const pay = await api(`/api/crm/invoices/${inv.body.id}/payments`, { amountCents: 10100, method: "check" });
+    expect(pay.status).toBe(201);
+    expect(pay.body).toMatchObject({ receiptQueued: false, receiptSkippedReason: "no_email" });
+    // A partly paid invoice is refused deletion with its own wording.
+    const del = await api(`/api/crm/invoices/${inv.body.id}`, {}, "DELETE");
+    expect(del.status).toBe(409);
+    expect(del.body.message).toMatch(/^Payments have been recorded against this invoice \(\$101\.00 so far\)/);
+  });
+  it("owner reverses a mistyped manual payment: row kept, balance restored, once only", async () => {
+    const inv = await api("/api/crm/invoices", { customerId: customers[0], items: [{ name: "Work", unitPriceCents: 175000 }] });
+    const pay = await api(`/api/crm/invoices/${inv.body.id}/payments`, { amountCents: 100000, method: "check" });
+    expect(pay.status).toBe(201);
+    const payId = pay.body.payment.id;
+    expect((await api(`/api/crm/payments/${payId}/reverse`, {})).status).toBe(400);
+    const rev = await api(`/api/crm/payments/${payId}/reverse`, { reason: "Typed $1,000 instead of $100" });
+    expect(rev.status).toBe(200);
+    expect(rev.body.payment.status).toBe("reversed");
+    expect(rev.body.invoice).toMatchObject({ paidCents: 0, status: "draft", paidAt: null });
+    expect((await api(`/api/crm/payments/${payId}/reverse`, { reason: "Twice" })).status).toBe(409);
+    const fixed = await api(`/api/crm/invoices/${inv.body.id}/payments`, { amountCents: 10000, method: "check" });
+    expect(fixed.status).toBe(201);
+    expect(fixed.body.invoice.paidCents).toBe(10000);
+    const { rows } = await pool.query(
+      "select status, amount_cents from crm_payments where invoice_id=$1 order by created_at", [inv.body.id]);
+    expect(rows).toEqual([{ status: "reversed", amount_cents: 100000 }, { status: "succeeded", amount_cents: 10000 }]);
+    const notes = await pool.query("select body from crm_customer_notes where org_id=$1 and body like '%reversed%'", [own]);
+    expect(notes.rows.some((n) => n.body.includes("Typed $1,000 instead of $100"))).toBe(true);
+    // Only the owner may reverse.
+    await pool.query("update crm_members set role='admin' where org_id=$1 and user_id=1", [own]);
+    try {
+      expect((await api(`/api/crm/payments/${fixed.body.payment.id}/reverse`, { reason: "Not mine" })).status).toBe(403);
+    } finally {
+      await pool.query("update crm_members set role='owner' where org_id=$1 and user_id=1", [own]);
     }
   });
 });
