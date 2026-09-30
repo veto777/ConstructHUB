@@ -15,6 +15,7 @@ const routes = new Map<string, any[]>(),
   provider = {
     generate: vi.fn(async () => "AI DRAFT: Use the observed page subject."),
   };
+const captcha = vi.fn(async () => new Response('{"success":true}'));
 let own: string, foreign: string;
 const auth = (req: any, res: any) => {
   if (req.testUser) return { id: req.testUser };
@@ -72,7 +73,7 @@ beforeAll(async () => {
   registerSiteScanRoutes(app, auth, {
     provider,
     send: mail,
-    http: vi.fn(async () => new Response('{"success":true}')) as any,
+    http: captcha as any,
   });
   own = await enqueue(1, "https://sitescan-fixture.test/", 2, 0);
   foreign = await enqueue(null, "https://sitescan-other.test/", 1, 0);
@@ -290,4 +291,119 @@ it("reserves monthly schedules once across competing ticks and notifies a score 
     "sitescan.regressed",
     expect.anything(),
   );
+});
+
+it("serializes schedule caps while allowing updates at the limit", async () => {
+  await pool.query("DELETE FROM sitescan_schedules WHERE user_id=1");
+  const schedule = (i: number, pageCap = 1) => call("post", "/api/sitescan/schedule", {
+    body: { url: `https://sitescan-cap-${i}.test/`, enabled: true, pageCap, psiPages: 0 },
+  });
+  for (let i = 0; i < 9; i++) expect((await schedule(i)).status).toBe(200);
+  const results = await Promise.all([schedule(9), schedule(10)]);
+  expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+  expect((await schedule(0, 20)).status).toBe(200);
+  const { rows } = await pool.query("SELECT page_cap FROM sitescan_schedules WHERE user_id=1");
+  expect(rows).toHaveLength(10);
+  expect(rows.some(r => r.page_cap === 20)).toBe(true);
+  await pool.query("DELETE FROM sitescan_schedules WHERE url LIKE 'https://sitescan-cap-%'");
+});
+
+it("failed CAPTCHA attempts do not exhaust scan budgets or capture leads", async () => {
+  const previous = process.env.RECAPTCHA_SECRET_KEY;
+  process.env.RECAPTCHA_SECRET_KEY = "fixture-secret";
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE 'sitescan:lead-%'");
+  const start = (captchaToken?: string) => call("post", "/api/sitescan/public/start", {
+    user: null,
+    body: { url: "https://sitescan-captcha.test/", email: "captcha@example.invalid", captchaToken },
+  });
+  const sent = mail.mock.calls.length;
+  try {
+    for (let i = 0; i < 4; i++) expect((await start()).status).toBe(400);
+    captcha.mockResolvedValueOnce(new Response('{"success":false}'));
+    expect((await start("invalid")).status).toBe(400);
+    captcha.mockRejectedValueOnce(new Error("offline"));
+    expect((await start("unavailable")).status).toBe(503);
+    expect(mail.mock.calls).toHaveLength(sent);
+    const { rows } = await pool.query("SELECT * FROM growth_budgets WHERE key LIKE 'sitescan:lead-%'");
+    expect(rows).toHaveLength(0);
+    expect((await start("valid-fixture")).status).toBe(202);
+    expect(mail.mock.calls).toHaveLength(sent + 1);
+  } finally {
+    if (previous === undefined) delete process.env.RECAPTCHA_SECRET_KEY;
+    else process.env.RECAPTCHA_SECRET_KEY = previous;
+  }
+});
+
+it("allows stopping a rescan after its linked profile becomes unavailable", async () => {
+  const url = "https://sitescan-disconnected.test/";
+  await pool.query("INSERT INTO sitescan_schedules(user_id,url,location_id) VALUES(1,$1,2147483647)", [url]);
+  expect((await call("post", "/api/sitescan/schedule", {
+    body: { url, locationId: 2147483647, enabled: false },
+  })).status).toBe(200);
+  expect((await pool.query("SELECT * FROM sitescan_schedules WHERE url=$1", [url])).rows).toHaveLength(0);
+});
+
+it("isolates all report mutations and exports from another owner's job", async () => {
+  for (const [method, suffix] of [["post", "plan"], ["post", "share"], ["delete", "share"], ["get", "pdf"]]) {
+    expect((await call(method, `/api/sitescan/jobs/:id/${suffix}`, { params: { id: foreign } })).status).toBe(404);
+    expect((await call(method, `/api/sitescan/jobs/:id/${suffix}`, { params: { id: own }, user: null })).status).toBe(401);
+  }
+});
+it("rotates bearer shares and enforces share and email verification expiry", async () => {
+  const share = async () => (await call("post", "/api/sitescan/jobs/:id/share", { params: { id: own } })).body.path.split("/").pop();
+  const read = (value: string) => call("get", "/api/sitescan/shared/:token", { params: { token: value }, user: null });
+  const first = await share(), second = await share();
+  expect(first).not.toBe(second);
+  expect((await read(first)).status).toBe(404);
+  expect((await read(second)).status).toBe(200);
+  await pool.query("UPDATE sitescan_jobs SET share_expires=now()-interval '1 second' WHERE id=$1", [own]);
+  expect((await read(second)).status).toBe(404);
+  await pool.query("UPDATE sitescan_leads SET expires_at=now()-interval '1 second' WHERE email='sitescan-test@example.invalid'");
+  const mailObject = (mail.mock.calls as any)[0][0];
+  const value = mailObject.text.match(/verify=([a-f0-9]{64})/)[1];
+  expect((await call("post", "/api/sitescan/public/verify", { body: { token: value }, user: null })).status).toBe(404);
+});
+it("enforces account scan and draft quotas before provider calls", async () => {
+  await pool.query("DELETE FROM growth_budgets WHERE key IN ('sitescan:scan:1','sitescan:ai:1')");
+  const { takeBudget } = await import("../growth-limits");
+  await takeBudget("sitescan:scan:1", 5, 5, 86400_000);
+  expect((await call("post", "/api/sitescan", { body: { url: "https://sitescan-quota.test/" } })).status).toBe(429);
+  await takeBudget("sitescan:ai:1", 3, 3, 86400_000);
+  const before = provider.generate.mock.calls.length;
+  expect((await call("post", "/api/sitescan/jobs/:id/plan", { params: { id: own } })).status).toBe(429);
+  expect(provider.generate.mock.calls).toHaveLength(before);
+});
+it("admin lead capture is restricted to platform admins and the configured gate", async () => {
+  const { rows: [user] } = await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [`sitescan-admin-${randomUUID()}@example.invalid`]);
+  try {
+    expect((await call("get", "/api/admin/sitescan-leads", { user: null })).status).toBe(401);
+    expect((await call("get", "/api/admin/sitescan-leads", { user: user.id })).status).toBe(403);
+    const admin = await call("get", "/api/admin/sitescan-leads");
+    if (process.env.ADMIN_GATE_USER && process.env.ADMIN_GATE_PASS) expect(admin.status).toBe(403);
+    else {
+      expect(admin.status).toBe(200);
+      expect(admin.body.leads.some((l: any) => l.email === "sitescan-test@example.invalid")).toBe(true);
+      expect(JSON.stringify(admin.body)).not.toMatch(/verify_hash|access_hash/);
+    }
+  } finally { await pool.query("DELETE FROM users WHERE id=$1", [user.id]); }
+});
+
+it("an exhausted user cannot drain the global PageSpeed budget without provider calls", async () => {
+  const { takeBudget } = await import("../growth-limits");
+  const { parsePage } = await import("./audit");
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE 'sitescan:psi:%'");
+  await takeBudget("sitescan:psi:1", 20, 20, 86400_000);
+  await pool.query("UPDATE sitescan_jobs SET status='failed' WHERE status='queued' AND url LIKE 'https://sitescan-%'");
+  const url = "https://sitescan-psi-quota.test/";
+  const id = await enqueue(1, url, 1, 1);
+  const state = emptyState(url);
+  state.pages = [parsePage({ url, status: 200, body: "<title>Fixture</title>", headers: {}, redirects: [], bytes: 22 })];
+  state.queue = [];
+  const pageSpeed = vi.fn();
+  await runSiteScanWorker({ crawl: async () => state, http: vi.fn(), pageSpeed });
+  expect(pageSpeed).not.toHaveBeenCalled();
+  expect((await pool.query("SELECT used FROM growth_budgets WHERE key='sitescan:psi:global'")).rows).toHaveLength(0);
+  const { rows: [job] } = await pool.query("SELECT report FROM sitescan_jobs WHERE id=$1", [id]);
+  expect(job.report.psi).toHaveLength(2);
+  expect(job.report.scores.categories.performance).toBeNull();
 });

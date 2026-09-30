@@ -192,21 +192,33 @@ export function registerSiteScanRoutes(
         .status(400)
         .json({ message: "Enter a public HTTP or HTTPS website URL." });
     }
-    if (body.locationId && !(await profileFor(user, body.locationId)))
+    if (body.enabled && body.locationId && !(await profileFor(user, body.locationId)))
       return res.status(404).json({ message: "Synced profile not found" });
     if (body.enabled) {
-      const {
-        rows: [n],
-      } = await pool.query(
-        "SELECT count(*)::int n FROM sitescan_schedules WHERE user_id=$1",
-        [user],
-      );
-      if (n.n >= 10)
-        return res.status(409).json({ message: "Maximum 10 scheduled sites" });
-      await pool.query(
-        "INSERT INTO sitescan_schedules(user_id,url,location_id,page_cap,psi_pages) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,url) DO UPDATE SET location_id=$3,page_cap=$4,psi_pages=$5",
-        [user, url, body.locationId ?? null, body.pageCap, body.psiPages],
-      );
+      const c = await pool.connect();
+      try {
+        await c.query("BEGIN");
+        // Serialize this owner's limit check and insert, including new URLs.
+        await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+        const { rows: [n] } = await c.query(
+          "SELECT count(*)::int n, bool_or(url=$2) AS existing FROM sitescan_schedules WHERE user_id=$1",
+          [user, url],
+        );
+        if (n.n >= 10 && !n.existing) {
+          await c.query("ROLLBACK");
+          return res.status(409).json({ message: "Maximum 10 scheduled sites" });
+        }
+        await c.query(
+          "INSERT INTO sitescan_schedules(user_id,url,location_id,page_cap,psi_pages) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,url) DO UPDATE SET location_id=$3,page_cap=$4,psi_pages=$5",
+          [user, url, body.locationId ?? null, body.pageCap, body.psiPages],
+        );
+        await c.query("COMMIT");
+      } catch (e) {
+        await c.query("ROLLBACK");
+        throw e;
+      } finally {
+        c.release();
+      }
     } else
       await pool.query(
         "DELETE FROM sitescan_schedules WHERE user_id=$1 AND url=$2",
@@ -322,6 +334,28 @@ export function registerSiteScanRoutes(
         .status(400)
         .json({ message: "Enter a public HTTP or HTTPS website URL." });
     }
+    if (process.env.RECAPTCHA_SECRET_KEY) {
+      if (!body.captchaToken)
+        return res.status(400).json({ message: "Complete the CAPTCHA." });
+      try {
+        const r = await deps.http(
+          "https://www.google.com/recaptcha/api/siteverify",
+          {
+            method: "POST",
+            body: new URLSearchParams({
+              secret: process.env.RECAPTCHA_SECRET_KEY,
+              response: body.captchaToken,
+            }),
+            signal: AbortSignal.timeout(5000),
+          },
+        );
+        const c = await r.json();
+        if (!r.ok || c.success !== true)
+          return res.status(400).json({ message: "CAPTCHA failed." });
+      } catch {
+        return res.status(503).json({ message: "CAPTCHA unavailable. Please retry." });
+      }
+    }
     if (
       !(await takeBudget("sitescan:lead-ip:" + ipKey(req), 3, 1, 86400_000)) ||
       !(await takeBudget(
@@ -335,24 +369,7 @@ export function registerSiteScanRoutes(
       return res
         .status(429)
         .json({ message: "Free scan limit reached. Try again tomorrow." });
-    if (process.env.RECAPTCHA_SECRET_KEY) {
-      if (!body.captchaToken)
-        return res.status(400).json({ message: "Complete the CAPTCHA." });
-      const r = await deps.http(
-        "https://www.google.com/recaptcha/api/siteverify",
-        {
-          method: "POST",
-          body: new URLSearchParams({
-            secret: process.env.RECAPTCHA_SECRET_KEY,
-            response: body.captchaToken,
-          }),
-          signal: AbortSignal.timeout(5000),
-        },
-      );
-      const c = await r.json();
-      if (!r.ok || c.success !== true)
-        return res.status(400).json({ message: "CAPTCHA failed." });
-    }
+
     const job = await enqueue(null, url, 11, 1),
       verify = token(),
       access = token();

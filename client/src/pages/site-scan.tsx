@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ function Copy({ text }: { text: string }) {
     </Button>
   );
 }
-export function ScanReport({ report, draft }: { report: any; draft?: string }) {
+export function ScanReport({ report, draft, summary = false }: { report: any; draft?: string; summary?: boolean }) {
   if (!report) return null;
   return (
     <div className="space-y-5">
@@ -57,9 +57,9 @@ export function ScanReport({ report, draft }: { report: any; draft?: string }) {
         ))}
       </div>
       <p className="text-sm text-muted-foreground">
-        {report.pages} pages checked. {report.remaining || 0} URLs remain
-        outside this report. Scores describe observed checks, not search
-        rankings.
+        {report.pages} pages checked. {summary
+          ? "Preview shows up to five findings. Verify your email for all findings and coverage details."
+          : `${report.remaining || 0} URLs remain outside this report.`} Scores describe observed checks, not search rankings.
       </p>
       {["technical", "performance", "local", "content", "ai-readiness"].map(
         (category) => (
@@ -108,22 +108,22 @@ export function ScanReport({ report, draft }: { report: any; draft?: string }) {
                 ))}
               {!report.findings.some((f: any) => f.category === category) && (
                 <p className="text-sm text-muted-foreground">
-                  No findings from available checks.
+                  {summary ? "Verify your email to see all findings in this category." : "No findings from available checks."}
                 </p>
               )}
             </div>
           </section>
         ),
       )}
-      <p className="text-sm text-muted-foreground">
+      {!summary && <p className="text-sm text-muted-foreground">
         {report.profile
           ? `GBP comparison: ${report.profile.business_name}; profile last synced ${new Date(report.profile.synced_at).toLocaleString()}.`
           : "No synced GBP profile: NAP, service and service-area comparisons were not assessed."}
-      </p>
+      </p>}
       {report.psi?.length > 0 && (
         <details>
           <summary>PageSpeed measurements and field data</summary>
-          <pre className="text-xs whitespace-pre-wrap">
+          <pre className="text-xs whitespace-pre-wrap break-all">
             {JSON.stringify(report.psi, null, 2)}
           </pre>
         </details>
@@ -138,7 +138,7 @@ export function ScanReport({ report, draft }: { report: any; draft?: string }) {
           </CardHeader>
           <CardContent>
             <Copy text={JSON.stringify(report.jsonLdDraft, null, 2)} />
-            <pre className="whitespace-pre-wrap text-xs mt-3">
+            <pre className="whitespace-pre-wrap break-all text-xs mt-3">
               {JSON.stringify(report.jsonLdDraft, null, 2)}
             </pre>
           </CardContent>
@@ -157,7 +157,7 @@ export function ScanReport({ report, draft }: { report: any; draft?: string }) {
           </CardHeader>
           <CardContent>
             <Copy text={draft} />
-            <pre className="whitespace-pre-wrap font-sans text-sm mt-3">
+            <pre className="whitespace-pre-wrap break-all font-sans text-sm mt-3">
               {draft}
             </pre>
           </CardContent>
@@ -335,6 +335,7 @@ export default function SiteScanPage() {
           {data?.jobs.map((j: any, index: number) => (
             <Button
               variant={selected === j.id ? "default" : "outline"}
+              className="h-auto max-w-full whitespace-normal break-all text-left"
               key={j.id}
               onClick={() => {
                 setSelected(j.id);
@@ -457,6 +458,7 @@ export function FreeSiteScanPage() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [captchaToken, setCaptcha] = useState("");
+  const captchaWidget = useRef<number | null>(null);
   const verify = new URLSearchParams(window.location.search).get("verify");
   const { data: config } = useQuery<any>({
     queryKey: ["/api/sitescan/public/config"],
@@ -469,10 +471,11 @@ export function FreeSiteScanPage() {
       if (!stopped && g?.render)
         g.ready(() => {
           if (!stopped)
-            g.render("sitescan-captcha", {
+            captchaWidget.current = g.render("sitescan-captcha", {
               sitekey: config.captchaSiteKey,
               callback: setCaptcha,
               "expired-callback": () => setCaptcha(""),
+              "error-callback": () => setCaptcha(""),
             });
         });
     };
@@ -525,6 +528,11 @@ export function FreeSiteScanPage() {
               setAccess(r.access);
             } catch (e: any) {
               setError(e.message);
+              // Tokens are single-use, including when a later server step fails.
+              if (captchaWidget.current !== null) {
+                (window as any).grecaptcha?.reset(captchaWidget.current);
+                setCaptcha("");
+              }
             } finally {
               setBusy(false);
             }
@@ -549,7 +557,7 @@ export function FreeSiteScanPage() {
             />
           </label>
           <div id="sitescan-captcha" />
-          <Button disabled={busy}>Scan my website</Button>
+          <Button disabled={busy || !config || (!!config.captchaSiteKey && !captchaToken)}>Scan my website</Button>
           <p className="text-xs">
             We use your email to deliver this report.{" "}
             <a href="/privacy" className="underline">
@@ -575,7 +583,7 @@ export function FreeSiteScanPage() {
           Scan {data.status}. {data.error}
         </p>
       )}
-      {data?.summary && <ScanReport report={data.summary} />}
+      {data?.summary && <ScanReport report={data.summary} summary />}
       <ScanReport report={data?.report} />
     </main>
   );

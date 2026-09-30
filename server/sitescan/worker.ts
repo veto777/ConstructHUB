@@ -16,12 +16,12 @@ export async function profileFor(user: number, id?: number) {
   const {
     rows: [p],
   } = await pool.query(
-    `SELECT l.id,l.business_name,l.address,l.city,l.state,l.zip_code,l.country,l.phone,l.website,l.services,l.service_areas,s.last_success AS synced_at
-    FROM business_locations l JOIN gbp_sync_status s ON s.location_id=l.id AND s.kind='profile' AND s.last_success IS NOT NULL
+    `SELECT l.id,s.profile_snapshot,s.last_success AS synced_at
+    FROM business_locations l JOIN gbp_sync_status s ON s.location_id=l.id AND s.kind='profile' AND s.last_success IS NOT NULL AND s.profile_snapshot IS NOT NULL
     WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL AND ($2::integer IS NULL OR l.id=$2) ORDER BY l.id LIMIT 1`,
     [user, id ?? null],
   );
-  return p || null;
+  return p ? { ...p.profile_snapshot, id: p.id, synced_at: p.synced_at } : null;
 }
 export async function enqueue(
   user: number | null,
@@ -146,8 +146,8 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       .slice(0, job.psi_pages))
       for (const strategy of ["mobile", "desktop"] as const) {
         if (
-          !(await takeBudget("sitescan:psi:global", 100, 1, 86400_000)) ||
-          !(await takeBudget("sitescan:psi:" + job.user_id, 20, 1, 86400_000))
+          !(await takeBudget("sitescan:psi:" + job.user_id, 20, 1, 86400_000)) ||
+          !(await takeBudget("sitescan:psi:global", 100, 1, 86400_000))
         ) {
           psi.push({
             url: p.url,

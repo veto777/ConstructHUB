@@ -278,8 +278,17 @@ export async function crawl(
             "Redirect leaves the selected origin; destination excluded from audit.",
         });
       } else {
+        // Several discovered aliases can redirect to the same page. Count the
+        // destination once so aliases cannot fabricate duplicate-content findings.
+        if (state.pages.some((p) => p.url === r.url)) {
+          state.queue.shift();
+          await checkpoint(state);
+          continue;
+        }
         const page = parsePage(r);
         state.pages.push(page);
+        visited.add(r.url);
+        for (const redirect of r.redirects) visited.add(redirect);
         if (!page.nofollow)
           for (const link of page.links)
             if (
@@ -301,6 +310,16 @@ export async function crawl(
     await checkpoint(state);
   }
   return state;
+}
+const businessTypes = new Set([
+  "LocalBusiness", "HomeAndConstructionBusiness", "Electrician",
+  "GeneralContractor", "HVACBusiness", "HousePainter", "Locksmith",
+  "MovingCompany", "Plumber", "RoofingContractor",
+]);
+function isBusinessSchema(value: any): boolean {
+  const types = Array.isArray(value?.["@type"]) ? value["@type"] : [value?.["@type"]];
+  return types.some((type: unknown) => typeof type === "string" &&
+    businessTypes.has(type.replace(/^https?:\/\/schema\.org\//, "")));
 }
 export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
   const findings: Finding[] = [];
@@ -496,9 +515,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
         p.invalidSchema ||
         p.schema.some(
           (s) =>
-            /LocalBusiness|HomeAndConstructionBusiness/.test(
-              String(s?.["@type"]),
-            ) &&
+            isBusinessSchema(s) &&
             (!s.name || (!s.address && !s.areaServed)),
         ),
     ),
@@ -512,11 +529,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "Business schema not found",
     pages.length &&
       !pages.some((p) =>
-        p.schema.some((s) =>
-          /LocalBusiness|HomeAndConstructionBusiness/.test(
-            String(s?.["@type"]),
-          ),
-        ),
+        p.schema.some(isBusinessSchema),
       )
       ? [pages[0].url]
       : [],

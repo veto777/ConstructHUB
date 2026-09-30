@@ -44,6 +44,7 @@ export async function ensureGbpSchema() {
       synced_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(location_id, name)
     );
     CREATE INDEX IF NOT EXISTS gbp_media_location_idx ON gbp_media(location_id, source, create_time DESC);
+    ALTER TABLE gbp_sync_status ADD COLUMN IF NOT EXISTS profile_snapshot jsonb;
     CREATE TABLE IF NOT EXISTS gbp_daily_metrics (
       location_id integer REFERENCES business_locations(id) ON DELETE CASCADE,
       date date NOT NULL, metric text NOT NULL, value bigint NOT NULL,

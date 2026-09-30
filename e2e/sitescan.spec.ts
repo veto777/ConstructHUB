@@ -146,4 +146,90 @@ test("public lead magnet shows summary and email verification guidance", async (
     page.getByText("Check your email for the verification link"),
   ).toBeVisible();
   await expect(page.getByText("Missing title", { exact: false })).toBeVisible();
+  await expect(page.getByText("Preview shows up to five findings.", { exact: false })).toBeVisible();
+  await expect(page.getByText("No findings from available checks.")).toHaveCount(0);
+  await expect(page.getByText("0 URLs remain", { exact: false })).toHaveCount(0);
+});
+
+test("configured CAPTCHA can be solved again after a rejected submission", async ({ page }) => {
+  await page.route("**/api/sitescan/public/config", r => r.fulfill({ json: { captchaSiteKey: "fixture-site-key" } }));
+  await page.route("https://www.google.com/recaptcha/api.js*", r => r.fulfill({
+    contentType: "application/javascript",
+    body: `window.grecaptcha = {
+      ready: callback => callback(),
+      render: (id, options) => {
+        const button = document.createElement('button');
+        button.type = 'button'; button.textContent = 'Solve fixture CAPTCHA';
+        button.onclick = () => options.callback('fixture-token');
+        document.getElementById(id).appendChild(button);
+        return 0;
+      },
+      reset: () => { window.captchaReset = true; }
+    };`,
+  }));
+  let attempts = 0;
+  await page.route("**/api/sitescan/public/start", r => {
+    attempts++;
+    return r.fulfill({ status: 400, json: { message: "CAPTCHA failed." } });
+  });
+  await page.goto("/free-site-scan");
+  await page.getByLabel("Website URL").fill("https://fixture.test/");
+  await page.getByLabel("Email", { exact: true }).fill("fixture@example.invalid");
+  const submit = page.getByRole("button", { name: "Scan my website" });
+  await expect(submit).toBeDisabled();
+  await page.getByRole("button", { name: "Solve fixture CAPTCHA" }).click();
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("CAPTCHA failed");
+  await expect(submit).toBeDisabled();
+  expect(await page.evaluate(() => (window as any).captchaReset)).toBe(true);
+  await page.getByRole("button", { name: "Solve fixture CAPTCHA" }).click();
+  await submit.click();
+  await expect.poll(() => attempts).toBe(2);
+});
+
+test("account history and reports fit a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const url = "https://sitescan-mobile.test/" + "long-path-".repeat(30);
+  await page.route("**/api/sitescan", r => r.fulfill({ json: {
+    locations: [], schedules: [], jobs: [{ id: "fixture-mobile", url, created_at: "2026-09-29", status: "completed", scores: { overall: 80 } }],
+  } }));
+  await page.route("**/api/sitescan/jobs/fixture-mobile", r => r.fulfill({ json: {
+    url, status: "completed", pages: 1, pageCap: 1, aiDraft: url,
+    report: { pages: 1, scores: { overall: 80, categories: { technical: 80 } }, findings: [], jsonLdDraft: { url } },
+  } }));
+  await page.goto("/site-scan");
+  await page.getByRole("button", { name: /sitescan-mobile/ }).click();
+  await expect(page.getByRole("heading", { name: "AI fix plan — draft" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const history = await page.getByRole("button", { name: /sitescan-mobile/ }).boundingBox();
+  expect(history!.x + history!.width).toBeLessThanOrEqual(390);
+  expect(await page.locator("pre").evaluateAll(nodes => nodes.every(n => n.scrollWidth <= n.clientWidth))).toBe(true);
+});
+
+test("verified quick report progresses from queued to complete and expired shares explain failure", async ({ page }) => {
+  let polls = 0;
+  await page.route("**/api/sitescan/public/config", r => r.fulfill({ json: { captchaSiteKey: null } }));
+  await page.route("**/api/sitescan/public/verify", r => r.fulfill({ json: ++polls === 1
+    ? { status: "queued", report: null }
+    : { status: "completed", report: { pages: 11, scores: { overall: 80, categories: { technical: 80 } }, findings: [], coverage: { notes: ["Fixture full report"] } } },
+  }));
+  await page.goto("/free-site-scan?verify=" + "c".repeat(64));
+  await expect(page.getByRole("status")).toContainText("queued");
+  await expect(page.getByText("Fixture full report")).toBeVisible();
+  await expect(page.getByLabel("Email", { exact: true })).toHaveCount(0);
+  await page.route("**/api/sitescan/shared/*", r => r.fulfill({ status: 404, json: { message: "Expired" } }));
+  await page.goto("/site-scan/report/" + "d".repeat(64));
+  await expect(page.getByRole("alert")).toContainText("unavailable or revoked");
+});
+
+test("signed-out site-scan uses the free form and account APIs deny access", async ({ page, request }) => {
+  test.skip(process.env.DEV_AUTH_BYPASS_USER1 !== "false", "Run against the lane server with bypass disabled");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/site-scan");
+  await expect(page.getByRole("heading", { name: "Free 60-second website scan" })).toBeVisible();
+  await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  expect((await request.get("/api/sitescan")).status()).toBe(401);
+  expect((await request.post("/api/sitescan", { data: { url: "https://fixture.test/" } })).status()).toBe(401);
+  expect((await request.get("/api/admin/sitescan-leads")).status()).toBe(401);
 });
