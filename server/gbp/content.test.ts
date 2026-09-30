@@ -32,8 +32,8 @@ const call = async (path: string, body?: any, method = body ? 'POST' : 'GET', ow
 };
 beforeAll(async () => {
     const url = new URL(process.env.DATABASE_URL!);
-    if (url.pathname !== '/constructhub_dev_a3' || !['127.0.0.1', 'localhost'].includes(url.hostname))
-        throw new Error('a3 DB required');
+    if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(url.pathname) || !['127.0.0.1', 'localhost'].includes(url.hostname))
+        throw new Error('a local development DB is required');
     process.env.GBP_MEDIA_PUBLIC_BASE_URL = 'https://media.example.invalid';
     await ensureGrowthSchema();
     await ensureGbpSchema();
