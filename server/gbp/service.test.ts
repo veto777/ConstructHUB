@@ -84,6 +84,15 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     expect(prof.hours).toMatchObject({Monday:'8:00 AM – 5:30 PM',Tuesday:'Closed'});expect(prof.social_profiles).toMatchObject({facebook:'https://www.facebook.com/fixture'});expect(prof.social_profiles.text_messaging).toBeUndefined();
     expect((await pool.query('SELECT value::text FROM gbp_daily_metrics WHERE location_id=$1',[locationId])).rows).toEqual([{value:'0'}]);
   });
+  it('does not erase a saved profile when Google returns an incomplete or mismatched successful response', async () => {
+    const before=(await pool.query('SELECT description,phone,services,hours FROM business_locations WHERE id=$1',[locationId])).rows[0];
+    for (const invalid of [{}, {name:'locations/wrong',title:'Wrong location'}]) {
+      const incomplete=new GoogleClient(async()=>'fixture',async(url,init)=>new URL(String(url)).pathname==='/v1/locations/fixture'
+        ? new Response(JSON.stringify(invalid)) : http(url,init),new Limiter(()=>0,async()=>{}),async()=>{});
+      expect(await syncLocation(userId,locationId,incomplete)).toMatchObject({profile:{kind:'invalid',message:expect.stringContaining('saved data was preserved')}});
+      expect((await pool.query('SELECT description,phone,services,hours FROM business_locations WHERE id=$1',[locationId])).rows[0]).toEqual(before);
+    }
+  });
   it('reconciles removed social links, preserves local-only fields and reports optional sync failures', async () => {
     await pool.query(`UPDATE business_locations SET social_profiles=$2 WHERE id=$1`, [locationId,
       JSON.stringify({facebook:'https://facebook.com/old',instagram:'https://instagram.com/removed',custom:'https://example.invalid/local'})]);

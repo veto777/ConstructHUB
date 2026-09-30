@@ -101,6 +101,8 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
       try {
         if (kind === 'profile') {
           const info = await client.request('information',`/v1/${l.gbp_location_name}?readMask=${PROFILE_READ_MASK}`);
+          if (info.name !== l.gbp_location_name || typeof info.title !== 'string' || !info.title.trim())
+            throw new GoogleError('invalid', 'Google returned an incomplete or mismatched profile; saved data was preserved', 502);
           const warnings: string[] = [];
           const optional = async (label: string, load: () => Promise<any>) => {
             try { return await load(); }
