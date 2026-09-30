@@ -16,7 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiIssueMessage } from "@/lib/api-issue-message";
 import {
   ArrowLeft, Loader2, Plus, DollarSign, FileDiff, ClipboardCheck, ClipboardCopy, NotebookPen,
-  Palette, FileBadge, TrendingUp, TrendingDown, Send, Check, RotateCcw, Pencil,
+  Palette, FileBadge, TrendingUp, TrendingDown, Send, Check, RotateCcw, Pencil, Trash2,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
@@ -26,6 +26,12 @@ import {
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
+/** The viewer's local calendar day of a timestamp, as YYYY-MM-DD (a date input's value). */
+const localDay = (d: string) => {
+  const x = new Date(d);
+  if (Number.isNaN(x.getTime())) return "";
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+};
 const cents = (v: string) => Math.round((parseFloat(v) || 0) * 100);
 
 const TABS = ["costing", "change-orders", "punch", "logs", "selections", "permits"] as const;
@@ -34,7 +40,7 @@ const SELECTION_STATUSES = ["pending", "chosen", "ordered", "installed"] as cons
 /** Server field keys → the words on these forms, for validation toasts. */
 const FIELD_LABELS: Record<string, string> = {
   title: "Title", amountCents: "Amount", scheduleImpactDays: "+Days", location: "Location",
-  workCompleted: "Work completed", weather: "Weather", crewCount: "Crew", name: "Selection",
+  workCompleted: "Work completed", weather: "Weather", crewCount: "Crew", logDate: "Date", name: "Selection",
   category: "Category", allowanceCents: "Allowance", actualCents: "Actual cost",
   chosenOptionName: "Chosen option", budgetCents: "Amount", costCodeId: "Cost code", description: "Description",
 };
@@ -132,6 +138,39 @@ export default function CrmProjectPage() {
   const [ce, setCe] = useState({ kind: "vendor_bill", costCodeId: "", amount: "", description: "" });
   // Selection being edited inline: its id + the draft values.
   const [selEdit, setSelEdit] = useState<{ id: string; chosen: string; actual: string; status: string } | null>(null);
+
+  // Daily logs: the author fixes their own, a manageJobs seat anyone's (the
+  // server enforces the same rule and says so on a 403). Edited inline like a
+  // selection; `date` is the calendar day the list shows (the viewer's local day).
+  type LogDraft = { id: string; date: string; origDate: string; workCompleted: string; weather: string; crewCount: string };
+  const [logEdit, setLogEdit] = useState<LogDraft | null>(null);
+  const [deletingLog, setDeletingLog] = useState<string | null>(null);
+  const logsKey = `/api/crm/projects/${id}/daily-logs`;
+  const canChangeLog = (l: any) => canManageJobs || (!!me?.member?.id && l.authorMemberId === me.member.id);
+  const saveLog = (draft: LogDraft) => {
+    const body: Record<string, unknown> = {
+      workCompleted: draft.workCompleted.trim(),
+      weather: draft.weather.trim() || null,
+      crewCount: draft.crewCount === "" ? null : parseInt(draft.crewCount),
+    };
+    // Only a changed day is sent, as local noon: the stored time is then the
+    // picked day in the viewer's zone, so the list never shows the day before.
+    if (draft.date && draft.date !== draft.origDate) body.logDate = new Date(`${draft.date}T12:00:00`).toISOString();
+    patchChild("daily-logs", draft.id, body, "daily log", "Log updated", logsKey)
+      .then((ok) => ok && setLogEdit(null));
+  };
+  const deleteLog = (logId: string) => {
+    if (!window.confirm("Delete this daily log? This can't be undone.")) return;
+    setDeletingLog(logId);
+    apiRequest("DELETE", `/api/crm/daily-logs/${logId}`)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: [logsKey] });
+        if (logEdit?.id === logId) setLogEdit(null);
+        toast({ title: "Log deleted" });
+      })
+      .catch((e) => toast({ title: "Could not delete daily log", description: apiIssueMessage(e), variant: "destructive" }))
+      .finally(() => setDeletingLog(null));
+  };
 
   const addCostEntry = () => {
     const kind = COST_ENTRY_KINDS.find((k) => k.value === ce.kind)!;
@@ -458,7 +497,7 @@ export default function CrmProjectPage() {
         <TabsContent value="logs" className="mt-4">
           <Card>
             <CardHeader>
-              <SectionTitle title="Daily logs" description="Any crew member can file one." />
+              <SectionTitle title="Daily logs" description="Any crew member can file one and edit their own; anyone who manages jobs can edit them all." />
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
@@ -479,14 +518,66 @@ export default function CrmProjectPage() {
                   </Button>
                 </div>
               </div>
-              {logs?.map((l: any) => (
-                <div key={l.id} className="rounded-lg border px-4 py-3">
-                  <div className="text-xs text-muted-foreground">
-                    {day(l.logDate)}{l.weather ? ` · ${l.weather}` : ""}{l.crewCount ? ` · ${l.crewCount} crew` : ""}
+              {logs?.map((l: any) => {
+                const editing = logEdit?.id === l.id ? logEdit : null;
+                return (
+                  <div key={l.id} className="rounded-lg border px-4 py-3 space-y-3" data-testid={`log-row-${l.id}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-xs text-muted-foreground">
+                          {day(l.logDate)}{l.weather ? ` · ${l.weather}` : ""}{l.crewCount ? ` · ${l.crewCount} crew` : ""}
+                        </div>
+                        <div className="text-sm mt-1 whitespace-pre-wrap">{l.workCompleted}</div>
+                      </div>
+                      {canChangeLog(l) && !editing && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button size="sm" variant="ghost" data-testid={`button-edit-log-${l.id}`}
+                            onClick={() => {
+                              const date = localDay(l.logDate);
+                              setLogEdit({
+                                id: l.id, date, origDate: date, workCompleted: l.workCompleted ?? "",
+                                weather: l.weather ?? "", crewCount: l.crewCount != null ? String(l.crewCount) : "",
+                              });
+                            }}>
+                            <Pencil className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                            aria-label="Delete this daily log" title="Delete this daily log"
+                            disabled={deletingLog === l.id} data-testid={`button-delete-log-${l.id}`}
+                            onClick={() => deleteLog(l.id)}>
+                            {deletingLog === l.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    {editing && (
+                      <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+                        <Textarea rows={3} value={editing.workCompleted} maxLength={20000}
+                          onChange={(e) => setLogEdit({ ...editing, workCompleted: e.target.value })}
+                          data-testid="input-edit-log-work" />
+                        <div className="flex flex-wrap gap-2 items-end">
+                          <div><Label className="text-xs">Date</Label>
+                            <Input type="date" value={editing.date}
+                              onChange={(e) => setLogEdit({ ...editing, date: e.target.value })}
+                              data-testid="input-edit-log-date" /></div>
+                          <div><Label className="text-xs">Weather</Label>
+                            <Input value={editing.weather} maxLength={100}
+                              onChange={(e) => setLogEdit({ ...editing, weather: e.target.value })} /></div>
+                          <div><Label className="text-xs">Crew</Label>
+                            <Input type="number" min={0} max={500} value={editing.crewCount}
+                              onChange={(e) => setLogEdit({ ...editing, crewCount: e.target.value })} /></div>
+                          <Button size="sm" variant="ghost" onClick={() => setLogEdit(null)}>Cancel</Button>
+                          <Button size="sm" data-testid="button-save-log"
+                            disabled={!editing.workCompleted.trim() || !editing.date}
+                            onClick={() => saveLog(editing)}>
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-sm mt-1 whitespace-pre-wrap">{l.workCompleted}</div>
-                </div>
-              ))}
+                );
+              })}
               {logsError ? (
                 <p className="text-sm text-destructive">Couldn't load daily logs — refresh to try again.</p>
               ) : !logs?.length && <EmptyState compact icon={NotebookPen} title="No logs yet" />}

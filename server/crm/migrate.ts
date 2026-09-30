@@ -17,6 +17,7 @@ import {
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { recalcEstimate } from "./entities";
+import { lockDocNumbers, nextDocNumber, type DocNumberPrefix } from "./doc-number";
 import { sendWithFallback } from "../email";
 import {
   MAX_CSV_BYTES, MAX_ROWS, MIGRATE_ENTITIES, MIGRATE_FIELDS,
@@ -91,6 +92,35 @@ async function importCustomerRow(
   return { id: row.id };
 }
 
+/** An imported row whose number this CRM already uses: skipped, never duplicated. */
+type NumberTaken = { taken: string };
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * The document number for an imported row, INSIDE the insert's transaction
+ * and under the same per-series, per-org lock every create path takes:
+ *   - the CSV's own number when it has one, unless this org already has a
+ *     document with that number — then the row is skipped, never duplicated;
+ *   - otherwise the next number from the one allocator (doc-number.ts). The
+ *     old fallback, 1000 + a count(*) taken once per import, handed out
+ *     numbers that still existed after any delete.
+ */
+async function importedDocNumber(
+  tx: Tx,
+  prefix: DocNumberPrefix,
+  table: typeof crmEstimates | typeof crmInvoices,
+  orgId: string,
+  given: string | undefined,
+): Promise<string | NumberTaken> {
+  const number = (given ?? "").trim();
+  if (!number) return nextDocNumber(tx, prefix, orgId);
+  await lockDocNumbers(tx, prefix, orgId);
+  const [clash] = await tx.select({ id: table.id }).from(table)
+    .where(and(eq(table.orgId, orgId), eq(table.number, number))).limit(1);
+  return clash ? { taken: number } : number;
+}
+
 /** Attach an imported document to an existing customer: email first, then exact name. */
 async function resolveCustomer(orgId: string, rec: Record<string, string>) {
   if (rec.customerEmail) {
@@ -127,48 +157,54 @@ async function resolveCustomer(orgId: string, rec: Record<string, string>) {
 async function importEstimateRow(
   ctx: OrgContext,
   rec: Record<string, string>,
-  seq: number,
-): Promise<{ id: string } | { error: string }> {
+): Promise<{ id: string } | { error: string } | NumberTaken> {
   const cust = await resolveCustomer(ctx.org.id, rec);
   if (!cust) {
     return { error: `no client in your CRM matches "${rec.customerName || rec.customerEmail}" — import clients first` };
   }
   const totalCents = parseMoneyToCents(rec.total) ?? 0;
   const status = mapEstimateStatus(rec.status);
-  const [est] = await db
-    .insert(crmEstimates)
-    .values({
-      orgId: ctx.org.id,
-      customerId: cust.id,
-      number: rec.number || `E-${1000 + seq}`,
-      title: rec.title || "Imported estimate",
-      status,
-      publicToken: token(),
-      createdByMemberId: ctx.member.id,
-      sentAt: status !== "draft" ? new Date() : null,
-    } as any)
-    .returning();
-  if (totalCents > 0) {
-    await db.insert(crmEstimateItems).values({
-      orgId: ctx.org.id,
-      estimateId: est.id,
-      sortOrder: 0,
-      kind: "labor",
-      name: "Imported total",
-      quantityMilli: 1000,
-      unitPriceCents: totalCents,
-      taxable: false,
-    } as any);
-    await recalcEstimate(ctx.org.id, est.id);
-  }
-  return { id: est.id };
+  const est = await db.transaction(async (tx) => {
+    const number = await importedDocNumber(tx, "E", crmEstimates, ctx.org.id, rec.number);
+    if (typeof number !== "string") return number;
+    const [row] = await tx
+      .insert(crmEstimates)
+      .values({
+        orgId: ctx.org.id,
+        customerId: cust.id,
+        number,
+        title: rec.title || "Imported estimate",
+        status,
+        publicToken: token(),
+        createdByMemberId: ctx.member.id,
+        sentAt: status !== "draft" ? new Date() : null,
+      } as any)
+      .returning();
+    if (totalCents > 0) {
+      await tx.insert(crmEstimateItems).values({
+        orgId: ctx.org.id,
+        estimateId: row.id,
+        sortOrder: 0,
+        kind: "labor",
+        name: "Imported total",
+        quantityMilli: 1000,
+        unitPriceCents: totalCents,
+        taxable: false,
+      } as any);
+    }
+    return { id: row.id as string };
+  });
+  if ("taken" in est) return est;
+  // recalcEstimate reads through the shared pool, so it runs once the
+  // estimate and its line item are committed.
+  if (totalCents > 0) await recalcEstimate(ctx.org.id, est.id);
+  return est;
 }
 
 async function importInvoiceRow(
   ctx: OrgContext,
   rec: Record<string, string>,
-  seq: number,
-): Promise<{ id: string } | { error: string }> {
+): Promise<{ id: string } | { error: string } | NumberTaken> {
   const cust = await resolveCustomer(ctx.org.id, rec);
   if (!cust) {
     return { error: `no client in your CRM matches "${rec.customerName || rec.customerEmail}" — import clients first` };
@@ -180,35 +216,41 @@ async function importInvoiceRow(
   if (status === "paid" && paidCents === 0) paidCents = totalCents;
   if (status === "draft" && paidCents > 0) status = paidCents >= totalCents && totalCents > 0 ? "paid" : "partial";
 
-  const [inv] = await db
-    .insert(crmInvoices)
-    .values({
-      orgId: ctx.org.id,
-      customerId: cust.id,
-      number: rec.number || `I-${1000 + seq}`,
-      title: rec.title || "Imported invoice",
-      status,
-      subtotalCents: totalCents,
-      totalCents,
-      paidCents,
-      publicToken: token(),
-      sentAt: status !== "draft" ? new Date() : null,
-      paidAt: status === "paid" ? new Date() : null,
-    } as any)
-    .returning();
-  if (totalCents > 0) {
-    await db.insert(crmInvoiceItems).values({
-      orgId: ctx.org.id,
-      invoiceId: inv.id,
-      sortOrder: 0,
-      kind: "labor",
-      name: "Imported total",
-      quantityMilli: 1000,
-      unitPriceCents: totalCents,
-      taxable: false,
-    } as any);
-  }
-  return { id: inv.id };
+  // A blank number takes the next INV- number, the series every other
+  // invoice create path allocates from.
+  return db.transaction(async (tx) => {
+    const number = await importedDocNumber(tx, "INV", crmInvoices, ctx.org.id, rec.number);
+    if (typeof number !== "string") return number;
+    const [inv] = await tx
+      .insert(crmInvoices)
+      .values({
+        orgId: ctx.org.id,
+        customerId: cust.id,
+        number,
+        title: rec.title || "Imported invoice",
+        status,
+        subtotalCents: totalCents,
+        totalCents,
+        paidCents,
+        publicToken: token(),
+        sentAt: status !== "draft" ? new Date() : null,
+        paidAt: status === "paid" ? new Date() : null,
+      } as any)
+      .returning();
+    if (totalCents > 0) {
+      await tx.insert(crmInvoiceItems).values({
+        orgId: ctx.org.id,
+        invoiceId: inv.id,
+        sortOrder: 0,
+        kind: "labor",
+        name: "Imported total",
+        quantityMilli: 1000,
+        unitPriceCents: totalCents,
+        taxable: false,
+      } as any);
+    }
+    return { id: inv.id as string };
+  });
 }
 
 // ── Request validation ──────────────────────────────────────────────────────
@@ -310,17 +352,8 @@ export function registerCrmMigrateRoutes(app: Express, getDevUser: GetUser): voi
     const results: RowOutcome[] = [];
     let created = 0;
     let skipped = 0;
-    let seq = 0;
-    if (entity !== "customers") {
-      // Document numbering continues from the org's current count, as in
-      // entities.ts — count once, then increment locally per created row.
-      const table = entity === "estimates" ? crmEstimates : crmInvoices;
-      const [{ n }] = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(table)
-        .where(eq(table.orgId, ctx.org.id));
-      seq = n;
-    }
+    // Documents are numbered row by row, inside each row's insert transaction
+    // (importedDocNumber), never from a count taken up front.
 
     for (let i = 0; i < rawRows.length; i++) {
       const rowNum = i + 1;
@@ -365,19 +398,27 @@ export function registerCrmMigrateRoutes(app: Express, getDevUser: GetUser): voi
             results.push({ row: rowNum, status: "created", id: out.id });
           }
         } else {
-          seq++;
           const out = entity === "estimates"
-            ? await importEstimateRow(ctx, rec, seq)
-            : await importInvoiceRow(ctx, rec, seq);
+            ? await importEstimateRow(ctx, rec)
+            : await importInvoiceRow(ctx, rec);
           if ("error" in out) {
-            seq--; // don't burn a number on a row that never imported
             results.push({ row: rowNum, status: "error", message: out.error });
+          } else if ("taken" in out) {
+            skipped++;
+            results.push({ row: rowNum, status: "skipped", message: `number ${out.taken} already exists in this CRM` });
           } else {
             created++;
             results.push({ row: rowNum, status: "created", id: out.id });
           }
         }
       } catch (e: any) {
+        if (entity !== "customers" && (e?.code ?? e?.cause?.code) === "23505") {
+          // The (org_id, number) unique index caught a number that another
+          // write took first: skip the row rather than import it twice.
+          skipped++;
+          results.push({ row: rowNum, status: "skipped", message: "its document number already exists in this CRM" });
+          continue;
+        }
         console.error(`[crm] migrate import row ${rowNum} failed:`, e?.message || e);
         results.push({ row: rowNum, status: "error", message: "unexpected error importing this row" });
       }
@@ -389,7 +430,13 @@ export function registerCrmMigrateRoutes(app: Express, getDevUser: GetUser): voi
       skipped,
       errors: errorCount,
       results,
-      hint: skipped && !force ? "Rows were skipped on an email/phone match. Re-run with ?force=1 to create them anyway." : undefined,
+      // ?force=1 only overrides the client dedupe; a document whose number
+      // is already in use is never imported twice.
+      hint: !skipped ? undefined
+        : entity === "customers"
+          ? (force ? undefined : "Rows were skipped on an email/phone match. Re-run with ?force=1 to create them anyway.")
+          : "Rows whose number already exists in this CRM were skipped, so nothing was numbered twice. " +
+            "Clear or change those numbers in the file to import them.",
     });
   });
 

@@ -23,7 +23,7 @@ async function makeInvoice(page: any): Promise<{ invoiceId: string; token: strin
 }
 
 test.describe("/i/:token (public invoice)", () => {
-  test("curated: open invoice renders, pay fails gracefully without Stripe", async ({ page }) => {
+  test("curated: open invoice renders, and says so honestly when it can't be paid online", async ({ page }) => {
     const guards = watchPage(page);
     const { token } = await makeInvoice(page);
 
@@ -31,10 +31,18 @@ test.describe("/i/:token (public invoice)", () => {
     await expect(page.getByText("E2E line item")).toBeVisible();
     await expect(page.getByText(/Due now/)).toBeVisible();
 
-    const pay = page.getByTestId("button-pay-invoice");
-    await expect(pay).toBeVisible();
-    await pay.click();
-    await expect(page.getByText("Payment unavailable", { exact: true })).toBeVisible();
+    // No Stripe account (the e2e lanes): pay-info says neither card nor bank
+    // transfer is offered, so the page tells the client how to pay instead of
+    // showing a Pay button that could only fail. With a rail, a pay button is
+    // there (not clicked: it would leave for Stripe checkout).
+    const info = await (await page.request.get(`/api/public/invoices/${token}/pay-info`)).json();
+    if (!info.cardAvailable && !info.achAvailable) {
+      await expect(page.getByTestId("text-online-pay-unavailable")).toBeVisible();
+      await expect(page.getByTestId("text-online-pay-unavailable")).toContainText("Online payment isn't available");
+      await expect(page.locator('[data-testid^="button-pay-invoice"]')).toHaveCount(0);
+    } else {
+      await expect(page.locator('[data-testid^="button-pay-invoice"]').first()).toBeVisible();
+    }
 
     guards.assertClean("public invoice pay");
   });
@@ -59,11 +67,20 @@ test.describe("/i/:token (public invoice)", () => {
 
   test("sweep: every button and link", async ({ page }) => {
     const { token } = await makeInvoice(page);
+    // makeInvoice left a client session on this context, so pay-info answers.
+    const info = await (await page.request.get(`/api/public/invoices/${token}/pay-info`)).json();
+    const noOnlineRail = !info.cardAvailable && !info.achAvailable;
     const { clicked, labels } = await sweepPage(page, `/i/${token}`, {
-      ready: '[data-testid="button-pay-invoice"]',
+      // The settled pay state: the honest "Online payment isn't available"
+      // card when no rail is offered (the e2e lanes), else a pay button.
+      ready: noOnlineRail
+        ? '[data-testid="text-online-pay-unavailable"]'
+        : '[data-testid^="button-pay-invoice"]',
     });
     console.log(`public invoice sweep clicked ${clicked}: ${labels.join(" | ")}`);
-    // Full-bleed client page: no app chrome — the Pay button is the one control.
-    expect(clicked).toBeGreaterThanOrEqual(1);
+    // Full-bleed client page: no app chrome — only the page's own controls.
+    // With no online rail the only controls are the company's tel:/mailto:
+    // links, which the sweep never follows; otherwise the pay button is one.
+    expect(clicked).toBeGreaterThanOrEqual(noOnlineRail ? 0 : 1);
   });
 });

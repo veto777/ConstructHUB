@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,8 +45,9 @@ const BID_PILL: Record<string, { label: string; cls: string }> = {
 
 type BidTab = (typeof BID_TABS)[number]["key"];
 
-/** One page of GET /api/crm/customers?paged=1 — total and bidCounts cover the
- *  whole book under the same search, not just the rows returned. */
+/** One page of GET /api/crm/customers?paged=1[&bidStatus=…] — bidCounts cover
+ *  the whole book under the same search; total counts the clients that match
+ *  the search AND the tab, not just the rows returned. */
 interface ClientPage {
   rows: Client[];
   total: number;
@@ -108,15 +109,21 @@ export default function CrmClientsPage() {
 
   // Paged: the legacy bare array stops at the newest 500, so a bigger book
   // silently lost clients and the tab counts undercounted. The server's
-  // total + bidCounts describe the whole book; rows arrive 100 at a time.
+  // bidCounts describe the whole book; rows arrive 100 at a time. A tab is a
+  // server-side filter (?bidStatus=), so "Job Won" pages through every won
+  // client, not just the won ones among the pages already loaded.
   const {
-    data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage,
+    data, isLoading, isError, isPlaceholderData, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["/api/crm/customers", "paged", qDebounced],
+    queryKey: ["/api/crm/customers", "paged", qDebounced, tab],
+    // While another tab (or search) loads, the tab counts stay on screen from
+    // the previous answer; the rows area shows the spinner, never the old rows.
+    placeholderData: keepPreviousData,
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<ClientPage> => {
       const params = new URLSearchParams({ paged: "1", limit: String(PAGE_SIZE), offset: String(pageParam) });
       if (qDebounced) params.set("q", qDebounced);
+      if (tab !== "all") params.set("bidStatus", tab);
       const r = await fetch(`/api/crm/customers?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
@@ -132,8 +139,12 @@ export default function CrmClientsPage() {
     ? Array.from(new Map(data.pages.flatMap((p) => p.rows).map((c) => [c.id, c] as const)).values())
     : undefined;
   const latest = data?.pages[data.pages.length - 1];
-  const total = latest?.total ?? 0;
-  const tabTotal = (t: BidTab) => (t === "all" ? total : latest?.bidCounts?.[t] ?? 0);
+  // Every client under the search, whatever the tab (the four buckets add up
+  // to the whole book).
+  const bookTotal = latest?.bidCounts
+    ? latest.bidCounts.won + latest.bidCounts.undecided + latest.bidCounts.declined + latest.bidCounts.none
+    : 0;
+  const tabTotal = (t: BidTab) => (t === "all" ? bookTotal : latest?.bidCounts?.[t] ?? 0);
 
   const create = useMutation({
     // force=true is the user's explicit "Create anyway" after a duplicate warning.
@@ -316,11 +327,11 @@ export default function CrmClientsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isLoading || isPlaceholderData ? (
         <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : isError ? (
         <ErrorCard title="Couldn't load clients" description="Check your connection and refresh the page." />
-      ) : !clients?.length && qDebounced.trim() ? (
+      ) : !bookTotal && qDebounced.trim() ? (
         <Card>
           <EmptyState
             icon={Search}
@@ -333,7 +344,7 @@ export default function CrmClientsPage() {
             }
           />
         </Card>
-      ) : !clients?.length ? (
+      ) : !bookTotal || !clients ? (
         <Card>
           <EmptyState
             icon={Users}
@@ -350,10 +361,10 @@ export default function CrmClientsPage() {
         </Card>
       ) : (
         (() => {
-          const shown = tab === "all" ? clients : clients.filter((c) => c.bidStatus === tab);
-          // More in this tab than the pages loaded so far → say so, and offer
-          // the next page (the tabs filter the loaded rows).
-          const tabN = tabTotal(tab);
+          // The server already filtered to this tab; total is how many
+          // clients match it, so more pages → say so and offer the next.
+          const shown = clients;
+          const tabN = latest?.total ?? shown.length;
           const moreExist = shown.length < tabN;
           const tabLabel = tab === "all" ? "" : ` ${BID_TABS.find((b) => b.key === tab)?.label ?? ""}`;
           return (
@@ -373,8 +384,8 @@ export default function CrmClientsPage() {
             <tbody>
               {shown.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground" data-testid="text-bid-tab-empty">
-                  {moreExist
-                    ? "None of the clients loaded so far are in this bucket — load more, or search."
+                  {qDebounced.trim()
+                    ? `No clients in this bucket match “${qDebounced.trim()}”.`
                     : "No clients in this bucket yet."}
                 </td></tr>
               )}

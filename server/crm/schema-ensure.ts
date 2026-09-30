@@ -1,4 +1,5 @@
 import { ensurePaymentLedgerSchema } from "./payment-ledger-schema";
+import { ensureDocNumberUniqueIndexes } from "./doc-number";
 import { pool } from "../db";
 
 // Idempotent schema setup for the CRM tenancy layer. Run on boot instead of
@@ -805,4 +806,16 @@ export async function ensureCrmSchema(): Promise<void> {
     console.warn("[crm] sku backfill skipped:", e?.message || e);
   }
   await ensurePaymentLedgerSchema();
+
+  // Schema backstop for document numbers: UNIQUE (org_id, number) on every
+  // numbered table. Guarded — an existing index is left alone, and a table
+  // that still repeats a number is skipped with a log line naming a few of
+  // the repeats (existing documents are never renumbered here); the index is
+  // added on the first boot after they are resolved. Each table is handled
+  // on its own, so one failure never blocks the CRM from starting.
+  try {
+    await ensureDocNumberUniqueIndexes(pool);
+  } catch (e: any) {
+    console.warn("[crm] doc-number unique indexes skipped:", e?.message || e);
+  }
 }

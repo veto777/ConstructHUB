@@ -23,12 +23,18 @@ test.describe("/e/:token (public estimate)", () => {
     await page.getByTestId("button-approve").click();
     await expect(page.getByText(/Approved — thank you!/)).toBeVisible();
 
-    // Deposit card appears; with no Stripe account the pay button must fail
-    // gracefully (toast), never crash.
-    const pay = page.getByTestId("button-pay");
-    await expect(pay).toBeVisible();
-    await pay.click();
-    await expect(page.getByText("Payment unavailable", { exact: true })).toBeVisible();
+    // The pay card appears. When pay-info says neither card nor bank transfer
+    // is offered (no Stripe account, as in the e2e lanes), it says so honestly
+    // and offers no Pay button that could only fail. With a rail, the Pay
+    // button is there (not clicked: it would leave for Stripe checkout).
+    const info = await (await page.request.get(`/api/public/estimates/${token}/pay-info`)).json();
+    if (!info.cardAvailable && !info.achAvailable) {
+      await expect(page.getByTestId("text-online-pay-unavailable")).toBeVisible();
+      await expect(page.getByTestId("text-online-pay-unavailable")).toContainText("Online payment isn't available");
+      await expect(page.getByTestId("button-pay")).toHaveCount(0);
+    } else {
+      await expect(page.getByTestId("button-pay")).toBeVisible();
+    }
 
     guards.assertClean("public estimate approve");
   });
