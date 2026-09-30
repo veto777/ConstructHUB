@@ -245,14 +245,15 @@ export function startGbpWorker() {
 
 /** After a Google account connects: link the contractor's matching Places-added rows and fully sync
  *  every listing that account manages, so the Locations pages fill in without further clicks. */
-export async function autoLinkAndSync(userId: number, subject: string) {
-  const d = await discover(clientFor(userId, subject));
+export async function autoLinkAndSync(userId: number, subject: string, make = clientFor, sync = syncLocation) {
+  const client = make(userId, subject);
+  const d = await discover(client);
   const {rows} = await pool.query('SELECT place_id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id IS NOT NULL AND NOT gbp_unlinked_by_user',[userId]);
   const wanted = new Set(rows.map(r => r.place_id));
   const toLink = d.locations.filter((l: any) => l.placeId && wanted.has(l.placeId)).map((l: any) => ({...l, grantSubject: subject}));
-  if (toLink.length) await importLocations(userId, toLink);
+  if (toLink.length) await importLocations(userId, toLink, client);
   const {rows:mine} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_google_subject=$2 AND gbp_location_name IS NOT NULL',[userId,subject]);
-  for (const l of mine) await syncLocation(userId, l.id).catch(() => null);
+  for (const l of mine) await sync(userId, l.id, client).catch(() => null);
 }
 
 /** Stop syncing one location: drop its Google link and the Google data synced for it; keep the row. */

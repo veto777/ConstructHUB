@@ -6,7 +6,7 @@ import {DatabaseLimiter} from './quota';
 import {registerGbpRoutes} from './routes';
 import {saveGrant,grantStatus,accessToken} from './grants';
 import {GBP_SCOPE,GoogleClient,Limiter} from './client';
-import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker,unlinkLocation} from './service';
+import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker,unlinkLocation,autoLinkAndSync} from './service';
 let userId:number,otherId:number,locationId:number,reviewId:number;
 let reviewRows:any[]=[];let failReviews=false, failReply=false;let reviewPaging=false,failSecondPage=false;
 const today=new Date();today.setUTCDate(today.getUTCDate()-2);const metricDate={year:today.getUTCFullYear(),month:today.getUTCMonth()+1,day:today.getUTCDate()};
@@ -159,5 +159,28 @@ describe('per-location unlink',()=>{
     expect(l).toMatchObject({gbp_location_name:null,gbp_account_name:null,gbp_google_subject:null,gbp_unlinked_by_user:true});
     const left=await pool.query(`SELECT (SELECT count(*) FROM google_profile_reviews WHERE location_id=$1 AND google_review_id LIKE 'accounts/%') r,(SELECT count(*) FROM gbp_daily_metrics WHERE location_id=$1) m,(SELECT count(*) FROM gbp_sync_status WHERE location_id=$1) s`,[locationId]);
     expect(left.rows[0]).toEqual({r:'0',m:'0',s:'0'});
+  });
+});
+
+describe('automatic linking after Google connect', () => {
+  it('uses the connected account, links a matching Place ID, respects explicit unlink and syncs existing links', async () => {
+    const ids:number[] = [];
+    try {
+      for (const [place, blocked] of [['auto-match',false],['auto-blocked',true]] as const) {
+        ids.push((await pool.query(`INSERT INTO business_locations(user_id,business_name,place_id,gbp_unlinked_by_user) VALUES($1,'Auto-link fixture',$2,$3) RETURNING id`,[otherId,place,blocked])).rows[0].id);
+      }
+      const client = new GoogleClient(async () => 'fixture', async url => new Response(JSON.stringify(String(url).includes('/accounts?')
+        ? {accounts:[{name:'accounts/auto'}]}
+        : {locations:['match','blocked'].map(name=>({name:`locations/${name}`,title:'Auto-link fixture',metadata:{placeId:`auto-${name}`}}))})),new Limiter(()=>0,async()=>{}),async()=>{});
+      const make = vi.fn(()=>client), sync = vi.fn(async()=>({}));
+      await autoLinkAndSync(otherId,'connected-subject',make,sync);
+      await autoLinkAndSync(otherId,'connected-subject',make,sync);
+      expect(make).toHaveBeenCalledWith(otherId,'connected-subject');
+      const rows=(await pool.query('SELECT id,gbp_location_name,gbp_google_subject FROM business_locations WHERE id=ANY($1) ORDER BY id',[ids])).rows;
+      expect(rows[0]).toMatchObject({gbp_location_name:'locations/match',gbp_google_subject:'connected-subject'});
+      expect(rows[1].gbp_location_name).toBeNull();
+      expect(sync).toHaveBeenCalledTimes(2);
+      expect(sync).toHaveBeenCalledWith(otherId,ids[0],client);
+    } finally { await pool.query('DELETE FROM business_locations WHERE id=ANY($1)',[ids]); }
   });
 });
