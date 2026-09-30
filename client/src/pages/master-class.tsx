@@ -24,6 +24,7 @@ import {
   Share2, Hash, Mail, Sparkles, Trophy
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
+import { useUrlParam } from "@/hooks/use-url-param";
 
 type CoursePurchase = {
   id: number;
@@ -132,7 +133,59 @@ type StateGuide = {
   payrollNotes: string | null;
   overview: string | null;
   steps?: StateGuideStep[];
+  /** Link check results (scripts/verify-state-guides.ts), when the API provides them. */
+  sosUrlStatus?: LinkStatus | null;
+  licensingBoardUrlStatus?: LinkStatus | null;
+  workersCompUrlStatus?: LinkStatus | null;
+  taxBoardUrlStatus?: LinkStatus | null;
+  linksCheckedAt?: string | null;
 };
+
+type LinkStatus = "verified" | "unconfirmed" | "dead" | "none";
+
+/**
+ * One state-agency tile. Unlocked and with a checked URL it opens the agency;
+ * with no URL it is an honest web search for the agency, never a guessed link.
+ */
+function AgencyTile({ icon: Icon, iconClass, name, caption, agency, url, status, checkedAt, stateName, unlocked, testid }: {
+  icon: any; iconClass: string; name: string; caption: string; agency: string; url: string | null;
+  status?: LinkStatus | null; checkedAt?: string | null; stateName: string; unlocked: boolean; testid: string;
+}) {
+  const usable = url && status !== "dead" ? url : null;
+  const className = "flex items-center gap-2 p-3 rounded-lg border bg-muted/30";
+  const body = (sub: string, trailing: React.ReactNode) => (
+    <>
+      <Icon className={`h-4 w-4 ${iconClass} shrink-0`} />
+      <div className="min-w-0">
+        <p className="text-xs font-medium truncate">{name}</p>
+        <p className="text-[10px] text-muted-foreground">{sub}</p>
+      </div>
+      {trailing}
+    </>
+  );
+  if (!unlocked) {
+    return <div className={className} data-testid={testid}>{body(caption, <Lock className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />)}</div>;
+  }
+  const checked = checkedAt ? ` Link checked ${new Date(`${checkedAt}T00:00`).toLocaleDateString()}.` : "";
+  const href = usable ?? `https://www.google.com/search?q=${encodeURIComponent(`${agency} ${stateName}`)}`;
+  const sub = !usable ? "Search the web" : status === "unconfirmed" ? `${caption} · link unconfirmed` : caption;
+  const title = usable
+    ? `${agency} — opens the agency's site.${status === "unconfirmed" ? " Our automated check couldn't confirm this page." : ""}${checked}`
+    : `We don't have a checked link for ${agency} — searches the web instead.`;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" title={title}
+      className={`${className} hover:border-[#4A6CF7]/50 hover:bg-muted/60 transition-colors`} data-testid={testid}>
+      {body(sub, usable
+        ? <ExternalLink className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
+        : <Search className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />)}
+    </a>
+  );
+}
+
+/** What the complete bundle charges (server/catalog.ts COURSE_BUNDLE — the server prices checkout). */
+const BUNDLE_PRICE_CENTS = 249900;
+const usd = (cents: number) => `$${(cents / 100).toLocaleString()}`;
+const MASTER_CLASS_TABS = ["overview", "state-guide", "website-seo", "vetting", "pricing"];
 
 type StateGuideStep = {
   id: number;
@@ -172,7 +225,10 @@ const MODULE_COLORS: Record<string, string> = {
 export default function MasterClassPage() {
   const [selectedState, setSelectedState] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
+  // The open tab lives in ?tab= so a reload (or a "?tab=pricing" link) opens it.
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const activeTab = MASTER_CLASS_TABS.includes(tabParam || "") ? tabParam! : "overview";
+  const setActiveTab = (tab: string) => setTabParam(tab === "overview" ? null : tab);
   const [seoName, setSeoName] = useState("");
   const [seoEmail, setSeoEmail] = useState("");
   const [seoPhone, setSeoPhone] = useState("");
@@ -197,6 +253,11 @@ export default function MasterClassPage() {
   const { data: purchases } = useQuery<CoursePurchase[]>({
     queryKey: ["/api/course-purchases"],
   });
+
+  // One reference price everywhere: what the four modules cost bought separately.
+  const modulesTotalCents = modules?.length ? modules.reduce((sum, m) => sum + m.price, 0) : null;
+  const bundleSavingsCents = modulesTotalCents !== null && modulesTotalCents > BUNDLE_PRICE_CENTS ? modulesTotalCents - BUNDLE_PRICE_CENTS : null;
+  const bundleSavingsPct = bundleSavingsCents !== null ? Math.round((bundleSavingsCents / modulesTotalCents!) * 100) : null;
 
   const { addItem, isInCart } = useCart();
   const isDev = import.meta.env.DEV;
@@ -305,9 +366,11 @@ export default function MasterClassPage() {
           <TabsContent value="overview" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
             <Card className="border-[#F97316]/30 bg-gradient-to-br from-[#F97316]/5 via-transparent to-[#4A6CF7]/5 overflow-hidden">
               <CardContent className="p-4 sm:p-6 relative">
-                <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
-                  <Badge className="bg-red-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-1 animate-pulse" data-testid="badge-sale">50% OFF — Limited Time</Badge>
-                </div>
+                {bundleSavingsPct !== null && (
+                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
+                    <Badge className="bg-red-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-1" data-testid="badge-sale">Bundle saves {bundleSavingsPct}%</Badge>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 mb-2">
                   <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-[#F97316]" />
                   <Badge variant="outline" className="text-xs border-[#F97316] text-[#F97316]">Master Class</Badge>
@@ -326,12 +389,14 @@ export default function MasterClassPage() {
                     <p className="text-[10px] sm:text-xs text-muted-foreground">State Guides</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-background/60 border">
-                    <p className="text-xl sm:text-2xl font-bold text-[#4A6CF7]">100+</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Action Steps</p>
+                    <p className="text-xl sm:text-2xl font-bold text-[#4A6CF7]" data-testid="stat-licensing-states">{guides ? statesWithLicensing : "—"}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">States Require a License</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-background/60 border">
-                    <p className="text-xl sm:text-2xl font-bold text-[#F97316]">$2,499</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground line-through">$4,999</p>
+                    <p className="text-xl sm:text-2xl font-bold text-[#F97316]">{usd(BUNDLE_PRICE_CENTS)}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground" data-testid="text-bundle-reference">
+                      {modulesTotalCents !== null ? <><span className="line-through">{usd(modulesTotalCents)}</span> separately</> : "All four modules"}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -466,7 +531,7 @@ export default function MasterClassPage() {
                   </div>
                   <div className="p-3 rounded-lg border bg-background/60">
                     <p className="font-semibold text-sm mb-1">All 50 States Covered</p>
-                    <p className="text-xs text-muted-foreground">Every state has different requirements. We've mapped them all so you don't have to figure it out yourself.</p>
+                    <p className="text-xs text-muted-foreground">Every state has different requirements. Each state guide covers formation, licensing, workers' comp and tax agencies; detailed step-by-step walkthroughs are being added state by state.</p>
                   </div>
                 </div>
               </CardContent>
@@ -599,16 +664,32 @@ export default function MasterClassPage() {
                               )}
                             </td>
                             <td className="py-2">
-                              <a
-                                href={guide.sosUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[#4A6CF7] hover:underline inline-flex items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
-                                data-testid={`link-sos-${state.code}`}
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
+                              {guide.sosUrl && guide.sosUrlStatus !== "dead" ? (
+                                <a
+                                  href={guide.sosUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#4A6CF7] hover:underline inline-flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`${guide.stateName} ${guide.sosName} (opens in a new tab)`}
+                                  title={guide.sosUrlStatus === "unconfirmed" ? "Our automated check couldn't confirm this page" : undefined}
+                                  data-testid={`link-sos-${state.code}`}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <a
+                                  href={`https://www.google.com/search?q=${encodeURIComponent(`${guide.sosName} ${guide.stateName} business filings`)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:underline inline-flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`Search the web for ${guide.stateName} ${guide.sosName}`}
+                                  data-testid={`link-sos-${state.code}`}
+                                >
+                                  <Search className="h-3 w-3" />
+                                </a>
+                              )}
                             </td>
                           </tr>
                         );
@@ -690,39 +771,32 @@ export default function MasterClassPage() {
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                      <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
-                        <Building2 className="h-4 w-4 text-blue-500 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium truncate">{stateGuide.sosName}</p>
-                          <p className="text-[10px] text-muted-foreground">Form Entity</p>
+                      <AgencyTile icon={Building2} iconClass="text-blue-500" name={stateGuide.sosName} caption="Form Entity"
+                        agency={stateGuide.sosName} url={stateGuide.sosUrl} status={stateGuide.sosUrlStatus}
+                        checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
+                        unlocked={isTabUnlocked("state-guide")} testid="link-agency-sos" />
+                      {stateGuide.licensingRequired === false && !stateGuide.licensingBoardUrl ? (
+                        <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30" data-testid="link-agency-licensing">
+                          <Shield className="h-4 w-4 text-purple-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate">Licensing Board</p>
+                            <p className="text-[10px] text-muted-foreground">No state license</p>
+                          </div>
                         </div>
-                        {!isTabUnlocked("state-guide") && <Lock className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />}
-                        {isTabUnlocked("state-guide") && <ExternalLink className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />}
-                      </div>
-                      <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
-                        <Shield className="h-4 w-4 text-purple-500 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium truncate">Licensing Board</p>
-                          <p className="text-[10px] text-muted-foreground">Get Licensed</p>
-                        </div>
-                        {!isTabUnlocked("state-guide") && <Lock className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />}
-                      </div>
-                      <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
-                        <Heart className="h-4 w-4 text-red-500 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium truncate">Workers Comp</p>
-                          <p className="text-[10px] text-muted-foreground">Coverage Info</p>
-                        </div>
-                        {!isTabUnlocked("state-guide") && <Lock className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />}
-                      </div>
-                      <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
-                        <Calculator className="h-4 w-4 text-green-500 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium truncate">Tax Board</p>
-                          <p className="text-[10px] text-muted-foreground">Taxes</p>
-                        </div>
-                        {!isTabUnlocked("state-guide") && <Lock className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />}
-                      </div>
+                      ) : (
+                        <AgencyTile icon={Shield} iconClass="text-purple-500" name="Licensing Board" caption="Get Licensed"
+                          agency={stateGuide.licensingBoardName || "contractor licensing board"} url={stateGuide.licensingBoardUrl}
+                          status={stateGuide.licensingBoardUrlStatus} checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
+                          unlocked={isTabUnlocked("state-guide")} testid="link-agency-licensing" />
+                      )}
+                      <AgencyTile icon={Heart} iconClass="text-red-500" name="Workers Comp" caption="Coverage Info"
+                        agency={stateGuide.workersCompAgency || "workers' compensation agency"} url={stateGuide.workersCompUrl}
+                        status={stateGuide.workersCompUrlStatus} checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
+                        unlocked={isTabUnlocked("state-guide")} testid="link-agency-workers-comp" />
+                      <AgencyTile icon={Calculator} iconClass="text-green-500" name="Tax Board" caption="Taxes"
+                        agency={stateGuide.taxBoardName || "department of revenue"} url={stateGuide.taxBoardUrl}
+                        status={stateGuide.taxBoardUrlStatus} checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
+                        unlocked={isTabUnlocked("state-guide")} testid="link-agency-tax" />
                     </div>
                   </CardContent>
                 </Card>
@@ -2423,7 +2497,11 @@ export default function MasterClassPage() {
 
           <TabsContent value="pricing" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
             <div className="text-center max-w-2xl mx-auto mb-4 sm:mb-8">
-              <Badge className="bg-red-600 text-white text-xs sm:text-sm px-3 py-1 mb-3 animate-pulse">50% OFF — Limited Time Offer</Badge>
+              {bundleSavingsPct !== null && (
+                <Badge className="bg-red-600 text-white text-xs sm:text-sm px-3 py-1 mb-3" data-testid="badge-pricing-savings">
+                  Bundle saves {bundleSavingsPct}% vs. buying modules separately
+                </Badge>
+              )}
               <h2 className="text-xl sm:text-2xl font-bold mb-2">Master Class Courses</h2>
               <p className="text-muted-foreground">
                 Go from zero to a fully operational, online-dominant construction business. Each module walks you through every detail with step-by-step instructions, direct links to every resource, and real-world strategies that actually work.
@@ -2518,33 +2596,39 @@ export default function MasterClassPage() {
               </div>
               <CardContent className="p-4 sm:p-6 text-center">
                 <Star className="h-8 w-8 text-[#F97316] mx-auto mb-3" />
-                <h3 className="text-lg sm:text-xl font-bold mb-2">Complete Master Class Bundle — 50% Off</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2">Complete Master Class Bundle</h3>
                 <p className="text-muted-foreground text-sm mb-4 max-w-lg mx-auto">
-                  Get all four modules at half price. The complete system — from forming your business to dominating local search. Built by owners who scaled from solo operators to hundreds of employees.
+                  Get all four modules for one price. The complete system — from forming your business to dominating local search. Built by owners who scaled from solo operators to hundreds of employees.
                 </p>
                 <div className="flex items-center justify-center gap-3 mb-2">
-                  <span className="text-xl sm:text-2xl font-bold text-muted-foreground line-through">$4,999</span>
-                  <span className="text-2xl sm:text-3xl font-bold text-[#F97316]">$2,499</span>
+                  {modulesTotalCents !== null && modulesTotalCents > BUNDLE_PRICE_CENTS && (
+                    <span className="text-xl sm:text-2xl font-bold text-muted-foreground line-through" data-testid="text-bundle-was">{usd(modulesTotalCents)}</span>
+                  )}
+                  <span className="text-2xl sm:text-3xl font-bold text-[#F97316]">{usd(BUNDLE_PRICE_CENTS)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">Save $2,500 — individual modules total $6,500 purchased separately</p>
+                {bundleSavingsCents !== null && (
+                  <p className="text-xs text-muted-foreground mb-4" data-testid="text-bundle-savings">
+                    Save {usd(bundleSavingsCents)} — the four modules total {usd(modulesTotalCents!)} purchased separately
+                  </p>
+                )}
                 {hasBundle ? (
                   <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" disabled data-testid="button-enrolled-bundle">
                     <CheckCircle2 className="h-4 w-4 mr-2" /> Bundle Purchased
                   </Button>
                 ) : (
-                  <div className="flex items-center justify-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
                     <Button
                       size="lg"
-                      className={isInCart("course_bundle") ? "bg-green-600 hover:bg-green-600 text-white" : ""}
+                      className={`w-full sm:w-auto ${isInCart("course_bundle") ? "bg-green-600 hover:bg-green-600 text-white" : ""}`}
                       variant={isInCart("course_bundle") ? "default" : "outline"}
                       disabled={isInCart("course_bundle")}
                       onClick={() => {
                         addItem({
                           id: "course_bundle",
                           type: "course_bundle",
-                          name: "Master Class — Complete Bundle (50% Off)",
-                          price: 249900,
-                          description: "All four modules at half price — licensing, GMB, website & SEO",
+                          name: "Master Class — Complete Bundle",
+                          price: BUNDLE_PRICE_CENTS,
+                          description: "All four modules — licensing, GMB, website & SEO",
                         });
                         toast({ title: "Added to cart", description: "Master Class Bundle has been added to your cart." });
                       }}
@@ -2558,13 +2642,13 @@ export default function MasterClassPage() {
                     </Button>
                     <Button
                       size="lg"
-                      className="bg-[#F97316] hover:bg-[#E86C0A] text-white"
+                      className="w-full sm:w-auto bg-[#F97316] hover:bg-[#E86C0A] text-white"
                       data-testid="button-enroll-bundle"
                       onClick={() => enrollMutation.mutate({ bundle: true })}
                       disabled={enrollMutation.isPending}
                     >
                       {enrollMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                      Buy Now — $2,499
+                      Buy Now — {usd(BUNDLE_PRICE_CENTS)}
                     </Button>
                   </div>
                 )}
@@ -2573,7 +2657,7 @@ export default function MasterClassPage() {
 
             <Card className="border-dashed">
               <CardContent className="p-4 sm:p-6">
-                <h3 className="text-base font-bold mb-3 text-center">What You're Getting for $2,499</h3>
+                <h3 className="text-base font-bold mb-3 text-center">What You're Getting for {usd(BUNDLE_PRICE_CENTS)}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {[
                     { value: "$1,500", label: "Business Formation & Licensing", desc: "All 50 states covered" },
@@ -2595,8 +2679,10 @@ export default function MasterClassPage() {
                   ))}
                 </div>
                 <div className="text-center mt-4 pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">Total individual value: <span className="font-bold line-through">$6,500</span></p>
-                  <p className="text-lg font-bold text-[#F97316]">Your price today: $2,499</p>
+                  {modulesTotalCents !== null && (
+                    <p className="text-sm text-muted-foreground">Modules bought separately: <span className="font-bold line-through">{usd(modulesTotalCents)}</span></p>
+                  )}
+                  <p className="text-lg font-bold text-[#F97316]">Bundle price: {usd(BUNDLE_PRICE_CENTS)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -2612,8 +2698,10 @@ export default function MasterClassPage() {
                     { q: "Is this course right for someone just starting out?", a: "Absolutely. It's designed to take you from zero to fully operational in your state. Built by owners who started from scratch themselves." },
                     { q: "I already have a business. Is this still worth it?", a: "Yes. Most established contractors are leaving money on the table with their online presence. The marketing and SEO modules alone can transform your lead generation." },
                     { q: "Do I get access to all modules at once with the bundle?", a: "Yes. When you purchase the bundle, everything unlocks immediately. You get lifetime access to all content and future updates." },
-                    { q: "Is this specific to my state?", a: "Yes. The course covers all 50 states with state-specific guidance. Requirements vary widely — we've mapped them all." },
-                    { q: "Can I purchase individual modules instead?", a: "Yes, you can buy any module separately. But the bundle saves you over $4,000 compared to buying individually." },
+                    { q: "Is this specific to my state?", a: "Yes. Every state has its own guide to the formation, licensing, workers' comp and tax agencies you'll deal with. Detailed step-by-step walkthroughs are being added state by state." },
+                    { q: "Can I purchase individual modules instead?", a: bundleSavingsCents !== null
+                      ? `Yes, you can buy any module separately. The bundle saves you ${usd(bundleSavingsCents)} compared to buying all four individually.`
+                      : "Yes, you can buy any module separately, or all four together as the bundle." },
                     { q: "Who created this course?", a: "Several construction company owners who scaled from solo owner-operators to running multi-state operations with hundreds of employees. Real-world experience, not theory from consultants." },
                   ].map((item, i) => (
                     <div key={i} className="p-3 rounded-lg border bg-background/60">

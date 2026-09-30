@@ -205,9 +205,54 @@ function PublicRouter() {
       <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
-      <Route component={LandingPage} />
+      <Route path="/landing" component={LandingPage} />
+      {/* Signed-in tools send a signed-out visitor to sign in and back; any
+          other unknown URL is an honest 404, never the landing page. */}
+      <Route component={SignedOutFallback} />
     </Switch>
   );
+}
+
+/** Dashboard routes that need an account (everything else here is public). */
+const SIGNED_IN_ONLY = [
+  "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
+  "/social-media", "/guides", "/cloudflare", "/search-console", "/lsa-leads", "/lsa-account-manager", "/settings",
+  ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
+  ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
+];
+
+function SignedOutFallback() {
+  const [location, setLocation] = useLocation();
+  const needsAccount = SIGNED_IN_ONLY.some(p => location === p || location.startsWith(`${p}/`));
+  useEffect(() => {
+    if (needsAccount) {
+      const next = `${location}${window.location.search}`;
+      setLocation(`/auth?next=${encodeURIComponent(next)}`, { replace: true });
+    }
+  }, [needsAccount, location, setLocation]);
+  return needsAccount ? null : <NotFound />;
+}
+
+/** Tab titles for the growth app; pages that set their own title are left alone. */
+const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
+const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy"];
+const PAGE_TITLES: Record<string, string> = {
+  "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
+  "/schedules": "Scrape Schedules", "/history": "Search History", "/photos": "Photo Optimizer",
+  "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
+  "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
+  "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
+  "/guides": "Guides", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
+  "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
+  "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
+  "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
+  "/vpn-shield": "VPN Shield", "/individual-pricing": "Individual Tools", "/google-reviews": "Google Reviews",
+  "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in",
+};
+
+/** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
+function sidebarDefaultOpen(): boolean {
+  return !/(?:^|;\s*)sidebar_state=false(?:;|$)/.test(document.cookie);
 }
 
 const sidebarStyle = {
@@ -329,6 +374,14 @@ function AppContent() {
     return () => document.documentElement.classList.remove("crm-theme");
   }, [portal, clientPortal]);
 
+  // Each growth-app page gets its own tab title (runs after the page's own
+  // effects, so self-titled pages are skipped rather than overwritten).
+  useEffect(() => {
+    if (portal || clientPortal || SELF_TITLED.includes(location)) return;
+    const key = Object.keys(PAGE_TITLES).find(p => location === p || location.startsWith(`${p}/`));
+    document.title = key ? `${PAGE_TITLES[key]} | ConstructHUB` : DEFAULT_TITLE;
+  }, [location, portal, clientPortal]);
+
   if (location === "/free-site-scan") return <FreeSiteScanPage />;
   if (location.startsWith("/site-scan/report/")) return <SharedSiteScanPage />;
 
@@ -417,6 +470,9 @@ function AppContent() {
       location.startsWith("/crm/inbox") ? "Messages" :
       location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
       location.startsWith("/crm/pricebook") ? "Price book" :
+      location.startsWith("/crm/estimates") ? "Estimates" :
+      location.startsWith("/crm/invoices") ? "Invoices" :
+      location.startsWith("/crm/migrate") ? "Import" :
       location.startsWith("/crm/payments") ? "Payments" :
       location.startsWith("/crm/team") ? "Team & Company" :
       location.startsWith("/crm/settings") ? "Settings" :
@@ -425,7 +481,7 @@ function AppContent() {
       location.startsWith("/crm/admin") ? "Platform Admin" :
       location.startsWith("/crm/join") ? "Join the team" : "Home";
     return (
-      <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
         <div className="flex h-screen w-full">
           <CrmSidebar />
           <div className="flex flex-col flex-1 min-w-0">
@@ -473,7 +529,9 @@ function AppContent() {
   }
 
   if (location.startsWith("/contract/sign/")) {
-    return <ContractSignPage />;
+    // Rendered through a Route so the page's useParams() gets :token (a bare
+    // <ContractSignPage /> outside any Route saw {} and showed "Not Found").
+    return <Route path="/contract/sign/:token" component={ContractSignPage} />;
   }
 
   // Client-facing pages render full-bleed on any host — no app chrome.
@@ -486,7 +544,7 @@ function AppContent() {
   if (location.startsWith("/portal/")) return <PublicPortalPage />;
 
   return (
-    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+    <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
@@ -495,7 +553,7 @@ function AppContent() {
             <div className="flex items-center gap-1">
               <RecentAuthModal /><NotificationBell />
               <Link href="/settings" data-testid="link-header-settings">
-                <button className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" data-testid="button-header-settings">
+                <button className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" aria-label="Settings" data-testid="button-header-settings">
                   <Settings className="h-4 w-4" />
                 </button>
               </Link>
@@ -514,7 +572,7 @@ function AppContent() {
               <span className="mx-2 text-border">&middot;</span>
               <a href="/privacy" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-privacy">Privacy</a>
               <span className="mx-2 text-border">&middot;</span>
-              <span>&copy; 2025 ConstructHUB</span>
+              <span>&copy; {new Date().getFullYear()} ConstructHUB</span>
             </footer>
           </main>
         </div>

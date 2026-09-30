@@ -8,10 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useUrlParam } from "@/hooks/use-url-param";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   User, Bell, Shield, CreditCard, Mail, Lock, Eye, EyeOff,
   Settings, ChevronRight, Camera, Save, LogOut, Trash2, Building2,
@@ -22,11 +27,31 @@ import {
 import { useLocation } from "wouter";
 
 type SettingsTab = "profile" | "account" | "notifications" | "security" | "billing";
+const SETTINGS_TABS: SettingsTab[] = ["profile", "account", "notifications", "security", "billing"];
+
+/**
+ * Close (X) should go back only when the previous history entry is part of
+ * the app. A document opened straight at /settings (typed URL, a link from
+ * another site, an email) has no in-app entry behind it — go home instead.
+ */
+function previousEntryIsInApp(): boolean {
+  if (window.history.length <= 1) return false;
+  const entry = performance.getEntriesByType?.("navigation")?.[0] as PerformanceNavigationTiming | undefined;
+  // Reached through in-app navigation: the document was loaded elsewhere.
+  if (entry && new URL(entry.name).pathname !== window.location.pathname) return true;
+  try {
+    return !!document.referrer && new URL(document.referrer).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
 
 export default function SettingsPage() {
-  const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<SettingsTab>(() => { const tab = new URLSearchParams(window.location.search).get("tab"); return ["profile","account","notifications","security","billing"].includes(tab || "") ? tab as SettingsTab : "profile"; });
+  // The open tab lives in ?tab= so a reload or shared link reopens it.
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const activeTab: SettingsTab = SETTINGS_TABS.includes(tabParam as SettingsTab) ? tabParam as SettingsTab : "profile";
+  const setActiveTab = (tab: SettingsTab) => setTabParam(tab === "profile" ? null : tab);
 
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -46,17 +71,18 @@ export default function SettingsPage() {
         <div className="mb-8 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">Settings</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage your account, profile, notifications, and preferences.</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage your profile, account, notifications, security and billing.</p>
           </div>
           <button
             onClick={() => {
-              if (window.history.length > 1) {
+              if (previousEntryIsInApp()) {
                 window.history.back();
               } else {
                 navigate("/");
               }
             }}
             className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            aria-label="Close settings"
             data-testid="button-close-settings"
           >
             <X className="h-5 w-5" />
@@ -70,6 +96,7 @@ export default function SettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
+                  aria-current={activeTab === tab.id ? "page" : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? "bg-primary/10 text-primary"
@@ -89,7 +116,7 @@ export default function SettingsPage() {
             {activeTab === "account" && <AccountSection user={user} />}
             {activeTab === "notifications" && <NotificationPreferences />}
             {activeTab === "security" && <SecuritySection user={user} />}
-            {activeTab === "billing" && <BillingSection user={user} />}
+            {activeTab === "billing" && <BillingSection />}
           </div>
         </div>
       </div>
@@ -101,17 +128,15 @@ function ProfileSection({ user }: { user: any }) {
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState(user?.displayName || "");
   const [email] = useState(user?.email || "");
-  const [phone, setPhone] = useState("");
   const [companyName, setCompanyName] = useState(user?.companyName || "");
   const [companyLogoUrl, setCompanyLogoUrl] = useState(user?.companyLogoUrl || "");
   const [googleProfileUrl, setGoogleProfileUrl] = useState(user?.googleProfileUrl || "");
-  const [bio, setBio] = useState("");
-  const logoInputRef = useState<HTMLInputElement | null>(null);
+  const nameMissing = !displayName.trim();
 
   const updateProfileMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("PATCH", "/api/auth/profile", {
-        displayName,
+        displayName: displayName.trim(),
         companyName,
         companyLogoUrl,
         googleProfileUrl,
@@ -122,8 +147,8 @@ function ProfileSection({ user }: { user: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({ title: "Profile updated" });
     },
-    onError: () => {
-      toast({ title: "Failed to update profile", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to update profile", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -271,8 +296,16 @@ function ProfileSection({ user }: { user: any }) {
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
                 placeholder="Your name"
+                required
+                aria-invalid={nameMissing}
+                aria-describedby={nameMissing ? "displayName-hint" : undefined}
                 data-testid="input-display-name"
               />
+              {nameMissing && (
+                <p id="displayName-hint" className="text-xs text-destructive" data-testid="text-display-name-required">
+                  Enter a display name to save your profile.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -282,16 +315,6 @@ function ProfileSection({ user }: { user: any }) {
                 disabled
                 className="opacity-60"
                 data-testid="input-email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="(555) 123-4567"
-                data-testid="input-phone"
               />
             </div>
             <div className="space-y-2">
@@ -348,23 +371,12 @@ function ProfileSection({ user }: { user: any }) {
                 </div>
               </div>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                value={bio}
-                onChange={e => setBio(e.target.value)}
-                placeholder="Tell us about your business..."
-                rows={3}
-                data-testid="textarea-bio"
-              />
-            </div>
           </div>
 
           <div className="flex justify-end">
             <Button
               onClick={() => updateProfileMutation.mutate()}
-              disabled={updateProfileMutation.isPending}
+              disabled={updateProfileMutation.isPending || nameMissing}
               data-testid="button-save-profile"
             >
               <Save className="h-4 w-4 mr-2" />
@@ -384,10 +396,10 @@ function GmbProfilesSection() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [deleting, setDeleting] = useState<any>(null);
   const [name, setName] = useState("");
   const [googleProfileUrl, setGoogleProfileUrl] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
-  const [gmbLogo, setGmbLogo] = useState("");
 
   const { data: templates = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/review-templates"],
@@ -409,7 +421,7 @@ function GmbProfilesSection() {
       closeDialog();
     },
     onError: (err: any) => {
-      toast({ title: "Failed to add profile", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to add profile", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -427,8 +439,8 @@ function GmbProfilesSection() {
       toast({ title: "GMB profile updated" });
       closeDialog();
     },
-    onError: () => {
-      toast({ title: "Failed to update profile", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to update profile", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -439,9 +451,10 @@ function GmbProfilesSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/review-templates"] });
       toast({ title: "GMB profile removed" });
+      setDeleting(null);
     },
-    onError: () => {
-      toast({ title: "Failed to remove profile", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to remove profile", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -453,45 +466,10 @@ function GmbProfilesSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/review-templates"] });
       toast({ title: "Default profile updated" });
     },
+    onError: (err: any) => {
+      toast({ title: "Failed to set default", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
-
-  const [gmbLogoUploading, setGmbLogoUploading] = useState(false);
-
-  function handleGmbLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = async () => {
-      const maxSize = 256;
-      let w = img.width, h = img.height;
-      if (w > maxSize || h > maxSize) {
-        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
-        else { w = Math.round(w * maxSize / h); h = maxSize; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, w, h);
-      let quality = 0.85;
-      let dataUrl = canvas.toDataURL("image/jpeg", quality);
-      while (dataUrl.length > 400_000 && quality > 0.3) {
-        quality -= 0.1;
-        dataUrl = canvas.toDataURL("image/jpeg", quality);
-      }
-      setGmbLogoUploading(true);
-      try {
-        const res = await apiRequest("POST", "/api/upload/logo", { imageData: dataUrl, type: "gmb-logo" });
-        const data = await res.json();
-        setGmbLogo(data.url);
-      } catch {
-        setGmbLogo(dataUrl);
-      } finally {
-        setGmbLogoUploading(false);
-      }
-    };
-    img.src = URL.createObjectURL(file);
-  }
 
   function closeDialog() {
     setShowDialog(false);
@@ -499,7 +477,6 @@ function GmbProfilesSection() {
     setName("");
     setGoogleProfileUrl("");
     setProjectDescription("");
-    setGmbLogo("");
   }
 
   function openEdit(t: any) {
@@ -507,7 +484,6 @@ function GmbProfilesSection() {
     setName(t.name);
     setGoogleProfileUrl(t.googleProfileUrl);
     setProjectDescription(t.projectDescription || "");
-    setGmbLogo("");
     setShowDialog(true);
   }
 
@@ -573,6 +549,7 @@ function GmbProfilesSection() {
                     size="icon"
                     className="h-7 w-7"
                     onClick={() => openEdit(t)}
+                    aria-label={`Edit ${t.name}`}
                     data-testid={`button-edit-gmb-${t.id}`}
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -581,7 +558,8 @@ function GmbProfilesSection() {
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-destructive hover:text-destructive"
-                    onClick={() => deleteMutation.mutate(t.id)}
+                    onClick={() => setDeleting(t)}
+                    aria-label={`Remove ${t.name}`}
                     data-testid={`button-delete-gmb-${t.id}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -593,101 +571,99 @@ function GmbProfilesSection() {
         )}
       </CardContent>
 
-      {showDialog && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" data-testid="overlay-gmb-dialog">
-          <div className="absolute inset-0 bg-black/50" onClick={closeDialog} />
-          <div className="relative bg-background border border-border rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">{editingTemplate ? "Edit GMB Profile" : "Add GMB Profile"}</h3>
-              <button onClick={closeDialog} className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground" data-testid="button-close-gmb-dialog">
-                <X className="h-4 w-4" />
-              </button>
+      <AlertDialog open={!!deleting} onOpenChange={open => { if (!open && !deleteMutation.isPending) setDeleting(null); }}>
+        <AlertDialogContent data-testid="dialog-confirm-delete-gmb">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {deleting?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You won't be able to choose it for new review requests. Requests you already sent keep their own review link.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending} data-testid="button-cancel-delete-gmb">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={e => { e.preventDefault(); if (deleting) deleteMutation.mutate(deleting.id); }}
+              data-testid="button-confirm-delete-gmb"
+            >
+              {deleteMutation.isPending ? "Removing..." : "Remove profile"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={showDialog} onOpenChange={open => { if (!open) closeDialog(); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="overlay-gmb-dialog">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? "Edit GMB Profile" : "Add GMB Profile"}</DialogTitle>
+            <DialogDescription>
+              Review request emails show the company logo from your profile above.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="gmb-name">Profile / Location Name</Label>
+              <Input
+                id="gmb-name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Premier Roofing - Denver"
+                data-testid="input-gmb-name"
+              />
             </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label><Camera className="h-3.5 w-3.5 inline mr-1" />Business Logo</Label>
-                <div className="flex items-center gap-3">
-                  {gmbLogo ? (
-                    <div className="relative">
-                      <img src={gmbLogo} alt="Logo" className="h-14 w-14 rounded-lg object-contain border border-border bg-white dark:bg-gray-900 p-1" data-testid="img-gmb-logo" />
-                      <button onClick={() => setGmbLogo("")} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px]" data-testid="button-remove-gmb-logo">x</button>
-                    </div>
-                  ) : (
-                    <div className="h-14 w-14 rounded-lg border-2 border-dashed border-border flex items-center justify-center">
-                      <Building2 className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div>
-                    <label htmlFor="gmbLogoUpload" className="cursor-pointer">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 text-sm font-medium transition-colors">
-                        <Camera className="h-3.5 w-3.5" />
-                        {gmbLogo ? "Change" : "Upload Logo"}
-                      </div>
-                    </label>
-                    <input id="gmbLogoUpload" type="file" accept="image/*" onChange={handleGmbLogoUpload} className="hidden" data-testid="input-gmb-logo-upload" />
-                    <p className="text-xs text-muted-foreground mt-1">Shown in review request emails</p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="gmb-name">Profile / Location Name</Label>
-                <Input
-                  id="gmb-name"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Premier Roofing - Denver"
-                  data-testid="input-gmb-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="gmb-url">Google Review Link</Label>
-                <Input
-                  id="gmb-url"
-                  value={googleProfileUrl}
-                  onChange={e => setGoogleProfileUrl(e.target.value)}
-                  placeholder="https://g.page/r/... or any Google Maps URL"
-                  data-testid="input-gmb-url"
-                />
-                <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50">
-                  <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    Paste any Google link: a review link (<span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/50 px-1 rounded">https://g.page/r/xxxx/review</span>), a Google Maps URL, a <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/50 px-1 rounded">share.google</span> link, or a <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/50 px-1 rounded">maps.app.goo.gl</span> short link.
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="gmb-desc">Description (optional)</Label>
-                <Textarea
-                  id="gmb-desc"
-                  value={projectDescription}
-                  onChange={e => setProjectDescription(e.target.value)}
-                  placeholder="Brief description of this location..."
-                  rows={2}
-                  data-testid="input-gmb-description"
-                />
+            <div className="space-y-2">
+              <Label htmlFor="gmb-url">Google Review Link</Label>
+              <Input
+                id="gmb-url"
+                value={googleProfileUrl}
+                onChange={e => setGoogleProfileUrl(e.target.value)}
+                placeholder="https://g.page/r/... or any Google Maps URL"
+                data-testid="input-gmb-url"
+              />
+              <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50">
+                <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Paste any Google link: a review link (<span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/50 px-1 rounded">https://g.page/r/xxxx/review</span>), a Google Maps URL, a <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/50 px-1 rounded">share.google</span> link, or a <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/50 px-1 rounded">maps.app.goo.gl</span> short link.
+                </p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={closeDialog} data-testid="button-cancel-gmb">Cancel</Button>
-              <Button
-                onClick={() => editingTemplate ? updateMutation.mutate() : createMutation.mutate()}
-                disabled={!name.trim() || !googleProfileUrl.trim() || createMutation.isPending || updateMutation.isPending}
-                data-testid="button-save-gmb"
-              >
-                {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingTemplate ? "Save Changes" : "Add Profile"}
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="gmb-desc">Description (optional)</Label>
+              <Textarea
+                id="gmb-desc"
+                value={projectDescription}
+                onChange={e => setProjectDescription(e.target.value)}
+                placeholder="Brief description of this location..."
+                rows={2}
+                data-testid="input-gmb-description"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closeDialog} data-testid="button-cancel-gmb">Cancel</Button>
+            <Button
+              onClick={() => editingTemplate ? updateMutation.mutate() : createMutation.mutate()}
+              disabled={!name.trim() || !googleProfileUrl.trim() || createMutation.isPending || updateMutation.isPending}
+              data-testid="button-save-gmb"
+            >
+              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingTemplate ? "Save Changes" : "Add Profile"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
 
 function AccountSection({ user }: { user: any }) {
-  const { toast } = useToast();
-  const [timezone, setTimezone] = useState("America/Los_Angeles");
-  const [dateFormat, setDateFormat] = useState("MM/DD/YYYY");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  // No self-serve deletion endpoint exists: the request goes to support, who
+  // handle it under the privacy policy. The mail is prefilled so it names the
+  // account unambiguously.
+  const deletionMailto = `mailto:support@constructhub.us?subject=${encodeURIComponent("Account deletion request")}&body=${encodeURIComponent(
+    `Please delete my ConstructHUB account and its data.\n\nAccount email: ${user?.email || ""}\nAccount ID: ${user?.accountId || ""}\n`,
+  )}`;
 
   return (
     <div className="space-y-6">
@@ -734,56 +710,6 @@ function AccountSection({ user }: { user: any }) {
         </CardContent>
       </Card>
 
-      <Card data-testid="card-preferences">
-        <CardHeader>
-          <CardTitle className="text-lg">Preferences</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
-              <select
-                id="timezone"
-                value={timezone}
-                onChange={e => setTimezone(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                data-testid="select-timezone"
-              >
-                <option value="America/New_York">Eastern (ET)</option>
-                <option value="America/Chicago">Central (CT)</option>
-                <option value="America/Denver">Mountain (MT)</option>
-                <option value="America/Los_Angeles">Pacific (PT)</option>
-                <option value="America/Anchorage">Alaska (AKT)</option>
-                <option value="Pacific/Honolulu">Hawaii (HST)</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dateFormat">Date Format</Label>
-              <select
-                id="dateFormat"
-                value={dateFormat}
-                onChange={e => setDateFormat(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                data-testid="select-date-format"
-              >
-                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => toast({ title: "Preferences saved" })}
-              data-testid="button-save-preferences"
-            >
-              <Save className="h-4 w-4 mr-2" /> Save Preferences
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <BetaAccessSection user={user} />
 
       <Card className="border-destructive/20" data-testid="card-danger-zone">
@@ -795,15 +721,34 @@ function AccountSection({ user }: { user: any }) {
             <div>
               <p className="text-sm font-medium">Delete Account</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Permanently delete your account and all associated data. This cannot be undone.
+                Ask our support team to permanently delete your account and its data.
               </p>
             </div>
-            <Button variant="destructive" size="sm" data-testid="button-delete-account">
-              <Trash2 className="h-4 w-4 mr-2" /> Delete Account
+            <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)} data-testid="button-delete-account">
+              <Trash2 className="h-4 w-4 mr-2" /> Request deletion
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent data-testid="dialog-request-deletion">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request account deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Account deletion is handled by our support team. Send the prefilled email from {user?.email ? <strong>{user.email}</strong> : "your account's email address"} so
+              we can confirm the request comes from you. Nothing is deleted until support processes it; the{" "}
+              <a href="/privacy" className="underline">privacy policy</a> explains what is removed and what must be kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-request-deletion">Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <a href={deletionMailto} data-testid="link-request-deletion-email">Email support@constructhub.us</a>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -839,9 +784,8 @@ function BetaAccessSection({ user }: { user: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/beta-codes/status"] });
       toast({ title: "Trial Activated!", description: data.message });
     },
-    onError: async (err: any) => {
-      const msg = err?.message || "Failed to redeem code";
-      toast({ title: "Invalid Code", description: msg, variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Couldn't activate code", description: apiErrorMessage(err, "Failed to redeem code"), variant: "destructive" });
     },
   });
 
@@ -863,8 +807,8 @@ function BetaAccessSection({ user }: { user: any }) {
       setRecipientName("");
       setShowCreateForm(false);
     },
-    onError: () => {
-      toast({ title: "Failed to generate code", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to generate code", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -877,8 +821,8 @@ function BetaAccessSection({ user }: { user: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/beta-codes"] });
       toast({ title: "Trial revoked", description: "Access has been removed." });
     },
-    onError: () => {
-      toast({ title: "Failed to revoke", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to revoke", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -1137,7 +1081,7 @@ function TwoFactorSection({ user }: { user: any }) {
       setSetupData({ secret: data.secret, qrCode: data.qrCode });
     },
     onError: (err: any) => {
-      toast({ title: err.message || "Failed to start 2FA setup", variant: "destructive" });
+      toast({ title: "Failed to start 2FA setup", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -1154,7 +1098,7 @@ function TwoFactorSection({ user }: { user: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (err: any) => {
-      toast({ title: err.message || "Invalid code", variant: "destructive" });
+      toast({ title: "Couldn't enable 2FA", description: apiErrorMessage(err, "Invalid code"), variant: "destructive" });
     },
   });
 
@@ -1170,7 +1114,7 @@ function TwoFactorSection({ user }: { user: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (err: any) => {
-      toast({ title: err.message || "Invalid code", variant: "destructive" });
+      toast({ title: "Couldn't disable 2FA", description: apiErrorMessage(err, "Invalid code"), variant: "destructive" });
     },
   });
 
@@ -1183,7 +1127,7 @@ function TwoFactorSection({ user }: { user: any }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {recoveryCodes.length > 0 && <div role="status"><p>Save these recovery codes now. Each works once; they will not be shown again.</p><pre className="select-all">{recoveryCodes.join("\n")}</pre><Button variant="outline" onClick={()=>setRecoveryCodes([])}>I saved my codes</Button></div>}
-        {is2FAEnabled && <Button variant="outline" onClick={async()=>{try {const r=await apiRequest('POST','/api/auth/2fa/recovery-codes');setRecoveryCodes((await r.json()).codes);}catch(e:any){toast({title:e.message,variant:'destructive'});}}}>Generate new recovery codes</Button>}
+        {is2FAEnabled && <Button variant="outline" onClick={async()=>{try {const r=await apiRequest('POST','/api/auth/2fa/recovery-codes');setRecoveryCodes((await r.json()).codes);}catch(e:any){toast({title:"Couldn't generate recovery codes",description:apiErrorMessage(e),variant:'destructive'});}}}>Generate new recovery codes</Button>}
         {is2FAEnabled && !showDisable && (
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
@@ -1337,7 +1281,7 @@ function SecuritySection({ user }: { user: any }) {
       setConfirmPassword("");
     },
     onError: (err: any) => {
-      toast({ title: err.message || "Failed to change password", variant: "destructive" });
+      toast({ title: "Failed to change password", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -1420,7 +1364,40 @@ function SecuritySection({ user }: { user: any }) {
   );
 }
 
-function BillingSection({ user }: { user: any }) {
+type PlanInfo = { name: string; price: number; features: string[] };
+type SubscriptionInfo = { plan: string; status: string; currentPeriodEnd?: string | null; stripeSubscriptionId?: string | null };
+const STATUS_LABELS: Record<string, string> = {
+  active: "Active", trialing: "Trial", past_due: "Payment past due", unpaid: "Unpaid",
+  canceled: "Canceled", incomplete: "Incomplete", incomplete_expired: "Expired", inactive: "Inactive",
+};
+
+/** Reads the real subscription (never a hardcoded plan); cards and invoices live in Stripe's portal. */
+function BillingSection() {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const { data: plans } = useQuery<Record<string, PlanInfo>>({ queryKey: ["/api/stripe/plans"] });
+  const { data: subscription, isLoading, error } = useQuery<SubscriptionInfo>({ queryKey: ["/api/stripe/subscription"] });
+
+  const portalMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/stripe/create-portal", {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data?.url) window.location.href = data.url;
+    },
+    onError: (err: any) => {
+      toast({ title: "Couldn't open billing", description: apiErrorMessage(err), variant: "destructive" });
+    },
+  });
+
+  const planKey = subscription?.plan && subscription.plan !== "free" ? subscription.plan : null;
+  const planName = planKey ? plans?.[planKey]?.name ?? planKey : null;
+  const hasPlan = !!planKey && ["active", "trialing", "past_due"].includes(subscription?.status || "");
+  const viaStripe = !!subscription?.stripeSubscriptionId;
+  const periodEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+  const openEnded = !!periodEnd && periodEnd.getUTCFullYear() >= 2099;
+
   return (
     <div className="space-y-6">
       <Card data-testid="card-current-plan">
@@ -1428,61 +1405,101 @@ function BillingSection({ user }: { user: any }) {
           <CardTitle className="text-lg">Current Plan</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/10 rounded-lg">
-            <div>
-              <p className="font-semibold text-primary" data-testid="text-current-plan">Free Plan</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Basic access to permit search and database directory</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-primary/5 border border-primary/10 rounded-lg">
+            <div className="min-w-0">
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground" data-testid="text-current-plan">Loading your plan…</p>
+              ) : error ? (
+                <p className="text-sm text-destructive" role="alert" data-testid="text-current-plan">
+                  Couldn't load your plan. {apiErrorMessage(error)}
+                </p>
+              ) : hasPlan ? (
+                <>
+                  <div className="font-semibold text-primary flex items-center gap-2" data-testid="text-current-plan">
+                    {planName} Plan
+                    <Badge variant="outline" className="text-[10px]" data-testid="badge-plan-status">
+                      {STATUS_LABELS[subscription!.status] || subscription!.status}
+                    </Badge>
+                  </div>
+                  {periodEnd && (
+                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-plan-period">
+                      {openEnded ? "No end date"
+                        : viaStripe ? `Current period ends ${periodEnd.toLocaleDateString()}`
+                        : `Access through ${periodEnd.toLocaleDateString()}`}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-primary" data-testid="text-current-plan">Free plan</p>
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-plan-inactive">
+                    {planKey
+                      ? `Your ${planName} subscription is ${(STATUS_LABELS[subscription!.status] || subscription!.status).toLowerCase()}.`
+                      : "No paid subscription on this account."}
+                  </p>
+                </>
+              )}
             </div>
-            <Button size="sm" data-testid="button-upgrade">
-              Upgrade Plan
+            <Button size="sm" onClick={() => navigate("/pricing")} data-testid="button-upgrade">
+              {hasPlan ? "Change plan" : "Upgrade plan"}
             </Button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: "Standard", price: "$15/mo", features: "Search + Schedules" },
-              { label: "Professional", price: "$30/mo", features: "+ GMB Tools" },
-              { label: "Premium", price: "$100/mo", features: "+ Click Guard" },
-              { label: "Platinum", price: "$995/mo", features: "Everything + Competitor Intel" },
-            ].map(plan => (
-              <div key={plan.label} className="p-3 border rounded-lg text-center" data-testid={`card-plan-${plan.label.toLowerCase()}`}>
-                <p className="text-sm font-semibold">{plan.label}</p>
-                <p className="text-lg font-bold text-primary mt-1">{plan.price}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{plan.features}</p>
-              </div>
-            ))}
-          </div>
+          {plans && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {Object.entries(plans).map(([key, plan]) => (
+                <a
+                  key={key}
+                  href="/pricing"
+                  onClick={e => { e.preventDefault(); navigate("/pricing"); }}
+                  className="p-3 border rounded-lg text-center hover:border-primary/50 hover:bg-muted/40 transition-colors"
+                  data-testid={`card-plan-${key}`}
+                >
+                  <div className="text-sm font-semibold flex items-center justify-center gap-1.5">
+                    {plan.name}
+                    {hasPlan && key === planKey && <Badge variant="outline" className="text-[9px] px-1 py-0">Current</Badge>}
+                  </div>
+                  <p className="text-lg font-bold text-primary mt-1">${(plan.price / 100).toLocaleString()}/mo</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{plan.features[0]}</p>
+                </a>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Card data-testid="card-payment-method">
         <CardHeader>
-          <CardTitle className="text-lg">Payment Method</CardTitle>
+          <CardTitle className="text-lg">Payment method &amp; invoices</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">No payment method on file</p>
-                <p className="text-xs text-muted-foreground">Add a card to upgrade your plan</p>
-              </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-3 min-w-0">
+              <CreditCard className="h-5 w-5 text-muted-foreground shrink-0" />
+              {viaStripe ? (
+                <p className="text-sm text-muted-foreground" data-testid="text-billing-portal">
+                  Your card, invoices and cancellation are managed in Stripe's secure billing portal.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="text-billing-portal">
+                  This account has no Stripe subscription, so there's no card or invoice to show. You enter a card at checkout when you choose a plan.
+                </p>
+              )}
             </div>
-            <Button variant="outline" size="sm" data-testid="button-add-payment">
-              Add Card
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card data-testid="card-billing-history">
-        <CardHeader>
-          <CardTitle className="text-lg">Billing History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No billing history yet</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Invoices will appear here after your first purchase</p>
+            {viaStripe ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => portalMutation.mutate()}
+                disabled={portalMutation.isPending}
+                data-testid="button-manage-billing"
+              >
+                {portalMutation.isPending ? "Opening…" : "Manage billing"}
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => navigate("/pricing")} data-testid="button-add-payment">
+                See plans
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
