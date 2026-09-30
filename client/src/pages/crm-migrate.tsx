@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   UploadCloud, Users, FileText, Receipt, Loader2, ArrowRight, ArrowLeft,
   CheckCircle2, AlertTriangle, Handshake,
@@ -121,6 +121,20 @@ export default function CrmMigratePage() {
       return;
     }
     const text = await f.text();
+    if (!text.trim()) {
+      // An empty file would leave Preview silently disabled — say why.
+      setCsv(null);
+      setFileName(null);
+      setPreview(null);
+      setResult(null);
+      if (fileRef.current) fileRef.current.value = "";
+      toast({
+        title: "This file is empty",
+        description: `${f.name} has no data in it. Export the list again and pick the new file.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setCsv(text);
     setFileName(f.name);
     setPreview(null);
@@ -135,7 +149,7 @@ export default function CrmMigratePage() {
       setResult(null);
     },
     onError: (e: any) =>
-      toast({ title: "Could not read that file", description: String(e.message ?? e), variant: "destructive" }),
+      toast({ title: "Could not read that file", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const doImport = useMutation({
@@ -154,14 +168,14 @@ export default function CrmMigratePage() {
       if (entity === "estimates") queryClient.invalidateQueries({ queryKey: ["/api/crm/estimates"] });
     },
     onError: (e: any) =>
-      toast({ title: "Import failed", description: String(e.message ?? e), variant: "destructive" }),
+      toast({ title: "Import failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const requestAssisted = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/migrate/assisted", { system, note })).json(),
     onSuccess: () => setAssistedSent(true),
     onError: (e: any) =>
-      toast({ title: "Request not sent", description: String(e.message ?? e), variant: "destructive" }),
+      toast({ title: "Request not sent", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // Map raw rows through the current mapping for the preview table.
@@ -337,11 +351,22 @@ export default function CrmMigratePage() {
               </div>
             )}
 
+            {preview.totalRows === 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm"
+                data-testid="text-preview-no-rows">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>
+                  No data rows found — is this a CSV or TSV export? Save the spreadsheet as CSV (a header
+                  row, then one row per {entity === "customers" ? "client" : entity === "estimates" ? "estimate" : "invoice"}) and pick it again.
+                </span>
+              </div>
+            )}
+
             <div className="flex justify-end">
-              <Button onClick={() => doImport.mutate()} disabled={doImport.isPending}
+              <Button onClick={() => doImport.mutate()} disabled={doImport.isPending || preview.totalRows === 0}
                 data-testid="button-run-import">
                 {doImport.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Import {preview.totalRows} rows
+                Import {preview.totalRows} {preview.totalRows === 1 ? "row" : "rows"}
               </Button>
             </div>
           </CardContent>

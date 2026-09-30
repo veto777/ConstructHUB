@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -10,8 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { marketingUrl } from "@/lib/site";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud, Plus,
@@ -52,6 +57,28 @@ type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
 
 const emptyToNull = (s: string) => (s.trim() === "" ? null : s.trim());
 
+/**
+ * Every org write refreshes BOTH caches: /api/crm/org (this page) and
+ * /api/crm/me, whose `org` snapshot seeds Team & Company and the app shell. A
+ * stale /api/crm/me let a later Team save carry old footers and prefs back.
+ */
+const invalidateOrg = () => {
+  queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+};
+
+/**
+ * A percent box → basis points, or an error to show. Out-of-range input is
+ * refused with a message, never silently clamped (150% must not save as 100%).
+ */
+function pctToBps(raw: string, label: string, max: number, min = 0): { bps: number | null; error?: string } {
+  if (raw.trim() === "") return { bps: null };
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return { bps: null, error: `${label} must be a number.` };
+  if (n < min || n > max) return { bps: null, error: `${label} must be between ${min}% and ${max}%.` };
+  return { bps: Math.round(n * 100) };
+}
+
 export default function CrmSettingsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -88,6 +115,21 @@ export default function CrmSettingsPage() {
     enabled: allowed,
   });
 
+  // The Google OAuth round-trip lands on /crm/settings?calendar=connected=1
+  // (or error=…). Read it once, then drop it from the URL — like the Team
+  // page does — so a reload or a later disconnect never re-shows a stale
+  // "connected" banner.
+  const [calendarParam] = useState(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("calendar"),
+  );
+  useEffect(() => {
+    if (!calendarParam) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("calendar");
+    url.searchParams.delete("error");
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, [calendarParam]);
+
   // ── Divisions ─────────────────────────────────────────────────────────────
   const emptyDivision = {
     name: "", code: "", email: "", phone: "", website: "",
@@ -98,15 +140,22 @@ export default function CrmSettingsPage() {
   };
   const [divForm, setDivForm] = useState(emptyDivision);
   const [editingDivisionId, setEditingDivisionId] = useState<string | null>(null);
+  // The add/edit form sits below the (possibly long) division list — Edit
+  // scrolls it into view and focuses the first field.
+  const divisionFormRef = useRef<HTMLDivElement>(null);
   const setD = (k: keyof typeof emptyDivision) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setDivForm((d) => ({ ...d, [k]: e.target.value }));
 
-  // "Seattle: 10.1%" per line → { Seattle: 1010 } (basis points, capped at 30%).
+  // "Seattle: 10.1%" per line → { Seattle: 1010 } (basis points, at most
+  // 30%). A rate over 30% is refused with a message, never clamped.
   const parseCityRates = (s: string) => {
     const out: Record<string, number> = {};
     for (const line of s.split(/\n+/)) {
       const m = /^\s*([^:]+?)\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*%?\s*$/.exec(line);
-      if (m) out[m[1]] = Math.round(Math.min(30, Math.max(0, parseFloat(m[2]))) * 100);
+      if (!m) continue;
+      const pct = parseFloat(m[2]);
+      if (pct > 30) throw new Error(`${m[1]} sales tax must be between 0% and 30%.`);
+      out[m[1]] = Math.round(pct * 100);
     }
     return out;
   };
@@ -115,11 +164,10 @@ export default function CrmSettingsPage() {
 
   const saveDivision = useMutation({
     mutationFn: async () => {
-      const taxDefault = parseFloat(divForm.taxDefaultPct);
+      const taxDefault = pctToBps(divForm.taxDefaultPct, "Division sales tax", 30);
+      if (taxDefault.error) throw new Error(taxDefault.error);
       const taxRates = {
-        default: divForm.taxDefaultPct.trim() === "" || Number.isNaN(taxDefault)
-          ? null
-          : Math.round(Math.min(30, Math.max(0, taxDefault)) * 100),
+        default: taxDefault.bps,
         cities: parseCityRates(divForm.taxCities),
       };
       const hasTax = taxRates.default != null || Object.keys(taxRates.cities).length > 0;
@@ -154,7 +202,7 @@ export default function CrmSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/divisions"] });
       toast({ title: editingDivisionId ? "Division updated" : "Division created" });
     },
-    onError: (e: any) => toast({ title: "Could not save division", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save division", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const setHq = useMutation({
@@ -164,7 +212,24 @@ export default function CrmSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/divisions"] });
       toast({ title: "Headquarters updated" });
     },
-    onError: (e: any) => toast({ title: "Could not update", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not update", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
+  // The server refuses (409) while projects or members still point at the
+  // division — that message says what to reassign, so it's shown as-is.
+  // Deleting asks first in an AlertDialog naming the division.
+  const [divisionToDelete, setDivisionToDelete] = useState<{ id: string; name: string; code: string } | null>(null);
+  const deleteDivision = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/crm/divisions/${id}`, undefined)).json(),
+    onSuccess: (_r: any, id: string) => {
+      if (editingDivisionId === id) {
+        setDivForm(emptyDivision);
+        setEditingDivisionId(null);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/divisions"] });
+      toast({ title: "Division deleted" });
+    },
+    onError: (e: any) => toast({ title: "Could not delete division", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const startEditDivision = (d: any) => {
@@ -180,10 +245,17 @@ export default function CrmSettingsPage() {
       taxCities: serializeCityRates(taxRates?.cities),
     });
     setEditingDivisionId(d.id);
+    requestAnimationFrame(() => {
+      divisionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("div-name")?.focus({ preventScroll: true });
+    });
   };
 
   // ── Company profile ───────────────────────────────────────────────────────
   const [company, setCompany] = useState<Record<string, string>>({});
+  // The logo URL whose preview failed to load — the warning shows only while
+  // the field still holds that exact URL.
+  const [logoBrokenUrl, setLogoBrokenUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!org) return;
     const s = (v: any) => v ?? "";
@@ -220,11 +292,10 @@ export default function CrmSettingsPage() {
       description: emptyToNull(company.description ?? ""),
     })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      invalidateOrg();
       toast({ title: "Company profile saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save company profile", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save company profile", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Company theme — one of 20 preset accents (customFields.themeColor),
@@ -232,10 +303,10 @@ export default function CrmSettingsPage() {
   const saveTheme = useMutation({
     mutationFn: async (id: string) => (await apiRequest("PATCH", "/api/crm/org", { themeColor: id })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Theme saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save theme", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save theme", description: apiErrorMessage(e), variant: "destructive" }),
   });
   // Which number this company's texts come FROM.
   const [senderForm, setSenderForm] = useState<{
@@ -261,22 +332,22 @@ export default function CrmSettingsPage() {
       apiToken: senderForm.apiToken.trim() || null,
     })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/sms/status"] });
       setSenderForm((f) => ({ ...f, apiToken: "" }));
       toast({ title: "Text sender saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save the sender", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save the sender", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // Default for "also text the estimate" when sending a bid.
   const saveSmsEstimates = useMutation({
     mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { smsEstimates: on })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Estimate texting saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // Org-default bid discounts — the standard offers every sent estimate
@@ -289,6 +360,8 @@ export default function CrmSettingsPage() {
   ];
   const [discForm, setDiscForm] = useState<{ code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean }[]>([]);
   const [discCustom, setDiscCustom] = useState({ label: "", pct: "", conditions: "" });
+  // Shown inline under the offer row: 150% is refused, never saved as −100%.
+  const discPctError = pctToBps(discCustom.pct, "A discount", 100).error ?? null;
   useEffect(() => {
     const saved = (org?.customFields as any)?.discountDefaults;
     if (Array.isArray(saved) && saved.length) {
@@ -302,20 +375,20 @@ export default function CrmSettingsPage() {
     mutationFn: async (next: typeof discForm) =>
       (await apiRequest("PATCH", "/api/crm/org", { discountDefaults: next })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Bid discounts saved", description: "New estimates start with these offers when sent." });
     },
-    onError: (e: any) => toast({ title: "Could not save discounts", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save discounts", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // Owner text alerts on signed approvals + payments (opt-in, costs money).
   const saveSmsAlerts = useMutation({
     mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { smsAlerts: on })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Text alerts saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save text alerts", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save text alerts", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // Voice "check your email" nudge on estimate send — calls need no carrier
@@ -323,10 +396,10 @@ export default function CrmSettingsPage() {
   const saveVoiceNudge = useMutation({
     mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { voiceNudge: on })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Voice nudge saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // Explicit SMS consent (carrier-required): the timestamp lands on MY member
@@ -337,7 +410,7 @@ export default function CrmSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
       toast({ title: "Text consent saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save consent", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save consent", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // The main (band) colour the accent pairs with — black or white.
@@ -345,10 +418,10 @@ export default function CrmSettingsPage() {
     mutationFn: async (base: "black" | "white") =>
       (await apiRequest("PATCH", "/api/crm/org", { themeBase: base })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Theme saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save theme", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save theme", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Company logo upload (PNG/JPG ≤ 2MB → org.logoUrl, shown on documents) ──
@@ -364,11 +437,10 @@ export default function CrmSettingsPage() {
     },
     onSuccess: (j: any) => {
       setCompany((c) => ({ ...c, logoUrl: j.logoUrl }));
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      invalidateOrg();
       toast({ title: "Logo uploaded" });
     },
-    onError: (e: any) => toast({ title: "Could not upload logo", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not upload logo", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Estimate & invoice defaults ───────────────────────────────────────────
@@ -390,26 +462,26 @@ export default function CrmSettingsPage() {
 
   const saveDefaults = useMutation({
     mutationFn: async () => {
-      const pct = parseFloat(defaults.depositPct);
-      const taxPctNum = parseFloat(defaults.taxPct);
+      // Refuse out-of-range values before anything is sent (the toast shows
+      // why) — a typo like 150% must never quietly save as 100%.
+      const deposit = pctToBps(defaults.depositPct, "Default deposit", 100);
+      if (deposit.error) throw new Error(deposit.error);
+      const tax = pctToBps(defaults.taxPct, "Default sales tax", 30);
+      if (tax.error) throw new Error(tax.error);
       return (await apiRequest("PATCH", "/api/crm/org", {
         estimateFooter: emptyToNull(defaults.estimateFooter),
         invoiceFooter: emptyToNull(defaults.invoiceFooter),
         termsAndConditions: emptyToNull(defaults.termsAndConditions),
         warrantyText: emptyToNull(defaults.warrantyText),
-        defaultDepositBps: defaults.depositPct.trim() === "" || Number.isNaN(pct)
-          ? null
-          : Math.round(Math.min(100, Math.max(0, pct)) * 100),
-        defaultTaxRateBps: defaults.taxPct.trim() === "" || Number.isNaN(taxPctNum)
-          ? null
-          : Math.round(Math.min(30, Math.max(0, taxPctNum)) * 100),
+        defaultDepositBps: deposit.bps,
+        defaultTaxRateBps: tax.bps,
       })).json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Defaults saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save defaults", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save defaults", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Notifications ─────────────────────────────────────────────────────────
@@ -429,10 +501,13 @@ export default function CrmSettingsPage() {
     mutationFn: async (patch: Record<string, boolean | Record<string, boolean>>) =>
       (await apiRequest("PATCH", "/api/crm/org", { notificationPrefs: patch })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      // invalidateOrg also refreshes /api/crm/me: switching a Text channel on
+      // stamps my SMS consent server-side, and the consent checkbox below
+      // reads it from me.member.
+      invalidateOrg();
       toast({ title: "Notification preferences saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save notifications", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save notifications", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── SMS (SignalWire) ──────────────────────────────────────────────────────
@@ -449,7 +524,7 @@ export default function CrmSettingsPage() {
       (await apiRequest("POST", "/api/crm/sms/test", { to: smsTestTo.trim() })).json(),
     onSuccess: (r: any) =>
       toast({ title: "Test text sent", description: `Delivered via ${r.provider} to ${r.to}.` }),
-    onError: (e: any) => toast({ title: "Test text failed", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Test text failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Price-floor lock (owner only) ─────────────────────────────────────────
@@ -466,19 +541,17 @@ export default function CrmSettingsPage() {
   }, [priceFloorLock.floorBps]);
 
   const saveLock = useMutation({
-    mutationFn: async (body: { enabled: boolean; floorBps: number | null }) =>
-      (await apiRequest("PUT", "/api/crm/org/price-floor-lock", body)).json(),
+    mutationFn: async ({ enabled }: { enabled: boolean }) => {
+      const floor = pctToBps(floorPct, "Floor margin", 100);
+      if (floor.error) throw new Error(floor.error);
+      return (await apiRequest("PUT", "/api/crm/org/price-floor-lock", { enabled, floorBps: floor.bps })).json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Price lock saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save the price lock", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save the price lock", description: apiErrorMessage(e), variant: "destructive" }),
   });
-
-  const lockBps = () => {
-    const pct = parseFloat(floorPct);
-    return floorPct.trim() === "" || Number.isNaN(pct) ? null : Math.round(Math.min(100, Math.max(0, pct)) * 100);
-  };
 
   // ── Auto-backup (owner only) ──────────────────────────────────────────────
   // custom_fields->'backup' — the server merges on save, so lastSentAt and
@@ -516,22 +589,22 @@ export default function CrmSettingsPage() {
         email: backupForm.email.trim(),
       })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Export settings saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save export settings", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save export settings", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const sendBackupNow = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/backups/send-now", {})).json(),
     onSuccess: (r: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({
         title: "Export sent",
         description: `${r.rows.clients} clients, ${r.rows.estimates} estimates, ${r.rows.invoices} invoices · ${(r.bytes / 1024).toFixed(1)} KB to ${r.recipient}`,
       });
     },
-    onError: (e: any) => toast({ title: "Export failed", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Export failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Payments: card fee passthrough + financing links ──────────────────────
@@ -561,21 +634,25 @@ export default function CrmSettingsPage() {
     mutationFn: async (body: any) => (await apiRequest("PUT", "/api/crm/payments/settings", body)).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/payments/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      invalidateOrg();
       toast({ title: "Payment settings saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save payment settings", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save payment settings", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const saveFee = () => {
-    const pct = parseFloat(feeForm.surchargePct);
+    const surcharge = pctToBps(feeForm.surchargePct, "Card surcharge", 10);
+    // Only a surcharge that will actually be charged has to be valid; with
+    // the passthrough off an unusable leftover value is simply dropped.
+    if (surcharge.error && feeForm.passFeeToClient) {
+      toast({ title: "Could not save payment settings", description: surcharge.error, variant: "destructive" });
+      return;
+    }
     const over = parseFloat(feeForm.achOnlyOver);
     savePaySettings.mutate({
       payments: {
         passFeeToClient: feeForm.passFeeToClient,
-        surchargeBps: feeForm.surchargePct.trim() === "" || Number.isNaN(pct)
-          ? null
-          : Math.round(Math.min(10, Math.max(0, pct)) * 100),
+        surchargeBps: surcharge.bps,
         railMode: feeForm.railMode,
         achOnlyOverCents: feeForm.railMode !== "both" || feeForm.achOnlyOver.trim() === "" || Number.isNaN(over) || over <= 0
           ? null
@@ -596,13 +673,13 @@ export default function CrmSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/feed-url"] });
       toast({ title: "New feed URL generated", description: "Old calendar subscriptions will stop updating." });
     },
-    onError: (e: any) => toast({ title: "Could not regenerate", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not regenerate", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const googleConnect = useMutation({
     mutationFn: async () => (await apiRequest("GET", "/api/crm/calendar/google/connect", undefined)).json(),
     onSuccess: (r: any) => { if (r.url) window.location.href = r.url; },
-    onError: (e: any) => toast({ title: "Can't start Google connect", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Can't start Google connect", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const googleSync = useMutation({
@@ -613,7 +690,7 @@ export default function CrmSettingsPage() {
     },
     onError: (e: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
-      toast({ title: "Sync failed", description: String(e.message ?? e), variant: "destructive" });
+      toast({ title: "Sync failed", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
 
@@ -623,7 +700,7 @@ export default function CrmSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
       toast({ title: "Google Calendar disconnected" });
     },
-    onError: (e: any) => toast({ title: "Could not disconnect", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not disconnect", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   if (meLoading || (allowed && orgLoading)) {
@@ -637,7 +714,6 @@ export default function CrmSettingsPage() {
   const acct = payStatus?.account;
   const theme = resolveOrgTheme(org?.customFields);
   const gcal = gcalStatus?.connection ?? null;
-  const calendarParam = new URLSearchParams(window.location.search).get("calendar");
 
   return (
     <CrmPage className="max-w-4xl">
@@ -693,8 +769,9 @@ export default function CrmSettingsPage() {
             <div className="space-y-1.5">
               <Label htmlFor="company-logo-file">Upload logo</Label>
               <div className="flex items-center gap-3">
-                {company.logoUrl && (
+                {company.logoUrl && logoBrokenUrl !== company.logoUrl && (
                   <img src={company.logoUrl} alt="Company logo" data-testid="img-company-logo"
+                    onError={() => setLogoBrokenUrl(company.logoUrl)}
                     className="h-9 w-9 rounded border object-contain bg-white" />
                 )}
                 <Input id="company-logo-file" type="file" accept="image/png,image/jpeg"
@@ -709,6 +786,11 @@ export default function CrmSettingsPage() {
                 PNG or JPG, 2MB max. Shows on estimates, invoices and the portal.
                 {uploadLogo.isPending ? " Uploading…" : ""}
               </p>
+              {company.logoUrl && logoBrokenUrl === company.logoUrl && (
+                <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="text-company-logo-broken">
+                  Couldn't load an image from this logo URL — check the address, or upload the file instead.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="company-address1">Address</Label>
@@ -886,13 +968,20 @@ export default function CrmSettingsPage() {
                       data-testid={`button-edit-division-${d.id}`}>
                       Edit
                     </Button>
+                    <Button size="sm" variant="ghost" title="Delete division" aria-label={`Delete division ${d.name}`}
+                      disabled={deleteDivision.isPending}
+                      onClick={() => setDivisionToDelete({ id: d.id, name: d.name, code: d.code })}
+                      data-testid={`button-delete-division-${d.id}`}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+          <div ref={divisionFormRef} className="rounded-lg border bg-muted/30 p-4 space-y-3 scroll-mt-4"
+            data-testid="form-division">
             <div className="text-sm font-medium">{editingDivisionId ? "Edit division" : "Add a division"}</div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -995,6 +1084,28 @@ export default function CrmSettingsPage() {
               </Button>
             </div>
           </div>
+
+          <AlertDialog open={!!divisionToDelete} onOpenChange={(o) => { if (!o) setDivisionToDelete(null); }}>
+            <AlertDialogContent data-testid="dialog-delete-division">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this division?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {divisionToDelete ? `"${divisionToDelete.name}" (${divisionToDelete.code})` : "This division"} is
+                  removed for good. A division that projects or team members still use can't be deleted —
+                  reassign them first.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete-division">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  data-testid="button-confirm-delete-division"
+                  onClick={() => { if (divisionToDelete) deleteDivision.mutate(divisionToDelete.id); }}
+                >
+                  Delete division
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardContent>
       </Card>
 
@@ -1077,7 +1188,11 @@ export default function CrmSettingsPage() {
           />
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 text-xs text-muted-foreground pb-2 border-b">
+          {/* Sticky so the channel names stay on screen while scrolling the
+              14 rows — on a phone the header otherwise scrolls away and
+              leaves three unlabeled switches per row. */}
+          <div className="sticky top-0 z-10 bg-card grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 text-xs text-muted-foreground pt-2 pb-2 border-b"
+            data-testid="notif-channel-header">
             <span />
             <span className="w-10 text-center">In-app</span>
             <span className="w-10 text-center">Email</span>
@@ -1104,6 +1219,7 @@ export default function CrmSettingsPage() {
                         })
                       }
                       disabled={saveNotif.isPending}
+                      aria-label={`${n.label}: ${ch === "inApp" ? "in-app" : ch === "email" ? "email" : "text"}`}
                       data-testid={ch === "email" ? `switch-notif-${n.key}` : `switch-notif-${n.key}-${ch}`}
                     />
                   </div>
@@ -1112,7 +1228,7 @@ export default function CrmSettingsPage() {
             ))}
           </div>
           <p className="text-xs text-muted-foreground pt-3">
-            Text alerts also need a text sender set up in the Text messaging card above.
+            Text alerts also need a text sender set up in the SMS card below.
           </p>
           <div className="flex items-start gap-2 border-t mt-3 pt-3" data-testid="section-sms-consent">
             <Checkbox
@@ -1194,12 +1310,14 @@ export default function CrmSettingsPage() {
                 data-testid="input-discount-conditions" />
             </div>
             <Button size="sm"
-              disabled={!discCustom.label.trim() || !(parseFloat(discCustom.pct) > 0) || saveDiscounts.isPending}
+              disabled={!discCustom.label.trim() || !(parseFloat(discCustom.pct) > 0) || !!discPctError || saveDiscounts.isPending}
               onClick={() => {
+                const pct = pctToBps(discCustom.pct, "A discount", 100);
+                if (pct.error || pct.bps === null) return;
                 const next = [...discForm, {
                   code: `custom-${Date.now().toString(36)}`,
                   label: discCustom.label.trim(),
-                  percentBps: Math.round(Math.min(100, parseFloat(discCustom.pct)) * 100),
+                  percentBps: pct.bps,
                   conditions: discCustom.conditions.trim() || null,
                   enabled: true,
                 }];
@@ -1210,6 +1328,9 @@ export default function CrmSettingsPage() {
               <Plus className="h-4 w-4 mr-1" /> Add
             </Button>
           </div>
+          {discPctError && (
+            <p className="text-xs text-destructive" data-testid="text-discount-pct-error">{discPctError}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -1228,12 +1349,14 @@ export default function CrmSettingsPage() {
             <div className="min-w-0 flex-1">
               {smsStatus?.planAllowsSms === false ? (
                 <>
-                  <div className="font-medium" data-testid="text-sms-plan">Texting is a Premium and Platinum feature</div>
+                  <div className="font-medium" data-testid="text-sms-plan">Texting is a Premium, Gold and Platinum feature</div>
                   <div className="text-xs text-muted-foreground">
                     {smsStatus.planMessage} Includes text reminders to clients, quick texts, and a text to you when a bid is
                     signed, money lands, or a client re-opens their estimate. Emails keep working on every plan.
                   </div>
-                  <a href="/pricing" className="text-xs text-primary underline" data-testid="link-sms-upgrade">See plans</a>
+                  {/* The portal host has no /pricing route (it would fall
+                      through to CRM home) — plans live on the main site. */}
+                  <a href={marketingUrl("/pricing")} className="text-xs text-primary underline" data-testid="link-sms-upgrade">See plans</a>
                 </>
               ) : smsStatus?.configured ? (
                 <>
@@ -1439,7 +1562,7 @@ export default function CrmSettingsPage() {
               </div>
               <Switch
                 checked={priceFloorLock.enabled === true}
-                onCheckedChange={(v) => saveLock.mutate({ enabled: v, floorBps: lockBps() })}
+                onCheckedChange={(v) => saveLock.mutate({ enabled: v })}
                 disabled={saveLock.isPending}
                 data-testid="switch-price-lock"
               />
@@ -1456,7 +1579,7 @@ export default function CrmSettingsPage() {
                 </p>
               </div>
               <Button
-                onClick={() => saveLock.mutate({ enabled: priceFloorLock.enabled === true, floorBps: lockBps() })}
+                onClick={() => saveLock.mutate({ enabled: priceFloorLock.enabled === true })}
                 disabled={saveLock.isPending}
                 data-testid="button-save-price-floor">
                 {saveLock.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -1787,7 +1910,7 @@ export default function CrmSettingsPage() {
           />
         </CardHeader>
         <CardContent className="space-y-6">
-          {calendarParam === "connected=1" && (
+          {(calendarParam === "connected=1" || calendarParam === "connected") && gcal && (
             <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm"
               data-testid="text-google-calendar-connected">
               Google Calendar connected. Hit "Sync now" to push your schedule.
@@ -1819,7 +1942,12 @@ export default function CrmSettingsPage() {
                 <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
               </Button>
               <Button size="sm" variant="outline" className="shrink-0" data-testid="button-regenerate-calendar-feed"
-                onClick={() => rotateFeed.mutate()} disabled={rotateFeed.isPending}>
+                onClick={() => {
+                  if (window.confirm("Regenerate the feed URL? Every calendar subscribed to the old link stops updating.")) {
+                    rotateFeed.mutate();
+                  }
+                }}
+                disabled={rotateFeed.isPending}>
                 {rotateFeed.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
                 Regenerate
               </Button>

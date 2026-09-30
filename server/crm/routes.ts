@@ -65,13 +65,120 @@ const permissionsSchema = z
     message: "Unknown permission key",
   });
 
+/**
+ * A logo must be something an <img> can actually load: a full http(s) web
+ * address, one of our own upload paths (/api/crm/org-logos/… from the logo
+ * upload, /api/files/… from the Growth account logo copied in at signup), or
+ * an inline data:image. Free text like "not a url" is refused.
+ */
+function isAcceptableLogoUrl(v: string): boolean {
+  const s = v.trim();
+  if (s.startsWith("/api/crm/org-logos/") || s.startsWith("/api/files/")) return true;
+  if (/^data:image\//i.test(s)) return true;
+  try {
+    const u = new URL(s);
+    return (u.protocol === "https:" || u.protocol === "http:") && !!u.hostname;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A member's mobile: blank clears it; anything else must be a real phone
+ * number (digits and the usual + ( ) - . separators, 7–15 digits) and is
+ * stored normalized to E.164 so texts and matching always agree.
+ */
+const memberPhoneSchema = z
+  .string()
+  .max(40)
+  .nullable()
+  .optional()
+  .transform((v, ctx) => {
+    if (v === undefined || v === null) return v;
+    const t = v.trim();
+    if (!t) return null;
+    const normalized = /^[+\d\s().-]+$/.test(t) ? normalizePhone(t) : null;
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a valid mobile number, e.g. +1 555 123 4567.",
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
+
+/** Plain-English names for the fields these routes validate. */
+const FIELD_LABELS: Record<string, string> = {
+  name: "Business name", legalEntityName: "Legal entity name", email: "Email", phone: "Phone",
+  website: "Website", logoUrl: "Logo URL", addressLine1: "Address", addressLine2: "Address line 2",
+  city: "City", state: "State", postalCode: "ZIP", country: "Country", timezone: "Time zone",
+  licenseNumber: "License number", licenseState: "License state", industry: "Industry",
+  description: "Description", invoiceFooter: "Invoice footer", estimateFooter: "Estimate footer",
+  termsAndConditions: "Terms and conditions", warrantyText: "Warranty text",
+  defaultDepositBps: "Default deposit", defaultTaxRateBps: "Default sales tax",
+  themeColor: "Theme colour", themeBase: "Main colour", discountDefaults: "Bid discounts",
+  notificationPrefs: "Notification preferences", displayName: "Name", title: "Title",
+  avatarUrl: "Avatar URL", calendarColor: "Calendar colour", role: "Role", status: "Status",
+  hourlyCostCents: "Cost rate", divisionId: "Division", permissions: "Permissions",
+};
+
+/**
+ * The first validation problem as one sentence a person can act on ("Email
+ * must be a valid email address…") — never a raw zod dump. The full issue
+ * list still ships alongside for API callers.
+ */
+function validationMessage(error: z.ZodError, fallback: string): string {
+  const issue = error.issues[0];
+  if (!issue) return fallback;
+  // Refinements and transforms already carry a full sentence.
+  if (issue.code === z.ZodIssueCode.custom) return issue.message;
+  const key = String(issue.path[0] ?? "");
+  const label = FIELD_LABELS[key]
+    ?? (key ? key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()) : "A field");
+  // Basis points read as a percent and cents as dollars — never the raw
+  // stored integer ("Cost rate must be at most 10000000" misleads).
+  const leaf = String(issue.path[issue.path.length - 1] ?? "");
+  const amount = (n: number | bigint) =>
+    /Bps$/.test(leaf) ? `${Number(n) / 100}%`
+      : /Cents$/.test(leaf) ? `$${(Number(n) / 100).toLocaleString("en-US")}`
+        : String(n);
+  switch (issue.code) {
+    case z.ZodIssueCode.invalid_string:
+      if (issue.validation === "email") return `${label} must be a valid email address, like name@company.com.`;
+      if (issue.validation === "url") return `${label} must be a full web address starting with https://.`;
+      return `${label} isn't in a valid format.`;
+    case z.ZodIssueCode.too_small:
+      if (issue.type === "string") {
+        return Number(issue.minimum) <= 1 ? `${label} can't be blank.` : `${label} must be at least ${issue.minimum} characters.`;
+      }
+      if (issue.type === "number") return `${label} must be at least ${amount(issue.minimum)}.`;
+      break;
+    case z.ZodIssueCode.too_big:
+      if (issue.type === "string") return `${label} must be ${issue.maximum} characters or fewer.`;
+      if (issue.type === "number") return `${label} must be at most ${amount(issue.maximum)}.`;
+      if (issue.type === "array") return `${label} can have at most ${issue.maximum} entries.`;
+      break;
+    case z.ZodIssueCode.invalid_enum_value:
+      return `${label} must be one of: ${issue.options.join(", ")}.`;
+  }
+  return `${label}: ${issue.message}`;
+}
+
 const orgPatchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   legalEntityName: z.string().max(200).nullable().optional(),
   email: z.string().email().nullable().optional(),
   phone: z.string().max(40).nullable().optional(),
   website: z.string().max(300).nullable().optional(),
-  logoUrl: z.string().max(1000).nullable().optional(),
+  logoUrl: z
+    .string()
+    .max(1000)
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || isAcceptableLogoUrl(v), {
+      message: "Logo URL must be a full web address starting with https:// — or upload the image instead.",
+    }),
   addressLine1: z.string().max(200).nullable().optional(),
   addressLine2: z.string().max(200).nullable().optional(),
   city: z.string().max(120).nullable().optional(),
@@ -137,7 +244,7 @@ const orgPatchSchema = z.object({
 const profilePatchSchema = z.object({
   displayName: z.string().max(120).nullable().optional(),
   title: z.string().max(120).nullable().optional(),
-  phone: z.string().max(40).nullable().optional(),
+  phone: memberPhoneSchema,
   avatarUrl: z.string().max(1000).nullable().optional(),
   calendarColor: z.string().max(20).nullable().optional(),
 });
@@ -335,18 +442,17 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!ctx) return;
 
     const parsed = profilePatchSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid profile", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: validationMessage(parsed.error, "Invalid profile"), issues: parsed.error.issues });
+    }
 
-    // Providing an alert phone doubles as SMS consent (first time only): the
-    // profile form shows the disclosure next to the field.
-    const consentStamp =
-      parsed.data.phone && !ctx.member.smsConsentAt
-        ? { smsConsentAt: new Date(), smsConsentPhone: parsed.data.phone }
-        : {};
-
+    // Saving a phone is NOT SMS consent: the profile form carries no
+    // disclosure, and it re-sends the phone on every save. Consent is recorded
+    // only by the disclosed opt-in (POST /api/crm/me/sms-consent) or by
+    // switching a Text notification on in Settings.
     const [row] = await db
       .update(crmMembers)
-      .set({ ...parsed.data, ...consentStamp, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(crmMembers.id, ctx.member.id))
       .returning();
 
@@ -381,7 +487,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!ctx) return;
 
     const parsed = z.object({ agree: z.boolean() }).safeParse(req.body ?? {});
-    if (!parsed.success) return res.status(400).json({ message: "Invalid consent", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: validationMessage(parsed.error, "Invalid consent"), issues: parsed.error.issues });
+    }
 
     // Carrier-standard opt-in confirmation: on a FIRST consent, text the
     // member a confirmation with brand, frequency, rates and STOP/HELP.
@@ -545,7 +653,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!requirePermission(res, ctx, "manageSettings")) return;
 
     const parsed = orgPatchSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid company profile", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: validationMessage(parsed.error, "Invalid company profile"), issues: parsed.error.issues });
+    }
 
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
@@ -636,7 +746,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!requirePermission(res, ctx, "manageTeam")) return;
 
     const parsed = memberPatchSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid member", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: validationMessage(parsed.error, "Invalid member"), issues: parsed.error.issues });
+    }
 
     const [target] = await db
       .select()
@@ -823,7 +935,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!requirePermission(res, ctx, "manageTeam")) return;
 
     const parsed = inviteSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid invitation", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: validationMessage(parsed.error, "Invalid invitation"), issues: parsed.error.issues });
+    }
     const { email, role, permissions, displayName, divisionId } = parsed.data;
 
     if (role === "owner" && ctx.member.role !== "owner") {
