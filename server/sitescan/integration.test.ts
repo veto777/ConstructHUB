@@ -10,6 +10,7 @@ import {
 } from "./routes";
 import { PRIMARY_DOMAIN, SITE_DOMAINS } from "../site-context";
 import { enqueue, runSiteScanWorker, runSchedules } from "./worker";
+import { quotaKey, resetsAt } from "../growth-quotas";
 import { emptyState } from "./audit";
 vi.mock("../account-events", () => ({
   notifyUser: vi.fn(async () => {}),
@@ -346,11 +347,17 @@ it("reserves monthly schedules once across competing ticks and notifies a score 
   await pool.query(
     "INSERT INTO sitescan_schedules(user_id,url,next_at,page_cap,psi_pages) VALUES(1,'https://sitescan-fixture.test/',now()-interval '1 day',1,0) ON CONFLICT(user_id,url) DO UPDATE SET next_at=now()-interval '1 day'",
   );
+  // A scheduled scan spends one of the owner's monthly Site Scans; put the dev user's count back afterwards.
+  const monthly = quotaKey(1, "siteScans");
+  const usedBefore = async () => Number((await pool.query("SELECT used FROM growth_budgets WHERE key=$1 AND period='0'", [monthly])).rows[0]?.used ?? 0);
+  const before = await usedBefore();
   await Promise.all([runSchedules(), runSchedules()]);
   const { rows: jobs } = await pool.query(
     "SELECT id FROM sitescan_jobs WHERE url='https://sitescan-fixture.test/' AND status='queued'",
   );
   expect(jobs).toHaveLength(1);
+  expect(await usedBefore()).toBe(before + 1);
+  await pool.query("UPDATE growth_budgets SET used=$2 WHERE key=$1 AND period='0'", [monthly, before]);
   // A new critical HTTP error must produce a regression notification.
   const http = async (url: string) => ({
     url,
@@ -378,6 +385,43 @@ it("reserves monthly schedules once across competing ticks and notifies a score 
     "sitescan.regressed",
     expect.anything(),
   );
+});
+
+it("scheduled scans follow the monthly plan allowance: a used-up month waits for the 1st, no plan waits a day", async () => {
+  const { takeBudget } = await import("../growth-limits");
+  const { rows } = await pool.query(
+    "INSERT INTO users(email) SELECT 'sitescan-sched-'||n||'-'||gen_random_uuid()||'@example.invalid' FROM generate_series(1,3) n RETURNING id",
+  );
+  const [usedUp, noPlan, dailyCapped] = rows.map((r) => r.id as number);
+  const url = (u: number) => `https://sitescan-sched-${u}.test/`;
+  try {
+    await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active'),($2,'starter','active')", [usedUp, dailyCapped]);
+    // Starter includes 2 Site Scans a month: both spent. The other Starter owner has used today's scan budget.
+    await takeBudget(quotaKey(usedUp, "siteScans"), 2, 2, Number.MAX_SAFE_INTEGER);
+    await takeBudget(`sitescan:scan:${dailyCapped}`, 5, 5, 86400_000);
+    for (const u of [usedUp, noPlan, dailyCapped])
+      await pool.query(
+        "INSERT INTO sitescan_schedules(user_id,url,next_at,page_cap,psi_pages) VALUES($1,$2,now()-interval '1 minute',1,0)",
+        [u, url(u)],
+      );
+    const next = async (u: number) => new Date((await pool.query("SELECT next_at FROM sitescan_schedules WHERE user_id=$1", [u])).rows[0].next_at).getTime();
+    // Other due schedules on a shared database are handled first (10 per tick).
+    for (let i = 0; i < 5 && (await Promise.all([usedUp, noPlan, dailyCapped].map(next))).some((t) => t <= Date.now()); i++) await runSchedules();
+    expect(await next(usedUp)).toBe(new Date(resetsAt()).getTime());
+    for (const u of [noPlan, dailyCapped]) {
+      expect(await next(u)).toBeGreaterThan(Date.now() + 23 * 3600_000);
+      expect(await next(u)).toBeLessThan(Date.now() + 25 * 3600_000);
+    }
+    expect((await pool.query("SELECT count(*)::int n FROM sitescan_jobs WHERE user_id=ANY($1::int[])", [[usedUp, noPlan, dailyCapped]])).rows[0].n).toBe(0);
+    // The daily refusal gave the monthly scan back.
+    expect(Number((await pool.query("SELECT used FROM growth_budgets WHERE key=$1 AND period='0'", [quotaKey(dailyCapped, "siteScans")])).rows[0]?.used ?? 0)).toBe(0);
+  } finally {
+    const ids = [usedUp, noPlan, dailyCapped];
+    await pool.query("DELETE FROM sitescan_schedules WHERE user_id=ANY($1::int[])", [ids]);
+    await pool.query("DELETE FROM growth_budgets WHERE key=ANY($1::text[])", [[...ids.map((u) => quotaKey(u, "siteScans")), ...ids.map((u) => `sitescan:scan:${u}`)]]);
+    await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1::int[])", [ids]);
+    await pool.query("DELETE FROM users WHERE id=ANY($1::int[])", [ids]);
+  }
 });
 
 it("serializes schedule caps while allowing updates at the limit", async () => {

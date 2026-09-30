@@ -38,7 +38,7 @@ beforeAll(async()=>{
   const app:any={get:(p:string,...h:Function[])=>handlers.set('get '+p,h.at(-1)!),post:(p:string,...h:Function[])=>handlers.set('post '+p,h.at(-1)!),put:(p:string,...h:Function[])=>handlers.set('put '+p,h.at(-1)!),delete:(p:string,...h:Function[])=>handlers.set('delete '+p,h.at(-1)!)};
   registerAgencyRoutes(app);registerAgencyAccess({use:(fn:Function)=>{middleware=fn;}} as any);
 });
-afterAll(async()=>{await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1::int[])',[[owner,member,other]]);await pool.query('DELETE FROM google_profile_reviews WHERE user_id=$1',[owner]);await pool.query('DELETE FROM citation_campaigns WHERE user_id=$1',[owner]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1::int[])',[[owner,member,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1::int[])',[[owner,member,other]]);await pool.end();});
+afterAll(async()=>{await pool.query("DELETE FROM growth_budgets WHERE key LIKE 'quota:user:'||$1::int||':%'",[owner]);await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1::int[])',[[owner,member,other]]);await pool.query('DELETE FROM google_profile_reviews WHERE user_id=$1',[owner]);await pool.query('DELETE FROM citation_campaigns WHERE user_id=$1',[owner]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1::int[])',[[owner,member,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1::int[])',[[owner,member,other]]);await pool.end();});
 describe('Agency access and 5,000-location scale',()=>{
   it('paginates and filters 5,000 rows in SQL and only exposes the 1,000 assigned locations',async()=>{
     const start=performance.now(),a=await accessFor(member,owner);
@@ -172,7 +172,19 @@ describe('Google invitations and email onboarding with mocked external boundarie
     const make=()=>new GoogleClient(async()=>'fixture',http as any,new Limiter(Date.now,async()=>{}),async()=>{});
     await pollInvitations(owner,'agency',make);
     expect(calls.filter(c=>c.startsWith('POST'))).toEqual(['POST /v1/accounts/agency/invitations/match:accept']);
-    const linked=(await pool.query('SELECT * FROM agency_onboarding WHERE id=$1',[created.id])).rows[0];expect(linked.status).toBe('linked');
+    // The fixture owner holds 5,000 locations, above Agency's self-serve cap: the accepted listing is not added,
+    // and the request says why in the words of the location limit (then a sales quote).
+    const held=(await pool.query('SELECT status,error FROM agency_onboarding WHERE id=$1',[created.id])).rows[0];
+    expect(held.status).toBe('accepted');
+    expect(held.error).toMatch(/^Your Agency plan covers 500 Google Business Profile locations and [\d,]+ are in use\. Above 500 locations, talk to a sales rep for a quote\.$/);
+    expect((await pool.query("SELECT count(*)::int n FROM business_locations WHERE user_id=$1 AND gbp_location_name='locations/fixture'",[owner])).rows[0].n).toBe(0);
+    await pollInvitations(owner,'agency',make); // still full: retried, and the owner is told only once
+    expect((await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND title='Client Google profile not linked'",[owner])).rows[0].n).toBe(1);
+    // With room under the cap, the next poll links it (fixture rows only; the rest of this file is done with them).
+    await pool.query("DELETE FROM business_locations WHERE user_id=$1 AND business_name LIKE 'Agency fixture %' AND id NOT IN (SELECT id FROM business_locations WHERE user_id=$1 ORDER BY id LIMIT 100)",[owner]);
+    await pollInvitations(owner,'agency',make);
+    expect(calls.filter(c=>c.startsWith('POST'))).toHaveLength(1);
+    const linked=(await pool.query('SELECT * FROM agency_onboarding WHERE id=$1',[created.id])).rows[0];expect(linked.status).toBe('linked');expect(linked.error).toBeNull();
     expect((await pool.query('SELECT agency_client_id FROM business_locations WHERE id=$1',[linked.location_id])).rows[0].agency_client_id).toBe(client);
     expect((await pool.query("SELECT action FROM agency_jobs WHERE location_id=$1",[linked.location_id])).rows).toEqual([{action:'sync'}]);
     await pollInvitations(owner,'agency',make);expect(calls.filter(c=>c.startsWith('POST'))).toHaveLength(1);

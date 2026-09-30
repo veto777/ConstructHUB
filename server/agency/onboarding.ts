@@ -7,7 +7,8 @@ import { takeBudget } from '../growth-limits';
 import { encryptToken, decryptToken } from '../gbp/token-crypto';
 import { clientFor } from '../gbp/service';
 import { GBP_SCOPE, GoogleError, resource } from '../gbp/client';
-import { agencyPlanPaused, clientAccess, positiveId, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
+import { locationCount } from '../entitlements';
+import { agencyPlanPaused, clientAccess, locationLimitRefusal, positiveId, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
 import { refreshDiscovery, queueSync } from './jobs';
 export const googleHelp='https://support.google.com/business/answer/3403100';
 export const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
@@ -86,7 +87,19 @@ export async function pollInvitations(user:number,subject:string,make=clientFor)
         const {rows:[existing]}=await c.query('SELECT id,agency_client_id FROM business_locations WHERE user_id=$1 AND (gbp_location_name=$2 OR ($3::text IS NOT NULL AND place_id=$3)) ORDER BY id LIMIT 1',[user,l.gbpName,l.placeId]);
         if(existing?.agency_client_id&&existing.agency_client_id!==r.client_id){await c.query('ROLLBACK');continue;}
         if(existing){id=existing.id;await c.query('UPDATE business_locations SET agency_client_id=$3,gbp_account_name=$4,gbp_location_name=$5,gbp_google_subject=$6,gbp_unlinked_by_user=false WHERE user_id=$1 AND id=$2',[user,id,r.client_id,l.accountResource,l.gbpName,subject]);}
-        else {id=(await c.query(`INSERT INTO business_locations(user_id,agency_client_id,business_name,address,city,state,zip_code,place_id,gbp_account_name,gbp_location_name,gbp_google_subject) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,[user,r.client_id,l.businessName,l.address,l.city,l.state,l.zipCode,l.placeId,l.accountResource,l.gbpName,subject])).rows[0].id;}
+        else {
+          // A new row counts toward the plan's locations, under the same per-account lock as POST /api/locations.
+          await c.query('SELECT pg_advisory_xact_lock(7170,$1)',[user]);
+          const refused=await locationLimitRefusal(user,await locationCount(user,c));
+          if(refused){
+            await c.query('ROLLBACK');
+            // Retried on every poll, so it links on its own once there is room; the owner hears about it once.
+            const {rowCount:changed}=await pool.query('UPDATE agency_onboarding SET error=$2 WHERE id=$1 AND error IS DISTINCT FROM $2',[r.id,refused]);
+            if(changed)await notifyUser(user,'gbp.profile_change',{title:'Client Google profile not linked',body:`${r.business_name}: ${refused}`,link:'/agency'});
+            continue;
+          }
+          id=(await c.query(`INSERT INTO business_locations(user_id,agency_client_id,business_name,address,city,state,zip_code,place_id,gbp_account_name,gbp_location_name,gbp_google_subject) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,[user,r.client_id,l.businessName,l.address,l.city,l.state,l.zipCode,l.placeId,l.accountResource,l.gbpName,subject])).rows[0].id;
+        }
         await c.query("UPDATE agency_onboarding SET status='linked',location_id=$2,error=NULL WHERE id=$1",[r.id,id]);await c.query('COMMIT');
       }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
       await queueSync(user,id!);

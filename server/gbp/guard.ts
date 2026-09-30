@@ -3,6 +3,8 @@ import { pool } from '../db';
 import { logActivity, notifyUser } from '../account-events';
 import { GoogleClient, GoogleError } from './client';
 import { clientFor, ownedLocation, withLocationLock, publicError } from './service';
+import { getEntitlements } from '../entitlements';
+import { PLANS, PLAN_KEYS } from '@shared/plans';
 
 export const GUARD_FIELDS = ['title','phoneNumbers','websiteUri','storefrontAddress','categories','profile.description','regularHours','specialHours','serviceArea','openInfo.openingDate','openInfo.status'] as const;
 export type GuardField = typeof GUARD_FIELDS[number];
@@ -153,12 +155,29 @@ export async function writeOwnerProfile(userId:number,id:number,fields:Record<st
     return response;
   });
 }
+/** The most frequent check any plan buys (shared/plans.ts guardCadenceMinutes). */
+const FASTEST_GUARD_MINUTES=Math.min(...PLAN_KEYS.map(k=>PLANS[k].limits.guardCadenceMinutes));
 let busy=false;
-export async function runGuardWorker(check=checkGuard) {
+/**
+ * Checks guarded locations at the cadence of their owner's plan (guardCadenceMinutes: every 15 minutes, every
+ * 30 on Agency). Owners with no active plan are not checked, so a lapsed account spends no Google quota; their
+ * guard settings stay and checks resume with a plan. `onlyUser` narrows a run to one owner (tests).
+ */
+export async function runGuardWorker(check=checkGuard,onlyUser?:number) {
   if(busy)return;busy=true;
   try {
-    const {rows}=await pool.query(`SELECT p.user_id,p.location_id FROM gbp_guard p JOIN business_locations l ON l.id=p.location_id
-      WHERE p.mode<>'off' AND l.gbp_location_name IS NOT NULL AND (p.last_attempt IS NULL OR p.last_attempt<now()-interval '15 minutes') ORDER BY p.last_attempt NULLS FIRST LIMIT 100`);
+    const due=`FROM gbp_guard p JOIN business_locations l ON l.id=p.location_id
+      WHERE p.mode<>'off' AND l.gbp_location_name IS NOT NULL AND ($1::int IS NULL OR p.user_id=$1)`;
+    const {rows:owners}=await pool.query(`SELECT DISTINCT p.user_id ${due} AND (p.last_attempt IS NULL OR p.last_attempt<now()-make_interval(mins=>$2::int))`,[onlyUser??null,FASTEST_GUARD_MINUTES]);
+    const ids:number[]=[],minutes:number[]=[];
+    for(const o of owners){
+      const plan=(await getEntitlements(o.user_id)).accessPlan;
+      if(plan){ids.push(o.user_id);minutes.push(PLANS[plan].limits.guardCadenceMinutes);}
+    }
+    if(!ids.length)return;
+    const {rows}=await pool.query(`SELECT p.user_id,p.location_id ${due} AND p.user_id=ANY($2::int[])
+      AND (p.last_attempt IS NULL OR p.last_attempt<now()-make_interval(mins=>(SELECT c.minutes FROM unnest($2::int[],$3::int[]) c(user_id,minutes) WHERE c.user_id=p.user_id)))
+      ORDER BY p.last_attempt NULLS FIRST LIMIT 100`,[onlyUser??null,ids,minutes]);
     for(const r of rows) try {await check(r.user_id,r.location_id);} catch { /* per-location error persisted */ }
   } finally {busy=false;}
 }

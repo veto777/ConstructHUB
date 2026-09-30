@@ -5,6 +5,12 @@ export const DOMAIN_MAIL_NOTIFICATION_KINDS = {
     email: true,
     security: true,
   },
+  "domains.disconnected": {
+    label: "A registrar API key was removed",
+    inApp: true,
+    email: true,
+    security: true,
+  },
   "domains.monitor": {
     label: "Domain expiry, DNS or website alert",
     inApp: true,

@@ -10,7 +10,9 @@ import { replySettingsSchema, saveReplySettings } from '../gbp/review-automation
 import { enqueue as enqueueContent, itemInput, scheduleInput } from '../gbp/content';
 import { enqueue as enqueueScan, profileFor } from '../sitescan/worker';
 import { siteUrl } from '../sitescan/http';
-import { accessFor, agencyPlanPaused, filters, locationAccess, locationFilter, locationJoin, positiveId, requireWrite, clientAccess, workspaceEntitled, type AgencyAccess } from './access';
+import { getEntitlements } from '../entitlements';
+import { reserveQuotaFor, refundReservation } from '../growth-quotas';
+import { accessFor, agencyPlanPaused, gbpSyncPaused, ownerHasPlan, filters, locationAccess, locationFilter, locationJoin, positiveId, requireWrite, clientAccess, workspaceEntitled, type AgencyAccess } from './access';
 export const bulkInput = z.object({
   requestKey:z.string().uuid(), action:z.enum(['sync','unlink','link','guard','ai-replies','content','scan','assign']),
   selection:z.object({allMatching:z.boolean().default(false),ids:z.array(positiveId).max(50).default([]),filters:filters.default({})}).strict(),
@@ -94,8 +96,14 @@ export async function performJob(j:any) {
     case 'scan': {
       const p=await profileFor(j.user_id,j.location_id);
       if(!p?.website) throw new GoogleError('invalid','Sync a Google profile with a website before scanning',409);
-      if(!await takeBudget('sitescan:scan:'+j.user_id,5,1,86400000)) throw new GoogleError('quota','Daily Site Scan budget reached; deferred',429);
-      return {id:await enqueueScan(j.user_id,siteUrl(p.website),150,1,p)};
+      // Each scan spends one of the owner's monthly Site Scans (Agency: one per billed location), like a scan
+      // started on the Site Scan page. A used-up month fails the job with the plan's own sentence.
+      const q=await reserveQuotaFor(j.user_id,'siteScans',1);
+      if(!q.ok) throw new GoogleError('invalid',String(q.body.message??'Site Scan is not included with the current plan'),q.status);
+      try {
+        if(!await takeBudget('sitescan:scan:'+j.user_id,5,1,86400000)) throw new GoogleError('quota','Daily Site Scan budget reached; deferred',429);
+        return {id:await enqueueScan(j.user_id,siteUrl(p.website),150,1,p)};
+      } catch(e) { await refundReservation(q.reservation,1); throw e; }
     }
     default: throw new GoogleError('invalid','Unknown queued action',400);
   }
@@ -114,9 +122,12 @@ export async function runAgencyJobs(perform=performJob,limit=10,onlyUser?:number
       if(!j)break;
       await c.query('INSERT INTO agency_worker_turns(user_id,last_at) VALUES($1,clock_timestamp()) ON CONFLICT(user_id) DO UPDATE SET last_at=clock_timestamp()',[j.user_id]);
       // Bulk actions belong to the agency workspace and follow the owner's current plan. Syncs are every plan's
-      // own Google sync queue (scheduleSyncs, queueSync) and always run.
+      // own Google sync queue (scheduleSyncs, queueSync): they run on any active plan, and not without one.
       if(j.action!=='sync'&&!await workspaceEntitled(j.user_id,j.actor_id)) {
         await c.query("UPDATE agency_jobs SET status='failed',error=$2,finished_at=now() WHERE id=$1",[j.id,agencyPlanPaused]);continue;
+      }
+      if(j.action==='sync'&&(await getEntitlements(j.user_id)).accessPlan===null) {
+        await c.query("UPDATE agency_jobs SET status='failed',error=$2,finished_at=now() WHERE id=$1",[j.id,gbpSyncPaused]);continue;
       }
       try {
         const result=await perform(j);
@@ -130,16 +141,26 @@ export async function runAgencyJobs(perform=performJob,limit=10,onlyUser?:number
     }
   }finally{if(locked)await c.query('SELECT pg_advisory_unlock(7161,1)');c.release();}
 }
-export async function scheduleSyncs() {
-  // Bounded replenishment; only one live sync/location. Six-hour cadence and explicit user unlink respected.
-  await pool.query(`INSERT INTO agency_jobs(id,user_id,actor_id,location_id,action,batch_id,priority)
-    SELECT gen_random_uuid(),l.user_id,l.user_id,l.id,'sync',gen_random_uuid(),20 FROM business_locations l
+/** Linked locations due a sync ($1: the owners to consider, or null for all). */
+const syncDue=`FROM business_locations l
     JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject AND NOT g.reconnect_required
-    WHERE (SELECT count(*) FROM agency_jobs q WHERE q.user_id=l.user_id AND q.status IN ('queued','running'))<19500
+    WHERE ($1::int[] IS NULL OR l.user_id=ANY($1::int[]))
+    AND (SELECT count(*) FROM agency_jobs q WHERE q.user_id=l.user_id AND q.status IN ('queued','running'))<19500
     AND l.gbp_location_name IS NOT NULL AND 'https://www.googleapis.com/auth/business.manage'=ANY(g.scopes)
     AND NOT EXISTS(SELECT 1 FROM gbp_sync_status s WHERE s.location_id=l.id AND s.last_attempt>now()-interval '6 hours')
-    AND NOT EXISTS(SELECT 1 FROM agency_jobs j WHERE j.location_id=l.id AND j.action='sync' AND (j.status IN ('queued','running') OR j.created_at>now()-interval '6 hours'))
-    ORDER BY (SELECT max(last_attempt) FROM gbp_sync_status s WHERE s.location_id=l.id) NULLS FIRST,l.id LIMIT 500 ON CONFLICT DO NOTHING`);
+    AND NOT EXISTS(SELECT 1 FROM agency_jobs j WHERE j.location_id=l.id AND j.action='sync' AND (j.status IN ('queued','running') OR j.created_at>now()-interval '6 hours'))`;
+/** `onlyUser` narrows a run to one owner (tests on a shared database). */
+export async function scheduleSyncs(onlyUser?:number) {
+  // Bounded replenishment; only one live sync/location. Six-hour cadence and explicit user unlink respected.
+  // Only owners with an active plan are synced (checked once per owner); the others stay due and are
+  // picked up again once they have a plan.
+  const {rows:owners}=await pool.query(`SELECT DISTINCT l.user_id ${syncDue}`,[onlyUser===undefined?null:[onlyUser]]);
+  const allowed:number[]=[];
+  for(const o of owners) if(await ownerHasPlan(o.user_id)) allowed.push(o.user_id);
+  if(!allowed.length)return;
+  await pool.query(`INSERT INTO agency_jobs(id,user_id,actor_id,location_id,action,batch_id,priority)
+    SELECT gen_random_uuid(),l.user_id,l.user_id,l.id,'sync',gen_random_uuid(),20 ${syncDue}
+    ORDER BY (SELECT max(last_attempt) FROM gbp_sync_status s WHERE s.location_id=l.id) NULLS FIRST,l.id LIMIT 500 ON CONFLICT DO NOTHING`,[allowed]);
 }
 export function startAgencyWorker() {
   if(process.env.GBP_SYNC_DISABLED==='true')return;

@@ -25,7 +25,7 @@ import { crmCustomerNotes, crmCustomers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { sendWithFallback } from "../email";
-import { normalizePhone, sendSms, smsMissingEnv, resolveSmsSender, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER, orgSmsEntitled, SMS_NEEDS_PLAN } from "./sms";
+import { normalizePhone, sendSms, smsMissingEnv, resolveSmsSender, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER, orgSmsEntitled, smsPlanRequired } from "./sms";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -119,7 +119,7 @@ export function registerCrmMessageRoutes(app: Express, getDevUser: GetUser): voi
       // shared platform number only texts the contractors themselves. The
       // composer greys out Text the same way.
       if (!(await orgSmsEntitled(ctx.org.id))) {
-        return res.status(402).json({ message: SMS_NEEDS_PLAN, planAllowsSms: false });
+        return res.status(402).json(smsPlanRequired());
       }
       if (resolveSmsSender(ctx.org.customFields) && !orgCanTextClients(ctx.org.customFields)) {
         return res.status(409).json({ message: CLIENT_TEXT_NEEDS_OWN_NUMBER });

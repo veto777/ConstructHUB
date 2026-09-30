@@ -11,6 +11,7 @@ import { guardRecentAuthOk } from '../gbp/guard-routes';
 import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
 import { bulkInput, queueBulk } from './jobs';
 import { createOnboarding, hash, instructions, onboardingLink } from './onboarding';
+import { getOwnerSeatUsage, seatLimitBody, SEAT_LOCK, type SeatUsage } from '../crm/tenancy';
 declare module 'express-session' { interface SessionData { agencyOwner?:number } }
 export async function requestAccess(req:Request):Promise<AgencyAccess> {
   if(!req.user)throw new GoogleError('auth','Not authenticated',401);
@@ -107,7 +108,16 @@ export function registerAgencyRoutes(app:Express) {
     const {rows:[n]}=await pool.query('SELECT count(*)::int n FROM agency_clients WHERE user_id=$1 AND id=ANY($2::int[])',[a.owner,[...new Set(b.clientIds)]]);
     if(n.n!==new Set(b.clientIds).size)throw missing();
     await pool.query('INSERT INTO agency_workspaces(user_id) VALUES($1) ON CONFLICT DO NOTHING',[a.owner]);
-    const c=await pool.connect();try{await c.query('BEGIN');await c.query('INSERT INTO agency_members(user_id,member_id,role,all_clients) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,member_id) DO UPDATE SET role=$3,all_clients=$4',[a.owner,u.id,b.role,b.allClients]);await c.query('DELETE FROM agency_member_clients WHERE user_id=$1 AND member_id=$2',[a.owner,u.id]);await c.query('INSERT INTO agency_member_clients(user_id,member_id,client_id) SELECT $1,$2,unnest($3::int[]) ON CONFLICT DO NOTHING',[a.owner,u.id,b.clientIds]);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
+    const c=await pool.connect();let full:SeatUsage|null=null;
+    try{await c.query('BEGIN');
+      // Team seats share the owner's plan seats with the CRM team (crmSeats plus Extra seat add-ons). The lock
+      // makes concurrent additions count one after another; changing an existing member's role takes no seat.
+      await c.query('SELECT pg_advisory_xact_lock($1,$2)',[SEAT_LOCK,a.owner]);
+      const seats=await getOwnerSeatUsage(a.owner,{adding:{userId:u.id}});
+      if(!seats.canAdd){full=seats;await c.query('ROLLBACK');}
+      else{await c.query('INSERT INTO agency_members(user_id,member_id,role,all_clients) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,member_id) DO UPDATE SET role=$3,all_clients=$4',[a.owner,u.id,b.role,b.allClients]);await c.query('DELETE FROM agency_member_clients WHERE user_id=$1 AND member_id=$2',[a.owner,u.id]);await c.query('INSERT INTO agency_member_clients(user_id,member_id,client_id) SELECT $1,$2,unnest($3::int[]) ON CONFLICT DO NOTHING',[a.owner,u.id,b.clientIds]);await c.query('COMMIT');}
+    }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
+    if(full)return void res.status(403).json(seatLimitBody(full));
     await logActivity(req,a.owner,'agency.member_updated',{memberId:u.id,role:b.role});res.json({ok:true});
   });
   route('delete','/team/:id',async(req,res,a)=>{if(a.role!=='owner')throw missing();await pool.query('DELETE FROM agency_members WHERE user_id=$1 AND member_id=$2',[a.owner,positiveId.parse(req.params.id)]);res.json({ok:true});});

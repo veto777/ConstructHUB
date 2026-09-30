@@ -4,6 +4,7 @@ import { encryptToken, decryptToken } from "../gbp/token-crypto";
 import { notifyUser, logActivity } from "../account-events";
 import { parseMail, classifyMail, type Mail } from "./classify";
 import { getEntitlements } from "../entitlements";
+import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function forwardingAddress(userId: number) {
   const domain = process.env.INBOUND_MAIL_DOMAIN;
@@ -24,14 +25,26 @@ export async function forwardingAddress(userId: number) {
 export async function purgeExpiredMail() {
   await pool.query("DELETE FROM mail_alert_messages WHERE expires_at<=now()");
 }
+/** How long a stored alert is kept (expires_at), whether or not the plan shows it yet. */
+export const MAIL_RETENTION_DAYS = 30;
+const mailPlan = PLANS[planForModule("domainsMailAlerts")].name;
+/** Notification text for an alert kept while the owner's plan doesn't include the module. */
+export const HELD_ALERT_NOTE = `It is kept for ${MAIL_RETENTION_DAYS} days and shows in Mail alerts once your plan includes ${MODULE_NAMES.domainsMailAlerts} (the ${mailPlan} plan).`;
+/**
+ * Store a recognised provider alert. `entitled: false` (the owner's plan lacks
+ * the module) still stores it for the same 30 days; only the notification
+ * wording changes, since the message can't be opened until the plan includes it.
+ */
 export async function storeMatched(
   userId: number,
   mail: Mail,
   source: "forwarding" | "gmail",
   receivedAt = new Date(),
+  opts: { entitled?: boolean } = {},
 ) {
+  const entitled = opts.entitled ?? true;
   const c = classifyMail(mail);
-  if (!c || receivedAt.getTime() < Date.now() - 30 * 86400000) return false;
+  if (!c || receivedAt.getTime() < Date.now() - MAIL_RETENTION_DAYS * 86400000) return false;
   const text = `${mail.subject}\n${mail.text}`.toLowerCase();
   // Extract candidate hostnames once, then use indexed equality; don't load an agency's whole inventory.
   const domains = [
@@ -59,7 +72,7 @@ export async function storeMatched(
     rows: [row],
   } = await pool.query(
     `INSERT INTO mail_alert_messages(user_id,dedupe,source,category,severity,sender,subject,body,confirmation_code,confirmation_link,domain_id,location_id,received_at,expires_at)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13::timestamptz+interval '30 days') ON CONFLICT(user_id,dedupe) DO NOTHING RETURNING id`,
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13::timestamptz+make_interval(days=>${MAIL_RETENTION_DAYS})) ON CONFLICT(user_id,dedupe) DO NOTHING RETURNING id`,
     [
       userId,
       dedupe,
@@ -83,6 +96,7 @@ export async function storeMatched(
       domainId,
       locationId,
       severity: c.severity,
+      ...(entitled ? {} : { heldForPlan: true }),
     });
     await notifyUser(
       userId,
@@ -92,7 +106,9 @@ export async function storeMatched(
           c.severity === "critical"
             ? "Critical provider email alert"
             : "Provider email alert received",
-        body: `${c.category} alert. Review the message in ConstructHUB.`,
+        body: entitled
+          ? `${c.category} alert. Review the message in ConstructHUB.`
+          : `${c.category} alert. ${HELD_ALERT_NOTE}`,
         link: "/mail-alerts",
         severity: c.severity,
       },
@@ -116,8 +132,11 @@ export async function ingest(raw: unknown, envelopeTo?: string) {
     "SELECT user_id FROM mail_alert_addresses WHERE token_hash=ANY($1::text[]) LIMIT 10",
     [tokens],
   );
-  // Forwarded alerts are kept only for owners whose plan includes the module.
+  // Forwarded alerts are never dropped. An owner whose plan doesn't include the
+  // module has them kept for the usual 30 days and shown once the plan does
+  // (the list lives behind the plan gate); they are told one arrived.
   for (const row of rows)
-    if ((await getEntitlements(row.user_id)).modules.domainsMailAlerts)
-      await storeMatched(row.user_id, mail, "forwarding");
+    await storeMatched(row.user_id, mail, "forwarding", new Date(), {
+      entitled: (await getEntitlements(row.user_id)).modules.domainsMailAlerts,
+    });
 }

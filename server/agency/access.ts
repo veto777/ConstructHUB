@@ -2,8 +2,8 @@ import { z } from 'zod';
 import type { Response } from 'express';
 import { pool } from '../db';
 import { GoogleError } from '../gbp/client';
-import { getEntitlements, sendPlanRequired } from '../entitlements';
-import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
+import { getEntitlements, sendLocationLimit, sendPlanRequired } from '../entitlements';
+import { MODULE_NAMES, PLANS, PLAN_KEYS, planForModule } from '@shared/plans';
 export const positiveId = z.coerce.number().int().positive().max(2147483647);
 export type AgencyAccess = { owner: number; actor: number; role: 'owner'|'admin'|'manager'|'viewer'; allClients: boolean };
 export const missing = () => new GoogleError('invalid','Record not found',404);
@@ -13,10 +13,40 @@ export async function workspaceEntitled(owner: number, actor = owner) {
   if ((await getEntitlements(owner)).modules.agencyWorkspace) return true;
   return actor !== owner && (await getEntitlements(actor)).isPlatformAdmin;
 }
+/**
+ * Why one more location can't be added to the owner's account, in the words of the 403 that POST
+ * /api/locations sends (sendLocationLimit: the Agency self-serve cap, then a sales quote), or null when it fits.
+ * For work with no response to answer (onboarding links a listing from a background worker).
+ */
+export async function locationLimitRefusal(owner: number, used: number): Promise<string|null> {
+  const ent = await getEntitlements(owner);
+  if (!ent.allowances) return agencyPlanPaused;
+  if (used < ent.allowances.locations) return null;
+  let body: { message?: string } = {};
+  const capture = { status() { return capture; }, json(b: { message?: string }) { body = b; return capture; } };
+  sendLocationLimit(capture as unknown as Response, ent, used);
+  return body.message ?? null;
+}
 export const agencyPlan = planForModule('agencyWorkspace');
 export const agencyPlanRequired = (res: Response) => sendPlanRequired(res, agencyPlan, MODULE_NAMES.agencyWorkspace);
 /** Recorded on queued agency work that was not run because the owner's plan no longer includes it. */
 export const agencyPlanPaused = `Not run: ${MODULE_NAMES.agencyWorkspace} is included with the ${PLANS[agencyPlan].name} plan.`;
+/** Recorded on a queued Google sync that was not run because the owner has no active plan. */
+export const gbpSyncPaused = `Not run: Google Business Profile sync is included with the ${PLANS[PLAN_KEYS[0]].name} plan.`;
+const planCache = new Map<number, { ok: boolean; at: number }>();
+/**
+ * Google Business Profile sync comes with every paid plan (a platform admin runs with the top plan). An owner
+ * with no active plan or grant is not synced. Answers are cached for five minutes, so a new plan resumes
+ * syncing within that; the scheduler asks once per owner, not once per location.
+ */
+export async function ownerHasPlan(owner: number): Promise<boolean> {
+  const hit = planCache.get(owner);
+  if (hit && Date.now() - hit.at < 300_000) return hit.ok;
+  const ok = (await getEntitlements(owner)).accessPlan !== null;
+  planCache.set(owner, { ok, at: Date.now() });
+  if (planCache.size > 50_000) planCache.clear();
+  return ok;
+}
 export async function accessFor(actor: number, owner = actor): Promise<AgencyAccess> {
   if (owner === actor) return {owner,actor,role:'owner',allClients:true};
   const { rows:[m] } = await pool.query('SELECT role,all_clients FROM agency_members WHERE user_id=$1 AND member_id=$2',[owner,actor]);
