@@ -306,7 +306,17 @@ export const generateText: Generate = async (context) => {
   return text;
 };
 async function sourceFor(userId: number, kind: string, sequence: number) {
-  if (kind === "gbp") await syncGbpSources(userId);
+  let manualOnly = false;
+  if (kind === "gbp") {
+    try {
+      await syncGbpSources(userId);
+    } catch (e) {
+      // A manually entered published update does not require a Google connection.
+      // Do not reuse stale imports after disconnection or hide provider failures.
+      if (!(e instanceof SocialError) || e.status !== 409) throw e;
+      manualOnly = true;
+    }
+  }
   if (kind === "tips")
     return {
       source: "Business profile; general educational tip",
@@ -339,8 +349,8 @@ async function sourceFor(userId: number, kind: string, sequence: number) {
     return { source: `Google review ${p.id}`, mediaUrls: [], text: p.comment };
   }
   const { rows } = await pool.query(
-    "SELECT * FROM social_sources WHERE user_id=$1 AND kind=$2 AND created_at>now()-interval '30 days' ORDER BY created_at DESC LIMIT 30",
-    [userId, kind],
+    "SELECT * FROM social_sources WHERE user_id=$1 AND kind=$2 AND created_at>now()-interval '30 days' AND (NOT $3 OR external_key IS NULL) ORDER BY created_at DESC LIMIT 30",
+    [userId, kind, manualOnly],
   );
   if (!rows.length)
     throw new SocialError(

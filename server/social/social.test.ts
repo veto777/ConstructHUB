@@ -499,6 +499,18 @@ describe("real Postgres, mocked Blotato publishing", () => {
     expect(generate).not.toHaveBeenCalled();
     expect((await pool.query("SELECT * FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`])).rows).toHaveLength(0);
   });
+  it("uses manually entered GBP updates without a Google connection and excludes stale imports", async () => {
+    await pool.query("DELETE FROM gbp_grants WHERE user_id=$1", [userId]);
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    await pool.query("INSERT INTO social_sources(user_id,kind,text,external_key) VALUES($1,'gbp','Stale import','accounts/stale/locations/stale/localPosts/old')", [userId]);
+    await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["gbp"] }));
+    const generate = vi.fn(async (_context: any) => "Manual GBP fixture draft");
+    await expect(userLock(userId, c => generateDue(c, userId, generate, true))).rejects.toThrow("No recent GBP");
+    expect(generate).not.toHaveBeenCalled();
+    await pool.query("INSERT INTO social_sources(user_id,kind,text) VALUES($1,'gbp','Manually supplied published fixture')", [userId]);
+    await userLock(userId, c => generateDue(c, userId, generate, true));
+    expect(generate.mock.calls[0][0].source).toBe("Manually supplied published fixture");
+  });
   it("disconnect cancels unsent work, disables generation, deletes the encrypted key, and logs activity", async () => {
     await disconnect(userId, null);
     expect(
