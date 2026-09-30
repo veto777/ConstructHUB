@@ -60,11 +60,11 @@ export function registerTrackingRoutes(app: Express) {
   }
   function getOS(){
     var ua=navigator.userAgent;
+    if(/Android/i.test(ua))return"Android";
+    if(/iPhone|iPad|iPod/i.test(ua))return"iOS";
     if(ua.indexOf("Win")>-1)return"Windows";
     if(ua.indexOf("Mac")>-1)return"macOS";
     if(ua.indexOf("Linux")>-1)return"Linux";
-    if(ua.indexOf("Android")>-1)return"Android";
-    if(ua.indexOf("iPhone")>-1||ua.indexOf("iPad")>-1)return"iOS";
     return"Other";
   }
   function send(){
@@ -82,8 +82,8 @@ export function registerTrackingRoutes(app: Express) {
       userAgent:navigator.userAgent
     };
     var body=JSON.stringify(data);
-    if(navigator.sendBeacon){
-      navigator.sendBeacon(api,new Blob([body],{type:"application/json"}));
+    if(window.fetch){
+      fetch(api,{method:"POST",body:body,keepalive:true,credentials:"omit",headers:{"Content-Type":"application/json"}}).catch(function(){});
     }else{
       var xhr=new XMLHttpRequest();
       xhr.open("POST",api,true);

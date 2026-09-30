@@ -1,11 +1,12 @@
 import { useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link, useRoute } from "wouter";
 import {
   ArrowLeft, AlertTriangle, CheckCircle, Shield, ShieldCheck,
-  Ban, Target, Eye, ChevronRight, XCircle,
+  Ban, Target, Eye, ChevronRight, XCircle, Lock, GraduationCap, Loader2,
 } from "lucide-react";
 
 import imgSitelinks from "@assets/image_1772130987636.png";
@@ -416,7 +417,7 @@ const SECTIONS: Record<string, SectionData> = {
     blocks: [
       { type: "heading", content: "Set Up Google Click Guard Immediately" },
       { type: "text", content: "IP exclusions are one of the most important settings in your campaign. Every time a fraudulent IP clicks your ad, you lose $30-50. Without a system to detect and block these IPs automatically, you're bleeding money every single day." },
-      { type: "text", content: "That's exactly what our Google Click Guard does. Go to Google Click Guard in the sidebar to set up your tracking script and link your Google Ads account. The system tracks every visitor to your website, identifies fraudulent click patterns, and automatically pushes blocked IPs to your Google Ads campaigns every hour." },
+      { type: "text", content: "That's what our Google Click Guard is for. Go to Google Click Guard in the sidebar to set up your tracking script. It records visitors to your website that run the script and flags unusual patterns. To apply the resulting IP list, paste the script from the 'Google Ads Script' tab into your own Google Ads account (Tools → Bulk actions → Scripts) and schedule it hourly. This script method needs no Google sign-in to ConstructHUB." },
       { type: "text", content: "Add the tracking script to your website, then install and schedule the separate Google Ads script to apply your IP list on supported campaigns. Review execution logs to verify it runs." },
       { type: "image", src: imgIpExclusions, caption: "IP Exclusions section in Campaign Settings — verify exclusions after running the separate Google Ads script" },
 
@@ -520,19 +521,18 @@ const SECTIONS: Record<string, SectionData> = {
         "$400/day × 30 days = $12,000 per month going straight to Google with zero return",
         "$12,000/month × 12 months = $144,000 per year in pure waste",
       ] },
-      { type: "text", content: "Click Guard pays for itself by blocking even a handful of fraudulent clicks per day. If it blocks just 5 fraudulent clicks per day at $40/click, that's $200/day saved — $6,000/month — $72,000/year redirected from fraud to reaching real customers." },
+      { type: "text", content: "As an illustration only: if IP exclusions stopped 5 wasted clicks per day at $40/click, that would be $200/day. Actual results depend on your campaigns — compare your real ad costs and lead quality before and after, because exclusions can also block legitimate visitors and savings are not guaranteed." },
 
-      { type: "heading", content: "Enable All Click Guard Detection Features" },
-      { type: "text", content: "Go to Google Click Guard in the sidebar and make sure every detection feature is enabled:" },
+      { type: "heading", content: "What Click Guard Checks Automatically" },
+      { type: "text", content: "Once the tracking script is on your site, Click Guard flags visits using fixed rules. These are signals, not proof of fraud:" },
       { type: "list", items: [
-        "Device ID tracking — identifies the same device even if the IP address changes",
-        "VPN blocking — blocks clicks from known VPN and proxy services",
-        "Behavior analysis — detects bot-like browsing patterns (no mouse movement, instant bounces)",
-        "Click threshold — set to 2-3 visits; anyone who visits more than that from an ad is suspicious",
-        "Aggressive blocking mode — recommended for high-CPC campaigns (roofing, HVAC, plumbing)",
-        "Google Ads sync — automated script that pushes blocked IPs to your campaigns every hour",
+        "Bot-like user agents — known crawler, headless-browser and script signatures, or a missing user agent",
+        "Repeat visits — more than 5 visits from one IP in an hour, or more than 15 in a day",
+        "Device fingerprints — the same browser fingerprint seen from different IPs within a day",
+        "Automatic listing — a flagged IP with more than 10 visits in an hour is added to your Blocked IPs list",
       ] },
-      { type: "text", content: "Link your Google Ads account using the automated sync script on the 'Link Google Ads' tab. This ensures blocked IPs are pushed to your campaigns automatically without any manual work." },
+      { type: "text", content: "The VPN, behavior-analysis, threshold and aggressive-blocking options in Domain Settings are saved preferences only; they do not change these rules yet." },
+      { type: "text", content: "To apply your Blocked IPs list in Google Ads, copy the script from the 'Google Ads Script' tab, paste it into Google Ads → Tools → Bulk actions → Scripts, and schedule it to run hourly. Check the script's Logs tab to confirm it ran. The script runs inside your own Google Ads account, so this method needs no Google sign-in to ConstructHUB." },
     ],
   },
 
@@ -597,9 +597,69 @@ export default function GoogleAdsGuideSection() {
   const section = SECTIONS[sectionSlug];
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Same entitlement rule as the guide index (google-ads-guide.tsx): a course
+  // purchase unlocks the playbook. Without this, a direct or shared section
+  // link rendered the paid content to anyone, signed out included.
+  const { data: user, isLoading: userLoading } = useQuery<{ id: number } | null>({
+    queryKey: ["/api/auth/me"],
+  });
+  const { data: purchases = [], isLoading: purchasesLoading } = useQuery<{ moduleId: string; purchasedAt: string }[]>({
+    queryKey: ["/api/course-purchases"],
+    enabled: !!user,
+  });
+  const isDev = import.meta.env.DEV;
+  const hasAccess = isDev || purchases.length > 0;
+  const checkingAccess = !isDev && (userLoading || (!!user && purchasesLoading));
+
   useEffect(() => {
     scrollRef.current?.scrollTo(0, 0);
   }, [sectionSlug]);
+
+  if (checkingAccess) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background" data-testid="view-guide-section-checking">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="h-full overflow-y-auto bg-background text-foreground">
+        <div className="max-w-2xl mx-auto px-4 py-12 space-y-6" data-testid="view-guide-section-locked">
+          <Link href="/google-ads-guide">
+            <Button variant="ghost" className="-ml-3" data-testid="button-back-to-guide">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Google Ads Guide
+            </Button>
+          </Link>
+          <Card className="bg-gradient-to-br from-[#4285F4]/10 to-[#34A853]/10 border-[#4285F4]/20">
+            <CardContent className="p-8 text-center">
+              <div className="inline-flex items-center gap-2 bg-[#4285F4]/10 border border-[#4285F4]/20 rounded-full px-4 py-1.5 mb-4">
+                <Lock className="h-4 w-4 text-[#4285F4]" />
+                <span className="text-sm text-[#4285F4] font-medium">Platinum & Master Class Subscribers Only</span>
+              </div>
+              <h2 className="text-xl font-bold text-foreground mb-2" data-testid="text-section-locked-title">
+                {section ? section.title : "Google Ads Playbook"}
+              </h2>
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                This section of the Google Ads playbook is included with a Platinum or Master Class purchase.
+              </p>
+              <a href="/master-class" data-testid="link-master-class">
+                <Button className="bg-gradient-to-r from-[#4285F4] to-[#34A853] hover:from-[#3367D6] hover:to-[#2D9A46] text-white px-8 h-11">
+                  <GraduationCap className="h-4 w-4 mr-2" /> Go to Master Class
+                </Button>
+              </a>
+              {!user && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  Already purchased? <a href="/auth" className="underline" data-testid="link-sign-in">Sign in</a> to open it.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (!section) {
     return (
@@ -725,10 +785,10 @@ export default function GoogleAdsGuideSection() {
             })}
           </div>
 
-          <div className="flex items-center justify-between mt-12 pt-6 border-t border-border">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 mt-12 pt-6 border-t border-border">
             {section.prevSection ? (
               <Link href={`/google-ads-guide/${section.prevSection.slug}`}>
-                <Button variant="ghost" className="" data-testid="button-prev-section">
+                <Button variant="ghost" className="max-w-full h-auto min-h-9 whitespace-normal text-left" data-testid="button-prev-section">
                   <ArrowLeft className="h-4 w-4 mr-2" /> {section.prevSection.title}
                 </Button>
               </Link>
@@ -736,13 +796,13 @@ export default function GoogleAdsGuideSection() {
 
             {section.nextSection ? (
               <Link href={`/google-ads-guide/${section.nextSection.slug}`}>
-                <Button className="bg-[#4285F4] hover:bg-[#3367D6] text-white" data-testid="button-next-section">
+                <Button className="max-w-full h-auto min-h-9 whitespace-normal text-left bg-[#4285F4] hover:bg-[#3367D6] text-white" data-testid="button-next-section">
                   {section.nextSection.title} <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
               </Link>
             ) : (
               <Link href="/google-ads">
-                <Button className="bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white" data-testid="button-go-click-guard">
+                <Button className="max-w-full h-auto min-h-9 whitespace-normal bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white" data-testid="button-go-click-guard">
                   <ShieldCheck className="h-4 w-4 mr-2" /> Set Up Click Guard
                 </Button>
               </Link>

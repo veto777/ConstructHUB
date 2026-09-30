@@ -1,12 +1,13 @@
 import { useAppOrigin } from "@/lib/app-origin";
 import { useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -92,11 +93,37 @@ type BlockedIp = {
 
 const FRAUD_TABS = ["Blocked IPs", "Countries", "Multi-Clicks", "Devices", "Browsers", "OS"];
 
+const PAGE_TABS = ["dashboard", "traffic", "fraud", "tools", "settings", "link-ads"] as const;
+type PageTab = typeof PAGE_TABS[number];
+
 export default function ClickGuardPage() {
   const appOrigin = useAppOrigin();
   const { toast } = useToast();
-  const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "traffic" | "fraud" | "tools" | "settings" | "link-ads">("dashboard");
+  // The tab and domain live in the URL (?tab=settings&domain=12) so a reload
+  // or a shared link lands on the same view instead of resetting to the
+  // dashboard and the first domain.
+  const [location, navigate] = useLocation();
+  const search = useSearch();
+  const urlParams = new URLSearchParams(search);
+  const tabParam = urlParams.get("tab");
+  const activeTab: PageTab = (PAGE_TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as PageTab) : "dashboard";
+  const domainParam = Number(urlParams.get("domain"));
+  const selectedDomainId = Number.isInteger(domainParam) && domainParam > 0 ? domainParam : null;
+  const updateUrl = (next: { tab?: PageTab; domain?: number | null }) => {
+    const params = new URLSearchParams(search);
+    if (next.tab !== undefined) {
+      if (next.tab === "dashboard") params.delete("tab");
+      else params.set("tab", next.tab);
+    }
+    if (next.domain !== undefined) {
+      if (next.domain == null) params.delete("domain");
+      else params.set("domain", String(next.domain));
+    }
+    const qs = params.toString();
+    navigate(qs ? `${location}?${qs}` : location, { replace: true });
+  };
+  const setActiveTab = (tab: PageTab) => updateUrl({ tab });
+  const setSelectedDomainId = (id: number | null) => updateUrl({ domain: id });
   const [fraudTab, setFraudTab] = useState("Blocked IPs");
   const [dateRange, setDateRange] = useState("7d");
   const [showAddDomain, setShowAddDomain] = useState(false);
@@ -122,7 +149,7 @@ export default function ClickGuardPage() {
   });
 
   const { data: visits = [] } = useQuery<ClickVisit[]>({
-    queryKey: ["/api/click-guard/domains", domainId, "visits"],
+    queryKey: ["/api/click-guard/domains", domainId, "visits", dateRange],
     queryFn: () => fetch(`/api/click-guard/domains/${domainId}/visits?start=${dateStart}&end=${dateEnd}`).then(r => r.json()),
     enabled: !!domainId,
   });
@@ -174,8 +201,8 @@ export default function ClickGuardPage() {
       setBlockIpInput("");
       toast({ title: "IP blocked" });
     },
-    onError: () => {
-      toast({ title: "Failed to block IP", variant: "destructive" });
+    onError: (e: unknown) => {
+      toast({ title: "Couldn't block IP", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
 
@@ -296,22 +323,22 @@ export default function ClickGuardPage() {
           )}
 
           <div className="flex items-center gap-1 mb-6 bg-card border border-border rounded-lg p-1 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 sm:w-fit scrollbar-none">
-            {(["dashboard", "traffic", "fraud", "tools", "settings", "link-ads"] as const).map(tab => {
+            {PAGE_TABS.map(tab => {
               const labels: Record<string, string> = {
                 dashboard: "Dashboard",
                 traffic: "Traffic Sources",
                 fraud: "Traffic Signals",
                 tools: "Tools",
                 settings: "Domain Settings",
-                "link-ads": "Link Google Ads",
+                "link-ads": "Google Ads Script",
               };
               const shortLabels: Record<string, string> = {
                 dashboard: "Dashboard",
                 traffic: "Traffic",
-                fraud: "Fraud",
+                fraud: "Signals",
                 tools: "Tools",
                 settings: "Settings",
-                "link-ads": "Link Ads",
+                "link-ads": "Ads Script",
               };
               const tabIcons: Record<string, typeof Shield> = {
                 "link-ads": Link2,
@@ -419,10 +446,11 @@ export default function ClickGuardPage() {
 
                   {activeTab === "settings" && (
                     <SettingsView
+                      key={selectedDomain.id}
                       domain={selectedDomain}
                       domains={domains}
                       deleteDomainMutation={deleteDomainMutation}
-                      selectedDomainId={selectedDomainId}
+                      selectedDomainId={selectedDomain.id}
                       setSelectedDomainId={setSelectedDomainId}
                       setShowAddDomain={setShowAddDomain}
                     />
@@ -456,6 +484,20 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
   });
 
   const activeBlockedCount = blockedIps.filter(b => b.isActive).length;
+
+  // A real check of the public list the Ads script downloads — not a
+  // hard-coded "Live". Shows what the script would receive right now.
+  const exclusionUrl = scriptData?.exclusionUrl;
+  const { data: exclusionCheck, isLoading: exclusionChecking, isError: exclusionCheckFailed } = useQuery<{ count: number }>({
+    queryKey: ["click-guard-exclusion-check", exclusionUrl],
+    queryFn: async () => {
+      const res = await fetch(exclusionUrl!, { cache: "no-store", credentials: "omit" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const body = await res.json();
+      return { count: Array.isArray(body?.ips) ? body.ips.length : 0 };
+    },
+    enabled: !!exclusionUrl,
+  });
 
   const trackingSnippet = trackingId
     ? `<!-- Click Guard by ConstructHUB -->\n<script src="${appOrigin}/api/click-guard/script/${trackingId}" async></script>`
@@ -495,13 +537,13 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
       <div className="text-center max-w-3xl mx-auto mb-8">
         <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5 mb-4">
           <Link2 className="h-4 w-4 text-blue-400" />
-          <span className="text-sm text-blue-400 font-medium">Google Ads Integration</span>
+          <span className="text-sm text-blue-400 font-medium">Google Ads Script</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3" data-testid="text-link-title">
-          Connect Your Website &amp; Google Ads
+          Apply Your IP List in Google Ads
         </h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Click Guard records script-observed visits and flags unusual patterns. To apply its local IP exclusion list, install and schedule the separate script in your Google Ads account.
+          Click Guard records script-observed visits and flags unusual patterns. To apply its IP exclusion list, you paste a script into your own Google Ads account (Tools &rarr; Bulk actions &rarr; Scripts) and schedule it. This tab has no Google sign-in; the script runs inside your own Google Ads account. Agencies with a Google Ads manager (MCC) account can instead connect it with Google under Agency Ads &amp; LSA and apply Click Guard exclusions to mapped client accounts from there.
         </p>
       </div>
 
@@ -523,7 +565,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <Shield className="h-7 w-7 text-white" />
             </div>
             <p className="text-xs font-semibold text-foreground">ConstructHUB</p>
-            <p className="text-[10px] text-muted-foreground">Detects fraud, blocks IPs</p>
+            <p className="text-[10px] text-muted-foreground">Flags unusual visits, lists IPs</p>
           </div>
           <div className="flex items-center justify-center">
             <ArrowRight className="h-5 w-5 text-blue-500 hidden md:block" />
@@ -534,7 +576,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <ShieldBan className="h-7 w-7 text-white" />
             </div>
             <p className="text-xs font-semibold text-foreground">Google Ads</p>
-            <p className="text-[10px] text-muted-foreground">IPs excluded from campaigns</p>
+            <p className="text-[10px] text-muted-foreground">Your pasted script applies the list</p>
           </div>
         </div>
       </div>
@@ -560,15 +602,19 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <Card className=" bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-api-status">
               <CardContent className="p-5">
                 <Activity className="h-6 w-6 text-blue-400 mb-2" />
-                <div className="text-2xl font-bold text-foreground">Live</div>
-                <div className="text-xs text-muted-foreground">Exclusion API Status</div>
+                <div className="text-2xl font-bold text-foreground" data-testid="text-api-status">
+                  {scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {exclusionCheck ? `Exclusion list URL · serving ${exclusionCheck.count} IP${exclusionCheck.count === 1 ? "" : "s"}` : "Exclusion list URL"}
+                </div>
               </CardContent>
             </Card>
             <Card className=" bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-google-limit">
               <CardContent className="p-5">
                 <ShieldCheck className="h-6 w-6 text-emerald-400 mb-2" />
                 <div className="text-2xl font-bold text-foreground">{Math.min(activeBlockedCount, 500)}/500</div>
-                <div className="text-xs text-muted-foreground">Google Ads IP Limit Used</div>
+                <div className="text-xs text-muted-foreground">Your list vs. Google's 500-IP campaign limit</div>
               </CardContent>
             </Card>
           </div>
@@ -629,7 +675,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#4285F4] to-[#3367D6] flex items-center justify-center text-white font-bold text-sm">2</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Click Guard Detects Fraud Automatically</CardTitle>
+                  <CardTitle className="text-foreground text-base">Click Guard Flags Unusual Traffic Automatically</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">No action needed — this happens on ConstructHUB's servers</p>
                 </div>
               </div>
@@ -637,10 +683,10 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { icon: MousePointerClick, label: "Multi-click detection", desc: "Same IP clicking your ad 5+ times in an hour" },
+                  { icon: MousePointerClick, label: "Multi-click detection", desc: "More than 5 visits from one IP in an hour" },
                   { icon: Bot, label: "Bot detection", desc: "Known bot user agents, headless browsers, crawlers" },
                   { icon: Fingerprint, label: "VPN hopping", desc: "Same device fingerprint appearing from different IPs" },
-                  { icon: Ban, label: "Auto-blocking", desc: "Suspicious IPs are automatically added to your block list" },
+                  { icon: Ban, label: "Auto-blocking", desc: "A flagged IP with more than 10 visits in an hour is added to your Blocked IPs list" },
                 ].map((item, i) => (
                   <div key={i} className="flex items-start gap-3 bg-card rounded-lg p-3">
                     <item.icon className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -659,15 +705,15 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">3</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Push Blocked IPs to Google Ads</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">Connect your Google Ads account so blocked IPs are automatically excluded from your campaigns</p>
+                  <CardTitle className="text-foreground text-base">Paste the Script into Google Ads</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-step3-subtitle">Paste this script into Google Ads &rarr; Tools &rarr; Bulk actions &rarr; Scripts and schedule it. No Google sign-in is needed here; the script runs inside your own Google Ads account.</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). This script runs every hour, calls ConstructHUB's API, gets your latest blocked IPs, and adds them as IP exclusions on all your active campaigns. Google applies IP exclusions where supported; changing IPs and campaign limitations can reduce their effectiveness.
+                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). Scheduled hourly, each run calls ConstructHUB's API, gets your latest blocked IPs, and adds them as IP exclusions on all your active campaigns. Google applies IP exclusions where supported; changing IPs and campaign limitations can reduce their effectiveness.
                 </p>
               </div>
 
@@ -679,7 +725,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 <div className="flex items-center gap-3">
                   <Zap className="h-5 w-5 text-blue-500" />
                   <div className="text-left">
-                    <p className="text-sm font-semibold text-foreground">Google Ads Auto-Sync Script</p>
+                    <p className="text-sm font-semibold text-foreground">Google Ads IP Exclusion Script</p>
                     <p className="text-xs text-muted-foreground">Click to view the script you paste into Google Ads</p>
                   </div>
                 </div>
@@ -759,7 +805,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  The Google Ads Script calls this URL automatically every hour. It returns up to 500 blocked IPs in JSON format. You can also use this with Microsoft Ads or any other platform.
+                  When you schedule it hourly, the Google Ads Script calls this URL on each run. It returns up to 500 blocked IPs in JSON format. You can also use this with Microsoft Ads or any other platform.
                 </p>
               </div>
             </CardContent>
@@ -836,8 +882,8 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <Card className=" bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-tip-auto">
               <CardContent className="p-5">
                 <RefreshCw className="h-8 w-8 text-blue-400 mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Syncs Every Hour</h4>
-                <p className="text-xs text-muted-foreground">The Google Ads Script runs hourly. New blocked IPs get pushed to all your campaigns automatically — no manual work needed.</p>
+                <h4 className="text-sm font-semibold text-foreground mb-1">Runs When You Schedule It</h4>
+                <p className="text-xs text-muted-foreground">Once you schedule the pasted script to run hourly in Google Ads, each run adds newly listed IPs to your enabled campaigns. Check its Logs tab to confirm it ran.</p>
               </CardContent>
             </Card>
             <Card className=" bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20" data-testid="card-tip-fingerprint">
@@ -856,7 +902,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 <div>
                   <h4 className="text-sm font-semibold text-blue-500 mb-1">Pro Tip: Google Ads Has a 500 IP Limit</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Google Ads allows 500 IP exclusions per campaign. The sync script respects this limit and prioritizes the most recent blocks. Enable IP Range Exclusion in Domain Settings to block entire subnets (e.g., 172.16.0.*) and fit more protections within Google's limit.
+                    Google Ads allows 500 IP exclusions per campaign. The script stops adding IPs once a campaign reaches that limit, so review and remove old exclusions in Google Ads when the list fills up.
                   </p>
                 </div>
               </div>
@@ -1002,7 +1048,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
           <Card className="bg-card border-border" data-testid="card-device-breakdown">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Monitor className="h-4 w-4 text-blue-400" /> Fraud by Device
+                <Monitor className="h-4 w-4 text-blue-400" /> Visits by Device
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -1203,7 +1249,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
     <div className="space-y-6">
       <Card className="bg-card border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-bold text-foreground">Google Ads Fraud Analytics</CardTitle>
+          <CardTitle className="text-lg font-bold text-foreground" data-testid="text-signals-title">Traffic Signals</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="flex items-center gap-1 px-4 pt-2 pb-4 overflow-x-auto">
@@ -1494,7 +1540,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                         <td className="py-2 px-3 text-center">
                           {v.isSuspicious ? (
                             <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[10px]">
-                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> Fraud
+                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> Flagged
                             </Badge>
                           ) : (
                             <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
@@ -1538,36 +1584,6 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
   scriptSnippet: string;
   copyScript: () => void;
 }) {
-  const appOrigin = useAppOrigin();
-  const { toast } = useToast();
-
-  const conversionScript = `<!-- Click Guard Conversion tracking-->
-<script type="text/javascript">
-ccConVal = 0;
-var script = document.createElement("script");
-script.async = true;
-script.type = "text/javascript";
-var target = '${appOrigin}/api/click-guard/script/${domain.trackingId}';
-script.src = target; var elem = document.head; elem.appendChild(script);
-</script>
-
-<!-- Click Guard Conversion tracking-->`;
-
-  const eventScript = `function initCGConversion(val) {
-  window.ccConVal = val || 0;
-  var script = document.createElement('script');
-  var target = '${appOrigin}/api/click-guard/script/${domain.trackingId}';
-  var elem = document.head;
-  script.type = 'text/javascript';
-  script.src = target;
-  elem.appendChild(script);
-}`;
-
-  const copyText = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: "Copied!", description: `${label} copied to clipboard.` });
-  };
-
   return (
     <div className="space-y-6">
       <Card className="bg-card border-border" data-testid="card-tracking-script">
@@ -1602,96 +1618,19 @@ script.src = target; var elem = document.head; elem.appendChild(script);
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-card border-border" data-testid="card-conversion-tracking">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Target className="h-5 w-5 text-emerald-400" /> Conversion Tracking Code
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <p className="text-sm text-muted-foreground mb-3">
-              This is your tracking code. It goes right after the opening <code className="text-blue-500">&lt;body&gt;</code> tag of your thank you page.
-            </p>
-            <p className="text-xs text-muted-foreground mb-3">
-              You can set a value to the ccConVal variable to track conversion value as well.
-            </p>
-            <div className="relative">
-              <pre className="bg-muted border border-border rounded-lg p-4 text-[11px] text-emerald-400 font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-60">
-                {conversionScript}
-              </pre>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="absolute top-2 right-2"
-                onClick={() => copyText(conversionScript, "Conversion tracking code")}
-                data-testid="button-copy-conversion"
-              >
-                <Copy className="h-3 w-3 mr-1" /> Copy
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border" data-testid="card-event-tracking">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Zap className="h-5 w-5 text-purple-400" /> Tracking Individual Events
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <p className="text-sm text-muted-foreground mb-3">
-              Call the following function to track individual events. This will allow our system to track an event or conversion on your page.
-            </p>
-            <p className="text-xs text-muted-foreground mb-3">
-              For example, you could put this code on a "Submit" button for a lead form to allow us track who was filling out the form.
-            </p>
-            <div className="relative">
-              <pre className="bg-muted border border-border rounded-lg p-4 text-[11px] text-purple-400 font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-60">
-                {eventScript}
-              </pre>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="absolute top-2 right-2"
-                onClick={() => copyText(eventScript, "Event tracking code")}
-                data-testid="button-copy-event"
-              >
-                <Copy className="h-3 w-3 mr-1" /> Copy
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="bg-card border-border" data-testid="card-conversions-table">
+      {/* Conversion tracking is not built: the tracker records page visits only
+          (no conversion value is sent or stored), so no snippet is offered. */}
+      <Card className="bg-card border-border" data-testid="card-conversion-tracking">
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-400" /> Conversions Table
-            </CardTitle>
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Activity className="h-5 w-5 text-emerald-400" /> Conversion Analysis
-            </CardTitle>
-          </div>
+          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Target className="h-5 w-5 text-muted-foreground" /> Conversion Tracking
+            <Badge className="bg-card text-muted-foreground border-border text-[10px] ml-1">Not available yet</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0">
-          <div className="grid grid-cols-2 gap-6">
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-3 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <BarChart3 className="h-8 w-8 text-blue-500/60" />
-              </div>
-              <p className="text-blue-500 font-medium text-sm">Data is on its way!</p>
-              <p className="text-xs text-muted-foreground mt-1">Add the conversion tracking code to start seeing data</p>
-            </div>
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-3 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <Activity className="h-8 w-8 text-emerald-400/60" />
-              </div>
-              <p className="text-emerald-400 font-medium text-sm">Your campaigns are now protected.</p>
-              <p className="text-xs text-muted-foreground mt-1">Conversion analysis will appear here</p>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground" data-testid="text-conversion-unavailable">
+            Conversion tracking is not available yet. Click Guard records page visits only; it does not record form submissions, calls or conversion values. Use Google Ads conversion tracking to measure leads.
+          </p>
         </CardContent>
       </Card>
     </div>
@@ -1730,8 +1669,11 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
   const [manualExcludeIps, setManualExcludeIps] = useState(settings.manualExcludeIps || "");
   const [whitelistIps, setWhitelistIps] = useState(settings.whitelistIps || "");
 
-  const toggleSetting = (key: string) => {
-    updateSetting.mutate({ [key]: !settings[key] });
+  // Save the value the Switch reports. Negating the stored value sent `true`
+  // for an unsaved key whose Switch already showed ON (default-on keys), so
+  // the first click was a no-op.
+  const setSwitch = (key: string) => (checked: boolean) => {
+    updateSetting.mutate({ [key]: checked });
   };
 
   const handleDeleteDomain = (id: number) => {
@@ -1744,7 +1686,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
 
   return (
     <div className="space-y-6">
-      <p className="rounded-md border p-4 text-sm text-muted-foreground">Detection preferences below are saved but do not yet change automatic detection or exclusions. Use the Link Ads instructions to apply IP exclusions. VPN Shield has separate browser controls.</p>
+      <p className="rounded-md border p-4 text-sm text-muted-foreground" data-testid="text-settings-note">Detection preferences below are saved but do not yet change automatic detection or the exclusion list. The exclusion list contains only the IPs on the Blocked IPs tab (Traffic Signals). Use the Google Ads Script tab to apply it in Google Ads. VPN Shield has separate browser controls.</p>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
           <Globe className="h-5 w-5 text-blue-500" /> Your Domains
@@ -1908,7 +1850,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 <Crosshair className="h-4 w-4 text-blue-500" /> Click Fraud Threshold
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Add up to 5 rules to detect IPs based on thresholds. For example: Detect an IP if they click on an ad 3 times within 10 minutes.
+                Saved preference only &mdash; automatic flagging currently uses fixed rules: bot-like user agents, more than 5 visits from one IP in an hour or more than 15 in a day, and one device fingerprint seen from different IPs.
               </p>
               <div className="mt-4 flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">Allow up to</span>
@@ -1947,12 +1889,12 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 <Fingerprint className="h-4 w-4 text-blue-500" /> Detect IPs Based on Device IDs
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                By enabling this feature, Click Guard will detect IPs that were used by the same device ID to click your ads repeatedly. This feature requires the tracking code to be installed.
+                Saved preference only &mdash; Click Guard already flags a device fingerprint seen from different IPs, and this toggle does not turn that off. Requires the tracking code to be installed.
               </p>
             </div>
             <Switch
               checked={settings.detectDeviceId !== false}
-              onCheckedChange={() => toggleSetting("detectDeviceId")}
+              onCheckedChange={setSwitch("detectDeviceId")}
               data-testid="switch-detect-device"
             />
           </div>
@@ -1982,16 +1924,14 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                     <strong className="text-foreground">Block</strong> any click coming from the following countries
                   </label>
                 </div>
-                <div className="mt-2">
-                  <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 px-3 py-1">
-                    United States <X className="h-3 w-3 ml-1.5 cursor-pointer" />
-                  </Badge>
-                </div>
+                <p className="mt-2 text-xs text-muted-foreground" data-testid="text-country-list-unavailable">
+                  No country list: the tracker does not record visitor countries yet, so there is nothing to allow or block.
+                </p>
               </div>
             </div>
             <Switch
               checked={settings.blockByCountry !== false}
-              onCheckedChange={() => toggleSetting("blockByCountry")}
+              onCheckedChange={setSwitch("blockByCountry")}
               data-testid="switch-block-country"
             />
           </div>
@@ -2011,7 +1951,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             </div>
             <Switch
               checked={settings.blockJsDisabled !== false}
-              onCheckedChange={() => toggleSetting("blockJsDisabled")}
+              onCheckedChange={setSwitch("blockJsDisabled")}
               data-testid="switch-block-js"
             />
           </div>
@@ -2032,7 +1972,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             </div>
             <Switch
               checked={settings.vpnBlocking !== false}
-              onCheckedChange={() => toggleSetting("vpnBlocking")}
+              onCheckedChange={setSwitch("vpnBlocking")}
               data-testid="switch-vpn"
             />
           </div>
@@ -2053,7 +1993,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             </div>
             <Switch
               checked={settings.behaviorAnalysis !== false}
-              onCheckedChange={() => toggleSetting("behaviorAnalysis")}
+              onCheckedChange={setSwitch("behaviorAnalysis")}
               data-testid="switch-behavior"
             />
           </div>
@@ -2070,7 +2010,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground">Block IPs for a Certain Period</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                A number between 1 and 90 that represents the maximum number of days each IP will be blocked.
+                Saved preference only &mdash; not applied yet. Blocked IPs stay on the list until you remove them.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -2103,7 +2043,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground">Exclusion List Refresh Rate</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                A number between 50-500 that represents the exclusion list max length. A longer list means a slower refresh rate.
+                Saved preference only &mdash; not applied yet. The exclusion list URL always serves up to 500 IPs.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -2136,12 +2076,12 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground">IP Range Exclusion</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                By enabling this feature, Click Guard will block ranges of IPs (like 172.165.11.*) when too many clicks are made by different IPs from the same range of IP addresses.
+                Saved preference only &mdash; not applied to the exclusion list yet. Click Guard does not block IP ranges.
               </p>
             </div>
             <Switch
               checked={settings.ipRangeExclusion !== false}
-              onCheckedChange={() => toggleSetting("ipRangeExclusion")}
+              onCheckedChange={setSwitch("ipRangeExclusion")}
               data-testid="switch-ip-range"
             />
           </div>
@@ -2152,12 +2092,8 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <h3 className="text-base font-semibold text-foreground">Manually Exclude IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Fill out the text box with IP addresses (each IP address in a new line) that you wish to add to your exclusion list. These IPs will be blocked until you remove them.
+            Saved preference only &mdash; not applied to the exclusion list yet. To exclude an IP now, add it on the Blocked IPs tab under Traffic Signals.
           </p>
-          <p className="text-xs text-muted-foreground mt-2">
-            You can use single IP addresses or a range using the wildcard character (*) or CIDR notation.
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">Examples: 112.4.5.67 · 112.4.5.* · 112.4.0.0/16 · 112.4.2.4/23</p>
           <Textarea
             value={manualExcludeIps}
             onChange={e => setManualExcludeIps(e.target.value)}
@@ -2181,9 +2117,8 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <h3 className="text-base font-semibold text-foreground">Whitelist IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Fill out the text box with IP addresses (each IP address in a new line) that you wish for Click Guard to <strong className="text-foreground">never</strong> block.
+            Saved preference only &mdash; not applied yet. IPs listed here are <strong className="text-foreground">not</strong> removed from the exclusion list or protected from automatic blocking; unblock an IP on the Blocked IPs tab instead.
           </p>
-          <p className="text-xs text-muted-foreground mt-2">Examples: 112.4.5.67 · 112.4.5.* · 112.4.0.0/16 · 112.4.2.4/23</p>
           <Textarea
             value={whitelistIps}
             onChange={e => setWhitelistIps(e.target.value)}
@@ -2214,7 +2149,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             </div>
             <Switch
               checked={settings.aggressiveBlocking === true}
-              onCheckedChange={() => toggleSetting("aggressiveBlocking")}
+              onCheckedChange={setSwitch("aggressiveBlocking")}
               data-testid="switch-aggressive"
             />
           </div>
