@@ -182,7 +182,7 @@ export const GOOGLE_ADS_GUIDE_SECTIONS: Record<string, GuideSection> = {
       { type: "heading", content: "NEVER Use Broad Match Keywords — This Is Non-Negotiable" },
       { type: "warning", content: "Broad match is Google's default keyword setting and it is specifically designed to spend your money as fast as possible. If you use a keyword without quotes or brackets, Google considers it broad match." },
       { type: "text", content: "Here's what happens with broad match: you enter the keyword 'roofer' thinking Google will show your ad when someone searches for a roofer. Instead, Google shows your ad for 'how to become a roofer,' 'roofer salary,' 'roofing school near me,' 'roofer jokes,' 'roofing materials wholesale,' and literally anything Google's algorithm thinks is vaguely related to roofing." },
-      { type: "text", content: "You pay $40-50 for each of those clicks, and not a single one of those people wants to hire a roofer. They're looking for a career, studying for school, or browsing Reddit." },
+      { type: "text", content: "You pay for each of those clicks, and not a single one of those people wants to hire a roofer. They're looking for a career, studying for school, or browsing Reddit." },
       { type: "text", content: "Always use one of these two match types:" },
       { type: "list", items: [
         "Phrase Match (\"keywords in quotes\") — Your ad shows when someone searches for your phrase in the correct order, with possible words before or after. Example: \"roof repair contractor\" matches 'best roof repair contractor near me'",
@@ -396,7 +396,7 @@ export const GOOGLE_ADS_GUIDE_SECTIONS: Record<string, GuideSection> = {
     nextSection: { slug: "tracking", title: "Tracking & Measurement" },
     blocks: [
       { type: "heading", content: "Set Up Google Click Guard Immediately" },
-      { type: "text", content: "IP exclusions are one of the most important settings in your campaign. Every time a fraudulent IP clicks your ad, you lose $30-50. Without a system to detect and block these IPs automatically, you're bleeding money every single day." },
+      { type: "text", content: "IP exclusions are one of the most important settings in your campaign. Every time a fraudulent IP clicks your ad, you pay for that click. Without a system to detect and block these IPs automatically, you're bleeding money every single day." },
       { type: "text", content: "That's what our Google Click Guard is for. Go to Google Click Guard in the sidebar to set up your tracking script. It records visitors to your website that run the script and flags unusual patterns. To apply the resulting IP list, paste the script from the 'Google Ads Script' tab into your own Google Ads account (Tools → Bulk actions → Scripts) and schedule it hourly. This script method needs no Google sign-in to ConstructHUB." },
       { type: "text", content: "Add the tracking script to your website, then install and schedule the separate Google Ads script to apply your IP list on supported campaigns. Review execution logs to verify it runs." },
       { type: "image", image: "image_1772133112337.png", caption: "IP Exclusions section in Campaign Settings — verify exclusions after running the separate Google Ads script" },
