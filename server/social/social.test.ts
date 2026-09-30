@@ -511,6 +511,11 @@ describe("real Postgres, mocked Blotato publishing", () => {
     await userLock(userId, c => generateDue(c, userId, generate, true));
     expect(generate.mock.calls[0][0].source).toBe("Manually supplied published fixture");
   });
+  it("returns an actionable validation error and keeps overlength approval edits as drafts", async () => {
+    const [p] = await createPosts(userId, request({ draft: true }));
+    await expect(changePost(userId, p.id, "approve", "x".repeat(281))).rejects.toMatchObject({ status: 400, message: "twitter: text exceeds 280 characters" });
+    expect((await rows()).find(row => row.id === p.id).state).toBe("draft");
+  });
   it("disconnect cancels unsent work, disables generation, deletes the encrypted key, and logs activity", async () => {
     await disconnect(userId, null);
     expect(

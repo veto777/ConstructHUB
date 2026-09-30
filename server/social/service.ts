@@ -241,7 +241,11 @@ export async function changePost(
         platform,
         ...p.payload.post.target,
       };
-      postPayload(d, text, p.payload.post.content.mediaUrls, p.ai_generated);
+      try {
+        postPayload(d, text, p.payload.post.content.mediaUrls, p.ai_generated);
+      } catch (e) {
+        throw new SocialError((e as Error).message);
+      }
       p.payload.post.content.text = text;
     }
     const {
