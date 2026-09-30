@@ -117,6 +117,13 @@ describe("CRM identity validation against the dev server", () => {
     expect(deposit.status).toBe(400);
     expect(deposit.body.message).toBe("Default deposit must be at most 100%.");
 
+    // Cents read as dollars, never the stored integer. Validation runs before
+    // any member lookup, so this refused PATCH writes nothing.
+    const me = await api("/api/crm/me", {}, cookie);
+    const cost = await patch(`/api/crm/members/${me.body.member.id}`, { hourlyCostCents: 100_000_01 }, cookie);
+    expect(cost.status).toBe(400);
+    expect(cost.body.message).toBe("Cost rate must be at most $100,000.");
+
     const theme = await patch("/api/crm/org", { themeColor: "not-a-theme" }, cookie);
     expect(theme.status).toBe(400);
     expect(theme.body.message).toBe("Unknown theme colour");

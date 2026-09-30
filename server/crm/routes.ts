@@ -136,7 +136,13 @@ function validationMessage(error: z.ZodError, fallback: string): string {
   const key = String(issue.path[0] ?? "");
   const label = FIELD_LABELS[key]
     ?? (key ? key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()) : "A field");
-  const isBps = /Bps$/.test(String(issue.path[issue.path.length - 1] ?? ""));
+  // Basis points read as a percent and cents as dollars — never the raw
+  // stored integer ("Cost rate must be at most 10000000" misleads).
+  const leaf = String(issue.path[issue.path.length - 1] ?? "");
+  const amount = (n: number | bigint) =>
+    /Bps$/.test(leaf) ? `${Number(n) / 100}%`
+      : /Cents$/.test(leaf) ? `$${(Number(n) / 100).toLocaleString("en-US")}`
+        : String(n);
   switch (issue.code) {
     case z.ZodIssueCode.invalid_string:
       if (issue.validation === "email") return `${label} must be a valid email address, like name@company.com.`;
@@ -146,11 +152,11 @@ function validationMessage(error: z.ZodError, fallback: string): string {
       if (issue.type === "string") {
         return Number(issue.minimum) <= 1 ? `${label} can't be blank.` : `${label} must be at least ${issue.minimum} characters.`;
       }
-      if (issue.type === "number") return `${label} must be at least ${isBps ? `${Number(issue.minimum) / 100}%` : issue.minimum}.`;
+      if (issue.type === "number") return `${label} must be at least ${amount(issue.minimum)}.`;
       break;
     case z.ZodIssueCode.too_big:
       if (issue.type === "string") return `${label} must be ${issue.maximum} characters or fewer.`;
-      if (issue.type === "number") return `${label} must be at most ${isBps ? `${Number(issue.maximum) / 100}%` : issue.maximum}.`;
+      if (issue.type === "number") return `${label} must be at most ${amount(issue.maximum)}.`;
       if (issue.type === "array") return `${label} can have at most ${issue.maximum} entries.`;
       break;
     case z.ZodIssueCode.invalid_enum_value:
