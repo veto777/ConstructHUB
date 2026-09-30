@@ -36,6 +36,10 @@ npm run build
 
 echo "== rsync dist/ =="
 "${RSYNC[@]}" dist/ "$HOST:$APP_DIR/dist/"
+# Old hashed bundles stay publicly fetchable by URL unless removed, and they can
+# carry content later taken out of the client (e.g. paid guide text). Keep only
+# the current build's assets.
+"${RSYNC[@]}" --delete dist/public/assets/ "$HOST:$APP_DIR/dist/public/assets/"
 
 echo "== dependency check =="
 # ~/ConstructHUB-demo/node_modules is a symlink to this tree's node_modules,
