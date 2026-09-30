@@ -19,6 +19,26 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 💲 2026-09-30 — new price book + TruthCoder AI (deployed 23:45 UTC)
+- **Price book** (owner decisions): Starter $29 / Pro $79 / Growth $199 / Agency $349 incl. 10 locations then
+  $15 / $10 / $7 per location (quote above 500); annual = 10x; no free plan; 1-day trial (one per Stripe customer);
+  add-ons (location $19, seat $15, protected site $15, texting $29 + $29 setup, competitor pack $39); Agency-only:
+  agency workspace, Ads/LSA manager, Cloudflare + Search Console, Domains + Gmail alerts; anything >= $1,000 is
+  "Talk to a sales rep" (enforced server-side, incl. SEO contracts); CRM included in every plan. Gold/Platinum and
+  /individual-pricing are gone (301 to /pricing#add-ons). Legacy keys map via LEGACY_PLAN_MAP (the one Platinum
+  row = the owner = Agency).
+- **Source of truth:** `shared/plans.ts` (prices, limits, modules, add-ons, bands) + `server/entitlements.ts`
+  (getEntitlements, requireModule, 402 plan_required / 403 limit_reached). Never hard-code plan names or prices.
+- **Billing:** Stripe Prices are created on first use by lookup key (`chub_v1_…`, amount encoded). Plan/add-on
+  changes update the existing subscription (no second checkout). past_due keeps access while Stripe retries —
+  **owner must set Stripe → Billing → Subscriptions → Manage failed payments to cancel/mark unpaid**. Agency
+  extra-location quantity syncs daily (production only; yearly subs invoice immediately).
+- **AI = TruthCoder** (owner's decision): live `.env` has `AI_INTEGRATIONS_OPENAI_BASE_URL=http://127.0.0.1:8250/api`
+  (truthcoder-webui on the same host, bypasses Cloudflare's 100 s cap), `AI_MODEL=truthcode:38`,
+  `AI_VISION_MODEL=huihui_ai/qwen3-vl-abliterated:8b`, `AI_TIMEOUT_MS=180000`, and the owner's TruthCoder API key.
+  Keys are managed at https://truthcoder.com/api-keys (named, revocable; built by Kimi in the TruthCoder project).
+  This is an owner-approved cross-project coupling — record it in `~/HUB/registry.json → known_tower_couplings`.
+
 ## 🚀 2026-09-30 — round-4 lanes + pre-launch QA (deployed 16:08 UTC)
 - **Shipped:** agency mode + email onboarding (a1), Site Scan fix guidance (a2), Google Ads/LSA manager (a3),
   Social business selector (a4), Cloudflare + Search Console (a5; Global Key is exchanged for a scoped token and
