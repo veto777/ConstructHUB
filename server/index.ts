@@ -1,3 +1,4 @@
+import { credentialBody } from "./cloudflare/credential-body";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -13,6 +14,8 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+app.use(["/api/cloudflare", "/api/gsc"], credentialBody);
 
 // Bound public AI/photo JSON before the general parser; Stripe raw-body stays intact.
 app.use(["/api/site-assistant", "/api/ads-consultant", "/api/review", "/api/photos", "/api/gmb/review-response"], express.json({ limit: "32kb" }));
@@ -56,7 +59,7 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       // Auth/consent bodies (QR seeds, recovery codes) and social bodies (signed upload URLs) never reach logs.
-      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads")) {
+      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

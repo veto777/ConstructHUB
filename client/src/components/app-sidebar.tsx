@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
+  Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
   Eye, Grid3X3, CreditCard, Shield, MapPin, GraduationCap, ChevronRight,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Zap, Star,
@@ -58,6 +58,30 @@ function SiteScanIcon({ className }: { className?: string }) {
       <rect x="13" y="25.5" width="7" height="2.2" rx="1.1" fill="#3F4650" />
       <circle cx="29" cy="28" r="6" fill="#fff" stroke="#3F4650" strokeWidth="2.6" />
       <path d="M33.3 32.3l4.7 4.7" stroke="#3F4650" strokeWidth="3.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloudflareIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#F1592F" />
+      <path d="M15 31h19.5a5.5 5.5 0 0 0 .8-10.94A8 8 0 0 0 20 19.2 6 6 0 0 0 15 31z" fill="#fff" />
+      <path d="M18 27.5h14" stroke="#3F4650" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M21 31.5h8" stroke="#3F4650" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SearchConsoleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#F1592F" />
+      <rect x="11" y="24" width="4.5" height="10" rx="1.2" fill="#fff" />
+      <rect x="18" y="18" width="4.5" height="16" rx="1.2" fill="#fff" />
+      <rect x="25" y="13" width="4.5" height="21" rx="1.2" fill="#fff" />
+      <circle cx="31" cy="27" r="5.2" fill="#fff" stroke="#3F4650" strokeWidth="2.4" />
+      <path d="M34.8 30.8l4.2 4.2" stroke="#3F4650" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );
 }
@@ -184,6 +208,8 @@ const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", ico
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
   { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },
   { title: "Site Scan", url: "/site-scan", icon: Search, logoComponent: SiteScanIcon },
+  { title: "Cloudflare", url: "/cloudflare", icon: Cloud, logoComponent: CloudflareIcon },
+  { title: "Search Console", url: "/search-console", icon: Search, logoComponent: SearchConsoleIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/competitors-landing" }] : []),

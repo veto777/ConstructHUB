@@ -4,6 +4,7 @@ import {
   ReportFilters,
   initialReportFilters,
 } from "@/components/site-scan-fixes";
+import { ScanIndexingSummary } from "./site-connections";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -826,6 +827,7 @@ export default function SiteScanPage() {
                   });
                 }}
               />
+              <ScanIndexingSummary scanId={job.id} />
             </>
           )}
         </section>

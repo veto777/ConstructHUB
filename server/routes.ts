@@ -167,6 +167,14 @@ export async function registerRoutes(
   registerAdsRoutes(app, getDevUser);
   const { startAdsWorker } = await import("./ads/worker");
   startAdsWorker();
+  const { ensureCloudflareSearchSchema } = await import("./cloudflare/schema");
+  await ensureCloudflareSearchSchema();
+  const { registerCloudflareRoutes } = await import("./cloudflare/routes");
+  const { registerGscRoutes } = await import("./gsc/routes");
+  registerCloudflareRoutes(app, getDevUser);
+  registerGscRoutes(app, getDevUser);
+  const { startEdgeWorker } = await import("./cloudflare/worker");
+  startEdgeWorker();
   const { ensureGbpTokenEncryption } = await import("./gbp/token-crypto");
   await ensureGbpTokenEncryption();
   const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");

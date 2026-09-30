@@ -1,4 +1,5 @@
 import AgencyPage from "@/pages/agency";
+import { CloudflarePage, SearchConsolePage } from "@/pages/site-connections";
 import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
 import SocialMediaPage from "@/pages/social-media";
@@ -117,6 +118,8 @@ function DashboardRouter() {
       <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/social-media" component={SocialMediaPage} />
       <Route path="/guides" component={GuidesPage} />
+      <Route path="/cloudflare" component={CloudflarePage} />
+      <Route path="/search-console" component={SearchConsolePage} />
       <Route path="/site-scan" component={SiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />

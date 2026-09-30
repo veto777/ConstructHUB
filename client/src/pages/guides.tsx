@@ -1,3 +1,4 @@
+import { SiteConnectionGuide } from "./site-connection-guide";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Redirect } from "wouter";
 const guides = [
@@ -111,6 +112,7 @@ export function GuidesContent() {
         <h2 className="text-2xl font-bold">Guides</h2>
         <p className="text-muted-foreground">Step-by-step help for the business tools available in ConstructHUB.</p>
       </div>
+      <SiteConnectionGuide />
       {guides.map((g) => (
         <Card key={g.title}>
           <CardHeader>
