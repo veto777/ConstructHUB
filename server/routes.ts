@@ -657,10 +657,11 @@ export async function registerRoutes(
         const found = await scrapeByPlatform(portal.platform!, (portal.searchUrl || portal.portalUrl)!, schedule.searchValue,
           portal.platform === "SmartGov" ? "address" : schedule.searchType, portal.id, portal.name, query.id, `schedule-${schedule.id}-${Date.now()}`);
         console.log(`Scrape schedule ${schedule.id} ran on ${portal.name}: ${found.length} results.`);
+        // A failed attempt is not a run: "Last run" only moves when the portal search completed.
+        await db.update(scrapeSchedules).set({ lastRunAt: new Date() }).where(eq(scrapeSchedules.id, schedule.id));
       } catch (err: any) {
         console.error(`Scrape schedule ${schedule.id} failed on ${portal.name}:`, err?.message || err);
       }
-      await db.update(scrapeSchedules).set({ lastRunAt: new Date() }).where(eq(scrapeSchedules.id, schedule.id));
     }
   }
   if (process.env.SCRAPE_SCHEDULER_DISABLED !== "true") {
@@ -3073,7 +3074,7 @@ Rules:
     }
   });
 
-  const inquiryText = (label: string, max: number) => z.string({ invalid_type_error: `${label} must be text` }).trim().max(max, `${label} is too long (max ${max} characters)`);
+  const inquiryText = (label: string, max: number) => z.string({ required_error: `${label} is required`, invalid_type_error: `${label} must be text` }).trim().max(max, `${label} is too long (max ${max} characters)`);
   const inquiryEmail = z.string({ required_error: "Email is required" }).trim().min(1, "Email is required").max(254).email("Enter a valid email address");
   const seoInquiryInput = z.object({
     name: inquiryText("Name", 200).min(1, "Name is required"),
@@ -4656,7 +4657,9 @@ function main() {
               // This checkout is ONE upfront charge for the whole term (mode "payment"),
               // so say that here rather than implying a monthly subscription.
               name: `ConstructHUB ${contract.packageName} — ${contract.termMonths}-Month Agreement, paid in full`,
-              description: `One payment today covering all ${contract.termMonths} months (equivalent to $${(contract.monthlyPrice / 100).toLocaleString()}/mo). No monthly charges follow. Contract #${contract.id}`,
+              // Describe this charge only: the signed contract text (section 3 renewal) is an
+              // open owner decision, so the receipt must not promise what happens after the term.
+              description: `One-time payment today covering all ${contract.termMonths} months (equivalent to $${(contract.monthlyPrice / 100).toLocaleString()}/mo). This checkout does not start a monthly subscription. Contract #${contract.id}`,
             },
             unit_amount: contract.totalPrice,
           },
