@@ -38,6 +38,23 @@ describe('account security',()=>{
   await pool.query("UPDATE account_trusted_devices SET expires_at=now()-interval '1 second' WHERE user_id=$1",[id]);expect(await trustedDevice(req,id)).toBe(false);
   await rememberDevice(req,res as any,id);await revokeDevices(id);expect((await pool.query('SELECT * FROM account_trusted_devices WHERE user_id=$1',[id])).rows).toHaveLength(0);
  });
+ it('does not report another owner’s or an absent device as revoked', async () => {
+  const handlers = new Map<string, any>(); const app: any = {};
+  for (const method of ['get', 'post', 'delete']) app[method] = (path: string, ...fns: any[]) => handlers.set(`${method} ${path}`, fns.at(-1));
+  registerAccountSecurityRoutes(app, req => req.user);
+  const cookie = response(); await rememberDevice({ headers: {} } as any, cookie as any, other);
+  const deviceId = cookie.cookie.mock.calls[0][1].split('.')[0];
+  const req: any = { user: { id }, headers: {}, params: { id: deviceId } };
+  const denied = response(); await handlers.get('delete /api/auth/devices/:id')(req, denied);
+  expect(denied.status).toHaveBeenCalledWith(404);
+  expect((await pool.query("SELECT id FROM account_activity WHERE user_id=$1 AND kind='security.device_revoked'", [id])).rowCount).toBe(0);
+  req.user.id = other;
+  const removed = response(); await handlers.get('delete /api/auth/devices/:id')(req, removed);
+  expect(removed.json).toHaveBeenCalledWith({ ok: true });
+  const absent = response(); await handlers.get('delete /api/auth/devices/:id')(req, absent);
+  expect(absent.status).toHaveBeenCalledWith(404);
+  expect((await pool.query("SELECT detail FROM account_activity WHERE user_id=$1 AND kind='security.device_revoked'", [other])).rows).toEqual([{ detail: { deviceId } }]);
+ });
  it('verifies passwords and TOTP without allowing weaker verification when 2FA is enabled',async()=>{
   const handlers=new Map<string,any>();const app:any={};for(const method of ['get','post','delete'])app[method]=(path:string,...fns:any[])=>handlers.set(`${method} ${path}`,fns.at(-1));registerAccountSecurityRoutes(app,req=>req.user);
   const verify=handlers.get('post /api/auth/reauth'),req:any={user:{id},headers:{},session:{},body:{value:'fixture-password'}};

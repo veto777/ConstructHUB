@@ -141,8 +141,9 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
   app.delete('/api/auth/devices/:id',async(req,res)=>{
     const u=auth(req,res);if(!u)return;
     if(!/^[a-f0-9]{32}$/.test(String(req.params.id))) return res.status(400).json({message:'Invalid device'});
-    await pool.query('DELETE FROM account_trusted_devices WHERE id=$1 AND user_id=$2',[req.params.id,u.id]);
-    await logActivity(req,u.id,'security.device_revoked');res.json({ok:true});
+    const removed = await pool.query('DELETE FROM account_trusted_devices WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,u.id]);
+    if (!removed.rowCount) return res.status(404).json({message:'Remembered device not found'});
+    await logActivity(req,u.id,'security.device_revoked',{deviceId:req.params.id});res.json({ok:true});
   });
   app.post('/api/auth/2fa/recovery-codes',rateLimit('security-recovery',5,15),async(req,res)=>{
     const u=auth(req,res);if(!u || !requireRecentAuth(req,res))return;
