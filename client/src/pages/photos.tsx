@@ -1069,6 +1069,9 @@ export default function PhotosPage() {
     const descMap: Record<string, string> = {};
     let descFailed = 0;
     let descError = "";
+    // The description endpoint rejects requests without a company name and a
+    // service (or category), so name the fields instead of the server's wording.
+    const canDescribe = !!businessInfo.companyName && !!(businessInfo.services || categories.length);
     for (let i = 0; i < uploadedFiles.length; i++) {
       const localFile = uploadedFiles[i];
       const fid = fileIds[i];
@@ -1076,6 +1079,12 @@ export default function PhotosPage() {
 
       if (descriptions[localFile.id]) {
         descMap[fid] = descriptions[localFile.id];
+        continue;
+      }
+
+      if (!canDescribe) {
+        descFailed++;
+        descError = "add a Company Name and Services under Business Info to generate them";
         continue;
       }
 
@@ -1094,7 +1103,7 @@ export default function PhotosPage() {
       }
     }
     descriptionIssueRef.current = descFailed
-      ? { failed: descFailed, total: uploadedFiles.length, ai: useAIDescriptions, message: descError }
+      ? { failed: descFailed, total: uploadedFiles.length, ai: useAIDescriptions && canDescribe, message: descError }
       : null;
 
     setProcessingStep("Geotagging address...");
