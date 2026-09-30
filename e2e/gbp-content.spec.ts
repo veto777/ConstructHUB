@@ -119,3 +119,43 @@ test('Link & sync reports a partial Google failure instead of claiming every fie
     await page.getByTestId('button-link-gbp-99882').click();
     await expect(page.getByText('Some Google data could not sync: Social profiles unavailable; Google denied reviews access', { exact: true })).toBeVisible();
 });
+
+test('mobile composer and profile fields fit a narrow viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await page.goto('/gbp-content');
+    await page.getByLabel('Location', { exact: true }).selectOption(String(location));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const fixture = { id: 99883, businessName: 'Mobile audit fixture', gbpLocationName: 'locations/fixture', description: 'Profile description', services: ['Roof repair'], socialProfiles: {facebook:'https://facebook.com/fixture'}, businessPhotoCount: 12, customerPhotoCount: 4 };
+    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    await page.goto('/locations');
+    await page.getByText('Mobile audit fixture', { exact: true }).click();
+    for (const tab of ['info', 'services', 'social', 'photos']) {
+        await page.getByTestId(`tab-${tab}`).click();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tab).toBe(true);
+    }
+});
+
+test('partial upload exposes saved photos immediately and allows retrying the remaining file', async ({ page }) => {
+    const photos: any[] = [];
+    let uploads = 0;
+    await page.route(`**/api/gbp/content/${location}**`, route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/upload')) {
+            uploads++;
+            if (uploads === 2) return route.fulfill({ status: 400, json: {message:'Fixture upload failure'} });
+            const photo = {id:uploads,name:`Saved ${uploads}.jpg`,url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'};
+            photos.push(photo); return route.fulfill({json:photo});
+        }
+        return route.fulfill({json:path.endsWith('/photos')?photos:{jobs:[],style:null,workerEnabled:false}});
+    });
+    await page.goto('/gbp-content');
+    await page.getByLabel('Location', {exact:true}).selectOption(String(location));
+    const files = ['one.jpg','two.jpg'].map(name => ({name,mimeType:'image/jpeg',buffer:Buffer.from('fixture')}));
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files);
+    await expect(page.getByText('Fixture upload failure',{exact:true})).toBeVisible();
+    await expect(page.getByLabel('Caption for Saved 1.jpg')).toBeVisible();
+    await expect(page.getByText('1 of 2 photos uploaded.',{exact:false})).toBeVisible();
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles([files[1]]);
+    await expect(page.getByLabel('Caption for Saved 3.jpg')).toBeVisible();
+    await expect(page.getByText('2 selected',{exact:true})).toBeVisible();
+});
