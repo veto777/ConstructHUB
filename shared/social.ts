@@ -67,7 +67,10 @@ export const postSchema = z
   .object({
     requestId: z.string().uuid(),
     text: z.string().trim().min(1).max(63206),
-    destinations: z.array(destinationSchema).min(1).max(20),
+    destinations: z.array(destinationSchema).min(1).max(20).refine(
+      (items) => new Set(items.map((d) => [d.accountId, d.pageId || "", d.boardId || ""].join(":"))).size === items.length,
+      "Choose each destination only once",
+    ),
     tweaks: z.record(z.string().max(63206)).default({}),
     mediaUrls: z.array(publicMediaUrl).max(10).default([]),
     scheduledTime: z.string().datetime({ offset: true }).optional(),

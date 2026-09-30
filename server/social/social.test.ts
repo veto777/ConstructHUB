@@ -263,6 +263,17 @@ describe("real Postgres, mocked Blotato publishing", () => {
       ).rows,
     ).toHaveLength(1);
   });
+  it("rejects changed retries and duplicate destinations without changing queued content", async () => {
+    const input = request({ draft: true });
+    const [p] = await createPosts(userId, input);
+    for (const change of [{ text: "Changed" }, { draft: false }, { mediaUrls: ["https://example.com/new.jpg"] }, { destinations: [] }]) {
+      await expect(createPosts(userId, { ...input, ...change })).rejects.toThrow();
+    }
+    await changePost(userId, p.id, "approve", "Approved edit");
+    expect((await createPosts(userId, input))[0].payload.post.content.text).toBe("Approved edit");
+    await expect(createPosts(userId, request({ destinations: [destination, destination] }))).rejects.toThrow("once");
+    await changePost(userId, p.id, "cancel");
+  });
   it("keeps scheduled posts and drafts local until due or approved; rejects other owner actions", async () => {
     const [p] = await createPosts(userId, request({ draft: true }));
     http.mockClear();
