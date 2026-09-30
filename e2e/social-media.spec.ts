@@ -169,3 +169,14 @@ test("guides match shipped approval controls and link to every walkthrough", asy
   await main.getByRole("link", { name: "Open Site Scan", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Site Scan", exact: true })).toBeVisible();
 });
+
+test("growth tools remain discoverable with Google Business collapsed", async ({ page }) => {
+  await page.goto("/guides");
+  const google = page.getByTestId("link-nav-group-google-business");
+  await expect(google).toHaveAttribute("aria-expanded", "false");
+  for (const name of ["social-media", "site-scan", "guides"])
+    await expect(page.getByTestId(`link-nav-${name}`)).toBeVisible();
+  await google.click();
+  await expect(google).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("link-nav-posts-&-photos")).toBeVisible();
+});
