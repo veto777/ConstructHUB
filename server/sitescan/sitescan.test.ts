@@ -287,3 +287,30 @@ it("counts redirected aliases once without false duplicate-content findings", as
     async () => response("https://fixture.test/final", "<title>Service</title>"), async () => {});
   expect(state.pages).toHaveLength(2);
 });
+
+it("blocks encoded loopback, IPv6 transition forms, and private redirect targets before transport", async () => {
+  for (const url of ["http://0x7f000001", "http://0177.0.0.1", "http://127.1", "http://[::ffff:7f00:1]", "http://[64:ff9b::7f00:1]", "http://[2001:0:1234::1]", "http://public.test:8080", "http://public.test:65535"]) {
+    expect(() => siteUrl(url)).toThrow();
+  }
+  for (const location of ["http://169.254.169.254/latest/meta-data", "http://[::1]/", "http://2130706433/"]) {
+    const send = vi.fn(async () => ({ status: 302, headers: { location }, body: "", bytes: 0 }));
+    await expect(makeSafeFetch(async () => [{ address: "8.8.8.8", family: 4 }], send)("https://public.test/")).rejects.toThrow();
+    expect(send).toHaveBeenCalledTimes(1);
+  }
+});
+it("discovers nested sitemaps, applies bot exclusions and reports each audit category", async () => {
+  const state = await crawl("https://fixture.test/", 3, undefined, undefined, async url => response(url,
+    url.endsWith("robots.txt") ? "User-agent: *\nDisallow: /private\nUser-agent: GPTBot\nDisallow: /" :
+    url.endsWith("sitemap.xml") ? "<sitemapindex><sitemap><loc>https://fixture.test/child.xml</loc></sitemap></sitemapindex>" :
+    url.endsWith("child.xml") ? "<urlset><url><loc>https://fixture.test/service</loc></url><url><loc>https://fixture.test/private</loc></url></urlset>" :
+    url.endsWith("llms.txt") ? "# Fixture" :
+    '<html><head><meta name="robots" content="noindex,nofollow"></head><body><img src="http://fixture.test/image.jpg"><h1>Fixture</h1></body></html>'), async () => {});
+  expect(state.pages).toHaveLength(2);
+  expect(state.blocked).toContain("https://fixture.test/private");
+  const findings = findingsFor(state);
+  expect(new Set(findings.map(f => f.category)).size).toBe(5);
+  expect(findings.map(f => f.id)).toEqual(expect.arrayContaining(["noindex", "nofollow", "mixed", "bot-GPTBot", "alt", "schema", "mobile"]));
+  const scores = scoresFor(findings, state, [{ score: 60 }, { score: 80 }]);
+  expect(scores.categories.performance).toBe(70);
+  expect(scores.overall).toBe(Math.round(Object.values(scores.categories).reduce<number>((sum, n) => sum + n!, 0) / 5));
+});

@@ -342,3 +342,48 @@ it("allows stopping a rescan after its linked profile becomes unavailable", asyn
   })).status).toBe(200);
   expect((await pool.query("SELECT * FROM sitescan_schedules WHERE url=$1", [url])).rows).toHaveLength(0);
 });
+
+it("isolates all report mutations and exports from another owner's job", async () => {
+  for (const [method, suffix] of [["post", "plan"], ["post", "share"], ["delete", "share"], ["get", "pdf"]]) {
+    expect((await call(method, `/api/sitescan/jobs/:id/${suffix}`, { params: { id: foreign } })).status).toBe(404);
+    expect((await call(method, `/api/sitescan/jobs/:id/${suffix}`, { params: { id: own }, user: null })).status).toBe(401);
+  }
+});
+it("rotates bearer shares and enforces share and email verification expiry", async () => {
+  const share = async () => (await call("post", "/api/sitescan/jobs/:id/share", { params: { id: own } })).body.path.split("/").pop();
+  const read = (value: string) => call("get", "/api/sitescan/shared/:token", { params: { token: value }, user: null });
+  const first = await share(), second = await share();
+  expect(first).not.toBe(second);
+  expect((await read(first)).status).toBe(404);
+  expect((await read(second)).status).toBe(200);
+  await pool.query("UPDATE sitescan_jobs SET share_expires=now()-interval '1 second' WHERE id=$1", [own]);
+  expect((await read(second)).status).toBe(404);
+  await pool.query("UPDATE sitescan_leads SET expires_at=now()-interval '1 second' WHERE email='sitescan-test@example.invalid'");
+  const mailObject = (mail.mock.calls as any)[0][0];
+  const value = mailObject.text.match(/verify=([a-f0-9]{64})/)[1];
+  expect((await call("post", "/api/sitescan/public/verify", { body: { token: value }, user: null })).status).toBe(404);
+});
+it("enforces account scan and draft quotas before provider calls", async () => {
+  await pool.query("DELETE FROM growth_budgets WHERE key IN ('sitescan:scan:1','sitescan:ai:1')");
+  const { takeBudget } = await import("../growth-limits");
+  await takeBudget("sitescan:scan:1", 5, 5, 86400_000);
+  expect((await call("post", "/api/sitescan", { body: { url: "https://sitescan-quota.test/" } })).status).toBe(429);
+  await takeBudget("sitescan:ai:1", 3, 3, 86400_000);
+  const before = provider.generate.mock.calls.length;
+  expect((await call("post", "/api/sitescan/jobs/:id/plan", { params: { id: own } })).status).toBe(429);
+  expect(provider.generate.mock.calls).toHaveLength(before);
+});
+it("admin lead capture is restricted to platform admins and the configured gate", async () => {
+  const { rows: [user] } = await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [`sitescan-admin-${randomUUID()}@example.invalid`]);
+  try {
+    expect((await call("get", "/api/admin/sitescan-leads", { user: null })).status).toBe(401);
+    expect((await call("get", "/api/admin/sitescan-leads", { user: user.id })).status).toBe(403);
+    const admin = await call("get", "/api/admin/sitescan-leads");
+    if (process.env.ADMIN_GATE_USER && process.env.ADMIN_GATE_PASS) expect(admin.status).toBe(403);
+    else {
+      expect(admin.status).toBe(200);
+      expect(admin.body.leads.some((l: any) => l.email === "sitescan-test@example.invalid")).toBe(true);
+      expect(JSON.stringify(admin.body)).not.toMatch(/verify_hash|access_hash/);
+    }
+  } finally { await pool.query("DELETE FROM users WHERE id=$1", [user.id]); }
+});
