@@ -175,11 +175,6 @@ function PublicRouter() {
       <Route path="/property" component={PropertyPage} />
       <Route path="/photos" component={PhotosPage} />
       <Route path="/pricing" component={PricingPage} />
-      <Route path="/agency" component={AgencyPage} />
-      <Route path="/locations" component={LocationsPage} />
-      <Route path="/domains" component={DomainsPage} />
-      <Route path="/mail-alerts" component={MailAlertsPage} />
-      <Route path="/gbp-content" component={GbpContentPage} />
       {/* Signed-out visitors get the free public scan; the full tool needs an account. */}
       <Route path="/site-scan" component={FreeSiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
@@ -218,6 +213,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/guides", "/cloudflare", "/search-console", "/lsa-leads", "/lsa-account-manager", "/settings",
+  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -553,10 +549,9 @@ function AppContent() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-1">
               <RecentAuthModal /><NotificationBell />
-              <Link href="/settings" data-testid="link-header-settings">
-                <button className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" aria-label="Settings" data-testid="button-header-settings">
-                  <Settings className="h-4 w-4" />
-                </button>
+              <Link href="/settings" data-testid="link-header-settings" aria-label="Settings"
+                className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                <Settings className="h-4 w-4" />
               </Link>
               <CartSheet />
               <ThemeToggle />

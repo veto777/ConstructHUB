@@ -430,9 +430,13 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
     ? `<!-- VPN Shield by ConstructHUB -->\n<script src="${appOrigin}/api/vpn-shield/script/${selectedDomain.trackingId}" async></script>`
     : "";
 
-  const copyScript = () => {
-    navigator.clipboard.writeText(scriptSnippet);
-    toast({ title: "Copied!", description: "VPN Shield script copied to clipboard." });
+  const copyScript = async () => {
+    try {
+      await navigator.clipboard.writeText(scriptSnippet);
+      toast({ title: "Copied!", description: "VPN Shield script copied to clipboard." });
+    } catch {
+      toast({ title: "Couldn't copy the script", description: "Your browser blocked clipboard access — select the script and copy it manually.", variant: "destructive" });
+    }
   };
 
   return (

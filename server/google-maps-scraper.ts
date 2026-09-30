@@ -1,6 +1,10 @@
+import { existsSync } from "fs";
 import { chromium, type Browser } from "playwright-core";
 
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+// Same rule as server/scraper.ts: CHROMIUM_PATH wins, the Replit-era Nix build
+// only where it exists, otherwise playwright-core's managed headless build.
+const REPLIT_CHROMIUM = "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || (existsSync(REPLIT_CHROMIUM) ? REPLIT_CHROMIUM : undefined);
 
 let browserInstance: Browser | null = null;
 let launchPromise: Promise<Browser> | null = null;

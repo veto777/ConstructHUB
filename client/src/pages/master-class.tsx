@@ -289,7 +289,7 @@ export default function MasterClassPage() {
       if (err.message.includes("Login required") || err.message.includes("401")) {
         toast({ title: "Sign in required", description: "Please sign in to enroll in a course.", variant: "destructive" });
       } else {
-        toast({ title: "Enrollment failed", description: err.message, variant: "destructive" });
+        toast({ title: "Enrollment failed", description: apiErrorMessage(err), variant: "destructive" });
       }
     },
   });

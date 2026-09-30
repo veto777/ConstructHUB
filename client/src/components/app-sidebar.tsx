@@ -498,17 +498,11 @@ export function AppSidebar() {
                   </span>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
-                  <Link href="/settings">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      aria-label="Settings"
-                      data-testid="button-settings"
-                    >
+                  <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    <Link href="/settings" aria-label="Settings" data-testid="button-settings">
                       <Settings className="h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

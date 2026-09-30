@@ -22,7 +22,7 @@ export function NotificationPreferences() {
   const save=useMutation({mutationFn:async(p:any)=>apiRequest('PUT','/api/notification-prefs',{prefs:[p]}),onSuccess:()=>{queryClient.invalidateQueries({queryKey:['/api/notification-prefs']});}});
   return <Card><CardHeader><CardTitle>Notifications</CardTitle></CardHeader><CardContent className="space-y-4"><p>Security emails are always on. Changes save immediately.</p>{(error||save.error) && <p role="alert">{apiErrorMessage(error||save.error)}</p>}{data?.prefs.map((p:any)=><div className="border-t py-3 flex flex-wrap gap-4 items-center" key={p.kind}><span className="flex-1">{p.label}</span><label className="flex gap-2 items-center">In app <Switch aria-label={`${p.label}: In app`} checked={p.inApp} disabled={save.isPending} onCheckedChange={v=>save.mutate({...p,inApp:v})}/></label><label className="flex gap-2 items-center">{p.security?'Email (always on)':'Email'} <Switch aria-label={`${p.label}: Email`} checked={p.security||p.email} disabled={p.security||save.isPending} onCheckedChange={v=>save.mutate({...p,email:v})}/></label></div>)}</CardContent></Card>;
 }
-const ACTIVITY_LABELS: Record<string, string> = {
+const ACTIVITY_LABELS: Record<string, string> = {'sitescan.deleted':'Site Scan deleted',
   'auth.login_success': 'Signed in', 'auth.login_failure': 'Failed sign-in attempt', 'auth.logout': 'Signed out',
   'security.reauthenticated': 'Identity verified', 'security.password_changed': 'Password changed',
   'security.2fa_changed': 'Two-factor sign-in turned on or off', 'security.device_revoked': 'Remembered device removed',

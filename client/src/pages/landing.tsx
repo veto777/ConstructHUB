@@ -473,7 +473,7 @@ export default function LandingPage() {
               <p className="text-muted-foreground dark:text-white/40 max-w-xl mx-auto mb-6">
                 Everything above as one package. Paid upfront. 4-6 months from start to finish. Excludes licensing exams and prerequisites.
               </p>
-              <Link href="/pricing" data-testid="link-dfy-pricing">
+              <Link href="/pricing#done-for-you" data-testid="link-dfy-pricing">
                 <Button size="lg" className="bg-[#F07C22] hover:bg-[#E06B15] text-white px-8 shadow-lg shadow-orange-500/25">
                   View Full Pricing <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
