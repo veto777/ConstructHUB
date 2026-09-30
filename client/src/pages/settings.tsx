@@ -32,8 +32,8 @@ import {
   type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import {
-  AGENCY_INCLUDED_LOCATIONS, addonPriceCents, addonsForPlan, agencyQuote, describeSubscription, formatUsd,
-  intervalSuffix, intervalWord, normalizeLocations, planPriceCents, type SubscriptionInfo,
+  AGENCY_INCLUDED_LOCATIONS, PAYMENT_PROBLEM_STATUSES, addonPriceCents, addonsForPlan, agencyQuote, describeSubscription,
+  formatUsd, intervalSuffix, intervalWord, normalizeLocations, planPriceCents, type SubscriptionInfo,
 } from "@/lib/pricing-display";
 
 type SettingsTab = "profile" | "account" | "notifications" | "security" | "billing";
@@ -1449,8 +1449,10 @@ function BillingSection() {
     onError: showError("Couldn't open billing"),
   });
 
+  // The billing route takes { addons: { key: quantity } }; the quantity is the new total, so a repeat is harmless.
   const addonMutation = useMutation({
-    mutationFn: async (v: { addon: AddonKey; quantity: number }) => (await apiRequest("POST", "/api/stripe/addons", v)).json(),
+    mutationFn: async (v: { addon: AddonKey; quantity: number }) =>
+      (await apiRequest("POST", "/api/stripe/addons", { addons: { [v.addon]: v.quantity } })).json(),
     onSuccess: (_data, v) => {
       refreshBilling();
       toast({ title: "Add-ons updated", description: `${ADDONS[v.addon].name}: ${v.quantity}` });
@@ -1459,12 +1461,16 @@ function BillingSection() {
   });
 
   const [locationsInput, setLocationsInput] = useState<string | null>(null);
-  const billedLocations = subscription?.locations ?? AGENCY_INCLUDED_LOCATIONS;
+  const billedLocations = view.locations ?? AGENCY_INCLUDED_LOCATIONS;
   const wantedLocations = normalizeLocations(locationsInput ?? billedLocations);
   const locationsQuote = agencyQuote(wantedLocations);
+  // Add-ons and location counts change a Stripe subscription on a current plan;
+  // a legacy plan keeps its old price until it switches plans in Pricing.
+  const editable = view.changesInPlace && !view.isLegacy;
   const locationsMutation = useMutation({
+    // Without a known interval the server keeps the subscription's own.
     mutationFn: async (locations: number) =>
-      (await apiRequest("POST", "/api/stripe/change-plan", { plan: "agency", interval, locations })).json(),
+      (await apiRequest("POST", "/api/stripe/change-plan", { plan: "agency", ...(view.interval ? { interval: view.interval } : {}), locations })).json(),
     onSuccess: (data: any, locations) => {
       if (data?.url) { window.location.href = data.url; return; }
       setLocationsInput(null);
@@ -1481,12 +1487,18 @@ function BillingSection() {
     : openEnded ? "No end date"
     : !view.viaStripe ? `Access through ${periodEnd.toLocaleDateString()}`
     : status === "trialing" ? `Trial ends ${periodEnd.toLocaleDateString()}`
-    : subscription?.cancelAtPeriodEnd ? `Ends ${periodEnd.toLocaleDateString()}`
-    : `Renews ${periodEnd.toLocaleDateString()}`;
+    : subscription?.cancelAtPeriodEnd === true ? `Ends ${periodEnd.toLocaleDateString()}`
+    : subscription?.cancelAtPeriodEnd === false ? `Renews ${periodEnd.toLocaleDateString()}`
+    // Not told whether it renews (it may be set to cancel in Stripe's portal).
+    : `Current period ends ${periodEnd.toLocaleDateString()}`;
   // Legacy subscriptions keep the Stripe price they were sold at until they change plans.
   const priceText = !plan || view.isLegacy || !view.interval ? null
     : plan.key === "agency"
-      ? (() => { const q = agencyQuote(billedLocations); return q.sales ? null : `${formatUsd(view.interval === "year" ? q.annualCents : q.monthlyCents)}${intervalSuffix(view.interval)} for ${billedLocations.toLocaleString("en-US")} locations`; })()
+      ? (() => {
+          if (!view.locations) return null;
+          const q = agencyQuote(view.locations);
+          return q.sales ? null : `${formatUsd(view.interval === "year" ? q.annualCents : q.monthlyCents)}${intervalSuffix(view.interval)} for ${view.locations.toLocaleString("en-US")} locations`;
+        })()
       : `${formatUsd(planPriceCents(plan, view.interval))}${intervalSuffix(view.interval)}`;
   const addons = plan ? addonsForPlan(plan.key) : [];
   const pendingAddon = addonMutation.isPending ? addonMutation.variables?.addon : null;
@@ -1527,7 +1539,7 @@ function BillingSection() {
                   {periodText && (
                     <p className="text-xs text-muted-foreground" data-testid="text-plan-period">{periodText}</p>
                   )}
-                  {status === "past_due" && (
+                  {PAYMENT_PROBLEM_STATUSES.includes(status) && (
                     <p className="text-xs text-destructive" role="alert">Your last payment didn't go through. Update your card in Manage billing.</p>
                   )}
                 </>
@@ -1583,18 +1595,22 @@ function BillingSection() {
             <p className="text-sm text-muted-foreground">
               Pay only for the extra you need; add-ons are billed with your plan{view.interval ? `, ${intervalWord(view.interval)}` : ""}.
             </p>
-            {!view.viaStripe && (
+            {!view.viaStripe ? (
               <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-3" data-testid="text-addons-no-stripe">
                 Add-ons are billed on a Stripe subscription, and this plan wasn't bought through Stripe checkout. Choose a plan in Pricing to add them.
               </p>
+            ) : view.isLegacy && (
+              <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-3" data-testid="text-addons-legacy">
+                Add-ons and location counts ride on the current plans. Your {view.displayName} price stays as it is; switch to {plan.name} in Pricing to add them.
+              </p>
             )}
-            {plan.key === "agency" && (
+            {plan.key === "agency" && editable && (
               <div className="rounded-lg border p-3 space-y-2" data-testid="row-billing-locations">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Client locations</p>
                     <p className="text-xs text-muted-foreground">
-                      {AGENCY_INCLUDED_LOCATIONS} included; billed for {billedLocations.toLocaleString("en-US")} now.
+                      {AGENCY_INCLUDED_LOCATIONS} included{view.locations ? `; billed for ${view.locations.toLocaleString("en-US")} now` : ""}.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1606,14 +1622,13 @@ function BillingSection() {
                       aria-label="Billed client locations"
                       value={locationsInput ?? String(billedLocations)}
                       onChange={(e) => setLocationsInput(e.target.value)}
-                      disabled={!view.viaStripe}
                       data-testid="input-billing-locations"
                     />
                     {!locationsQuote.sales && (
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={!view.viaStripe || wantedLocations === billedLocations || locationsMutation.isPending}
+                        disabled={wantedLocations === billedLocations || locationsMutation.isPending}
                         onClick={() => locationsMutation.mutate(wantedLocations)}
                         data-testid="button-billing-locations"
                       >
@@ -1637,7 +1652,7 @@ function BillingSection() {
             {addons.map((addon) => {
               const qty = Math.max(0, Number(subscription?.addons?.[addon.key] ?? 0) || 0);
               const pending = pendingAddon === addon.key;
-              const disabled = !view.viaStripe || addonMutation.isPending;
+              const disabled = !editable || addonMutation.isPending;
               return (
                 <div key={addon.key} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3" data-testid={`row-billing-addon-${addon.key}`}>
                   <div className="min-w-0 flex-1">

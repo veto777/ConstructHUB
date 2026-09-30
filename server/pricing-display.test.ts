@@ -119,6 +119,29 @@ describe("pricing display: subscriptions", () => {
     expect(describeSubscription(undefined).live).toBe(false);
     expect(describeSubscription({ plan: "mystery", status: "active" })).toMatchObject({ planKey: null, live: false });
   });
+
+  it("reads the billing route's field names (billingInterval, agencyLocations)", () => {
+    expect(describeSubscription({ plan: "agency", status: "active", stripeSubscriptionId: "sub_1", billingInterval: "year", agencyLocations: 25 }))
+      .toMatchObject({ planKey: "agency", interval: "year", locations: 25, changesInPlace: true });
+    expect(describeSubscription({ plan: "agency", status: "active", interval: "month", locations: 12 }))
+      .toMatchObject({ interval: "month", locations: 12 });
+    expect(describeSubscription({ plan: "agency", status: "active", agencyLocations: null })).toMatchObject({ interval: null, locations: null });
+  });
+
+  it("changes in place only with a Stripe subscription, in any status the server still bills", () => {
+    for (const status of ["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]) {
+      expect(describeSubscription({ plan: "pro", status, stripeSubscriptionId: "sub_1" }).changesInPlace, status).toBe(true);
+    }
+    // An access grant without Stripe (beta, manual) has no subscription to change: it checks out.
+    expect(describeSubscription({ plan: "platinum", status: "active" })).toMatchObject({ live: true, changesInPlace: false });
+    expect(describeSubscription({ plan: "pro", status: "canceled", stripeSubscriptionId: "sub_1" }).changesInPlace).toBe(false);
+  });
+
+  it("offers the trial only to an account that never had a Stripe subscription", () => {
+    expect(describeSubscription({ plan: "free", status: "inactive" }).firstSubscription).toBe(true);
+    expect(describeSubscription(undefined).firstSubscription).toBe(true);
+    expect(describeSubscription({ plan: "pro", status: "canceled", stripeSubscriptionId: "sub_old" }).firstSubscription).toBe(false);
+  });
 });
 
 describe("pricing display: services at or above the sales threshold", () => {

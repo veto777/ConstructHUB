@@ -14,10 +14,13 @@ const usd = (cents: number) => {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 });
 };
 
+// Shapes as GET /api/stripe/subscription reports them (server/billing/sync.ts subscriptionSummary).
 type Sub = Record<string, unknown>;
 const NO_SUB: Sub = { plan: "free", status: "inactive" };
-const PRO_STRIPE: Sub = { plan: "pro", status: "active", stripeSubscriptionId: "sub_P_test", currentPeriodEnd: "2026-11-01T12:00:00Z", interval: "month", addons: { protected_site: 1 } };
-const PLATINUM_STRIPE: Sub = { plan: "platinum", status: "active", stripeSubscriptionId: "sub_P_legacy", currentPeriodEnd: "2026-11-01T12:00:00Z", interval: "month", addons: { extra_seat: 2 }, locations: 10 };
+const PRO_STRIPE: Sub = { plan: "pro", status: "active", stripeSubscriptionId: "sub_P_test", currentPeriodEnd: "2026-11-01T12:00:00Z", billingInterval: "month", addons: { protected_site: 1 }, agencyLocations: null };
+const PLATINUM_STRIPE: Sub = { plan: "platinum", status: "active", stripeSubscriptionId: "sub_P_legacy", currentPeriodEnd: "2026-11-01T12:00:00Z", billingInterval: "month", addons: {}, agencyLocations: null };
+const AGENCY_STRIPE: Sub = { plan: "agency", status: "active", stripeSubscriptionId: "sub_P_agency", currentPeriodEnd: "2027-10-01T12:00:00Z", billingInterval: "year", addons: { extra_seat: 2 }, agencyLocations: 25 };
+const CANCELED_STRIPE: Sub = { plan: "pro", status: "canceled", stripeSubscriptionId: "sub_P_old", currentPeriodEnd: null, billingInterval: null, addons: {}, agencyLocations: null };
 
 /** Mock every billing endpoint the page can call and record what it sends. */
 async function mockBilling(page: Page, sub: Sub) {
@@ -177,6 +180,29 @@ test.describe("pricing page", () => {
   });
 });
 
+test.describe("pricing page: returning and Agency subscribers", () => {
+  test("a returning customer checks out again without a trial promise", async ({ page }) => {
+    const calls = await mockBilling(page, CANCELED_STRIPE);
+    await gotoCrm(page, "/pricing");
+    for (const k of PLAN_KEYS) await expect(page.getByTestId(`button-subscribe-${k}`)).toHaveText(`Choose ${PLANS[k].name}`);
+    await page.getByTestId("button-subscribe-pro").click();
+    await expect.poll(() => calls.checkout).toEqual([{ plan: "pro", interval: "month" }]);
+    expect(calls.changePlan).toEqual([]);
+  });
+
+  test("an Agency subscriber switching billing keeps the locations they pay for", async ({ page }) => {
+    const calls = await mockBilling(page, AGENCY_STRIPE);
+    await gotoCrm(page, "/pricing?interval=year");
+    await expect(page.getByTestId("button-subscribe-agency")).toHaveText("Current plan");
+    await page.getByTestId("button-interval-month").click();
+    await page.getByTestId("button-subscribe-agency").click();
+    await expect(page.getByTestId("dialog-change-plan")).toContainText(`with 25 locations at ${usd(agencyMonthlyCents(25)!)}/mo`);
+    await page.getByTestId("button-confirm-change-plan").click();
+    await expect.poll(() => calls.changePlan).toEqual([{ plan: "agency", interval: "month", locations: 25 }]);
+    expect(calls.checkout).toEqual([]);
+  });
+});
+
 test.describe("cart", () => {
   test("a stored service of $1,000+ leaves checkout and waits as a sales request", async ({ page }) => {
     const calls = await mockBilling(page, NO_SUB);
@@ -221,22 +247,42 @@ test.describe("cart", () => {
 });
 
 test.describe("settings billing", () => {
-  test("a legacy plan shows its old name, the plan it matches, and add-on controls", async ({ page }) => {
+  test("a legacy plan shows its old name and the plan it matches; add-ons wait for a switch", async ({ page }) => {
     const calls = await mockBilling(page, PLATINUM_STRIPE);
     await gotoCrm(page, "/settings?tab=billing");
     await expect(page.getByTestId("text-current-plan")).toContainText("Platinum plan");
     await expect(page.getByTestId("text-legacy-match")).toContainText(`Your features now match ${PLANS.agency.name}`);
     await expect(page.getByTestId("text-plan-interval")).toContainText("Billed monthly");
-    await expect(page.getByTestId("text-plan-period")).toContainText("Renews");
+    // The server doesn't say whether it renews, so no "Renews" claim.
+    await expect(page.getByTestId("text-plan-period")).toContainText("Current period ends");
     await expect(page.getByTestId("button-manage-billing")).toBeVisible();
-    await expect(page.getByTestId("text-addon-qty-extra_seat")).toHaveText("2");
+    // Add-ons and location counts are sold on the current plans only (the server refuses them on a legacy price).
+    await expect(page.getByTestId("text-addons-legacy")).toContainText(`switch to ${PLANS.agency.name}`);
+    await expect(page.getByTestId("row-billing-locations")).toHaveCount(0);
     await expect(page.getByTestId("row-billing-addon-extra_location")).toHaveCount(0); // not sold on Agency
+    await expect(page.getByTestId("button-addon-inc-extra_seat")).toBeDisabled();
+    expect(calls.addons).toEqual([]);
+  });
+
+  test("Agency: add-on + / − send the new total and the location count changes the plan", async ({ page }) => {
+    const calls = await mockBilling(page, AGENCY_STRIPE);
+    await gotoCrm(page, "/settings?tab=billing");
+    await expect(page.getByTestId("text-current-plan")).toContainText(`${PLANS.agency.name} plan`);
+    await expect(page.getByTestId("text-plan-interval")).toHaveText(`Billed yearly · ${usd(agencyMonthlyCents(25)! * 10)}/yr for 25 locations`);
+    await expect(page.getByTestId("row-billing-locations")).toContainText("billed for 25 now");
+    await expect(page.getByTestId("text-addon-qty-extra_seat")).toHaveText("2");
     await page.getByTestId("button-addon-inc-extra_seat").click();
-    await expect.poll(() => calls.addons).toEqual([{ addon: "extra_seat", quantity: 3 }]);
+    await expect.poll(() => calls.addons).toEqual([{ addons: { extra_seat: 3 } }]);
     await page.getByTestId("button-addon-dec-extra_seat").click();
     await expect.poll(() => calls.addons.length).toBe(2);
-    expect(calls.addons[1]).toEqual({ addon: "extra_seat", quantity: 1 });
+    expect(calls.addons[1]).toEqual({ addons: { extra_seat: 1 } });
     await expect(page.getByTestId("button-addon-dec-competitor_pack")).toBeDisabled();
+
+    await page.getByTestId("input-billing-locations").fill("30");
+    await expect(page.getByTestId("text-billing-locations-quote")).toHaveText(`30 locations = ${usd(agencyMonthlyCents(30)! * 10)}/yr`);
+    await page.getByTestId("button-billing-locations").click();
+    await expect.poll(() => calls.changePlan).toEqual([{ plan: "agency", interval: "year", locations: 30 }]);
+    expect(calls.checkout).toEqual([]);
   });
 
   test("a current plan shows interval, price and its add-ons", async ({ page }) => {

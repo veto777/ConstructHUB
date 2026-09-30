@@ -24,7 +24,7 @@ import {
 import {
   formatUsd, intervalSuffix, intervalWord, planPriceCents, annualSavingsCents, annualMonthsFree,
   addonPriceCents, addonPlanNames, agencyQuote, agencyBandRows, comparisonSections, describeSubscription,
-  normalizeLocations, isSalesOnlyService, DFY_SERVICES, AGENCY_INCLUDED_LOCATIONS,
+  normalizeLocations, isSalesOnlyService, DFY_SERVICES, AGENCY_INCLUDED_LOCATIONS, PAYMENT_PROBLEM_STATUSES,
   type CompareCell, type SubscriptionInfo,
 } from "@/lib/pricing-display";
 import { TalkToSalesButton } from "@/components/talk-to-sales";
@@ -105,7 +105,7 @@ export default function PricingPage() {
   const { data: subscription, isPending: subscriptionPending } = useQuery<SubscriptionInfo>({
     queryKey: ["/api/stripe/subscription"],
   });
-  const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: user, isPending: userPending } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const view = describeSubscription(subscription);
 
   // Back from Stripe Checkout: say what happened once, then drop the flag.
@@ -150,22 +150,29 @@ export default function PricingPage() {
     onError: showError("Couldn't open billing"),
   });
 
-  const busy = checkoutMutation.isPending || changePlanMutation.isPending;
+  // Wait for the account and its subscription before any plan button works: a
+  // subscriber must change plans, never start a second checkout.
+  const busy = checkoutMutation.isPending || changePlanMutation.isPending || userPending || (!!user && subscriptionPending);
   const pendingPlan = (checkoutMutation.isPending ? checkoutMutation.variables : changePlanMutation.isPending ? changePlanMutation.variables : null) as PlanRequest | null;
 
-  /** One subscription per account: a live one is changed, never checked out again. */
+  /** One subscription per account: a Stripe subscription is changed in place, never checked out again. */
   const choosePlan = (r: PlanRequest) => {
     if (!user) { setLocation(`/auth?next=${encodeURIComponent(`/pricing${r.interval === "year" ? "?interval=year" : ""}`)}`); return; }
-    if (view.live) setConfirm(r);
+    if (view.changesInPlace) setConfirm(r);
     else checkoutMutation.mutate(r);
   };
+
+  /** The trial is for an account's first subscription only (the server decides; this mirrors it). */
+  const startLabel = (plan: PlanKey) => (view.firstSubscription ? `Start ${TRIAL_DAYS}-day free trial` : `Choose ${PLANS[plan].name}`);
+  /** An Agency subscriber keeps the location count they are billed for unless they pick another. */
+  const currentAgencyLocations = view.planKey === "agency" && !view.isLegacy && view.locations ? view.locations : AGENCY_INCLUDED_LOCATIONS;
 
   const isCurrent = (plan: PlanKey) =>
     view.live && !view.isLegacy && view.planKey === plan && (view.interval === null || view.interval === interval);
 
   const ctaLabel = (plan: PlanKey) => {
     if (isCurrent(plan)) return "Current plan";
-    if (!view.live) return `Start ${TRIAL_DAYS}-day free trial`;
+    if (!view.live) return startLabel(plan);
     if (view.planKey === plan && !view.isLegacy) return `Switch to ${intervalWord(interval)} billing`;
     return `Switch to ${PLANS[plan].name}`;
   };
@@ -204,6 +211,8 @@ export default function PricingPage() {
     if (el) scrollToSection(el);
   };
 
+  // Add-ons ride on a Stripe subscription to one of the current plans (a legacy plan switches first).
+  const addonsEditable = view.changesInPlace && !view.isLegacy;
   const monthsFree = annualMonthsFree();
   const quote = agencyQuote(agencyLocations);
   const bandPrices = AGENCY_LOCATION_BANDS.map((b) => b.centsPerLocation).filter((c) => c > 0);
@@ -222,7 +231,7 @@ export default function PricingPage() {
             Plans &amp; pricing
           </h1>
           <p className="text-muted-foreground max-w-xl mx-auto" data-testid="text-trial">
-            Every plan starts with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
+            A new account starts any plan with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
             CRM included on every plan.
           </p>
           <div
@@ -264,7 +273,7 @@ export default function PricingPage() {
                 Your features now match {PLANS[view.planKey].name}.
               </span>
             )}
-            {subscription?.status === "past_due" && (
+            {PAYMENT_PROBLEM_STATUSES.includes(subscription?.status ?? "") && (
               <span className="text-destructive" role="alert">Your last payment didn't go through. Update your card in Manage billing.</span>
             )}
             {view.viaStripe && (
@@ -282,7 +291,7 @@ export default function PricingPage() {
             const style = PLAN_STYLE[key];
             const Icon = style.icon;
             const current = isCurrent(key);
-            const request: PlanRequest = { plan: key, interval, ...(key === "agency" ? { locations: AGENCY_INCLUDED_LOCATIONS } : {}) };
+            const request: PlanRequest = { plan: key, interval, ...(key === "agency" ? { locations: currentAgencyLocations } : {}) };
             const pending = busy && pendingPlan?.plan === key && pendingPlan.locations === request.locations;
             return (
               <Card key={key} className={`relative flex flex-col transition-colors ${style.card}`} data-testid={`card-plan-${key}`}>
@@ -351,7 +360,7 @@ export default function PricingPage() {
           })}
         </div>
         <p className="text-center text-xs text-muted-foreground -mt-4">
-          No free plan — every plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
+          No free plan. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
         </p>
 
         <section id="comparison" className="space-y-4 scroll-mt-16" aria-labelledby="comparison-heading">
@@ -489,15 +498,15 @@ export default function PricingPage() {
                     </p>
                     <Button
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                      disabled={busy || (isCurrent("agency") && subscription?.locations === quote.locations)}
+                      disabled={busy || (isCurrent("agency") && view.locations === quote.locations)}
                       onClick={() => choosePlan({ plan: "agency", interval, locations: quote.locations })}
                       data-testid="button-agency-start"
                     >
                       {busy && pendingPlan?.plan === "agency" && pendingPlan.locations === quote.locations && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
                       {isCurrent("agency")
-                        ? (subscription?.locations === quote.locations ? "Your current location count" : `Change to ${quote.locations.toLocaleString("en-US")} locations`)
-                        : view.live ? `Switch to Agency with ${quote.locations.toLocaleString("en-US")} locations`
-                        : `Start ${TRIAL_DAYS}-day free trial`}
+                        ? (view.locations === quote.locations ? "Your current location count" : `Change to ${quote.locations.toLocaleString("en-US")} locations`)
+                        : view.live ? `Switch to ${PLANS.agency.name} with ${quote.locations.toLocaleString("en-US")} locations`
+                        : startLabel("agency")}
                     </Button>
                   </div>
                 )}
@@ -514,7 +523,7 @@ export default function PricingPage() {
             <h2 id="addons-heading" className="text-2xl font-extrabold tracking-tight" data-testid="text-addons-heading">Add-ons: pay per feature</h2>
             <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
               Need one more of something? Add it to your plan instead of moving up a plan.
-              {view.live ? " Add or remove them any time in Settings → Billing." : " Add them in Settings → Billing once your plan starts."}
+              {addonsEditable ? " Add or remove them any time in Settings → Billing." : " Add them in Settings → Billing once you're subscribed to one of these plans."}
             </p>
           </div>
           <div className="overflow-x-auto rounded-xl border border-border max-w-4xl mx-auto">
@@ -547,7 +556,7 @@ export default function PricingPage() {
               </tbody>
             </table>
           </div>
-          {view.live && (
+          {addonsEditable && (
             <div className="flex justify-center">
               <Button variant="outline" onClick={() => setLocation("/settings?tab=billing")} data-testid="button-manage-addons">
                 <Settings2 className="w-4 h-4 mr-2" /> Manage add-ons

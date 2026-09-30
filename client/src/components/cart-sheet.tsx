@@ -84,12 +84,12 @@ export function CartSheet() {
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Cart" data-testid="button-cart-trigger">
           <ShoppingCart className="h-5 w-5" />
-          {itemCount > 0 && (
+          {itemCount + salesItems.length > 0 && (
             <Badge
               className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-[#F97316] text-white border-none"
               data-testid="badge-cart-count"
             >
-              {itemCount}
+              {itemCount + salesItems.length}
             </Badge>
           )}
         </Button>

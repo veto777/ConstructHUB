@@ -172,20 +172,32 @@ export function agencyOnlyModuleNames(): string[] {
 
 // ── The signed-in subscription ──────────────────────────────────────────────
 
-/** GET /api/stripe/subscription. Fields past `stripeSubscriptionId` arrive with the new billing routes. */
+/**
+ * GET /api/stripe/subscription. The billing routes report the interval and the
+ * Agency location count as `billingInterval` / `agencyLocations`; the shorter
+ * `interval` / `locations` are read too. Fields past `stripeSubscriptionId`
+ * may be absent (older server, no subscription).
+ */
 export type SubscriptionInfo = {
   plan: string;
   status: string;
   currentPeriodEnd?: string | null;
   stripeSubscriptionId?: string | null;
+  billingInterval?: BillingInterval | null;
   interval?: BillingInterval | null;
   addons?: Partial<Record<AddonKey, number>> | null;
+  agencyLocations?: number | null;
   locations?: number | null;
   cancelAtPeriodEnd?: boolean | null;
 };
 
-/** Statuses that still hold a subscription: changing plan must modify it, never start a second checkout. */
-export const LIVE_STATUSES: readonly string[] = ["active", "trialing", "past_due"];
+/**
+ * Statuses that still hold a subscription (the server's own list): changing
+ * plan must modify it, never start a second checkout.
+ */
+export const LIVE_STATUSES: readonly string[] = ["active", "trialing", "past_due", "unpaid", "incomplete", "paused"];
+/** Live statuses whose last payment failed: the card needs updating in Manage billing. */
+export const PAYMENT_PROBLEM_STATUSES: readonly string[] = ["past_due", "unpaid", "incomplete"];
 
 export type SubscriptionView = {
   /** The key as stored (may be a legacy key such as "platinum"). */
@@ -195,10 +207,16 @@ export type SubscriptionView = {
   isLegacy: boolean;
   /** The name the customer bought: "Pro", or the legacy "Platinum". */
   displayName: string | null;
-  /** Holds a subscription that plan changes must modify. */
+  /** Holds a plan (a Stripe subscription or an access grant). */
   live: boolean;
   viaStripe: boolean;
+  /** Holds a Stripe subscription: plan changes modify it in place; a checkout would start a second one. */
+  changesInPlace: boolean;
+  /** Never had a Stripe subscription, so a checkout starts with the trial (one trial per account). */
+  firstSubscription: boolean;
   interval: BillingInterval | null;
+  /** Agency locations billed, when the server reports them. */
+  locations: number | null;
 };
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -208,14 +226,21 @@ export function describeSubscription(sub: SubscriptionInfo | null | undefined): 
   // Map the key whatever the status, so a past-due plan still shows by name.
   const planKey = stored ? effectivePlanKey({ plan: stored, status: "active" }) : null;
   const isLegacy = !!stored && !!planKey && stored !== planKey;
+  const live = !!planKey && LIVE_STATUSES.includes(sub?.status ?? "");
+  const viaStripe = !!sub?.stripeSubscriptionId;
+  const interval = sub?.billingInterval ?? sub?.interval;
+  const locations = Number(sub?.agencyLocations ?? sub?.locations);
   return {
     storedPlan: stored,
     planKey,
     isLegacy,
     displayName: stored ? (isLegacy || !planKey ? titleCase(stored) : PLANS[planKey].name) : null,
-    live: !!planKey && LIVE_STATUSES.includes(sub?.status ?? ""),
-    viaStripe: !!sub?.stripeSubscriptionId,
-    interval: sub?.interval === "month" || sub?.interval === "year" ? sub.interval : null,
+    live,
+    viaStripe,
+    changesInPlace: live && viaStripe,
+    firstSubscription: !viaStripe,
+    interval: interval === "month" || interval === "year" ? interval : null,
+    locations: Number.isInteger(locations) && locations >= 1 ? locations : null,
   };
 }
 
