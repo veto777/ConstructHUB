@@ -1,10 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, apiErrorMessage, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { GbpLinkCell, useGbpLinkage } from '@/components/gbp-connection';
+/** Google failures arrive as {message,kind,needsAuth}; turn the ones a contractor can act on into plain next steps. */
+export function guardErrorMessage(e: unknown): string {
+  let body: any = null;
+  try { body = JSON.parse(String((e as any)?.message ?? '').replace(/^\d{3}:\s*/, '')); } catch { /* not a JSON error body */ }
+  if (body?.needsAuth || body?.kind === 'auth') return 'Google access for this location has expired. Reconnect Google Business Profile, then try again.';
+  if (body?.kind === 'invalid' && /^Invalid (accounts|locations) resource$/.test(body?.message ?? '')) return "This location's link to Google is not valid. Link it to Google again from the Locations page, then try again.";
+  return apiErrorMessage(e);
+}
 export const fieldLabels:Record<string,string>={title:'Business name',phoneNumbers:'Phone numbers',websiteUri:'Website',storefrontAddress:'Address',categories:'Categories','profile.description':'Description',regularHours:'Regular hours',specialHours:'Special hours',serviceArea:'Service area','openInfo.openingDate':'Opening date','openInfo.status':'Open status'};
 const pretty=(v:any)=>v===null||v===undefined?'Not set':typeof v==='string'?v:JSON.stringify(v,null,2);
 export function GuardStatus({id}:{id:number}) {
@@ -16,7 +26,7 @@ export function GoogleReport({type,id}:{type:'changes'|'reviews';id:number}) {
   const [open,setOpen]=useState(false),[explanation,setExplanation]=useState('');
   const {toast}=useToast(),url=`/api/gbp/reports/${type}/${id}`;
   const {data,error,refetch}=useQuery<any>({queryKey:[url],enabled:open});
-  const mark=useMutation({mutationFn:()=>apiRequest('POST',url,{submitted:true}),onSuccess:()=>{void refetch();toast({title:'Marked reported locally'});},onError:(e:Error)=>toast({title:e.message,variant:'destructive'})});
+  const mark=useMutation({mutationFn:()=>apiRequest('POST',url,{submitted:true}),onSuccess:()=>{void refetch();toast({title:'Marked reported locally'});},onError:(e:Error)=>toast({title:'Could not mark reported',description:guardErrorMessage(e),variant:'destructive'})});
   return <><Button size="sm" variant="outline" onClick={()=>setOpen(true)}>Report{type==='reviews'?' review':''}</Button>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>Prepare report for Google</DialogTitle><DialogDescription>Google receives this report only when you submit Google's form. Marking it reported here only updates ConstructHUB.</DialogDescription></DialogHeader>
       {error?<p role="alert">Could not load report.</p>:!data?<p>Loading evidence…</p>:<>
@@ -30,12 +40,24 @@ export function GoogleReport({type,id}:{type:'changes'|'reviews';id:number}) {
       </>}
     </DialogContent></Dialog></>;
 }
+/** Not linked yet: say what Guard does and offer the one next step — Link & sync when a connected account manages the listing, otherwise connect Google. */
+function GuardUnlinked({locationId}:{locationId:number}) {
+  const {data}=useGbpLinkage();
+  const ready=data?.locations.find(l=>l.id===locationId)?.state==='available';
+  return <Card data-testid="card-guard-unlinked"><CardHeader className="pb-3"><CardTitle className="text-base">Profile Guard</CardTitle>
+    <CardDescription>Profile Guard checks this location's Google Business Profile every 15 minutes — name, phone, website, address, categories, hours and more — and alerts you when something changes. In Lockdown it puts your approved values back after a change is detected.</CardDescription></CardHeader>
+    <CardContent className="space-y-3 text-sm">{ready
+      ?<><p>This listing is on a Google account you've connected. Link it to turn on Profile Guard.</p><GbpLinkCell locationId={locationId}/></>
+      :<><p>It works once this location is linked to its Google Business Profile listing. Connect the Google account that manages the listing; if the listing is found there, you can link it here.</p>
+        <Button asChild variant="outline" size="sm"><a href="/api/gbp/connect" data-testid="link-guard-connect-gbp">Connect Google Business Profile</a></Button></>}
+    </CardContent></Card>;
+}
 export function ProfileGuard({locationId,linked}:{locationId:number;linked:boolean}) {
   const url=`/api/gbp/locations/${locationId}/guard`,{toast}=useToast();
   const {data,error}=useQuery<any>({queryKey:[url],enabled:linked,refetchInterval:30000});
   const [mode,setMode]=useState<string|null>(null),[watched,setWatched]=useState<string[]|null>(null),[preview,setPreview]=useState<any>(null);
-  const mutation=useMutation({mutationFn:async({method,path,body}:{method:string;path:string;body?:any})=>(await apiRequest(method,path,body)).json(),onSuccess:()=>{void queryClient.invalidateQueries({queryKey:[url]});void queryClient.invalidateQueries({queryKey:['/api/gbp/guard/status']});},onError:(e:Error)=>toast({title:'Profile Guard',description:e.message,variant:'destructive'})});
-  if(!linked)return <p>Link this location to Google Business Profile to use Profile Guard.</p>;
+  const mutation=useMutation({mutationFn:async({method,path,body}:{method:string;path:string;body?:any})=>(await apiRequest(method,path,body)).json(),onSuccess:()=>{void queryClient.invalidateQueries({queryKey:[url]});void queryClient.invalidateQueries({queryKey:['/api/gbp/guard/status']});},onError:(e:Error)=>toast({title:'Profile Guard',description:guardErrorMessage(e),variant:'destructive'})});
+  if(!linked)return <GuardUnlinked locationId={locationId}/>;
   if(error)return <p role="alert">Unable to load Profile Guard.</p>;
   if(!data)return <p>Loading Profile Guard…</p>;
   const selected:string[]=watched??(data.snapshot?data.watched:Object.keys(fieldLabels));

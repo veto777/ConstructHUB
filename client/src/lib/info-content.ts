@@ -19,7 +19,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "This is your home base — the first thing you see when you log in. It answers one question fast: what needs my attention today?",
       "The numbers up top are live: how many leads are sitting untouched, how much work is in the pipeline, and what's waiting on you. Click any number to jump straight to that list.",
-      "If you're brand new, a setup checklist appears here and walks you through the essentials one at a time — add your company info, create your first client, send your first estimate. Once everything's done, it goes away.",
+      "If you're brand new, a setup checklist appears here and walks you through the essentials one at a time — your profile (name and mobile), your company details (the name, address and phone that print on estimates and invoices), and inviting your crew. Once it's done, or you dismiss it, it goes away.",
       "Example: you open the app Monday morning, see \"3 leads · $48,200 in pipeline\", tap the leads number, and call the three people who asked for bids over the weekend before your competitor does.",
     ],
   },
@@ -163,8 +163,8 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Delete this location from ConstructHUB",
     body: [
       "This only removes the location from ConstructHUB. It does not delete, close or change your listing on Google Business Profile — your Google listing, its reviews and its photos stay exactly as they are.",
-      "What goes away is ConstructHUB's copy: the synced reviews and stats stored here, Profile Guard settings and history, AI reply settings, scheduled posts and photos, and citation campaigns for this location.",
-      "Changed your mind later? You can bring the location back with Add Location(s) → Import from GBP. Its ConstructHUB history won't come back, but everything on Google re-syncs.",
+      "What goes away is ConstructHUB's copy: the synced reviews and stats stored here, Profile Guard settings and history, AI reply settings, scheduled posts and photos, this business's Social Media connections, settings and posts, and citation campaigns for this location.",
+      "Changed your mind later? Add it again with Add Location(s): use Import from GBP if the listing is on a Google account you've connected, or Search Google otherwise. Its ConstructHUB history won't come back; a listing imported from a connected Google account syncs its Google reviews, photos and stats again.",
       "To remove a listing from Google itself, do that in Google Business Profile — ConstructHUB never deletes Google listings.",
     ],
   },
@@ -222,18 +222,19 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Schedule",
     body: [
       "Every visit, install date and appointment across all your projects, on one calendar. Day by day you can see who's supposed to be where.",
-      "This is the crew's morning huddle screen: what's on today, what's tomorrow, what's this week. Items come from your projects, so a job that's approved and dated shows up without extra typing.",
+      "This is the crew's morning huddle screen: what's on today, what's tomorrow, what's this week. Nothing lands here on its own — you add each visit, install or appointment, choose who's going, and link it to the client or project it belongs to.",
       "It also syncs out — from Settings you can subscribe to this schedule from Google Calendar, Apple Calendar or Outlook, so it lives in the calendar app you already check.",
       "Example: Monday 7am you open the schedule, see the Martinez install Tuesday and the gutter job Thursday, and text the crew their week in one message.",
     ],
   },
 
   inbox: {
-    title: "Inbox",
+    title: "Messages",
     body: [
-      "A live feed of what your clients are doing, as it happens: opened an estimate, approved a bid, paid an invoice, sent a message through their portal.",
-      "This is not email — it's the system's way of tapping you on the shoulder. The items that matter most (a client re-reading your bid at 10pm) surface here so you can strike while they're thinking about you.",
-      "Example: your phone buzzes — \"Dana W. viewed Estimate #1042 for the third time.\" You call her before you've finished your coffee and the job is yours.",
+      "Two-way conversations with your clients, one thread per client. A client writes to you from their portal; your reply shows up in their portal and is also emailed to them when they have an email address on file.",
+      "Unread threads are counted on the Messages tab, so a client waiting on an answer is hard to miss.",
+      "The Client activity tab is the live feed of what clients are doing: opening an estimate, approving a bid, paying an invoice.",
+      "Example: Dana W. asks in her portal whether the crew can start Tuesday. You answer here; she sees it in her portal and gets it by email too.",
     ],
   },
 
@@ -325,8 +326,8 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   reports: {
     title: "Measurement reports",
     body: [
-      "Every roof and siding measurement report in one place — imported from HOVER or added by hand after a site visit.",
-      "Reports match themselves to the right client by address; if there's no client yet, one is created from the report. From here a report becomes a priced bid in a couple of taps with Quick Bid.",
+      "Every roof and siding measurement report in one place — synced from HOVER when it's connected, or pasted or uploaded here.",
+      "HOVER jobs are matched to a client by address. Pasted or uploaded reports are matched by the client's email or phone; if neither matches, a new client is created from the report. To price one, open the client and use Quick Bid.",
       "Example: the HOVER job you ordered this morning lands here at lunch — address matched to Mr. Chen, 2,874 sq ft of roof, ready to price before you've finished eating.",
     ],
   },
@@ -421,7 +422,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Settings",
     body: [
       "The control room for your whole company: what prints on your documents, which emails you get, how you take payment, and where your leads come from.",
-      "Every card is one topic, and every card has its own ⓘ if you want the long version. Nothing here affects your clients until you hit save.",
+      "Every card is one topic, and every card has its own ⓘ if you want the long version. Switches and colour picks save the moment you change them; forms save with their button.",
       "Set this up once when you start — after that you'll only come back when something in the business changes.",
     ],
   },
@@ -438,10 +439,9 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "settings-defaults": {
     title: "Estimate & invoice defaults",
     body: [
-      "The fine print and starting values every new document begins with: your estimate footer, invoice terms, default tax rate and how long a bid stays valid before it expires.",
+      "The fine print and starting values every new document begins with: your estimate and invoice footers, terms & conditions, warranty text, default deposit and default sales tax.",
       "Set them once here and they pre-fill on every new estimate or invoice. You can still edit any of it per document — these are starting points, not handcuffs.",
-      "The expiry setting is worth a thought: a bid that expires in 14 days gives the client a reason to decide, and gives you an honest reason to follow up.",
-      "Example: every estimate you send automatically ends with \"Price valid for 14 days. Fully licensed and insured. 10-year workmanship warranty.\" — because you typed it here once.",
+      "Example: every estimate you send automatically ends with \"Fully licensed and insured. 10-year workmanship warranty.\" — because you typed it here once.",
     ],
   },
 
@@ -484,9 +484,9 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "settings-theme": {
     title: "Company theme",
     body: [
-      "Your brand colour, applied across your workspace and your clients' portal. Pick one of the preset accents and the whole product — buttons, highlights, the portal your clients see — dresses in it.",
+      "Your brand colour on everything your clients see: estimates, invoices, contracts and the client portal. Pick one of the preset accents and a black or white base; your own ConstructHUB workspace keeps its normal look.",
       "It's a small thing that reads as polish: when your client's portal matches your trucks and your estimate PDFs, you look like one company, not a pile of software.",
-      "Example: your brand is a deep green. You pick it here, and every estimate email and portal page your clients touch carries that same green.",
+      "Example: your brand is a deep green. You pick it here, and every estimate, invoice and portal page your clients see carries that same green.",
     ],
   },
 
@@ -583,9 +583,9 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Estimate expiry",
     body: [
       "Every estimate carries an expiry date — after it, the price is no longer guaranteed. It's printed on the client's page so there's no ambiguity.",
-      "Expiry is a selling tool, not a punishment: it protects you from material-price swings and gives the client a fair reason to decide now instead of \"someday\". You set the default number of days in Settings.",
+      "Expiry is a selling tool, not a punishment: it protects you from material-price swings and gives the client a fair reason to decide now instead of \"someday\". Estimates expire 7 days after you send them.",
       "If a good client needs more time, Extend adds seven days with one tap — you stay generous without your price book drifting.",
-      "Example: lumber spikes 15% in a month. Your old bids expired after 14 days, so you're re-quoting at honest prices instead of eating the difference on a job you priced in the spring.",
+      "Example: lumber spikes 15% in a month. Your old bids expired after a week, so you're re-quoting at honest prices instead of eating the difference on a job you priced in the spring.",
     ],
   },
 
