@@ -314,3 +314,12 @@ it("discovers nested sitemaps, applies bot exclusions and reports each audit cat
   expect(scores.categories.performance).toBe(70);
   expect(scores.overall).toBe(Math.round(Object.values(scores.categories).reduce<number>((sum, n) => sum + n!, 0) / 5));
 });
+
+it.each(["RoofingContractor", "Plumber", "Electrician", ["Organization", "HVACBusiness"], "https://schema.org/GeneralContractor"])("recognizes contractor-specific business schema %j", type => {
+  const state = emptyState("https://fixture.test/");
+  const markup = { "@context": "https://schema.org", "@type": type, name: "Fixture business", areaServed: "Fixture area" };
+  state.pages = [parsePage(response(state.queue[0], `<script type="application/ld+json">${JSON.stringify(markup)}</script>`))];
+  expect(findingsFor(state).filter(f => ["schema", "schema-invalid"].includes(f.id))).toEqual([]);
+  delete (state.pages[0].schema[0] as any).name;
+  expect(findingsFor(state).map(f => f.id)).toContain("schema-invalid");
+});

@@ -311,6 +311,16 @@ export async function crawl(
   }
   return state;
 }
+const businessTypes = new Set([
+  "LocalBusiness", "HomeAndConstructionBusiness", "Electrician",
+  "GeneralContractor", "HVACBusiness", "HousePainter", "Locksmith",
+  "MovingCompany", "Plumber", "RoofingContractor",
+]);
+function isBusinessSchema(value: any): boolean {
+  const types = Array.isArray(value?.["@type"]) ? value["@type"] : [value?.["@type"]];
+  return types.some((type: unknown) => typeof type === "string" &&
+    businessTypes.has(type.replace(/^https?:\/\/schema\.org\//, "")));
+}
 export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
   const findings: Finding[] = [];
   const add = (
@@ -505,9 +515,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
         p.invalidSchema ||
         p.schema.some(
           (s) =>
-            /LocalBusiness|HomeAndConstructionBusiness/.test(
-              String(s?.["@type"]),
-            ) &&
+            isBusinessSchema(s) &&
             (!s.name || (!s.address && !s.areaServed)),
         ),
     ),
@@ -521,11 +529,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "Business schema not found",
     pages.length &&
       !pages.some((p) =>
-        p.schema.some((s) =>
-          /LocalBusiness|HomeAndConstructionBusiness/.test(
-            String(s?.["@type"]),
-          ),
-        ),
+        p.schema.some(isBusinessSchema),
       )
       ? [pages[0].url]
       : [],
