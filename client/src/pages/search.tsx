@@ -134,6 +134,10 @@ export default function SearchPage() {
   });
   // True while showing a search reopened from the URL rather than one started here.
   const restoredSearchRef = useRef(searchId !== null);
+  // The form the search in the address bar (sid) was run with: set by handleSearch, or read from the
+  // URL when a search is reopened. While a sid is present the URL keeps these instead of the live
+  // inputs, so a reload never pairs an old search's results with a query or area typed since.
+  const [submitted, setSubmitted] = useState(() => ({ state: scopeState, loc: scopeLocation, type: searchType, q: searchValue.trim() }));
   const [liveStatus, setLiveStatus] = useState<LiveSearchStatus | null>(null);
   const [initialResults, setInitialResults] = useState<any[] | null>(null);
   // Set when nothing in the chosen area can be searched live: nothing ran, so there is no search to poll.
@@ -218,14 +222,15 @@ export default function SearchPage() {
   }, [databases]);
 
   useEffect(() => {
+    const form = searchId ? submitted : { state: scopeState, loc: scopeLocation, type: searchType, q: searchValue.trim() };
     replaceQueryParams({
-      state: scopeState !== "all" ? scopeState : null,
-      loc: scopeLocation !== "all" ? scopeLocation : null,
-      type: searchType !== "address" ? searchType : null,
-      q: searchValue.trim() || null,
+      state: form.state !== "all" ? form.state : null,
+      loc: form.loc !== "all" ? form.loc : null,
+      type: form.type !== "address" ? form.type : null,
+      q: form.q || null,
       sid: searchId,
     });
-  }, [scopeState, scopeLocation, searchType, searchValue, searchId]);
+  }, [scopeState, scopeLocation, searchType, searchValue, searchId, submitted]);
 
   const filteredLocationOptions = useMemo(() => {
     const search = locationSearch.toLowerCase().trim();
@@ -366,6 +371,7 @@ export default function SearchPage() {
       return;
     }
     restoredSearchRef.current = false;
+    setSubmitted({ state: scopeState, loc: scopeLocation, type: searchType, q: searchValue.trim() });
     setSearchId(null);
     setLiveStatus(null);
     setInitialResults(null);
