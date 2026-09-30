@@ -104,6 +104,10 @@ describe("delete refusal rules (pure)", () => {
     expect(invoiceDeleteRefusal(clean, 0)).toBeNull();
     expect(invoiceDeleteRefusal({ ...clean, status: "paid" }, 0)).toMatch(/money trail/);
     expect(invoiceDeleteRefusal({ ...clean, paidCents: 50_00 }, 0)).toMatch(/money trail/);
+    // Partly paid is not "has been paid" — it says payments were recorded.
+    expect(invoiceDeleteRefusal({ ...clean, status: "partial", paidCents: 101_00 }, 1))
+      .toBe("Payments have been recorded against this invoice ($101.00 so far) — money trails are never deletable.");
+    expect(invoiceDeleteRefusal({ ...clean, status: "paid", paidCents: 300_00 }, 1)).toMatch(/has been paid/);
     expect(invoiceDeleteRefusal({ ...clean, paidAt: new Date() }, 0)).toMatch(/money trail/);
     expect(invoiceDeleteRefusal(clean, 1)).toMatch(/[Pp]ayments/);
   });

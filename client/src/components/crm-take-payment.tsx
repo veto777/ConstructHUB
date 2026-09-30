@@ -9,11 +9,15 @@
  *     Stripe's page; nothing is captured here.
  *   - **Manual**: record cash/check/wire/card-on-file against the invoice
  *     (the existing POST /api/crm/invoices/:id/payments path).
+ * When the caller passes the client's estimates, a signed estimate whose
+ * deposit is still unpaid also gets an online deposit link (POST
+ * /api/crm/estimates/:id/payment-link — same guards as the client's own
+ * deposit button).
  *
  * Money moves in integer cents; the text field is dollars typed by a human.
  */
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -36,31 +40,58 @@ export function invoiceDueCents(inv: any): number {
   return Math.max(0, (inv.totalCents ?? 0) - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
 }
 
-export function TakePaymentDialog({ customerName, invoices, open, onOpenChange, onChanged }: {
+const ONLINE_OFF_TEXT =
+  "Online payment links need a connected Stripe account that can take charges — set it up on the Payments page.";
+
+/** Payment states that mean an estimate's deposit is already paid (or settling). */
+const DEPOSIT_TAKEN = ["succeeded", "processing", "partially_refunded", "refunded"];
+
+export function TakePaymentDialog({
+  customerName, invoices, estimates, payments, open, onOpenChange, onChanged,
+}: {
   customerName: string;
   /** Every invoice for this client; the dialog keeps only the payable ones. */
   invoices: any[] | undefined;
+  /** The client's estimates — signed ones with an unpaid deposit get a deposit link. */
+  estimates?: any[] | undefined;
+  /** The client's payments, when the caller has them — hides deposits already paid. */
+  payments?: any[] | undefined;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   /** Caller invalidates its queries after a payment lands. */
   onChanged?: () => void;
 }) {
   const { toast } = useToast();
+  // Online links need a connected Stripe account that can charge. Once the
+  // status says there is none, say so instead of offering a button that can
+  // only fail (while it loads, the button stays and the server answers).
+  const { data: payStatus } = useQuery<any>({ queryKey: ["/api/crm/payments/status"], enabled: open });
+  const onlineOff = Boolean(payStatus) && !payStatus.account?.chargesEnabled;
   const payable = (invoices ?? []).filter((i) => !i.voidedAt && invoiceDueCents(i) > 0);
+  // A deposit is not credited to later invoices, so once an estimate has a
+  // live invoice, collecting its deposit too would bill the client twice.
+  const deposits = (estimates ?? []).filter((e) =>
+    e.approvedAt && (e.depositCents ?? 0) >= 50
+    && !(payments ?? []).some((p) => p.estimateId === e.id && DEPOSIT_TAKEN.includes(p.status))
+    && !(invoices ?? []).some((i) => i.estimateId === e.id && !i.voidedAt));
 
   const [invoiceId, setInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("check");
   const [note, setNote] = useState("");
   const [link, setLink] = useState<string | null>(null);
+  const [depositLink, setDepositLink] = useState<{ estimateId: string; url: string } | null>(null);
 
   const inv = payable.find((i) => i.id === invoiceId) ?? payable[0] ?? null;
   const due = inv ? invoiceDueCents(inv) : 0;
+  // What the button records, in whole cents — "0.001" is $0.00, not a payment.
+  const amountCents = Math.round((parseFloat(amount) || 0) * 100);
 
   // (Re)seed the form whenever the dialog opens or the invoice list shifts.
   useEffect(() => {
     if (!open) return;
     setLink(null);
+    setDepositLink(null);
     setNote("");
     if (inv) {
       setInvoiceId(inv.id);
@@ -79,12 +110,20 @@ export function TakePaymentDialog({ customerName, invoices, open, onOpenChange, 
   const recordManual = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/invoices/${inv.id}/payments`, {
-        amountCents: Math.round((parseFloat(amount) || 0) * 100),
+        amountCents,
         method,
         note: note || null,
       })).json(),
-    onSuccess: () => {
-      toast({ title: "Payment recorded", description: `${inv.number} updated — the client gets a receipt.` });
+    onSuccess: (r: any) => {
+      // Only promise the receipt the server says it is sending.
+      const receipt = r?.receiptQueued
+        ? "the client gets an emailed receipt."
+        : r?.receiptSkippedReason === "no_email"
+          ? `no receipt emailed — ${customerName} has no email address on file.`
+          : r?.receiptSkippedReason === "receipts_off"
+            ? "no receipt emailed — automatic receipts are turned off in Settings."
+            : "no receipt was emailed.";
+      toast({ title: "Payment recorded", description: `${inv.number} updated — ${receipt}` });
       onOpenChange(false);
       onChanged?.();
     },
@@ -105,12 +144,66 @@ export function TakePaymentDialog({ customerName, invoices, open, onOpenChange, 
     onError: (e: any) => toast({ title: "Can't create an online payment link", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
+  const makeDepositLink = useMutation({
+    mutationFn: async (estimateId: string) => ({
+      estimateId,
+      r: await (await apiRequest("POST", `/api/crm/estimates/${estimateId}/payment-link`, {})).json(),
+    }),
+    onSuccess: ({ estimateId, r }: { estimateId: string; r: any }) => {
+      if (r.url) {
+        setDepositLink({ estimateId, url: r.url });
+        navigator.clipboard?.writeText(r.url).catch(() => {});
+        toast({ title: "Deposit link created — copied", description: "Text or email it to the client; they pay by card or bank (ACH)." });
+      }
+      onChanged?.();
+    },
+    onError: (e: any) => toast({ title: "Can't create a deposit link", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" data-testid="dialog-take-payment">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-take-payment">
         <DialogHeader>
           <DialogTitle>Take a payment — {customerName}</DialogTitle>
         </DialogHeader>
+
+        {deposits.length > 0 && (
+          <div className="rounded-lg border p-3 space-y-2.5" data-testid="take-deposits">
+            <div className="text-sm font-medium flex items-center gap-2">
+              <Link2 className="h-4 w-4" /> Deposit on a signed estimate
+            </div>
+            {deposits.map((e) => (
+              <div key={e.id} className="space-y-2" data-testid={`take-deposit-${e.id}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="min-w-0">{e.number} · {e.title} — {money(e.depositCents)} deposit</span>
+                  {!onlineOff && depositLink?.estimateId !== e.id && (
+                    <Button size="sm" variant="outline" onClick={() => makeDepositLink.mutate(e.id)}
+                      disabled={makeDepositLink.isPending} data-testid={`button-deposit-link-${e.id}`}>
+                      {makeDepositLink.isPending && makeDepositLink.variables === e.id
+                        ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Link2 className="h-4 w-4 mr-2" />}
+                      Create deposit link
+                    </Button>
+                  )}
+                </div>
+                {depositLink && depositLink.estimateId === e.id && (
+                  <div className="flex gap-2">
+                    <Input readOnly value={depositLink.url} className="text-xs" data-testid="input-deposit-link"
+                      onFocus={(ev) => ev.target.select()} />
+                    <Button size="sm" variant="outline" aria-label="Copy deposit link"
+                      onClick={() => { navigator.clipboard?.writeText(depositLink.url); toast({ title: "Copied" }); }}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {onlineOff && <p className="text-xs text-muted-foreground">{ONLINE_OFF_TEXT}</p>}
+            <p className="text-xs text-muted-foreground">
+              Took the deposit by cash or check? Recording it against the estimate isn't supported
+              yet — invoice the estimate, then record the payment on that invoice.
+            </p>
+          </div>
+        )}
 
         {!inv ? (
           <p className="text-sm text-muted-foreground" data-testid="take-payment-no-invoices">
@@ -161,6 +254,8 @@ export function TakePaymentDialog({ customerName, invoices, open, onOpenChange, 
                     Copied to your clipboard. The link expires after the client pays or abandons it.
                   </p>
                 </div>
+              ) : onlineOff ? (
+                <p className="text-xs font-medium" data-testid="text-online-links-off">{ONLINE_OFF_TEXT}</p>
               ) : (
                 <Button size="sm" variant="default" onClick={() => makeLink.mutate()}
                   disabled={makeLink.isPending} data-testid="button-create-checkout-link">
@@ -211,10 +306,10 @@ export function TakePaymentDialog({ customerName, invoices, open, onOpenChange, 
         {inv && (
           <DialogFooter>
             <Button onClick={() => recordManual.mutate()}
-              disabled={!(parseFloat(amount) > 0) || recordManual.isPending}
+              disabled={amountCents < 1 || recordManual.isPending}
               data-testid="button-record-manual-payment">
               {recordManual.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Record {parseFloat(amount) > 0 ? money(Math.round(parseFloat(amount) * 100)) : "payment"}
+              Record {amountCents >= 1 ? money(amountCents) : "payment"}
             </Button>
           </DialogFooter>
         )}

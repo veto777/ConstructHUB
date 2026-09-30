@@ -250,21 +250,22 @@ export function registerCrmClientAuthRoutes(app: Express): void {
   // Success: single-use check, mint session, set cookie, 302 to / — or to an
   // allowlisted document path (`next=/e/:token` / `/i/:token`), which is how a
   // document-gate verification link returns the client to the page they were
-  // trying to open. Failure (bogus / used / expired): 302 to /?auth=invalid —
-  // the SPA renders the explanation there. `client=1` is forwarded so dev
-  // (where the client face is query-forced) survives the redirect; harmless
-  // on real hosts.
+  // trying to open. Failure (bogus / used / expired): 302 back to that same
+  // document with ?auth=expired when a valid `next` was given — its email gate
+  // explains and offers a fresh link — else to /?auth=invalid, where the SPA
+  // renders the explanation. `client=1` is forwarded so dev (where the client
+  // face is query-forced) survives the redirect; harmless on real hosts.
   app.get("/api/client/auth/verify", async (req: any, res) => {
     const dev = req.query?.client === "1" ? "&client=1" : "";
     const devOnly = req.query?.client === "1" ? "?client=1" : "";
-    const invalid = () => res.redirect(302, `/?auth=invalid${dev}`);
-
-    const token = String(req.query?.token || "");
-    if (token.length < 32) return invalid();
 
     // Open-redirect guard: next is honoured only for public document paths.
     const next = String(req.query?.next || "");
     const safeNext = /^\/[ei]\/[0-9a-fA-F]{24,120}$/.test(next) ? next : "";
+    const invalid = () => res.redirect(302, safeNext ? `${safeNext}?auth=expired` : `/?auth=invalid${dev}`);
+
+    const token = String(req.query?.token || "");
+    if (token.length < 32) return invalid();
 
     // Atomic single-use: only one concurrent verify can flip used_at.
     const [row] = await db

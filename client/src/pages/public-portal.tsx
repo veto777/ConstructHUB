@@ -1,14 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Loader2, FileText, Hammer, Phone, Mail, ArrowRight, Receipt, ShieldCheck } from "lucide-react";
 import { StatusPill, EmptyState, ErrorCard, statusTone } from "@/components/crm-ui";
 import { PrintLockdown } from "@/components/print-lockdown";
+import { apiErrorMessage } from "@/lib/queryClient";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
+// Each row is already a link — its call to action is a styled span, never a
+// <button> nested inside the <a> (invalid HTML, double focus stop).
+const rowCta = `${buttonVariants({ size: "sm" })} shrink-0 pointer-events-none`;
 
 /**
  * The client's own portal, created automatically with the client record.
@@ -31,7 +35,7 @@ export default function PublicPortalPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
-        <ErrorCard title="This link isn't valid" description={String((error as Error).message)} />
+        <ErrorCard title="This link isn't valid" description={apiErrorMessage(error, "This portal link couldn't be opened.")} />
       </div>
     );
   }
@@ -39,6 +43,8 @@ export default function PublicPortalPage() {
   const { customer, company, estimates, invoices = [], projects } = data;
   const needsAction = estimates.filter((e: any) => !e.approvedAt && !e.declinedAt);
   const openInvoices = invoices.filter((i: any) => !i.paidAt && i.dueCents > 0);
+  // Every sent invoice, paid ones included — paying one must not make it vanish.
+  const invoiceStatus = (i: any) => (i.paidAt ? "paid" : i.status);
 
   return (
     <main className="min-h-screen bg-muted/40 py-10 px-4">
@@ -77,7 +83,7 @@ export default function PublicPortalPage() {
                         {money(e.totalCents)}{e.expiresAt ? ` · expires ${day(e.expiresAt)}` : ""}
                       </div>
                     </div>
-                    <Button size="sm" className="shrink-0">Review <ArrowRight className="h-4 w-4 ml-1" /></Button>
+                    <span className={rowCta} aria-hidden="true">Review <ArrowRight className="h-4 w-4 ml-1" /></span>
                   </div>
                 </a>
               ))}
@@ -102,7 +108,11 @@ export default function PublicPortalPage() {
                         {money(i.dueCents)} due{i.dueAt ? ` · by ${day(i.dueAt)}` : ""}
                       </div>
                     </div>
-                    <Button size="sm" className="shrink-0">Pay <ArrowRight className="h-4 w-4 ml-1" /></Button>
+                    {/* "Pay" only when online payment is on offer (payOnline from
+                        the server); otherwise the invoice page says how to pay. */}
+                    <span className={rowCta} aria-hidden="true">
+                      {i.payOnline === false ? "View" : "Pay"} <ArrowRight className="h-4 w-4 ml-1" />
+                    </span>
                   </div>
                 </a>
               ))}
@@ -136,6 +146,33 @@ export default function PublicPortalPage() {
             ))}
           </CardContent>
         </Card>
+
+        {invoices.length > 0 && (
+          <Card className="shadow-sm" data-testid="portal-invoice-history">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-muted-foreground" /> Your invoices
+              </CardTitle>
+              <CardDescription>Open one to see what's been paid and what's still due.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {invoices.map((i: any) => (
+                <a key={i.id} href={i.link} data-testid={`portal-invoice-row-${i.id}`}>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{i.number} · {i.title}</div>
+                      <div className="text-sm text-muted-foreground tabular-nums">
+                        {money(i.totalCents)}
+                        {i.paidAt ? ` · paid ${day(i.paidAt)}` : i.dueCents > 0 ? ` · ${money(i.dueCents)} due` : ""}
+                      </div>
+                    </div>
+                    <StatusPill tone={statusTone(invoiceStatus(i))}>{invoiceStatus(i)}</StatusPill>
+                  </div>
+                </a>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {projects.length > 0 && (
           <Card className="shadow-sm">
