@@ -32,6 +32,9 @@ describe('AI reply settings and queue with injected AI/publisher',()=>{
   it('notifies each newly synced review once, including reviews before AI was enabled',async()=>{
     await add(5,new Date('2020-01-01'));await notifyNewReviews(user,id);await notifyNewReviews(user,id);
     const {rows:[n]}=await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND kind='gbp.new_review'",[user]);expect(n.n).toBe(1);
+    // The first import is one summary; a review arriving afterwards is announced on its own.
+    await add(4,new Date());await notifyNewReviews(user,id);
+    expect((await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND kind='gbp.new_review'",[user])).rows[0].n).toBe(2);
     await processReplies(user,id,generate,publish as any);expect(generate).not.toHaveBeenCalled();
   });
   it('future only uses review date, protects existing drafts, and low ratings remain drafts in auto mode',async()=>{

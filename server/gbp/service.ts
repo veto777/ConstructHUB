@@ -123,8 +123,8 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           });
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
           // Every photo/video on the listing (paged), not a sample. A failed list keeps the previous gallery.
-          const businessItems = await client.pages('reviews',`/v4/${parent}/media`,'mediaItems').catch(() => null);
-          const customerItems = await client.pages('reviews',`/v4/${parent}/media/customers`,'mediaItems').catch(() => null);
+          const businessItems = await optional('Business photos', () => client!.pages('reviews',`/v4/${parent}/media`,'mediaItems'));
+          const customerItems = await optional('Customer photos', () => client!.pages('reviews',`/v4/${parent}/media/customers`,'mediaItems'));
           const counts: Record<string, number> = {};
           for (const [source, items] of [['business', businessItems], ['customer', customerItems]] as const) {
             if (!items) continue;

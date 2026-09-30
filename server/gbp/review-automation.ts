@@ -74,6 +74,19 @@ export async function generateReply(s:ReplySettings,r:any,business:string) {
   return result.choices[0]?.message.content?.trim()||'';
 }
 export async function notifyNewReviews(userId:number,id:number) {
+  // The first review import for a location is history, not news: record it silently with one summary.
+  const {rows:[seen]}=await pool.query(`SELECT count(*)::int n FROM gbp_review_automation a JOIN google_profile_reviews r ON r.id=a.review_id
+    WHERE r.user_id=$1 AND r.location_id=$2`,[userId,id]);
+  if(!seen.n){
+    const {rows:initial}=await pool.query(`INSERT INTO gbp_review_automation(user_id,review_id,notified_at)
+      SELECT user_id,id,now() FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND NOT google_deleted AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'
+      ON CONFLICT DO NOTHING RETURNING review_id`,[userId,id]);
+    if(initial.length){
+      const {rows:[l]}=await pool.query('SELECT business_name FROM business_locations WHERE id=$1',[id]);
+      await notifyUser(userId,'gbp.new_review',{title:`Imported ${initial.length} existing Google review${initial.length===1?'':'s'}`,body:`${l?.business_name??'Location'} — you'll be notified about new reviews from now on.`,link:'/google-reviews'});
+    }
+    return 0;
+  }
   const {rows}=await pool.query(`INSERT INTO gbp_review_automation(user_id,review_id)
     SELECT user_id,id FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND NOT google_deleted AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'
     ON CONFLICT DO NOTHING RETURNING review_id`,[userId,id]);

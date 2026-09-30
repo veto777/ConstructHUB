@@ -13,7 +13,7 @@ const reviews:number[]=[];
 const calls:{path:string;token:string;method:string}[]=[];
 beforeAll(async()=>{
   const url=new URL(process.env.DATABASE_URL!);
-  if(url.pathname!=='/constructhub_dev_a2'||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a2 only');
+  if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(url.pathname)||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a local development DB is required');
   user=(await pool.query("INSERT INTO users(email) VALUES('audit-a2-'||gen_random_uuid()||'@example.invalid') RETURNING id")).rows[0].id;
   vi.stubGlobal('fetch',vi.fn(async(input:any,options:any)=>{
     const url=new URL(input);

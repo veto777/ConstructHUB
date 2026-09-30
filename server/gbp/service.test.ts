@@ -115,7 +115,7 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     const result:any = await syncLocation(userId,locationId,failing);
     expect(result.profile.warnings).toHaveLength(3);
     expect((await read()).social_profiles.facebook).toBe('https://www.facebook.com/fixture');
-    expect((await read()).business_photo_count).toBe(12);
+    expect((await read()).business_photo_count).toBe(3); // failed photo lists keep the previous synced gallery count
     expect((await pool.query("SELECT last_error FROM gbp_sync_status WHERE location_id=$1 AND kind='profile'",[locationId])).rows[0].last_error).toContain('Social profiles');
     const empty = new GoogleClient(async () => 'fixture', async (url, init) => String(url).includes('/attributes')
       ? new Response('{}') : http(url,init), new Limiter(()=>0,async()=>{}),async()=>{});
