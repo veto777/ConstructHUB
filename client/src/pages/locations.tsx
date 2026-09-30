@@ -2,6 +2,7 @@ import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection, GbpLinkCell } from "@/components/gbp-connection";
 import { InfoTip } from "@/components/info-tip";
 import { useState } from "react";
+import { useUrlParam } from "@/hooks/use-url-param";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -47,7 +48,12 @@ const SOCIAL_PLATFORMS = [
 
 export default function LocationsPage() {
   const { toast } = useToast();
-  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const [locationParam, setLocationParam] = useUrlParam("location");
+  const selectedLocationId = locationParam ? Number(locationParam) : null;
+  const setSelectedLocationId = (id: number | null) => {
+    if (id === null) { const u = new URL(window.location.href); u.searchParams.delete("tab"); window.history.replaceState(window.history.state, "", u.toString()); }
+    setLocationParam(id === null ? null : String(id), id !== null);
+  };
   const [searchFilter, setSearchFilter] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
@@ -461,7 +467,9 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
   onBack: () => void;
   isPremiumPlus: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState("insights");
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const activeTab = tabParam || "insights";
+  const setActiveTab = (tab: string) => setTabParam(tab);
 
   const tabItems = [
     { value: "insights", label: "Insights", icon: BarChart3 },

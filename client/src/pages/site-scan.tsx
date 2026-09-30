@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
+import { useUrlParam } from "@/hooks/use-url-param";
 const api = async (method: string, url: string, body?: unknown) =>
   (await apiRequest(method, url, body)).json();
 function canonicalUrl(value: string) {
@@ -170,11 +171,12 @@ export function ScanReport({ report, draft }: { report: any; draft?: string }) {
 }
 export default function SiteScanPage() {
   const cache = useQueryClient();
+  const [scanParam, setScanParam] = useUrlParam("scan");
+  const selected = scanParam ?? "", setSelected = (v: string | number) => setScanParam(v === "" ? null : String(v), true);
   const [url, setUrl] = useState(""),
     [locationId, setLocationId] = useState(""),
     [cap, setCap] = useState(150),
     [psi, setPsi] = useState(1),
-    [selected, setSelected] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [share, setShare] = useState("");

@@ -15,6 +15,7 @@ import {
   type Destination,
 } from "@shared/social";
 import { CalendarDays, Send, Sparkles, Link2 } from "lucide-react";
+import { useUrlParam } from "@/hooks/use-url-param";
 const refresh = () =>
   queryClient.invalidateQueries({ queryKey: ["/api/social"] });
 const selectClass = "rounded-md border bg-background px-3 py-2 text-sm w-full";
@@ -37,6 +38,8 @@ export default function SocialMediaPage() {
   const { data: sources = [] } = useQuery<any[]>({
     queryKey: ["/api/social/sources"],
   });
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const tab = tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
   const [apiKey, setKey] = useState(""),
     [text, setText] = useState(""),
     [tweaks, setTweaks] = useState<Record<string, string>>({});
@@ -44,7 +47,6 @@ export default function SocialMediaPage() {
     [mediaText, setMediaText] = useState(""),
     [schedule, setSchedule] = useState("");
   const [settings, setSettings] = useState<AutoSettings | null>(null),
-    [tab, setTab] = useState("compose"),
     [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [sourceKind, setSourceKind] = useState("offers"),
     [sourceText, setSourceText] = useState("");

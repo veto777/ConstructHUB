@@ -26,6 +26,7 @@ import {
   Phone, MapPin, Search, Download, Bot, PenLine, MousePointerClick,
   CalendarDays, StickyNote, BarChart3, FolderOpen
 } from "lucide-react";
+import { useUrlParam } from "@/hooks/use-url-param";
 
 const formatPST = (dateStr: string) => {
   try {
@@ -104,7 +105,9 @@ function FloatingParticles({ color = "#f59e0b" }: { color?: string }) {
 
 export default function GoogleReviewsPage() {
   const { toast } = useToast();
-  const [pageTab, setPageTab] = useState<"requests" | "profile-reviews">("requests");
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const pageTab: "requests" | "profile-reviews" = tabParam === "profile-reviews" ? "profile-reviews" : "requests";
+  const setPageTab = (v: "requests" | "profile-reviews") => setTabParam(v === "requests" ? null : v);
   const [createOpen, setCreateOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
@@ -451,7 +454,7 @@ export default function GoogleReviewsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-reviews-title">Google Reviews</h1>
             <p className="text-sm text-muted-foreground">
-              {pageTab === "requests" ? "Request reviews from clients with a professional feedback-gated system" : "Monitor and manage your Google Business Profile reviews"}
+              {pageTab === "requests" ? "Ask every client for a Google review with a simple, professional feedback flow" : "Monitor and manage your Google Business Profile reviews"}
             </p>
           </div>
         </div>
