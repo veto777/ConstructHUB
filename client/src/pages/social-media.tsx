@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,8 +17,6 @@ import {
 } from "@shared/social";
 import { CalendarDays, Send, Sparkles, Link2 } from "lucide-react";
 import { useUrlParam } from "@/hooks/use-url-param";
-const refresh = () =>
-  queryClient.invalidateQueries({ queryKey: ["/api/social"] });
 const selectClass = "rounded-md border bg-background px-3 py-2 text-sm w-full";
 type Account = {
   id: string;
@@ -27,19 +26,29 @@ type Account = {
   boards?: { id: string; name: string }[];
 };
 export default function SocialMediaPage() {
+  const [business,setBusiness]=useUrlParam("business");
+  const valid=business==='all'||(!!business&&/^[1-9]\d*$/.test(business)&&Number.isSafeInteger(Number(business)));
+  return <div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto p-4 space-y-4">
+    <h1 className="text-3xl font-bold">Social Media</h1>
+    <BusinessSelector value={business} onChange={v=>setBusiness(v,true)}/>
+    {business && valid ? <SocialWorkbench key={business} businessId={business==='all'?null:Number(business)} all={business==='all'}/> : <p>Choose a business above. Add or import businesses in <a className="underline" href="/locations">Locations</a>.</p>}
+  </div></div>;
+}
+function SocialWorkbench({businessId,all}:{businessId:number|null;all:boolean}) {
   const { toast } = useToast();
-  const { data, error, isLoading } = useQuery<any>({
-    queryKey: ["/api/social"],
-    refetchInterval: 15000,
-  });
-  const { data: media = [] } = useQuery<any[]>({
-    queryKey: ["/api/social/media"],
-  });
-  const { data: sources = [] } = useQuery<any[]>({
-    queryKey: ["/api/social/sources"],
-  });
+  const [selectedPosts,setSelectedPosts]=useState<string[]>([]);
+  const [bulkErrors,setBulkErrors]=useState<string[]>([]);
+  const [offset,setOffset]=useState(0),[postSearch,setPostSearch]=useState(''),[postState,setPostState]=useState(''),[postPlatform,setPostPlatform]=useState('');
+  const [calendarDate,setCalendarDate]=useState(''),[connectionScope,setConnectionScope]=useState('business');
+  const [sourceOffset,setSourceOffset]=useState(0),[sourceSearch,setSourceSearch]=useState('');
+  const [mediaOffset,setMediaOffset]=useState(0),[mediaSearch,setMediaSearch]=useState('');
+  const scope=businessId?`businessId=${businessId}`:'';
+  const qs=new URLSearchParams({offset:String(offset),search:postSearch,state:postState,platform:postPlatform,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,...(businessId?{businessId:String(businessId)}:{}),...(calendarDate?{day:calendarDate}:{})});
+  const {data,error,isLoading}=useQuery<any>({queryKey:['/api/social',businessId,all,qs.toString()],refetchInterval:15000,queryFn:async()=>(await apiRequest('GET',`/api/social${all?'/calendar':''}?${qs}`)).json()});
+  const {data:media=[]}=useQuery<any[]>({queryKey:['/api/social','media',businessId,mediaOffset,mediaSearch],enabled:!all,queryFn:async()=>(await apiRequest('GET',`/api/social/media?${scope}&offset=${mediaOffset}&search=${encodeURIComponent(mediaSearch)}`)).json()});
+  const {data:sources=[]}=useQuery<any[]>({queryKey:['/api/social','sources',businessId,sourceOffset,sourceSearch],enabled:!all,queryFn:async()=>(await apiRequest('GET',`/api/social/sources?${scope}&offset=${sourceOffset}&search=${encodeURIComponent(sourceSearch)}`)).json()});
   const [tabParam, setTabParam] = useUrlParam("tab");
-  const tab = tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
+  const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
   const [apiKey, setKey] = useState(""),
     [text, setText] = useState(""),
     [tweaks, setTweaks] = useState<Record<string, string>>({});
@@ -50,8 +59,8 @@ export default function SocialMediaPage() {
     [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [sourceKind, setSourceKind] = useState("offers"),
     [sourceText, setSourceText] = useState("");
-  const [uploading, setUploading] = useState(false),
-    [calendarDate, setCalendarDate] = useState("");
+  const [uploading, setUploading] = useState(false);
+  useEffect(()=>{setDestinations(data?.defaults||[]);},[JSON.stringify(data?.defaults)]);
   const mutation = useMutation({
     mutationFn: async ({
       path,
@@ -61,10 +70,15 @@ export default function SocialMediaPage() {
       path: string;
       body?: unknown;
       method?: string;
-    }) => (await apiRequest(method, `/api/social${path}`, body)).json(),
-    onSuccess: () => {
-      refresh();
-      queryClient.invalidateQueries({ queryKey: ["/api/social/sources"] });
+    }) => {
+      const isConnection=['/connect','/disconnect'].includes(path);
+      const activeScope=isConnection&&connectionScope==='agency'?'':scope;
+      const url=path.includes('?')?`/api/social${path}`:`/api/social${path}?${activeScope}`;
+      return (await apiRequest(method,url,body)).json();
+    },
+    onSuccess: (result) => {
+      if(result.results){setBulkErrors(result.results.filter((r:any)=>!r.ok).map((r:any)=>r.error));setSelectedPosts([]);}
+      refreshSocial();
       toast({ title: "Social Media saved" });
     },
     onError: (e: Error) =>
@@ -159,7 +173,7 @@ export default function SocialMediaPage() {
       <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6">
         <header className="flex justify-between gap-4 items-start">
           <div>
-            <h1 className="text-3xl font-bold">Social Media</h1>
+            <h2 className="text-2xl font-bold">{all?"All-clients calendar":data?.business?.business_name||"Business workspace"}</h2>
             <p className="text-muted-foreground mt-2">
               Compose once. Review, schedule, and follow every destination.
             </p>
@@ -172,7 +186,7 @@ export default function SocialMediaPage() {
         {error && (
           <p role="alert">Could not load Social Media. Sign in and refresh.</p>
         )}
-        <Card>
+        {!all && <Card>
           <CardHeader>
             <CardTitle className="flex gap-2 items-center">
               <Link2 className="w-5 h-5" />
@@ -197,6 +211,8 @@ export default function SocialMediaPage() {
               </a>
               .
             </p>
+            <p>Effective connection: {data?.connectionScope==='business'?'Business key':'Agency key (fallback)'}</p>
+            <label>Key to manage <select aria-label="Connection key scope" className={selectClass} value={connectionScope} onChange={e=>setConnectionScope(e.target.value)}><option value="business">This business only (optional)</option><option value="agency">Agency shared key</option></select></label>
             <div className="flex flex-wrap gap-2">
               <Input
                 aria-label="Blotato API key"
@@ -223,7 +239,7 @@ export default function SocialMediaPage() {
               >
                 {data?.connected ? "Verify / replace key" : "Connect Blotato"}
               </Button>
-              {data?.connected && (
+              {(connectionScope==='agency'?data?.agencyConnected:data?.businessConnected??data?.connected) && (
                 <Button
                   variant="outline"
                   disabled={mutation.isPending}
@@ -246,8 +262,9 @@ export default function SocialMediaPage() {
               </p>
             )}
           </CardContent>
-        </Card>
-        <nav className="flex flex-wrap gap-2" aria-label="Social Media views">
+        </Card>}
+        {!all && businessId && <MappingEditor businessId={businessId} defaults={data?.defaults||[]}/>}
+        {!all && <nav className="flex flex-wrap gap-2" aria-label="Social Media views">
           {[
             ["compose", "Compose", Send],
             ["queue", "Calendar & queue", CalendarDays],
@@ -262,7 +279,7 @@ export default function SocialMediaPage() {
               {label}
             </Button>
           ))}
-        </nav>
+        </nav>}
         {tab === "compose" && (
           <Card>
             <CardHeader>
@@ -428,6 +445,8 @@ export default function SocialMediaPage() {
                   placeholder="https://your-public-media-host/photo.jpg"
                 />
               </label>
+              <Input aria-label="Search business photos" value={mediaSearch} onChange={e=>{setMediaSearch(e.target.value);setMediaOffset(0);}} placeholder="Search synced business photos"/>
+              <Pager offset={mediaOffset} setOffset={setMediaOffset} more={media.length===25} label="photos"/>
               <div className="grid md:grid-cols-2 gap-3">
                 <label>
                   Media Library
@@ -526,7 +545,7 @@ export default function SocialMediaPage() {
                   aria-label="Calendar day"
                   type="date"
                   value={calendarDate}
-                  onChange={(e) => setCalendarDate(e.target.value)}
+                  onChange={(e) => {setCalendarDate(e.target.value);setOffset(0);}}
                 />
               </label>
               {!data?.posts?.length && (
@@ -535,27 +554,26 @@ export default function SocialMediaPage() {
                   draft.
                 </p>
               )}
+              <Input aria-label="Search calendar" placeholder="Search post text or business" value={postSearch} onChange={e=>{setPostSearch(e.target.value);setOffset(0);}}/>
+              <div className="flex flex-wrap gap-2"><select aria-label="Post status filter" className={selectClass} value={postState} onChange={e=>{setPostState(e.target.value);setOffset(0);}}>{['','draft','queued','submitting','submitted','published','failed','uncertain','cancelled'].map(s=><option key={s} value={s}>{s||'All statuses'}</option>)}</select>
+              <select aria-label="Post platform filter" className={selectClass} value={postPlatform} onChange={e=>{setPostPlatform(e.target.value);setOffset(0);}}>{['',...Object.keys(socialLimits)].map(p=><option key={p} value={p}>{p||'All platforms'}</option>)}</select></div>
+              <p>{data?.total||0} matching posts</p>
+              <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>setSelectedPosts((data?.posts||[]).filter((p:any)=>['draft','queued'].includes(p.state)).map((p:any)=>p.id))}>Select this page of posts</Button>
+              {['approve','cancel'].map(action=><Button key={action} disabled={!selectedPosts.length||selectedPosts.length>100||mutation.isPending} onClick={()=>mutation.mutate({path:'/posts/bulk-action',body:{ids:selectedPosts,action}})}>{action==='approve'?'Approve selected drafts':'Cancel selected posts'}</Button>)}</div>
+              <p className="text-xs">{selectedPosts.length} selected (up to 100 per action). Approve publishes each saved draft as written.</p>
+              {bulkErrors.map((error,i)=><p role="alert" key={i}>{error}</p>)}
+              <Pager offset={offset} setOffset={setOffset} more={offset+25<(data?.total||0)} label="posts"/>
               {(data?.posts || [])
-                .filter(
-                  (p: any) =>
-                    !calendarDate ||
-                    new Date(
-                      p.scheduled_at || p.created_at || p.due_at,
-                    ).toLocaleDateString("en-CA") === calendarDate,
-                )
-                .sort(
-                  (a: any, b: any) =>
-                    Date.parse(a.scheduled_at || a.created_at || a.due_at) -
-                    Date.parse(b.scheduled_at || b.created_at || b.due_at),
-                )
                 .map((p: any) => (
                   <PostRow
                     key={p.id}
                     post={p}
+                    selected={selectedPosts.includes(p.id)}
+                    onSelect={checked=>setSelectedPosts(old=>checked?[...old,p.id]:old.filter(id=>id!==p.id))}
                     pending={mutation.isPending}
                     action={(action, text) =>
                       mutation.mutate({
-                        path: `/posts/${p.id}/action`,
+                        path: `/posts/${p.id}/action${p.business_id?`?businessId=${p.business_id}`:"?"}`,
                         body: { action, ...(text ? { text } : {}) },
                       })
                     }
@@ -778,7 +796,7 @@ export default function SocialMediaPage() {
                   <Button
                     variant="outline"
                     disabled={mutation.isPending || !data?.connected}
-                    onClick={() => mutation.mutate({ path: "/generate" })}
+                    onClick={() => mutation.mutate({ path: "/generate", body: {requestId:crypto.randomUUID()} })}
                   >
                     Generate draft from saved settings
                   </Button>
@@ -842,6 +860,9 @@ export default function SocialMediaPage() {
                   Uses media URLs from Compose. Sources expire from generation
                   after 30 days; remove offers when they end.
                 </p>
+                <p className="text-sm">GBP refresh: {data?.sourcesSync?.sync_requested?'Queued':data?.sourcesSync?.synced_at?new Date(data.sourcesSync.synced_at).toLocaleString():'Not yet requested'}{data?.sourcesSync?.sync_error?` — ${data.sourcesSync.sync_error}`:''}</p>
+                <Input aria-label="Search content sources" value={sourceSearch} onChange={e=>{setSourceSearch(e.target.value);setSourceOffset(0);}} placeholder="Search sources"/>
+                <Pager offset={sourceOffset} setOffset={setSourceOffset} more={sources.length===25} label="sources"/>
                 {sources.map((s) => (
                   <div
                     key={s.id}
@@ -874,10 +895,14 @@ export default function SocialMediaPage() {
 }
 function PostRow({
   post: p,
+  selected,
+  onSelect,
   pending,
   action,
 }: {
   post: any;
+  selected: boolean;
+  onSelect: (checked:boolean)=>void;
   pending: boolean;
   action: (a: string, text?: string) => void;
 }) {
@@ -885,7 +910,9 @@ function PostRow({
   return (
     <article className="border rounded-lg p-4 space-y-2">
       <div className="flex flex-wrap gap-2 items-center">
+        {["draft","queued"].includes(p.state)&&<input type="checkbox" aria-label={`Select post ${p.id}`} checked={selected} onChange={e=>onSelect(e.target.checked)}/>}
         <Badge>{p.state}</Badge>
+        <strong>{p.business_name||"Legacy / unassigned"}</strong>
         <strong>{p.payload.post.content.platform}</strong>
         <span>
           {new Date(
