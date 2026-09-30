@@ -165,7 +165,8 @@ function PublicRouter() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/locations" component={LocationsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
-      <Route path="/site-scan" component={SiteScanPage} />
+      {/* Signed-out visitors get the free public scan; the full tool needs an account. */}
+      <Route path="/site-scan" component={FreeSiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
