@@ -15,6 +15,7 @@ import {
   publicMediaUrl,
 } from "../../shared/social";
 import { BlotatoClient, encryptKey, decryptKey, SocialError } from "./client";
+import { aiModel } from "../ai-config";
 export type ClientFactory = (key: string) => BlotatoClient;
 export const clientFactory: ClientFactory = (key) => new BlotatoClient(key);
 export async function userLock<T>(
@@ -299,7 +300,7 @@ export const generateText: Generate = async (context) => {
     timeout: 25000,
   });
   const r = await ai.chat.completions.create({
-    model: process.env.SOCIAL_AI_MODEL || "gpt-4o-mini",
+    model: aiModel(process.env.SOCIAL_AI_MODEL),
     max_tokens: 500,
     messages: [
       {

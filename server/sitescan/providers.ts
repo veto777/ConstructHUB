@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { CrawlState, Finding } from "./audit";
+import { aiModel } from "../ai-config";
 export async function pageSpeed(
   url: string,
   strategy: "mobile" | "desktop",
@@ -61,7 +62,7 @@ export const openAIProvider: PlanProvider = {
       timeout: 60_000,
     });
     const r = await client.chat.completions.create({
-      model: process.env.SITESCAN_AI_MODEL || "gpt-4o-mini",
+      model: aiModel(process.env.SITESCAN_AI_MODEL),
       max_tokens: 4000,
       messages: [
         {

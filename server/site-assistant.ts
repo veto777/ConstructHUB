@@ -1,6 +1,7 @@
 import { chatInput, rateLimit, siteChatGate } from "./growth-limits";
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
+import { aiModel } from "./ai-config";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -241,7 +242,7 @@ export function registerSiteAssistantRoutes(app: Express) {
       }));
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: aiModel(),
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "system", content: `Here is your complete knowledge base. Use this to answer all questions:\n\n${KNOWLEDGE_BASE}` },

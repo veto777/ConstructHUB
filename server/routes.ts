@@ -34,6 +34,7 @@ import { getBaseUrl } from "./auth";
 import { eq, and, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed } from "./crm/admin";
+import { aiModel } from "./ai-config";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -966,7 +967,7 @@ ${county ? `County/Region: ${county}` : ""}
 The description should naturally incorporate the service keyword and location. It should describe work being done by the contractor and be suitable for alt text and image metadata. Keep it professional and local-SEO focused. Do not use hashtags or emojis.`;
 
         const completion = await photoOpenai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: aiModel(),
           messages: [{ role: "user", content: prompt }],
           max_tokens: 200,
           temperature: 0.7,
@@ -1736,7 +1737,7 @@ The description should naturally incorporate the service keyword and location. I
         : "Be professional, kind, and constructive.";
 
       const response = await photoOpenai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: aiModel(),
         messages: [
           {
             role: "system",
@@ -4938,7 +4939,7 @@ function main() {
       const prompt = reviewDraftPrompt(request.companyName || "the company", request.feedbackRating, highlights.trim());
 
       const response = await photoOpenai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: aiModel(),
         messages: [{ role: "user", content: prompt }],
         max_tokens: 300,
         temperature: 0.8,

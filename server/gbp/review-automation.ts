@@ -6,6 +6,7 @@ import { takeBudget } from '../growth-limits';
 import { logActivity, notifyUser } from '../account-events';
 import { GoogleError } from './client';
 import { ownedLocation, reply, withLocationLock } from './service';
+import {aiModel} from '../ai-config';
 export const replySettingsSchema=z.object({
   mode:z.enum(['off','draft','auto']).default('off'), scope:z.enum(['future','existing']).default('future'),
   tone:z.string().trim().min(1).max(200).default('Warm and professional'), signOff:z.string().trim().max(150).default(''),
@@ -69,7 +70,7 @@ export function replyPrompt(s:ReplySettings,r:any,business:string) {
 export async function generateReply(s:ReplySettings,r:any,business:string) {
   if(!process.env.AI_INTEGRATIONS_OPENAI_API_KEY)throw new Error('AI not configured');
   const ai=new OpenAI({apiKey:process.env.AI_INTEGRATIONS_OPENAI_API_KEY,baseURL:process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,maxRetries:0,timeout:30000});
-  const result=await ai.chat.completions.create({model:'gpt-4o-mini',messages:replyPrompt(s,r,business),max_tokens:900});
+  const result=await ai.chat.completions.create({model:aiModel(),messages:replyPrompt(s,r,business),max_tokens:900});
   if(result.choices[0]?.finish_reason!=='stop')throw new Error('Incomplete AI reply');
   return result.choices[0]?.message.content?.trim()||'';
 }
