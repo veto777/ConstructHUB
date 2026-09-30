@@ -173,6 +173,18 @@ export default function GoogleReviewsPage() {
   const [emailTheme, setEmailTheme] = useState("navy-orange");
   const [bccEmail, setBccEmail] = useState("");
   const [bccInfoOpen, setBccInfoOpen] = useState(false);
+  const bccInfoToggle = useRef<HTMLButtonElement>(null);
+  // Escape closes the BCC explainer (and returns focus to its toggle), like any popover.
+  useEffect(() => {
+    if (!bccInfoOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setBccInfoOpen(false);
+      bccInfoToggle.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [bccInfoOpen]);
   const [savedBccEmails, setSavedBccEmails] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("savedBccEmails") || "[]").slice(0, 3); } catch { return []; }
   });
@@ -682,14 +694,15 @@ export default function GoogleReviewsPage() {
                 <div className="relative flex items-center gap-1.5">
                   <Label htmlFor="bccEmail"><Mail className="w-3.5 h-3.5 inline mr-1" />BCC Email</Label>
                   <div className="sm:relative">
-                    <button type="button" onClick={() => setBccInfoOpen(!bccInfoOpen)} className="text-amber-500 hover:text-amber-600 transition-colors" data-testid="icon-bcc-info">
+                    {/* Above the click-away overlay while open, so clicking it again closes the explainer. */}
+                    <button type="button" ref={bccInfoToggle} onClick={() => setBccInfoOpen(!bccInfoOpen)} aria-label="Why add a BCC email?" aria-expanded={bccInfoOpen} aria-controls="bcc-info-tooltip" className={`text-amber-500 hover:text-amber-600 transition-colors ${bccInfoOpen ? "relative z-[301]" : ""}`} data-testid="icon-bcc-info">
                       <Info className="w-3.5 h-3.5" />
                     </button>
                     {bccInfoOpen && (
                       <>
                         <div className="fixed inset-0 z-[299]" onClick={() => setBccInfoOpen(false)} />
-                        <div className="absolute top-full left-0 right-0 mt-2 sm:right-auto sm:top-0 sm:left-full sm:mt-0 sm:ml-2 sm:w-72 p-3 rounded-lg bg-popover border border-border shadow-lg text-xs text-popover-foreground z-[300]" data-testid="tooltip-bcc-info">
-                          <button type="button" onClick={() => setBccInfoOpen(false)} className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
+                        <div id="bcc-info-tooltip" className="absolute top-full left-0 right-0 mt-2 sm:right-auto sm:top-0 sm:left-full sm:mt-0 sm:ml-2 sm:w-72 p-3 rounded-lg bg-popover border border-border shadow-lg text-xs text-popover-foreground z-[300]" data-testid="tooltip-bcc-info">
+                          <button type="button" onClick={() => setBccInfoOpen(false)} aria-label="Close" className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
                           <p className="font-semibold text-amber-500 mb-1.5">Why this is critical for deliverability</p>
                           <p className="mb-1.5">Adding a BCC of your existing business email helps the review request avoid spam folders. Email providers like Gmail track sender-recipient relationships — if this client has already received emails from you, that trust carries over.</p>
                           <p className="mb-1.5"><strong>Use the same email you've been communicating with this client through.</strong> If you used a CRM, use a well-established, trusted email address instead.</p>

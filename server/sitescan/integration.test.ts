@@ -436,6 +436,82 @@ it("isolates all report mutations and exports from another owner's job", async (
     expect((await call(method, `/api/sitescan/jobs/:id/${suffix}`, { params: { id: own }, user: null })).status).toBe(401);
   }
 });
+it("an owner deletes only their own scan; the report, share link and history entry go with it", async () => {
+  const url = "https://sitescan-delete.test/";
+  const id = await enqueue(1, url, 1, 0);
+  const del = (params: any, user: any = 1) =>
+    call("delete", "/api/sitescan/jobs/:id", { params, user });
+  expect((await del({ id }, null)).status).toBe(401);
+  expect((await del({ id }, 2)).status).toBe(404);
+  expect((await del({ id: foreign })).status).toBe(404);
+  expect((await del({ id: "not-a-scan" })).status).toBe(400);
+  await pool.query("UPDATE sitescan_jobs SET status='completed',report=$2 WHERE id=$1", [
+    id,
+    { scores: { overall: 1, categories: {} }, findings: [], coverage: { notes: [] } },
+  ]);
+  const share = await call("post", "/api/sitescan/jobs/:id/share", { params: { id } });
+  const value = share.body.path.split("/").pop();
+  expect((await del({ id })).status).toBe(200);
+  expect((await call("get", "/api/sitescan/jobs/:id", { params: { id } })).status).toBe(404);
+  expect(
+    (await call("get", "/api/sitescan/shared/:token", { params: { token: value }, user: null })).status,
+  ).toBe(404);
+  expect(
+    (await call("get", "/api/sitescan", { body: {}, params: {} })).body.jobs.some((j: any) => j.id === id),
+  ).toBe(false);
+  expect((await pool.query("SELECT 1 FROM sitescan_jobs WHERE id=$1", [foreign])).rowCount).toBe(1);
+  expect((await del({ id })).status).toBe(404);
+});
+it("deleting a running scan stops the worker without resurrecting the row or notifying", async () => {
+  const url = "https://sitescan-delete-running.test/";
+  // The worker claims the oldest queued job: retire earlier fixtures, and never run someone else's.
+  await pool.query("UPDATE sitescan_jobs SET status='failed' WHERE status='queued' AND url LIKE 'https://sitescan-%'");
+  const id = await enqueue(1, url, 1, 0);
+  expect(
+    (await pool.query("SELECT 1 FROM sitescan_jobs WHERE status='queued' AND id<>$1", [id])).rowCount,
+  ).toBe(0);
+  const before = (notifyUser as any).mock.calls.length;
+  let crawled = false;
+  await runSiteScanWorker({
+    http: vi.fn(),
+    pageSpeed: vi.fn(),
+    crawl: async (target: string, _cap: number, state: any, checkpoint: any) => {
+      crawled = target === url;
+      expect((await call("delete", "/api/sitescan/jobs/:id", { params: { id } })).status).toBe(200);
+      await checkpoint(state);
+      return state;
+    },
+  } as any);
+  expect(crawled).toBe(true);
+  expect((await pool.query("SELECT 1 FROM sitescan_jobs WHERE id=$1", [id])).rowCount).toBe(0);
+  expect((notifyUser as any).mock.calls.length).toBe(before);
+});
+it("owners can remove their PDF branding and it never touches another owner's", async () => {
+  const users: number[] = [];
+  for (const n of [1, 2])
+    users.push(
+      (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [
+        `sitescan-brand-${n}-${randomUUID()}@example.invalid`,
+      ])).rows[0].id,
+    );
+  try {
+    for (const user of users)
+      expect(
+        (await call("post", "/api/sitescan/branding", { body: { name: `Fixture ${user}` }, user })).status,
+      ).toBe(200);
+    expect((await call("delete", "/api/sitescan/branding", { user: null })).status).toBe(401);
+    expect((await call("delete", "/api/sitescan/branding", { user: users[0] })).status).toBe(200);
+    expect((await call("get", "/api/sitescan/branding", { user: users[0] })).body).toEqual({
+      name: "",
+      logo: null,
+    });
+    expect((await call("get", "/api/sitescan/branding", { user: users[1] })).body.name).toBe(
+      `Fixture ${users[1]}`,
+    );
+  } finally {
+    await pool.query("DELETE FROM users WHERE id=ANY($1::int[])", [users]);
+  }
+});
 it("rotates bearer shares and enforces share and email verification expiry", async () => {
   const share = async () => (await call("post", "/api/sitescan/jobs/:id/share", { params: { id: own } })).body.path.split("/").pop();
   const read = (value: string) => call("get", "/api/sitescan/shared/:token", { params: { token: value }, user: null });

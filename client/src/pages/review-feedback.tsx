@@ -105,7 +105,12 @@ export default function ReviewFeedbackPage() {
   const [generatedReview, setGeneratedReview] = useState("");
   const [highlights, setHighlights] = useState("");
   const [copied, setCopied] = useState(false);
+  // The browser refused the clipboard write: the customer is asked to copy the text by hand.
+  const [copyError, setCopyError] = useState(false);
+  const reviewBox = useRef<HTMLTextAreaElement>(null);
   const [photosDownloaded, setPhotosDownloaded] = useState(false);
+  // "Skip Photos" is a real choice: without it the photo reminder reopened on every Google click.
+  const [photosSkipped, setPhotosSkipped] = useState(false);
   const [showCopyWarning, setShowCopyWarning] = useState(false);
   const [showPhotoReminder, setShowPhotoReminder] = useState(false);
   const [skippedDescribe, setSkippedDescribe] = useState(false);
@@ -271,22 +276,41 @@ export default function ReviewFeedbackPage() {
 
   const trackGoogleOpen = () => track("google-link-opened", undefined, true);
 
+  // Only a completed clipboard write counts as copied (it can be blocked by permissions, an
+  // insecure page or an in-app browser). "Copied" then lasts until the text changes.
+  const copyReview = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedReview);
+      setCopied(true);
+      setCopyError(false);
+      return true;
+    } catch {
+      setCopied(false);
+      setCopyError(true);
+      // Select the text so a manual copy is one keystroke or long-press away.
+      setTimeout(() => {
+        reviewBox.current?.focus();
+        reviewBox.current?.select();
+      }, 0);
+      return false;
+    }
+  };
+
   const handleCopyReview = () => {
-    if (hasPhotos && !photosDownloaded) {
+    if (photosPending) {
       setShowPhotoReminder(true);
       return;
     }
-    navigator.clipboard.writeText(generatedReview);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
+    void copyReview();
   };
 
   const handleGoogleClick = () => {
-    if (hasPhotos && !photosDownloaded) {
+    if (photosPending) {
       setShowPhotoReminder(true);
       return;
     }
-    if (!copied) {
+    // After a blocked copy the customer was told to copy by hand, so Google opens directly.
+    if (!copied && !copyError) {
       setShowCopyWarning(true);
       return;
     }
@@ -295,10 +319,11 @@ export default function ReviewFeedbackPage() {
     completeFlowMutation.mutate();
   };
 
-  const handleCopyAndGo = () => {
-    navigator.clipboard.writeText(generatedReview);
-    setCopied(true);
+  const handleCopyAndGo = async () => {
+    const ok = await copyReview();
     setShowCopyWarning(false);
+    // A failed copy stays on the page with the manual-copy instructions instead of opening Google empty-handed.
+    if (!ok) return;
     setTimeout(() => {
       window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
     trackGoogleOpen();
@@ -322,6 +347,7 @@ export default function ReviewFeedbackPage() {
   type PhotoItem = { url: string; originalName?: string } | string;
   const photoItems: PhotoItem[] = reviewData?.photos || [];
   const hasPhotos = photoItems.length > 0;
+  const photosPending = hasPhotos && !photosDownloaded && !photosSkipped;
   const getPhotoUrl = (p: PhotoItem) => typeof p === "string" ? p : p.url;
   const getPhotoName = (p: PhotoItem, i: number) => typeof p === "string" ? `photo-${i + 1}.jpg` : (p.originalName || `photo-${i + 1}.jpg`);
   const getDownloadUrl = (p: PhotoItem, i: number) => {
@@ -1018,7 +1044,7 @@ export default function ReviewFeedbackPage() {
                   )}
 
                   <div className={`p-4 rounded-xl border-2 transition-all ${
-                    hasPhotos && !photosDownloaded
+                    photosPending
                       ? "border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 opacity-50"
                       : copied
                         ? "border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10"
@@ -1026,7 +1052,7 @@ export default function ReviewFeedbackPage() {
                   }`}>
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                        copied ? "bg-green-500" : hasPhotos && !photosDownloaded ? "bg-gray-300 dark:bg-gray-600" : "bg-gray-900 dark:bg-white dark:text-gray-900"
+                        copied ? "bg-green-500" : photosPending ? "bg-gray-300 dark:bg-gray-600" : "bg-gray-900 dark:bg-white dark:text-gray-900"
                       }`}>
                         {copied ? <CheckCircle2 className="w-4 h-4" /> : hasPhotos ? "2" : "1"}
                       </div>
@@ -1035,13 +1061,14 @@ export default function ReviewFeedbackPage() {
                           {copied ? "Review Copied to Clipboard!" : "Copy Your Review"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {hasPhotos && !photosDownloaded ? "Download your photos first" : "Edit it however you'd like, then copy"}
+                          {photosPending ? "Download your photos first" : "Edit it however you'd like, then copy"}
                         </p>
                       </div>
                     </div>
 
                     <div className="relative mb-3">
                       <Textarea
+                        ref={reviewBox}
                         value={generatedReview}
                         onChange={(e) => {
                           setGeneratedReview(e.target.value);
@@ -1049,16 +1076,21 @@ export default function ReviewFeedbackPage() {
                         }}
                         rows={7}
                         className="text-sm leading-relaxed border-2"
-                        disabled={hasPhotos && !photosDownloaded}
+                        disabled={photosPending}
                         data-testid="textarea-generated-review"
                       />
                     </div>
+                    {copyError && (
+                      <p role="alert" className="mb-3 text-xs text-destructive" data-testid="text-copy-review-error">
+                        Your browser blocked automatic copying. Select the review text above and copy it yourself (Ctrl+C, ⌘C on Mac, or long-press and choose Copy), then open Google and paste it.
+                      </p>
+                    )}
 
                     <div className="flex gap-2">
                       <Button
                         onClick={handleCopyReview}
-                        disabled={hasPhotos && !photosDownloaded}
-                        className={`flex-1 h-10 font-bold ${copied ? "bg-green-500 hover:bg-green-600" : hasPhotos && !photosDownloaded ? "bg-gray-200 dark:bg-gray-700 text-muted-foreground cursor-not-allowed" : "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900"} text-white`}
+                        disabled={photosPending}
+                        className={`flex-1 h-10 font-bold ${copied ? "bg-green-500 hover:bg-green-600" : photosPending ? "bg-gray-200 dark:bg-gray-700 text-muted-foreground cursor-not-allowed" : "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900"} text-white`}
                         data-testid="button-copy-review"
                       >
                         {copied ? (
@@ -1071,10 +1103,11 @@ export default function ReviewFeedbackPage() {
                         variant="outline"
                         size="icon"
                         className="h-10 w-10 border-2"
-                        disabled={hasPhotos && !photosDownloaded}
+                        disabled={photosPending}
                         onClick={() => {
                           setGeneratedReview("");
                           setCopied(false);
+                          setCopyError(false);
                           generateMutation.mutate();
                         }}
                         title="Regenerate"
@@ -1086,28 +1119,28 @@ export default function ReviewFeedbackPage() {
                   </div>
 
                   <div className={`p-4 rounded-xl border-2 transition-all ${
-                    copied
+                    copied || copyError
                       ? "border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-800/50"
                       : "border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50"
                   }`}>
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        copied ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "bg-gray-300 dark:bg-gray-600 text-white"
+                        copied || copyError ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "bg-gray-300 dark:bg-gray-600 text-white"
                       }`}>
                         {hasPhotos ? "3" : "2"}
                       </div>
                       <div>
-                        <p className={`font-semibold text-sm ${!copied ? "text-muted-foreground" : ""}`}>
+                        <p className={`font-semibold text-sm ${!copied && !copyError ? "text-muted-foreground" : ""}`}>
                           Open Google & Paste Your Review
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {copied ? "You're ready! Click below to open Google." : "Copy the review first to unlock this step."}
+                          {copied ? "You're ready! Click below to open Google." : copyError ? "Copy the review text yourself, then click below to open Google." : "Copy the review first to unlock this step."}
                         </p>
                       </div>
                     </div>
 
                     <Button
-                      className={`w-full h-12 font-bold ${copied ? "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white" : "bg-gray-200 dark:bg-gray-700 text-muted-foreground cursor-not-allowed"}`}
+                      className={`w-full h-12 font-bold ${copied || copyError ? "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white" : "bg-gray-200 dark:bg-gray-700 text-muted-foreground cursor-not-allowed"}`}
                       onClick={handleGoogleClick}
                       disabled={completeFlowMutation.isPending}
                       data-testid="button-open-google-review"
@@ -1253,9 +1286,8 @@ export default function ReviewFeedbackPage() {
                 className="flex-1 border-2"
                 onClick={() => {
                   setShowPhotoReminder(false);
-                  navigator.clipboard.writeText(generatedReview);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 3000);
+                  setPhotosSkipped(true);
+                  void copyReview();
                 }}
                 data-testid="button-skip-photos"
               >
@@ -1273,9 +1305,7 @@ export default function ReviewFeedbackPage() {
                   setPhotosDownloaded(true);
                   track("track-photos");
                   setShowPhotoReminder(false);
-                  navigator.clipboard.writeText(generatedReview);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 3000);
+                  void copyReview();
                 }}
                 data-testid="button-download-and-continue"
               >

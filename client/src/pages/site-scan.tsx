@@ -142,19 +142,34 @@ const severityOrder: Record<string, number> = {
   info: 2,
 };
 function Copy({ text, label = "Copy draft" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"" | "done" | "failed">("");
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() =>
-        navigator.clipboard.writeText(text).then(() => setCopied(true))
-      }
-    >
-      {copied ? "Copied" : label}
-    </Button>
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={async () => {
+          // Blocked or unavailable clipboard access must not look like a copy.
+          try {
+            await navigator.clipboard.writeText(text);
+            setCopied("done");
+          } catch {
+            setCopied("failed");
+          }
+        }}
+      >
+        {copied === "done" ? "Copied" : label}
+      </Button>
+      {copied === "failed" && (
+        <span role="alert" className="text-sm text-red-600">
+          Could not copy: your browser blocked clipboard access. Select the
+          text and copy it manually.
+        </span>
+      )}
+    </>
   );
 }
+const pageCount = (n: number) => `${n} ${n === 1 ? "page" : "pages"}`;
 export function ScanReport({
   report,
   draft,
@@ -193,10 +208,10 @@ export function ScanReport({
         ))}
       </div>
       <p className="text-sm text-muted-foreground">
-        {report.pages} pages checked.{" "}
+        {pageCount(report.pages)} checked.{" "}
         {summary
           ? "Preview shows up to five findings. Verify your email for all findings and coverage details."
-          : `${report.remaining || 0} URLs remain outside this report.`}{" "}
+          : `${report.remaining || 0} ${report.remaining === 1 ? "URL remains" : "URLs remain"} outside this report.`}{" "}
         Scores describe observed checks, not search rankings.
       </p>
       {report.scoreExplanation && (
@@ -400,7 +415,11 @@ export default function SiteScanPage() {
     [email, setEmail] = useState(""),
     [mailResult, setMailResult] = useState("");
   const [agencyName, setAgencyName] = useState(""),
-    [logo, setLogo] = useState<string | null>(null);
+    [logo, setLogo] = useState<string | null>(null),
+    [brandNotice, setBrandNotice] = useState(""),
+    [notice, setNotice] = useState("");
+  // Seed the branding form once from what is saved, so saving a new name keeps the saved logo.
+  const brandSeeded = useRef(false);
   // Empty filters are omitted: the agency access layer rejects an empty status.
   const listParams = new URLSearchParams({
     q: historyQ,
@@ -430,6 +449,18 @@ export default function SiteScanPage() {
   // Same cached query AgencyWorkspace uses: a delegated member acts through a business.
   const { data: agencyMe } = useQuery<any>({ queryKey: ["/api/agency/me"] });
   const delegated = !!agencyMe && agencyMe.owner !== agencyMe.actor;
+  // PDF branding is the account owner's; delegated members cannot read or change it.
+  const { data: brand } = useQuery<any>({
+    queryKey: ["/api/sitescan/branding"],
+    enabled: !delegated,
+    retry: false,
+  });
+  useEffect(() => {
+    if (!brand || brandSeeded.current) return;
+    brandSeeded.current = true;
+    setAgencyName(brand.name || "");
+    setLogo(brand.logo || null);
+  }, [brand]);
   const { data, error: listError } = useQuery<any>({
     queryKey: ["/api/sitescan", listParams.toString()],
     queryFn: () => api("GET", "/api/sitescan?" + listParams),
@@ -467,6 +498,8 @@ export default function SiteScanPage() {
   }, [data]);
   const action = async (fn: () => Promise<void>) => {
     setError("");
+    setNotice("");
+    setBrandNotice("");
     setBusy(true);
     try {
       await fn();
@@ -743,6 +776,7 @@ export default function SiteScanPage() {
           {error}
         </p>
       )}
+      {notice && <p role="status">{notice}</p>}
       <section>
         <h2 className="text-xl font-semibold mb-2">History & score trend</h2>
         {listError && (
@@ -778,8 +812,10 @@ export default function SiteScanPage() {
             ))}
           </select>
         </label>
+        {/* Each button is disabled when it would not change the list, so neither looks dead. */}
         <Button
           variant="outline"
+          disabled={!locationId || clientFilter === locationId}
           onClick={() => {
             setClientFilter(locationId);
             setHistoryOffset(0);
@@ -789,6 +825,7 @@ export default function SiteScanPage() {
         </Button>
         <Button
           variant="outline"
+          disabled={!clientFilter}
           onClick={() => {
             setClientFilter("");
             setHistoryOffset(0);
@@ -796,6 +833,19 @@ export default function SiteScanPage() {
         >
           All clients
         </Button>
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {clientFilter
+            ? `Showing scans for ${
+                data?.locations?.find(
+                  (l: any) => String(l.id) === clientFilter,
+                )?.business_name ?? "the selected client"
+              }.`
+            : locationId
+              ? "Showing scans for all clients."
+              : data?.locationTotal
+                ? "Showing scans for all clients. Choose a Linked GBP location above to see one client's history."
+                : "Showing scans for all clients. Per-client history is available for Business Profile-linked locations."}
+        </p>
         <div className="flex gap-2 my-2">
           <Button
             variant="outline"
@@ -856,9 +906,39 @@ export default function SiteScanPage() {
       {job && (
         <section className="space-y-4">
           <h2 className="text-xl font-semibold break-all">{job.url}</h2>
-          <p role="status">
-            {job.status} · {job.pages}/{job.pageCap} pages checked
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p role="status">
+              {job.status} · {job.pages} of {pageCount(job.pageCap)} checked
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600"
+              disabled={busy}
+              onClick={() => {
+                const id = job.id;
+                if (
+                  !window.confirm(
+                    `Delete this scan of ${job.url}? Its report, fix progress and any share link are removed${
+                      ["queued", "running"].includes(job.status)
+                        ? " and the scan stops"
+                        : ""
+                    }. It still counts toward today's scan limit. This cannot be undone.`,
+                  )
+                )
+                  return;
+                void action(async () => {
+                  await api("DELETE", `/api/sitescan/jobs/${id}`);
+                  setSelected("");
+                  setShare("");
+                  cache.removeQueries({ queryKey: ["/api/sitescan/jobs/" + id] });
+                  setNotice("Scan deleted.");
+                });
+              }}
+            >
+              Delete scan
+            </Button>
+          </div>
           {job.error && <p role="alert">{job.error}</p>}
           {job.report && (
             <>
@@ -989,48 +1069,118 @@ export default function SiteScanPage() {
                 {mailResult && <p role="status">{mailResult}</p>}
                 <details>
                   <summary>White-label PDF branding</summary>
-                  <label>
-                    Agency name
-                    <Input
-                      value={agencyName}
-                      onChange={(e) => setAgencyName(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Agency logo (PNG/JPEG, up to 200 KB)
-                    <Input
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        if (f.size > 200000) {
-                          setError("Logo must be under 200 KB");
-                          return;
-                        }
-                        const r = new FileReader();
-                        r.onload = () => setLogo(String(r.result));
-                        r.readAsDataURL(f);
-                      }}
-                    />
-                  </label>
-                  <Button
-                    disabled={busy || !agencyName}
-                    onClick={() =>
-                      action(async () => {
-                        await api("POST", "/api/sitescan/branding", {
-                          name: agencyName,
-                          logo,
-                        });
-                      })
-                    }
-                  >
-                    Save PDF branding
-                  </Button>
-                  <p>
-                    Branding is applied on the next PDF download. No remote logo
-                    URL is fetched.
-                  </p>
+                  {delegated ? (
+                    <p className="text-sm text-muted-foreground">
+                      PDF branding is managed by the workspace owner.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      <label>
+                        Agency name
+                        <Input
+                          value={agencyName}
+                          onChange={(e) => {
+                            setAgencyName(e.target.value);
+                            setBrandNotice("");
+                          }}
+                        />
+                      </label>
+                      <label>
+                        Agency logo (PNG/JPEG, up to 200 KB)
+                        <Input
+                          type="file"
+                          accept="image/png,image/jpeg"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            setBrandNotice("");
+                            if (!f) return;
+                            if (f.size > 200000) {
+                              setError("Logo must be under 200 KB");
+                              return;
+                            }
+                            const r = new FileReader();
+                            r.onload = () => setLogo(String(r.result));
+                            r.readAsDataURL(f);
+                          }}
+                        />
+                      </label>
+                      {logo && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <img
+                            src={logo}
+                            alt="Logo for PDF exports"
+                            className="max-h-12 max-w-[160px] border rounded"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => {
+                              setLogo(null);
+                              setBrandNotice(
+                                "Logo removed from the form. Save PDF branding to apply it.",
+                              );
+                            }}
+                          >
+                            Remove logo
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={busy || !agencyName.trim()}
+                          onClick={() =>
+                            action(async () => {
+                              await api("POST", "/api/sitescan/branding", {
+                                name: agencyName,
+                                logo,
+                              });
+                              await cache.invalidateQueries({
+                                queryKey: ["/api/sitescan/branding"],
+                              });
+                              setBrandNotice(
+                                `PDF branding saved${logo ? " with logo" : " without a logo"}. It applies to your next PDF export.`,
+                              );
+                            })
+                          }
+                        >
+                          Save PDF branding
+                        </Button>
+                        {brand?.name && (
+                          <Button
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  "Remove your PDF branding? Exports go back to the ConstructHUB title.",
+                                )
+                              )
+                                return;
+                              void action(async () => {
+                                await api("DELETE", "/api/sitescan/branding");
+                                await cache.invalidateQueries({
+                                  queryKey: ["/api/sitescan/branding"],
+                                });
+                                setAgencyName("");
+                                setLogo(null);
+                                setBrandNotice(
+                                  "PDF branding removed. Exports use the ConstructHUB title.",
+                                );
+                              });
+                            }}
+                          >
+                            Remove branding
+                          </Button>
+                        )}
+                      </div>
+                      {brandNotice && <p role="status">{brandNotice}</p>}
+                      <p>
+                        Branding is applied on the next PDF download. No remote
+                        logo URL is fetched.
+                      </p>
+                    </div>
+                  )}
                 </details>
               </div>
               <ReportFilters

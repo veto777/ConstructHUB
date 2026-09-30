@@ -9,6 +9,7 @@ export function FixChecklist({
   onDone?: (keys: string[], done: boolean) => void;
 }) {
   const [copied, setCopied] = useState("");
+  const [copyFailed, setCopyFailed] = useState("");
   if (!report?.fixes) return null;
   return (
     <section className="space-y-3" aria-label="Prioritized fix checklist">
@@ -106,14 +107,26 @@ export function FixChecklist({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  navigator.clipboard
-                    .writeText(f.code)
-                    .then(() => setCopied(f.key))
-                }
+                onClick={async () => {
+                  // A blocked clipboard must not read as copied.
+                  try {
+                    await navigator.clipboard.writeText(f.code);
+                    setCopied(f.key);
+                    setCopyFailed("");
+                  } catch {
+                    setCopied("");
+                    setCopyFailed(f.key);
+                  }
+                }}
               >
                 {copied === f.key ? "Code copied" : "Copy code"}
               </Button>
+              {copyFailed === f.key && (
+                <p role="alert" className="text-sm text-red-600">
+                  Could not copy: your browser blocked clipboard access. Select
+                  the code below and copy it manually.
+                </p>
+              )}
               <pre className="text-xs whitespace-pre-wrap break-all">
                 {f.code}
               </pre>
@@ -173,7 +186,6 @@ export function ReportFilters({
         </select>
       </label>
       <label>
-        {" "}
         Verification{" "}
         <select
           className="border p-2 bg-background"

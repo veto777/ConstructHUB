@@ -238,6 +238,12 @@ export function registerSiteScanRoutes(
     );
     res.json({ ok: true });
   });
+  // Removing branding returns PDFs to the ConstructHUB title. Agency members never reach this
+  // (the access layer only delegates object routes), so it only clears the owner's own row.
+  owner("delete", "/api/sitescan/branding", async (_req, res, user) => {
+    await pool.query("DELETE FROM sitescan_branding WHERE user_id=$1", [user]);
+    res.json({ ok: true });
+  });
   owner("post", "/api/sitescan/jobs/:id/fixes", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -437,6 +443,18 @@ export function registerSiteScanRoutes(
     );
     await logActivity(req, user, "sitescan.shared", { id: j.id });
     res.json({ path: "/site-scan/report/" + value });
+  });
+  owner("delete", "/api/sitescan/jobs/:id", async (req, res, user) => {
+    const j = await getJob(req, res, user);
+    if (!j) return;
+    // Removes the report, its share link and fix progress. A queued or running scan stops: the
+    // worker's lease-checked writes find no row. The daily scan budget is not refunded.
+    await pool.query("DELETE FROM sitescan_jobs WHERE id=$1 AND user_id=$2", [
+      j.id,
+      user,
+    ]);
+    await logActivity(req, user, "sitescan.deleted", { id: j.id, url: j.url });
+    res.json({ ok: true });
   });
   owner("delete", "/api/sitescan/jobs/:id/share", async (req, res, user) => {
     const j = await getJob(req, res, user);
