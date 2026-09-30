@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoCrm, grantClientSession, ORGS, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, markEstimateSent, ORGS, switchOrg, watchPage } from "./helpers";
 import { q } from "./db";
 
 /**
@@ -40,6 +40,7 @@ async function makeOptionEstimate(page: Page) {
   });
   if (!est.ok()) throw new Error(`create estimate: ${est.status()} ${await est.text()}`);
   const estimate = await est.json();
+  await markEstimateSent(page, estimate.id); // a never-sent draft can't be answered
 
   const scope = (name: string, cents: number) => ({
     kind: "labor", name, quantityMilli: 1000, unitPriceCents: cents, taxable: true,

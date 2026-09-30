@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { BadgePercent, Loader2, Plus, Trash2 } from "lucide-react";
 
 type Offer = {
@@ -50,6 +50,17 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
   const [customLabel, setCustomLabel] = useState("");
   const [customPct, setCustomPct] = useState("");
   const [customConditions, setCustomConditions] = useState("");
+  // Shown INSIDE the dialog: a toast renders beneath the modal overlay.
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // A discount is a percentage OF the price: 0 < pct ≤ 100 (the server's
+  // percentBps cap is 10,000). Checked here so the owner gets a plain
+  // sentence instead of a 400.
+  const customPctNum = parseFloat(customPct);
+  const customPctError = customPct.trim() === "" ? null
+    : !Number.isFinite(customPctNum) || customPctNum <= 0 ? "Enter a percentage above 0."
+    : customPctNum > 100 ? "A discount can't be more than 100%."
+    : null;
 
   const { data, isLoading } = useQuery<{ offers: Offer[]; presets: Preset[] }>({
     queryKey: [`/api/crm/estimates/${estimate.id}/discounts`],
@@ -60,6 +71,7 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
   // Reset the editable list from the server each time the dialog opens.
   useEffect(() => {
     if (open && data) setOffers(data.offers.map((o) => ({ ...o })));
+    if (open) setSaveError(null);
   }, [open, data]);
 
   const save = useMutation({
@@ -72,10 +84,15 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
       })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${estimate.id}/discounts`] });
+      setSaveError(null);
       setOpen(false);
       toast({ title: "Discount offers saved", description: "They appear on the client's estimate page." });
     },
-    onError: (e: any) => toast({ title: "Could not save offers", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => {
+      const message = apiErrorMessage(e);
+      setSaveError(message);
+      toast({ title: "Could not save offers", description: message, variant: "destructive" });
+    },
   });
 
   const presetOffer = (code: string) => offers.find((o) => o.code === code);
@@ -94,7 +111,7 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
 
   const addCustom = () => {
     const bps = Math.round((parseFloat(customPct) || 0) * 100);
-    if (!customLabel.trim() || bps <= 0) return;
+    if (!customLabel.trim() || customPctError || bps <= 0 || bps > 10_000) return;
     setOffers((cur) => [...cur, {
       code: `custom-${Date.now().toString(36)}`,
       label: customLabel.trim(), percentBps: bps,
@@ -189,18 +206,24 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
                   </div>
                   <div>
                     <Label className="text-xs">Discount %</Label>
-                    <Input type="number" step="0.5" min="0" value={customPct}
+                    <Input type="number" step="0.5" min="0" max="100" value={customPct}
                       onChange={(e) => setCustomPct(e.target.value)}
+                      aria-invalid={!!customPctError}
                       data-testid="input-custom-discount-pct" />
                   </div>
                 </div>
+                {customPctError && (
+                  <p className="text-xs text-destructive" role="alert" data-testid="text-custom-discount-error">
+                    {customPctError}
+                  </p>
+                )}
                 <div>
                   <Label className="text-xs">Conditions (optional)</Label>
                   <Input value={customConditions} onChange={(e) => setCustomConditions(e.target.value)}
                     placeholder="What the client must do to qualify" data-testid="input-custom-discount-conditions" />
                 </div>
                 <Button size="sm" variant="outline" onClick={addCustom}
-                  disabled={!customLabel.trim() || !(parseFloat(customPct) > 0)}
+                  disabled={!customLabel.trim() || !(parseFloat(customPct) > 0) || !!customPctError}
                   data-testid="button-add-custom-discount">
                   <Plus className="h-4 w-4 mr-2" /> Add custom offer
                 </Button>
@@ -208,6 +231,11 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
             </div>
           )}
 
+          {saveError && (
+            <p className="text-sm text-destructive" role="alert" data-testid="text-discounts-save-error">
+              Could not save offers — {saveError}
+            </p>
+          )}
           <DialogFooter>
             <Button onClick={() => save.mutate()} disabled={save.isPending || isLoading}
               data-testid="button-save-discounts">

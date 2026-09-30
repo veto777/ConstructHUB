@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { q } from "./db";
-import { gotoCrm, grantClientSession, ORGS, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, markEstimateSent, ORGS, switchOrg, watchPage } from "./helpers";
 
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.alpine));
 
@@ -104,6 +104,7 @@ test("pipeline: client → estimate → approve → invoice → payment → void
     },
   });
   const est2Id = (await est2.json()).id;
+  await markEstimateSent(page, est2Id); // a never-sent draft can't be approved
   const [{ public_token: est2Token }] = await q<{ public_token: string }>(
     `select public_token from crm_estimates where id = $1`, [est2Id]);
   const approve2 = await page.request.post(`/api/public/estimates/${est2Token}/respond`, {

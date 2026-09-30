@@ -21,6 +21,7 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 import { db } from "../db";
 import {
   crmCustomers, crmEstimates, crmMembers, crmOrgs, crmProjects,
+  crmClientTokens,
   crmEngagementSessions, crmNotificationEnabled,
   crmNotificationChannel,
   crmNotifications,
@@ -729,7 +730,22 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     }
 
     const base = getBaseUrl(req);
-    const link = `${base}/e/${est.publicToken}`;
+    // First-open pass, exactly like the original send (portal.ts): clicking
+    // from the inbox proves inbox possession, so the reminder's own link signs
+    // the client straight in instead of landing on the "email me a secure
+    // link" gate. Single-use; valid as long as the estimate is.
+    const now = Date.now();
+    const passExpiresAt = est.expiresAt && est.expiresAt.getTime() > now
+      ? est.expiresAt
+      : new Date(now + 7 * 86_400_000);
+    const pass = randomBytes(32).toString("hex");
+    await db.insert(crmClientTokens).values({
+      tokenHash: createHash("sha256").update(pass).digest("hex"),
+      customerIds: [cust.id],
+      email: (to ?? cust.email ?? est.sentToEmail ?? "").toLowerCase(),
+      expiresAt: passExpiresAt,
+    });
+    const link = `${base}/e/${est.publicToken}?k=${pass}`;
     const estLabel = est.number ? `estimate ${est.number}` : "your estimate";
     const total = money(est.totalCents);
 

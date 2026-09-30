@@ -34,6 +34,10 @@
  *       Idempotent: upsert keyed on orgId + normalized name (stored in
  *       crm_pb_items.code / crm_pb_materials.sku). A second run with
  *       unchanged data writes nothing.
+ *   npx tsx scripts/mine-skus.ts --clean-descriptions --org=<orgId> --database-url=postgres://…
+ *       One-off cleanup: strips the internal "Mined from N HCP estimate
+ *       options … Last used …" sentence older runs wrote into client-facing
+ *       descriptions (provenance stays in custom_fields.hcpStats).
  *
  * Classification (simple heuristic, per assignment):
  *   labor    — name matches /labor|install|installation|removal|tear ?off|hr\b/
@@ -284,24 +288,53 @@ function displayName(g: Group): string {
 
 /**
  * Full representative scope text for a group: the most common raw variant in
- * full (never truncated), then every alternate writing in full, then mining
- * provenance. This is what lands in crm_pb_items.description /
- * crm_pb_materials.description — keep it in sync with the description
- * patch-samples.ts rebuilds from skus-review.json.
+ * full (never truncated), then every alternate writing in full. This is what
+ * lands in crm_pb_items.description / crm_pb_materials.description — and the
+ * builder copies it onto estimate lines the CLIENT reads, so it carries scope
+ * words only. Mining provenance (use count, last-used date, source) lives in
+ * custom_fields.hcpStats / .source, never in the description. Matches the
+ * text patch-samples.ts rebuilds from skus-review.json.
  */
 function scopeDescription(g: Group): string {
   const full = g.variants[0] ?? g.normalized;
   const alts = g.variants.slice(1);
-  return (
-    full +
-    (alts.length ? ` Also written as: ${alts.join(" | ")}.` : "") +
-    ` Mined from ${g.uses} HCP estimate option${g.uses === 1 ? "" : "s"} (scope names — HCP exported no line items).` +
-    (g.lastUsed ? ` Last used ${g.lastUsed.slice(0, 10)}.` : "")
-  );
+  return full + (alts.length ? ` Also written as: ${alts.join(" | ")}.` : "");
+}
+
+/**
+ * The provenance sentence older runs appended to descriptions (" Mined from
+ * N HCP estimate option(s) (scope names — HCP exported no line items). Last
+ * used YYYY-MM-DD."). --clean-descriptions strips it from rows already in
+ * the price book without needing the HCP export.
+ */
+const PROVENANCE_SUFFIX_SQL =
+  "\\s*Mined from [0-9]+ HCP estimate options? \\(scope names [^)]*\\)\\.(\\s*Last used [0-9]{4}-[0-9]{2}-[0-9]{2}\\.)?\\s*$";
+
+async function cleanDescriptions(): Promise<void> {
+  const { pool } = await import("../server/db");
+  const org = await pool.query(`SELECT id, name FROM crm_orgs WHERE id = $1`, [ORG_ID]);
+  if (!org.rows.length) throw new Error(`Org ${ORG_ID} not found — pass an existing org id via --org`);
+  let total = 0;
+  for (const table of ["crm_pb_items", "crm_pb_materials"]) {
+    const r = await pool.query(
+      `UPDATE ${table} SET description = regexp_replace(description, $2, ''), updated_at = now()
+        WHERE org_id = $1 AND description ~ $2
+        RETURNING id`,
+      [ORG_ID, PROVENANCE_SUFFIX_SQL],
+    );
+    console.log(`${table}: stripped mining provenance from ${r.rowCount ?? 0} description(s)`);
+    total += r.rowCount ?? 0;
+  }
+  console.log(`done — ${total} description(s) cleaned in org ${ORG_ID} (${org.rows[0].name})`);
+  await pool.end();
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
+  if (argv.includes("--clean-descriptions")) {
+    if (!ORG_ID) throw new Error("--clean-descriptions needs --org=<orgId> (and --database-url)");
+    return cleanDescriptions();
+  }
   const groups = mine();
   const selected = groups.filter((g) => g.uses >= MIN_USES).slice(0, LIMIT ?? undefined);
 

@@ -98,7 +98,31 @@ export type ContractPdfInput = {
   }[];
   /** org.termsAndConditions — flows over as many pages as it needs. */
   terms?: string | null;
+  /**
+   * The approve-time breakdown of the client's optional discounts, when the
+   * caller re-derived it (portal.ts deliverSignedContract re-runs
+   * computeApprovalTotals and passes it only when it reproduces the stored
+   * approved total). With it, the totals block prints the discount amount and
+   * the tax on the reduced base; without it, just the discount labels.
+   */
+  approval?: { optionalDiscountCents: number; taxCents: number } | null;
 };
+
+/**
+ * Text as the PDF core fonts can draw it. The standard 14 fonts are WinAnsi:
+ * a TAB (common in pasted Word terms, "1)\tChecks") garbles the rest of the
+ * run, and the other control characters render as junk. Tabs become spaces,
+ * CRLF becomes LF, other controls are dropped, and U+2212 (which WinAnsi
+ * lacks) becomes an ASCII hyphen.
+ */
+export function pdfText(s: string | null | undefined): string {
+  return String(s ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\t/g, "    ")
+    .replace(/−/g, "-")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "");
+}
 
 /** The optional discounts the client ticked at signing (label + percent —
  *  the stored SelectionRecord carries no per-offer amount, and inventing one
@@ -136,10 +160,29 @@ export function contractAdminRecipients(args: {
   return [...new Set(all)];
 }
 
+/** Every string field of a flat record through pdfText (numbers, dates untouched). */
+function cleanStrings<T extends Record<string, any>>(o: T): T {
+  const out: Record<string, any> = { ...o };
+  for (const [k, v] of Object.entries(out)) if (typeof v === "string") out[k] = pdfText(v);
+  return out as T;
+}
+
 export async function buildContractPdf(
-  input: ContractPdfInput,
+  rawInput: ContractPdfInput,
   opts: { compress?: boolean } = {},
 ): Promise<Buffer> {
+  // All user-typed text is normalised for the WinAnsi core fonts first — the
+  // terms body especially (pasted numbered lists carry TABs).
+  const input: ContractPdfInput = {
+    ...rawInput,
+    branding: cleanStrings(rawInput.branding),
+    customer: cleanStrings(rawInput.customer),
+    estimate: cleanStrings(rawInput.estimate),
+    items: rawInput.items.map(cleanStrings),
+    options: rawInput.options.map(cleanStrings),
+    orgName: pdfText(rawInput.orgName),
+    terms: rawInput.terms == null ? rawInput.terms : pdfText(rawInput.terms),
+  };
   const { branding: b, customer: c, estimate: e } = input;
   const approvedTotal = e.approvedTotalCents ?? e.totalCents;
 
@@ -276,18 +319,41 @@ export async function buildContractPdf(
     const y = doc.y;
     doc.font(opts2.bold ? "Helvetica-Bold" : "Helvetica").fontSize(opts2.big ? 12 : 9.5)
       .fillColor(opts2.bold ? INK : MUTED).text(label, totalsX, y, { width: 140 });
-    // ASCII '-' only — the PDF core fonts are WinAnsi; U+2212 renders as '('.
-    doc.font(opts2.bold ? "Helvetica-Bold" : "Helvetica").fontSize(opts2.big ? 12 : 9.5).fillColor(INK)
-      .text(`${opts2.negative ? "-" : ""}${value}`, totalsX + 140, y, { width: 80, align: "right" });
+    const labelBottom = doc.y;
+    let valueBottom = y;
+    if (value) {
+      // ASCII '-' only — the PDF core fonts are WinAnsi; U+2212 renders as '('.
+      doc.font(opts2.bold ? "Helvetica-Bold" : "Helvetica").fontSize(opts2.big ? 12 : 9.5).fillColor(INK)
+        .text(`${opts2.negative ? "-" : ""}${value}`, totalsX + 140, y, { width: 80, align: "right" });
+      valueBottom = doc.y;
+    }
+    // The next row starts below whichever cell ran longer — a long label
+    // wraps, and the value call would otherwise pull doc.y back up to `y`
+    // and the next row would print on top of the wrapped label.
+    doc.y = Math.max(labelBottom, valueBottom);
     doc.moveDown(0.35);
   };
   totalRow("Subtotal", money(e.subtotalCents));
   if (e.discountCents > 0) totalRow("Discount", money(e.discountCents), { negative: true });
   const selected = selectedDiscountDetails(e.selectedDiscounts);
-  for (const d of selected) {
-    totalRow(`Optional discount — ${d.label}${d.percentBps != null ? ` (-${(d.percentBps / 100).toLocaleString("en-US")}%)` : ""}`, "");
+  const approval = input.approval ?? null;
+  const pctLabel = (d: { percentBps: number | null }) =>
+    d.percentBps != null ? ` (-${(d.percentBps / 100).toLocaleString("en-US")}%)` : "";
+  if (selected.length === 1) {
+    // One offer: its row carries the amount the approve route computed.
+    const d = selected[0];
+    totalRow(`Optional discount — ${pdfText(d.label)}${pctLabel(d)}`,
+      approval ? money(approval.optionalDiscountCents) : "", { negative: !!approval });
+  } else if (selected.length > 1) {
+    // Several: one row per offer (label + percent), then their combined amount
+    // — the server computes the concession on the combined percentage, so a
+    // per-offer amount would be a number it never produced.
+    for (const d of selected) totalRow(`Optional discount — ${pdfText(d.label)}${pctLabel(d)}`, "");
+    if (approval) totalRow("Optional discounts", money(approval.optionalDiscountCents), { negative: true });
   }
-  if (e.taxCents > 0) totalRow("Tax", money(e.taxCents));
+  // With optional discounts the tax was charged on the reduced base.
+  const taxCents = approval ? approval.taxCents : e.taxCents;
+  if (taxCents > 0) totalRow("Tax", money(taxCents));
   doc.moveTo(totalsX, doc.y).lineTo(rightEdge, doc.y).lineWidth(0.75).strokeColor(LINE).stroke();
   doc.moveDown(0.3);
   totalRow("Approved total", money(approvedTotal), { bold: true, big: true });

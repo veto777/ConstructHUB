@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,8 +108,8 @@ function PayCard({ token, company, estimate }: { token: string; company: any; es
           <div>
             <div className="font-semibold">Payment processing</div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Your payment was submitted. Bank transfers (ACH) can take a few days to settle —
-              {company.name} has been notified.
+              If you completed checkout, your payment is processing. Bank transfers (ACH) can take a
+              few days to settle — this page shows "Payment received" once {company.name} has it.
             </p>
           </div>
         </CardContent>
@@ -117,12 +117,15 @@ function PayCard({ token, company, estimate }: { token: string; company: any; es
     );
   }
 
-  const amount = estimate.depositCents || estimate.totalCents;
+  // Exactly what the pay route charges (payments.ts): the deposit when one is
+  // set, otherwise the APPROVED total — which already reflects any optional
+  // discounts the client ticked when signing.
+  const amount = estimate.depositCents || (estimate.approvedTotalCents ?? estimate.totalCents);
   return (
     <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="text-lg">
-          {estimate.depositCents ? "Pay your deposit" : "Pay this invoice"}
+          {estimate.depositCents ? "Pay your deposit" : "Pay in full"}
         </CardTitle>
         <CardDescription>
           {money(amount)} — paid directly to {company.name}. Bank transfer (ACH) is the
@@ -410,14 +413,20 @@ export default function PublicEstimatePage() {
     }
     return (
       <div className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
-        <ErrorCard title="This link isn't valid" description={String((error as Error).message)} />
+        <ErrorCard title="This link isn't valid"
+          description={apiErrorMessage(error, "This link is no longer valid.")} />
       </div>
     );
   }
 
-  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep } = data;
+  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep, answerBlock } = data;
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
+  // The server says this estimate can't be answered (a draft that was never
+  // sent, the other half of a scope selection already signed, or withdrawn):
+  // the page renders read-only with the reason — the respond route refuses
+  // it too, this just doesn't offer a button that would fail.
+  const blocked = !settled && !!answerBlock;
 
   // ?terms=1 → the separate Terms & Conditions page (HCP-style hyperlink
   // target). Same data, same email gate — just a different render.
@@ -503,7 +512,7 @@ export default function PublicEstimatePage() {
   // payload; re-points --primary for everything below this root.
   const themeStyle = orgThemeStyle(company?.theme);
 
-  const canRespond = !settled && !expired && !preview;
+  const canRespond = !settled && !expired && !preview && !blocked;
   const termsHref = `/e/${token}?terms=1${previewGrant ? `&preview=${encodeURIComponent(previewGrant)}` : ""}`;
   const scrollToSign = () => {
     document.getElementById("sign-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -556,6 +565,31 @@ export default function PublicEstimatePage() {
           <PayCard token={token!} company={company} estimate={e} />
         )}
 
+        {blocked && !(preview && answerBlock.code === "not_sent") && (
+          <Card className="border-amber-500/50 bg-amber-500/5" data-testid="notice-not-answerable">
+            <CardContent className="p-5 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold">
+                  {answerBlock.code === "not_sent" ? "This estimate hasn't been sent yet"
+                    : answerBlock.code === "superseded" ? "You've already approved this job"
+                    : "This estimate is no longer open"}
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5" data-testid="text-not-answerable">
+                  {answerBlock.message}
+                  {answerBlock.code === "not_sent" && ` ${company.name} will send it to you when it's ready.`}
+                </p>
+                {answerBlock.link && (
+                  <a href={answerBlock.link} className="inline-block mt-2 text-sm font-medium text-primary hover:underline"
+                    data-testid="link-current-estimate">
+                    Open the current estimate →
+                  </a>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {settled && (
           <Card className={settled === "approved" ? "border-emerald-500/50 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5"}>
             <CardContent className="p-5 flex items-start gap-3">
@@ -576,7 +610,7 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
-        {selectable.length > 0 && !settled && !expired && !preview ? (
+        {selectable.length > 0 && !settled && !expired && !preview && !blocked ? (
           <Card className="shadow-sm" data-testid="options-checklist">
             <CardHeader>
               <CardTitle className="text-lg">Choose your scopes</CardTitle>
@@ -916,7 +950,7 @@ export default function PublicEstimatePage() {
             secure link, and the contractor sees who was added. */}
         {!preview && !expired && <ShareEstimateCard token={token!} />}
 
-        {offers.length > 0 && !settled && !expired && (
+        {offers.length > 0 && !settled && !expired && !blocked && (
           <Card className="shadow-md" data-testid="discounts-section">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -969,7 +1003,7 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
-        {!settled && !expired && !preview && (
+        {canRespond && (
           <Card className="shadow-md border-primary/30" id="sign-card">
             <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg">Ready to go ahead?</CardTitle>

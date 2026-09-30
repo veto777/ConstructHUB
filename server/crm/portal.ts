@@ -31,7 +31,10 @@ import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl, clientPortalBaseUrl } from "../site-context";
-import { logEvent, presentEstimate, recalcEstimate } from "./entities";
+import {
+  logEvent, presentEstimate, recalcEstimate, nextDocNumber,
+  ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend,
+} from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
 import { recordActivity } from "./activity";
@@ -40,7 +43,7 @@ import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
-import { recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
+import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
 import { storeGeneratedPdf } from "./attachments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
@@ -84,15 +87,11 @@ const VIEW_DEDUPE_MIN = 30;
 // ── Engagement + expiry: pure helpers (unit-tested in engagement.test.ts) ───
 
 /**
- * Sent estimates expire. Default: 7 days from the moment it is sent — long
- * enough to decide, short enough that pricing doesn't go stale. Stamped at
- * send time (not at create), so a draft sitting in the pipeline doesn't burn
- * its validity window before the client ever sees it.
+ * Sent estimates expire — 7 days from the send by default. Defined in
+ * entities.ts (the PATCH route's "marked sent" stamps the same clock) and
+ * re-exported here, where the send route and its tests have always found it.
  */
-export const ESTIMATE_EXPIRY_DAYS = 7;
-export function estimateExpiryOnSend(sentAt: Date, days: number = ESTIMATE_EXPIRY_DAYS): Date {
-  return new Date(sentAt.getTime() + days * 86_400_000);
-}
+export { ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend };
 
 /**
  * A heartbeat says "I was still here N seconds after the last one". Gaps are
@@ -165,6 +164,57 @@ function previewGrantValid(estimateId: string, grant: string): boolean {
   const a = Buffer.from(m[2]);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Why the client can't answer this estimate (approve, decline or pick scopes),
+ * or null when they can. Runs after the answered/expired checks:
+ *   • not_sent  — a draft (or one pulled back to draft) was never put in front
+ *                 of the client, so it can't be signed yet;
+ *   • superseded — the client already signed the other half of a scope
+ *                 selection (the "your selections" estimate, or the original
+ *                 it was generated from): one job, one contract;
+ *   • withdrawn — the contractor cancelled it, or a newer selection replaced it.
+ * `link` points the client at the document that took its place, when there is
+ * one — always the same customer's, the only session that gets this far.
+ */
+async function estimateAnswerBlock(
+  est: typeof crmEstimates.$inferSelect,
+): Promise<{ code: "not_sent" | "superseded" | "withdrawn"; message: string; link?: string } | null> {
+  if (!est.sentAt || est.status === "draft") {
+    return { code: "not_sent", message: "This estimate hasn't been sent yet, so it can't be approved or declined." };
+  }
+  const cf = (est.customFields ?? {}) as Record<string, any>;
+  const relatedIds = [cf.clientSelection?.newEstimateId, cf.selectedFromEstimateId]
+    .filter((x): x is string => typeof x === "string" && x.length > 0);
+  for (const id of relatedIds) {
+    const [other] = await db.select({
+      number: crmEstimates.number, approvedAt: crmEstimates.approvedAt,
+      publicToken: crmEstimates.publicToken, customerId: crmEstimates.customerId,
+    }).from(crmEstimates)
+      .where(and(eq(crmEstimates.id, id), eq(crmEstimates.orgId, est.orgId))).limit(1);
+    if (other?.approvedAt && other.customerId === est.customerId) {
+      return {
+        code: "superseded",
+        message: `You already approved ${other.number ?? "another estimate"} for this job — that signed estimate is your contract.`,
+        link: `/e/${other.publicToken}`,
+      };
+    }
+  }
+  if (est.status === "cancelled") {
+    if (typeof cf.supersededByEstimateId === "string") {
+      const [next] = await db.select({ publicToken: crmEstimates.publicToken, customerId: crmEstimates.customerId })
+        .from(crmEstimates)
+        .where(and(eq(crmEstimates.id, cf.supersededByEstimateId), eq(crmEstimates.orgId, est.orgId))).limit(1);
+      return {
+        code: "withdrawn",
+        message: `This estimate was replaced by ${cf.supersededByNumber ?? "a newer one"} with your latest selections.`,
+        ...(next && next.customerId === est.customerId ? { link: `/e/${next.publicToken}` } : {}),
+      };
+    }
+    return { code: "withdrawn", message: "This estimate was withdrawn. Please contact us for an updated quote." };
+  }
+  return null;
 }
 
 /** What the homeowner is allowed to see. Hidden items and all costs are dropped. */
@@ -586,9 +636,13 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         eq(crmEstimateDiscounts.enabled, true),
       ))
       .orderBy(asc(crmEstimateDiscounts.sortOrder), asc(crmEstimateDiscounts.createdAt));
+    // Not answerable (a draft, the other half of an already-signed scope
+    // selection, or withdrawn): the page renders read-only with this notice.
+    const answerBlock = current.approvedAt || current.declinedAt ? null : await estimateAnswerBlock(current);
     res.json({
       ...view,
       preview: preview || undefined, // read-only: the page hides approve/pay
+      answerBlock: answerBlock ?? undefined,
       salesRep,
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
       discountOffers: discountOffers.map((o) => ({
@@ -598,7 +652,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       options: options.map((o) => {
         // An option carrying its own line items is a client-selectable scope;
         // subtotal/taxable are recomputed here so the page's live total can
-        // never drift from what select-options would generate.
+        // never drift from what select-options would generate. A selectable
+        // scope ALWAYS shows its price — the client is choosing between
+        // priced scopes and the running total is the point; showTotal only
+        // governs the legacy display tiers (no items) below.
         const scopeItems = Array.isArray(o.items) ? (o.items as any[]) : [];
         let subtotal = 0, taxable = 0;
         for (const i of scopeItems) {
@@ -651,6 +708,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (est.expiresAt && est.expiresAt.getTime() < Date.now()) {
       return res.status(410).json({ message: "This estimate has expired. Please contact us for an updated quote." });
     }
+    // A draft, a withdrawn estimate, or the other half of a scope selection
+    // the client already signed can't be answered — one job, one contract.
+    const block = await estimateAnswerBlock(est);
+    if (block) return res.status(409).json({ message: block.message, code: block.code, link: block.link });
     if (parsed.data.decision === "approve" && !parsed.data.signatureName) {
       return res.status(400).json({ message: "Please type your name to approve." });
     }
@@ -738,6 +799,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (est.expiresAt && est.expiresAt.getTime() < Date.now()) {
       return res.status(410).json({ message: "This estimate has expired. Please contact us for an updated quote." });
     }
+    const block = await estimateAnswerBlock(est);
+    if (block) return res.status(409).json({ message: block.message, code: block.code, link: block.link });
 
     const options = await db.select().from(crmEstimateOptions)
       .where(eq(crmEstimateOptions.estimateId, est.id)).orderBy(asc(crmEstimateOptions.tier));
@@ -756,12 +819,11 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // ids only, percentages are never taken from the client.
     const selections = await resolveSelectedOffers(est.orgId, est.id, parsed.data.selectedDiscounts ?? []);
 
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEstimates)
-      .where(eq(crmEstimates.orgId, est.orgId));
-
-    const [newEst] = await db.insert(crmEstimates).values({
+    // Numbered under the per-org lock (entities.ts nextDocNumber) — never
+    // count(*)+1, which repeats after a delete and races a concurrent create.
+    const [newEst] = await db.transaction(async (tx) => tx.insert(crmEstimates).values({
       orgId: est.orgId, customerId: est.customerId, projectId: est.projectId,
-      number: `E-${1000 + n + 1}`,
+      number: await nextDocNumber(tx, crmEstimates, est.orgId, "E"),
       title: `${est.title} — your selections`.slice(0, 200),
       introText: est.introText, termsText: est.termsText,
       taxRateBps: est.taxRateBps,
@@ -777,7 +839,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         selectedOptionNames: chosen.map((o) => o.name),
         preselectedDiscountCodes: selections.map((s) => s.code),
       },
-    } as any).returning();
+    } as any).returning());
 
     const scopeItems = chosen.flatMap((o) => o.items as any[]);
     await db.insert(crmEstimateItems).values(
@@ -1490,7 +1552,26 @@ async function deliverSignedContract(
   ]);
   const branding = companyBranding(org, division);
 
+  // The optional-discount breakdown the approve route computed: re-run the
+  // same pure function over the same (now locked) lines and the recorded
+  // selections. Printed only when it reproduces the stored approved total
+  // exactly — otherwise the contract shows labels and the total, never a
+  // number the server can't stand behind.
+  const selections = Array.isArray(est.selectedDiscounts) ? (est.selectedDiscounts as any[]) : [];
+  let approval: { optionalDiscountCents: number; taxCents: number } | null = null;
+  if (selections.length && est.approvedTotalCents != null) {
+    const t = computeApprovalTotals(
+      items,
+      est.taxRateBps ?? 0,
+      selections.map((s) => ({ percentBps: Number(s?.percentBps) || 0 })),
+    );
+    if (t.totalCents === est.approvedTotalCents) {
+      approval = { optionalDiscountCents: t.optionalDiscountCents, taxCents: t.taxCents };
+    }
+  }
+
   const pdf = await buildContractPdf({
+    approval,
     branding,
     // The org's theme accent — the letterhead name prints in it (orange when
     // the org never picked one).
@@ -1580,10 +1661,28 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const to = parsed.data.email || cust.email;
     if (!to) return res.status(400).json({ message: "This client has no email address. Add one first." });
 
-    const link = `${getBaseUrl(req)}/i/${inv.publicToken}`;
-    const from = ctx.member.displayName || ctx.org.name;
+    // Nothing to bill → nothing to send: a "$0.00 due — View & pay" email is
+    // noise at best and looks like a scam at worst.
     const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
+    if ((inv.totalCents ?? 0) <= 0) {
+      return res.status(409).json({ message: "This invoice is $0 — add line items before sending it." });
+    }
+    if (due <= 0) {
+      return res.status(409).json({
+        message: (inv.paidCents ?? 0) >= inv.totalCents
+          ? "This invoice is already paid in full — there's nothing to send."
+          : "Nothing is due on this invoice right now (the rest is retainage held until closeout).",
+      });
+    }
+
+    const link = `${getBaseUrl(req)}/i/${inv.publicToken}`;
     const branding = companyBranding(ctx.org, await resolveInvoiceDivision(inv));
+    // "Sam at Acme has sent you…" — or just "Acme has sent you…" when the
+    // sender has no display name (never "Acme at Acme").
+    const senderName = (ctx.member.displayName ?? "").trim();
+    const sentBy = senderName && senderName.toLowerCase() !== branding.name.trim().toLowerCase()
+      ? `${esc(senderName)} at <strong>${esc(branding.name)}</strong>`
+      : `<strong>${esc(branding.name)}</strong>`;
 
     let emailed = false, emailError: string | null = null;
     try {
@@ -1593,7 +1692,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         html: `
           <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px">
             <p style="font-size:16px">Hi ${esc(cust.displayName)},</p>
-            <p style="font-size:16px">${esc(from)} at <strong>${esc(branding.name)}</strong> has sent you
+            <p style="font-size:16px">${sentBy} has sent you
               invoice ${esc(inv.number ?? "")}.</p>
             ${parsed.data.message ? `<p style="font-size:16px;white-space:pre-wrap">${esc(parsed.data.message)}</p>` : ""}
             <p style="font-size:22px;margin:18px 0"><strong>${money(due)}</strong> due</p>

@@ -88,6 +88,14 @@ describe("signed contract on approval (dev server)", () => {
     }, cookie);
     expect(est.status).toBe(201);
     estimateIds.push(est.body.id);
+    // Only an estimate that went out can be signed — a never-sent draft is
+    // refused. Mark it sent by hand (no email), like a hand-delivered bid.
+    const sent = await api(`/api/crm/estimates/${est.body.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "sent" }),
+    }, cookie);
+    expect(sent.status).toBe(200);
     const rows = await q<{ public_token: string }>(
       `select public_token from crm_estimates where id = $1`, [est.body.id]);
     return { id: est.body.id, token: rows[0].public_token };

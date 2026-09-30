@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
-  CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable,
+  CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable, crmTableCards,
 } from "@/components/crm-ui";
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { money } from "@/lib/estimate-math";
@@ -52,15 +52,50 @@ const BLANK: EditLine = {
 };
 
 const KINDS = ["labor", "material", "equipment", "subcontractor", "fee", "discount"];
-const EDITABLE_STATUSES = ["draft", "sent", "viewed", "declined", "expired", "cancelled"];
+/**
+ * Statuses a person may set by hand (the server enforces the same). "viewed"
+ * and "expired" are recorded by the system — an estimate that has one keeps
+ * it in the list, but nobody picks it. "sent" here records a hand-delivered
+ * bid (the send clock starts); it does not email anyone.
+ */
+const MANUAL_STATUSES = ["draft", "sent", "declined", "cancelled"];
+const TAX_MAX_PCT = 30; // server: taxRateBps ≤ 3000
+const TITLE_MAX = 200;
 
 const dayTime = (d?: string | null) => (d ? new Date(d).toLocaleString() : "—");
+const pctText = (bps?: number | null) =>
+  bps == null ? "" : ` (−${(bps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%)`;
 
 /** Editable-line math, same rounding as the server's recalcEstimate. */
 function lineCents(l: EditLine): number {
   const qty = Math.max(0, Math.round((parseFloat(l.qtyText) || 0) * 1000));
   const price = Math.max(0, Math.round((parseFloat(l.priceText) || 0) * 100));
   return Math.round((price * qty) / 1000);
+}
+
+/** A line the user never touched (no name, no scope, no price) — safe to drop on save. */
+const isBlankLine = (l: EditLine) =>
+  !l.name.trim() && !l.description.trim() && lineCents(l) === 0 && !l.unit.trim();
+
+/**
+ * The save error in words. A 400 from the PATCH carries zod issues; name the
+ * field ("Tax rate — Number must be less than or equal to 3000") instead of
+ * the generic "Invalid estimate".
+ */
+function describeSaveError(err: any): string {
+  const raw = String(err?.message ?? "");
+  try {
+    const body = JSON.parse(raw.replace(/^\d{3}:\s*/, ""));
+    const issue = Array.isArray(body?.issues) ? body.issues[0] : null;
+    if (issue && Array.isArray(issue.path)) {
+      const p = issue.path;
+      const field = p[0] === "items" && typeof p[1] === "number"
+        ? `Line ${p[1] + 1}${p[2] ? ` ${String(p[2]).replace(/Cents|Milli/, "")}` : ""}`
+        : ({ title: "Title", taxRateBps: "Tax rate", depositCents: "Deposit", introText: "Message" } as Record<string, string>)[p[0]] ?? String(p[0] ?? "");
+      return `${field ? `${field} — ` : ""}${issue.message}`;
+    }
+  } catch { /* not JSON — fall through */ }
+  return apiErrorMessage(err);
 }
 
 export default function CrmEstimateDetailPage() {
@@ -99,7 +134,7 @@ export default function CrmEstimateDetailPage() {
     setTaxPct(((e.taxRateBps ?? 0) / 100).toString());
     setDeposit(e.depositCents != null ? (e.depositCents / 100).toString() : "");
     setDivisionId(e.divisionId ?? "");
-    setStatus(EDITABLE_STATUSES.includes(e.status) ? e.status : "draft");
+    setStatus(e.status ?? "draft");
     setLines((data?.items ?? []).map((i: any) => ({
       kind: i.kind ?? "labor",
       name: i.name ?? "",
@@ -126,14 +161,49 @@ export default function CrmEstimateDetailPage() {
     return { subtotal, discount, tax, total: Math.max(0, subtotal - discount + tax) };
   }, [lines, taxPct]);
 
+  // What stops a save, in words — checked BEFORE the PATCH so nothing the
+  // preview counted is silently dropped and nothing out of the server's
+  // range comes back as a bare "Invalid estimate".
+  const depositCents = deposit.trim() ? Math.round((parseFloat(deposit) || 0) * 100) : null;
+  const unnamedLines = lines
+    .map((l, idx) => (!l.name.trim() && !isBlankLine(l) ? idx : -1))
+    .filter((idx) => idx >= 0);
+  const problems = useMemo(() => {
+    const out: string[] = [];
+    if (title.trim().length > TITLE_MAX) out.push(`The title can be at most ${TITLE_MAX} characters.`);
+    const tax = taxPct.trim() === "" ? 0 : Number(taxPct);
+    if (!Number.isFinite(tax) || tax < 0 || tax > TAX_MAX_PCT) out.push(`Tax must be between 0% and ${TAX_MAX_PCT}%.`);
+    if (deposit.trim()) {
+      const d = Number(deposit);
+      if (!Number.isFinite(d) || d < 0) out.push("The deposit must be a dollar amount.");
+      else if ((depositCents ?? 0) > preview.total) {
+        out.push(`The deposit (${money(depositCents)}) can't be more than the total (${money(preview.total)}).`);
+      }
+    }
+    for (const idx of unnamedLines) out.push(`Line ${idx + 1} needs a name — or remove it.`);
+    if (!lines.some((l) => l.name.trim())) out.push("Add at least one named line.");
+    return out;
+  }, [title, taxPct, deposit, depositCents, preview.total, unnamedLines.join(","), lines]);
+
+  // Leave edit mode AND drop ?edit=1, so a reload shows the saved estimate
+  // instead of re-opening the editor.
+  const exitEdit = () => {
+    setEditing(false);
+    if (new URLSearchParams(window.location.search).has("edit")) {
+      setLocation(`/crm/estimates/${id}`, { replace: true });
+    }
+  };
+
   const save = useMutation({
     mutationFn: async () => {
-      const clean = lines.filter((l) => l.name.trim());
+      // Only lines nobody touched are dropped; an unnamed line WITH a price
+      // or scope blocks the save above instead of vanishing.
+      const clean = lines.filter((l) => !isBlankLine(l));
       return (await apiRequest("PATCH", `/api/crm/estimates/${id}`, {
         title: title.trim() || "Estimate",
         introText: intro.trim() || null,
         taxRateBps: Math.round((parseFloat(taxPct) || 0) * 100),
-        depositCents: deposit.trim() ? Math.round((parseFloat(deposit) || 0) * 100) : null,
+        depositCents,
         divisionId: divisionId || null,
         status,
         items: clean.map((l, idx) => ({
@@ -150,13 +220,13 @@ export default function CrmEstimateDetailPage() {
       })).json();
     },
     onSuccess: () => {
-      setEditing(false);
+      exitEdit();
       queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${id}`] });
       queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
       if (e?.customerId) queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${e.customerId}`] });
       toast({ title: "Estimate updated", description: e?.sentAt ? "The client link shows the new version immediately." : undefined });
     },
-    onError: (err: any) => toast({ title: "Could not save", description: apiErrorMessage(err), variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Could not save", description: describeSaveError(err), variant: "destructive" }),
   });
 
   const send = useMutation({
@@ -232,6 +302,12 @@ export default function CrmEstimateDetailPage() {
   const items: any[] = data.items ?? [];
   const events: any[] = data.events ?? [];
   const customer = data.customer;
+  // What the client signed for: the approved total (after any optional
+  // discounts they ticked) — the amount the invoice, the contract PDF and
+  // the pay link all use.
+  const signedTotal: number | null = e.approvedAt && e.approvedTotalCents != null ? e.approvedTotalCents : null;
+  const signedDiffers = signedTotal != null && signedTotal !== e.totalCents;
+  const signedDiscounts: any[] = e.approvedAt && Array.isArray(e.selectedDiscounts) ? e.selectedDiscounts : [];
   const divisionName = divisionId || e.divisionId
     ? divisions?.find((d) => d.id === (editing ? divisionId : e.divisionId))?.name ?? null
     : null;
@@ -243,7 +319,8 @@ export default function CrmEstimateDetailPage() {
         title={
           <span className="flex items-center gap-2.5 flex-wrap">
             {e.number} · {e.title}
-            <StatusPill tone={statusTone(e.status)}>{e.status}</StatusPill>
+            {/* "expired" is derived server-side (out, unanswered, past its date). */}
+            <StatusPill tone={statusTone(e.expired ? "expired" : e.status)}>{e.expired ? "expired" : e.status}</StatusPill>
           </span>
         }
         subtitle={
@@ -353,17 +430,21 @@ export default function CrmEstimateDetailPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Title</Label>
-                <Input value={title} onChange={(ev) => setTitle(ev.target.value)} data-testid="input-edit-title" />
+                <Input value={title} maxLength={TITLE_MAX} onChange={(ev) => setTitle(ev.target.value)}
+                  data-testid="input-edit-title" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Tax %</Label>
-                  <Input type="number" step="0.01" value={taxPct} onChange={(ev) => setTaxPct(ev.target.value)}
+                  <Input type="number" step="0.01" min={0} max={TAX_MAX_PCT} value={taxPct}
+                    onChange={(ev) => setTaxPct(ev.target.value)}
+                    aria-invalid={Number(taxPct) > TAX_MAX_PCT || Number(taxPct) < 0}
                     data-testid="input-edit-tax" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Deposit $</Label>
-                  <Input type="number" step="0.01" value={deposit} placeholder="none"
+                  <Input type="number" step="0.01" min={0} value={deposit} placeholder="none"
+                    aria-invalid={(depositCents ?? 0) > preview.total}
                     onChange={(ev) => setDeposit(ev.target.value)} data-testid="input-edit-deposit" />
                 </div>
               </div>
@@ -399,8 +480,15 @@ export default function CrmEstimateDetailPage() {
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid="select-edit-status"
                 >
-                  {EDITABLE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {(MANUAL_STATUSES.includes(e.status) ? MANUAL_STATUSES : [e.status, ...MANUAL_STATUSES])
+                    .map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
+                {status === "sent" && e.status !== "sent" && (
+                  <p className="text-[11px] text-muted-foreground" data-testid="text-status-sent-note">
+                    Records that you delivered it another way (its validity clock starts if it isn't
+                    running) — it doesn't email the client. Use Send for that.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -411,7 +499,9 @@ export default function CrmEstimateDetailPage() {
                   <div className="grid gap-2 sm:grid-cols-12 items-end">
                     <div className="sm:col-span-4">
                       <Label className="text-xs">Item</Label>
-                      <Input value={l.name} onChange={(ev) => setLine(idx, { name: ev.target.value })}
+                      <Input value={l.name} maxLength={300} onChange={(ev) => setLine(idx, { name: ev.target.value })}
+                        aria-invalid={unnamedLines.includes(idx)}
+                        className={unnamedLines.includes(idx) ? "border-destructive" : undefined}
                         placeholder="Hardie siding — front elevation" data-testid={`edit-line-name-${idx}`} />
                     </div>
                     <div className="sm:col-span-2">
@@ -433,7 +523,7 @@ export default function CrmEstimateDetailPage() {
                     </div>
                     <div className="sm:col-span-1">
                       <Label className="text-xs">Unit</Label>
-                      <Input value={l.unit} onChange={(ev) => setLine(idx, { unit: ev.target.value })}
+                      <Input value={l.unit} maxLength={20} onChange={(ev) => setLine(idx, { unit: ev.target.value })}
                         placeholder="sf" data-testid={`edit-line-unit-${idx}`} />
                     </div>
                     <div className="sm:col-span-2">
@@ -506,9 +596,15 @@ export default function CrmEstimateDetailPage() {
               </div>
             </div>
 
+            {problems.length > 0 && (
+              <ul className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-2.5 text-sm text-destructive space-y-0.5"
+                role="alert" data-testid="edit-problems">
+                {problems.map((p) => <li key={p}>{p}</li>)}
+              </ul>
+            )}
             <div className="flex justify-end gap-2 border-t pt-4">
-              <Button variant="outline" onClick={() => setEditing(false)} data-testid="button-cancel-edit">Cancel</Button>
-              <Button onClick={() => save.mutate()} disabled={save.isPending || !lines.some((l) => l.name.trim())}
+              <Button variant="outline" onClick={exitEdit} data-testid="button-cancel-edit">Cancel</Button>
+              <Button onClick={() => save.mutate()} disabled={save.isPending || problems.length > 0}
                 data-testid="button-save-estimate-edit">
                 {save.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Save changes{e.sentAt ? " (client sees them now)" : ""}
@@ -527,9 +623,12 @@ export default function CrmEstimateDetailPage() {
               <EmptyState compact icon={FileText} title="No line items"
                 description={canEdit ? "Hit Edit to add the scope and pricing." : "No lines on this estimate yet."} />
             ) : (
+              /* Below sm each line stacks as a card — name and scope, then
+                 "qty × price", then the line total — so nothing is clipped
+                 or needs sideways scrolling on a phone. Desktop is a table. */
               <div className={crmTable.wrapper}>
-                <table className={crmTable.table}>
-                  <thead className={crmTable.thead}>
+                <table className={cn(crmTable.table, "block sm:table")}>
+                  <thead className={cn(crmTable.thead, crmTableCards.thead)}>
                     <tr>
                       <th className={crmTable.th}>Item</th>
                       <th className={crmTable.thRight}>Qty</th>
@@ -537,31 +636,35 @@ export default function CrmEstimateDetailPage() {
                       <th className={crmTable.thRight}>Total</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {items.map((i: any, idx: number) => (
-                      <tr key={i.id ?? idx} className={crmTable.tr} data-testid={`detail-line-${idx}`}>
-                        <td className={crmTable.td}>
-                          <div className="font-medium flex items-center gap-2">
-                            {i.name}
-                            {i.kind === "discount" && <StatusPill tone="neutral">discount</StatusPill>}
-                            {i.hiddenFromClient && <StatusPill tone="neutral">hidden</StatusPill>}
-                          </div>
-                          {i.description && (
-                            <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-0.5 leading-relaxed">
-                              {i.description}
+                  <tbody className="block sm:table-row-group">
+                    {items.map((i: any, idx: number) => {
+                      const qtyLabel = `${((i.quantityMilli ?? 0) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })}${i.unit ? ` ${i.unit}` : ""}`;
+                      return (
+                        <tr key={i.id ?? idx} className={cn(crmTable.tr, crmTableCards.tr)} data-testid={`detail-line-${idx}`}>
+                          <td className={cn(crmTableCards.td, "min-w-0")}>
+                            <div className="font-medium flex flex-wrap items-center gap-2">
+                              {i.name}
+                              {i.kind === "discount" && <StatusPill tone="neutral">discount</StatusPill>}
+                              {i.hiddenFromClient && <StatusPill tone="neutral">hidden</StatusPill>}
                             </div>
-                          )}
-                        </td>
-                        <td className={cn(crmTable.tdRight, "tabular-nums")}>
-                          {((i.quantityMilli ?? 0) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })}
-                          {i.unit ? ` ${i.unit}` : ""}
-                        </td>
-                        <td className={cn(crmTable.tdRight, "tabular-nums")}>{money(i.unitPriceCents)}</td>
-                        <td className={cn(crmTable.tdRight, "tabular-nums font-medium")}>
-                          {money(Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 0)) / 1000))}
-                        </td>
-                      </tr>
-                    ))}
+                            {i.description && (
+                              <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-0.5 leading-relaxed">
+                                {i.description}
+                              </div>
+                            )}
+                            <div className="sm:hidden mt-1 text-xs text-muted-foreground tabular-nums">
+                              {qtyLabel} × {money(i.unitPriceCents)}
+                            </div>
+                          </td>
+                          <td className={cn(crmTable.tdRight, "hidden sm:table-cell tabular-nums")}>{qtyLabel}</td>
+                          <td className={cn(crmTable.tdRight, "hidden sm:table-cell tabular-nums")}>{money(i.unitPriceCents)}</td>
+                          <td className={cn(crmTableCards.td, "flex items-baseline justify-between sm:text-right tabular-nums font-medium")}>
+                            <span className="sm:hidden text-xs font-normal text-muted-foreground">Line total</span>
+                            {money(Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 0)) / 1000))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -583,10 +686,35 @@ export default function CrmEstimateDetailPage() {
                   <span className="text-muted-foreground">Tax</span>
                   <span className="tabular-nums font-medium">{money(e.taxCents)}</span>
                 </div>
-                <div className="flex justify-between border-t pt-1.5 text-lg font-bold">
-                  <span>Total</span>
-                  <span className="tabular-nums" data-testid="text-detail-total">{money(e.totalCents)}</span>
-                </div>
+                {signedDiffers ? (
+                  <>
+                    <div className="flex justify-between border-t pt-1.5 text-muted-foreground">
+                      <span>Total as quoted</span>
+                      <span className="tabular-nums" data-testid="text-detail-total">{money(e.totalCents)}</span>
+                    </div>
+                    {signedDiscounts.length > 0 && (
+                      <div className="flex justify-between gap-3" data-testid="row-signed-discounts">
+                        <span className="text-muted-foreground shrink-0">Optional discounts</span>
+                        <span className="font-medium text-right">
+                          {signedDiscounts.map((d: any) => `${d.label}${pctText(d.percentBps)}`).join(", ")}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t pt-1.5 text-lg font-bold">
+                      <span>Signed total</span>
+                      <span className="tabular-nums" data-testid="text-signed-total">{money(signedTotal)}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      What {e.signatureName ?? "the client"} approved — the optional discounts they ticked come off
+                      the taxable amount, and tax is recalculated on what's left.
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex justify-between border-t pt-1.5 text-lg font-bold">
+                    <span>{signedTotal != null ? "Signed total" : "Total"}</span>
+                    <span className="tabular-nums" data-testid="text-detail-total">{money(e.totalCents)}</span>
+                  </div>
+                )}
                 {e.depositCents ? (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Deposit due</span>
