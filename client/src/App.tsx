@@ -1,3 +1,5 @@
+import SocialMediaPage from "@/pages/social-media";
+import GuidesPage from "@/pages/guides";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
@@ -105,6 +107,8 @@ function DashboardRouter() {
       <Route path="/pricing" component={PricingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/social-media" component={SocialMediaPage} />
+      <Route path="/guides" component={GuidesPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
