@@ -1,4 +1,5 @@
 /** GBP content queue. External boundaries are injectable; no credentials are stored here. */
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import type { Express } from 'express';
 import { z } from 'zod';
 import { pool } from '../db';
@@ -80,9 +81,27 @@ export function scheduleTimes(raw: unknown, count: number) {
     }
     return times;
 }
-export function publicPhotoUrl(key: string, base = process.env.GBP_MEDIA_PUBLIC_BASE_URL) {
-    if (!base)
-        throw new GoogleError('invalid', 'Configure GBP_MEDIA_PUBLIC_BASE_URL for publicly readable R2 media', 503);
+// Google (and the vision model) must download photos from a public URL. Without a public bucket domain we
+// hand out a short-lived HMAC-signed link to /api/public/gbp-media that streams only media/ keys from R2.
+const mediaSigningKey = () => createHash('sha256').update(`gbp-media:${process.env.GBP_TOKEN_KEY || process.env.SESSION_SECRET || 'dev-only'}`).digest();
+/** Queued payloads store r2:<key>; a fresh signed link is minted only when the job is dispatched. */
+export function resolveMediaRefs(payload: any): any {
+    const fix = (m: any) => typeof m?.sourceUrl === 'string' && m.sourceUrl.startsWith('r2:') ? { ...m, sourceUrl: publicPhotoUrl(m.sourceUrl.slice(3)) } : m;
+    const out = fix(payload);
+    return Array.isArray(out?.media) ? { ...out, media: out.media.map(fix) } : out;
+}
+export function signMediaKey(key: string, exp: number) { return createHmac('sha256', mediaSigningKey()).update(`${key}\n${exp}`).digest('base64url'); }
+export function verifyMediaSignature(key: string, exp: number, sig: string) {
+    if (!key.startsWith('media/') || key.includes('..') || !Number.isFinite(exp) || exp < Date.now() / 1000) return false;
+    const want = Buffer.from(signMediaKey(key, exp)), got = Buffer.from(String(sig));
+    return want.length === got.length && timingSafeEqual(want, got);
+}
+export function publicPhotoUrl(key: string, base = process.env.GBP_MEDIA_PUBLIC_BASE_URL, ttlSeconds = 3600) {
+    if (!base) {
+        if (!key.startsWith('media/') || key.includes('..')) throw new GoogleError('invalid', 'Invalid media key', 400);
+        const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+        return `${(process.env.APP_URL || 'https://constructhub.us').replace(/\/$/, '')}/api/public/gbp-media?${new URLSearchParams({ k: key, exp: String(exp), sig: signMediaKey(key, exp) })}`;
+    }
     const u = new URL(base);
     if (u.protocol !== 'https:' || u.username || u.password || !key.startsWith('media/') || key.includes('..'))
         throw new GoogleError('invalid', 'Invalid public media configuration', 400);
@@ -96,7 +115,7 @@ export async function photosFor(user: number, ids: number[]) {
 }
 function googleDate(value: string) { const d = new Date(value + 'Z'); return { date: { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() }, time: { hours: d.getUTCHours(), minutes: d.getUTCMinutes() } }; }
 export async function payloadFor(user: number, raw: unknown) {
-    const v = itemInput.parse(raw), photos = await photosFor(user, v.photoIds), media = photos.map(p => ({ mediaFormat: 'PHOTO', sourceUrl: publicPhotoUrl(p.r2_key || '') }));
+    const v = itemInput.parse(raw), photos = await photosFor(user, v.photoIds), media = photos.map(p => { publicPhotoUrl(p.r2_key || ''); return { mediaFormat: 'PHOTO', sourceUrl: `r2:${p.r2_key}` }; });
     if (v.kind === 'photo')
         return { ...media[0], locationAssociation: { category: v.category }, ...(v.category !== 'COVER' && v.summary ? { description: v.summary } : {}) };
     const start = v.event && googleDate(v.event.start), end = v.event && googleDate(v.event.end);
@@ -169,7 +188,7 @@ export async function runContentWorker(make: typeof clientFor = clientFor) {
                 const l = await ownedLocation(j.user_id, j.location_id);
                 if (l.gbp_account_name !== j.target.account || l.gbp_location_name !== j.target.location || l.gbp_google_subject !== j.target.subject)
                     throw new GoogleError('invalid', 'Location linkage changed; cancel and create a new publish', 409);
-                result = await make(j.user_id, l.gbp_google_subject).request('reviews', `/v4/${l.gbp_account_name}/${l.gbp_location_name}/${j.kind === 'photo' ? 'media' : 'localPosts'}`, 'POST', j.payload);
+                result = await make(j.user_id, l.gbp_google_subject).request('reviews', `/v4/${l.gbp_account_name}/${l.gbp_location_name}/${j.kind === 'photo' ? 'media' : 'localPosts'}`, 'POST', resolveMediaRefs(j.payload));
                 const prefix=`${l.gbp_account_name}/${l.gbp_location_name}/${j.kind==='photo'?'media':'localPosts'}/`;
                 if(typeof result.name!=='string'||!result.name.startsWith(prefix)||!/^[A-Za-z0-9_-]+$/.test(result.name.slice(prefix.length))){result=undefined;throw new GoogleError('transient','Google returned no valid resource identifier',503);}
                 if (result.state === 'REJECTED') {
@@ -209,6 +228,21 @@ export const createDraftGenerator = (http: typeof fetch = fetch): DraftAI => asy
 };
 export const generateDraft = createDraftGenerator();
 export function registerContentRoutes(app: Express, auth: (req: any, res: any) => any, ai: DraftAI = generateDraft, make: typeof clientFor = clientFor) {
+    // Public on purpose (Google fetches it) but only with a valid, unexpired signature for a media/ key.
+    app.get('/api/public/gbp-media', async (req, res) => {
+        const key = String(req.query.k || ''), exp = Number(req.query.exp), sig = String(req.query.sig || '');
+        if (!verifyMediaSignature(key, exp, sig)) return res.status(403).json({ message: 'Link expired or invalid' });
+        try {
+            const { getFromR2 } = await import('../r2');
+            const { body, contentType } = await getFromR2(key);
+            if (!body) return res.status(404).end();
+            res.setHeader('Content-Type', contentType || 'image/jpeg');
+            res.setHeader('Cache-Control', 'private, max-age=300');
+            const stream: any = body;
+            if (typeof stream.pipe === 'function') return stream.pipe(res);
+            res.send(Buffer.from(await stream.arrayBuffer()));
+        } catch { res.status(404).end(); }
+    });
     const route = (method: 'get' | 'post' | 'patch', suffix: string, fn: (req: any, user: number, location: number) => Promise<any>) => app[method](`/api/gbp/content/:location${suffix}`, async (req, res) => {
         const u = auth(req, res);
         if (!u)

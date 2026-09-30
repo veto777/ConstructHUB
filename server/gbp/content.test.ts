@@ -184,3 +184,23 @@ describe('real lane DB and mocked provider integration', () => {
         expect(ai).not.toHaveBeenCalled();
     });
 });
+
+describe('signed media links (no public bucket)', () => {
+    it('mints a short-lived signed link, verifies it, and rejects tampering, expiry and non-media keys', async () => {
+        const { verifyMediaSignature, signMediaKey, resolveMediaRefs } = await import('./content');
+        const saved = process.env.GBP_MEDIA_PUBLIC_BASE_URL; delete process.env.GBP_MEDIA_PUBLIC_BASE_URL;
+        try {
+            const u = new URL(publicPhotoUrl('media/abc/photo.jpg'));
+            expect(u.pathname).toBe('/api/public/gbp-media');
+            const k = u.searchParams.get('k')!, exp = Number(u.searchParams.get('exp')), sig = u.searchParams.get('sig')!;
+            expect(verifyMediaSignature(k, exp, sig)).toBe(true);
+            expect(verifyMediaSignature('media/abc/other.jpg', exp, sig)).toBe(false);
+            expect(verifyMediaSignature(k, exp + 1, sig)).toBe(false);
+            const past = Math.floor(Date.now() / 1000) - 10;
+            expect(verifyMediaSignature(k, past, signMediaKey(k, past))).toBe(false);
+            expect(verifyMediaSignature('private/x.jpg', exp, signMediaKey('private/x.jpg', exp))).toBe(false);
+            const out = resolveMediaRefs({ summary: 's', media: [{ mediaFormat: 'PHOTO', sourceUrl: 'r2:media/abc/photo.jpg' }] });
+            expect(out.media[0].sourceUrl).toMatch(/\/api\/public\/gbp-media\?k=media%2Fabc%2Fphoto\.jpg&exp=\d+&sig=/);
+        } finally { process.env.GBP_MEDIA_PUBLIC_BASE_URL = saved; }
+    });
+});
