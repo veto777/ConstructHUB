@@ -13,12 +13,23 @@ import { PrintLockdown } from "@/components/print-lockdown";
  * ALWAYS answers { sent: true } — whether the email matched is never
  * revealed here either. On a match, the emailed magic link flips to a client
  * session and lands back on this same URL, which then just works.
+ *
+ * A sign-in link that was already used or had expired lands back here with
+ * ?auth=expired (the verify route, both /e/ and /i/) — the gate says so
+ * above the form, for either document type.
  */
 export function DocGateChallenge({ docType, token }: { docType: "estimate" | "invoice"; token: string }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [expired] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("auth") === "expired";
+    } catch {
+      return false;
+    }
+  });
 
   const submit = async () => {
     setBusy(true);
@@ -62,6 +73,12 @@ export function DocGateChallenge({ docType, token }: { docType: "estimate" | "in
             </div>
           ) : (
             <>
+              {expired && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm"
+                  role="status" data-testid="notice-gate-link-expired">
+                  That sign-in link expired or was already used — enter your email below to get a new one.
+                </div>
+              )}
               <div className="text-center space-y-2">
                 <Lock className="h-10 w-10 text-muted-foreground mx-auto" />
                 <h1 className="text-xl font-semibold">This document is private</h1>

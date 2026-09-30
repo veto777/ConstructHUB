@@ -316,7 +316,9 @@ export default function CrmProjectPage() {
                     </thead>
                     <tbody>
                       {costing.lines.map((l: any) => (
-                        <tr key={l.costCodeId} className={`${crmTable.tr} ${l.overBudget ? "bg-destructive/5" : ""}`}
+                        // The costing API returns one "Unassigned" line with
+                        // costCodeId null — give it a stable, unique key.
+                        <tr key={l.costCodeId ?? "unassigned"} className={`${crmTable.tr} ${l.overBudget ? "bg-destructive/5" : ""}`}
                           data-testid={`cost-line-${l.code}`}>
                           <td className={`${crmTable.td} font-mono text-xs`}>{l.code}</td>
                           <td className={crmTable.td}>{l.name}</td>

@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
@@ -27,7 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
   FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
-  Pencil, Search, Calendar, MessageSquare, CreditCard,
+  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
@@ -240,8 +240,11 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
                   {o.description && <div className="text-sm text-muted-foreground truncate">{o.description}</div>}
                 </div>
                 <div className="flex items-center gap-1">
+                  {/* A client-selectable scope always shows its price on the
+                      public page (the client can't choose blind), so only a
+                      display tier can really be "hidden from client". */}
                   {o.totalCents != null && (
-                    <div className="font-medium">{money(o.totalCents)}{!o.showTotal && <span className="text-xs text-muted-foreground"> · hidden from client</span>}</div>
+                    <div className="font-medium">{money(o.totalCents)}{!o.showTotal && !(Array.isArray(o.items) && o.items.length > 0) && <span className="text-xs text-muted-foreground"> · hidden from client</span>}</div>
                   )}
                   <Button variant="ghost" size="sm" onClick={() => remove.mutate(o.id)}
                     disabled={remove.isPending}
@@ -366,11 +369,20 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
                 data-testid="check-option-recommended" />
               Recommended
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={showTotal} onCheckedChange={(c) => setShowTotal(c === true)}
-                data-testid="check-option-show-total" />
-              Show the total to the client
-            </label>
+            {/* With lines the option is a scope the client ticks, and the
+                public page always prices it — a "hide the total" box there
+                would promise something the page doesn't do. */}
+            {lines.length > 0 ? (
+              <p className="text-xs text-muted-foreground" data-testid="text-option-total-always-shown">
+                Selectable scopes always show their price so the client can choose.
+              </p>
+            ) : (
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={showTotal} onCheckedChange={(c) => setShowTotal(c === true)}
+                  data-testid="check-option-show-total" />
+                Show the total to the client
+              </label>
+            )}
           </div>
         </div>
 
@@ -381,6 +393,9 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
             <Separator />
             <div className="space-y-2">
               <Label>…or add a whole package as an option</Label>
+              <p className="text-xs text-muted-foreground">
+                A package becomes a scope the client can tick, so its price always shows.
+              </p>
               <div className="flex gap-2">
                 <Select value={packageId} onValueChange={setPackageId}>
                   <SelectTrigger className="flex-1" data-testid="select-option-package">
@@ -679,19 +694,47 @@ export default function CrmClientPage() {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("check");
   const [payNote, setPayNote] = useState("");
+  // What the button records, in whole cents — "0.001" is $0.00, not a payment.
+  const payAmountCents = Math.round((parseFloat(payAmount) || 0) * 100);
   const recordPayment = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/invoices/${payFor.id}/payments`, {
-        amountCents: Math.round((parseFloat(payAmount) || 0) * 100),
+        amountCents: payAmountCents,
         method: payMethod,
         note: payNote || null,
       })).json(),
-    onSuccess: () => {
+    onSuccess: (r: any) => {
+      const number = payFor?.number;
       setPayFor(null); setPayAmount(""); setPayNote("");
       refresh();
-      toast({ title: "Payment recorded" });
+      // Only promise the receipt the server says it is sending (same wording
+      // as the Take-a-payment dialog).
+      const name = data?.customer?.displayName ?? "the client";
+      const receipt = r?.receiptQueued
+        ? "the client gets an emailed receipt."
+        : r?.receiptSkippedReason === "no_email"
+          ? `no receipt emailed — ${name} has no email address on file.`
+          : r?.receiptSkippedReason === "receipts_off"
+            ? "no receipt emailed — automatic receipts are turned off in Settings."
+            : "no receipt was emailed.";
+      toast({ title: "Payment recorded", description: `${number ? `${number} updated — ` : ""}${receipt}` });
     },
     onError: (e: any) => toast({ title: "Could not record payment", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
+  // ── Owner: reverse a mistyped manual payment (same flow as /crm/payments) ──
+  const [reverseFor, setReverseFor] = useState<any | null>(null);
+  const [reverseReason, setReverseReason] = useState("");
+  const reverse = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", `/api/crm/payments/${reverseFor.id}/reverse`, { reason: reverseReason })).json(),
+    onSuccess: () => {
+      toast({ title: "Payment reversed", description: "The invoice balance is restored and the reversal is on the client's notes." });
+      setReverseFor(null);
+      setReverseReason("");
+      refresh();
+    },
+    onError: (e: any) => toast({ title: "Could not reverse the payment", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const voidInvoice = useMutation({
@@ -834,13 +877,19 @@ export default function CrmClientPage() {
 
   if (isError || !data) {
     const connectionProblem = isError && !notFound;
+    // A 404 is the server saying the record is gone (an owner hard delete),
+    // not a network problem — say that, and point back to the list.
     return (
       <ErrorCard
-        title={connectionProblem ? "Couldn't load this client" : "Client not found"}
-        description={connectionProblem ? "Check your connection and refresh the page." : "This client may have been removed."}
+        title={connectionProblem ? "Couldn't load this client" : "This client was deleted"}
+        description={connectionProblem
+          ? "Check your connection and refresh the page."
+          : "It's no longer in your client list. If you followed an old link, find the client from All clients."}
       >
         <Link href="/crm/clients">
-          <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> All clients</Button>
+          <Button variant="outline" size="sm" data-testid="link-error-back-clients">
+            <ArrowLeft className="h-4 w-4 mr-1" /> All clients
+          </Button>
         </Link>
       </ErrorCard>
     );
@@ -1025,6 +1074,12 @@ export default function CrmClientPage() {
                 const estN = (data.estimates ?? []).length;
                 const projN = (data.projects ?? []).length;
                 const invN = (invoices ?? []).length;
+                // The server always deletes the client's calendar visits with
+                // them (their own, and any booked against their projects) —
+                // name them. Counted from this page's calendar window.
+                const projIds = new Set((data.projects ?? []).map((p: any) => p.id));
+                const visitN = (apptData?.appointments ?? []).filter((a: any) =>
+                  a.customerId === id || (a.projectId && projIds.has(a.projectId))).length;
                 const hasDocs = estN + projN + invN > 0;
                 return (
                   <AlertDialog open={delOpen} onOpenChange={setDelOpen}>
@@ -1040,9 +1095,11 @@ export default function CrmClientPage() {
                         <AlertDialogDescription>
                           {hasDocs
                             ? `This permanently deletes ${c.displayName} AND their entire tree: ` +
-                              `${estN} estimate(s), ${invN} invoice(s) and ${projN} project(s), ` +
+                              `${estN} estimate(s), ${invN} invoice(s), ${projN} project(s) and ${visitN} scheduled visit(s), ` +
                               `with all line items, payments and history. This cannot be undone.`
-                            : `This permanently deletes ${c.displayName}. This cannot be undone.`}
+                            : visitN > 0
+                              ? `This permanently deletes ${c.displayName} and their ${visitN} scheduled visit(s). This cannot be undone.`
+                              : `This permanently deletes ${c.displayName}. This cannot be undone.`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -1150,8 +1207,23 @@ export default function CrmClientPage() {
                           {p.refundedCents > 0 && <span>{money(p.refundedCents)} refunded · </span>}
                           {when(p.paidAt ?? p.createdAt)}{p.note ? ` · ${p.note}` : ""}
                         </div>
+                        {p.status === "reversed" && p.failureReason && (
+                          <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-payment-reversed-${p.id}`}>
+                            {p.failureReason}
+                          </div>
+                        )}
                       </div>
-                      <StatusPill tone={statusTone(p.status)}>{p.status}</StatusPill>
+                      <div className="flex items-center gap-2">
+                        {/* Owner-only undo for a mistyped manual record (same
+                            flow as the Payments page). */}
+                        {isOwner && p.provider === "manual" && p.status === "succeeded" && (
+                          <Button size="sm" variant="ghost" onClick={() => { setReverseFor(p); setReverseReason(""); }}
+                            data-testid={`button-reverse-payment-${p.id}`}>
+                            <Undo2 className="h-4 w-4 mr-1" /> Reverse
+                          </Button>
+                        )}
+                        <StatusPill tone={statusTone(p.status)}>{p.status}</StatusPill>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1348,9 +1420,19 @@ export default function CrmClientPage() {
                     {e.number} · {e.title}
                     <StatusPill tone={statusTone(e.status)}>{e.status}</StatusPill>
                   </div>
-                  {canSeePrices && (
-                    <div className="text-sm text-muted-foreground mt-0.5 tabular-nums">{money(e.totalCents)}</div>
-                  )}
+                  {/* A signed estimate's number is what the client signed for
+                      (after any optional discounts they ticked), not the quote. */}
+                  {canSeePrices && (() => {
+                    const signed = e.approvedAt && e.approvedTotalCents != null;
+                    return (
+                      <div className="text-sm text-muted-foreground mt-0.5 tabular-nums" data-testid={`text-estimate-total-${e.id}`}>
+                        {money(signed ? e.approvedTotalCents : e.totalCents)}
+                        {signed && e.approvedTotalCents !== e.totalCents && (
+                          <span className="text-xs"> · signed · quoted {money(e.totalCents)}</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   {/* Edit verbiage / add work scopes — opens the full editor.
@@ -1412,14 +1494,24 @@ export default function CrmClientPage() {
                       Remind
                     </Button>
                   )}
-                  {canInvoice && e.approvedAt && (
-                    <Button size="sm" variant="outline"
-                      onClick={() => convert.mutate(e.id)} disabled={convert.isPending}
-                      data-testid={`button-convert-${e.id}`}>
-                      {convert.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Receipt className="h-4 w-4 mr-2" />}
-                      Create invoice
-                    </Button>
-                  )}
+                  {/* One invoice per signed estimate from here: once a live
+                      (non-void) invoice exists, name it instead of offering a
+                      second one — the server refuses a draw past 100% anyway. */}
+                  {canInvoice && e.approvedAt && (() => {
+                    const estInvoices = (invoices ?? []).filter((i: any) => i.estimateId === e.id && !i.voidedAt);
+                    return estInvoices.length > 0 ? (
+                      <span className="text-xs text-muted-foreground" data-testid={`text-invoiced-${e.id}`}>
+                        Invoiced · {estInvoices.map((i: any) => i.number).join(", ")}
+                      </span>
+                    ) : (
+                      <Button size="sm" variant="outline"
+                        onClick={() => convert.mutate(e.id)} disabled={convert.isPending}
+                        data-testid={`button-convert-${e.id}`}>
+                        {convert.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Receipt className="h-4 w-4 mr-2" />}
+                        Create invoice
+                      </Button>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1499,13 +1591,27 @@ export default function CrmClientPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {canInvoice && !inv.voidedAt && (
-                        <Button size="sm" variant={inv.sentAt ? "outline" : "default"}
-                          onClick={() => sendInvoice.mutate(inv.id)} disabled={sendInvoice.isPending}
-                          data-testid={`button-send-invoice-${inv.id}`}>
-                          <Send className="h-4 w-4 mr-2" /> {inv.sentAt ? "Resend" : "Send"}
-                        </Button>
-                      )}
+                      {canInvoice && !inv.voidedAt && (() => {
+                        // Same rules as the send route (409s): a $0 invoice or
+                        // one with nothing due has nothing to send. The title
+                        // sits on a wrapper — a disabled button gets no hover.
+                        const noSend = (inv.totalCents ?? 0) <= 0
+                          ? "This invoice is $0 — add line items before sending it."
+                          : due <= 0
+                            ? (inv.paidCents ?? 0) >= (inv.totalCents ?? 0)
+                              ? "Already paid in full — there's nothing to send."
+                              : "Nothing is due right now — the rest is retainage held until closeout."
+                            : null;
+                        return (
+                          <span title={noSend ?? undefined} className="inline-flex">
+                            <Button size="sm" variant={inv.sentAt ? "outline" : "default"}
+                              onClick={() => sendInvoice.mutate(inv.id)} disabled={!!noSend || sendInvoice.isPending}
+                              data-testid={`button-send-invoice-${inv.id}`}>
+                              <Send className="h-4 w-4 mr-2" /> {inv.sentAt ? "Resend" : "Send"}
+                            </Button>
+                          </span>
+                        );
+                      })()}
                       {/* A voided invoice's link answers 410 — never offer to copy it. */}
                       {inv.publicToken && !inv.voidedAt && (
                         <Button size="sm" variant="ghost" data-testid={`button-copy-invoice-${inv.id}`}
@@ -1675,13 +1781,44 @@ export default function CrmClientPage() {
       )}
 
       {/* Take a payment — online checkout link or manual record. */}
+      {/* estimates → a "Deposit on a signed estimate" link; payments → hides
+          deposits already paid. */}
       <TakePaymentDialog
         customerName={c.displayName}
         invoices={invoices}
+        estimates={estimates}
+        payments={payments}
         open={takeOpen}
         onOpenChange={setTakeOpen}
         onChanged={refresh}
       />
+
+      {/* Owner: reverse a manual payment recorded by mistake. */}
+      <Dialog open={!!reverseFor} onOpenChange={(o) => { if (!o) { setReverseFor(null); setReverseReason(""); } }}>
+        <DialogContent className="max-w-md" data-testid="dialog-reverse-payment">
+          <DialogHeader>
+            <DialogTitle>Reverse this payment?</DialogTitle>
+            <DialogDescription>
+              {reverseFor && <>{money(reverseFor.amountCents)} · {reverseFor.method ?? "manual"} from {c.displayName}.</>}{" "}
+              The payment stays in the history marked "reversed", the invoice balance goes back up,
+              and the reason is noted on the client. Use this for a payment recorded by mistake.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="reverse-reason">Reason</Label>
+            <Input id="reverse-reason" value={reverseReason} onChange={(e) => setReverseReason(e.target.value)}
+              placeholder="Typed $1,000 instead of $100" data-testid="input-reverse-reason" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setReverseFor(null); setReverseReason(""); }}>Cancel</Button>
+            <Button variant="destructive" onClick={() => reverse.mutate()}
+              disabled={reverseReason.trim().length < 3 || reverse.isPending} data-testid="button-confirm-reverse">
+              {reverse.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Reverse payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Schedule an appointment — lands on the calendar and this page. */}
       <Dialog open={apptOpen} onOpenChange={setApptOpen}>
@@ -1777,8 +1914,9 @@ export default function CrmClientPage() {
           </div>
           <DialogFooter>
             <Button onClick={() => recordPayment.mutate()}
-              disabled={!(parseFloat(payAmount) > 0) || recordPayment.isPending} data-testid="button-save-payment">
-              {recordPayment.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Record payment
+              disabled={payAmountCents < 1 || recordPayment.isPending} data-testid="button-save-payment">
+              {recordPayment.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Record {payAmountCents >= 1 ? money(payAmountCents) : "payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

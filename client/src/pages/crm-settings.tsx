@@ -527,6 +527,34 @@ export default function CrmSettingsPage() {
     onError: (e: any) => toast({ title: "Test text failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
+  // Deep links such as /crm/settings#sms (the Quick message hint) land on
+  // that card. The page renders behind a spinner until the org loads, so the
+  // browser's own hash jump finds nothing — scroll once the settings (and the
+  // SMS status that sizes the card) are on screen. Once only: never yank a
+  // user who has already scrolled away.
+  const hashScrolled = useRef(false);
+  const settingsRendered = allowed && !!org && smsStatus !== undefined;
+  useEffect(() => {
+    if (!settingsRendered || hashScrolled.current) return;
+    let id = "";
+    try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
+    if (!id) return;
+    const frame = requestAnimationFrame(() => {
+      hashScrolled.current = true;
+      const el = document.getElementById(id);
+      if (!el) return;
+      // Scroll only the app's own scroll pane: scrollIntoView would also
+      // scroll the window and push the top bar out of view.
+      let pane = el.parentElement;
+      while (pane && !(pane.scrollHeight > pane.clientHeight && /(auto|scroll)/.test(getComputedStyle(pane).overflowY))) {
+        pane = pane.parentElement;
+      }
+      if (pane) pane.scrollTop += el.getBoundingClientRect().top - pane.getBoundingClientRect().top - 16;
+      else el.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [settingsRendered]);
+
   // ── Price-floor lock (owner only) ─────────────────────────────────────────
   // custom_fields->'priceFloorLock' — reps can price above the floor, never
   // below. The owner is always exempt (they set the prices).
@@ -1335,7 +1363,7 @@ export default function CrmSettingsPage() {
       </Card>
 
       {/* ── SMS (SignalWire) ───────────────────────────────────────────── */}
-      <Card data-testid="card-sms">
+      <Card data-testid="card-sms" id="sms" className="scroll-mt-4">
         <CardHeader>
           <SectionTitle
             icon={MessageSquare}

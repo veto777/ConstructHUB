@@ -43,6 +43,7 @@ export interface DocRow {
   sentAt?: string | null;
   dueAt?: string | null;
   paidCents?: number;
+  paidAt?: string | null;
   refundedCents?: number;
   overdue?: boolean;
   /** Estimates: derived server-side — out, unanswered, past its expiry. */
@@ -599,9 +600,13 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                             </Button>
                           </Link>
                         )}
-                        {/* A signed (approved) estimate is a contract — the
-                            server refuses to delete it, so no button. */}
-                        {isOwner && !(kind === "estimates" && (r.approvedAt || r.status === "approved")) && (
+                        {/* A signed (approved) estimate is a contract, and an
+                            invoice with money on it (paid, or partly paid) is
+                            a financial record — the server refuses to delete
+                            either, so no button. */}
+                        {isOwner
+                          && !(kind === "estimates" && (r.approvedAt || r.status === "approved"))
+                          && !(kind === "invoices" && (r.status === "paid" || (r.paidCents ?? 0) > 0 || r.paidAt)) && (
                           <Button
                             variant="ghost"
                             size="sm"

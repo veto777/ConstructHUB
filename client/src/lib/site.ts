@@ -52,19 +52,24 @@ export function isClientPortal(): boolean {
   }
 }
 
-/** The CRM origin for the domain currently being browsed. */
+/**
+ * The CRM origin for the domain currently being browsed. Built from
+ * location.host (hostname + port) so local testing on e.g. localhost:8215
+ * keeps its port; production hosts carry no port, so nothing changes there.
+ */
 export function portalUrl(path = "/"): string {
   if (typeof window === "undefined") return path;
-  const host = window.location.hostname.toLowerCase();
+  const host = window.location.host.toLowerCase();
   const prefix = CRM_HOST_PREFIXES.find((p) => host.startsWith(p));
   if (prefix) return path;
   return `${window.location.protocol}//${CRM_HOST_PREFIXES[0]}${host}${path}`;
 }
 
-/** The marketing origin for the domain currently being browsed. */
+/** The marketing origin for the domain currently being browsed (port kept —
+ *  portal.localhost:8215 → localhost:8215, not localhost). */
 export function marketingUrl(path = "/"): string {
   if (typeof window === "undefined") return path;
-  const host = window.location.hostname.toLowerCase();
+  const host = window.location.host.toLowerCase();
   const prefix = CRM_HOST_PREFIXES.find((p) => host.startsWith(p));
   if (!prefix) return path;
   return `${window.location.protocol}//${host.slice(prefix.length)}${path}`;

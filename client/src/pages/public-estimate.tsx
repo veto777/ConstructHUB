@@ -23,8 +23,6 @@ const money = (c?: number | null) =>
 const qty = (m: number) => (m / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
 
-/** Deposit payment, shown only after approval. ACH is highlighted because it is
- *  dramatically cheaper on a large deposit and the client should know. */
 /** "Have a question?" — lands in the contractor's Messages inbox, tagged
  *  with this estimate, and pings whoever is assigned to the job. */
 function AskQuestionCard({ token, repName }: { token: string; repName: string | null }) {
@@ -71,7 +69,13 @@ function AskQuestionCard({ token, repName }: { token: string; repName: string | 
   );
 }
 
-function PayCard({ token, company, estimate }: { token: string; company: any; estimate: any }) {
+/** Deposit payment, shown only after approval. ACH is highlighted because it is
+ *  dramatically cheaper on a large deposit and the client should know. When
+ *  pay-info says neither card nor bank is offered, there is no Pay button —
+ *  the client is told how to reach the contractor instead. */
+function PayCard({ token, company, estimate, payInfo }: {
+  token: string; company: any; estimate: any; payInfo?: any;
+}) {
   const { toast } = useToast();
   // ?paid=1 is only the Stripe redirect hint — "Paid" comes from the server.
   const returned = new URLSearchParams(window.location.search).get("paid");
@@ -121,6 +125,9 @@ function PayCard({ token, company, estimate }: { token: string; company: any; es
   // set, otherwise the APPROVED total — which already reflects any optional
   // discounts the client ticked when signing.
   const amount = estimate.depositCents || (estimate.approvedTotalCents ?? estimate.totalCents);
+  // Only a LOADED pay-info can say no rail is offered; while it loads (or if
+  // it fails) the plain Pay button stays and the server answers honestly.
+  const noOnlineRail = Boolean(payInfo) && !payInfo.cardAvailable && !payInfo.achAvailable;
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -128,15 +135,36 @@ function PayCard({ token, company, estimate }: { token: string; company: any; es
           {estimate.depositCents ? "Pay your deposit" : "Pay in full"}
         </CardTitle>
         <CardDescription>
-          {money(amount)} — paid directly to {company.name}. Bank transfer (ACH) is the
-          cheapest option and usually free to you.
+          {noOnlineRail
+            ? `${money(amount)} — pay ${company.name} directly.`
+            : `${money(amount)} — paid directly to ${company.name}. Bank transfer (ACH) is the cheapest option and usually free to you.`}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate()} disabled={pay.isPending} data-testid="button-pay">
-          {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Pay {money(amount)}
-        </Button>
+        {noOnlineRail ? (
+          <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1.5" data-testid="text-online-pay-unavailable">
+            <p>
+              Online payment isn't available for this estimate. To pay the {money(amount)}
+              {estimate.depositCents ? " deposit" : ""}, contact {company.name}
+              {company.phone || company.email ? ":" : " directly."}
+            </p>
+            {company.phone && (
+              <a href={`tel:${company.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                <Phone className="h-3.5 w-3.5" />{company.phone}
+              </a>
+            )}
+            {company.email && (
+              <a href={`mailto:${company.email}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                <Mail className="h-3.5 w-3.5" />{company.email}
+              </a>
+            )}
+          </div>
+        ) : (
+          <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate()} disabled={pay.isPending} data-testid="button-pay">
+            {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Pay {money(amount)}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -562,7 +590,7 @@ export default function PublicEstimatePage() {
         )}
 
         {settled === "approved" && !preview && (
-          <PayCard token={token!} company={company} estimate={e} />
+          <PayCard token={token!} company={company} estimate={e} payInfo={payInfo} />
         )}
 
         {blocked && !(preview && answerBlock.code === "not_sent") && (
