@@ -576,7 +576,7 @@ export default function LandingPage() {
           <p className="text-muted-foreground dark:text-white/40 mb-10 max-w-xl mx-auto" data-testid="text-coverage-summary">
             {counts ? `${formatCount(counts.total)} county and city jurisdictions` : "County and city jurisdictions"} listed
             across all 50 states and DC{hasVerified ? `, ${formatCount(counts!.verifiedPortals!)} with a verified permit portal link` : ""}.
-            Portal links are added only after they pass our link checks.
+            Every portal link we show is checked, and links we could not confirm are labeled.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {[

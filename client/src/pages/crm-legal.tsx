@@ -295,7 +295,8 @@ export function CrmPrivacyPage() {
         anything else: if you choose <strong>Accept</strong>, we set a first-party analytics cookie
         (<code>ch_vid</code>, a random visitor id) and record the pages you view on our own sites,
         the referring page, your browser and device type, and a shortened IP address that shows only
-        general location. We use it to understand how the product is used. Your answer is remembered
+        general location. If you are signed in, those page views are also linked to your account.
+        We use it to understand how the product is used. Your answer is remembered
         in a <code>ch_consent</code> cookie for a year; if you choose <strong>Decline</strong>, no
         analytics cookie is set and nothing is recorded. No advertising cookies, no third-party
         trackers, no analytics that follow you around the web.
