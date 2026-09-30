@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { CrawlState, Finding } from "./audit";
-import { aiModel } from "../ai-config";
+import { aiModel, aiTimeoutMs } from "../ai-config";
 export async function pageSpeed(
   url: string,
   strategy: "mobile" | "desktop",
@@ -90,7 +90,7 @@ export const openAIProvider: PlanProvider = {
       apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
       baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       maxRetries: 0,
-      timeout: 60_000,
+      timeout: aiTimeoutMs(60_000),
     });
     const r = await client.chat.completions.create({
       model: aiModel(process.env.SITESCAN_AI_MODEL),

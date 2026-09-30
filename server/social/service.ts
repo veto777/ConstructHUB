@@ -15,7 +15,7 @@ import {
   publicMediaUrl,
 } from "../../shared/social";
 import { BlotatoClient, encryptKey, decryptKey, SocialError } from "./client";
-import { aiModel } from "../ai-config";
+import { aiModel, aiTimeoutMs } from "../ai-config";
 export type ClientFactory = (key: string) => BlotatoClient;
 export const clientFactory: ClientFactory = (key) => new BlotatoClient(key);
 export async function userLock<T>(
@@ -329,7 +329,7 @@ export const generateText: Generate = async (context) => {
     apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
     maxRetries: 0,
-    timeout: 25000,
+    timeout: aiTimeoutMs(25000),
   });
   const r = await ai.chat.completions.create({
     model: aiModel(process.env.SOCIAL_AI_MODEL),
