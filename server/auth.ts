@@ -820,8 +820,10 @@ export async function setupAuth(app: Express) {
     // worth logging when we know who it was.
     const actor = (req.isAuthenticated?.() && req.user) ? (req.user as any) : null;
     req.logout(() => {
-      req.session.destroy(() => {
+      req.session.destroy(async () => {
         if (actor) {
+          await logActivity(req, actor.id, "auth.logout")
+            .catch((e: any) => console.error("[security] logout activity failed:", e?.message || e));
           logMemberAuth(actor, "logout")
             .catch((e: any) => console.error("[crm] logout activity failed:", e?.message || e));
         }
