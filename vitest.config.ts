@@ -23,6 +23,13 @@ process.env.CRM_TEST_DATABASE_URL ??= process.env.DATABASE_URL;
 process.env.TEST_GATE_PORT = String(lanePort + 1);
 process.env.TEST_HOVER_PORT = String(lanePort + 2);
 
+// The app pins every pooled session to UTC (server/db.ts), because
+// `timestamp` columns hold UTC wall time. The fixtures' own pg.Pools must
+// write now() on the same clock, or a dev DB whose default zone is not UTC
+// (America/New_York here) stores fixture rows hours off the app's. pg reads
+// PGOPTIONS for every connection it opens, so this covers them all.
+process.env.PGOPTIONS ??= "-c TimeZone=UTC";
+
 //
 // Files run SERIALLY (fileParallelism:false): the dev-server suites share one
 // dev-bypass user and one org — several flip the user's role via SQL

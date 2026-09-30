@@ -24,7 +24,7 @@ import {
   crmPayments, crmCustomerNotes, crmClientComments, crmFinanceClicks,
   crmAttachments, crmAppointments, crmChangeOrders, crmPunchItems,
   crmDailyLogs, crmSelections, crmBudgetLines, crmCommitments,
-  crmCostEntries, crmPhases, crmMeasurements,
+  crmCostEntries, crmPhases, crmMeasurements, crmNotifications,
   CRM_PROJECT_STATUSES, CRM_JOB_STATUSES, CRM_LINE_ITEM_KINDS,
   CRM_PROJECT_STAGE_META, CRM_ESTIMATE_STATUSES, CRM_INVOICE_STATUSES,
 } from "@shared/schema";
@@ -38,6 +38,7 @@ import {
   divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, getDivision,
 } from "./divisions";
 import { priceFloorViolation } from "./price-floor";
+import { nextDocNumber as allocateDocNumber } from "./doc-number";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -138,27 +139,23 @@ export function depositRefusal(depositCents: number | null | undefined, totalCen
 // ── Document numbers ────────────────────────────────────────────────────────
 
 /**
- * The next per-org document number ("E-1234", "P-1001"): one more than the
- * highest number already issued with that prefix, taken under a per-org,
- * per-prefix transaction advisory lock. Call it INSIDE the transaction that
- * inserts the row, so two concurrent creates serialise on the lock instead of
- * reading the same value — and a hard delete can never hand out a number that
- * is still in use (count(*)+1 did both). The first number is base+1.
+ * The next per-org document number ("E-1234", "P-1001"), allocated under the
+ * per-org, per-series lock in doc-number.ts — the one allocator every series
+ * shares, so a plain create, a Quick Bid and a portal selection copy all
+ * serialise on the same lock, and a hard delete can never hand out a number
+ * that is still in use (count(*)+1 did both). Call it INSIDE the transaction
+ * that inserts the row. The table argument must be the prefix's own table.
  */
 export async function nextDocNumber(
   tx: any,
   table: typeof crmEstimates | typeof crmProjects,
   orgId: string,
-  prefix: string,
-  base = 1000,
+  prefix: "E" | "P",
 ): Promise<string> {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`crm-doc-number:${orgId}:${prefix}`}))`);
-  const pattern = `^${prefix}-([0-9]{1,15})$`;
-  const [row] = await tx.select({
-    max: sql<string | number | null>`max((substring(${table.number} from ${pattern}))::bigint)`,
-  }).from(table).where(eq(table.orgId, orgId));
-  const highest = Number(row?.max ?? 0) || 0;
-  return `${prefix}-${Math.max(highest, base) + 1}`;
+  if ((table === crmEstimates) !== (prefix === "E")) {
+    throw new Error(`nextDocNumber: prefix ${prefix} does not number this table`);
+  }
+  return allocateDocNumber(tx, prefix, orgId);
 }
 
 /**
@@ -365,6 +362,42 @@ const customerSchema = z.object({
   customFields: z.record(z.any()).nullable().optional(),
 });
 
+const CUSTOMER_FIELD_LABELS: Record<string, string> = {
+  displayName: "Client name", firstName: "First name", lastName: "Last name",
+  companyName: "Company name", email: "Email", phone: "Phone", altPhone: "Alternate phone",
+  addressLine1: "Address", addressLine2: "Address line 2", city: "City", state: "State",
+  postalCode: "ZIP code", leadSourceId: "Lead source", notes: "Notes", tags: "Tags",
+  customFields: "Custom fields",
+};
+
+/** One sentence for the first thing wrong with a customer body — the toast
+ *  shows `message`; the raw `issues` stay in the response for API callers. */
+export function customerIssueMessage(issues: z.ZodIssue[]): string {
+  const issue = issues[0];
+  const field = String(issue?.path?.[0] ?? "");
+  if (!issue) return "Invalid customer";
+  if (field === "email") return "Enter a valid email address.";
+  if (field === "displayName" && issue.code === "too_small") return "Enter the client's name.";
+  const label = CUSTOMER_FIELD_LABELS[field];
+  if (!label) return "Invalid customer";
+  if (issue.code === "too_big") {
+    if (field === "tags") {
+      return issue.path.length === 1
+        ? `Use ${issue.maximum} tags at most.`
+        : `Each tag can be ${issue.maximum} characters at most.`;
+    }
+    return `${label} is too long (${issue.maximum} characters at most).`;
+  }
+  return `${label} isn't valid.`;
+}
+
+/** The customer fields a PATCH body actually changes (arrays and objects
+ *  compare by value; a missing and a null value are the same "empty"). */
+export function changedCustomerFields(before: Record<string, unknown>, patch: Record<string, unknown>): string[] {
+  const norm = (v: unknown) => JSON.stringify(v ?? null);
+  return Object.keys(patch).filter((k) => norm(before[k]) !== norm(patch[k]));
+}
+
 const projectSchema = z.object({
   customerId: z.string().min(1),
   name: z.string().min(1).max(200),
@@ -505,7 +538,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
     const parsed = customerSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid customer", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: customerIssueMessage(parsed.error.issues), issues: parsed.error.issues });
+    }
 
     // Dedupe. Leap admits it cannot merge customer records or move a job between
     // them ("the answer is no, not currently"), so their users accumulate
@@ -557,9 +592,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .orderBy(asc(crmCustomers.displayName)).limit(10000);
 
     rows = await objectPolicy(ctx).filter("customers", rows);
-    const header = ["id", "name", "email", "phone", "address", "city", "state", "postal_code", "created_at"];
+    const header = ["id", "name", "email", "phone", "address", "city", "state", "postal_code", "notes", "created_at"];
     const lines = rows.map((c) => [
-      c.id, c.displayName, c.email, c.phone, c.addressLine1, c.city, c.state, c.postalCode,
+      c.id, c.displayName, c.email, c.phone, c.addressLine1, c.city, c.state, c.postalCode, c.notes,
       c.createdAt ? new Date(c.createdAt).toISOString() : "",
     ].map(csvCell).join(","));
     const csv = [header.join(","), ...lines].join("\n") + "\n";
@@ -599,16 +634,26 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
     const parsed = customerSchema.partial().safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid customer", issues: parsed.error.issues });
+    if (!parsed.success) {
+      return res.status(400).json({ message: customerIssueMessage(parsed.error.issues), issues: parsed.error.issues });
+    }
+    const [before] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id))).limit(1);
+    if (!before) return res.status(404).json({ message: "Customer not found" });
     const [row] = await db.update(crmCustomers)
       .set({ ...parsed.data, updatedAt: new Date() } as any)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id)))
       .returning();
     if (!row) return res.status(404).json({ message: "Customer not found" });
-    logActivity(ctx, "customer.updated", {
-      entityType: "customer", entityId: row.id, customerId: row.id,
-      meta: { fields: Object.keys(parsed.data) },
-    });
+    // The audit line names only what really changed — a client (or API
+    // caller) resending the whole record must not log every field as edited.
+    const fields = changedCustomerFields(before as Record<string, unknown>, parsed.data);
+    if (fields.length) {
+      logActivity(ctx, "customer.updated", {
+        entityType: "customer", entityId: row.id, customerId: row.id,
+        meta: { fields },
+      });
+    }
     res.json({ ...row, portalToken: undefined });
   });
 
@@ -737,6 +782,15 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         .where(and(eq(crmFinanceClicks.orgId, orgId), eq(crmFinanceClicks.customerId, c.id)));
       await tx.delete(crmAttachments)
         .where(and(eq(crmAttachments.orgId, orgId), eq(crmAttachments.refId, c.id)));
+      // Bell items that open this client (their page or inbox thread) or one
+      // of their projects — left behind they would link to a deleted record.
+      const linkPrefix = (path: string) => `${path.replace(/[\\%_]/g, "\\$&")}%`;
+      await tx.delete(crmNotifications)
+        .where(and(eq(crmNotifications.orgId, orgId), or(
+          sql`${crmNotifications.link} like ${linkPrefix(`/crm/clients/${c.id}`)}`,
+          sql`${crmNotifications.link} like ${linkPrefix(`/crm/inbox?c=${c.id}`)}`,
+          ...projIds.map((id) => sql`${crmNotifications.link} like ${linkPrefix(`/crm/projects/${id}`)}`),
+        )));
       await tx.delete(crmCustomers)
         .where(and(eq(crmCustomers.orgId, orgId), eq(crmCustomers.id, c.id)));
     });
@@ -837,7 +891,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const [before] = await db.select({ status: crmProjects.status }).from(crmProjects)
       .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).limit(1);
     const patch: any = { ...parsed.data, updatedAt: new Date() };
-    if (parsed.data.status) patch.stageChangedAt = new Date();
+    // Time-in-stage restarts only on a real move — the edit dialog and API
+    // callers may resend the unchanged status with other edits.
+    if (parsed.data.status && before?.status !== parsed.data.status) patch.stageChangedAt = new Date();
     const [row] = await db.update(crmProjects).set(patch)
       .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).returning();
     if (!row) return res.status(404).json({ message: "Project not found" });

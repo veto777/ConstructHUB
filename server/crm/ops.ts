@@ -504,6 +504,13 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       entityType: "payment", entityId: pay.id, customerId: pay.customerId,
       meta: { number: invoice?.number ?? null, change: `payment of ${usd(pay.amountCents)} reversed`, invoiceId: pay.invoiceId },
     });
+    // Subscribers that were told payment.succeeded (and maybe invoice.paid)
+    // hear about the reversal too, with the invoice balance it left behind.
+    await emitCrmEvent(ctx.org.id, "payment.reversed", {
+      paymentId: pay.id, amountCents: pay.amountCents, method: pay.method, reason,
+      invoiceId: pay.invoiceId, projectId: pay.projectId,
+      invoiceStatus: invoice?.status ?? null, invoicePaidCents: invoice?.paidCents ?? null,
+    });
     res.json({ payment: pay, invoice });
   });
 
@@ -832,11 +839,15 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       amountCents: z.number().int().min(0), externalOrderId: z.string().max(120).nullable().optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid commitment", issues: parsed.error.issues });
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmCommitments)
-      .where(eq(crmCommitments.orgId, ctx.org.id));
-    const [row] = await db.insert(crmCommitments).values({
-      ...parsed.data, orgId: ctx.org.id, projectId: proj.id, number: `PO-${1000 + n + 1}`,
-    } as any).returning();
+    // Numbered inside the insert transaction under the org's PO lock — never
+    // count(*)+1, which repeats a number after a delete and races.
+    const row = await db.transaction(async (tx) => {
+      const number = await nextDocNumber(tx, "PO", ctx.org.id);
+      const [inserted] = await tx.insert(crmCommitments).values({
+        ...parsed.data, orgId: ctx.org.id, projectId: proj.id, number,
+      } as any).returning();
+      return inserted;
+    });
     res.status(201).json(row);
   });
 
@@ -893,12 +904,16 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       costCodeId: z.string().nullable().optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid change order", issues: parsed.error.issues });
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmChangeOrders)
-      .where(eq(crmChangeOrders.orgId, ctx.org.id));
-    const [row] = await db.insert(crmChangeOrders).values({
-      ...parsed.data, orgId: ctx.org.id, projectId: proj.id, customerId: proj.customerId,
-      number: `CO-${100 + n + 1}`, publicToken: tok(),
-    } as any).returning();
+    // Same numbering rule as invoices and POs: allocated under the org's CO
+    // lock inside the insert transaction (the CO series starts at CO-101).
+    const row = await db.transaction(async (tx) => {
+      const number = await nextDocNumber(tx, "CO", ctx.org.id);
+      const [inserted] = await tx.insert(crmChangeOrders).values({
+        ...parsed.data, orgId: ctx.org.id, projectId: proj.id, customerId: proj.customerId,
+        number, publicToken: tok(),
+      } as any).returning();
+      return inserted;
+    });
     res.status(201).json({ ...row, publicPath: `/co/${row.publicToken}` });
   });
 
@@ -1031,6 +1046,19 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     actualCents: z.number().int().min(0).nullable().optional(),
   }), "manageJobs");
 
+  const dailyLogSchema = z.object({
+    logDate: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "Enter a valid log date.").optional(),
+    weather: z.string().max(100).nullable().optional(),
+    tempF: z.number().int().min(-80).max(150).nullable().optional(),
+    crewCount: z.number().int().min(0).max(500).nullable().optional(),
+    hoursMilli: z.number().int().min(0).nullable().optional(),
+    workCompleted: z.string().max(20000).nullable().optional(),
+    delays: z.string().max(8000).nullable().optional(),
+    visitors: z.string().max(2000).nullable().optional(),
+    safetyNotes: z.string().max(8000).nullable().optional(),
+    photoUrls: z.array(z.string().max(1000)).max(50).nullable().optional(),
+  });
+
   app.get("/api/crm/projects/:id/daily-logs", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -1047,17 +1075,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (!ctx) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
-    const parsed = z.object({
-      logDate: z.string().optional(), weather: z.string().max(100).nullable().optional(),
-      tempF: z.number().int().min(-80).max(150).nullable().optional(),
-      crewCount: z.number().int().min(0).max(500).nullable().optional(),
-      hoursMilli: z.number().int().min(0).nullable().optional(),
-      workCompleted: z.string().max(20000).nullable().optional(),
-      delays: z.string().max(8000).nullable().optional(),
-      visitors: z.string().max(2000).nullable().optional(),
-      safetyNotes: z.string().max(8000).nullable().optional(),
-      photoUrls: z.array(z.string().max(1000)).max(50).nullable().optional(),
-    }).safeParse(req.body);
+    const parsed = dailyLogSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid daily log", issues: parsed.error.issues });
     // Any crew member can file a log — that's the point of a daily log.
     const [row] = await db.insert(crmDailyLogs).values({
@@ -1066,6 +1084,52 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       logDate: parsed.data.logDate ? new Date(parsed.data.logDate) : new Date(),
     } as any).returning();
     res.status(201).json(row);
+  });
+
+  /**
+   * Load a daily log for an edit or delete: in the caller's org, on a project
+   * of that org, and written by the caller unless they can manage jobs (a
+   * crew member fixes their own typo; a PM or owner can fix anyone's).
+   */
+  async function editableDailyLog(ctx: OrgContext, logId: string, res: any) {
+    const [log] = await db.select().from(crmDailyLogs)
+      .where(and(eq(crmDailyLogs.orgId, ctx.org.id), eq(crmDailyLogs.id, logId))).limit(1);
+    if (!log || !(await ownProject(ctx.org.id, log.projectId))) {
+      res.status(404).json({ message: "Daily log not found" });
+      return null;
+    }
+    if (log.authorMemberId !== ctx.member.id && !ctx.permissions.manageJobs) {
+      res.status(403).json({ message: "Only the log's author or someone who can manage jobs can change it." });
+      return null;
+    }
+    return log;
+  }
+
+  app.patch("/api/crm/daily-logs/:logId", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const parsed = dailyLogSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid daily log", issues: parsed.error.issues });
+    const log = await editableDailyLog(ctx, req.params.logId, res);
+    if (!log) return;
+    const { logDate, ...rest } = parsed.data;
+    const patch: Record<string, unknown> = { ...rest };
+    if (logDate !== undefined) patch.logDate = new Date(logDate);
+    if (!Object.keys(patch).length) return res.json(log);
+    // crm_daily_logs has no updated_at column — nothing else to stamp.
+    const [row] = await db.update(crmDailyLogs).set(patch as any)
+      .where(and(eq(crmDailyLogs.orgId, ctx.org.id), eq(crmDailyLogs.id, log.id))).returning();
+    res.json(row);
+  });
+
+  app.delete("/api/crm/daily-logs/:logId", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const log = await editableDailyLog(ctx, req.params.logId, res);
+    if (!log) return;
+    await db.delete(crmDailyLogs)
+      .where(and(eq(crmDailyLogs.orgId, ctx.org.id), eq(crmDailyLogs.id, log.id)));
+    res.json({ ok: true });
   });
 
   // ══ PERMITS — our moat, finally wired to the CRM ═══════════════════════════
@@ -1187,7 +1251,19 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       url: z.string().url().max(500),
       events: z.array(z.enum(CRM_WEBHOOK_EVENTS as unknown as [string, ...string[]])).min(1).max(40),
     }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid webhook", issues: parsed.error.issues });
+    if (!parsed.success) {
+      // One plain sentence for the toast; the raw issues stay for API callers.
+      const issue = parsed.error.issues[0];
+      const field = issue?.path?.[0];
+      const message = field === "url"
+        ? "Webhook URL must be a full web address, e.g. https://example.com/hooks/crm."
+        : field === "events" && issue.code === "invalid_enum_value"
+          ? `"${String(issue.received)}" isn't a webhook event this CRM sends.`
+          : field === "events" && issue.code === "too_big"
+            ? `Pick at most ${issue.maximum} events.`
+            : field === "events" ? "Pick at least one event to send." : "Invalid webhook";
+      return res.status(400).json({ message, issues: parsed.error.issues });
+    }
     // SSRF guard: refuse anything that resolves to a private/loopback address
     // (covers IPv4-mapped IPv6, 0.0.0.0, ULA and DNS pointing at RFC1918).
     // Delivery re-checks on every send — see emitCrmEvent.

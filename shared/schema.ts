@@ -420,7 +420,9 @@ export const stateGuides = pgTable("state_guides", {
   stateCode: text("state_code").notNull().unique(),
   stateName: text("state_name").notNull(),
   sosName: text("sos_name").notNull(),
-  sosUrl: text("sos_url").notNull(),
+  // Nullable: a Secretary of State link that goes dead becomes null (never a
+  // guessed replacement) — the UI then offers an honest search fallback.
+  sosUrl: text("sos_url"),
   entityTypes: text("entity_types").array(),
   licensingBoardName: text("licensing_board_name"),
   licensingBoardUrl: text("licensing_board_url"),
@@ -439,6 +441,15 @@ export const stateGuides = pgTable("state_guides", {
   insuranceNotes: text("insurance_notes"),
   payrollNotes: text("payroll_notes"),
   overview: text("overview"),
+  // Link-check result per agency URL (link policy: verified | unconfirmed |
+  // dead | none) and the date the links were last checked ("2026-09-30"),
+  // from server/data/state-guides.json. Null = not checked yet. Added by
+  // server/state-guides-schema.ts (ALTER … ADD COLUMN IF NOT EXISTS).
+  sosUrlStatus: text("sos_url_status"),
+  licensingBoardUrlStatus: text("licensing_board_url_status"),
+  workersCompUrlStatus: text("workers_comp_url_status"),
+  taxBoardUrlStatus: text("tax_board_url_status"),
+  linksCheckedAt: text("links_checked_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -2158,6 +2169,8 @@ export const CRM_WEBHOOK_EVENTS = [
   "changeorder.approved", "changeorder.declined",
   "appointment.scheduled", "appointment.completed",
   "payment.succeeded", "payment.failed",
+  // An owner reversed a mistyped manual payment (POST /api/crm/payments/:id/reverse).
+  "payment.reversed",
 ] as const;
 
 export type CrmInvoice = typeof crmInvoices.$inferSelect;
