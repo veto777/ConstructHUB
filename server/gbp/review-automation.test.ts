@@ -16,7 +16,7 @@ const add=async(rating=5,date=new Date(),draft:string|null=null)=> (await pool.q
   VALUES($1,$2,'accounts/ai/locations/ai/reviews/'||gen_random_uuid(),'AI fixture',$3,'Untrusted review text',$4,$5) RETURNING id`,[user,id,rating,date,draft])).rows[0].id;
 const state=async(review:number)=>(await pool.query('SELECT * FROM gbp_review_automation WHERE review_id=$1',[review])).rows[0];
 beforeAll(async()=>{
-  const url=new URL(process.env.DATABASE_URL!);if(url.pathname!=='/constructhub_dev_a2'||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a2 only');
+  const url=new URL(process.env.DATABASE_URL!);if(!/^\/constructhub_dev(?:_a[1-5])?$/.test(url.pathname)||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('Local isolated development DB required');
   await ensureGbpSchema();await ensureAccountEventsSchema();await ensureProfileGuardSchema();
   const {rows}=await pool.query("INSERT INTO users(email) VALUES('ai-'||gen_random_uuid()||'@example.invalid'),('ai-'||gen_random_uuid()||'@example.invalid') RETURNING id");[user,other]=rows.map(r=>r.id);
   id=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name) VALUES($1,'AI fixture','accounts/ai','locations/ai') RETURNING id",[user])).rows[0].id;
