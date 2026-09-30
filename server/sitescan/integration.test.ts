@@ -512,6 +512,30 @@ it("owners can remove their PDF branding and it never touches another owner's", 
     await pool.query("DELETE FROM users WHERE id=ANY($1::int[])", [users]);
   }
 });
+it("renaming PDF branding without a logo field keeps the saved logo; null removes it", async () => {
+  const {
+    rows: [{ id: user }],
+  } = await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [
+    `sitescan-brand-keep-${randomUUID()}@example.invalid`,
+  ]);
+  const png =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jA1kAAAAASUVORK5CYII=";
+  const read = async () => (await call("get", "/api/sitescan/branding", { user })).body;
+  try {
+    // A first save without a logo field still creates the row with no logo.
+    expect((await call("post", "/api/sitescan/branding", { body: { name: "First" }, user })).status).toBe(200);
+    expect(await read()).toEqual({ name: "First", logo: null });
+    expect((await call("post", "/api/sitescan/branding", { body: { name: "Logo", logo: png }, user })).status).toBe(200);
+    const saved = (await read()).logo;
+    expect(saved).toMatch(/^data:image\/png;base64,/);
+    expect((await call("post", "/api/sitescan/branding", { body: { name: "Renamed" }, user })).status).toBe(200);
+    expect(await read()).toEqual({ name: "Renamed", logo: saved });
+    expect((await call("post", "/api/sitescan/branding", { body: { name: "No logo", logo: null }, user })).status).toBe(200);
+    expect(await read()).toEqual({ name: "No logo", logo: null });
+  } finally {
+    await pool.query("DELETE FROM users WHERE id=$1", [user]);
+  }
+});
 it("rotates bearer shares and enforces share and email verification expiry", async () => {
   const share = async () => (await call("post", "/api/sitescan/jobs/:id/share", { params: { id: own } })).body.path.split("/").pop();
   const read = (value: string) => call("get", "/api/sitescan/shared/:token", { params: { token: value }, user: null });

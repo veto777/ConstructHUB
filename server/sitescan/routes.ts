@@ -208,7 +208,9 @@ export function registerSiteScanRoutes(
           .max(300000)
           .regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/)
           .nullable()
-          .default(null),
+          // Omitted keeps the saved logo, so a rename never re-sends it (the stored, normalized PNG
+          // can exceed this upload cap); null removes it.
+          .optional(),
       })
       .strict()
       .parse(req.body);
@@ -232,10 +234,16 @@ export function registerSiteScanRoutes(
         throw new TypeError("Invalid logo");
       }
     }
-    await pool.query(
-      "INSERT INTO sitescan_branding(user_id,name,logo) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET name=$2,logo=$3",
-      [user, b.name, b.logo],
-    );
+    if (b.logo === undefined)
+      await pool.query(
+        "INSERT INTO sitescan_branding(user_id,name) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET name=$2",
+        [user, b.name],
+      );
+    else
+      await pool.query(
+        "INSERT INTO sitescan_branding(user_id,name,logo) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET name=$2,logo=$3",
+        [user, b.name, b.logo],
+      );
     res.json({ ok: true });
   });
   // Removing branding returns PDFs to the ConstructHUB title. Agency members never reach this

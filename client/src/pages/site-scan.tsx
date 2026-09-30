@@ -1133,13 +1133,18 @@ export default function SiteScanPage() {
                             action(async () => {
                               await api("POST", "/api/sitescan/branding", {
                                 name: agencyName,
-                                logo,
+                                // Send the logo only when it changed; an omitted logo keeps the saved one
+                                // (the stored, normalized image can be larger than an upload may be).
+                                ...(logo === (brand?.logo ?? null) ? {} : { logo }),
                               });
                               await cache.invalidateQueries({
                                 queryKey: ["/api/sitescan/branding"],
                               });
+                              const saved = cache.getQueryData<any>([
+                                "/api/sitescan/branding",
+                              ]);
                               setBrandNotice(
-                                `PDF branding saved${logo ? " with logo" : " without a logo"}. It applies to your next PDF export.`,
+                                `PDF branding saved${(saved ? saved.logo : logo) ? " with logo" : " without a logo"}. It applies to your next PDF export.`,
                               );
                             })
                           }
