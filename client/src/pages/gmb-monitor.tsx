@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { GmbListing, GmbEditHistory } from "@shared/schema";
 import {
@@ -88,6 +92,11 @@ function ListingCard({ listing }: { listing: GmbListing }) {
     enabled: expanded,
   });
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  // The first check only records a baseline (the server compares nothing until
+  // lastCheckedAt is set), so it must not be reported as "no changes".
+  const isBaseline = !listing.lastCheckedAt;
+
   const checkMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/gmb/listings/${listing.id}/check`);
@@ -97,13 +106,15 @@ function ListingCard({ listing }: { listing: GmbListing }) {
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings", listing.id, "history"] });
       const changeCount = data.changes?.length || 0;
-      toast({
-        title: changeCount > 0 ? `${changeCount} change(s) detected` : "No changes detected",
-        description: changeCount > 0 ? "Changes have been logged to edit history." : "Your listing matches the current Google data.",
-      });
+      toast(isBaseline
+        ? { title: "Baseline captured", description: "Later checks compare the listing against today's Google data." }
+        : {
+            title: changeCount > 0 ? `${changeCount} change(s) detected` : "No changes detected",
+            description: changeCount > 0 ? "Changes have been logged to edit history." : "Your listing matches the current Google data.",
+          });
     },
     onError: (err: Error) => {
-      toast({ title: "Check failed", description: err.message, variant: "destructive" });
+      toast({ title: "Check failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -115,6 +126,9 @@ function ListingCard({ listing }: { listing: GmbListing }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings"] });
     },
+    onError: (err: Error) => {
+      toast({ title: "Could not update listing", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -124,6 +138,9 @@ function ListingCard({ listing }: { listing: GmbListing }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings"] });
       toast({ title: "Listing removed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not remove listing", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -160,17 +177,19 @@ function ListingCard({ listing }: { listing: GmbListing }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5">
-            <Label className="text-[10px] text-muted-foreground">Monitor</Label>
+            <Label htmlFor={`switch-monitor-${listing.id}`} className="text-[10px] leading-tight text-right text-muted-foreground max-w-[4.5rem] sm:max-w-none">Include in Check All</Label>
             <Switch
+              id={`switch-monitor-${listing.id}`}
               checked={listing.isMonitoring}
               onCheckedChange={(val) => toggleMutation.mutate(val)}
+              disabled={toggleMutation.isPending}
               data-testid={`switch-monitor-${listing.id}`}
             />
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/40">
+      <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border/40">
         <Button
           size="sm"
           variant="outline"
@@ -198,18 +217,40 @@ function ListingCard({ listing }: { listing: GmbListing }) {
           size="sm"
           variant="ghost"
           className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-          onClick={() => deleteMutation.mutate()}
+          onClick={() => setConfirmDelete(true)}
           disabled={deleteMutation.isPending}
+          aria-label={`Remove ${listing.businessName}`}
           data-testid={`button-delete-${listing.id}`}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
-        {listing.lastCheckedAt && (
-          <span className="text-[10px] text-muted-foreground">
-            Last checked: {new Date(listing.lastCheckedAt).toLocaleDateString()}
-          </span>
-        )}
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap" data-testid={`text-last-checked-${listing.id}`}>
+          {listing.lastCheckedAt
+            ? `Last checked: ${new Date(listing.lastCheckedAt).toLocaleDateString()}`
+            : "Not checked yet"}
+        </span>
       </div>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent data-testid={`dialog-delete-listing-${listing.id}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {listing.businessName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the listing from ConstructHUB together with its edit history. Nothing changes on Google. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid={`button-cancel-delete-${listing.id}`}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteMutation.mutate()}
+              data-testid={`button-confirm-delete-${listing.id}`}
+            >
+              Remove listing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {expanded && (
         <div className="mt-3 pt-2 border-t border-border/40">
@@ -228,7 +269,9 @@ function ListingCard({ listing }: { listing: GmbListing }) {
               <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-400/50" />
               <p className="text-xs text-muted-foreground">No edits detected yet</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Click "Check Now" to scan for changes
+                {listing.lastCheckedAt
+                  ? 'Click "Check Now" to compare the listing against Google again'
+                  : 'Click "Check Now" to capture a baseline; later checks compare against it'}
               </p>
             </div>
           )}
@@ -264,7 +307,13 @@ function ReviewResponseTool() {
       setShowWarning(false);
     },
     onError: (err: Error) => {
-      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+      // A 5xx here means the AI provider call failed, not the user's input.
+      const serverFault = /^5\d\d:/.test(err.message);
+      toast({
+        title: serverFault ? "AI responses are unavailable right now" : "Generation failed",
+        description: serverFault ? "Please try again later." : apiErrorMessage(err),
+        variant: "destructive",
+      });
     },
   });
 
@@ -411,15 +460,21 @@ export default function GmbMonitorPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings"] });
       setSearchResults([]);
       setSearchQuery("");
-      toast({ title: "Business added", description: "Monitoring will begin tracking changes." });
+      toast({ title: "Listing added", description: "Click Check Now on the listing to capture a baseline from Google." });
     },
     onError: (err: Error) => {
-      toast({ title: "Failed to add", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to add", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
+  const [searchError, setSearchError] = useState("");
+
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (searchQuery.trim().length < 2) {
+      setSearchError("Enter at least 2 characters.");
+      return;
+    }
+    setSearchError("");
     setIsSearching(true);
     setSearchResults([]);
     try {
@@ -430,8 +485,8 @@ export default function GmbMonitorPage() {
       } else {
         toast({ title: "No results", description: "Try a different search." });
       }
-    } catch {
-      toast({ title: "Search failed", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Search failed", description: apiErrorMessage(err), variant: "destructive" });
     } finally {
       setIsSearching(false);
     }
@@ -439,24 +494,47 @@ export default function GmbMonitorPage() {
 
   const checkAllMutation = useMutation({
     mutationFn: async () => {
-      if (!listings) return;
-      const active = listings.filter(l => l.isMonitoring);
+      const active = (listings ?? []).filter(l => l.isMonitoring);
       let totalChanges = 0;
+      let baselines = 0;
+      let failed = 0;
+      let firstError = "";
       for (const listing of active) {
         try {
           const res = await apiRequest("POST", `/api/gmb/listings/${listing.id}/check`);
           const data = await res.json();
+          if (!listing.lastCheckedAt) baselines++;
           totalChanges += data.changes?.length || 0;
-        } catch {}
+        } catch (err) {
+          failed++;
+          if (!firstError) firstError = `${listing.businessName}: ${apiErrorMessage(err)}`;
+        }
       }
-      return totalChanges;
+      return { total: active.length, totalChanges, baselines, failed, firstError };
     },
-    onSuccess: (totalChanges) => {
+    onSuccess: ({ total, totalChanges, baselines, failed, firstError }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings"] });
+      const checked = total - failed;
+      const parts: string[] = [];
+      if (totalChanges) parts.push(`${totalChanges} change(s) detected.`);
+      if (baselines) parts.push(`${baselines} baseline(s) captured.`);
+      if (failed > 0) {
+        // Never report "no changes" for a listing that was not actually checked.
+        if (checked > 0 && !totalChanges) parts.push(`No changes in the ${checked} checked.`);
+        toast({
+          title: `${failed} of ${total} listing${total === 1 ? "" : "s"} could not be checked`,
+          description: [...parts, firstError].join(" "),
+          variant: "destructive",
+        });
+        return;
+      }
       toast({
-        title: "All listings checked",
-        description: totalChanges ? `${totalChanges} total change(s) detected.` : "No changes detected across any listings.",
+        title: `${total} listing${total === 1 ? "" : "s"} checked`,
+        description: parts.length ? parts.join(" ") : "No changes detected across the checked listings.",
       });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Check All failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -473,7 +551,7 @@ export default function GmbMonitorPage() {
             </h1>
             <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
             <p className="text-sm text-muted-foreground mt-1 max-w-lg">
-              Your Google Business listing can be edited by anyone — Google, competitors, or random users. Monitor every change in real time so unauthorized edits never cost you leads.
+              Your Google Business listing can be edited by anyone — Google, competitors, or random users. Check your listing against Google's public data whenever you like, and keep a history of every change a check finds. Checks run only when you click Check Now or Check All — there are no automatic checks or alerts.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -511,8 +589,10 @@ export default function GmbMonitorPage() {
               <Input
                 placeholder="Business name, address, or Google Maps URL..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => { setSearchQuery(e.target.value); if (searchError) setSearchError(""); }}
                 onKeyDown={e => e.key === "Enter" && handleSearch()}
+                aria-invalid={!!searchError}
+                aria-describedby={searchError ? "gmb-search-error" : undefined}
                 data-testid="input-gmb-search"
               />
               <Button
@@ -523,6 +603,9 @@ export default function GmbMonitorPage() {
                 {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
             </div>
+            {searchError && (
+              <p id="gmb-search-error" role="alert" className="text-xs text-destructive mt-1.5" data-testid="text-gmb-search-error">{searchError}</p>
+            )}
             {searchResults.length > 0 && (
               <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
                 {searchResults.map((r: any, i: number) => (
@@ -568,9 +651,9 @@ export default function GmbMonitorPage() {
         ) : (
           <Card className="p-12 text-center">
             <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
-            <h3 className="text-lg font-semibold mb-1">No listings being monitored</h3>
+            <h3 className="text-lg font-semibold mb-1">No listings added yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Add your Google Business listings to start tracking changes like name edits, address updates, photo count changes, and more.
+              Add your Google Business listings, then use Check Now to spot changes like name edits, address updates, photo count changes, and more.
             </p>
             <Button onClick={() => setShowAddForm(true)} data-testid="button-add-first">
               <Plus className="h-4 w-4 mr-2" /> Add Your First Business

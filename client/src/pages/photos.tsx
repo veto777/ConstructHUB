@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { GBP_CATEGORIES } from "@/data/gbp-categories";
 
 const GENERIC_SUFFIXES = [
@@ -206,6 +210,10 @@ function loadTemplates(): PhotoTemplate[] {
   return [];
 }
 
+/** Nearby-city lookups carry a distance; cities typed in by hand don't (null). */
+type ServiceArea = { name: string; state: string; distance: number | null };
+const serviceAreaKey = (r: { name: string; state: string }) => (r.state ? `${r.name}, ${r.state}` : r.name);
+
 function saveTemplates(templates: PhotoTemplate[]) {
   localStorage.setItem("gmb-photo-templates", JSON.stringify(templates));
 }
@@ -221,6 +229,7 @@ export default function PhotosPage() {
   const [businessCollapsed, setBusinessCollapsed] = useState(true);
 
   const [businessQuery, setBusinessQuery] = useState("");
+  const [businessSearchError, setBusinessSearchError] = useState("");
   const [businessResults, setBusinessResults] = useState<any[]>([]);
   const [businessSearching, setBusinessSearching] = useState(false);
   const [businessNextPageToken, setBusinessNextPageToken] = useState<string | null>(null);
@@ -236,7 +245,7 @@ export default function PhotosPage() {
   const [serviceAreaTypes, setServiceAreaTypes] = useState<Set<string>>(new Set(["locality"]));
   const [serviceAreaDensity, setServiceAreaDensity] = useState<"low" | "medium" | "high" | "max">("medium");
   const [serviceAreaNameFilter, setServiceAreaNameFilter] = useState<string>("");
-  const [serviceAreaResults, setServiceAreaResults] = useState<{ name: string; state: string; distance: number }[]>([]);
+  const [serviceAreaResults, setServiceAreaResults] = useState<ServiceArea[]>([]);
   const [selectedServiceAreas, setSelectedServiceAreas] = useState<Set<string>>(new Set());
   const [serviceAreaLoading, setServiceAreaLoading] = useState(false);
   const [manualCityInput, setManualCityInput] = useState<string>("");
@@ -329,6 +338,17 @@ export default function PhotosPage() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  // "rename" changes only the name; "overwrite" replaces the stored settings with
+  // the page's current ones; "new" saves the current settings as a new template.
+  const [templateMode, setTemplateMode] = useState<"new" | "rename" | "overwrite">("new");
+  const [templateToDelete, setTemplateToDelete] = useState<PhotoTemplate | null>(null);
+
+  const closeTemplateForm = () => {
+    setTemplateName("");
+    setShowSaveTemplate(false);
+    setEditingTemplateId(null);
+    setTemplateMode("new");
+  };
 
   const handleSaveTemplate = () => {
     const name = templateName.trim();
@@ -336,8 +356,19 @@ export default function PhotosPage() {
       toast({ title: "Enter a template name", variant: "destructive" });
       return;
     }
+    if (templateMode === "rename" && editingTemplateId) {
+      setTemplates(prev => {
+        const updated = prev.map(t => (t.id === editingTemplateId ? { ...t, name } : t));
+        saveTemplates(updated);
+        return updated;
+      });
+      closeTemplateForm();
+      toast({ title: "Template renamed", description: `Now called "${name}". Its settings are unchanged.` });
+      return;
+    }
+    const overwriting = templateMode === "overwrite" && !!editingTemplateId;
     const newTemplate: PhotoTemplate = {
-      id: editingTemplateId || `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: overwriting ? editingTemplateId! : `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name,
       businessInfo,
       category: categories.join(", "),
@@ -349,16 +380,16 @@ export default function PhotosPage() {
       createdAt: Date.now(),
     };
     setTemplates(prev => {
-      const updated = editingTemplateId
+      const updated = overwriting
         ? prev.map(t => (t.id === editingTemplateId ? newTemplate : t))
         : [...prev, newTemplate];
       saveTemplates(updated);
       return updated;
     });
-    setTemplateName("");
-    setShowSaveTemplate(false);
-    setEditingTemplateId(null);
-    toast({ title: editingTemplateId ? "Template updated" : "Template saved", description: `"${name}" saved for quick use.` });
+    closeTemplateForm();
+    toast(overwriting
+      ? { title: "Template overwritten", description: `"${name}" now holds your current settings.` }
+      : { title: "Template saved", description: `"${name}" saved for quick use.` });
   };
 
   const loadTemplate = (tpl: PhotoTemplate) => {
@@ -379,11 +410,13 @@ export default function PhotosPage() {
       saveTemplates(updated);
       return updated;
     });
+    if (editingTemplateId === id) closeTemplateForm();
     toast({ title: "Template deleted" });
   };
 
-  const startEditTemplate = (tpl: PhotoTemplate) => {
+  const startEditTemplate = (tpl: PhotoTemplate, mode: "rename" | "overwrite") => {
     setEditingTemplateId(tpl.id);
+    setTemplateMode(mode);
     setTemplateName(tpl.name);
     setShowSaveTemplate(true);
   };
@@ -581,12 +614,12 @@ export default function PhotosPage() {
       const seen = new Set(prev.map(r => `${r.name.toLowerCase()}|${r.state.toLowerCase()}`));
       const additions = parsed
         .filter(p => !seen.has(`${p.name.toLowerCase()}|${p.state.toLowerCase()}`))
-        .map(p => ({ name: p.name, state: p.state, distance: 0 }));
+        .map(p => ({ name: p.name, state: p.state, distance: null }));
       return [...prev, ...additions];
     });
     setSelectedServiceAreas(prev => {
       const next = new Set(prev);
-      for (const p of parsed) next.add(p.state ? `${p.name}, ${p.state}` : p.name);
+      for (const p of parsed) next.add(serviceAreaKey(p));
       return next;
     });
     setManualCityInput("");
@@ -618,7 +651,12 @@ export default function PhotosPage() {
   };
 
   const searchBusiness = async () => {
-    if (!businessQuery.trim()) return;
+    // The server needs at least 2 characters; say so here instead of a vague failure.
+    if (businessQuery.trim().length < 2) {
+      if (businessQuery.trim()) setBusinessSearchError("Enter at least 2 characters.");
+      return;
+    }
+    setBusinessSearchError("");
     setBusinessSearching(true);
     setBusinessResults([]);
     setBusinessNextPageToken(null);
@@ -631,8 +669,8 @@ export default function PhotosPage() {
       } else {
         toast({ title: "No results found", description: "Google's business index doesn't have this name. Paste the business's Google Maps share link (maps.app.goo.gl/...) instead — that always works." });
       }
-    } catch {
-      toast({ title: "Search failed", description: "Could not look up business info. Try again.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Search failed", description: apiErrorMessage(err, "Could not look up business info. Try again."), variant: "destructive" });
     } finally {
       setBusinessSearching(false);
     }
@@ -812,25 +850,35 @@ export default function PhotosPage() {
     setSelectedKeywords(new Set());
   };
 
+  /** Keep JPG/PNG files and say how many others were skipped, never drop them silently. */
+  const acceptPhotoFiles = (list: FileList | File[]) => {
+    const all = Array.from(list);
+    const files = all.filter(f => /\.(jpe?g|png)$/i.test(f.name));
+    const skipped = all.length - files.length;
+    if (skipped > 0) {
+      toast({
+        title: "Only JPG and PNG photos are supported",
+        description: `${skipped} file${skipped === 1 ? "" : "s"} skipped${files.length ? `; ${files.length} added` : ""}.`,
+        variant: "destructive",
+      });
+    }
+    return files;
+  };
+
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter(f =>
-      /\.(jpe?g|png)$/i.test(f.name)
-    );
-    addFiles(files);
+    addFiles(acceptPhotoFiles(e.dataTransfer.files));
   }, []);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).filter(f =>
-        /\.(jpe?g|png)$/i.test(f.name)
-      );
-      addFiles(files);
+      addFiles(acceptPhotoFiles(e.target.files));
       e.target.value = "";
     }
   }, []);
 
   const addFiles = (files: File[]) => {
+    if (files.length === 0) return;
     const newFiles: UploadedFile[] = files.map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       file,
@@ -891,6 +939,8 @@ export default function PhotosPage() {
   });
 
   const [useAIDescriptions, setUseAIDescriptions] = useState(false);
+  // Descriptions that could not be generated for the current processing run.
+  const descriptionIssueRef = useRef<{ failed: number; total: number; ai: boolean; message: string } | null>(null);
 
   const descriptionMutation = useMutation({
     mutationFn: async ({ fileId, fileName }: { fileId: string; fileName: string }) => {
@@ -958,8 +1008,19 @@ export default function PhotosPage() {
       }
       const errCount = data.errors?.length || 0;
       const successCount = (data.processed || []).length;
+      const descIssue = descriptionIssueRef.current;
+      descriptionIssueRef.current = null;
+      const descNote = descIssue
+        ? `${descIssue.failed} of ${descIssue.total} photo(s) were processed without a description (${descIssue.message}).${descIssue.ai ? " Turn off AI Descriptions to use the standard descriptions, or try again later." : ""}`
+        : "";
       if (errCount > 0) {
-        toast({ title: `${successCount} photos processed`, description: `${errCount} photo(s) had errors and were skipped.`, variant: "destructive" });
+        toast({ title: `${successCount} photos processed`, description: [`${errCount} photo(s) had errors and were skipped.`, descNote].filter(Boolean).join(" "), variant: "destructive" });
+      } else if (descIssue) {
+        toast({
+          title: descIssue.ai ? "Photos processed — AI descriptions unavailable" : "Photos processed — some descriptions missing",
+          description: descNote,
+          variant: "destructive",
+        });
       } else {
         toast({ title: "Photos processed!", description: "Scroll down to download your optimized photos." });
       }
@@ -1006,6 +1067,8 @@ export default function PhotosPage() {
 
     setProcessingStep("Generating AI descriptions...");
     const descMap: Record<string, string> = {};
+    let descFailed = 0;
+    let descError = "";
     for (let i = 0; i < uploadedFiles.length; i++) {
       const localFile = uploadedFiles[i];
       const fid = fileIds[i];
@@ -1024,8 +1087,15 @@ export default function PhotosPage() {
         });
         descMap[fid] = data.description;
         setDescriptions(prev => ({ ...prev, [localFile.id]: data.description }));
-      } catch {}
+      } catch (err) {
+        // The photo is still processed, just without a description — report it below.
+        descFailed++;
+        if (!descError) descError = apiErrorMessage(err).replace(/\.$/, "");
+      }
     }
+    descriptionIssueRef.current = descFailed
+      ? { failed: descFailed, total: uploadedFiles.length, ai: useAIDescriptions, message: descError }
+      : null;
 
     setProcessingStep("Geotagging address...");
     let lat = businessInfo.lat ?? null;
@@ -1122,7 +1192,7 @@ export default function PhotosPage() {
           </h1>
           <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
           <p className="text-sm text-muted-foreground max-w-lg">
-            Most contractors upload phone photos with zero optimization. Add watermarks, inject EXIF geotag data, generate AI descriptions, and create SEO-friendly filenames that actually boost your local rankings.
+            Add watermarks, write EXIF details and GPS geotags, generate descriptions, and give your job photos clear, keyword-rich filenames in one batch. Google strips EXIF on upload to a Business Profile, so geotags and metadata are for your own files and other sites — they don't promise a ranking benefit.
           </p>
         </div>
 
@@ -1142,6 +1212,7 @@ export default function PhotosPage() {
               variant="outline"
               onClick={() => {
                 setEditingTemplateId(null);
+                setTemplateMode("new");
                 setTemplateName(categories.join(", ") || "");
                 setShowSaveTemplate(true);
               }}
@@ -1155,7 +1226,12 @@ export default function PhotosPage() {
           {showSaveTemplate && (
             <div className="flex items-end gap-2" data-testid="template-save-form">
               <div className="flex-1 space-y-1.5">
-                <Label className="text-xs">Template name</Label>
+                <Label className="text-xs">
+                  {templateMode === "rename" ? "New template name" : "Template name"}
+                  {templateMode === "overwrite" && (
+                    <span className="text-muted-foreground font-normal"> — replaces this template's settings with your current ones</span>
+                  )}
+                </Label>
                 <Input
                   value={templateName}
                   onChange={e => setTemplateName(e.target.value)}
@@ -1166,12 +1242,13 @@ export default function PhotosPage() {
                 />
               </div>
               <Button size="sm" onClick={handleSaveTemplate} data-testid="button-confirm-save-template">
-                {editingTemplateId ? "Update" : "Save"}
+                {templateMode === "rename" ? "Rename" : templateMode === "overwrite" ? "Overwrite" : "Save"}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => { setShowSaveTemplate(false); setEditingTemplateId(null); setTemplateName(""); }}
+                onClick={closeTemplateForm}
+                aria-label="Cancel"
                 data-testid="button-cancel-save-template"
               >
                 <X className="h-4 w-4" />
@@ -1211,23 +1288,18 @@ export default function PhotosPage() {
                       <DropdownMenuItem onClick={() => loadTemplate(tpl)} data-testid={`menu-load-template-${tpl.id}`}>
                         <FolderOpen className="h-3.5 w-3.5 mr-2" /> Load
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => startEditTemplate(tpl)} data-testid={`menu-rename-template-${tpl.id}`}>
+                      <DropdownMenuItem onClick={() => startEditTemplate(tpl, "rename")} data-testid={`menu-rename-template-${tpl.id}`}>
                         <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          loadTemplate(tpl);
-                          setEditingTemplateId(tpl.id);
-                          setTemplateName(tpl.name);
-                          setShowSaveTemplate(true);
-                        }}
+                        onClick={() => startEditTemplate(tpl, "overwrite")}
                         data-testid={`menu-overwrite-template-${tpl.id}`}
                       >
                         <Save className="h-3.5 w-3.5 mr-2" /> Overwrite with current
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
-                        onClick={() => deleteTemplate(tpl.id)}
+                        onClick={() => setTemplateToDelete(tpl)}
                         data-testid={`menu-delete-template-${tpl.id}`}
                       >
                         <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
@@ -1238,6 +1310,27 @@ export default function PhotosPage() {
               ))}
             </div>
           )}
+
+          <AlertDialog open={!!templateToDelete} onOpenChange={o => { if (!o) setTemplateToDelete(null); }}>
+            <AlertDialogContent data-testid="dialog-delete-template">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete template “{templateToDelete?.name}”?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Its saved business info, categories, keywords and watermark settings will be removed from this browser. Your current page settings stay as they are. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete-template">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => { if (templateToDelete) deleteTemplate(templateToDelete.id); setTemplateToDelete(null); }}
+                  data-testid="button-confirm-delete-template"
+                >
+                  Delete template
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </Card>
 
         <Card className="p-5 animate-in-delay-1" style={{ boxShadow: "var(--shadow-sm)" }}>
@@ -1366,10 +1459,12 @@ export default function PhotosPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       value={businessQuery}
-                      onChange={e => setBusinessQuery(e.target.value)}
+                      onChange={e => { setBusinessQuery(e.target.value); if (businessSearchError) setBusinessSearchError(""); }}
                       onKeyDown={e => e.key === "Enter" && searchBusiness()}
                       placeholder="Business name + city, or Google Maps URL..."
                       className="pl-9"
+                      aria-invalid={!!businessSearchError}
+                      aria-describedby={businessSearchError ? "business-search-error" : undefined}
                       data-testid="input-business-search"
                     />
                   </div>
@@ -1382,6 +1477,9 @@ export default function PhotosPage() {
                     {businessSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
                   </Button>
                 </div>
+                {businessSearchError && (
+                  <p id="business-search-error" role="alert" className="text-xs text-destructive" data-testid="text-business-search-error">{businessSearchError}</p>
+                )}
                 {businessResults.length > 0 && (
                   <div className="space-y-2" data-testid="business-results">
                     {businessResults.map((r: any, i: number) => (
@@ -1671,10 +1769,10 @@ export default function PhotosPage() {
                   const data = await res.json();
                   const results = (data.results || []) as { name: string; state: string; distance: number }[];
                   setServiceAreaResults(results);
-                  setSelectedServiceAreas(new Set(results.map(r => `${r.name}, ${r.state}`)));
+                  setSelectedServiceAreas(new Set(results.map(serviceAreaKey)));
                   toast({ title: `Found ${results.length} areas`, description: `Within ${serviceAreaRadius} miles of your address.` });
                 } catch (err: any) {
-                  toast({ title: "Lookup failed", description: err?.message || "Could not fetch nearby areas", variant: "destructive" });
+                  toast({ title: "Lookup failed", description: apiErrorMessage(err, "Could not fetch nearby areas"), variant: "destructive" });
                 } finally {
                   setServiceAreaLoading(false);
                 }
@@ -1687,7 +1785,7 @@ export default function PhotosPage() {
             </Button>
             {serviceAreaResults.length > 0 && (
               <>
-                <Button variant="outline" size="sm" onClick={() => setSelectedServiceAreas(new Set(serviceAreaResults.map(r => `${r.name}, ${r.state}`)))} data-testid="button-select-all-areas">
+                <Button variant="outline" size="sm" onClick={() => setSelectedServiceAreas(new Set(serviceAreaResults.map(serviceAreaKey)))} data-testid="button-select-all-areas">
                   Select All
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setSelectedServiceAreas(new Set())} data-testid="button-clear-areas">
@@ -1753,7 +1851,7 @@ export default function PhotosPage() {
                 </div>
                 <div className="max-h-64 overflow-y-auto rounded-md border border-border p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
                   {filtered.map((r, i) => {
-                    const key = `${r.name}, ${r.state}`;
+                    const key = serviceAreaKey(r);
                     const checked = selectedServiceAreas.has(key);
                     return (
                       <label key={`${key}-${i}`} className="flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer" data-testid={`label-area-${i}`}>
@@ -1770,7 +1868,9 @@ export default function PhotosPage() {
                           data-testid={`checkbox-area-${i}`}
                         />
                         <span className="flex-1 truncate">{r.name}{r.state ? `, ${r.state}` : ""}</span>
-                        <span className="text-[11px] text-muted-foreground shrink-0">{r.distance} mi</span>
+                        {r.distance != null && (
+                          <span className="text-[11px] text-muted-foreground shrink-0">{r.distance} mi</span>
+                        )}
                       </label>
                     );
                   })}
@@ -2511,7 +2611,7 @@ export default function PhotosPage() {
             />
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Horizontally flips every photo so search engines see them as completely new images, not duplicates of what's already on your account or anywhere else online.
+            Flips every photo horizontally (a mirror image). Only use photos of your own work that you have the rights to.
           </p>
         </Card>
 

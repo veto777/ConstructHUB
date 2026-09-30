@@ -1,4 +1,3 @@
-import { useRef, useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -13,54 +12,26 @@ import {
 } from "lucide-react";
 import googleBusinessLogo from "@assets/google-business-logo.png";
 
-function CountUp({ end, suffix = "", prefix = "", duration = 2000 }: { end: number; suffix?: string; prefix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !started.current) {
-          started.current = true;
-          const start = Date.now();
-          const tick = () => {
-            const elapsed = Date.now() - start;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setCount(Math.floor(eased * end));
-            if (progress < 1) requestAnimationFrame(tick);
-          };
-          tick();
-        }
-      },
-      { threshold: 0.5 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [end, duration]);
-
-  return <span ref={ref}>{prefix}{count}{suffix}</span>;
-}
-
-const stats = [
-  { value: 84, suffix: "%", label: "Search Locally", sub: "of customers search for local services" },
-  { value: 5, suffix: "x", label: "More Calls", sub: "with an optimized GBP profile" },
-  { value: 76, suffix: "%", label: "Visit Within 24h", sub: "of nearby searchers visit a business" },
-  { value: 3, suffix: ".5", label: "Stars Minimum", sub: "before customers will consider you" },
+// No unsourced statistics on this page: every point is a plain description of
+// how Google Business Profile works, not a number we can't back up.
+const opportunity = [
+  { icon: MapPin, label: "Local Pack", sub: "Google Maps shows a short list of nearby businesses first — usually three" },
+  { icon: Users, label: "Public Edits", sub: "Google and the public can suggest changes to your listing" },
+  { icon: Star, label: "Reviews", sub: "Your rating and replies sit right beside your name in search" },
+  { icon: Phone, label: "Calls & Directions", sub: "Searchers can call or get directions straight from your profile" },
 ];
 
 const tools = [
   {
     icon: Eye,
     title: "GBP Monitor",
-    description: "Your listing can be edited by anyone — Google, competitors, or random users. Track every change in real time. AI-powered review response generator included.",
+    description: "Your listing can be edited by anyone — Google, competitors, or random users. Check it against Google's public data on demand and keep a history of every change found. AI-powered review response generator included.",
     gradient: "from-purple-500 to-violet-500",
     border: "border-purple-500/20",
     link: "/gmb-monitor",
     badge: "Monitoring",
     badgeColor: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-    features: ["Real-time edit tracking", "AI review responses", "Instant change alerts"],
+    features: ["On-demand change checks", "Edit history log", "AI review responses"],
   },
   {
     icon: Grid3X3,
@@ -76,7 +47,7 @@ const tools = [
   {
     icon: Camera,
     title: "SEO Photo Optimizer",
-    description: "Google Business photos with proper EXIF data, geotagging, and optimized filenames rank higher. Most contractors upload phone photos with zero optimization.",
+    description: "Watermark, rename, geotag and describe your job photos in one batch. Google strips EXIF on upload, so metadata and geotags are for your own files and other sites — they don't promise a ranking benefit.",
     gradient: "from-blue-500 to-indigo-500",
     border: "border-blue-500/20",
     link: "/photos",
@@ -98,7 +69,7 @@ const tools = [
   {
     icon: ShieldAlert,
     title: "GBP Reinstatement",
-    description: "A suspended Google Business Profile means zero visibility. Our proven 4-step process has reinstated hundreds of profiles. Flat rate, expert handling.",
+    description: "A suspended Google Business Profile disappears from Maps and search. We work through a 4-step reinstatement process with you. Flat rate, expert handling.",
     gradient: "from-red-500 to-orange-500",
     border: "border-red-500/20",
     link: "/reinstatement",
@@ -110,17 +81,17 @@ const tools = [
 
 const pipeline = [
   { step: "01", title: "Claim & Verify Your Profile", desc: "We ensure your Google Business Profile is properly claimed, verified, and set up with the right categories, service areas, and business details.", icon: BadgeCheck, color: "from-[#4A6CF7] to-[#3B5DE7]" },
-  { step: "02", title: "Optimize Every Detail", desc: "Photos with EXIF data, AI-generated descriptions, proper attributes, and SEO-optimized content. Every element tuned for maximum visibility.", icon: Sparkles, color: "from-[#34A853] to-[#2D9A46]" },
-  { step: "03", title: "Monitor & Dominate", desc: "Real-time monitoring catches unauthorized edits. Ranking grids show your position everywhere. Analytics track what's working and what needs improvement.", icon: TrendingUp, color: "from-[#8B5CF6] to-[#7C3AED]" },
+  { step: "02", title: "Optimize Every Detail", desc: "Clear job photos, well-written descriptions, the right attributes and regular updates — so your profile shows customers what you actually do.", icon: Sparkles, color: "from-[#34A853] to-[#2D9A46]" },
+  { step: "03", title: "Check & Improve", desc: "On-demand checks catch unauthorized edits. Ranking grids show your position across your service area. Analytics track what's working and what needs improvement.", icon: TrendingUp, color: "from-[#8B5CF6] to-[#7C3AED]" },
 ];
 
 const keyPoints = [
-  { icon: Bell, color: "text-purple-600 dark:text-purple-400", title: "Anyone Can Edit Your Listing", desc: "Google, competitors, and random users suggest changes to your profile daily" },
-  { icon: Star, color: "text-yellow-500 dark:text-yellow-400", title: "Reviews Are Everything", desc: "88% of consumers trust online reviews as much as personal recommendations" },
-  { icon: Camera, color: "text-blue-600 dark:text-blue-400", title: "Photos Drive 42% More Clicks", desc: "Listings with 100+ photos get 520% more calls than those with fewer" },
-  { icon: MapPin, color: "text-emerald-600 dark:text-emerald-400", title: "Local Pack = 3 Spots", desc: "Only 3 businesses appear in Google's Local Pack — are you one of them?" },
-  { icon: Target, color: "text-pink-600 dark:text-pink-400", title: "Citations Build Authority", desc: "Consistent NAP data across directories is a top local ranking factor" },
-  { icon: MessageSquare, color: "text-violet-600 dark:text-violet-400", title: "Response Time Matters", desc: "Businesses that respond to reviews within 24h get 35% more engagement" },
+  { icon: Bell, color: "text-purple-600 dark:text-purple-400", title: "Anyone Can Edit Your Listing", desc: "Google and the public can suggest changes to your profile, and Google can apply some of them without your approval" },
+  { icon: Star, color: "text-yellow-500 dark:text-yellow-400", title: "Reviews Are Public", desc: "Your star rating and review replies appear right beside your name in search and Maps" },
+  { icon: Camera, color: "text-blue-600 dark:text-blue-400", title: "Photos Show Your Work", desc: "Recent job photos let customers see the quality of your work before they call" },
+  { icon: MapPin, color: "text-emerald-600 dark:text-emerald-400", title: "The Local Pack Is Short", desc: "Google shows a short list of nearby businesses above the rest — usually three" },
+  { icon: Target, color: "text-pink-600 dark:text-pink-400", title: "Consistency Matters", desc: "Keep your name, address and phone the same everywhere your business is listed" },
+  { icon: MessageSquare, color: "text-violet-600 dark:text-violet-400", title: "Replies Are Read", desc: "Future customers read how you answer reviews, especially the negative ones" },
 ];
 
 export default function GoogleBusinessPage() {
@@ -151,8 +122,8 @@ export default function GoogleBusinessPage() {
               </span>
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-in-delay-3">
-              84% of customers search for local services online. Your Google Business Profile is the first thing they see.
-              Monitor it, optimize it, and dominate the Local Pack with 5 purpose-built tools.
+              When customers search for a local contractor, your Google Business Profile is often the first thing they see.
+              Check it, optimize it, and compete for the Local Pack with 5 purpose-built tools.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
               <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-hero-start">
@@ -168,7 +139,7 @@ export default function GoogleBusinessPage() {
             </div>
             <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground animate-in-delay-5">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Real-time profile monitoring
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> On-demand profile change checks
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" /> AI review response generator
@@ -196,13 +167,11 @@ export default function GoogleBusinessPage() {
             </h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-            {stats.map((stat, i) => (
-              <Card key={stat.label} className={`bg-card border-border p-6 text-center animate-in-delay-${i + 1}`} data-testid={`card-stat-${i}`}>
-                <div className="text-3xl sm:text-4xl font-extrabold text-foreground">
-                  <CountUp end={stat.value} suffix={stat.suffix} />
-                </div>
-                <p className="text-sm text-muted-foreground mt-1 font-medium">{stat.label}</p>
-                <p className="text-[10px] text-muted-foreground/60 mt-0.5">{stat.sub}</p>
+            {opportunity.map((point, i) => (
+              <Card key={point.label} className={`bg-card border-border p-6 text-center animate-in-delay-${i + 1}`} data-testid={`card-stat-${i}`}>
+                <point.icon className="h-8 w-8 mx-auto text-[#4A6CF7]" />
+                <p className="text-sm text-foreground mt-2 font-semibold">{point.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{point.sub}</p>
               </Card>
             ))}
           </div>
@@ -267,7 +236,7 @@ export default function GoogleBusinessPage() {
               <span className="bg-gradient-to-r from-[#4A6CF7] to-[#34A853] bg-clip-text text-transparent"> Dominate Locally</span>
             </h2>
             <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
-              From setup to domination — a proven system that works for every contractor.
+              From setup to ongoing upkeep — the same steps apply to every contractor.
             </p>
           </div>
           <div className="space-y-6">
@@ -351,7 +320,7 @@ export default function GoogleBusinessPage() {
                   {[
                     "Unauthorized edits go unnoticed",
                     "No idea where you actually rank",
-                    "Photos with zero SEO value",
+                    "Unlabelled, unwatermarked phone photos",
                     "Reviews unanswered for days",
                     "Competitors outrank you locally",
                   ].map((item, i) => (
@@ -366,10 +335,10 @@ export default function GoogleBusinessPage() {
                     <CheckCircle2 className="h-4 w-4" /> With Our Suite
                   </h3>
                   {[
-                    "Instant alerts on every profile change",
-                    "See your rank from every zip code",
-                    "EXIF-optimized, geotagged photos",
-                    "AI writes review responses instantly",
+                    "Check your profile for changes any time",
+                    "See your rank across your service area",
+                    "Watermarked, clearly named job photos",
+                    "AI drafts review responses for you to edit",
                     "Citation campaigns build local authority",
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -395,7 +364,7 @@ export default function GoogleBusinessPage() {
             </span>
           </h2>
           <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-            Join hundreds of contractors who use our Google Business Profile Suite to get more calls, more leads, and more revenue from local search.
+            Use our Google Business Profile Suite to keep your profile accurate, see where you rank, and turn more local searches into calls.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-final-start">

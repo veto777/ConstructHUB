@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, apiErrorMessage, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -40,7 +40,7 @@ function useLinkLocations() {
           : 'First sync is queued. Check Agency jobs for progress.',
         variant: issues.length ? 'destructive' : 'default' });
     },
-    onError: (e: Error) => toast({ title: 'Could not link location', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) => toast({ title: 'Could not link location', description: apiErrorMessage(e), variant: 'destructive' }),
   });
 }
 
@@ -49,7 +49,7 @@ function useUnlinkLocation() {
   return useMutation({
     mutationFn: async (id: number) => (await apiRequest('POST', `/api/gbp/locations/${id}/unlink`)).json(),
     onSuccess: () => { refreshAll(); toast({ title: 'Location unlinked', description: 'It no longer syncs from Google. Its synced Google reviews and stats were removed.' }); },
-    onError: (e: Error) => toast({ title: 'Could not unlink location', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) => toast({ title: 'Could not unlink location', description: apiErrorMessage(e), variant: 'destructive' }),
   });
 }
 
@@ -87,7 +87,14 @@ export function GbpLinkCell({ locationId }: { locationId: number }) {
   </div>;
 }
 
-export function GbpConnection({locationId}:{locationId?:number}) {
+/** What the page can still do while Google isn't connected; defaults to the reviews wording. */
+const NOT_CONNECTED_COPY = {
+  reviews: 'Google Business Profile not connected. Replies can be saved as drafts in ConstructHUB.',
+  content: 'Google Business Profile not connected. Connect it and link a location to publish posts and photos.',
+  locations: 'Google Business Profile not connected. Connect it to link your locations and sync their reviews and performance.',
+} as const;
+
+export function GbpConnection({locationId,context='reviews'}:{locationId?:number;context?:keyof typeof NOT_CONNECTED_COPY}) {
   const {toast}=useToast();
   const {data,error}=useQuery<any>({queryKey:['/api/gbp/status',locationId??'all'],queryFn:()=>apiRequest('GET','/api/gbp/status'+(locationId?'?locationId='+locationId:'')).then(r=>r.json()),refetchInterval:30000});
   const {data:linkage}=useGbpLinkage();
@@ -96,7 +103,7 @@ export function GbpConnection({locationId}:{locationId?:number}) {
     refreshAll();
     const errors=Object.values(result).filter((v:any)=>v?.kind).map((v:any)=>v.message);
     toast({title:errors.length?'Sync needs attention':result.message||'Sync complete',description:errors.join(' '),variant:errors.length?'destructive':undefined});
-  },onError:(e:Error)=>toast({title:'Google Business Profile',description:e.message,variant:'destructive'})});
+  },onError:(e:Error)=>toast({title:'Google Business Profile',description:apiErrorMessage(e),variant:'destructive'})});
   const accounts: Linkage['accounts'] = data?.accounts ?? (data?.email ? [{subject:'',email:data.email,connected:!!data.connected,reconnectRequired:!!data.reconnectRequired}] : []);
   const rows = linkage?.locations ?? [];
   const count = (s: string) => rows.filter(r => r.state === s).length;
@@ -106,7 +113,7 @@ export function GbpConnection({locationId}:{locationId?:number}) {
   const failedParam = typeof window!=='undefined' && new URLSearchParams(window.location.search).get('gbp')==='consent-failed';
   return <section className="rounded-lg border p-4 space-y-3" aria-label="Google Business Profile connection">
     {error ? <p>Unable to check Google connection</p> : !data ? <p>Checking Google connection…</p> : accounts.length === 0
-      ? <p>Google Business Profile not connected. Replies can be saved as drafts in ConstructHUB.</p>
+      ? <p>{NOT_CONNECTED_COPY[context]}</p>
       : <div className="space-y-2">
           <p className="font-medium">Connected Google accounts</p>
           {accounts.map(a => <div key={a.subject || a.email} className="flex flex-wrap items-center gap-2 text-sm" data-testid="gbp-account">

@@ -1,7 +1,8 @@
 import { AgencyWorkspace, useAgencyFilter } from "@/components/agency-workspace";
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, apiErrorMessage } from '@/lib/queryClient';
+import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,13 +12,26 @@ import { useUrlParam } from '@/hooks/use-url-param';
 type Photo={id:number;name:string;url:string};
 export default function GbpContentPage(){
   const f=useAgencyFilter();
-  const {data:locations=[],error:locationsError}=useQuery<any[]>({queryKey:[`/api/locations?${f.params}`]});
+  const {data:locations=[],error:locationsError,isLoading:locationsLoading}=useQuery<any[]>({queryKey:[`/api/locations?${f.params}`]});
   const [locationParam,setLocationParam]=useUrlParam('location');
   const location=locationParam??'',setLocation=(v:string)=>setLocationParam(v||null);
+  const linked=locations.filter(l=>l.gbpLocationName);
+  // A ?location= value can name a deleted or unlinked location (old link, typo);
+  // only open the editor for a location that is actually linked to Google.
+  const chosen=location?locations.find(l=>String(l.id)===location):undefined;
   return <main className="p-6 max-w-6xl mx-auto space-y-5"><h1 className="text-3xl font-bold">Posts &amp; Photos</h1><p>Publish approved content to your Google Business Profile.</p>
     <AgencyWorkspace compact/>{locationsError&&<p role="alert">Unable to load locations. Please reload the page.</p>}
-    <label className="block">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={location} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{locations.filter(l=>l.gbpLocationName).map(l=><option key={l.id} value={l.id}>{l.businessName}</option>)}</select></label>
-    {!location?<GbpConnection/>:<Editor key={location} location={location}/>}</main>;
+    <label className="block">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={chosen?.gbpLocationName?location:''} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{linked.map(l=><option key={l.id} value={l.id}>{l.businessName}</option>)}</select></label>
+    {!locationsLoading&&!locationsError&&!linked.length&&<p className="text-sm text-muted-foreground" data-testid="text-no-linked-locations">No locations are linked to Google Business Profile yet. Connect your Google account, then use <strong>Link &amp; sync</strong> in <Link href="/locations" className="text-primary underline">Locations</Link> to link one.</p>}
+    {!location?<GbpConnection context="content"/>
+      :locationsLoading?<p role="status">Loading locations…</p>
+      :locationsError?null
+      :chosen?.gbpLocationName?<Editor key={location} location={location}/>
+      :<div role="alert" className="border rounded-lg p-4 space-y-2" data-testid="gbp-content-location-unavailable">
+        <p className="font-medium">{chosen?`${chosen.businessName} isn't linked to Google Business Profile.`:'Location not found.'}</p>
+        <p className="text-sm text-muted-foreground">{chosen?'Link it to the Google listing it belongs to before publishing posts or photos.':'It may have been deleted, or it belongs to another client workspace.'}</p>
+        <div className="flex flex-wrap gap-2">{chosen&&<Button asChild size="sm"><Link href={`/locations?location=${chosen.id}`}>Link it in Locations</Link></Button>}<Button size="sm" variant="outline" onClick={()=>setLocation('')}>Choose another location</Button></div>
+      </div>}</main>;
 }
 function Editor({location}:{location:string}){
   const base=`/api/gbp/content/${location}`;
@@ -29,12 +43,14 @@ function Editor({location}:{location:string}){
   const [instructions,setInstructions]=useState(''),[examples,setExamples]=useState(''),[summary,setSummary]=useState(''),[style,setStyle]=useState<string|null>(null);
   const [category,setCategory]=useState('ADDITIONAL'),[topicType,setTopic]=useState('STANDARD'),[cta,setCta]=useState(''),[url,setUrl]=useState('');
   const [eventTitle,setEventTitle]=useState(''),[eventStart,setEventStart]=useState(''),[eventEnd,setEventEnd]=useState(''),[coupon,setCoupon]=useState('');
-  const [start,setStart]=useState(''),[cadence,setCadence]=useState('day'),[count,setCount]=useState(1),[custom,setCustom]=useState(''),[hours,setHours]=useState(false);
+  const [start,setStart]=useState(''),[cadence,setCadence]=useState('day'),[countText,setCountText]=useState('1'),[custom,setCustom]=useState(''),[hours,setHours]=useState(false);
   const [zone,setZone]=useState(Intl.DateTimeFormat().resolvedOptions().timeZone),[open,setOpen]=useState(9),[close,setClose]=useState(17),[days,setDays]=useState([1,2,3,4,5]);
   const [postBatch,setPostBatch]=useState<any[]>([]);
+  // 0 or a blank field would schedule every item at the same instant (1440/0 = Infinity).
+  const count=Number(countText),countValid=countText.trim()!==''&&Number.isInteger(count)&&count>=1&&count<=100;
   const [view,setView]=useState('queue'),[requestKey,setRequestKey]=useState(crypto.randomUUID());
   const call=async(path:string,body:any,method='POST')=>(await apiRequest(method,base+path,body)).json();
-  async function run(fn:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await fn();}catch(e){setError(e instanceof Error?e.message:'Operation failed');}finally{setBusy(false);}}
+  async function run(fn:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await fn();}catch(e){setError(apiErrorMessage(e,'Operation failed'));}finally{setBusy(false);}}
   const metadata=()=>({pattern,title,...(lat!==''?{lat:Number(lat)}:{}),...(lon!==''?{lon:Number(lon)}:{})});
   async function uploadPhotos(files: File[]) {
     if (files.length > 100) throw new Error('Choose at most 100 photos');
@@ -85,7 +101,7 @@ function Editor({location}:{location:string}){
       <div className="grid sm:grid-cols-3 gap-3"><label>EXIF title<Input value={title} onChange={e=>setTitle(e.target.value)}/></label><label>GPS latitude (optional)<Input value={lat} onChange={e=>setLat(e.target.value)} type="number" min="-90" max="90" step="any"/></label><label>GPS longitude (optional)<Input value={lon} onChange={e=>setLon(e.target.value)} type="number" min="-180" max="180" step="any"/></label></div>
       <label className="block">Upload photos (up to 100, 15 MB each)<Input aria-label="Upload photos" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void run(()=>uploadPhotos(files));}}/></label>
       <div className="grid sm:grid-cols-3 gap-3 max-h-96 overflow-auto">{photos.map(p=><div key={p.id} className="border rounded p-2 space-y-2"><label className="flex gap-2"><input type="checkbox" checked={selected.includes(p.id)} onChange={e=>setSelected(old=>e.target.checked?[...old,p.id].slice(-100):old.filter(i=>i!==p.id))}/><img src={p.url} alt="" className="w-12 h-12 object-cover"/><span>{p.name}</span></label>{selected.includes(p.id)&&<Textarea aria-label={`Caption for ${p.name}`} placeholder="Editable caption draft" maxLength={1500} value={captions[p.id]||''} onChange={e=>setCaptions({...captions,[p.id]:e.target.value})}/>}</div>)}</div>
-      {!photos.length&&<p>Your media library is empty.</p>}<p>{selected.length} selected</p>
+      {!photos.length&&!photosError&&<p>Your media library is empty.</p>}<p>{selected.length} selected</p>
       <Button variant="outline" disabled={!selected.length} onClick={()=>void run(async()=>{const r=await call('/prepare',{...metadata(),photoIds:selected});setCaptions(old=>({...old,...Object.fromEntries(r.map((p:Photo,i:number)=>[p.id,old[selected[i]]||'']))}));setSelected(r.map((p:Photo)=>p.id));await refreshPhotos();setMessage('Renamed copies with metadata saved to your library.');})}>Apply filename and EXIF to selected copies</Button>
       <label className="block">Photo category<select aria-label="Photo category" className="border p-2 bg-background" value={category} onChange={e=>setCategory(e.target.value)}>{['ADDITIONAL','EXTERIOR','INTERIOR','PRODUCT','AT_WORK','FOOD_AND_DRINK','MENU','COMMON_AREA','ROOMS','TEAMS','COVER'].map(c=><option key={c}>{c}</option>)}</select></label>
     </fieldset>
@@ -105,14 +121,15 @@ function Editor({location}:{location:string}){
     </fieldset>
     <fieldset disabled={busy} className="border rounded-lg p-4 space-y-3"><legend className="font-semibold">Schedule and approval</legend>
       <label>First publish (blank = now)<Input aria-label="First publish" type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/></label>
-      <div className="flex gap-3"><label>Items per period<Input aria-label="Items per period" type="number" min={1} max={100} value={count} onChange={e=>setCount(Number(e.target.value))}/></label><label>Cadence<select aria-label="Cadence" className="block border p-2 bg-background" value={cadence} onChange={e=>setCadence(e.target.value)}><option value="day">Per day</option><option value="week">Per week</option><option value="custom">Custom times</option></select></label></div>
+      <div className="flex gap-3"><label>Items per period<Input aria-label="Items per period" type="number" min={1} max={100} step={1} value={countText} aria-invalid={!countValid} aria-describedby={countValid?undefined:'items-per-period-error'} onChange={e=>setCountText(e.target.value)}/></label><label>Cadence<select aria-label="Cadence" className="block border p-2 bg-background" value={cadence} onChange={e=>setCadence(e.target.value)}><option value="day">Per day</option><option value="week">Per week</option><option value="custom">Custom times</option></select></label></div>
+      {!countValid&&<p id="items-per-period-error" role="alert" className="text-sm text-destructive">Items per period must be a whole number from 1 to 100.</p>}
       <p>Spacing applies to selected photos or distinct posts in your draft batch. Without a batch, only the current post is scheduled. Blank start publishes the first item now, then spaces the remaining items. Cadence sets elapsed spacing; closed hours can move items to later days.</p>
       {cadence==='custom'&&<Textarea aria-label="Custom times" placeholder="One ISO date/time per item, including timezone" value={custom} onChange={e=>setCustom(e.target.value)}/>}
       <label className="flex gap-2"><input type="checkbox" checked={hours} onChange={e=>setHours(e.target.checked)}/>Business hours only</label>
       {hours&&<div className="space-y-2"><p>Set the business's publishing hours explicitly; these are not inferred from Google.</p><Input aria-label="Timezone" value={zone} onChange={e=>setZone(e.target.value)}/><div className="flex gap-2"><label>Opening hour<Input type="number" value={open} onChange={e=>setOpen(Number(e.target.value))}/></label><label>Closing hour<Input type="number" value={close} onChange={e=>setClose(Number(e.target.value))}/></label></div>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=><label key={d} className="inline-flex gap-1 mr-3"><input type="checkbox" checked={days.includes(i)} onChange={e=>setDays(e.target.checked?[...days,i]:days.filter(n=>n!==i))}/>{d}</label>)}</div>}
-      <p>Approving authorizes Google publishing at the scheduled times. AI text remains a draft until you approve it. With a draft batch, approval queues only the posts in that batch. Unsaved drafts are lost on reload.</p><div className="flex gap-2"><Button disabled={!selected.length} onClick={()=>void run(()=>queue('photo'))}>Approve &amp; queue photos</Button><Button disabled={!summary.trim()&&!postBatch.length} onClick={()=>void run(()=>queue('post'))}>Approve &amp; queue post</Button></div>
+      <p>Approving authorizes Google publishing at the scheduled times. AI text remains a draft until you approve it. With a draft batch, approval queues only the posts in that batch. Unsaved drafts are lost on reload.</p><div className="flex gap-2"><Button disabled={!selected.length||!countValid} onClick={()=>void run(()=>queue('photo'))}>Approve &amp; queue photos</Button><Button disabled={(!summary.trim()&&!postBatch.length)||!countValid} onClick={()=>void run(()=>queue('post'))}>Approve &amp; queue post</Button></div>
     </fieldset>
-    <section className="space-y-3"><h2 className="font-semibold text-xl">Calendar, queue &amp; history</h2><div className="flex gap-2"><Button variant="outline" onClick={()=>setView('queue')}>Queue</Button><Button variant="outline" onClick={()=>setView('calendar')}>Calendar</Button><Button variant="outline" disabled={busy} onClick={()=>void run(async()=>{await call('/refresh',{});await refetch();setMessage('Google statuses refreshed.');})}>Refresh Google status</Button></div>
+    <section className="space-y-3"><h2 className="font-semibold text-xl">Calendar, queue &amp; history</h2><div className="flex gap-2"><Button variant={view==='queue'?'default':'outline'} aria-pressed={view==='queue'} onClick={()=>setView('queue')}>Queue</Button><Button variant={view==='calendar'?'default':'outline'} aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>Calendar</Button><Button variant="outline" disabled={busy} onClick={()=>void run(async()=>{await call('/refresh',{});await refetch();setMessage('Google statuses refreshed.');})}>Refresh Google status</Button></div>
       {!jobs.length&&<p>No scheduled content yet.</p>}{(view==='calendar'?ordered:jobs).map((j:any,i:number,all:any[])=><div key={j.id}>
         {view==='calendar'&&(i===0||new Date(all[i-1].due_at).toLocaleDateString()!==new Date(j.due_at).toLocaleDateString())&&<h3 className="font-semibold mt-4">{new Date(j.due_at).toLocaleDateString()}</h3>}
         <article className="border rounded p-3 space-y-2"><p>{j.kind} · {new Date(j.due_at).toLocaleString()} · <strong>{j.status}</strong>{j.google_status&&` · Google: ${j.google_status}`}</p><p>{j.payload.summary||j.payload.description||j.payload.locationAssociation?.category}</p>{j.google_name&&<p className="text-sm break-all">Google resource: {j.google_name}</p>}{j.error&&<p role="alert">{j.error}</p>}

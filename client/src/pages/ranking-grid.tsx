@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Grid3X3, Search, Loader2, Trash2, Target, TrendingUp, ChevronDown, ChevronUp, Building, ZoomIn, ZoomOut, RotateCcw, FileText, BarChart3, Trophy, MapPin, ArrowLeft, Printer } from "lucide-react";
 import type { RankingGridScan, RankingGridResult } from "@shared/schema";
 
@@ -128,7 +132,35 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
   const mapUrl = `/api/ranking-grid/map/${scan.id}?w=${reqW}&h=${reqH}&zoom=${zoom}`;
 
   return (
-    <div ref={containerRef} className="w-full">
+    <div ref={containerRef} className="w-full relative">
+      {/* On phones the grid fills the map's width, so the zoom controls sit in a
+          toolbar above the map instead of covering the top-right rank cells. */}
+      <div className="flex justify-end gap-1 mb-2 sm:mb-0 sm:absolute sm:top-3 sm:right-3 sm:z-10 sm:flex-col print:hidden">
+        <button
+          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+          onClick={() => setZoom(z => Math.min(z + 1, 20))}
+          aria-label="Zoom in"
+          data-testid="button-zoom-in"
+        >
+          <ZoomIn className="h-4 w-4" />
+        </button>
+        <button
+          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+          onClick={() => setZoom(z => Math.max(z - 1, 5))}
+          aria-label="Zoom out"
+          data-testid="button-zoom-out"
+        >
+          <ZoomOut className="h-4 w-4" />
+        </button>
+        <button
+          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+          onClick={() => setZoom(defaultZoom)}
+          aria-label="Reset zoom"
+          data-testid="button-zoom-reset"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+      </div>
       <div
         className="relative rounded-xl overflow-hidden shadow-lg border border-border"
         style={{ width: "100%", height: mapH }}
@@ -214,30 +246,6 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
           )}
         </div>
 
-        <div className="absolute top-3 right-3 flex flex-col gap-1">
-          <button
-            className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-            onClick={() => setZoom(z => Math.min(z + 1, 20))}
-            data-testid="button-zoom-in"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </button>
-          <button
-            className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-            onClick={() => setZoom(z => Math.max(z - 1, 5))}
-            data-testid="button-zoom-out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </button>
-          <button
-            className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-            onClick={() => setZoom(defaultZoom)}
-            data-testid="button-zoom-reset"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
         <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1.5 flex items-center gap-2.5">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "rgba(16,185,129,0.9)" }} />
@@ -261,7 +269,7 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
           </div>
         </div>
 
-        <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
+        <div className="hidden sm:block absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
           <span className="text-[10px] text-white font-medium">Zoom: {zoom}</span>
         </div>
       </div>
@@ -583,10 +591,7 @@ const DISTANCE_OPTIONS = [
   { value: "10", label: "10 miles" },
   { value: "15", label: "15 miles" },
   { value: "20", label: "20 miles" },
-  { value: "25", label: "25 miles" },
-  { value: "30", label: "30 miles" },
-  { value: "40", label: "40 miles" },
-  { value: "50", label: "50 miles" },
+  // The server rejects spacing above 20 miles (POST /api/ranking-grid/scans).
 ];
 
 export default function RankingGridPage() {
@@ -617,9 +622,9 @@ export default function RankingGridPage() {
       setSearchResults(data.results || []);
       setIsSearching(false);
     },
-    onError: () => {
+    onError: (err: any) => {
       setIsSearching(false);
-      toast({ title: "Search failed", description: "Could not search for businesses", variant: "destructive" });
+      toast({ title: "Search failed", description: apiErrorMessage(err, "Could not search for businesses"), variant: "destructive" });
     },
   });
 
@@ -673,16 +678,21 @@ export default function RankingGridPage() {
       toast({ title: "Scan started", description: `Checking "${keyword}" across ${gridSize}×${gridSize} grid` });
     },
     onError: (err: any) => {
-      toast({ title: "Failed to start scan", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to start scan", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
+  const [scanToDelete, setScanToDelete] = useState<RankingGridScan | null>(null);
   const deleteScanMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/ranking-grid/scans/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ranking-grid/scans"] });
+      toast({ title: "Scan deleted" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not delete scan", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -864,13 +874,36 @@ export default function RankingGridPage() {
                 scan={scan}
                 isExpanded={expandedScan === scan.id}
                 onToggle={() => setExpandedScan(expandedScan === scan.id ? null : scan.id)}
-                onDelete={() => deleteScanMutation.mutate(scan.id)}
+                onDelete={() => setScanToDelete(scan)}
                 onViewReport={() => setViewingReport(scan.id)}
               />
             ))}
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!scanToDelete} onOpenChange={o => { if (!o) setScanToDelete(null); }}>
+        <AlertDialogContent data-testid="dialog-delete-scan">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this ranking scan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {scanToDelete
+                ? `The "${scanToDelete.keyword}" scan for ${scanToDelete.businessName} (${scanToDelete.gridSize}×${scanToDelete.gridSize} grid) and all of its grid results and report will be permanently deleted. This cannot be undone.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-scan">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (scanToDelete) deleteScanMutation.mutate(scanToDelete.id); setScanToDelete(null); }}
+              data-testid="button-confirm-delete-scan"
+            >
+              Delete scan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
