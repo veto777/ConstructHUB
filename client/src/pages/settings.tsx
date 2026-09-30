@@ -23,7 +23,7 @@ import {
   Globe, BarChart3, AlertTriangle, CheckCircle, Monitor,
   Smartphone, FileText, Megaphone, ShieldCheck, Activity,
   Gift, Copy, Clock, Sparkles, Plus, X, Pencil, Link, Info, Minus, Loader2,
-  KeyRound, ExternalLink,
+  ExternalLink,
 } from "lucide-react";
 import { Link as RouterLink, useLocation } from "wouter";
 import { VerificationCancelled } from "@/components/recent-auth";
@@ -40,10 +40,9 @@ import {
 } from "@/lib/pricing-display";
 import { apiErrorCode } from "@/lib/plan-errors";
 import { joinNames } from "@shared/plan-copy";
-import { CREDENTIAL_SOURCES, disconnectMessage, fetchOptionalList, type CredentialSource, type SavedCredential } from "@/lib/saved-credentials";
 import { portalUrl } from "@/lib/site";
 
-type SettingsTab = "profile" | "account" | "notifications" | "security" | "api-keys" | "billing";
+type SettingsTab = "profile" | "account" | "notifications" | "security" | "billing";
 
 // Same host rule as the server's googleReviewLink (and google-reviews.tsx): google.<tld>
 // but not the bare homepage, g.page, goo.gl or share.google. The server has the final say.
@@ -59,7 +58,7 @@ function looksLikeGoogleReviewLink(input: string): boolean {
   if (google) return !(u.pathname === "/" && !u.search);
   return /^(?:[a-z0-9-]+\.)*(?:goo\.gl|g\.page|share\.google)$/.test(host);
 }
-const SETTINGS_TABS: SettingsTab[] = ["profile", "account", "notifications", "security", "api-keys", "billing"];
+const SETTINGS_TABS: SettingsTab[] = ["profile", "account", "notifications", "security", "billing"];
 
 /**
  * Close (X) should go back only when the previous history entry is part of
@@ -94,7 +93,6 @@ export default function SettingsPage() {
     { id: "account", label: "Account", icon: Settings },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "security", label: "Security & activity", icon: Shield },
-    { id: "api-keys", label: "API keys", icon: KeyRound },
     { id: "billing", label: "Billing & Plans", icon: CreditCard },
   ];
 
@@ -104,7 +102,7 @@ export default function SettingsPage() {
         <div className="mb-8 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">Settings</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage your profile, account, notifications, security, API keys and billing.</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage your profile, account, notifications, security and billing.</p>
           </div>
           <button
             onClick={() => {
@@ -149,7 +147,6 @@ export default function SettingsPage() {
             {activeTab === "account" && <AccountSection user={user} />}
             {activeTab === "notifications" && <NotificationPreferences />}
             {activeTab === "security" && <SecuritySection user={user} />}
-            {activeTab === "api-keys" && <ApiKeysSection />}
             {activeTab === "billing" && <BillingSection />}
           </div>
         </div>
@@ -1835,183 +1832,3 @@ function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) {
   );
 }
 
-/**
- * Settings → API keys: every API key, token and account sign-in saved on this
- * account for another service (lib/saved-credentials.ts), where it's used, and
- * a Remove that works whatever the plan (behind a recent sign-in). Keys for the
- * CRM's own public API live in the CRM (Integrations).
- */
-function ApiKeysSection() {
-  const { toast } = useToast();
-  const results = useQueries({
-    queries: CREDENTIAL_SOURCES.map((s) => ({
-      queryKey: [s.url],
-      ...(s.optional ? { queryFn: () => fetchOptionalList(s.url) } : {}),
-    })),
-  });
-  const loading = results.some((r) => r.isPending);
-  const rows = results.flatMap((r, i) => CREDENTIAL_SOURCES[i].items(r.data).map((item) => ({ item, source: CREDENTIAL_SOURCES[i] })));
-  const failed = CREDENTIAL_SOURCES.map((source, i) => ({ source, error: results[i].error })).filter((f) => f.error);
-  // A list the server doesn't offer (yet) can't be summed up as "nothing saved": name only what was checked.
-  const unavailable = CREDENTIAL_SOURCES.filter((s, i) => s.optional && results[i].isSuccess && results[i].data === null);
-  const checked = CREDENTIAL_SOURCES.filter((s, i) => results[i].isSuccess && results[i].data !== null);
-  // Which modules the plan includes: where a source the server can't list here can be seen at all.
-  const { data: entitlements } = useQuery<Pick<EntitlementsInfo, "modules">>({ queryKey: ["/api/entitlements"] });
-  const [confirm, setConfirm] = useState<{ item: SavedCredential; source: CredentialSource } | null>(null);
-
-  const remove = useMutation({
-    mutationFn: async ({ item }: { item: SavedCredential; source: CredentialSource }) =>
-      (await apiRequest("POST", item.disconnect.url, item.disconnect.body)).json(),
-    onSuccess: (data, { item, source }) => {
-      setConfirm(null);
-      void queryClient.invalidateQueries({ queryKey: [source.url] });
-      toast({ title: `${item.service} removed`, description: disconnectMessage(data) });
-    },
-    onError: (err) => {
-      setConfirm(null);
-      if (err instanceof VerificationCancelled) return;
-      toast({ title: "Couldn't remove it", description: apiErrorMessage(err), variant: "destructive" });
-    },
-  });
-
-  // Each page that adds a key, once (two sources can share a page's name but not its link).
-  const pages = CREDENTIAL_SOURCES.filter((s, i, all) => all.findIndex((o) => o.manageHref === s.manageHref) === i);
-
-  return (
-    <div className="space-y-6">
-      <Card data-testid="card-api-keys">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-muted-foreground" />
-            API keys &amp; connected accounts
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Keys, tokens and Google sign-ins you've saved so ConstructHUB can work with another service for you.
-            Removing one here stops ConstructHUB from using it, whatever your plan. You may be asked to confirm your sign-in first.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {loading && !rows.length ? (
-            <p className="text-sm text-muted-foreground flex items-center gap-2" data-testid="text-api-keys-loading">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading saved keys…
-            </p>
-          ) : rows.length === 0 ? (
-            failed.length === 0 && (
-              <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-3" data-testid="text-api-keys-empty">
-                {unavailable.length === 0
-                  ? "No API keys or connected accounts are saved on this account."
-                  : `Nothing is saved for ${joinNames(checked.map((s) => s.serviceName))}.`}
-              </p>
-            )
-          ) : (
-            <ul className="divide-y divide-border rounded-lg border" data-testid="list-api-keys">
-              {rows.map(({ item, source }) => (
-                <li key={item.key} className="flex flex-wrap items-center justify-between gap-3 p-3" data-testid={`row-api-key-${item.key}`}>
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium">{item.service}</span>
-                      <Badge variant="outline" className="text-[10px]">{item.kind}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground break-all">{item.label}</p>
-                    <RouterLink href={source.manageHref} className="text-xs text-primary hover:underline">
-                      Used in {source.manageLabel}
-                    </RouterLink>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-destructive hover:text-destructive"
-                    disabled={remove.isPending}
-                    onClick={() => setConfirm({ item, source })}
-                    data-testid={`button-remove-api-key-${item.key}`}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1.5" /> Remove
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {failed.map(({ source, error }) => (
-            <p key={source.url} role="alert" className="text-sm text-destructive" data-testid="text-api-keys-error">
-              Couldn't load your {source.serviceName} connections. {apiErrorMessage(error)}
-            </p>
-          ))}
-          {unavailable.map((source) => {
-            const name = source.serviceName.charAt(0).toUpperCase() + source.serviceName.slice(1);
-            const page = <RouterLink href={source.manageHref} className="text-primary hover:underline">{source.manageLabel}</RouterLink>;
-            // Without the module that page shows the upgrade card, not the keys; and a list the
-            // server doesn't offer has no remove route either, so neither is promised.
-            const locked = entitlements?.modules?.[source.module] === false;
-            return (
-              <p key={source.url} className="text-sm text-muted-foreground" data-testid="text-api-keys-elsewhere">
-                {locked
-                  ? <>{name} can't be listed or removed here yet. The {page} page lists them on the {PLANS[planForModule(source.module)].name} plan.</>
-                  : <>{name} are listed on the {page} page. They can't be removed from ConstructHUB yet.</>}
-              </p>
-            );
-          })}
-          <div className="border-t pt-3 text-xs text-muted-foreground space-y-1.5">
-            <p>You add a key on the page that uses it:</p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {pages.map((s) => (
-                <RouterLink key={s.manageHref} href={s.manageHref} className="text-primary hover:underline" data-testid={`link-api-keys-page-${s.manageHref.slice(1)}`}>
-                  {s.manageLabel}
-                </RouterLink>
-              ))}
-              <RouterLink href="/social-media" className="text-primary hover:underline" data-testid="link-api-keys-page-social-media">
-                Social Media
-              </RouterLink>
-            </div>
-            <p>Social Media keys (Blotato) are saved per business and removed on the Social Media page.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card data-testid="card-crm-api-keys">
-        <CardHeader>
-          <CardTitle className="text-lg">ConstructHub CRM API keys</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Keys that let your own software read your CRM data (customers, projects, estimates, invoices and payments)
-            are created and revoked in the CRM, under Integrations.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" size="sm" asChild>
-            <a href={portalUrl("/crm/integrations")} data-testid="link-crm-api-keys">
-              Open CRM Integrations <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
-            </a>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <AlertDialog open={confirm !== null} onOpenChange={(open) => { if (!open && !remove.isPending) setConfirm(null); }}>
-        <AlertDialogContent data-testid="dialog-remove-api-key">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove {confirm?.item.service}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirm && (
-                <>
-                  ConstructHUB stops using <span className="font-medium text-foreground break-all">{confirm.item.label}</span> and
-                  deletes what it saved for it. Anything already changed at {confirm.item.service} stays as it is. To use it
-                  again, add it back in {confirm.source.manageLabel}.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); if (confirm) remove.mutate(confirm); }}
-              disabled={remove.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-remove-api-key"
-            >
-              {remove.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}

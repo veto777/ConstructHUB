@@ -323,16 +323,13 @@ test.describe("mobile 390", () => {
     await expectNoSideScroll(page, "card-current-plan");
   });
 
-  test("usage and API keys never scroll sideways", async ({ page }) => {
+  test("usage never scrolls sideways", async ({ page }) => {
     await mockBilling(page, AGENCY_STRIPE);
     await mockEntitlements(page, AGENCY_ENTITLEMENTS);
     await mockSavedCredentials(page, SAVED_ALL);
     await gotoCrm(page, "/settings?tab=billing");
     await expect(page.getByTestId("card-usage")).toBeVisible();
     await expectNoSideScroll(page, "card-usage");
-    await gotoCrm(page, "/settings?tab=api-keys");
-    await expect(page.getByTestId("row-api-key-cloudflare-7")).toBeVisible();
-    await expectNoSideScroll(page, "card-api-keys");
   });
 });
 
@@ -448,7 +445,7 @@ test.describe("pricing page: refusals with a next step", () => {
   });
 });
 
-test.describe("settings: usage and API keys", () => {
+test.describe("settings: usage", () => {
   test("Billing shows this month's usage from the entitlements the server enforces", async ({ page }) => {
     await mockBilling(page, PRO_STRIPE);
     await mockEntitlements(page, PRO_ENTITLEMENTS);
@@ -470,59 +467,6 @@ test.describe("settings: usage and API keys", () => {
     await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText(`${ADDONS.competitor_pack.name} × 1`);
   });
 
-  test("API keys lists every saved key and removes one after confirming", async ({ page }) => {
-    const guards = watchPage(page);
-    await mockBilling(page, PRO_STRIPE);
-    const disconnects = await mockSavedCredentials(page, { ...SAVED_ALL, cloudflare: [...SAVED_ALL.cloudflare] });
-    await gotoCrm(page, "/settings");
-    await page.getByTestId("button-settings-tab-api-keys").click();
-    await expect(page).toHaveURL(/tab=api-keys/);
-    for (const key of ["registrar-3", "cloudflare-7", "gsc-8", "ads", "gmail-i3-subject"]) {
-      await expect(page.getByTestId(`row-api-key-${key}`)).toBeVisible();
-    }
-    await expect(page.getByTestId("row-api-key-registrar-3")).toContainText("Porkbun");
-    await expect(page.getByTestId("row-api-key-ads")).toContainText("Manager account 1112223334");
-    await expect(page.getByTestId("link-crm-api-keys")).toHaveAttribute("href", /\/crm\/integrations$/);
-
-    await page.getByTestId("button-remove-api-key-cloudflare-7").click();
-    const dialog = page.getByTestId("dialog-remove-api-key");
-    await expect(dialog).toContainText("i3-cf@example.invalid");
-    await page.getByTestId("button-confirm-remove-api-key").click();
-    await expect.poll(() => disconnects).toEqual([{ url: "/api/cloudflare/disconnect", body: { ids: [7] } }]);
-    await expect(page.getByText("Previously applied edge rules remain")).toBeVisible();
-    await expect(page.getByTestId("row-api-key-cloudflare-7")).toHaveCount(0);
-    guards.assertClean("settings api keys");
-  });
-
-  test("with nothing saved the tab says so", async ({ page }) => {
-    await mockBilling(page, NO_SUB);
-    await mockSavedCredentials(page, { cloudflare: [], gsc: [], ads: { saved: false, managerId: null }, gmail: [], registrar: [] });
-    await gotoCrm(page, "/settings?tab=api-keys");
-    await expect(page.getByTestId("text-api-keys-empty")).toHaveText("No API keys or connected accounts are saved on this account.");
-    await expect(page.getByTestId("text-api-keys-elsewhere")).toHaveCount(0);
-  });
-
-  test("before the server lists registrar keys, the tab claims only what it checked", async ({ page }) => {
-    await mockBilling(page, NO_SUB);
-    await mockSavedCredentials(page, { cloudflare: [], gsc: [], ads: { saved: false, managerId: null }, gmail: [], registrar: null });
-    await gotoCrm(page, "/settings?tab=api-keys");
-    await expect(page.getByTestId("text-api-keys-empty")).toHaveText("Nothing is saved for Cloudflare, Search Console, Google Ads and Gmail.");
-    await expect(page.getByTestId("text-api-keys-elsewhere")).toContainText("Registrar API keys (Porkbun, Name.com) are listed on the Domains page.");
-    // No remove route exists for them yet, so none is promised.
-    await expect(page.getByTestId("text-api-keys-elsewhere")).toContainText("They can't be removed from ConstructHUB yet.");
-    await expect(page.getByTestId("text-api-keys-error")).toHaveCount(0);
-  });
-
-  test("without the Agency plan the tab doesn't send registrar keys to a page that won't list them", async ({ page }) => {
-    await mockBilling(page, PRO_STRIPE);
-    await mockEntitlements(page, PRO_ENTITLEMENTS);
-    await mockSavedCredentials(page, { cloudflare: [], gsc: [], ads: { saved: false, managerId: null }, gmail: [], registrar: null });
-    await gotoCrm(page, "/settings?tab=api-keys");
-    const note = page.getByTestId("text-api-keys-elsewhere");
-    await expect(note).toContainText("Registrar API keys (Porkbun, Name.com) can't be listed or removed here yet.");
-    await expect(note).toContainText(`lists them on the ${PLANS.agency.name} plan`);
-    await expect(note).not.toContainText("are listed on the Domains page");
-  });
 });
 
 test.describe("plan answers anywhere get a way forward", () => {
