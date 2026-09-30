@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
-  cartSubtotalCents, lineTotalCents, milliToQty, money, priceToCents, qtyToMilli,
+  cartSubtotalCents, lineTotalCents, milliToQty, money, priceTextError, priceToCents, qtyTextError, qtyToMilli,
 } from "@/lib/estimate-math";
 import {
   ArrowLeft, Check, CheckCircle2, ChevronRight, ClipboardCopy, FileText, Loader2,
@@ -58,6 +58,76 @@ const lineNumbers = (l: CartLine) => ({
   unitPriceCents: priceToCents(l.priceText),
 });
 
+/** Why a line can't be saved yet (bad qty and/or price text), or null.
+ *  priceToCents/qtyToMilli quietly read garbage as 0 — right for the
+ *  running total, wrong for what gets sent to the client. */
+const lineErrors = (l: CartLine) => ({ qty: qtyTextError(l.qtyText), price: priceTextError(l.priceText) });
+
+/**
+ * The in-progress estimate survives a reload (a phone that drops the tab, a
+ * pull-to-refresh): step, client and cart live in THIS tab's sessionStorage
+ * and are cleared once the estimate is saved or sent. Storage can be blocked
+ * or throw — the builder then simply starts fresh.
+ */
+const DRAFT_KEY = "crm-estimate-new-draft";
+
+interface SavedDraft {
+  step: 1 | 2 | 3;
+  customer: CustomerLite | null;
+  lines: CartLine[];
+  title: string;
+  intro: string;
+}
+
+const isStr = (v: unknown): v is string => typeof v === "string";
+
+function readDraft(): SavedDraft | null {
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || typeof d !== "object") return null;
+    const customer: CustomerLite | null =
+      d.customer && isStr(d.customer.id) && isStr(d.customer.displayName)
+        ? {
+          id: d.customer.id, displayName: d.customer.displayName,
+          email: isStr(d.customer.email) ? d.customer.email : null,
+          phone: isStr(d.customer.phone) ? d.customer.phone : null,
+          city: isStr(d.customer.city) ? d.customer.city : null,
+        }
+        : null;
+    const lines: CartLine[] = (Array.isArray(d.lines) ? d.lines : [])
+      .filter((l: any) => l && isStr(l.key) && isStr(l.name) && isStr(l.qtyText) && isStr(l.priceText))
+      .map((l: any) => ({
+        key: l.key, name: l.name, qtyText: l.qtyText, priceText: l.priceText,
+        description: isStr(l.description) ? l.description : "",
+        unit: isStr(l.unit) ? l.unit : null,
+        taxable: l.taxable !== false,
+      }));
+    // Steps 2 and 3 need a client; step 3 also needs something in the cart.
+    const step: 1 | 2 | 3 = !customer ? 1 : d.step === 3 && lines.length ? 3 : 2;
+    return { step, customer, lines, title: isStr(d.title) ? d.title : "", intro: isStr(d.intro) ? d.intro : "" };
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(draft: SavedDraft | null) {
+  try {
+    if (draft) {
+      // The picked row is the whole customer record — keep only what the
+      // builder shows (no notes, tags or owner ids in browser storage).
+      const c = draft.customer;
+      const customer = c
+        ? { id: c.id, displayName: c.displayName, email: c.email ?? null, phone: c.phone ?? null, city: c.city ?? null }
+        : null;
+      window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, customer }));
+    } else {
+      window.sessionStorage.removeItem(DRAFT_KEY);
+    }
+  } catch { /* storage blocked — the builder just won't survive a reload */ }
+}
+
 interface DoneState {
   id?: string;
   sent: boolean;
@@ -72,11 +142,13 @@ interface DoneState {
 
 export default function CrmEstimateNewPage() {
   const { toast } = useToast();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Read once: a reload lands back on the same step with the same cart.
+  const [restored] = useState(readDraft);
+  const [step, setStep] = useState<1 | 2 | 3>(restored?.step ?? 1);
   const [done, setDone] = useState<DoneState | null>(null);
 
   // ── Step 1: the client ────────────────────────────────────────────────────
-  const [customer, setCustomer] = useState<CustomerLite | null>(null);
+  const [customer, setCustomer] = useState<CustomerLite | null>(restored?.customer ?? null);
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -129,7 +201,7 @@ export default function CrmEstimateNewPage() {
   // ── Step 2: price-book items ──────────────────────────────────────────────
   const [itemInput, setItemInput] = useState("");
   const [itemQ, setItemQ] = useState("");
-  const [lines, setLines] = useState<CartLine[]>([]);
+  const [lines, setLines] = useState<CartLine[]>(restored?.lines ?? []);
   const [addingId, setAddingId] = useState<string | null>(null);
   /** Lines with their scope editor open (auto-opens when text exists). */
   const [scopeOpen, setScopeOpen] = useState<Set<string>>(new Set());
@@ -145,6 +217,12 @@ export default function CrmEstimateNewPage() {
   });
 
   const subtotal = cartSubtotalCents(lines.map(lineNumbers));
+  // Any line whose qty or price text isn't a number blocks Review/Send —
+  // saving it would quietly turn the typo into $0.
+  const cartHasErrors = lines.some((l) => {
+    const err = lineErrors(l);
+    return !!(err.qty || err.price);
+  });
 
   const addItem = async (item: any) => {
     // One tap = one unit. Already in the cart? The tap bumps its quantity.
@@ -182,10 +260,50 @@ export default function CrmEstimateNewPage() {
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   // ── Step 3: review + send ─────────────────────────────────────────────────
-  const [title, setTitle] = useState("");
-  const [intro, setIntro] = useState("");
+  const [title, setTitle] = useState(restored?.title ?? "");
+  const [intro, setIntro] = useState(restored?.intro ?? "");
   const [divisionId, setDivisionId] = useState<string>("");
   const [sending, setSending] = useState(false);
+
+  // Keep the tab's draft current; nothing picked yet (or already saved/sent)
+  // means there is nothing worth restoring.
+  useEffect(() => {
+    writeDraft(done || (!customer && !lines.length) ? null : { step, customer, lines, title, intro });
+  }, [done, step, customer, lines, title, intro]);
+
+  // The draft only has to survive a reload of THIS builder (a reload never
+  // unmounts). Leaving the builder in-app discards it, so the next "New
+  // estimate" — often for a different client — starts clean instead of
+  // reopening the last client's cart at step 2.
+  useEffect(() => () => writeDraft(null), []);
+
+  // A restored client may have been edited (an email added) or deleted since
+  // — refresh it once from the server rather than trust the stored copy.
+  useEffect(() => {
+    const id = restored?.customer?.id;
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/crm/customers/${id}`, { credentials: "include" });
+        if (cancelled) return;
+        if (r.status === 404) {
+          setCustomer(null);
+          setStep(1);
+          toast({ title: "That client was deleted", description: "Pick the client again — your items are still in the cart." });
+          return;
+        }
+        if (!r.ok) return; // offline or similar: keep the stored copy
+        const c = (await r.json())?.customer;
+        if (!cancelled && c?.id === id) {
+          setCustomer({ id: c.id, displayName: c.displayName, email: c.email ?? null, phone: c.phone ?? null, city: c.city ?? null });
+        }
+      } catch { /* keep the stored copy */ }
+    })();
+    return () => { cancelled = true; };
+    // Once, on mount — only the restored client needs checking.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Letterhead pick — only surfaces when the org actually runs divisions.
   const { data: divisions } = useQuery<any[]>({
@@ -194,7 +312,7 @@ export default function CrmEstimateNewPage() {
   });
 
   const submit = async (sendEmail: boolean) => {
-    if (!customer || !lines.length) return;
+    if (!customer || !lines.length || cartHasErrors) return;
     setSending(true);
     try {
       const created = await (await apiRequest("POST", "/api/crm/estimates", {
@@ -483,6 +601,7 @@ export default function CrmEstimateNewPage() {
                 <div className="space-y-2">
                   {lines.map((l) => {
                     const nums = lineNumbers(l);
+                    const err = lineErrors(l);
                     return (
                       <div key={l.key} className="rounded-lg border p-2.5 space-y-2" data-testid={`cart-line-${l.key}`}>
                         <div className="flex items-start justify-between gap-2">
@@ -502,7 +621,9 @@ export default function CrmEstimateNewPage() {
                               value={l.qtyText}
                               inputMode="decimal"
                               onChange={(e) => setLine(l.key, { qtyText: e.target.value })}
-                              className="h-11 text-base"
+                              className={cn("h-11 text-base", err.qty && "border-destructive focus-visible:ring-destructive")}
+                              aria-invalid={err.qty ? true : undefined}
+                              aria-describedby={err.qty ? `err-qty-${l.key}` : undefined}
                               data-testid={`input-qty-${l.key}`}
                               aria-label={`Quantity for ${l.name}`}
                             />
@@ -513,7 +634,9 @@ export default function CrmEstimateNewPage() {
                               value={l.priceText}
                               inputMode="decimal"
                               onChange={(e) => setLine(l.key, { priceText: e.target.value })}
-                              className="h-11 text-base"
+                              className={cn("h-11 text-base", err.price && "border-destructive focus-visible:ring-destructive")}
+                              aria-invalid={err.price ? true : undefined}
+                              aria-describedby={err.price ? `err-price-${l.key}` : undefined}
                               data-testid={`input-price-${l.key}`}
                               aria-label={`Unit price for ${l.name}`}
                             />
@@ -522,6 +645,12 @@ export default function CrmEstimateNewPage() {
                             {money(lineTotalCents(nums))}
                           </div>
                         </div>
+                        {(err.qty || err.price) && (
+                          <div className="space-y-0.5 text-xs text-destructive" role="alert" data-testid={`text-line-error-${l.key}`}>
+                            {err.qty && <p id={`err-qty-${l.key}`}>Qty: {err.qty}</p>}
+                            {err.price && <p id={`err-price-${l.key}`}>Price: {err.price}</p>}
+                          </div>
+                        )}
                         {/* Work scope — what the client reads. Prefilled from the
                             price book; multi-line bullets survive verbatim. */}
                         {l.description || scopeOpen.has(l.key) ? (
@@ -550,9 +679,14 @@ export default function CrmEstimateNewPage() {
                 </div>
               )}
 
+              {cartHasErrors && (
+                <p className="text-xs text-destructive" data-testid="text-cart-has-errors">
+                  Fix the quantity or price marked above to continue.
+                </p>
+              )}
               <Button
                 className="w-full h-12 text-base"
-                disabled={!lines.length || subtotal <= 0}
+                disabled={!lines.length || subtotal <= 0 || cartHasErrors}
                 onClick={() => setStep(3)}
                 data-testid="button-review"
               >
@@ -745,9 +879,14 @@ export default function CrmEstimateNewPage() {
             </CardContent>
           </Card>
 
+          {cartHasErrors && (
+            <p className="text-sm text-destructive text-center" data-testid="text-review-has-errors">
+              A quantity or price isn't a number — go back a step and fix it before saving.
+            </p>
+          )}
           <Button
             className="w-full h-12 text-base"
-            disabled={sending || !customer.email}
+            disabled={sending || !customer.email || cartHasErrors}
             onClick={() => submit(true)}
             data-testid="button-send"
             title={!customer.email ? "This client has no email address" : undefined}
@@ -757,7 +896,7 @@ export default function CrmEstimateNewPage() {
           </Button>
           <Button
             variant="outline" className="w-full h-12"
-            disabled={sending}
+            disabled={sending || cartHasErrors}
             onClick={() => submit(false)}
             data-testid="button-save-draft"
           >

@@ -63,9 +63,10 @@ const NAV: {
     perm: "manageSettings",
     active: (l: string) => l.startsWith("/crm/integrations") },
   // Gated: only members with manageSettings see (or can reach) Settings.
+  // Import (/crm/migrate) is reached from Settings, so it lights Settings up.
   { title: "Settings", url: "/crm/settings", icon: Settings, testid: "link-nav-settings",
     perm: "manageSettings",
-    active: (l: string) => l.startsWith("/crm/settings") },
+    active: (l: string) => l.startsWith("/crm/settings") || l.startsWith("/crm/migrate") },
   // Gated: ConstructHUB staff only — cross-account monitoring, never org-scoped.
   { title: "Platform Admin", url: "/admin", icon: ShieldCheck, testid: "link-portal-nav-admin",
     platformAdmin: true,

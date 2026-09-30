@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EMAIL_RE, customerErrorMessage, duplicateMatches, type DuplicateMatch } from "@/lib/crm-customer-errors";
-import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight } from "lucide-react";
+import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight, Download, Upload } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
 
 interface Client {
@@ -44,6 +44,18 @@ const BID_PILL: Record<string, { label: string; cls: string }> = {
 };
 
 type BidTab = (typeof BID_TABS)[number]["key"];
+
+/** One page of GET /api/crm/customers?paged=1 — total and bidCounts cover the
+ *  whole book under the same search, not just the rows returned. */
+interface ClientPage {
+  rows: Client[];
+  total: number;
+  bidCounts: Record<"won" | "undecided" | "declined" | "none", number>;
+  limit: number;
+  offset: number;
+}
+
+const PAGE_SIZE = 100;
 
 /** The tab + search live in the URL (?tab=won&q=kane) so a reload or Back keeps them. */
 function readListParams(): { tab: BidTab; q: string } {
@@ -92,15 +104,36 @@ export default function CrmClientsPage() {
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canManage = me?.permissions?.manageCustomers === true;
+  const canExport = me?.permissions?.exportData === true;
 
-  const { data: clients, isLoading, isError } = useQuery<Client[]>({
-    queryKey: ["/api/crm/customers", qDebounced ? `?q=${encodeURIComponent(qDebounced)}` : ""],
-    queryFn: async () => {
-      const r = await fetch(`/api/crm/customers${qDebounced ? `?q=${encodeURIComponent(qDebounced)}` : ""}`, { credentials: "include" });
+  // Paged: the legacy bare array stops at the newest 500, so a bigger book
+  // silently lost clients and the tab counts undercounted. The server's
+  // total + bidCounts describe the whole book; rows arrive 100 at a time.
+  const {
+    data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["/api/crm/customers", "paged", qDebounced],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<ClientPage> => {
+      const params = new URLSearchParams({ paged: "1", limit: String(PAGE_SIZE), offset: String(pageParam) });
+      if (qDebounced) params.set("q", qDebounced);
+      const r = await fetch(`/api/crm/customers?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     },
+    getNextPageParam: (last: ClientPage) => {
+      const next = last.offset + last.rows.length;
+      return last.rows.length > 0 && next < last.total ? next : undefined;
+    },
   });
+  // A client created between two page loads shifts the offsets by one, so a
+  // row can arrive twice — keep the first copy.
+  const clients: Client[] | undefined = data
+    ? Array.from(new Map(data.pages.flatMap((p) => p.rows).map((c) => [c.id, c] as const)).values())
+    : undefined;
+  const latest = data?.pages[data.pages.length - 1];
+  const total = latest?.total ?? 0;
+  const tabTotal = (t: BidTab) => (t === "all" ? total : latest?.bidCounts?.[t] ?? 0);
 
   const create = useMutation({
     // force=true is the user's explicit "Create anyway" after a duplicate warning.
@@ -139,7 +172,24 @@ export default function CrmClientsPage() {
         title="Clients"
         infoKey="clients"
         subtitle="Every client gets their own portal the moment you create them."
-        actions={canManage ? (
+        actions={canManage || canExport ? (
+          <>
+          {/* The server gates the CSV on exportData and logs every export. */}
+          {canExport && (
+            <Button variant="outline" asChild>
+              <a href="/api/crm/customers/export.csv" download data-testid="link-export-clients">
+                <Download className="h-4 w-4 mr-2" /> Export CSV
+              </a>
+            </Button>
+          )}
+          {canManage && (
+            <Link href="/crm/migrate">
+              <Button variant="outline" data-testid="link-import-clients">
+                <Upload className="h-4 w-4 mr-2" /> Import
+              </Button>
+            </Link>
+          )}
+          {canManage && (
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDupes(null); }}>
             <DialogTrigger asChild>
               <Button data-testid="button-new-client"><Plus className="h-4 w-4 mr-2" /> New client</Button>
@@ -236,6 +286,8 @@ export default function CrmClientsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          )}
+          </>
         ) : undefined}
       />
 
@@ -248,9 +300,8 @@ export default function CrmClientsPage() {
         {/* Bid outcome tabs — where does every client stand on their bid? */}
         <div className="inline-flex rounded-lg border bg-card p-0.5" data-testid="tabs-bid-status">
           {BID_TABS.map((t) => {
-            const n = t.key === "all"
-              ? clients?.length ?? 0
-              : clients?.filter((c) => c.bidStatus === t.key).length ?? 0;
+            // Whole-book counts from the server, not just the loaded rows.
+            const n = tabTotal(t.key);
             return (
               <button key={t.key}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -300,7 +351,13 @@ export default function CrmClientsPage() {
       ) : (
         (() => {
           const shown = tab === "all" ? clients : clients.filter((c) => c.bidStatus === tab);
+          // More in this tab than the pages loaded so far → say so, and offer
+          // the next page (the tabs filter the loaded rows).
+          const tabN = tabTotal(tab);
+          const moreExist = shown.length < tabN;
+          const tabLabel = tab === "all" ? "" : ` ${BID_TABS.find((b) => b.key === tab)?.label ?? ""}`;
           return (
+        <>
         <div className={crmTable.wrapper}>
           <table className={crmTable.table}>
             <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
@@ -316,7 +373,9 @@ export default function CrmClientsPage() {
             <tbody>
               {shown.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground" data-testid="text-bid-tab-empty">
-                  No clients in this bucket yet.
+                  {moreExist
+                    ? "None of the clients loaded so far are in this bucket — load more, or search."
+                    : "No clients in this bucket yet."}
                 </td></tr>
               )}
               {shown.map((c) => (
@@ -388,6 +447,22 @@ export default function CrmClientsPage() {
             </tbody>
           </table>
         </div>
+        {moreExist && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground"
+            data-testid="clients-pager">
+            <span data-testid="text-clients-showing">
+              Showing {shown.length.toLocaleString()} of {tabN.toLocaleString()}{tabLabel} clients — search to find others.
+            </span>
+            {hasNextPage && (
+              <Button variant="outline" size="sm" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}
+                data-testid="button-load-more-clients">
+                {isFetchingNextPage && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Load more
+              </Button>
+            )}
+          </div>
+        )}
+        </>
           );
         })()
       )}

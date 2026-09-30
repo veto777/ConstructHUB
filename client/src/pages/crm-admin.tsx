@@ -9,7 +9,7 @@ import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard, Activity,
   Search, Mail, Copy, Check, Loader2, Rocket, Ban,
@@ -134,7 +134,7 @@ export default function CrmAdminPage() {
       setGatePass("");
       queryClient.invalidateQueries();
     },
-    onError: (e: any) => toast({ title: "Sign-in failed", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Sign-in failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const { data: overview } = useQuery<Overview>({
@@ -187,7 +187,7 @@ export default function CrmAdminPage() {
       });
     },
     onError: (err: any) => {
-      toast({ title: "Invite failed", description: err.message, variant: "destructive" });
+      toast({ title: "Invite failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -199,7 +199,7 @@ export default function CrmAdminPage() {
       toast({ title: "Invite revoked", description: "The invite link no longer works." });
     },
     onError: (err: any) => {
-      toast({ title: "Could not revoke", description: err.message, variant: "destructive" });
+      toast({ title: "Could not revoke", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -324,12 +324,10 @@ export default function CrmAdminPage() {
           context={overview ? `${overview.payments.count} charges, all orgs` : undefined} />
       </div>
 
-      {/* Growth-site Site Scan leads — wide table, so it scrolls sideways on a phone. */}
-      <Card data-testid="card-sitescan-leads">
-        <CardContent className="p-0 overflow-x-auto [&_section]:p-4 sm:[&_section]:p-5 [&_th]:text-left [&_th]:pr-4 [&_td]:pr-4 [&_td]:py-1.5 [&_table]:min-w-[480px]">
-          <SiteScanLeads />
-        </CardContent>
-      </Card>
+      {/* Growth-site Site Scan leads, after the metrics. The component is its
+          own Card (data-testid section-sitescan-leads) and its table scrolls
+          sideways on a phone — no second card around it. */}
+      <SiteScanLeads />
 
       {/* ── Users ────────────────────────────────────────────────────────── */}
       <Card data-testid="card-users" id="card-users" className="scroll-mt-6">
@@ -539,7 +537,11 @@ export default function CrmAdminPage() {
                       <td className={crmTable.tdRight}>
                         {inv.status === "pending" && (
                           <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                            onClick={() => revokeInvite.mutate(inv.id)}
+                            onClick={() => {
+                              if (window.confirm(`Revoke the beta invite for ${inv.email}? The emailed link stops working.`)) {
+                                revokeInvite.mutate(inv.id);
+                              }
+                            }}
                             disabled={revokeInvite.isPending}
                             data-testid={`button-revoke-beta-${inv.id}`}>
                             {revokeInvite.isPending

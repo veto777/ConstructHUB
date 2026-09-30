@@ -219,13 +219,17 @@ export async function sweepPage(
   return { clicked: labels.length, labels };
 }
 
-/** Create a throwaway customer + one-line estimate through the real API;
- *  returns ids and the public token (read from the DB). */
 /**
- * A throwaway customer + estimate for the public-page specs. The estimate is
+ * A throwaway customer + one-line estimate, built through the real API;
+ * returns the ids and the public token (read from the DB). The estimate is
  * MARKED SENT (PATCH status "sent" — no email) because a client can only
  * answer an estimate that went out: a never-sent draft renders read-only.
  * Pass `draft: true` for a spec that needs the draft itself.
+ *
+ * Callers that also POST …/send afterwards simply re-send a sent estimate
+ * (the send route allows it, and restamps sentAt/expiry), and owner delete
+ * accepts any unsigned estimate — so "sent by default" changes no caller's
+ * outcome (audited for every makeEstimate spec, QA round 2).
  */
 export async function makeEstimate(
   page: Page,
