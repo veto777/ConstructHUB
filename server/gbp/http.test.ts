@@ -22,6 +22,12 @@ describe('GBP real HTTP routes without a Google grant',()=>{
     const sync=await call(`/api/gbp/locations/${id}/sync`,'POST',{});expect(sync.status).toBe(200);expect(sync.body).toMatchObject({reviews:{kind:'auth'},performance:{kind:'auth'}});
     const status=await call('/api/gbp/status');expect(status.body.locations.filter((l:any)=>l.id===id).every((l:any)=>l.last_error&&!l.last_success)).toBe(true);expect(JSON.stringify(status.body)).not.toMatch(/access_token|refresh_token/);
   });
+  it('preserves the actionable profile error when importing a disconnected linked location', async () => {
+    const result = await call(`/api/locations/${id}/import-google`, 'POST', {});
+    expect(result.status).toBe(409);
+    expect(result.body.message).toMatch(/connect|Reconnect/i);
+    expect(result.body.message).not.toBe('GBP operation failed. Try again.');
+  });
   it('saves a draft without posting and preserves it when disconnected publish/delete fail',async()=>{
     const created=await call('/api/google-profile-reviews','POST',{reviewerName:'GBP HTTP fixture',rating:5,reviewDate:'2026-09-01',locationId:id});expect(created.status).toBe(200);reviewId=created.body.id;
     const draft=await call(`/api/google-profile-reviews/${reviewId}/reply`,'PATCH',{replyComment:'Local draft',action:'draft'});expect(draft.body.replyDraft).toBe('Local draft');

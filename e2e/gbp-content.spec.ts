@@ -96,3 +96,16 @@ test('AI update is a draft until edited and approved, and provider failures can 
     await page.getByLabel('Post draft').fill('Owner edited update');await page.getByRole('button',{name:'Approve & queue post'}).click();await expect(page.locator('article')).toContainText('Google denied permission');expect(approved.items[0].summary).toBe('Owner edited update');
     await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('article')).toContainText('queued');
 });
+
+test('linked profile without a public Place ID can import and surfaces partial sync warnings', async ({ page }) => {
+    const fixture = { id: 99881, businessName: 'Profile audit fixture', gbpLocationName: 'locations/fixture', gbpAccountName: 'accounts/fixture', placeId: null };
+    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], locations: [], errors: [] } }));
+    await page.route('**/api/locations/99881/import-google', route => route.fulfill({ json: { ...fixture, syncWarnings: ['Social profiles: Google denied permission.'] } }));
+    await page.goto('/locations');
+    await page.getByText('Profile audit fixture', { exact: true }).click();
+    await page.getByTestId('tab-info').click();
+    await page.getByTestId('button-import-google').click();
+    await expect(page.getByText('Google data partially imported', { exact: true })).toBeVisible();
+    await expect(page.getByText('Social profiles: Google denied permission.', { exact: true })).toBeVisible();
+});
