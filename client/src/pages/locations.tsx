@@ -592,11 +592,7 @@ function LocationInfoTab({ location }: { location: BusinessLocation }) {
     },
   });
 
-  const hoursDisplay = location.hours
-    ? (typeof location.hours === "object"
-      ? Object.entries(location.hours as Record<string, string>).map(([day, hrs]) => `${day}: ${hrs}`).join(", ")
-      : String(location.hours))
-    : null;
+  const hoursDisplay = formatHours(location.hours);
 
   return (
     <Card>
@@ -642,31 +638,62 @@ function LocationInfoTab({ location }: { location: BusinessLocation }) {
   );
 }
 
-function ServicesTab({ location }: { location: BusinessLocation }) {
-  const primaryCategory = location.categories?.[0] || "Uncategorized";
-  const services = location.services || [];
+const WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+/** Google hours are stored per day ({Monday: "8:00 AM – 5:00 PM"}); JSON storage loses key order. Legacy
+ *  Places imports stored {weekday_text: ["Monday: …", …]}. */
+function formatHours(hours: unknown): string | null {
+  if (!hours) return null;
+  if (typeof hours !== "object") return String(hours);
+  const h = hours as Record<string, unknown>;
+  if (Array.isArray(h.weekday_text)) return (h.weekday_text as string[]).join(" · ");
+  const days = WEEK.filter((d) => typeof h[d] === "string");
+  if (!days.length) return null;
+  const values = days.map((d) => h[d] as string);
+  if (days.length === 7 && values.every((v) => v === values[0])) return `${values[0]}, every day`;
+  return days.map((d, i) => `${d.slice(0, 3)}: ${values[i]}`).join(" · ");
+}
 
+function ServicesTab({ location }: { location: BusinessLocation }) {
+  const [filter, setFilter] = useState("");
+  const categories = location.categories || [];
+  const services = location.services || [];
+  const shown = filter ? services.filter((s) => s.toLowerCase().includes(filter.toLowerCase())) : services;
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          {primaryCategory}
-          <Badge variant="outline" className="text-xs">{services.length}/100</Badge>
+          Services on your Google profile
+          <Badge variant="outline" className="text-xs" data-testid="badge-service-count">{services.length}</Badge>
         </CardTitle>
-        <CardDescription>Services already added to your GBP</CardDescription>
+        <CardDescription>
+          {location.gbpLocationName ? "Synced from your Google Business Profile. Edit services in Google Business Profile; they update here on the next sync." : "Link this location to your Google Business Profile to sync its services."}
+        </CardDescription>
+        {categories.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-2" data-testid="service-categories">
+            {categories.map((c, i) => (
+              <Badge key={c} variant={i === 0 ? "default" : "secondary"} className="text-[11px]">{c}{i === 0 ? " · primary" : ""}</Badge>
+            ))}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {services.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">No services added yet.</p>
+          <p className="text-sm text-muted-foreground py-4 text-center">No services synced yet.</p>
         ) : (
-          <div className="space-y-1">
-            {services.map((svc, i) => (
-              <div key={i} className="flex items-center gap-2 py-2 border-b border-border/30 last:border-0" data-testid={`service-row-${i}`}>
-                <Check className="w-4 h-4 text-green-500 shrink-0" />
-                <span className="text-sm">{svc}</span>
-              </div>
-            ))}
-          </div>
+          <>
+            {services.length > 12 && (
+              <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Search ${services.length} services…`} className="mb-3 h-8 text-sm" data-testid="input-service-filter" />
+            )}
+            <div className="grid sm:grid-cols-2 gap-x-6">
+              {shown.map((svc, i) => (
+                <div key={svc + i} className="flex items-center gap-2 py-1.5 border-b border-border/30" data-testid={`service-row-${i}`}>
+                  <Check className="w-4 h-4 text-green-500 shrink-0" />
+                  <span className="text-sm">{svc}</span>
+                </div>
+              ))}
+            </div>
+            {filter && shown.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">No services match “{filter}”.</p>}
+          </>
         )}
       </CardContent>
     </Card>
