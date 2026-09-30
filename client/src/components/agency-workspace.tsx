@@ -12,6 +12,13 @@ export function useAgencyFilter() {
     setClient:(v:string)=>{setClient(v||null);setOffset(null);},setQ:(v:string)=>{setQ(v||null);setOffset(null);},setStatus:(v:string)=>{setStatus(v==='all'?null:v);setOffset(null);},setOffset:(v:number)=>setOffset(v?String(v):null)};
 }
 export const selectClass='rounded border p-2 bg-background text-sm';
+/** Street line plus city, state and ZIP. New locations store only the street line in `address`; older rows
+ *  (and Places text-search adds) hold Google's full formatted address, so don't append the locality twice. */
+export function fullAddress(l:{address?:string|null;city?:string|null;state?:string|null;zipCode?:string|null}):string {
+  const street=l.address?.trim()||'';
+  if(street&&l.city&&l.state&&street.includes(`${l.city}, ${l.state}`))return street;
+  return [street,l.city,[l.state,l.zipCode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+}
 export function Pager({offset,total,onChange}:{offset:number;total:number;onChange:(n:number)=>void}) {
   return <div className="flex gap-3 items-center text-sm"><Button variant="outline" disabled={!offset} onClick={()=>onChange(Math.max(0,offset-50))}>Previous page</Button><span>{total?offset+1:0}–{Math.min(offset+50,total)} of {total}</span><Button variant="outline" disabled={offset+50>=total} onClick={()=>onChange(offset+50)}>Next page</Button></div>;
 }
@@ -41,7 +48,7 @@ export function AgencyWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>voi
     <div className="flex gap-2 flex-wrap">
       <Input className="max-w-xs" aria-label="Find client" placeholder="Find client…" value={clientSearch} onChange={e=>setClientSearch(e.target.value)}/>
       <select className={selectClass} aria-label="Client filter" value={f.client} onChange={e=>f.setClient(e.target.value)}><option value="">All accessible clients</option>{clients?.items?.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-      <Input className="max-w-sm" aria-label="Global location search" placeholder="Search name, address or Place ID…" value={f.q} onChange={e=>f.setQ(e.target.value)}/>
+      <Input className="max-w-sm" aria-label="Global location search" placeholder="Search name, address, ZIP or Place ID…" value={f.q} onChange={e=>f.setQ(e.target.value)}/>
       <select className={selectClass} aria-label="Location status" value={f.status} onChange={e=>f.setStatus(e.target.value)}>{Object.entries({all:'All statuses',synced:'Synced',reconnect:'Needs reconnect',unlinked:'Not linked',guard:'Guard alerts',unanswered:'Unanswered reviews',failed:'Failed posts'}).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
     </div>
     <div className="flex flex-wrap gap-2">{stats&&Object.entries({synced:'Synced',reconnect:'Needs reconnect',unlinked:'Not linked',guard:'Locations with Guard alerts',unanswered:'Locations with unanswered reviews',failed:'Locations with failed posts'}).map(([k,v])=><Button key={k} variant="outline" size="sm" onClick={()=>{f.setStatus(k);setExpanded(true);}}>{v}: {stats[k]}</Button>)}</div>
@@ -53,7 +60,7 @@ export function AgencyWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>voi
         <Button variant="ghost" onClick={()=>{setAll(false);setIds([]);}}>Clear selection</Button><span>{selectAll?data?.total:selected.length} selected</span>
         <a className="text-primary underline text-sm" href={'/api/agency/export?'+f.params+(!selectAll&&selected.length?'&ids='+selected.join(','):'')}>{!selectAll&&selected.length?'Export selected CSV':'Export matching CSV'}</a>
       </div>
-      <div className="overflow-auto"><table className="w-full text-sm"><thead><tr><th>Select</th><th className="text-left">Location</th><th className="text-left">Client</th><th className="text-left">Address</th><th className="text-left">Google link</th></tr></thead><tbody>{data?.items.map((l:any)=><tr key={l.id} className="border-t" data-testid={`agency-location-${l.id}`}><td className="p-2"><input aria-label={`Select ${l.businessName}`} type="checkbox" checked={selectAll||selected.includes(l.id)} onChange={e=>{setSelectionKey(selectedKey);setAll(false);setIds(e.target.checked?[...selected,l.id]:selected.filter(id=>id!==l.id));}}/></td><td className="p-2"><button className="text-primary underline" onClick={()=>onOpen?onOpen(l.id):window.location.assign(`/locations?location=${l.id}`)}>{l.businessName}</button></td><td>{l.clientName||'Unassigned'}</td><td>{[l.address,l.city,l.state].filter(Boolean).join(', ')||'Not set'}</td><td>{l.gbpLocationName?'Linked':'Not linked'}</td></tr>)}</tbody></table></div>
+      <div className="overflow-auto"><table className="w-full text-sm"><thead><tr><th>Select</th><th className="text-left">Location</th><th className="text-left">Client</th><th className="text-left">Address</th><th className="text-left">Google link</th></tr></thead><tbody>{data?.items.map((l:any)=><tr key={l.id} className="border-t" data-testid={`agency-location-${l.id}`}><td className="p-2"><input aria-label={`Select ${l.businessName}`} type="checkbox" checked={selectAll||selected.includes(l.id)} onChange={e=>{setSelectionKey(selectedKey);setAll(false);setIds(e.target.checked?[...selected,l.id]:selected.filter(id=>id!==l.id));}}/></td><td className="p-2"><button className="text-primary underline" onClick={()=>onOpen?onOpen(l.id):window.location.assign(`/locations?location=${l.id}`)}>{l.businessName}</button></td><td>{l.clientName||'Unassigned'}</td><td>{fullAddress(l)||'Not set'}</td><td>{l.gbpLocationName?'Linked':'Not linked'}</td></tr>)}</tbody></table></div>
       <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
       {writable&&<fieldset disabled={mutation.isPending} className="border rounded p-3 space-y-3"><legend>Apply to selected locations</legend>
         <select className={selectClass} aria-label="Bulk action" value={action} onChange={e=>setAction(e.target.value)}>{Object.entries({sync:'Sync now',link:'Link & sync',unlink:'Unlink',assign:'Assign client',guard:'Set Guard mode','ai-replies':'AI reply settings',content:'Schedule post/photo batch',scan:'Start Site Scans'}).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>

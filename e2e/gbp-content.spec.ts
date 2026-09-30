@@ -97,13 +97,22 @@ test('AI update is a draft until edited and approved, and provider failures can 
     await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('article')).toContainText('queued');
 });
 
+// The Locations list is the AgencyWorkspace table (paged envelope from /api/agency/locations); opening a row
+// sets ?location= and the detail loads /api/locations/:id.
+const agencyList = (items: any[]) => ({ items, total: items.length, offset: 0, pageSize: 50 });
+const mockAgencyList = (page: import('@playwright/test').Page, items: any[]) =>
+    page.route(/\/api\/agency\/locations(\?|$)/, route => route.fulfill({ json: agencyList(items) }));
+
 test('linked profile without a public Place ID can import and surfaces partial sync warnings', async ({ page }) => {
     const fixture = { id: 99881, businessName: 'Profile audit fixture', gbpLocationName: 'locations/fixture', gbpAccountName: 'accounts/fixture', placeId: null };
-    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    await mockAgencyList(page, [fixture]);
+    await page.route('**/api/locations/99881', route => route.fulfill({ json: fixture }));
     await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], locations: [], errors: [] } }));
     await page.route('**/api/locations/99881/import-google', route => route.fulfill({ json: { ...fixture, syncWarnings: ['Social profiles: Google denied permission.'] } }));
     await page.goto('/locations');
-    await page.getByText('Profile audit fixture', { exact: true }).click();
+    await expect(page.getByTestId('agency-location-99881')).toContainText('Linked');
+    await page.getByRole('button', { name: 'Profile audit fixture', exact: true }).click();
+    await expect(page).toHaveURL(/[?&]location=99881(&|$)/);
     await page.getByTestId('tab-info').click();
     await page.getByTestId('button-import-google').click();
     await expect(page.getByText('Google data partially imported', { exact: true })).toBeVisible();
@@ -111,13 +120,17 @@ test('linked profile without a public Place ID can import and surfaces partial s
 });
 
 test('Link & sync reports a partial Google failure instead of claiming every field synced', async ({ page }) => {
-    const fixture = { id: 99882, businessName: 'Link audit fixture', placeId: 'fixture-place' };
-    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    const fixture = { id: 99882, businessName: 'Link audit fixture', placeId: 'fixture-place', gbpLocationName: null };
+    let linked: any;
+    await page.route('**/api/locations/99882', route => route.fulfill({ json: fixture }));
     await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], errors: [], locations: [{ id: fixture.id, state: 'available', listing: { accountResource: 'accounts/fixture', gbpName: 'locations/fixture', grantSubject: 'fixture' } }] } }));
-    await page.route('**/api/gbp/import', route => route.fulfill({ json: { imported: 1, synced: { [fixture.id]: { profile: { warnings: ['Social profiles unavailable'] }, reviews: { kind: 'permission', message: 'Google denied reviews access' } } } } }));
-    await page.goto('/locations');
+    await page.route('**/api/gbp/import', route => { linked = route.request().postDataJSON(); return route.fulfill({ json: { imported: 1, synced: { [fixture.id]: { profile: { warnings: ['Social profiles unavailable'] }, reviews: { kind: 'permission', message: 'Google denied reviews access' } } } } }); });
+    // Per-location Link & sync lives on an unlinked location's Profile Guard tab when a connected account manages the listing.
+    await page.goto('/locations?location=99882&tab=guard');
+    await expect(page.getByTestId('card-guard-unlinked')).toBeVisible();
     await page.getByTestId('button-link-gbp-99882').click();
     await expect(page.getByText('Some Google data could not sync: Social profiles unavailable; Google denied reviews access', { exact: true })).toBeVisible();
+    expect(linked.locations).toEqual([{ accountResource: 'accounts/fixture', gbpName: 'locations/fixture', grantSubject: 'fixture' }]);
 });
 
 test('mobile composer and profile fields fit a narrow viewport', async ({ page }) => {
@@ -126,9 +139,9 @@ test('mobile composer and profile fields fit a narrow viewport', async ({ page }
     await page.getByLabel('Location', { exact: true }).selectOption(String(location));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const fixture = { id: 99883, businessName: 'Mobile audit fixture', gbpLocationName: 'locations/fixture', description: 'Profile description', services: ['Roof repair'], socialProfiles: {facebook:'https://facebook.com/fixture'}, businessPhotoCount: 12, customerPhotoCount: 4 };
-    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
-    await page.goto('/locations');
-    await page.getByText('Mobile audit fixture', { exact: true }).click();
+    await page.route('**/api/locations/99883', route => route.fulfill({ json: fixture }));
+    await page.goto('/locations?location=99883');
+    await expect(page.getByTestId('text-detail-name')).toHaveText('Mobile audit fixture');
     for (const tab of ['info', 'services', 'social', 'photos']) {
         await page.getByTestId(`tab-${tab}`).click();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tab).toBe(true);
@@ -207,14 +220,23 @@ test('profile Photos tab distinguishes a count Google never reported from zero o
 });
 
 test('unlinked Places import remains available and renders weekday text without array indexes', async ({ page }) => {
-    const fixture = {id:99885,businessName:'Unlinked audit fixture',placeId:'fixture-place',gbpLocationName:null,hours:['Monday: 8:00 AM – 5:00 PM','Tuesday: Closed']};
+    // A Places add stores Google's full formatted address; a newer row stores only the street line.
+    const fullGoogleAddress = '100 Fixture Rd, Fixture City, ST 00000, USA';
+    const fixture = {id:99885,businessName:'Unlinked audit fixture',placeId:'fixture-place',gbpLocationName:null,address:fullGoogleAddress,city:'Fixture City',state:'ST',zipCode:'00000',hours:['Monday: 8:00 AM – 5:00 PM','Tuesday: Closed']};
+    const streetOnly = {id:99886,businessName:'Street-only audit fixture',placeId:null,gbpLocationName:null,address:'5 Fixture Ave',city:'Fixture City',state:'ST',zipCode:'00000'};
     let imported = false;
-    await page.route('**/api/locations', route=>route.fulfill({json:[fixture]}));
+    await mockAgencyList(page, [fixture, streetOnly]);
+    await page.route('**/api/locations/99885', route=>route.fulfill({json:fixture}));
     await page.route('**/api/locations/99885/import-google', route=>{imported=true;return route.fulfill({json:fixture});});
     await page.goto('/locations');
-    await page.getByText('Unlinked audit fixture',{exact:true}).click();
+    // Address column: the full Google address once (no repeated city/state), the street line completed with city, state and ZIP.
+    await expect(page.getByTestId('agency-location-99885').locator('td').nth(3)).toHaveText(fullGoogleAddress);
+    await expect(page.getByTestId('agency-location-99886').locator('td').nth(3)).toHaveText('5 Fixture Ave, Fixture City, ST 00000');
+    await page.getByRole('button',{name:'Unlinked audit fixture',exact:true}).click();
+    await expect(page).toHaveURL(/[?&]location=99885(&|$)/);
     await page.getByTestId('tab-info').click();
-    await expect(page.getByTestId('info-hours')).toHaveText('Monday: 8:00 AM – 5:00 PM, Tuesday: Closed');
+    await expect(page.getByTestId('info-address')).toHaveText(fullGoogleAddress);
+    await expect(page.getByTestId('info-hours')).toHaveText('Monday: 8:00 AM – 5:00 PM · Tuesday: Closed');
     await page.getByTestId('button-import-google').click();
     await expect(page.getByText('Google data imported',{exact:true})).toBeVisible();
     expect(imported).toBe(true);

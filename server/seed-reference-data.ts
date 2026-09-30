@@ -1,4 +1,5 @@
-import { db } from "./db";
+import { db, pool } from "./db";
+import { ensureStateGuidesSchema } from "./state-guides-schema";
 import { stateGuides, stateGuideSteps, masterClassModules, betaAccessCodes } from "@shared/schema";
 import { sql, eq } from "drizzle-orm";
 import { readFileSync } from "fs";
@@ -14,15 +15,10 @@ function loadJson(filename: string) {
  * (verified / unconfirmed / dead -> null / none). Each boot copies the four URLs and
  * their check status onto the existing rows, only where something differs, so fixed
  * links reach databases that were seeded earlier (production included).
- * The status columns are added idempotently here; they are read by master-class.tsx.
+ * The status columns (read by master-class.tsx) come from ensureStateGuidesSchema,
+ * which seedReferenceData runs first.
  */
 async function syncStateGuideLinks(guidesData: any[]) {
-  await db.execute(sql`ALTER TABLE state_guides
-    ADD COLUMN IF NOT EXISTS sos_url_status text,
-    ADD COLUMN IF NOT EXISTS licensing_board_url_status text,
-    ADD COLUMN IF NOT EXISTS workers_comp_url_status text,
-    ADD COLUMN IF NOT EXISTS tax_board_url_status text,
-    ADD COLUMN IF NOT EXISTS links_checked_at text`);
   const rows = guidesData.map((g: any) => ({
     state_code: g.state_code,
     sos_url: g.sos_url ?? null,
@@ -35,10 +31,10 @@ async function syncStateGuideLinks(guidesData: any[]) {
     tax_board_url_status: g.tax_board_url_status ?? null,
     links_checked_at: g.links_checked_at ?? null,
   }));
-  // sos_url is NOT NULL: a Secretary of State link found dead keeps its old value, and its
-  // "dead" status hides it in the UI.
+  // sos_url is nullable (ensureStateGuidesSchema), so a Secretary of State link found dead
+  // is cleared like the other three instead of being kept behind its "dead" status.
   const result = await db.execute(sql`UPDATE state_guides g SET
-      sos_url = COALESCE(j.sos_url, g.sos_url),
+      sos_url = j.sos_url,
       licensing_board_url = j.licensing_board_url,
       workers_comp_url = j.workers_comp_url,
       tax_board_url = j.tax_board_url,
@@ -52,7 +48,7 @@ async function syncStateGuideLinks(guidesData: any[]) {
       sos_url_status text, licensing_board_url_status text, workers_comp_url_status text, tax_board_url_status text,
       links_checked_at text)
     WHERE g.state_code = j.state_code AND (
-      g.sos_url IS DISTINCT FROM COALESCE(j.sos_url, g.sos_url)
+      g.sos_url IS DISTINCT FROM j.sos_url
       OR g.licensing_board_url IS DISTINCT FROM j.licensing_board_url
       OR g.workers_comp_url IS DISTINCT FROM j.workers_comp_url
       OR g.tax_board_url IS DISTINCT FROM j.tax_board_url
@@ -65,6 +61,11 @@ async function syncStateGuideLinks(guidesData: any[]) {
 }
 
 export async function seedReferenceData() {
+  // First, before any drizzle query on stateGuides: its select and insert name the link-status
+  // columns, so a database without them (production included) would fail the seed insert and
+  // /api/state-guides. Boot runs this seeder before the routes are registered.
+  await ensureStateGuidesSchema(pool);
+
   const guideCount = await db.execute(sql`SELECT COUNT(*) as count FROM state_guides`);
   const totalGuides = Number(guideCount.rows[0].count);
 
@@ -78,17 +79,22 @@ export async function seedReferenceData() {
           stateCode: g.state_code,
           stateName: g.state_name,
           sosName: g.sos_name,
-          sosUrl: g.sos_url,
+          sosUrl: g.sos_url ?? null,
+          sosUrlStatus: g.sos_url_status ?? null,
           entityTypes: g.entity_types,
           licensingBoardName: g.licensing_board_name,
           licensingBoardUrl: g.licensing_board_url,
+          licensingBoardUrlStatus: g.licensing_board_url_status ?? null,
           licensingRequired: g.licensing_required,
           licensingNotes: g.licensing_notes,
           workersCompType: g.workers_comp_type,
           workersCompAgency: g.workers_comp_agency,
           workersCompUrl: g.workers_comp_url,
+          workersCompUrlStatus: g.workers_comp_url_status ?? null,
           taxBoardName: g.tax_board_name,
           taxBoardUrl: g.tax_board_url,
+          taxBoardUrlStatus: g.tax_board_url_status ?? null,
+          linksCheckedAt: g.links_checked_at ?? null,
           salesTaxOnLabor: g.sales_tax_on_labor,
           bAndOTax: g.b_and_o_tax,
           bondRequired: g.bond_required,

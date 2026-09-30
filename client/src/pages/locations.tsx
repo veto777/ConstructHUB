@@ -1,4 +1,4 @@
-import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
+import { AgencyWorkspace, Pager, fullAddress, useAgencyFilter } from "@/components/agency-workspace";
 import { LocationSearchSummary } from "./site-connections";
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection } from "@/components/gbp-connection";
@@ -62,14 +62,6 @@ function showLocation(id: string | null) {
   window.history.replaceState(window.history.state, "", url.toString());
   window.dispatchEvent(new Event("urlparamchange"));
 }
-/** Street line plus city, state and ZIP. New locations store only the street line in `address`; older rows
- *  (and Places text-search adds) hold Google's full formatted address, so don't append the locality twice. */
-function fullAddress(l: Pick<BusinessLocation, "address" | "city" | "state" | "zipCode">): string {
-  const street = l.address?.trim() || "";
-  if (street && l.city && l.state && street.includes(`${l.city}, ${l.state}`)) return street;
-  return [street, l.city, [l.state, l.zipCode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-}
-
 const refreshLocationLists = () => ["/api/locations", "/api/agency/locations", "/api/agency/dashboard", "/api/gbp/linkage", "/api/gbp/status"]
   .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
@@ -834,6 +826,8 @@ function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDe
   const nextEmail = useAccountSettings ? null : notificationEmail.trim();
   const emailInvalid = nextEmail !== null && !EMAIL_RE.test(nextEmail);
   const dirty = (nextEmail ?? "") !== savedEmail;
+  // Only a location tied to Google (Place ID or a linked Business Profile) has a listing to reassure about.
+  const hasGoogleListing = !!(location.placeId || location.gbpLocationName);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -855,7 +849,8 @@ function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDe
     },
     onSuccess: () => {
       setConfirmOpen(false);
-      toast({ title: "Location deleted", description: `${location.businessName} was removed from ConstructHUB. Your Google listing is unchanged.` });
+      const googleNote = hasGoogleListing ? " Your Google listing is unchanged." : "";
+      toast({ title: "Location deleted", description: `${location.businessName} was removed from ConstructHUB.${googleNote}` });
       onDeleted();
     },
     onError: (err: Error) => {
@@ -943,7 +938,9 @@ function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDe
             <AlertDialogTitle>Delete {location.businessName} from ConstructHUB?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Your listing on Google is not changed. ConstructHUB permanently removes its own copy:</p>
+                <p>{hasGoogleListing
+                  ? "Your listing on Google is not changed. ConstructHUB permanently removes its own copy:"
+                  : "ConstructHUB permanently removes this location and its data:"}</p>
                 <ul className="list-disc pl-5 space-y-0.5">
                   <li>synced Google reviews, photos and performance stats</li>
                   <li>Profile Guard settings and history</li>

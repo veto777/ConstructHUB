@@ -7,9 +7,11 @@ export function useUrlParam(key: string, fallback: string | null = null): [strin
   const [value, setValue] = useState<string | null>(read);
   useEffect(() => {
     const onPop = () => setValue(read());
-    window.addEventListener("popstate", onPop);
-    window.addEventListener("urlparamchange", onPop);
-    return () => { window.removeEventListener("popstate", onPop); window.removeEventListener("urlparamchange", onPop); };
+    // wouter v3 fires "pushState"/"replaceState" on window for every navigation, so a <Link> to the
+    // same page without the param (e.g. the sidebar's /settings while on ?tab=security) resets it too.
+    const events = ["popstate", "urlparamchange", "pushState", "replaceState"];
+    for (const event of events) window.addEventListener(event, onPop);
+    return () => { for (const event of events) window.removeEventListener(event, onPop); };
   }, [key]);
   const update = (next: string | null, push = false) => {
     const url = new URL(window.location.href);
