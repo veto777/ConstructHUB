@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
+import { rememberPlanPrompt } from "@/lib/plan-errors";
+import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -220,6 +222,16 @@ function saveTemplates(templates: PhotoTemplate[]) {
 
 export default function PhotosPage() {
   const { toast } = useToast();
+
+  // Processing needs an account with a plan (the server answers 401 / 402 at
+  // /api/photos/process); say so before anyone sets up a batch.
+  const { data: me, isPending: mePending } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: photoEntitlements } = useQuery<{ accessPlan: string | null }>({
+    queryKey: ["/api/entitlements"],
+    enabled: !!me,
+  });
+  const processingBlock: "sign-in" | "plan" | null =
+    mePending ? null : !me ? "sign-in" : photoEntitlements && !photoEntitlements.accessPlan ? "plan" : null;
 
   const { data: savedLocations } = useQuery<any[]>({
     queryKey: ["/api/locations"],
@@ -994,6 +1006,8 @@ export default function PhotosPage() {
       });
       if (!startRes.ok) {
         const errData = await startRes.json().catch(() => ({ message: "Processing failed" }));
+        // 402 plan_required: the toast gets its "See plans" link (lib/plan-errors.ts).
+        rememberPlanPrompt(errData);
         throw new Error(errData.message || "Processing failed");
       }
       const { jobId, total } = await startRes.json();
@@ -1230,6 +1244,21 @@ export default function PhotosPage() {
             Add watermarks, write EXIF details and GPS geotags, generate descriptions, and give your job photos clear, keyword-rich filenames in one batch. Google strips EXIF on upload to a Business Profile, so geotags and metadata are for your own files and other sites — they don't promise a ranking benefit.
           </p>
         </div>
+
+        {processingBlock && (
+          <Card className="p-4 flex flex-wrap items-center justify-between gap-3 border-[#4A6CF7]/30 bg-[#4A6CF7]/5" role="status" data-testid="notice-photos-access">
+            <p className="text-sm min-w-0 flex-1">
+              {processingBlock === "sign-in"
+                ? "Sign in to process photos. The Photo Optimizer is included with every ConstructHUB plan."
+                : `Processing photos is included with every plan, starting with ${PLANS[PLAN_KEYS[0]].name}. Choose a plan to process this batch.`}
+            </p>
+            <Button asChild size="sm" className="shrink-0">
+              {processingBlock === "sign-in"
+                ? <Link href={`/auth?next=${encodeURIComponent("/photos")}`} data-testid="link-photos-sign-in">Sign in</Link>
+                : <Link href="/pricing" data-testid="link-photos-plans">See plans</Link>}
+            </Button>
+          </Card>
+        )}
 
         <Card className="p-5 space-y-4 animate-in-delay-1" style={{ boxShadow: "var(--shadow-sm)" }}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -2910,7 +2939,6 @@ export default function PhotosPage() {
             <div className="flex items-center gap-2">
               <ExternalLink className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-semibold">Upload to Platforms</span>
-              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20">Platinum</Badge>
             </div>
             <p className="text-xs text-muted-foreground">
               Download your optimized photos above, then upload them directly to your business profiles.

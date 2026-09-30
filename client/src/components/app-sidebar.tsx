@@ -5,8 +5,9 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell,
+  KanbanSquare, ArrowRight, Bell, Lock,
 } from "lucide-react";
+import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
 import masterclassLogo from "@assets/Masterclass_1772158106209.png";
 import priceLogo from "@assets/Price_1772158106209.png";
@@ -124,6 +125,34 @@ function GoogleAdsIcon({ className }: { className?: string }) {
 type BadgeType = "new" | "hot" | "best";
 /** testId overrides the title-derived test id when two items share a title. */
 type NavChild = { title: string; url: string; icon: any; badge?: BadgeType; subChildren?: NavChild[]; testId?: string };
+
+/** Pages of the modules only some plans include; the page itself shows the plan_required card. */
+const MODULE_BY_URL: Record<string, ModuleKey> = {
+  "/agency": "agencyWorkspace",
+  "/domains": "domainsMailAlerts",
+  "/mail-alerts": "domainsMailAlerts",
+  "/ads-manager": "adsManager",
+  "/cloudflare": "cloudflareSearchConsole",
+  "/search-console": "cloudflareSearchConsole",
+};
+
+/** url → the plan name to show before the click, or null when the account can use the page. */
+type PlanBadgeFor = (url: string) => string | null;
+
+/** "Agency" on a module the signed-in account's plan doesn't include, so the upgrade card is no surprise. */
+function PlanBadge({ plan, label }: { plan: string; label: string }) {
+  // The sidebar is narrow: a lock keeps the page name readable; the plan is in the tooltip and for screen readers.
+  return (
+    <span
+      className="ml-auto shrink-0 inline-flex items-center p-0.5 text-sidebar-foreground/60"
+      title={`Included with the ${plan} plan`}
+      data-testid={`badge-plan-${label.toLowerCase().replace(/\s+/g, "-")}`}
+    >
+      <Lock className="h-3 w-3" aria-hidden="true" />
+      <span className="sr-only">{plan} plan</span>
+    </span>
+  );
+}
 
 const navTestId = (item: { title: string; testId?: string }) =>
   item.testId ?? `link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`;
@@ -245,11 +274,11 @@ const pricingGroup: NavGroup = {
     { title: "Add-ons", url: "/pricing#add-ons", icon: PlusCircle },
     { title: "Master Class", url: "/master-class-landing", icon: BookOpen, testId: "link-nav-pricing-master-class" },
     // The done-for-you SEO packages section of the pricing page.
-    { title: "SEO Services", url: "/pricing#done-for-you", icon: Rocket },
+    { title: "SEO Services", url: "/pricing#services", icon: Rocket },
   ],
 };
 
-function CollapsibleNavGroup({ group }: { group: NavGroup }) {
+function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavGroup; planBadgeFor?: PlanBadgeFor }) {
   const [location] = useLocation();
   const isActiveGroup = group.children.some(c => c.url === location || c.subChildren?.some(sc => sc.url === location)) || location === group.landingUrl;
   const [open, setOpen] = useState(isActiveGroup);
@@ -290,7 +319,11 @@ function CollapsibleNavGroup({ group }: { group: NavGroup }) {
                 <Link href={item.url} onClick={() => scrollToFragment(item.url)} data-testid={navTestId(item)} className="flex items-center gap-1.5 w-full min-w-0">
                   <item.icon className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{item.title}</span>
-                  {item.badge && <FeatureBadge type={item.badge} label={item.title} />}
+                  {(() => {
+                    const plan = planBadgeFor(item.url);
+                    if (plan) return <PlanBadge plan={plan} label={item.title} />;
+                    return item.badge ? <FeatureBadge type={item.badge} label={item.title} /> : null;
+                  })()}
                 </Link>
               </SidebarMenuSubButton>
               {item.subChildren && item.subChildren.map(sub => (
@@ -338,6 +371,24 @@ export function AppSidebar() {
     queryKey: ["/api/auth/me"],
   });
 
+  // Which plan-gated modules this account can open. Agency workspace follows the
+  // workspace owner's plan (members need none of their own), so it reads /api/agency/me.
+  const { data: entitlements } = useQuery<{ modules?: Partial<Record<ModuleKey, boolean>> } | null>({
+    queryKey: ["/api/entitlements"],
+    enabled: !!user,
+  });
+  const { data: agencyMe } = useQuery<{ entitled?: boolean } | null>({
+    queryKey: ["/api/agency/me"],
+    enabled: !!user,
+  });
+  const planBadgeFor: PlanBadgeFor = (url) => {
+    const module = MODULE_BY_URL[url];
+    if (!module || !user) return null;
+    const allowed = module === "agencyWorkspace" ? agencyMe?.entitled : entitlements?.modules?.[module];
+    // Unknown (loading or failed) shows nothing rather than a wrong lock.
+    return allowed === false ? PLANS[planForModule(module)].name : null;
+  };
+
   const activeCount = dbCounts?.total ?? 0;
   const countyCount = counties?.length ?? 0;
 
@@ -364,8 +415,8 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        {/* ConstructHub CRM — a separate product/membership. Prominent pathway
-            in, gated behind the /crm-app gateway (member → portal, else plans). */}
+        {/* ConstructHub CRM — included in every paid plan, on its own portal.
+            Prominent pathway in through the /crm-app gateway (member → portal, else plans). */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -375,7 +426,7 @@ export function AppSidebar() {
                     <KanbanSquare className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                     <span className="font-semibold">CRM</span>
                     <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-primary/80">
-                      Membership <ArrowRight className="h-3 w-3" />
+                      Included <ArrowRight className="h-3 w-3" />
                     </span>
                   </Link>
                 </SidebarMenuButton>
@@ -400,7 +451,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {googleGroups.map(group => (
-                <CollapsibleNavGroup key={group.label} group={group} />
+                <CollapsibleNavGroup key={group.label} group={group} planBadgeFor={planBadgeFor} />
               ))}
               {SHOW_GOOGLE_REVIEWS && (
                 <SidebarMenuItem>
@@ -454,7 +505,9 @@ export function AppSidebar() {
                           <item.icon className="h-5 w-5 min-w-5 min-h-5 shrink-0" />
                         )}
                         <span>{item.title}</span>
-                        {item.badge && <FeatureBadge type={item.badge} label={item.title} />}
+                        {planBadgeFor(item.url)
+                          ? <PlanBadge plan={planBadgeFor(item.url)!} label={item.title} />
+                          : item.badge && <FeatureBadge type={item.badge} label={item.title} />}
                       </Link>
                     </SidebarMenuButton>
                     {item.landingUrl && (

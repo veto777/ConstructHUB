@@ -122,8 +122,9 @@ test.describe("pricing page", () => {
   test("services show no price and open the sales form, which posts to /api/seo-inquiry", async ({ page }) => {
     const calls = await mockBilling(page, NO_SUB);
     await gotoCrm(page, "/pricing#done-for-you");
-    const section = page.locator("#done-for-you");
-    await expect(section.getByRole("button", { name: /Talk to a sales rep/ })).toHaveCount(6);
+    const section = page.locator("#services");
+    // One per service card, plus the section's own inquiry button.
+    await expect(section.getByRole("button", { name: /Talk to a sales rep/ })).toHaveCount(7);
     expect(await section.innerText()).not.toMatch(/\$\s?\d/);
     await expect(section.getByRole("button", { name: /Add to cart/i })).toHaveCount(0);
     expect(await section.innerText()).not.toMatch(/guarantee(d)? (first|top)/i);
@@ -312,7 +313,7 @@ test.describe("mobile 390", () => {
 
   test("pricing and billing never scroll sideways", async ({ page }) => {
     await mockBilling(page, PLATINUM_STRIPE);
-    for (const hash of ["", "#comparison", "#agency", "#add-ons", "#done-for-you"]) {
+    for (const hash of ["", "#comparison", "#agency", "#add-ons", "#services"]) {
       await gotoCrm(page, `/pricing${hash}`);
       await expect(page.getByTestId("text-pricing-title")).toBeAttached();
       await expectNoSideScroll(page, "text-pricing-title");
@@ -320,5 +321,250 @@ test.describe("mobile 390", () => {
     await gotoCrm(page, "/settings?tab=billing");
     await expect(page.getByTestId("card-addons")).toBeVisible();
     await expectNoSideScroll(page, "card-current-plan");
+  });
+
+  test("usage and API keys never scroll sideways", async ({ page }) => {
+    await mockBilling(page, AGENCY_STRIPE);
+    await mockEntitlements(page, AGENCY_ENTITLEMENTS);
+    await mockSavedCredentials(page, SAVED_ALL);
+    await gotoCrm(page, "/settings?tab=billing");
+    await expect(page.getByTestId("card-usage")).toBeVisible();
+    await expectNoSideScroll(page, "card-usage");
+    await gotoCrm(page, "/settings?tab=api-keys");
+    await expect(page.getByTestId("row-api-key-cloudflare-7")).toBeVisible();
+    await expectNoSideScroll(page, "card-api-keys");
+  });
+});
+
+// ── Integration (i3-client): the server's refusal codes, usage meters, API keys ──
+
+const PRO_ENTITLEMENTS = {
+  plan: "pro", storedPlan: "pro", accessPlan: "pro", planName: "Pro", isPlatformAdmin: false, grantEndsAt: null,
+  limits: PLANS.pro.limits, allowances: PLANS.pro.limits,
+  modules: PLANS.pro.modules, addons: { protected_site: 1 },
+  locations: { used: 1, limit: PLANS.pro.limits.locations },
+  usage: {
+    searches: { used: 120, limit: PLANS.pro.limits.permitSearches },
+    rankings: { used: PLANS.pro.limits.gridCredits, limit: PLANS.pro.limits.gridCredits },
+    siteScans: { used: 1, limit: PLANS.pro.limits.siteScans },
+    competitorScans: { used: 0, limit: PLANS.pro.limits.competitorScans },
+  },
+  resetsAt: "2026-11-01T00:00:00.000Z",
+};
+const AGENCY_ENTITLEMENTS = {
+  ...PRO_ENTITLEMENTS, plan: "agency", storedPlan: "agency", accessPlan: "agency", planName: "Agency",
+  limits: PLANS.agency.limits, allowances: PLANS.agency.limits, modules: PLANS.agency.modules,
+  locations: { used: 25, limit: 500 },
+};
+
+async function mockEntitlements(page: Page, body: Record<string, unknown>) {
+  await page.route("**/api/entitlements", (r) => r.fulfill({ json: body }));
+}
+
+type Saved = { cloudflare: any[]; gsc: any[]; ads: any; gmail: any[]; registrar: any[] | null };
+const SAVED_ALL: Saved = {
+  cloudflare: [{ id: 7, label: "i3-cf@example.invalid" }],
+  gsc: [{ id: 8, label: "i3-gsc@example.invalid" }],
+  ads: { saved: true, managerId: "1112223334" },
+  gmail: [{ subject: "i3-subject", email: "i3-alerts@example.invalid" }],
+  registrar: [{ id: 3, provider: "porkbun", label: "I3- main registrar" }],
+};
+
+/** The saved-credential lists and their disconnect routes; records every disconnect body. */
+async function mockSavedCredentials(page: Page, saved: Saved) {
+  const disconnects: { url: string; body: any }[] = [];
+  const list = (url: string, body: () => unknown) => page.route(url, (r) => r.fulfill({ json: body() }));
+  await list("**/api/cloudflare/saved-connections", () => ({ items: saved.cloudflare }));
+  await list("**/api/gsc/saved-connections", () => ({ items: saved.gsc }));
+  await list("**/api/ads/saved-connection", () => saved.ads);
+  await list("**/api/mail-alerts/oauth/saved-connections", () => ({ items: saved.gmail }));
+  await page.route("**/api/domains/saved-connections", (r) => saved.registrar
+    ? r.fulfill({ json: { items: saved.registrar } })
+    : r.fulfill({ status: 404, json: { message: "Not found" } }));
+  for (const url of ["**/api/cloudflare/disconnect", "**/api/gsc/disconnect", "**/api/ads/disconnect", "**/api/mail-alerts/oauth/disconnect", "**/api/domains/disconnect"]) {
+    await page.route(url, async (r) => {
+      disconnects.push({ url: new URL(r.request().url()).pathname, body: r.request().postDataJSON() });
+      if (url.includes("cloudflare")) {
+        saved.cloudflare = [];
+        await r.fulfill({ json: { results: [{ id: 7, revoked: true, message: "Disconnected locally. Previously applied edge rules remain; manage them in Cloudflare." }] } });
+      } else await r.fulfill({ json: { ok: true, message: "Disconnected." } });
+    });
+  }
+  return disconnects;
+}
+
+test.describe("pricing page: refusals with a next step", () => {
+  test("#services is where every sales link lands, with its own inquiry form", async ({ page }) => {
+    const calls = await mockBilling(page, NO_SUB);
+    await gotoCrm(page, "/pricing#services");
+    const section = page.locator("#services");
+    await expect(section.getByTestId("text-dfy-heading")).toBeInViewport();
+    await section.getByTestId("button-services-sales").click();
+    const dialog = page.getByTestId("dialog-talk-to-sales");
+    await expect(dialog.getByTestId("text-sales-topic")).toContainText("Done-for-you services");
+    await dialog.getByTestId("input-sales-name").fill("I3- Services Tester");
+    await dialog.getByTestId("input-sales-email").fill("i3-services@example.invalid");
+    await dialog.getByTestId("button-sales-submit").click();
+    await expect(dialog.getByTestId("text-sales-success")).toBeVisible();
+    expect(calls.inquiry.at(-1)).toMatchObject({ services: ["Done-for-you services"] });
+  });
+
+  test("a 409 talk_to_sales opens the inquiry form for that plan instead of an error", async ({ page }) => {
+    await mockBilling(page, NO_SUB);
+    await page.route("**/api/stripe/create-checkout", (r) => r.fulfill({ status: 409, json: { code: "talk_to_sales", message: "Talk to a sales rep" } }));
+    await gotoCrm(page, "/pricing");
+    await page.getByTestId("button-subscribe-growth").click();
+    await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText(`${PLANS.growth.name} plan`);
+  });
+
+  test("a 409 has_subscription (subscribed in another tab) switches to changing that plan", async ({ page }) => {
+    const calls = await mockBilling(page, NO_SUB);
+    let subscribed = false;
+    await page.route("**/api/stripe/subscription", (r) => r.fulfill({ json: subscribed ? PRO_STRIPE : NO_SUB }));
+    await page.route("**/api/stripe/create-checkout", async (r) => {
+      subscribed = true;
+      await r.fulfill({ status: 409, json: { code: "has_subscription", message: "You already have a subscription." } });
+    });
+    await gotoCrm(page, "/pricing");
+    await page.getByTestId("button-subscribe-growth").click();
+    const dialog = page.getByTestId("dialog-change-plan");
+    await expect(dialog).toContainText(`Growth at ${usd(PLANS.growth.monthlyCents)}/mo`);
+    await page.getByTestId("button-confirm-change-plan").click();
+    await expect.poll(() => calls.changePlan).toEqual([{ plan: "growth", interval: "month" }]);
+  });
+
+  test("a declined card (402 payment_failed) changes nothing and offers Manage billing", async ({ page }) => {
+    await mockBilling(page, PRO_STRIPE);
+    const message = "Your card couldn't be charged, so nothing changed (Your card was declined.). Update your card in Manage billing and try again.";
+    await page.route("**/api/stripe/change-plan", (r) => r.fulfill({ status: 402, json: { code: "payment_failed", message } }));
+    let portal = 0;
+    await page.route("**/api/stripe/create-portal", async (r) => { portal++; await r.fulfill({ json: {} }); });
+    await gotoCrm(page, "/pricing");
+    await page.getByTestId("button-subscribe-growth").click();
+    await page.getByTestId("button-confirm-change-plan").click();
+    await expect(page.getByText(message)).toBeVisible();
+    await page.getByTestId("button-toast-manage-billing").click();
+    await expect.poll(() => portal).toBe(1);
+  });
+});
+
+test.describe("settings: usage and API keys", () => {
+  test("Billing shows this month's usage from the entitlements the server enforces", async ({ page }) => {
+    await mockBilling(page, PRO_STRIPE);
+    await mockEntitlements(page, PRO_ENTITLEMENTS);
+    await gotoCrm(page, "/settings?tab=billing");
+    const card = page.getByTestId("card-usage");
+    await expect(card.getByTestId("usage-searches")).toContainText(`120 of ${PLANS.pro.limits.permitSearches} used`);
+    await expect(card.getByTestId("usage-rankings")).toContainText(`${PLANS.pro.limits.gridCredits} of ${PLANS.pro.limits.gridCredits} used`);
+    await expect(card.getByTestId("usage-rankings").getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+    await expect(card.getByTestId("usage-locations")).toContainText(`1 of ${PLANS.pro.limits.locations}`);
+    await expect(card.getByTestId("text-usage-resets")).toContainText("November 1");
+    await expect(page.getByTestId("card-addons")).toContainText("prorated and invoiced right away");
+  });
+
+  test("an add-on order above self-serve opens the inquiry form", async ({ page }) => {
+    await mockBilling(page, PRO_STRIPE);
+    await page.route("**/api/stripe/addons", (r) => r.fulfill({ status: 409, json: { code: "talk_to_sales", message: "Talk to a sales rep" } }));
+    await gotoCrm(page, "/settings?tab=billing");
+    await page.getByTestId("button-addon-inc-competitor_pack").click();
+    await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText(`${ADDONS.competitor_pack.name} × 1`);
+  });
+
+  test("API keys lists every saved key and removes one after confirming", async ({ page }) => {
+    const guards = watchPage(page);
+    await mockBilling(page, PRO_STRIPE);
+    const disconnects = await mockSavedCredentials(page, { ...SAVED_ALL, cloudflare: [...SAVED_ALL.cloudflare] });
+    await gotoCrm(page, "/settings");
+    await page.getByTestId("button-settings-tab-api-keys").click();
+    await expect(page).toHaveURL(/tab=api-keys/);
+    for (const key of ["registrar-3", "cloudflare-7", "gsc-8", "ads", "gmail-i3-subject"]) {
+      await expect(page.getByTestId(`row-api-key-${key}`)).toBeVisible();
+    }
+    await expect(page.getByTestId("row-api-key-registrar-3")).toContainText("Porkbun");
+    await expect(page.getByTestId("row-api-key-ads")).toContainText("Manager account 1112223334");
+    await expect(page.getByTestId("link-crm-api-keys")).toHaveAttribute("href", /\/crm\/integrations$/);
+
+    await page.getByTestId("button-remove-api-key-cloudflare-7").click();
+    const dialog = page.getByTestId("dialog-remove-api-key");
+    await expect(dialog).toContainText("i3-cf@example.invalid");
+    await page.getByTestId("button-confirm-remove-api-key").click();
+    await expect.poll(() => disconnects).toEqual([{ url: "/api/cloudflare/disconnect", body: { ids: [7] } }]);
+    await expect(page.getByText("Previously applied edge rules remain")).toBeVisible();
+    await expect(page.getByTestId("row-api-key-cloudflare-7")).toHaveCount(0);
+    guards.assertClean("settings api keys");
+  });
+
+  test("with nothing saved the tab says so", async ({ page }) => {
+    await mockBilling(page, NO_SUB);
+    await mockSavedCredentials(page, { cloudflare: [], gsc: [], ads: { saved: false, managerId: null }, gmail: [], registrar: [] });
+    await gotoCrm(page, "/settings?tab=api-keys");
+    await expect(page.getByTestId("text-api-keys-empty")).toHaveText("No API keys or connected accounts are saved on this account.");
+    await expect(page.getByTestId("text-api-keys-elsewhere")).toHaveCount(0);
+  });
+
+  test("before the server lists registrar keys, the tab claims only what it checked", async ({ page }) => {
+    await mockBilling(page, NO_SUB);
+    await mockSavedCredentials(page, { cloudflare: [], gsc: [], ads: { saved: false, managerId: null }, gmail: [], registrar: null });
+    await gotoCrm(page, "/settings?tab=api-keys");
+    await expect(page.getByTestId("text-api-keys-empty")).toHaveText("Nothing is saved for Cloudflare, Search Console, Google Ads and Gmail.");
+    await expect(page.getByTestId("text-api-keys-elsewhere")).toContainText("Registrar API keys (Porkbun, Name.com) are listed on the Domains page.");
+    // No remove route exists for them yet, so none is promised.
+    await expect(page.getByTestId("text-api-keys-elsewhere")).toContainText("They can't be removed from ConstructHUB yet.");
+    await expect(page.getByTestId("text-api-keys-error")).toHaveCount(0);
+  });
+
+  test("without the Agency plan the tab doesn't send registrar keys to a page that won't list them", async ({ page }) => {
+    await mockBilling(page, PRO_STRIPE);
+    await mockEntitlements(page, PRO_ENTITLEMENTS);
+    await mockSavedCredentials(page, { cloudflare: [], gsc: [], ads: { saved: false, managerId: null }, gmail: [], registrar: null });
+    await gotoCrm(page, "/settings?tab=api-keys");
+    const note = page.getByTestId("text-api-keys-elsewhere");
+    await expect(note).toContainText("Registrar API keys (Porkbun, Name.com) can't be listed or removed here yet.");
+    await expect(note).toContainText(`lists them on the ${PLANS.agency.name} plan`);
+    await expect(note).not.toContainText("are listed on the Domains page");
+  });
+});
+
+test.describe("plan answers anywhere get a way forward", () => {
+  test("a 402 plan_required toast links to Pricing", async ({ page }) => {
+    const message = "Click-fraud protection (Click Guard, IP Tracker and VPN Shield) is included with the Pro plan. Upgrade in Pricing to use it.";
+    await page.route("**/api/click-guard/domains", (r) => r.request().method() === "POST"
+      ? r.fulfill({ status: 402, json: { code: "plan_required", requiredPlan: "pro", message } })
+      : r.fulfill({ json: [] }));
+    await gotoCrm(page, "/ip-tracker");
+    await page.getByTestId("button-add-first-domain").click();
+    await page.getByTestId("input-domain").fill("i3-example.invalid");
+    await page.getByTestId("button-save-domain").click();
+    await expect(page.getByText(message)).toBeVisible();
+    const link = page.getByTestId("link-toast-plan-prompt");
+    await expect(link).toHaveText(`See ${PLANS.pro.name}`);
+    await link.click();
+    await expect(page).toHaveURL(/\/pricing$/);
+  });
+
+  test("the sidebar marks Agency-only pages before the click, and only for accounts without them", async ({ page }) => {
+    const openGroups = async () => {
+      for (const g of ["google-business", "google-ads"]) {
+        const b = page.getByTestId(`link-nav-group-${g}`);
+        if ((await b.getAttribute("aria-expanded")) !== "true") await b.click();
+      }
+    };
+    await mockEntitlements(page, PRO_ENTITLEMENTS);
+    await page.route("**/api/agency/me", (r) => r.fulfill({ json: { entitled: false, requiredPlan: "agency" } }));
+    await gotoCrm(page, "/pricing");
+    await openGroups();
+    for (const id of ["agency", "domains", "mail-alerts", "agency-ads-&-lsa", "cloudflare", "search-console"]) {
+      await expect(page.getByTestId(`badge-plan-${id}`)).toHaveAttribute("title", `Included with the ${PLANS.agency.name} plan`);
+    }
+    await expect(page.getByTestId("badge-plan-locations")).toHaveCount(0);
+
+    await page.unroute("**/api/entitlements");
+    await page.unroute("**/api/agency/me");
+    await mockEntitlements(page, AGENCY_ENTITLEMENTS);
+    await page.route("**/api/agency/me", (r) => r.fulfill({ json: { entitled: true } }));
+    await gotoCrm(page, "/pricing");
+    await openGroups();
+    await expect(page.getByTestId("link-nav-domains")).toBeVisible();
+    await expect(page.locator('[data-testid^="badge-plan-"]')).toHaveCount(0);
   });
 });

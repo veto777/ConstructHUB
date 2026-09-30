@@ -584,7 +584,8 @@ export default function CrmAdminPage() {
               <div className="text-sm text-muted-foreground" data-testid="text-org-seats">
                 Seats: {orgDetail.seats.used} used
                 {orgDetail.seats.limit < 0 ? " · unlimited (beta)" : ` of ${orgDetail.seats.limit}`}
-                {" · "}{orgDetail.seats.planName} plan
+                {/* Without a plan the server reports plan "none" (planName "current"). */}
+                {" · "}{orgDetail.seats.plan === "none" ? "no active plan" : `${orgDetail.seats.planName} plan`}
               </div>
 
               <div className="space-y-2">

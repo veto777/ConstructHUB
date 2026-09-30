@@ -98,10 +98,9 @@ export default function TermsOfUsePage() {
             <p>ConstructHUB may issue trial access codes or grant beta access to certain users at our discretion. Trial and beta access is provided "as-is" without warranty. We reserve the right to modify, limit, or revoke trial or beta access at any time without notice. Features available during trial or beta periods may change or be discontinued. Trial access codes are non-transferable and intended for single-user use only.</p>
           </section>
 
-          <section data-testid="section-consulting">
-            <h2 className="text-xl font-semibold mb-3">9. Consulting and Custom Work</h2>
-            <p>Consulting sessions and custom work are not included in any subscription plan. They are quoted by a sales rep before they are scheduled.</p>
-            <p className="mt-2">Consulting sessions must be scheduled in advance. Cancellation with less than 24 hours' notice may result in forfeiture of the session fee. Consulting advice is provided for informational purposes and does not constitute legal, financial, or professional advice.</p>
+          <section data-testid="section-custom-work">
+            <h2 className="text-xl font-semibold mb-3">9. Custom Work</h2>
+            <p>Custom work is not included in any subscription plan. It is quoted by a sales rep and agreed with you before it is scheduled.</p>
           </section>
 
           <section data-testid="section-refund-policy">
@@ -111,7 +110,6 @@ export default function TermsOfUsePage() {
               <li>Digital services, tools, and Master Class content are generally non-refundable.</li>
               <li>Subscription plans may be eligible for pro-rated refunds at our discretion if canceled within the first 7 days of a billing cycle.</li>
               <li>Done-For-You services are non-refundable once work has commenced.</li>
-              <li>Consulting session fees are non-refundable for no-shows or late cancellations.</li>
               <li>Refund requests should be directed to support@constructhub.us.</li>
             </ul>
           </section>

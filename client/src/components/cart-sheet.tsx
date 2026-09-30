@@ -120,7 +120,7 @@ export function CartSheet() {
               <Button variant="outline" size="sm" onClick={() => { setOpen(false); setLocation("/master-class"); }} data-testid="link-browse-courses">
                 Master Class
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { setOpen(false); setLocation("/pricing#done-for-you"); }} data-testid="link-browse-services">
+              <Button variant="outline" size="sm" onClick={() => { setOpen(false); setLocation("/pricing#services"); }} data-testid="link-browse-services">
                 Services
               </Button>
             </div>

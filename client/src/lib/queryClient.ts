@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { rememberPlanPrompt } from "@/lib/plan-errors";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -37,14 +38,19 @@ export async function apiRequest(
 /**
  * apiRequest errors carry "STATUS: <response body>" and the body is our own
  * JSON ({ message }) — unwrap it so a toast reads like a sentence ("This
- * client has no email address. Add one first."), never raw JSON.
+ * client has no email address. Add one first."), never raw JSON. A plan answer
+ * (plan_required, limit_reached, payment_failed) is remembered so the Toaster
+ * can add its link (lib/plan-errors.ts).
  */
 export function apiErrorMessage(err: any, fallback = "Something went wrong — please try again."): string {
   const raw: string = typeof err?.message === "string" ? err.message : String(err ?? "");
   const body = raw.replace(/^\d{3}:\s*/, "");
   try {
     const parsed = JSON.parse(body);
-    if (parsed && typeof parsed.message === "string") return parsed.message;
+    if (parsed && typeof parsed.message === "string") {
+      rememberPlanPrompt(parsed);
+      return parsed.message;
+    }
   } catch { /* plain-text or empty body — show it as-is */ }
   return body || fallback;
 }

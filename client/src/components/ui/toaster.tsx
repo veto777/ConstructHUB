@@ -1,12 +1,30 @@
+import { Link } from "wouter"
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
+  ToastAction,
   ToastClose,
   ToastDescription,
   ToastProvider,
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
+import { planPromptFor, type PlanPrompt } from "@/lib/plan-errors"
+import { isPortal, marketingUrl } from "@/lib/site"
+
+/** "See Pro" / "Add extra seat" / "Manage billing" next to a toast that shows a plan answer. */
+function PlanPromptAction({ prompt }: { prompt: PlanPrompt }) {
+  // Plans and billing live on the main site; the CRM portal host has no /pricing route.
+  return (
+    <ToastAction altText={prompt.label} asChild>
+      {isPortal() ? (
+        <a href={marketingUrl(prompt.href)} data-testid="link-toast-plan-prompt">{prompt.label}</a>
+      ) : (
+        <Link href={prompt.href} data-testid="link-toast-plan-prompt">{prompt.label}</Link>
+      )}
+    </ToastAction>
+  )
+}
 
 export function Toaster() {
   const { toasts } = useToast()
@@ -14,6 +32,7 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
+        const prompt = action ? null : planPromptFor(description)
         return (
           <Toast key={id} {...props}>
             <div className="grid gap-1">
@@ -22,7 +41,7 @@ export function Toaster() {
                 <ToastDescription>{description}</ToastDescription>
               )}
             </div>
-            {action}
+            {action ?? (prompt && <PlanPromptAction prompt={prompt} />)}
             <ToastClose />
           </Toast>
         )
