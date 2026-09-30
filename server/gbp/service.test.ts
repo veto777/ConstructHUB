@@ -1,3 +1,4 @@
+import { decryptToken } from './token-crypto';
 import {beforeAll,afterAll,describe,it,expect,vi} from 'vitest';
 import {pool} from '../db';
 import {ensureGbpSchema} from './schema';
@@ -46,7 +47,7 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     await saveGrant(userId,{sub:'google-b',email:'b@example.invalid',email_verified:true},{access_token:'b',scope:GBP_SCOPE});
     // Two Google accounts coexist; a refresh token is never borrowed across accounts.
     const tokens=(await pool.query('SELECT google_subject,refresh_token FROM gbp_grants WHERE user_id=$1 ORDER BY google_subject',[userId])).rows;
-    expect(tokens).toEqual([{google_subject:'google-a',refresh_token:'ra'},{google_subject:'google-b',refresh_token:null}]);
+    expect(tokens.map(t=>({...t,refresh_token:decryptToken(t.refresh_token)}))).toEqual([{google_subject:'google-a',refresh_token:'ra'},{google_subject:'google-b',refresh_token:null}]);
     const status=await grantStatus(userId);
     expect(status).toMatchObject({connected:true,email:'b@example.invalid'});expect(status.accounts.map((a:any)=>a.email).sort()).toEqual(['a@example.invalid','b@example.invalid']);
     expect(JSON.stringify(status)).not.toContain('access_token');
@@ -110,18 +111,18 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
   });
   it('rejects cross-user sync and replies',async()=>{await expect(syncLocation(otherId,locationId,client)).rejects.toMatchObject({status:404});await expect(reply(otherId,reviewId,'x','publish',client)).rejects.toMatchObject({status:404})});
   it('binds callback identity without logging in as the Google account, and disconnects despite remote revoke failure',async()=>{
-    const handlers=new Map<string,any>();const app:any={};
+    const handlers=new Map<string,any>();const app:any={use:vi.fn()};
     for(const method of ['get','post','patch','delete']) app[method]=(path:string,fn:any)=>handlers.set(`${method} ${path}`,fn);
-    registerGbpRoutes(app,()=>({id:userId}));
+    registerGbpRoutes(app,()=>({id:userId}),{afterConnect:async()=>{}});
     const res:any={redirect:vi.fn(),json:vi.fn(),status:vi.fn().mockReturnThis()};
     const tokenHttp=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({access_token:'oauth-fixture',refresh_token:'oauth-refresh',scope:GBP_SCOPE,expires_in:3600}))).mockResolvedValueOnce(new Response(JSON.stringify({sub:'different-google-account',email:'linked@example.invalid',email_verified:true})));
     vi.stubGlobal('fetch',tokenHttp);
     try {
-      await handlers.get('get /api/gbp/callback')({session:{gbpOAuth:{state:'bound',userId,expires:Date.now()+60000,redirect:'http://127.0.0.1:8139/api/gbp/callback'}},query:{state:'bound',code:'fixture-code'}},res);
+      await handlers.get('get /api/gbp/callback')({headers:{},session:{gbpOAuth:{state:'bound',userId,expires:Date.now()+60000,redirect:'http://127.0.0.1:8139/api/gbp/callback'}},query:{state:'bound',code:'fixture-code'}},res);
       expect(res.redirect).toHaveBeenCalledWith('/locations?gbp=connected');expect(await grantStatus(userId)).toMatchObject({connected:true,email:'linked@example.invalid'});
       const user=(await pool.query('SELECT email FROM users WHERE id=$1',[userId])).rows[0];expect(user.email).not.toBe('linked@example.invalid');
       tokenHttp.mockReset().mockResolvedValue(new Response('{}',{status:503}));
-      await handlers.get('post /api/gbp/disconnect')({},res);
+      await handlers.get('post /api/gbp/disconnect')({user:{id:userId},headers:{},session:{recentAuth:{userId,at:Date.now()}}},res);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({connected:false,revoked:false}));expect((await grantStatus(userId)).connected).toBe(false);
       expect(tokenHttp.mock.calls[0][0]).toBe('https://oauth2.googleapis.com/revoke');
       const left=await pool.query(`SELECT (SELECT count(*) FROM google_profile_reviews WHERE user_id=$1 AND google_review_id LIKE 'accounts/%') reviews,(SELECT count(*) FROM gbp_daily_metrics WHERE location_id=$2) metrics,(SELECT count(*) FROM gbp_sync_status WHERE location_id=$2) sync,(SELECT count(*) FROM business_locations WHERE id=$2) locations`,[userId,locationId]);

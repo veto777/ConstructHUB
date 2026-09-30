@@ -1,3 +1,6 @@
+import { requireRecentAuth, markRecentAuth, trustedDevice, rememberDevice, replaceRecoveryCodes, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
+import { encryptToken, decryptToken } from "./gbp/token-crypto";
+import { logActivity } from "./account-events";
 import { rateLimit, takeBudget } from "./growth-limits";
 import { createHash } from "node:crypto";
 import { testAuthAdapter } from "./test-auth";
@@ -211,6 +214,8 @@ export async function setupAuth(app: Express) {
       next();
     });
 
+  app.use(["/api/auth/2fa/setup", "/api/auth/2fa/verify", "/api/auth/2fa/disable", "/api/auth/change-password"], rateLimit("security-changes", 10, 30, 15 * 60_000));
+
   app.get("/api/auth/google", (req, res, next) => {
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
     if (req.query.gbp === "1") return res.redirect("/api/gbp/connect");
@@ -247,8 +252,9 @@ export async function setupAuth(app: Express) {
       try {
         if (req.user) {
           const [fullUser] = await db.select().from(users).where(eq(users.id, req.user.id));
-          if (fullUser?.totpEnabled && fullUser?.totpSecret) {
+          if (fullUser?.totpEnabled && !(await trustedDevice(req, fullUser.id))) {
             req.session.pending2FAUserId = fullUser.id;
+            req.session.pending2FAExpires = Date.now() + 10 * 60_000;
             // keepSessionInfo: passport's logout regenerates the session,
             // which would wipe the pending 2FA marker we just set.
             req.logout({ keepSessionInfo: true } as any, () => {
@@ -257,7 +263,11 @@ export async function setupAuth(app: Express) {
             return;
           }
         }
-      } catch {}
+        if (req.user) await logActivity(req, req.user.id, "auth.login_success", { method: "google" });
+      } catch {
+        req.logout(() => res.redirect("/auth?error=google-failed"));
+        return;
+      }
       // Re-checked here: the stashed value only ever passed safeNextPath,
       // but the session is server-side state from an earlier request —
       // validate again before putting it in a Location header.
@@ -333,25 +343,31 @@ export async function setupAuth(app: Express) {
 
       const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
       if (!user || !user.passwordHash) {
+        if (user) await logActivity(req, user.id, "auth.login_failure", { method: "password" });
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
       const valid = await bcrypt.compare(password, user.passwordHash);
       if (!valid) {
+        await logActivity(req, user.id, "auth.login_failure", { method: "password" });
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
       if (!user.emailVerified) {
+        await logActivity(req, user.id, "auth.login_failure", { reason: "email_unverified" });
         return res.status(403).json({ message: "Please verify your email before logging in. Check your inbox for a verification link." });
       }
 
-      if (user.totpEnabled && user.totpSecret) {
+      if (user.totpEnabled && !(await trustedDevice(req, user.id))) {
         req.session.pending2FAUserId = user.id;
+        req.session.pending2FAExpires = Date.now() + 10 * 60_000;
         return res.json({ requires2FA: true });
       }
 
-      req.login(user, (err) => {
+      req.login(user, async (err) => {
         if (err) return res.status(500).json({ message: "Login failed" });
+        if (!user.totpEnabled) markRecentAuth(req, user.id);
+        await logActivity(req, user.id, "auth.login_success", { method: "password" });
         // Owner's "team member signs in" notice (debounced per user/org/hour).
         // Fire-and-forget: mail latency must never sit on the login path.
         notifyMemberLogin(user).catch((e: any) => console.error("[crm] login notify failed:", e?.message || e));
@@ -373,15 +389,16 @@ export async function setupAuth(app: Express) {
     try {
       const { code } = req.body;
       const pendingUserId = req.session.pending2FAUserId;
-      if (!pendingUserId) {
+      if (!pendingUserId || !req.session.pending2FAExpires || req.session.pending2FAExpires < Date.now()) {
         return res.status(400).json({ message: "No pending login. Please start over." });
       }
-      if (!code || typeof code !== "string") {
+      if (typeof code !== "string" || !/^(?:[0-9]{6}|[a-fA-F0-9]{16})$/.test(code)) {
         return res.status(400).json({ message: "Verification code is required" });
       }
 
+      if (!(await takeBudget(`security-2fa:user:${pendingUserId}`, 10, 1, 15*60_000))) return res.status(429).json({ message: "Too many attempts. Please try again later." });
       const [user] = await db.select().from(users).where(eq(users.id, pendingUserId));
-      if (!user || !user.totpSecret) {
+      if (!user || !user.totpSecret || !user.totpEnabled) {
         return res.status(400).json({ message: "Invalid session. Please start over." });
       }
 
@@ -392,17 +409,22 @@ export async function setupAuth(app: Express) {
         algorithm: "SHA1",
         digits: 6,
         period: 30,
-        secret: user.totpSecret,
+        secret: decryptToken(user.totpSecret)!,
       });
 
       const delta = totp.validate({ token: code.trim(), window: 1 });
-      if (delta === null) {
+      if (delta === null && !(await consumeRecoveryCode(user.id, code.trim()))) {
+        await logActivity(req, user.id, "auth.login_failure", { method: "2fa" });
         return res.status(401).json({ message: "Invalid verification code. Please try again." });
       }
 
       delete req.session.pending2FAUserId;
-      req.login(user, (err) => {
+      delete req.session.pending2FAExpires;
+      req.login(user, async (err) => {
         if (err) return res.status(500).json({ message: "Login failed" });
+        if (delta !== null) markRecentAuth(req, user.id);
+        if (req.body.rememberDevice === true) await rememberDevice(req, res, user.id);
+        await logActivity(req, user.id, "auth.login_success", { method: "2fa" });
         res.json({
           id: user.id,
           email: user.email,
@@ -537,6 +559,8 @@ export async function setupAuth(app: Express) {
         res.clearCookie("connect.sid");
       }
 
+      await revokeDevices(user.id);
+      await securityChanged(req, user.id, "security.password_changed", "Your password was reset");
       res.json({ message: "Password reset successfully. You can now log in." });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -560,6 +584,7 @@ export async function setupAuth(app: Express) {
           companyLogoUrl: fresh.companyLogoUrl,
           googleProfileUrl: fresh.googleProfileUrl,
           totpEnabled: fresh.totpEnabled,
+          hasPassword: !!fresh.passwordHash,
           hasGbpAccess: (await (await import("./gbp/grants")).grantStatus(fresh.id)).connected,
           createdAt: fresh.createdAt,
         });
@@ -649,6 +674,8 @@ export async function setupAuth(app: Express) {
       }
       const hash = await bcrypt.hash(newPassword, 10);
       await db.update(users).set({ passwordHash: hash }).where(eq(users.id, req.user.id));
+      await revokeDevices(user.id);
+      await securityChanged(req, user.id, "security.password_changed", "Your password was changed");
       // Owner's "account changed" notice — field names only, never the password.
       notifyMemberAccountChange(req.user as any, ["password"])
         .catch((e: any) => console.error("[crm] account-change notify failed:", e?.message || e));
@@ -657,6 +684,7 @@ export async function setupAuth(app: Express) {
       res.status(500).json({ message: "Failed to change password" });
     }
   });
+
 
   app.post("/api/auth/2fa/setup", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
@@ -680,7 +708,7 @@ export async function setupAuth(app: Express) {
 
       const otpauthUrl = totp.toString();
 
-      await db.update(users).set({ totpSecret: secret.base32 }).where(eq(users.id, user.id));
+      await db.update(users).set({ totpSecret: encryptToken(secret.base32) }).where(eq(users.id, user.id));
 
       const QRCode = await import("qrcode");
       const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
@@ -701,12 +729,12 @@ export async function setupAuth(app: Express) {
     }
     try {
       const { code } = req.body;
-      if (!code || typeof code !== "string") {
+      if (typeof code !== "string" || !/^[0-9]{6}$/.test(code)) {
         return res.status(400).json({ message: "Verification code is required" });
       }
 
       const [user] = await db.select().from(users).where(eq(users.id, req.user.id));
-      if (!user || !user.totpSecret) {
+      if (!user || !user.totpSecret || user.totpEnabled) {
         return res.status(400).json({ message: "2FA setup not started. Please start setup first." });
       }
 
@@ -717,7 +745,7 @@ export async function setupAuth(app: Express) {
         algorithm: "SHA1",
         digits: 6,
         period: 30,
-        secret: user.totpSecret,
+        secret: decryptToken(user.totpSecret)!,
       });
 
       const delta = totp.validate({ token: code.trim(), window: 1 });
@@ -726,7 +754,10 @@ export async function setupAuth(app: Express) {
       }
 
       await db.update(users).set({ totpEnabled: true }).where(eq(users.id, user.id));
-      res.json({ message: "Two-factor authentication enabled successfully!" });
+      const codes = await replaceRecoveryCodes(user.id);
+      markRecentAuth(req, user.id);
+      await securityChanged(req, user.id, "security.2fa_changed", "Two-factor sign-in was enabled");
+      res.json({ message: "Two-factor authentication enabled successfully!", codes });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to verify 2FA" });
     }
@@ -736,9 +767,10 @@ export async function setupAuth(app: Express) {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    if (!requireRecentAuth(req, res)) return;
     try {
       const { code } = req.body;
-      if (!code || typeof code !== "string") {
+      if (typeof code !== "string" || !/^[0-9]{6}$/.test(code)) {
         return res.status(400).json({ message: "Verification code is required to disable 2FA" });
       }
 
@@ -754,7 +786,7 @@ export async function setupAuth(app: Express) {
         algorithm: "SHA1",
         digits: 6,
         period: 30,
-        secret: user.totpSecret,
+        secret: decryptToken(user.totpSecret)!,
       });
 
       const delta = totp.validate({ token: code.trim(), window: 1 });
@@ -763,6 +795,9 @@ export async function setupAuth(app: Express) {
       }
 
       await db.update(users).set({ totpSecret: null, totpEnabled: false }).where(eq(users.id, user.id));
+      await revokeDevices(user.id);
+      await pool.query("DELETE FROM account_recovery_codes WHERE user_id=$1", [user.id]);
+      await securityChanged(req, user.id, "security.2fa_changed", "Two-factor sign-in was disabled");
       res.json({ message: "Two-factor authentication has been disabled." });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to disable 2FA" });

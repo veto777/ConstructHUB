@@ -154,6 +154,11 @@ export async function registerRoutes(
   registerAccountEventRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
+  const { ensureGbpTokenEncryption } = await import("./gbp/token-crypto");
+  await ensureGbpTokenEncryption();
+  const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");
+  await ensureAccountSecuritySchema();
+  registerAccountSecurityRoutes(app, getDevUser);
   const { ensureGbpContentSchema, registerContentRoutes, startContentWorker } = await import("./gbp/content");
   await ensureGbpContentSchema();
   registerContentRoutes(app, getDevUser);

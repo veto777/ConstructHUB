@@ -1,3 +1,4 @@
+import { NotificationPreferences, SecurityActivity } from "@/components/account-security";
 import { ReviewReferralSettings } from "@/components/review-referral-settings";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +26,7 @@ type SettingsTab = "profile" | "account" | "notifications" | "security" | "billi
 export default function SettingsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => { const tab = new URLSearchParams(window.location.search).get("tab"); return ["profile","account","notifications","security","billing"].includes(tab || "") ? tab as SettingsTab : "profile"; });
 
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -35,7 +36,7 @@ export default function SettingsPage() {
     { id: "profile", label: "Profile", icon: User },
     { id: "account", label: "Account", icon: Settings },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "security", label: "Security", icon: Shield },
+    { id: "security", label: "Security & activity", icon: Shield },
     { id: "billing", label: "Billing & Plans", icon: CreditCard },
   ];
 
@@ -86,7 +87,7 @@ export default function SettingsPage() {
           <div className="flex-1 min-w-0">
             {activeTab === "profile" && <ProfileSection user={user} />}
             {activeTab === "account" && <AccountSection user={user} />}
-            {activeTab === "notifications" && <NotificationsSection />}
+            {activeTab === "notifications" && <NotificationPreferences />}
             {activeTab === "security" && <SecuritySection user={user} />}
             {activeTab === "billing" && <BillingSection user={user} />}
           </div>
@@ -1119,165 +1120,9 @@ function BetaAccessSection({ user }: { user: any }) {
   );
 }
 
-function NotificationsSection() {
-  const { toast } = useToast();
-  const [notifEmail, setNotifEmail] = useState("");
-  const [notifEmails, setNotifEmails] = useState<string[]>([]);
-
-  const [settings, setSettings] = useState({
-    clickGuardAlerts: false,
-    clickGuardWeeklyReport: true,
-    clickGuardMonthlyReport: true,
-    competitorAlerts: true,
-    gmbChanges: true,
-    rankingChanges: true,
-    permitUpdates: false,
-    newFeatures: true,
-    marketingEmails: false,
-  });
-
-  const toggleSetting = (key: keyof typeof settings) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const addEmail = () => {
-    if (notifEmail && notifEmails.length < 5 && !notifEmails.includes(notifEmail)) {
-      setNotifEmails([...notifEmails, notifEmail]);
-      setNotifEmail("");
-    }
-  };
-
-  const removeEmail = (email: string) => {
-    setNotifEmails(notifEmails.filter(e => e !== email));
-  };
-
-  const notifications = [
-    {
-      category: "Click Guard",
-      icon: ShieldCheck,
-      items: [
-        { key: "clickGuardAlerts" as const, title: "Google Ads Alerts", desc: "Get notified by email every time an IP has been detected and blocked." },
-        { key: "clickGuardWeeklyReport" as const, title: "Weekly Report", desc: "Get weekly reports regarding domain traffic and security performance." },
-        { key: "clickGuardMonthlyReport" as const, title: "Monthly Analytics Report", desc: "Receive a monthly report detailing all click fraud insights on your domain including personalized recommendations." },
-      ],
-    },
-    {
-      category: "Google Business",
-      icon: Globe,
-      items: [
-        { key: "gmbChanges" as const, title: "GMB Listing Changes", desc: "Get notified when changes are detected on your Google Business listings." },
-        { key: "rankingChanges" as const, title: "Ranking Changes", desc: "Get alerts when your local rankings change significantly." },
-      ],
-    },
-    {
-      category: "Competitor Intel",
-      icon: BarChart3,
-      items: [
-        { key: "competitorAlerts" as const, title: "Competitor Activity", desc: "Get notified about significant changes in competitor profiles and reviews." },
-      ],
-    },
-    {
-      category: "Permits & Updates",
-      icon: FileText,
-      items: [
-        { key: "permitUpdates" as const, title: "Permit Updates", desc: "Get notified when new permits match your saved searches." },
-        { key: "newFeatures" as const, title: "New Features & Tips", desc: "Stay updated on new ConstructHUB features and tips for contractors." },
-        { key: "marketingEmails" as const, title: "Marketing Emails", desc: "Receive promotional offers, discounts, and partnership opportunities." },
-      ],
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <Card data-testid="card-notification-emails">
-        <CardHeader>
-          <CardTitle className="text-lg">Notification Email</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Enter an email address to receive notifications (up to 5 addresses).
-          </p>
-          <div className="flex gap-2">
-            <Input
-              type="email"
-              value={notifEmail}
-              onChange={e => setNotifEmail(e.target.value)}
-              placeholder="you@company.com"
-              onKeyDown={e => e.key === "Enter" && addEmail()}
-              data-testid="input-notification-email"
-            />
-            <Button
-              variant="outline"
-              onClick={addEmail}
-              disabled={!notifEmail || notifEmails.length >= 5}
-              className="shrink-0"
-              data-testid="button-add-notification-email"
-            >
-              Add New
-            </Button>
-          </div>
-          {notifEmails.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {notifEmails.map(email => (
-                <Badge key={email} variant="secondary" className="gap-1.5 py-1 px-3">
-                  {email}
-                  <button
-                    onClick={() => removeEmail(email)}
-                    className="text-destructive hover:text-destructive/80"
-                    data-testid={`button-remove-email-${email}`}
-                  >
-                    &times;
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {notifications.map(group => (
-        <Card key={group.category} data-testid={`card-notif-${group.category.toLowerCase().replace(/\s+/g, "-")}`}>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <group.icon className="h-5 w-5 text-primary" />
-              {group.category}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {group.items.map((item, idx) => (
-              <div
-                key={item.key}
-                className={`flex items-center justify-between py-4 ${idx < group.items.length - 1 ? "border-b border-border/50" : ""}`}
-              >
-                <div className="flex-1 pr-4">
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-                </div>
-                <Switch
-                  checked={settings[item.key]}
-                  onCheckedChange={() => toggleSetting(item.key)}
-                  data-testid={`switch-notif-${item.key}`}
-                />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ))}
-
-      <div className="flex justify-end">
-        <Button
-          onClick={() => toast({ title: "Notification preferences saved" })}
-          data-testid="button-save-notifications"
-        >
-          <Save className="h-4 w-4 mr-2" /> Save Notification Settings
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function TwoFactorSection({ user }: { user: any }) {
   const { toast } = useToast();
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [setupData, setSetupData] = useState<{ secret: string; qrCode: string } | null>(null);
   const [verifyCode, setVerifyCode] = useState("");
   const [disableCode, setDisableCode] = useState("");
@@ -1301,7 +1146,8 @@ function TwoFactorSection({ user }: { user: any }) {
       const res = await apiRequest("POST", "/api/auth/2fa/verify", { code: verifyCode });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      setRecoveryCodes(data.codes || []);
       toast({ title: "Two-factor authentication enabled!" });
       setSetupData(null);
       setVerifyCode("");
@@ -1336,6 +1182,8 @@ function TwoFactorSection({ user }: { user: any }) {
         <CardTitle className="text-lg">Two-Factor Authentication</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {recoveryCodes.length > 0 && <div role="status"><p>Save these recovery codes now. Each works once; they will not be shown again.</p><pre className="select-all">{recoveryCodes.join("\n")}</pre><Button variant="outline" onClick={()=>setRecoveryCodes([])}>I saved my codes</Button></div>}
+        {is2FAEnabled && <Button variant="outline" onClick={async()=>{try {const r=await apiRequest('POST','/api/auth/2fa/recovery-codes');setRecoveryCodes((await r.json()).codes);}catch(e:any){toast({title:e.message,variant:'destructive'});}}}>Generate new recovery codes</Button>}
         {is2FAEnabled && !showDisable && (
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
@@ -1495,7 +1343,7 @@ function SecuritySection({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
-      {!user?.googleId && (
+      {user?.hasPassword && (
         <Card data-testid="card-change-password">
           <CardHeader>
             <CardTitle className="text-lg">Change Password</CardTitle>
@@ -1566,33 +1414,8 @@ function SecuritySection({ user }: { user: any }) {
         </Card>
       )}
 
-      <Card data-testid="card-active-sessions">
-        <CardHeader>
-          <CardTitle className="text-lg">Active Sessions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Monitor className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium">Current Session</p>
-                <p className="text-xs text-muted-foreground">This browser · Active now</p>
-              </div>
-            </div>
-            <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-200 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:bg-emerald-950">
-              Active
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            If you notice any suspicious activity, sign out of all sessions and change your password.
-          </p>
-          <Button variant="outline" size="sm" className="text-destructive border-destructive/20 hover:bg-destructive/5" data-testid="button-sign-out-all">
-            <LogOut className="h-4 w-4 mr-2" /> Sign Out All Other Sessions
-          </Button>
-        </CardContent>
-      </Card>
-
       <TwoFactorSection user={user} />
+      <SecurityActivity />
     </div>
   );
 }

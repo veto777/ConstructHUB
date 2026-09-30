@@ -93,6 +93,7 @@ export function registerAccountEventRoutes(app: Express, auth: (req: any, res: a
   });
   app.post("/api/notifications/read", async (req, res) => {
     const u = auth(req, res); if (!u) return;
+    if (req.body?.ids !== undefined && (!Array.isArray(req.body.ids) || req.body.ids.length > 500 || req.body.ids.some((id: unknown) => typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0))) return res.status(400).json({ message: 'Invalid notification IDs' });
     const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite).slice(0, 500) : null;
     await pool.query(`UPDATE user_notifications SET read_at=now() WHERE user_id=$1 AND read_at IS NULL ${ids ? "AND id=ANY($2)" : ""}`, ids ? [u.id, ids] : [u.id]);
     res.json({ ok: true });
@@ -104,7 +105,8 @@ export function registerAccountEventRoutes(app: Express, auth: (req: any, res: a
   });
   app.put("/api/notification-prefs", async (req, res) => {
     const u = auth(req, res); if (!u) return;
-    const list = Array.isArray(req.body?.prefs) ? req.body.prefs : [];
+    if (!Array.isArray(req.body?.prefs) || req.body.prefs.length > Object.keys(KIND_DEFAULTS).length || req.body.prefs.some((p: any) => !p || !Object.hasOwn(KIND_DEFAULTS,p.kind) || typeof p.inApp !== 'boolean' || typeof p.email !== 'boolean')) return res.status(400).json({ message: 'Invalid notification preferences' });
+    const list = req.body.prefs;
     for (const p of list) {
       if (!KIND_DEFAULTS[p?.kind]) continue;
       await pool.query(`INSERT INTO user_notification_prefs(user_id,kind,in_app,email) VALUES($1,$2,$3,$4)
