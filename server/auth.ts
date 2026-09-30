@@ -453,10 +453,18 @@ export async function setupAuth(app: Express) {
         return res.redirect("/auth?error=token-expired");
       }
 
-      await db
-        .update(users)
-        .set({ emailVerified: true, verificationToken: null, verificationExpiry: null })
-        .where(eq(users.id, user.id));
+      const verified = await pool.query(`UPDATE users SET email_verified=true,verification_token=NULL,verification_expiry=NULL
+        WHERE id=$1 AND verification_token=$2 AND verification_expiry>timezone('UTC',now()) RETURNING id`, [user.id, token]);
+      if (!verified.rowCount) return res.redirect("/auth?error=invalid-token");
+
+      // A still-valid email link must never bypass a subsequently enabled second factor.
+      if (user.totpEnabled) {
+        req.session.pending2FAUserId = user.id;
+        req.session.pending2FAExpires = Date.now() + 10 * 60_000;
+        return req.logout({ keepSessionInfo: true } as any, (error) => {
+          res.redirect(error ? "/auth?error=verification-failed" : "/auth?mode=2fa");
+        });
+      }
 
       // passport.regenerate on login wipes the session — capture (and clear)
       // the destination BEFORE req.login. A signup that started from an

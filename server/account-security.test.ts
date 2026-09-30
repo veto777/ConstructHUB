@@ -99,6 +99,22 @@ describe('Google-only verification and Google second-factor gate',()=>{
   req.body.value=code;await handlers.get('post /api/auth/reauth')(req,response());expect(req.session.recentAuth.userId).toBe(other);expect(req.session.reauthEmail).toBeUndefined();
   delete req.session.recentAuth;const replay=response();await handlers.get('post /api/auth/reauth')(req,replay);expect(replay.status).toHaveBeenCalledWith(401);
  });
+ it('email verification cannot bypass enabled 2FA and its link is single-use', async () => {
+  const express = (await import('express')).default;
+  const { setupAuth } = await import('./auth');
+  const app = express(); await setupAuth(app);
+  const handler = (app.router as any).stack.find((l: any) => l.route?.path === '/api/auth/verify-email').route.stack.at(-1).handle;
+  const token = 'audit-email-' + id;
+  await pool.query("UPDATE users SET verification_token=$1,verification_expiry=timezone('UTC',now())+interval '1 hour' WHERE id=$2", [token, id]);
+  const req: any = { query: { token }, session: {}, login: vi.fn(), logout: vi.fn((_options: any, done: any) => done()) };
+  const res: any = { redirect: vi.fn() };
+  await handler(req, res);
+  expect(req.login).not.toHaveBeenCalled();
+  expect(req.session.pending2FAUserId).toBe(id);
+  expect(res.redirect).toHaveBeenCalledWith('/auth?mode=2fa');
+  res.redirect.mockClear(); await handler(req, res);
+  expect(res.redirect).toHaveBeenCalledWith('/auth?error=invalid-token');
+ });
  it('Google callback removes the authenticated session until second-factor verification, and honors revocation',async()=>{
   const express=(await import('express')).default;const {setupAuth}=await import('./auth');const app=express();await setupAuth(app);
   const layer=app.router.stack.find((l:any)=>l.route?.path==='/api/auth/google/callback');const callback=layer.route.stack.at(-1).handle;
