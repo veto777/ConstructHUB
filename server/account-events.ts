@@ -4,8 +4,8 @@
  *   notifyUser(userId, kind, msg)  — in-app row + optional email, per the user's per-kind preferences
  *   logActivity(req|null, userId, kind, detail) — who / when / from where, for the Activity log
  *
- * Kinds are open strings; KIND_DEFAULTS decides the default channels for a kind the user never
- * configured. Security kinds default to email ON so an intruder cannot act silently.
+ * Every emitted kind belongs to the shared registry; KIND_DEFAULTS supplies channels until
+ * the user configures them. Security kinds default to email ON so an intruder cannot act silently.
  */
 import type { Express } from "express";
 import { pool } from "./db";
