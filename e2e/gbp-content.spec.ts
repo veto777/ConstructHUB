@@ -96,3 +96,117 @@ test('AI update is a draft until edited and approved, and provider failures can 
     await page.getByLabel('Post draft').fill('Owner edited update');await page.getByRole('button',{name:'Approve & queue post'}).click();await expect(page.locator('article')).toContainText('Google denied permission');expect(approved.items[0].summary).toBe('Owner edited update');
     await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('article')).toContainText('queued');
 });
+
+test('linked profile without a public Place ID can import and surfaces partial sync warnings', async ({ page }) => {
+    const fixture = { id: 99881, businessName: 'Profile audit fixture', gbpLocationName: 'locations/fixture', gbpAccountName: 'accounts/fixture', placeId: null };
+    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], locations: [], errors: [] } }));
+    await page.route('**/api/locations/99881/import-google', route => route.fulfill({ json: { ...fixture, syncWarnings: ['Social profiles: Google denied permission.'] } }));
+    await page.goto('/locations');
+    await page.getByText('Profile audit fixture', { exact: true }).click();
+    await page.getByTestId('tab-info').click();
+    await page.getByTestId('button-import-google').click();
+    await expect(page.getByText('Google data partially imported', { exact: true })).toBeVisible();
+    await expect(page.getByText('Social profiles: Google denied permission.', { exact: true })).toBeVisible();
+});
+
+test('Link & sync reports a partial Google failure instead of claiming every field synced', async ({ page }) => {
+    const fixture = { id: 99882, businessName: 'Link audit fixture', placeId: 'fixture-place' };
+    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], errors: [], locations: [{ id: fixture.id, state: 'available', listing: { accountResource: 'accounts/fixture', gbpName: 'locations/fixture', grantSubject: 'fixture' } }] } }));
+    await page.route('**/api/gbp/import', route => route.fulfill({ json: { imported: 1, synced: { [fixture.id]: { profile: { warnings: ['Social profiles unavailable'] }, reviews: { kind: 'permission', message: 'Google denied reviews access' } } } } }));
+    await page.goto('/locations');
+    await page.getByTestId('button-link-gbp-99882').click();
+    await expect(page.getByText('Some Google data could not sync: Social profiles unavailable; Google denied reviews access', { exact: true })).toBeVisible();
+});
+
+test('mobile composer and profile fields fit a narrow viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await page.goto('/gbp-content');
+    await page.getByLabel('Location', { exact: true }).selectOption(String(location));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const fixture = { id: 99883, businessName: 'Mobile audit fixture', gbpLocationName: 'locations/fixture', description: 'Profile description', services: ['Roof repair'], socialProfiles: {facebook:'https://facebook.com/fixture'}, businessPhotoCount: 12, customerPhotoCount: 4 };
+    await page.route('**/api/locations', route => route.fulfill({ json: [fixture] }));
+    await page.goto('/locations');
+    await page.getByText('Mobile audit fixture', { exact: true }).click();
+    for (const tab of ['info', 'services', 'social', 'photos']) {
+        await page.getByTestId(`tab-${tab}`).click();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tab).toBe(true);
+    }
+});
+
+test('partial upload exposes saved photos immediately and allows retrying the remaining file', async ({ page }) => {
+    const photos: any[] = [];
+    let uploads = 0;
+    await page.route(`**/api/gbp/content/${location}**`, route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/upload')) {
+            uploads++;
+            if (uploads === 2) return route.fulfill({ status: 400, json: {message:'Fixture upload failure'} });
+            const photo = {id:uploads,name:`Saved ${uploads}.jpg`,url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'};
+            photos.push(photo); return route.fulfill({json:photo});
+        }
+        return route.fulfill({json:path.endsWith('/photos')?photos:{jobs:[],style:null,workerEnabled:false}});
+    });
+    await page.goto('/gbp-content');
+    await page.getByLabel('Location', {exact:true}).selectOption(String(location));
+    const files = ['one.jpg','two.jpg'].map(name => ({name,mimeType:'image/jpeg',buffer:Buffer.from('fixture')}));
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files);
+    await expect(page.getByText('Fixture upload failure',{exact:true})).toBeVisible();
+    await expect(page.getByLabel('Caption for Saved 1.jpg')).toBeVisible();
+    await expect(page.getByText('1 of 2 photos uploaded.',{exact:false})).toBeVisible();
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles([files[1]]);
+    await expect(page.getByLabel('Caption for Saved 3.jpg')).toBeVisible();
+    await expect(page.getByText('2 selected',{exact:true})).toBeVisible();
+});
+
+test('100-file boundary uploads sequentially and refuses 101 before any request', async ({ page }) => {
+    let uploads = 0;
+    const photos: any[] = [];
+    await page.route(`**/api/gbp/content/${location}**`, async route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/upload')) {
+            uploads++;
+            const photo = {id:uploads,name:`Boundary fixture ${uploads}.jpg`,url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'};
+            photos.push(photo);
+            return route.fulfill({json:photo});
+        }
+        return route.fulfill({json:path.endsWith('/photos')?photos:{jobs:[],style:null,workerEnabled:false}});
+    });
+    await page.goto('/gbp-content');
+    await page.getByLabel('Location', {exact:true}).selectOption(String(location));
+    const files = Array.from({length:101}, (_,i)=>({name:`fixture-${i}.jpg`,mimeType:'image/jpeg',buffer:Buffer.from('fixture')}));
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files);
+    await expect(page.getByRole('alert')).toContainText('Choose at most 100 photos');
+    expect(uploads).toBe(0);
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files.slice(0,100));
+    await expect(page.getByText('100 selected',{exact:true})).toBeVisible();
+    await expect(page.getByText('100 photos uploaded. Review captions before publishing.',{exact:true})).toBeVisible();
+    expect(uploads).toBe(100);
+});
+
+test('profile Photos tab points to the shipped publisher and distinguishes unknown counts from zero', async ({ page }) => {
+    await page.route('**/api/locations', route => route.fulfill({json:[{id:99884,businessName:'Photos audit fixture',businessPhotoCount:null,customerPhotoCount:0}]}));
+    await page.goto('/locations');
+    await page.getByText('Photos audit fixture',{exact:true}).click();
+    await page.getByTestId('tab-photos').click();
+    await expect(page.getByTestId('text-business-photo-count')).toHaveText('Unavailable');
+    await expect(page.getByTestId('text-customer-photo-count')).toHaveText('0');
+    await expect(page.getByText('we do not currently support photo uploads',{exact:false})).toHaveCount(0);
+    await page.getByTestId('button-posts-photos').click();
+    await expect(page).toHaveURL(/\/gbp-content$/);
+});
+
+test('unlinked Places import remains available and renders weekday text without array indexes', async ({ page }) => {
+    const fixture = {id:99885,businessName:'Unlinked audit fixture',placeId:'fixture-place',gbpLocationName:null,hours:['Monday: 8:00 AM – 5:00 PM','Tuesday: Closed']};
+    let imported = false;
+    await page.route('**/api/locations', route=>route.fulfill({json:[fixture]}));
+    await page.route('**/api/locations/99885/import-google', route=>{imported=true;return route.fulfill({json:fixture});});
+    await page.goto('/locations');
+    await page.getByText('Unlinked audit fixture',{exact:true}).click();
+    await page.getByTestId('tab-info').click();
+    await expect(page.getByTestId('info-hours')).toHaveText('Monday: 8:00 AM – 5:00 PM, Tuesday: Closed');
+    await page.getByTestId('button-import-google').click();
+    await expect(page.getByText('Google data imported',{exact:true})).toBeVisible();
+    expect(imported).toBe(true);
+});

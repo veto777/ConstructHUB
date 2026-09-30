@@ -6,7 +6,7 @@ import {DatabaseLimiter} from './quota';
 import {registerGbpRoutes} from './routes';
 import {saveGrant,grantStatus,accessToken} from './grants';
 import {GBP_SCOPE,GoogleClient,Limiter} from './client';
-import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker,unlinkLocation} from './service';
+import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker,unlinkLocation,autoLinkAndSync} from './service';
 let userId:number,otherId:number,locationId:number,reviewId:number;
 let reviewRows:any[]=[];let failReviews=false, failReply=false;let reviewPaging=false,failSecondPage=false;
 const today=new Date();today.setUTCDate(today.getUTCDate()-2);const metricDate={year:today.getUTCFullYear(),month:today.getUTCMonth()+1,day:today.getUTCDate()};
@@ -87,6 +87,35 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     expect(media[0]).toMatchObject({source:'business',category:'EXTERIOR',google_url:'https://lh3.example/b1'});expect(media[3]).toMatchObject({source:'customer',attribution:'Happy Customer'});
     expect((await pool.query('SELECT value::text FROM gbp_daily_metrics WHERE location_id=$1',[locationId])).rows).toEqual([{value:'0'}]);
   });
+  it('does not erase a saved profile when Google returns an incomplete or mismatched successful response', async () => {
+    const before=(await pool.query('SELECT description,phone,services,hours FROM business_locations WHERE id=$1',[locationId])).rows[0];
+    for (const invalid of [{}, {name:'locations/wrong',title:'Wrong location'}]) {
+      const incomplete=new GoogleClient(async()=>'fixture',async(url,init)=>new URL(String(url)).pathname==='/v1/locations/fixture'
+        ? new Response(JSON.stringify(invalid)) : http(url,init),new Limiter(()=>0,async()=>{}),async()=>{});
+      expect(await syncLocation(userId,locationId,incomplete)).toMatchObject({profile:{kind:'invalid',message:expect.stringContaining('saved data was preserved')}});
+      expect((await pool.query('SELECT description,phone,services,hours FROM business_locations WHERE id=$1',[locationId])).rows[0]).toEqual(before);
+    }
+  });
+  it('reconciles removed social links, preserves local-only fields and reports optional sync failures', async () => {
+    await pool.query(`UPDATE business_locations SET social_profiles=$2 WHERE id=$1`, [locationId,
+      JSON.stringify({facebook:'https://facebook.com/old',instagram:'https://instagram.com/removed',custom:'https://example.invalid/local'})]);
+    await syncLocation(userId,locationId,client);
+    const read = async () => (await pool.query('SELECT social_profiles,business_photo_count FROM business_locations WHERE id=$1',[locationId])).rows[0];
+    expect((await read()).social_profiles).toEqual({facebook:'https://www.facebook.com/fixture',custom:'https://example.invalid/local'});
+    const failing = new GoogleClient(async () => 'fixture', async (url, init) => {
+      if (String(url).includes('/attributes') || String(url).includes('/media')) return new Response('{}',{status:403});
+      return http(url,init);
+    }, new Limiter(()=>0,async()=>{}),async()=>{});
+    const result:any = await syncLocation(userId,locationId,failing);
+    expect(result.profile.warnings).toHaveLength(3);
+    expect((await read()).social_profiles.facebook).toBe('https://www.facebook.com/fixture');
+    expect((await read()).business_photo_count).toBe(12);
+    expect((await pool.query("SELECT last_error FROM gbp_sync_status WHERE location_id=$1 AND kind='profile'",[locationId])).rows[0].last_error).toContain('Social profiles');
+    const empty = new GoogleClient(async () => 'fixture', async (url, init) => String(url).includes('/attributes')
+      ? new Response('{}') : http(url,init), new Limiter(()=>0,async()=>{}),async()=>{});
+    await syncLocation(userId,locationId,empty);
+    expect((await read()).social_profiles).toEqual({custom:'https://example.invalid/local'});
+  });
   it('does not apply a partial multi-page snapshot and upserts every successful page',async()=>{
     const before=(await pool.query('SELECT comment FROM google_profile_reviews WHERE id=$1',[reviewId])).rows[0].comment;
     reviewPaging=true;failSecondPage=true;await syncLocation(userId,locationId,client);
@@ -142,5 +171,28 @@ describe('per-location unlink',()=>{
     expect(l).toMatchObject({gbp_location_name:null,gbp_account_name:null,gbp_google_subject:null,gbp_unlinked_by_user:true});
     const left=await pool.query(`SELECT (SELECT count(*) FROM google_profile_reviews WHERE location_id=$1 AND google_review_id LIKE 'accounts/%') r,(SELECT count(*) FROM gbp_daily_metrics WHERE location_id=$1) m,(SELECT count(*) FROM gbp_sync_status WHERE location_id=$1) s`,[locationId]);
     expect(left.rows[0]).toEqual({r:'0',m:'0',s:'0'});
+  });
+});
+
+describe('automatic linking after Google connect', () => {
+  it('uses the connected account, links a matching Place ID, respects explicit unlink and syncs existing links', async () => {
+    const ids:number[] = [];
+    try {
+      for (const [place, blocked] of [['auto-match',false],['auto-blocked',true]] as const) {
+        ids.push((await pool.query(`INSERT INTO business_locations(user_id,business_name,place_id,gbp_unlinked_by_user) VALUES($1,'Auto-link fixture',$2,$3) RETURNING id`,[otherId,place,blocked])).rows[0].id);
+      }
+      const client = new GoogleClient(async () => 'fixture', async url => new Response(JSON.stringify(String(url).includes('/accounts?')
+        ? {accounts:[{name:'accounts/auto'}]}
+        : {locations:['match','blocked'].map(name=>({name:`locations/${name}`,title:'Auto-link fixture',metadata:{placeId:`auto-${name}`}}))})),new Limiter(()=>0,async()=>{}),async()=>{});
+      const make = vi.fn(()=>client), sync = vi.fn(async()=>({}));
+      await autoLinkAndSync(otherId,'connected-subject',make,sync);
+      await autoLinkAndSync(otherId,'connected-subject',make,sync);
+      expect(make).toHaveBeenCalledWith(otherId,'connected-subject');
+      const rows=(await pool.query('SELECT id,gbp_location_name,gbp_google_subject FROM business_locations WHERE id=ANY($1) ORDER BY id',[ids])).rows;
+      expect(rows[0]).toMatchObject({gbp_location_name:'locations/match',gbp_google_subject:'connected-subject'});
+      expect(rows[1].gbp_location_name).toBeNull();
+      expect(sync).toHaveBeenCalledTimes(2);
+      expect(sync).toHaveBeenCalledWith(otherId,ids[0],client);
+    } finally { await pool.query('DELETE FROM business_locations WHERE id=ANY($1)',[ids]); }
   });
 });

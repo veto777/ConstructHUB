@@ -647,16 +647,19 @@ function InfoRow({ label, value, fromGoogle }: { label: string; value: string | 
 
 function LocationInfoTab({ location }: { location: BusinessLocation }) {
   const { toast } = useToast();
-  const hasGoogle = !!location.placeId;
+  const hasGoogle = !!(location.placeId || location.gbpLocationName);
 
   const importMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/locations/${location.id}/import-google`);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      toast({ title: "Google data imported" });
+      queryClient.invalidateQueries({ queryKey: ["/api/gbp/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/gbp/linkage"] });
+      toast({ title: result.syncWarnings?.length ? "Google data partially imported" : "Google data imported",
+        description: result.syncWarnings?.join('; '), variant: result.syncWarnings?.length ? 'destructive' : 'default' });
     },
     onError: (err: Error) => {
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
@@ -715,6 +718,7 @@ const WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 function formatHours(hours: unknown): string | null {
   if (!hours) return null;
   if (typeof hours !== "object") return String(hours);
+  if (Array.isArray(hours)) return hours.map(String).join(" · ");
   const h = hours as Record<string, unknown>;
   if (Array.isArray(h.weekday_text)) return (h.weekday_text as string[]).join(" · ");
   const days = WEEK.filter((d) => typeof h[d] === "string");

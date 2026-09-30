@@ -34,6 +34,30 @@ function Editor({location}:{location:string}){
   const call=async(path:string,body:any,method='POST')=>(await apiRequest(method,base+path,body)).json();
   async function run(fn:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await fn();}catch(e){setError(e instanceof Error?e.message:'Operation failed');}finally{setBusy(false);}}
   const metadata=()=>({pattern,title,...(lat!==''?{lat:Number(lat)}:{}),...(lon!==''?{lon:Number(lon)}:{})});
+  async function uploadPhotos(files: File[]) {
+    if (files.length > 100) throw new Error('Choose at most 100 photos');
+    const options = metadata();
+    let completed = 0;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const form = new FormData();
+        form.append('photo', files[i]);
+        for (const [key, value] of Object.entries(options)) form.append(key, String(value));
+        form.append('index', String(i));
+        const response = await fetch(base + '/upload', { method: 'POST', credentials: 'include', body: form });
+        const photo = await response.json();
+        if (!response.ok) throw new Error(photo.message || 'Upload failed');
+        completed++;
+        setSelected(old => [...old, photo.id].slice(-100));
+      }
+      setMessage(`${completed} photos uploaded. Review captions before publishing.`);
+    } catch (error) {
+      setMessage(`${completed} of ${files.length} photos uploaded. Completed photos are saved in your library; retry only the remaining files.`);
+      throw error;
+    } finally {
+      await refreshPhotos();
+    }
+  }
   const schedule=()=>({start:start?new Date(start).toISOString():new Date().toISOString(),everyMinutes:Math.max(1,Math.floor((cadence==='week'?10080:1440)/count)),...(cadence==='custom'?{custom:custom.split('\n').filter(Boolean).map(t=>new Date(t).toISOString())}:{}),businessHours:hours,timezone:zone,openHour:open,closeHour:close,weekdays:days});
   const currentPost=()=>({kind:'post',photoIds:selected.slice(0,10),summary,topicType,...(cta?{callToAction:{actionType:cta,...(url?{url}:{})}}:{}),...(topicType!=='STANDARD'?{event:{title:eventTitle,start:eventStart,end:eventEnd},...(topicType==='OFFER'?{offer:{couponCode:coupon}}:{})}:{})});
   const queue=async(kind:'photo'|'post')=>{const items=kind==='photo'?selected.map(id=>({kind,photoIds:[id],summary:captions[id]||'',category})):postBatch.length?postBatch:[currentPost()];
@@ -57,7 +81,7 @@ function Editor({location}:{location:string}){
       <p>Choose up to 100 photos. Google strips EXIF on upload; GPS geotags and titles are cosmetic and do not promise ranking benefits. Captions cannot be updated through Google after publishing; cover photos do not accept captions.</p>
       <label className="block">SEO filename pattern<Input aria-label="SEO filename pattern" value={pattern} onChange={e=>setPattern(e.target.value)}/></label><p className="text-sm">Placeholders: {'{business}, {city}, {n}'}. Metadata changes create a library copy.</p>
       <div className="grid sm:grid-cols-3 gap-3"><label>EXIF title<Input value={title} onChange={e=>setTitle(e.target.value)}/></label><label>GPS latitude (optional)<Input value={lat} onChange={e=>setLat(e.target.value)} type="number" min="-90" max="90" step="any"/></label><label>GPS longitude (optional)<Input value={lon} onChange={e=>setLon(e.target.value)} type="number" min="-180" max="180" step="any"/></label></div>
-      <label className="block">Upload photos (up to 100, 15 MB each)<Input aria-label="Upload photos" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e=>{const files=Array.from(e.target.files||[]);void run(async()=>{if(files.length>100)throw new Error('Choose at most 100 photos');const added:number[]=[];for(let i=0;i<files.length;i++){const form=new FormData();form.append('photo',files[i]);for(const [k,v]of Object.entries(metadata()))form.append(k,String(v));form.append('index',String(i));const response=await fetch(base+'/upload',{method:'POST',credentials:'include',body:form});const p=await response.json();if(!response.ok)throw new Error(p.message);added.push(p.id);setSelected(old=>[...old,p.id].slice(-100));}await refreshPhotos();setMessage(`${added.length} photos uploaded. Review captions before publishing.`);});}}/></label>
+      <label className="block">Upload photos (up to 100, 15 MB each)<Input aria-label="Upload photos" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void run(()=>uploadPhotos(files));}}/></label>
       <div className="grid sm:grid-cols-3 gap-3 max-h-96 overflow-auto">{photos.map(p=><div key={p.id} className="border rounded p-2 space-y-2"><label className="flex gap-2"><input type="checkbox" checked={selected.includes(p.id)} onChange={e=>setSelected(old=>e.target.checked?[...old,p.id].slice(-100):old.filter(i=>i!==p.id))}/><img src={p.url} alt="" className="w-12 h-12 object-cover"/><span>{p.name}</span></label>{selected.includes(p.id)&&<Textarea aria-label={`Caption for ${p.name}`} placeholder="Editable caption draft" maxLength={1500} value={captions[p.id]||''} onChange={e=>setCaptions({...captions,[p.id]:e.target.value})}/>}</div>)}</div>
       {!photos.length&&<p>Your media library is empty.</p>}<p>{selected.length} selected</p>
       <Button variant="outline" disabled={!selected.length} onClick={()=>void run(async()=>{const r=await call('/prepare',{...metadata(),photoIds:selected});setCaptions(old=>({...old,...Object.fromEntries(r.map((p:Photo,i:number)=>[p.id,old[selected[i]]||'']))}));setSelected(r.map((p:Photo)=>p.id));await refreshPhotos();setMessage('Renamed copies with metadata saved to your library.');})}>Apply filename and EXIF to selected copies</Button>

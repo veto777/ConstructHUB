@@ -9,6 +9,9 @@ import { ensureGbpContentSchema, enqueue, scheduleTimes, publicPhotoUrl, itemInp
 import { GoogleClient, Limiter } from './client';
 import { seoName, preparePhoto } from './content-upload';
 import sharp from 'sharp';
+import { Readable, Writable } from 'node:stream';
+import * as r2 from '../r2';
+import piexif from 'piexifjs';
 let user: number, other: number, location: number, photo: number, app: express.Express;
 const due = { start: '2026-01-01T12:00:00Z', everyMinutes: 1 };
 const ai = vi.fn(async () => 'Fixture AI draft');
@@ -61,6 +64,22 @@ describe('GBP content scheduling and validation', () => {
         expect(() => scheduleTimes({ ...due, custom: [] }, 1)).toThrow();
         expect(() => scheduleTimes({ ...due, timezone: 'invalid' }, 1)).toThrow();
     });
+    it('rejects impossible event dates instead of silently publishing on a different day', () => {
+        const post = { kind: 'post', summary: 'Fixture event', topicType: 'EVENT',
+            event: { title: 'Fixture', start: '2027-02-29T09:00', end: '2027-03-02T10:00' } };
+        expect(itemInput.safeParse(post).success).toBe(false);
+        expect(itemInput.safeParse({ ...post, event: { ...post.event, start: '2028-02-29T09:00', end: '2028-03-01T10:00' } }).success).toBe(true);
+        expect(itemInput.safeParse({ ...post, event: { ...post.event, start: '2027-02-28T24:00' } }).success).toBe(false);
+    });
+    it('schedules daily, weekly and explicit times and crosses the autumn DST weekend correctly', () => {
+        expect(scheduleTimes({start:'2027-01-04T09:00:00Z',everyMinutes:1440},2).map(d=>d.toISOString()))
+            .toEqual(['2027-01-04T09:00:00.000Z','2027-01-05T09:00:00.000Z']);
+        expect(scheduleTimes({start:'2027-01-04T09:00:00Z',everyMinutes:10080},2)[1].toISOString()).toBe('2027-01-11T09:00:00.000Z');
+        const custom=['2027-01-04T09:00:00Z','2027-01-10T12:00:00Z'];
+        expect(scheduleTimes({...due,custom},2).map(d=>d.toISOString())).toEqual(custom.map(d=>new Date(d).toISOString()));
+        expect(scheduleTimes({start:'2026-10-30T21:00:00Z',businessHours:true,timezone:'America/New_York'},1)[0].toISOString()).toBe('2026-11-02T14:00:00.000Z');
+        expect(()=>scheduleTimes({...due,custom:['2027-01-10T12:00:00Z'],businessHours:true},1)).toThrow('outside selected business hours');
+    });
     it('validates offers and CTA URLs and confines photo URLs to owned R2 keys', () => {
         expect(itemInput.safeParse({ kind: 'post', summary: 'Offer', topicType: 'OFFER' }).success).toBe(false);
         expect(itemInput.safeParse({ kind: 'post', summary: 'Text', callToAction: { actionType: 'BOOK', url: 'javascript:alert(1)' } }).success).toBe(false);
@@ -74,6 +93,11 @@ describe('GBP content scheduling and validation', () => {
         await preparePhoto(buffer, name, { title: 'Fixture title', lat: 47.6, lon: -122.3 }, upload);
         const output = upload.mock.calls[0] as any;
         expect((await sharp(output[0]).metadata()).exif).toBeDefined();
+        const metadata = piexif.load(output[0].toString('binary'));
+        expect(Buffer.from(metadata['0th'][piexif.ImageIFD.XPTitle]).toString('utf16le')).toBe('Fixture title\0');
+        expect(metadata.GPS[piexif.GPSIFD.GPSLatitudeRef]).toBe('N');
+        expect(metadata.GPS[piexif.GPSIFD.GPSLongitudeRef]).toBe('W');
+        expect(metadata.GPS[piexif.GPSIFD.GPSLatitude][0]).toEqual([47,1]);
         expect(output[4]).toBe(name);
     });
 });
@@ -154,6 +178,24 @@ describe('real lane DB and mocked provider integration', () => {
         expect(row.status).toBe('queued');
         expect(new Date(row.due_at).getTime()).toBeGreaterThan(Date.now());
     });
+    it('moves a later moderation rejection out of published history and alerts only once', async () => {
+        const [job] = await enqueue(user, location, { requestKey: randomUUID(), items: [{ kind: 'post', summary: 'Moderation fixture' }], schedule: due });
+        await runContentWorker(make);
+        const rejectedApp = express();
+        registerContentRoutes(rejectedApp, () => ({ id: user }), ai, () => ({request: async () => ({state:'REJECTED'})}) as any);
+        const originalApp = app;
+        app = rejectedApp;
+        try {
+            await call('/refresh', {});
+            const row = (await pool.query('SELECT * FROM gbp_content_jobs WHERE id=$1',[job.id])).rows[0];
+            expect(row).toMatchObject({status:'rejected',google_status:'REJECTED'});
+            expect(row.error).toContain('corrected post');
+            const count = async () => Number((await pool.query("SELECT count(*) FROM user_notifications WHERE user_id=$1 AND kind='gbp.post_failed'",[user])).rows[0].count);
+            const first = await count();
+            await call('/refresh', {});
+            expect(await count()).toBe(first);
+        } finally { app = originalApp; }
+    });
     it('honors provider failure details and redacts the bearer token', async () => {
         const request = vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Invalid photo size; fixture-secret', code: 400 } }), { status: 400 }));
         const c = new GoogleClient(async () => 'fixture-secret', request, new Limiter(() => 0, async () => { }));
@@ -176,6 +218,34 @@ describe('real lane DB and mocked provider integration', () => {
                 process.env.AI_INTEGRATIONS_OPENAI_API_KEY = old;
         }
     });
+    it('accepts a 100-photo queue, rejects 101, and prevents publishing after a location is relinked', async () => {
+        const items=Array.from({length:100},(_,i)=>({kind:'photo',photoIds:[photo],summary:`Boundary fixture ${i}`}));
+        const jobs=await enqueue(user,location,{requestKey:randomUUID(),items,schedule:due});
+        expect(jobs).toHaveLength(100);
+        await pool.query("UPDATE gbp_content_jobs SET status='cancelled' WHERE id=ANY($1::bigint[])",[jobs.map(j=>j.id)]);
+        await expect(enqueue(user,location,{requestKey:randomUUID(),items:[...items,items[0]],schedule:due})).rejects.toThrow();
+        const [job]=await enqueue(user,location,{requestKey:randomUUID(),items:[items[0]],schedule:due});
+        await pool.query("UPDATE business_locations SET gbp_location_name='locations/relinked' WHERE id=$1",[location]);
+        try {
+            http.mockClear();await runContentWorker(make);expect(http).not.toHaveBeenCalled();
+            expect((await pool.query('SELECT status,error FROM gbp_content_jobs WHERE id=$1',[job.id])).rows[0]).toMatchObject({status:'failed',error:expect.stringContaining('linkage changed')});
+        } finally {await pool.query("UPDATE business_locations SET gbp_location_name='locations/content' WHERE id=$1",[location]);}
+    });
+    it('stores durable media references and mints their signed URL at delayed dispatch', async () => {
+        const saved=process.env.GBP_MEDIA_PUBLIC_BASE_URL;
+        delete process.env.GBP_MEDIA_PUBLIC_BASE_URL;
+        try {
+            const [job]=await enqueue(user,location,{requestKey:randomUUID(),items:[{kind:'photo',photoIds:[photo]}],schedule:due});
+            expect(job.payload.sourceUrl).toBe('r2:media/fixture.jpg');
+            const dispatchTime=Date.now()+2*86400000;
+            const now=vi.spyOn(Date,'now').mockReturnValue(dispatchTime);
+            try {
+                http.mockClear();await runContentWorker(make);
+                const payload=JSON.parse(http.mock.calls[0][1].body),url=new URL(payload.sourceUrl);
+                expect(Number(url.searchParams.get('exp'))).toBe(Math.floor(dispatchTime/1000)+3600);
+            } finally {now.mockRestore();}
+        } finally {if(saved!==undefined)process.env.GBP_MEDIA_PUBLIC_BASE_URL=saved;}
+    });
     it('rejects malformed requests and enforces the daily AI budget before provider calls', async () => {
         expect((await call('/queue', { items: [] })).status).toBe(400);
         await pool.query("INSERT INTO growth_budgets(key,period,used) VALUES($1,$2,100) ON CONFLICT(key,period) DO UPDATE SET used=100", [`gbp-content-ai:${user}`, String(Math.floor(Date.now() / 86400000))]);
@@ -186,6 +256,44 @@ describe('real lane DB and mocked provider integration', () => {
 });
 
 describe('signed media links (no public bucket)', () => {
+    it('streams valid signed media, avoids storage on forged links, and contains source stream errors', async () => {
+        const { signMediaKey } = await import('./content');
+        const get = vi.spyOn(r2, 'getFromR2');
+        const path = '/api/public/gbp-media';
+        const layer = (app.router as any).stack.find((entry:any)=>entry.route?.methods.get && entry.match(path));
+        const exp = Math.floor(Date.now()/1000)+3600, key = 'media/fixture.jpg';
+        const invoke = async (sig:string) => {
+            const chunks:Buffer[] = [];
+            const response:any = new Writable({write(chunk,_encoding,done){chunks.push(Buffer.from(chunk));done();}});
+            response.statusCode=200;
+            response.setHeader=vi.fn();
+            response.status=(code:number)=>{response.statusCode=code;return response;};
+            response.json=(body:any)=>response.end(JSON.stringify(body));
+            await layer.route.stack[0].handle({query:{k:key,exp:String(exp),sig}},response);
+            return {response,body:Buffer.concat(chunks).toString()};
+        };
+        try {
+            expect((await invoke('forged')).response.statusCode).toBe(403);
+            expect(get).not.toHaveBeenCalled();
+            get.mockResolvedValue({body:Readable.from(['fixture image']) as any,contentType:'image/jpeg'});
+            expect((await invoke(signMediaKey(key,exp))).body).toBe('fixture image');
+            get.mockResolvedValue({body:new Readable({read(){this.destroy(new Error('Storage stream failed'));}}) as any,contentType:'image/jpeg'});
+            expect((await invoke(signMediaKey(key,exp))).response.destroyed).toBe(true);
+        } finally {get.mockRestore();}
+    });
+    it('fails closed without a configured signing secret', async () => {
+        const { verifyMediaSignature, signMediaKey } = await import('./content');
+        const key = process.env.GBP_TOKEN_KEY, session = process.env.SESSION_SECRET;
+        delete process.env.GBP_TOKEN_KEY;
+        delete process.env.SESSION_SECRET;
+        try {
+            expect(() => signMediaKey('media/fixture.jpg', Date.now())).toThrow('not configured');
+            expect(verifyMediaSignature('media/fixture.jpg', Date.now(), 'forged')).toBe(false);
+        } finally {
+            if (key !== undefined) process.env.GBP_TOKEN_KEY = key;
+            if (session !== undefined) process.env.SESSION_SECRET = session;
+        }
+    });
     it('mints a short-lived signed link, verifies it, and rejects tampering, expiry and non-media keys', async () => {
         const { verifyMediaSignature, signMediaKey, resolveMediaRefs } = await import('./content');
         const saved = process.env.GBP_MEDIA_PUBLIC_BASE_URL; delete process.env.GBP_MEDIA_PUBLIC_BASE_URL;

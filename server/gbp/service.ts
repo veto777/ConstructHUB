@@ -103,7 +103,23 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
       try {
         if (kind === 'profile') {
           const info = await client.request('information',`/v1/${l.gbp_location_name}?readMask=${PROFILE_READ_MASK}`);
-          const attrs = await client.request('information',`/v1/${l.gbp_location_name}/attributes`).then(r => r.attributes || []).catch(() => []);
+          if (info.name !== l.gbp_location_name || typeof info.title !== 'string' || !info.title.trim())
+            throw new GoogleError('invalid', 'Google returned an incomplete or mismatched profile; saved data was preserved', 502);
+          const warnings: string[] = [];
+          const optional = async (label: string, load: () => Promise<any>) => {
+            try { return await load(); }
+            catch (e) {
+              if (e instanceof GoogleError && e.kind === 'auth') throw e;
+              warnings.push(`${label}: ${publicError(e).message}`);
+              return null;
+            }
+          };
+          const attrs = await optional('Social profiles', async () => {
+            const response = await client!.request('information', `/v1/${l.gbp_location_name}/attributes`);
+            if (response.attributes !== undefined && !Array.isArray(response.attributes))
+              throw new GoogleError('invalid', 'Invalid Google attributes response');
+            return response.attributes || [];
+          });
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
           // Every photo/video on the listing (paged), not a sample. A failed list keeps the previous gallery.
           const businessItems = await client.pages('reviews',`/v4/${parent}/media`,'mediaItems').catch(() => null);
@@ -128,18 +144,19 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           const storedCount = (src: string) => stored.find((r: any) => r.source === src)?.n ?? 0;
           const media = counts.business !== undefined ? { totalMediaItemCount: storedCount('business') } : null;
           const customerMedia = counts.customer !== undefined ? { totalMediaItemCount: storedCount('customer') } : null;
-          const p = mapProfile(info, attrs);
+          const p = mapProfile(info, attrs || []);
           verified = !!info?.metadata?.hasVoiceOfMerchant;
           await c.query(`UPDATE business_locations SET business_name=COALESCE($2,business_name),phone=$3,website=$4,address=$5,city=$6,state=$7,zip_code=$8,country=COALESCE($9,country),
             categories=$10,description=$11,service_areas=$12,services=$13,hours=$14,opening_date=$15,open_status=COALESCE($16,open_status),
             place_id=COALESCE($17,place_id),google_cid=COALESCE($18,google_cid),
-            social_profiles=COALESCE(social_profiles,'{}'::jsonb)||$19::jsonb,
+            social_profiles=CASE WHEN $19::jsonb IS NULL THEN social_profiles ELSE
+              (COALESCE(social_profiles,'{}'::jsonb) - ARRAY['facebook','instagram','linkedin','pinterest','tiktok','twitter','youtube']) || $19::jsonb END,
             business_photo_count=COALESCE($20,business_photo_count),customer_photo_count=COALESCE($21,customer_photo_count),updated_at=now() WHERE id=$1`,
             [id,p.businessName,p.phone,p.website,p.address,p.city,p.state,p.zipCode,p.country,p.categories,p.description,p.serviceAreas,p.services,
-             p.hours ? JSON.stringify(p.hours) : null,p.openingDate,p.openStatus,p.placeId,p.googleCid,JSON.stringify(p.social),
+             p.hours ? JSON.stringify(p.hours) : null,p.openingDate,p.openStatus,p.placeId,p.googleCid,attrs === null ? null : JSON.stringify(p.social),
              typeof media?.totalMediaItemCount === 'number' ? media.totalMediaItemCount : null,
              typeof customerMedia?.totalMediaItemCount === 'number' ? customerMedia.totalMediaItemCount : null]);
-          result.profile = {services:p.services.length,serviceAreas:p.serviceAreas.length,social:Object.keys(p.social).length};
+          result.profile = {services:p.services.length,serviceAreas:p.serviceAreas.length,social:attrs === null ? null : Object.keys(p.social).length,warnings};
         } else if (kind === 'reviews') {
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
           const reviews = (await client.pages('reviews',`/v4/${parent}/reviews`,'reviews')).map(r => mapReview(r,parent));
@@ -196,7 +213,9 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           await c.query(`UPDATE business_locations SET monthly_views=COALESCE((SELECT sum(value)::int FROM gbp_daily_metrics WHERE location_id=$1 AND metric LIKE 'BUSINESS_IMPRESSIONS_%' AND date>current_date-30),0) WHERE id=$1`,[id]);
           result.performance = {count:rows.length,available:rows.length>0};
         }
-        await c.query('UPDATE gbp_sync_status SET last_success=now(),last_error=NULL WHERE location_id=$1 AND kind=$2',[id,kind]);
+        const warnings = (result[kind] as any)?.warnings as string[] | undefined;
+        await c.query('UPDATE gbp_sync_status SET last_success=now(),last_error=$3 WHERE location_id=$1 AND kind=$2',
+          [id,kind,warnings?.length ? warnings.join('; ') : null]);
       } catch(e) {
         const error = publicError(e);
         // Google only shares performance for listings whose owner it has verified (voice of merchant).
@@ -269,14 +288,15 @@ export function startGbpWorker() {
 
 /** After a Google account connects: link the contractor's matching Places-added rows and fully sync
  *  every listing that account manages, so the Locations pages fill in without further clicks. */
-export async function autoLinkAndSync(userId: number, subject: string) {
-  const d = await discover(clientFor(userId, subject));
+export async function autoLinkAndSync(userId: number, subject: string, make = clientFor, sync = syncLocation) {
+  const client = make(userId, subject);
+  const d = await discover(client);
   const {rows} = await pool.query('SELECT place_id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id IS NOT NULL AND NOT gbp_unlinked_by_user',[userId]);
   const wanted = new Set(rows.map(r => r.place_id));
   const toLink = d.locations.filter((l: any) => l.placeId && wanted.has(l.placeId)).map((l: any) => ({...l, grantSubject: subject}));
-  if (toLink.length) await importLocations(userId, toLink);
+  if (toLink.length) await importLocations(userId, toLink, client);
   const {rows:mine} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_google_subject=$2 AND gbp_location_name IS NOT NULL',[userId,subject]);
-  for (const l of mine) await syncLocation(userId, l.id).catch(() => null);
+  for (const l of mine) await sync(userId, l.id, client).catch(() => null);
 }
 
 /** Stop syncing one location: drop its Google link and the Google data synced for it; keep the row. */

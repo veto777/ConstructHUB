@@ -1,5 +1,6 @@
 /** GBP content queue. External boundaries are injectable; no credentials are stored here. */
 import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { pipeline } from 'node:stream/promises';
 import type { Express } from 'express';
 import { z } from 'zod';
 import { pool } from '../db';
@@ -26,11 +27,15 @@ export async function ensureGbpContentSchema() {
 export const categories = ['ADDITIONAL', 'EXTERIOR', 'INTERIOR', 'PRODUCT', 'AT_WORK', 'FOOD_AND_DRINK', 'MENU', 'COMMON_AREA', 'ROOMS', 'TEAMS', 'COVER'] as const;
 const id = z.number().int().positive();
 const https = z.string().url().max(2000).refine(v => new URL(v).protocol === 'https:', 'HTTPS required');
+const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(value => {
+    const date = new Date(value + 'Z');
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 16) === value;
+}, 'Enter a valid calendar date and time');
 export const itemInput = z.object({
     kind: z.enum(['photo', 'post']), photoIds: z.array(id).max(10).default([]), summary: z.string().trim().max(1500).default(''),
     category: z.enum(categories).default('ADDITIONAL'), topicType: z.enum(['STANDARD', 'EVENT', 'OFFER']).default('STANDARD'),
     callToAction: z.object({ actionType: z.enum(['BOOK', 'ORDER', 'SHOP', 'LEARN_MORE', 'SIGN_UP', 'CALL']), url: https.optional() }).optional(),
-    event: z.object({ title: z.string().min(1).max(58), start: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(v => Number.isFinite(Date.parse(v + 'Z'))), end: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(v => Number.isFinite(Date.parse(v + 'Z'))) }).optional(),
+    event: z.object({ title: z.string().min(1).max(58), start: localDateTime, end: localDateTime }).optional(),
     offer: z.object({ couponCode: z.string().max(100).optional(), redeemOnlineUrl: https.optional(), termsConditions: z.string().max(5000).optional() }).optional(),
 }).superRefine((v, c) => {
     if (v.kind === 'photo' && v.photoIds.length !== 1)
@@ -83,7 +88,11 @@ export function scheduleTimes(raw: unknown, count: number) {
 }
 // Google (and the vision model) must download photos from a public URL. Without a public bucket domain we
 // hand out a short-lived HMAC-signed link to /api/public/gbp-media that streams only media/ keys from R2.
-const mediaSigningKey = () => createHash('sha256').update(`gbp-media:${process.env.GBP_TOKEN_KEY || process.env.SESSION_SECRET || 'dev-only'}`).digest();
+const mediaSigningKey = () => {
+    const secret = process.env.GBP_TOKEN_KEY || process.env.SESSION_SECRET;
+    if (!secret) throw new GoogleError('invalid', 'Media signing is not configured', 503);
+    return createHash('sha256').update(`gbp-media:${secret}`).digest();
+};
 /** Queued payloads store r2:<key>; a fresh signed link is minted only when the job is dispatched. */
 export function resolveMediaRefs(payload: any): any {
     const fix = (m: any) => typeof m?.sourceUrl === 'string' && m.sourceUrl.startsWith('r2:') ? { ...m, sourceUrl: publicPhotoUrl(m.sourceUrl.slice(3)) } : m;
@@ -93,8 +102,10 @@ export function resolveMediaRefs(payload: any): any {
 export function signMediaKey(key: string, exp: number) { return createHmac('sha256', mediaSigningKey()).update(`${key}\n${exp}`).digest('base64url'); }
 export function verifyMediaSignature(key: string, exp: number, sig: string) {
     if (!key.startsWith('media/') || key.includes('..') || !Number.isFinite(exp) || exp < Date.now() / 1000) return false;
-    const want = Buffer.from(signMediaKey(key, exp)), got = Buffer.from(String(sig));
-    return want.length === got.length && timingSafeEqual(want, got);
+    try {
+        const want = Buffer.from(signMediaKey(key, exp)), got = Buffer.from(String(sig));
+        return want.length === got.length && timingSafeEqual(want, got);
+    } catch { return false; }
 }
 export function publicPhotoUrl(key: string, base = process.env.GBP_MEDIA_PUBLIC_BASE_URL, ttlSeconds = 3600) {
     if (!base) {
@@ -238,9 +249,12 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
             res.setHeader('Content-Type', contentType || 'image/jpeg');
             res.setHeader('Cache-Control', 'private, max-age=300');
             const stream: any = body;
-            if (typeof stream.pipe === 'function') return stream.pipe(res);
+            if (typeof stream.pipe === 'function') {
+                await pipeline(stream, res);
+                return;
+            }
             res.send(Buffer.from(await stream.arrayBuffer()));
-        } catch { res.status(404).end(); }
+        } catch { if (!res.headersSent && !res.destroyed) res.status(404).end(); }
     });
     const route = (method: 'get' | 'post' | 'patch', suffix: string, fn: (req: any, user: number, location: number) => Promise<any>) => app[method](`/api/gbp/content/:location${suffix}`, async (req, res) => {
         const u = auth(req, res);
@@ -272,7 +286,15 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
                 continue;
             try {
                 const post = await client.request('reviews', `/v4/${job.google_name}`);
-                await pool.query('UPDATE gbp_content_jobs SET google_status=$2,error=NULL WHERE id=$1', [job.id, post.state || null]);
+                if (post.state === 'REJECTED') {
+                    const changed = await pool.query("UPDATE gbp_content_jobs SET google_status=$2,status='rejected',error=$3 WHERE id=$1 AND status='published' RETURNING id", [job.id, post.state,
+                        'Google rejected this post. Review Google content policies and compose a corrected post.']);
+                    if (!changed.rowCount) continue;
+                    await notifyUser(u, 'gbp.post_failed', { title: 'Google rejected your post', body: 'Review the content and compose a corrected post.', link: '/gbp-content', severity: 'warning' }).catch(() => {});
+                    await logActivity(null, u, 'gbp.content_rejected', { jobId: job.id, locationId: l, googleName: job.google_name }).catch(() => {});
+                } else {
+                    await pool.query('UPDATE gbp_content_jobs SET google_status=$2,error=NULL WHERE id=$1', [job.id, post.state || null]);
+                }
             }
             catch (e) {
                 await pool.query('UPDATE gbp_content_jobs SET error=$2 WHERE id=$1', [job.id, e instanceof GoogleError ? e.message : 'Google status unavailable']);
