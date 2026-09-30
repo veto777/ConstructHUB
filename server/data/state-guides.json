@@ -249,7 +249,7 @@
     "licensing_notes": "Delaware does NOT require a state contractor license. Some trades (electrical, plumbing, HVAC) may require local licensing. Business licenses may be required by Division of Revenue.",
     "workers_comp_type": "private",
     "workers_comp_agency": "Delaware Office of Workers Compensation",
-    "workers_comp_url": "https://labor.delaware.gov/divisions/industrial-affairs/workers-comp/",
+    "workers_comp_url": "https://industrialaffairs.delaware.gov/workers-compensation",
     "tax_board_name": "Delaware Division of Revenue",
     "tax_board_url": "https://revenue.delaware.gov/",
     "sales_tax_on_labor": false,
@@ -270,7 +270,7 @@
         "field": "workers_comp_url",
         "previous": "https://dia.delawareworks.com/workers-comp/",
         "previous_reason": "ENOTFOUND",
-        "source": "linked from https://labor.delaware.gov/ (Learn More about Worker's Compensation)",
+        "source": "linked from https://labor.delaware.gov/ (Workers' Compensation); the division path labor.delaware.gov/divisions/industrial-affairs/workers-comp/ only redirects (301) to the Division of Industrial Affairs home page",
         "checked_at": "2026-09-30"
       }
     ]

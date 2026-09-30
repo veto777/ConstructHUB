@@ -1415,12 +1415,12 @@ function BillingSection() {
                 </p>
               ) : hasPlan ? (
                 <>
-                  <p className="font-semibold text-primary flex items-center gap-2" data-testid="text-current-plan">
+                  <div className="font-semibold text-primary flex items-center gap-2" data-testid="text-current-plan">
                     {planName} Plan
                     <Badge variant="outline" className="text-[10px]" data-testid="badge-plan-status">
                       {STATUS_LABELS[subscription!.status] || subscription!.status}
                     </Badge>
-                  </p>
+                  </div>
                   {periodEnd && (
                     <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-plan-period">
                       {openEnded ? "No end date"
@@ -1432,7 +1432,11 @@ function BillingSection() {
               ) : (
                 <>
                   <p className="font-semibold text-primary" data-testid="text-current-plan">Free plan</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">No paid subscription on this account.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-plan-inactive">
+                    {planKey
+                      ? `Your ${planName} subscription is ${(STATUS_LABELS[subscription!.status] || subscription!.status).toLowerCase()}.`
+                      : "No paid subscription on this account."}
+                  </p>
                 </>
               )}
             </div>
@@ -1450,10 +1454,10 @@ function BillingSection() {
                   className="p-3 border rounded-lg text-center hover:border-primary/50 hover:bg-muted/40 transition-colors"
                   data-testid={`card-plan-${key}`}
                 >
-                  <p className="text-sm font-semibold flex items-center justify-center gap-1.5">
+                  <div className="text-sm font-semibold flex items-center justify-center gap-1.5">
                     {plan.name}
                     {hasPlan && key === planKey && <Badge variant="outline" className="text-[9px] px-1 py-0">Current</Badge>}
-                  </p>
+                  </div>
                   <p className="text-lg font-bold text-primary mt-1">${(plan.price / 100).toLocaleString()}/mo</p>
                   <p className="text-[10px] text-muted-foreground mt-1">{plan.features[0]}</p>
                 </a>

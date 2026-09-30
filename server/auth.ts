@@ -272,6 +272,9 @@ export async function setupAuth(app: Express) {
       // (server_error, temporarily_unavailable, …) used to surface as raw JSON.
       passport.authenticate("google", { callbackURL } as any, async (err: any, user: any) => {
         delete req.session.googleReauth; // single use
+        // The visitor gets a page either way; the server log keeps the cause
+        // (this error used to reach the global handler, which logged it).
+        if (err) console.error("[auth] Google callback failed:", err?.message || err);
         if (reauth) {
           // Step-up only: the session keeps its signed-in user either way.
           const nextPath = safeNextPath(req.session.authNext) ?? "/settings?tab=security";
