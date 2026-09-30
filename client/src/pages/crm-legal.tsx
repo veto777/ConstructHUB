@@ -10,7 +10,7 @@ import { CrmLogo } from "@/components/crm-logo";
  * DRAFT for attorney review before being represented as final legal terms.
  */
 
-const EFFECTIVE = "August 1, 2026";
+const EFFECTIVE = "September 30, 2026";
 
 function LegalShell({ title, children, testid }: { title: string; children: React.ReactNode; testid: string }) {
   useEffect(() => {

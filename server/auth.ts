@@ -685,9 +685,12 @@ export async function setupAuth(app: Express) {
       }
       if (googleProfileUrl !== undefined) {
         // Same rule as review templates: resolve Google short links, then accept only Google hosts. Blank clears it.
+        // Only a changed link is checked: resending the stored value (possibly a legacy
+        // non-Google link) leaves it as is and must not block an unrelated profile save.
         let raw = String(googleProfileUrl ?? "").trim();
+        const [current] = await db.select({ googleProfileUrl: users.googleProfileUrl }).from(users).where(eq(users.id, req.user.id));
         if (!raw) updateData.googleProfileUrl = null;
-        else {
+        else if (raw !== (current?.googleProfileUrl ?? "").trim()) {
           if (raw.length > 500) return res.status(400).json({ message: GOOGLE_REVIEW_LINK_MESSAGE });
           if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) raw = `https://${raw}`;
           const link = googleReviewLink(await resolveGoogleUrl(raw));

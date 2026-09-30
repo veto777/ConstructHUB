@@ -28,14 +28,26 @@ const STORAGE_KEY = "constructhub_cart";
 
 const CartContext = createContext<CartContextValue | null>(null);
 
+/** One entry per item id (the first one wins); an entry without an id is dropped. */
+function uniqueById(items: CartItem[]): CartItem[] {
+  const seen = new Set<string>();
+  return items.filter(i => {
+    if (!i || typeof i.id !== "string" || seen.has(i.id)) return false;
+    seen.add(i.id);
+    return true;
+  });
+}
+
 function loadCart(): CartItem[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // A cart saved before bundles were enforced may hold a bundle AND its
-      // parts — the bundle already includes them, so drop the duplicates.
-      if (Array.isArray(parsed)) return withoutBundledParts(parsed);
+      // A stored cart that repeats an item id showed it twice and doubled the
+      // subtotal. A cart saved before bundles were enforced may also hold a
+      // bundle AND its parts — the bundle already includes them. Drop both kinds
+      // of duplicate.
+      if (Array.isArray(parsed)) return withoutBundledParts(uniqueById(parsed));
     }
   } catch {}
   return [];
@@ -76,7 +88,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Adding a bundle replaces the parts of it that are already in the cart.
     const bundleId = bundleIdOf(item);
     const replaced = bundleId ? current.filter(i => coveringBundleOf(i) === bundleId) : [];
-    const next = [...current.filter(i => !replaced.includes(i)), item];
+    const next = uniqueById([...current.filter(i => !replaced.includes(i)), item]);
     itemsRef.current = next;
     setItems(next);
     if (bundleId && replaced.length) {

@@ -98,8 +98,6 @@ type AuditEntry = {
 
 type Tab = "manager" | "accounts" | "invitations" | "audit";
 
-type AdminAccess = "allowed" | "denied" | "gate" | "error";
-
 export default function LsaAccountManagerPage() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [, navigate] = useLocation();
@@ -107,25 +105,19 @@ export default function LsaAccountManagerPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
   // Who counts as a platform admin is the server's decision (server/admin.ts,
-  // including the dev-bypass account). Ask the admin API itself rather than
-  // keeping a second, drifting email list in the client.
-  const { data: access, isLoading: accessLoading, isError: accessCheckFailed } = useQuery<AdminAccess>({
-    queryKey: ["/api/admin/lsa/manager", "access"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/lsa/manager", { credentials: "include", cache: "no-store" });
-      if (res.ok) return "allowed";
-      if (res.status === 403 || res.status === 401) {
-        const body = await res.json().catch(() => null);
-        return body?.gateRequired === true ? "gate" : "denied";
-      }
-      return "error";
-    },
-    enabled: !!user,
+  // including the dev-bypass account); /api/auth/me reports it, so the client
+  // keeps no second, drifting email list. The admin API still enforces it.
+  const isAdmin = user?.isPlatformAdmin === true;
+  // The admin passphrase wall (same one the /crm/admin console uses). Its status
+  // route only reads the session, unlike the old probe of the LSA data route.
+  const { data: gate, isLoading: gateLoading, isError: gateCheckFailed } = useQuery<{ gateConfigured: boolean; gatePassed: boolean }>({
+    queryKey: ["/api/admin/gate"],
+    enabled: isAdmin,
   });
 
   if (!user) return null;
 
-  if (accessLoading) {
+  if (isAdmin && gateLoading) {
     return (
       <div className="h-full flex items-center justify-center p-8" data-testid="view-lsa-access-checking">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -133,9 +125,9 @@ export default function LsaAccountManagerPage() {
     );
   }
 
-  if (access === "gate") return <AdminGateCard />;
+  if (isAdmin && gate && gate.gateConfigured && !gate.gatePassed) return <AdminGateCard />;
 
-  if (access === "error" || accessCheckFailed) {
+  if (isAdmin && (gateCheckFailed || !gate)) {
     return (
       <div className="h-full flex items-center justify-center p-8">
         <Card className="max-w-md w-full">
@@ -149,7 +141,7 @@ export default function LsaAccountManagerPage() {
     );
   }
 
-  if (access !== "allowed") {
+  if (!isAdmin) {
     return (
       <div className="h-full flex items-center justify-center p-8">
         <Card className="max-w-md w-full">
@@ -227,6 +219,7 @@ function AdminGateCard() {
       (await apiRequest("POST", "/api/admin/gate", { username: gateUser, password: gatePass })).json(),
     onSuccess: () => {
       setGatePass("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/gate"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/lsa/manager"] });
     },
     onError: (e: any) => toast({ title: "Sign-in failed", description: apiErrorMessage(e), variant: "destructive" }),

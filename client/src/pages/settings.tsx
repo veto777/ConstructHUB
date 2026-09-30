@@ -27,6 +27,21 @@ import {
 import { useLocation } from "wouter";
 
 type SettingsTab = "profile" | "account" | "notifications" | "security" | "billing";
+
+// Same host rule as the server's googleReviewLink (and google-reviews.tsx): google.<tld>
+// but not the bare homepage, g.page, goo.gl or share.google. The server has the final say.
+const GOOGLE_REVIEW_LINK_HINT = "Paste your Google review link (https://g.page/r/... or a Google Maps link).";
+function looksLikeGoogleReviewLink(input: string): boolean {
+  let v = input.trim();
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = `https://${v}`;
+  let u: URL;
+  try { u = new URL(v); } catch { return false; }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+  const host = u.hostname.toLowerCase();
+  const google = /^(?:[a-z0-9-]+\.)*google\.[a-z]{2,3}(?:\.[a-z]{2})?$/.test(host);
+  if (google) return !(u.pathname === "/" && !u.search);
+  return /^(?:[a-z0-9-]+\.)*(?:goo\.gl|g\.page|share\.google)$/.test(host);
+}
 const SETTINGS_TABS: SettingsTab[] = ["profile", "account", "notifications", "security", "billing"];
 
 /**
@@ -130,16 +145,16 @@ function ProfileSection({ user }: { user: any }) {
   const [email] = useState(user?.email || "");
   const [companyName, setCompanyName] = useState(user?.companyName || "");
   const [companyLogoUrl, setCompanyLogoUrl] = useState(user?.companyLogoUrl || "");
-  const [googleProfileUrl, setGoogleProfileUrl] = useState(user?.googleProfileUrl || "");
   const nameMissing = !displayName.trim();
 
   const updateProfileMutation = useMutation({
     mutationFn: async () => {
+      // This form has no review-link field, so googleProfileUrl is never sent: a saved
+      // legacy (non-Google) value must not block an unrelated name or logo change.
       const res = await apiRequest("PATCH", "/api/auth/profile", {
         displayName: displayName.trim(),
         companyName,
         companyLogoUrl,
-        googleProfileUrl,
       });
       return res.json();
     },
@@ -404,6 +419,8 @@ function GmbProfilesSection() {
   const { data: templates = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/review-templates"],
   });
+  const urlChanged = !editingTemplate || googleProfileUrl.trim() !== String(editingTemplate.googleProfileUrl ?? "").trim();
+  const urlInvalid = urlChanged && googleProfileUrl.trim() !== "" && !looksLikeGoogleReviewLink(googleProfileUrl);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -429,7 +446,8 @@ function GmbProfilesSection() {
     mutationFn: async () => {
       const res = await apiRequest("PATCH", `/api/review-templates/${editingTemplate.id}`, {
         name,
-        googleProfileUrl,
+        // Only a changed link is re-checked, so an older saved link doesn't block a rename.
+        ...(urlChanged ? { googleProfileUrl } : {}),
         projectDescription,
       });
       return res.json();
@@ -619,8 +637,15 @@ function GmbProfilesSection() {
                 value={googleProfileUrl}
                 onChange={e => setGoogleProfileUrl(e.target.value)}
                 placeholder="https://g.page/r/... or any Google Maps URL"
+                aria-invalid={urlInvalid}
+                aria-describedby={urlInvalid ? "gmb-url-error" : undefined}
                 data-testid="input-gmb-url"
               />
+              {urlInvalid && (
+                <p id="gmb-url-error" className="text-xs text-destructive" data-testid="text-gmb-url-error">
+                  {GOOGLE_REVIEW_LINK_HINT}
+                </p>
+              )}
               <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50">
                 <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-700 dark:text-blue-300">
@@ -644,7 +669,7 @@ function GmbProfilesSection() {
             <Button variant="outline" onClick={closeDialog} data-testid="button-cancel-gmb">Cancel</Button>
             <Button
               onClick={() => editingTemplate ? updateMutation.mutate() : createMutation.mutate()}
-              disabled={!name.trim() || !googleProfileUrl.trim() || createMutation.isPending || updateMutation.isPending}
+              disabled={!name.trim() || !googleProfileUrl.trim() || urlInvalid || createMutation.isPending || updateMutation.isPending}
               data-testid="button-save-gmb"
             >
               {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingTemplate ? "Save Changes" : "Add Profile"}
@@ -761,8 +786,8 @@ function BetaAccessSection({ user }: { user: any }) {
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const ADMIN_EMAILS = ["alpinesidingcompany@gmail.com", "support@constructhub.us"];
-  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+  // /api/auth/me reports the server's own platform-admin check; the admin endpoints enforce it.
+  const isAdmin = user?.isPlatformAdmin === true;
 
   const { data: betaStatus } = useQuery<{ active: boolean; expiresAt?: string; trialDays?: number }>({
     queryKey: ["/api/beta-codes/status"],
