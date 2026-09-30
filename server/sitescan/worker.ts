@@ -1,0 +1,316 @@
+import { randomUUID } from "node:crypto";
+import { pool } from "../db";
+import { takeBudget } from "../growth-limits";
+import { notifyUser } from "../account-events";
+import {
+  crawl,
+  emptyState,
+  findingsFor,
+  scoresFor,
+  type CrawlState,
+} from "./audit";
+import { pageSpeed, businessSchema } from "./providers";
+import { safeFetch } from "./http";
+import { robotsRules } from "./robots";
+export async function profileFor(user: number, id?: number) {
+  const {
+    rows: [p],
+  } = await pool.query(
+    `SELECT l.id,l.business_name,l.address,l.city,l.state,l.zip_code,l.country,l.phone,l.website,l.services,l.service_areas,s.last_success AS synced_at
+    FROM business_locations l JOIN gbp_sync_status s ON s.location_id=l.id AND s.kind='profile' AND s.last_success IS NOT NULL
+    WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL AND ($2::integer IS NULL OR l.id=$2) ORDER BY l.id LIMIT 1`,
+    [user, id ?? null],
+  );
+  return p || null;
+}
+export async function enqueue(
+  user: number | null,
+  url: string,
+  cap: number,
+  psi: number,
+  profile: any = null,
+) {
+  const id = randomUUID();
+  await pool.query(
+    "INSERT INTO sitescan_jobs(id,user_id,url,page_cap,psi_pages,profile,state) VALUES($1,$2,$3,$4,$5,$6,$7)",
+    [id, user, url, cap, psi, profile, emptyState(url)],
+  );
+  return id;
+}
+export const workerDependencies = { crawl, pageSpeed, http: safeFetch };
+export async function runSiteScanWorker(deps = workerDependencies) {
+  const token = randomUUID();
+  const {
+    rows: [job],
+  } = await pool.query(
+    `UPDATE sitescan_jobs SET status='running',lease_token=$1,lease_until=now()+interval '2 minutes',attempts=attempts+1
+    WHERE id=(SELECT id FROM sitescan_jobs WHERE (status='queued' OR status='running' AND lease_until<now()) AND attempts<5 ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`,
+    [token],
+  );
+  if (!job) return;
+  const heartbeat = setInterval(
+    () =>
+      void pool
+        .query(
+          "UPDATE sitescan_jobs SET lease_until=now()+interval '2 minutes' WHERE id=$1 AND lease_token=$2",
+          [job.id, token],
+        )
+        .catch(() => {}),
+    30_000,
+  );
+  heartbeat.unref();
+  try {
+    const checkpoint = async (state: CrawlState) => {
+      const r = await pool.query(
+        "UPDATE sitescan_jobs SET state=$3,lease_until=now()+interval '2 minutes' WHERE id=$1 AND lease_token=$2",
+        [job.id, token, state],
+      );
+      if (!r.rowCount) throw new Error("Lease lost");
+    };
+    const state = await deps.crawl(
+      job.url,
+      job.page_cap,
+      job.state,
+      checkpoint,
+      deps.http,
+      undefined,
+      job.user_id ? 20 * 60_000 : 50_000,
+    );
+    // Link sampling is explicitly bounded; external robots policy is fetched before each host's links.
+    const rules = new Map<string, ReturnType<typeof robotsRules>>([
+      [state.origin || new URL(job.url).origin, robotsRules(state.robots)],
+    ]);
+    const candidates = [...new Set(state.pages.flatMap((p) => p.links))]
+      .filter((u) => !state.pages.some((p) => p.url === u))
+      .slice(0, job.user_id ? 40 : 0);
+    for (const url of candidates) {
+      if (state.linkChecks.some((c) => c.url === url)) continue;
+      try {
+        const origin = new URL(url).origin;
+        if (!rules.has(origin)) {
+          const r = await deps.http(
+            origin + "/robots.txt",
+            (u) => new URL(u).origin === origin,
+          );
+          if (r.status !== 200 && r.status !== 404) continue;
+          rules.set(origin, robotsRules(r.status === 200 ? r.body : ""));
+        }
+        const rule = rules.get(origin)!;
+        if (!rule.allowed(url) || rule.delay > 30) continue;
+        await new Promise((r) =>
+          setTimeout(r, Math.max(300, rule.delay * 1000)),
+        );
+        const result = await deps.http(
+          url,
+          (u) => new URL(u).origin === origin && rule.allowed(u),
+        );
+        state.linkChecks.push({ url, status: result.status });
+      } catch {
+        state.linkChecks.push({ url, status: null });
+      }
+      await checkpoint(state);
+    }
+    state.imageChecks ||= [];
+    for (const image of [
+      ...new Set(state.pages.flatMap((p) => p.images.map((i) => i.url))),
+    ].slice(0, job.user_id ? 30 : 0)) {
+      if (state.imageChecks.some((i) => i.url === image)) continue;
+      const origin = new URL(image).origin,
+        rule = rules.get(origin);
+      // Only origins whose robots policy was already checked; never fetch unknown CDNs blindly.
+      if (!rule || !rule.allowed(image) || rule.delay > 30) continue;
+      await new Promise((r) => setTimeout(r, Math.max(300, rule.delay * 1000)));
+      try {
+        const r = await deps.http(
+          image,
+          (u) => new URL(u).origin === origin && rule.allowed(u),
+        );
+        if (r.status === 200)
+          state.imageChecks.push({
+            url: image,
+            bytes: r.bytes,
+            pages: state.pages
+              .filter((p) => p.images.some((i) => i.url === image))
+              .map((p) => p.url),
+          });
+      } catch {
+        /* Unmeasured, never invent image weight. */
+      }
+      await checkpoint(state);
+    }
+    const psi: any[] = [];
+    for (const p of state.pages
+      .filter((p) => p.status === 200)
+      .slice(0, job.psi_pages))
+      for (const strategy of ["mobile", "desktop"] as const) {
+        if (
+          !(await takeBudget("sitescan:psi:global", 100, 1, 86400_000)) ||
+          !(await takeBudget("sitescan:psi:" + job.user_id, 20, 1, 86400_000))
+        ) {
+          psi.push({
+            url: p.url,
+            strategy,
+            unavailable: "Daily PageSpeed budget exhausted",
+          });
+          continue;
+        }
+        try {
+          psi.push(await deps.pageSpeed(p.url, strategy));
+        } catch {
+          psi.push({
+            url: p.url,
+            strategy,
+            unavailable: "PageSpeed unavailable or quota exceeded",
+          });
+        }
+      }
+    const findings = findingsFor(state, job.profile);
+    for (const p of psi)
+      if (typeof p.score === "number" && p.score < 90)
+        findings.push({
+          id: "psi-" + p.strategy + "-" + p.url,
+          category: "performance",
+          severity: p.score < 50 ? "critical" : "warning",
+          title: `${p.strategy} PageSpeed performance: ${p.score}`,
+          urls: [p.url],
+          why: "Measured Lighthouse lab performance is below 90; field data may differ.",
+          fix: "Review the attached LCP, CLS, blocking time and transfer size measurements; optimize the largest resources and JavaScript.",
+        });
+    const scores = scoresFor(findings, state, psi);
+    const report = {
+      url: job.url,
+      scannedAt: new Date().toISOString(),
+      pages: state.pages.length,
+      remaining: state.queue.length,
+      blocked: state.blocked.length,
+      errors: state.errors,
+      findings,
+      scores,
+      psi,
+      profile: job.profile,
+      jsonLdDraft: businessSchema(job.profile),
+      coverage: {
+        pageCap: job.page_cap,
+        checkedLinks: state.linkChecks.length,
+        checkedImages: state.imageChecks.length,
+        notes: [
+          "Scores are heuristic audit indicators, not search rankings.",
+          "HTML-only crawl; JavaScript is not executed.",
+          "Links (40) and images (30, 2 MB maximum) are sampled; full page weight comes from PageSpeed. Unknown CDN image sizes are not measured.",
+          "NAP and service gaps compare scanned text/headings with the last synced GBP snapshot.",
+          "AI drafts must be reviewed before use.",
+        ],
+      },
+    };
+    const {
+      rows: [previous],
+    } = await pool.query(
+      "SELECT report FROM sitescan_jobs WHERE user_id=$1 AND url=$2 AND status='completed' AND id<>$3 ORDER BY completed_at DESC LIMIT 1",
+      [job.user_id, job.url, job.id],
+    );
+    const changed = await pool.query(
+      "UPDATE sitescan_jobs SET report=$3,state=$4,status='completed',completed_at=now(),lease_until=NULL WHERE id=$1 AND lease_token=$2",
+      [job.id, token, report, state],
+    );
+    if (changed.rowCount && job.user_id) {
+      const oldCritical = new Set(
+        (previous?.report?.findings || [])
+          .filter((f: any) => f.severity === "critical")
+          .map((f: any) => f.id + JSON.stringify(f.urls)),
+      );
+      const regressed =
+        previous &&
+        ((scores.overall !== null &&
+          previous.report.scores.overall !== null &&
+          scores.overall < previous.report.scores.overall) ||
+          findings.some(
+            (f) =>
+              f.severity === "critical" &&
+              !oldCritical.has(f.id + JSON.stringify(f.urls)),
+          ));
+      await notifyUser(
+        job.user_id,
+        regressed ? "sitescan.regressed" : "sitescan.completed",
+        {
+          title: regressed
+            ? "Site Scan needs attention"
+            : "Site Scan completed",
+          body: `${state.pages.length} pages checked. Overall score: ${scores.overall ?? "unavailable"}.`,
+          link: "/site-scan",
+          severity: regressed ? "warning" : "info",
+        },
+      );
+    }
+  } catch {
+    await pool.query(
+      "UPDATE sitescan_jobs SET status='failed',error='Scan could not complete. Check website availability and robots policy, then retry.',lease_until=NULL WHERE id=$1 AND lease_token=$2 AND status='running'",
+      [job.id, token],
+    );
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+export async function runSchedules() {
+  const c = await pool.connect();
+  try {
+    await c.query("BEGIN");
+    const { rows } = await c.query(
+      "SELECT * FROM sitescan_schedules WHERE next_at<=now() FOR UPDATE SKIP LOCKED LIMIT 10",
+    );
+    for (const s of rows) {
+      if (await takeBudget("sitescan:scan:" + s.user_id, 5, 1, 86400_000)) {
+        const profile = s.location_id
+            ? await profileFor(s.user_id, s.location_id)
+            : null,
+          id = randomUUID();
+        await c.query(
+          "INSERT INTO sitescan_jobs(id,user_id,url,page_cap,psi_pages,profile,state) VALUES($1,$2,$3,$4,$5,$6,$7)",
+          [
+            id,
+            s.user_id,
+            s.url,
+            s.page_cap,
+            s.psi_pages,
+            profile,
+            emptyState(s.url),
+          ],
+        );
+        await c.query(
+          "UPDATE sitescan_schedules SET next_at=now()+interval '1 month' WHERE user_id=$1 AND url=$2",
+          [s.user_id, s.url],
+        );
+      } else
+        await c.query(
+          "UPDATE sitescan_schedules SET next_at=now()+interval '1 day' WHERE user_id=$1 AND url=$2",
+          [s.user_id, s.url],
+        );
+    }
+    await c.query(
+      "UPDATE sitescan_jobs SET status='failed',error='Worker retry limit reached' WHERE status='running' AND lease_until<now() AND attempts>=5",
+    );
+    await c.query("COMMIT");
+  } catch (e) {
+    await c.query("ROLLBACK");
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+export function startSiteScanWorker() {
+  if (process.env.SITESCAN_WORKER_DISABLED === "true") return;
+  let busy = false;
+  const timer = setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      await runSchedules();
+      await runSiteScanWorker();
+    } catch {
+      console.error("Site Scan worker tick failed");
+    } finally {
+      busy = false;
+    }
+  }, 5000);
+  timer.unref();
+  return timer;
+}

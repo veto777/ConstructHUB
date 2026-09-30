@@ -154,6 +154,12 @@ export async function registerRoutes(
   registerAccountEventRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
+  const { ensureSiteScanSchema } = await import("./sitescan/schema");
+  await ensureSiteScanSchema();
+  const { registerSiteScanRoutes } = await import("./sitescan/routes");
+  registerSiteScanRoutes(app, getDevUser);
+  const { startSiteScanWorker } = await import("./sitescan/worker");
+  startSiteScanWorker();
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
   const { startGbpWorker } = await import("./gbp/service");
