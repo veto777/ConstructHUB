@@ -48,13 +48,20 @@ for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`/review/${token}/unsubscribe`);
     await expect(page.getByTestId("cookie-consent-banner")).toBeVisible();
-    await expect(page.getByRole("button", { name: /unsubscribe/i })).toBeVisible();
-    await page.getByRole("button", { name: /unsubscribe/i }).click();
+    await expect(page.getByTestId("button-submit-feedback-unsubscribe")).toBeVisible();
     await page.getByTestId("button-submit-feedback-unsubscribe").click();
+    await expect(page.getByTestId("text-unsubscribed")).toBeVisible();
     await expect.poll(async () => (await (await request.get(`/api/review/${token}/unsubscribe-info`)).json()).unsubscribed).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }
+test("RFC 8058 one-click unsubscribe POST", async ({ request }) => {
+  const token = await review();
+  const res = await request.post(`/review/${token}/unsubscribe`, { form: { "List-Unsubscribe": "One-Click" } });
+  expect(res.status()).toBe(200);
+  expect((await (await request.get(`/api/review/${token}/unsubscribe-info`)).json()).unsubscribed).toBe(true);
+  expect((await request.post(`/review/${randomUUID()}/unsubscribe`, { form: { "List-Unsubscribe": "One-Click" } })).status()).toBe(404);
+});
 test("failed feedback stays on the rating form", async ({ page }) => {
   const token = await review();
   await page.route(`**/api/review/${token}/feedback`, route => route.fulfill({ status: 500, json: { message: "Test failure" } }));
