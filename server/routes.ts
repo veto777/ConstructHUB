@@ -173,6 +173,12 @@ export async function registerRoutes(
   const { startReplyWorker } = await import("./gbp/review-automation");
   startGuardWorker();
   startReplyWorker();
+  const { ensureSiteScanSchema } = await import("./sitescan/schema");
+  await ensureSiteScanSchema();
+  const { registerSiteScanRoutes } = await import("./sitescan/routes");
+  registerSiteScanRoutes(app, getDevUser);
+  const { startSiteScanWorker } = await import("./sitescan/worker");
+  startSiteScanWorker();
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
   const { startGbpWorker } = await import("./gbp/service");
