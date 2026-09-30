@@ -11,9 +11,31 @@ import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 // tests) must not require STRIPE_SECRET_KEY. The client is only built when a
 // Stripe API call actually runs.
 let _stripe: Stripe | null = null;
+
+/** No STRIPE_SECRET_KEY on this server: checkout can't start, and the caller
+ *  hears that in plain words (503) instead of the SDK's "Neither apiKey nor
+ *  config.authenticator provided". Nothing is charged either way. */
+export class PaymentsNotConfiguredError extends Error {
+  readonly status = 503;
+  constructor() {
+    super("Online payments aren't set up on this server yet. Nothing was charged — please try again later.");
+    this.name = "PaymentsNotConfiguredError";
+  }
+}
+
+/** A checkout/portal route's catch: the not-configured case as an honest 503,
+ *  anything else as before. */
+function sendStripeError(res: Response, err: any) {
+  if (err instanceof PaymentsNotConfiguredError) {
+    return res.status(err.status).json({ message: err.message });
+  }
+  return res.status(500).json({ message: err?.message });
+}
+
 function getStripe(): Stripe {
   if (!_stripe) {
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    if (!process.env.STRIPE_SECRET_KEY) throw new PaymentsNotConfiguredError();
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: "2025-01-27.acacia" as any,
     });
   }
@@ -198,7 +220,7 @@ export function registerStripeRoutes(app: Express) {
         stripeSubscriptionId: sub.stripeSubscriptionId,
       });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      sendStripeError(res, err);
     }
   });
 
@@ -246,7 +268,7 @@ export function registerStripeRoutes(app: Express) {
 
       res.json({ url: session.url });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      sendStripeError(res, err);
     }
   });
 
@@ -272,7 +294,7 @@ export function registerStripeRoutes(app: Express) {
 
       res.json({ url: session.url });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      sendStripeError(res, err);
     }
   });
 
@@ -341,7 +363,7 @@ export function registerStripeRoutes(app: Express) {
 
       res.json({ url: session.url });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      sendStripeError(res, err);
     }
   });
 
@@ -444,7 +466,7 @@ export function registerStripeRoutes(app: Express) {
 
       res.json({ url: session.url });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      sendStripeError(res, err);
     }
   });
 

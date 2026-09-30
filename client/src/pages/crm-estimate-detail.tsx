@@ -234,13 +234,21 @@ export default function CrmEstimateDetailPage() {
 
   const send = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/crm/estimates/${id}/send`, {})).json(),
-    onSuccess: (r: any) => {
+    onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${id}`] });
       if (r.emailed) {
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}.` });
       } else {
-        if (r.link) navigator.clipboard?.writeText(window.location.origin + r.link);
-        toast({ title: "Email failed — link copied", description: "Send this link to your client directly.", variant: "destructive" });
+        // Only say "copied" when the clipboard took it; otherwise show the link.
+        // The send route returns an absolute link — resolve, never prefix it.
+        const url = r.link ? new URL(r.link, window.location.origin).toString() : null;
+        let copied = false;
+        if (url) {
+          try { await navigator.clipboard.writeText(url); copied = true; } catch { /* shown below */ }
+        }
+        toast(copied
+          ? { title: "Email failed — link copied", description: "Send this link to your client directly.", variant: "destructive" }
+          : { title: "Email failed", description: url ? `Send this link to your client directly: ${url}` : "Use Copy client link on this page and send it to your client directly.", variant: "destructive" });
       }
     },
     onError: (err: any) => toast({ title: "Could not send", description: apiErrorMessage(err), variant: "destructive" }),

@@ -341,13 +341,18 @@ export function startBackupScheduler(): void {
 
 // ── Routes (owner only, always — admins get 403) ─────────────────────────────
 
-const backupSettingsSchema = z.object({
+export const backupSettingsSchema = z.object({
   enabled: z.boolean(),
   frequency: z.enum(["weekly", "biweekly", "custom"]),
   /** Required when frequency is "custom": days between exports. */
   customDays: z.number().int().min(1).max(90).nullable().optional(),
   format: z.enum(["csv", "xlsx"]),
-  email: z.string().email().max(320),
+  /** Blank/null clears the saved address: exports then go to the org email,
+   *  else the owner's seat (resolveRecipient). A non-blank value must be an email. */
+  email: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+    z.string().trim().email("Enter a valid email address, or leave it blank").max(320).nullable().optional(),
+  ).transform((v) => v ?? null),
 }).refine((v) => v.frequency !== "custom" || (v.customDays ?? 0) >= 1, {
   message: "Choose how many days between exports (1–90).",
 });
@@ -364,10 +369,15 @@ export function registerCrmBackupRoutes(app: Express, getDevUser: GetUser): void
     if (!ctx) return;
     if (!requireOwnerRole(res, ctx)) return;
     const cfg = backupConfigOf(ctx.org.customFields);
+    // Where an export goes when no address is saved — the form shows it, so a
+    // blank "Send to" is never a mystery.
+    const defaultEmail = await resolveRecipient(ctx.org, { ...cfg, email: null });
     res.json({
       ...cfg,
       // The form always shows a concrete address — the one a send would use.
-      email: cfg.email ?? ctx.org.email ?? ctx.member.email,
+      email: cfg.email ?? defaultEmail,
+      configuredEmail: cfg.email,
+      defaultEmail,
     });
   });
 

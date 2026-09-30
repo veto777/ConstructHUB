@@ -499,7 +499,13 @@ export default function CrmAdminPage() {
                 className="h-7 px-2"
                 data-testid="button-copy-beta-link"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(lastLink);
+                  // A denied clipboard must not throw unhandled or tick "copied".
+                  try {
+                    await navigator.clipboard.writeText(lastLink);
+                  } catch {
+                    toast({ title: "Copy failed", description: "Select the link and copy it by hand.", variant: "destructive" });
+                    return;
+                  }
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1500);
                 }}

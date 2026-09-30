@@ -282,6 +282,7 @@ function MyGoogleCalendarCard() {
             </Button>
             <span className="text-xs text-muted-foreground">
               Only appointments assigned to you are synced — into a dedicated calendar in your account.
+              You approve access on Google's page, then come straight back here.
             </span>
           </div>
         )}
@@ -797,7 +798,16 @@ export default function CrmTeamPage() {
                   <div className="flex items-center gap-2 text-sm border rounded-md p-2">
                     <code className="flex-1 truncate text-xs">{lastLink}</code>
                     <Button size="sm" variant="outline" data-testid="button-copy-link"
-                      onClick={() => { navigator.clipboard?.writeText(lastLink); toast({ title: "Link copied" }); }}>
+                      onClick={async () => {
+                        // Only claim the copy when the clipboard actually took it
+                        // (denied permission / insecure context → show the link instead).
+                        try {
+                          await navigator.clipboard.writeText(lastLink);
+                          toast({ title: "Link copied" });
+                        } catch {
+                          toast({ title: "Copy failed", description: lastLink, variant: "destructive" });
+                        }
+                      }}>
                       <Copy className="h-3 w-3 mr-1" /> Copy
                     </Button>
                   </div>

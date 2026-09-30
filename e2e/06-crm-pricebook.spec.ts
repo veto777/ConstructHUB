@@ -57,11 +57,20 @@ test.describe("/crm/pricebook", () => {
     await expect(row).toBeVisible();
     const skuId = (await row.getAttribute("data-testid"))!.replace("pb-item-", "");
 
+    // An open preview re-prices when the SKU's price is edited (Kimi QA: it
+    // kept the pre-edit total until the qty changed).
+    await page.getByTestId(`input-qty-${skuId}`).fill("2");
+    await page.getByTestId(`button-preview-${skuId}`).click();
+    const previewTotal = page.getByTestId(`pb-item-${skuId}`).locator("tr", { hasText: "Total" });
+    await expect(previewTotal).toContainText("$250.00");
+
     await page.getByTestId(`button-edit-item-${skuId}`).click();
     await page.getByTestId("input-item-name").fill(`E2E SKU ${stamp} v2`);
+    await page.getByTestId("input-item-flat-price").fill("150");
     await page.getByTestId("button-save-item").click();
     await expect(page.getByText("SKU updated", { exact: true })).toBeVisible();
     await expect(page.getByTestId(`pb-item-${skuId}`)).toContainText(`E2E SKU ${stamp} v2`);
+    await expect(previewTotal).toContainText("$300.00");
 
     await page.getByTestId(`button-delete-item-${skuId}`).click(); // confirm auto-accepted
     await expect(page.getByText("SKU deleted", { exact: true })).toBeVisible();

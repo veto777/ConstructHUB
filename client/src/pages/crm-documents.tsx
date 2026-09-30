@@ -316,11 +316,24 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
 
       <Card>
         <CardContent className="p-4 sm:p-5 space-y-4">
-          {/* Status checkboxes — multi-select, they combine (OR). */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="filter-statuses">
+          {/* Status checkboxes — multi-select, they combine (OR). No status
+              ticked means no status filter, so "All" says so explicitly (and
+              ticking it clears the others) — the boxes always match the list. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="filter-statuses"
+            role="group" aria-label="Status">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Status
             </span>
+            <label className="inline-flex items-center gap-1.5 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                data-testid="filter-status-all"
+                checked={selected.size === 0}
+                onChange={() => setSelected(new Set())}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+              All
+            </label>
             {cfg.statuses.map((s) => (
               <label
                 key={s.key}

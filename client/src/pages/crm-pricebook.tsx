@@ -236,6 +236,11 @@ export default function CrmPriceBookPage() {
   const invalidate = () => {
     ["items", "materials", "labor-rates"].forEach((k) =>
       queryClient.invalidateQueries({ queryKey: [`/api/crm/pricebook/${k}`] }));
+    // SKU previews are priced from those same items, materials and labor
+    // rates — re-price them too, or an open preview keeps the pre-edit total.
+    queryClient.invalidateQueries({
+      predicate: (q) => /^\/api\/crm\/pricebook\/items\/[^/]+\/preview$/.test(String(q.queryKey[0])),
+    });
   };
   /** onError for every write: the server's own words, not its raw JSON. */
   const fail = (title: string) => (e: any) =>

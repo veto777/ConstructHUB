@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { apiIssueMessage } from "@/lib/api-issue-message";
 import { marketingUrl } from "@/lib/site";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
@@ -602,11 +603,22 @@ export default function CrmSettingsPage() {
       frequency: b.frequency === "biweekly" || b.frequency === "custom" ? b.frequency : "weekly",
       customDays: b.customDays ? String(b.customDays) : "",
       format: b.format === "xlsx" ? "xlsx" : "csv",
-      email: b.email ?? org.email ?? me?.member?.email ?? "",
+      // Only the saved address — blank means "the default recipient" below.
+      email: typeof b.email === "string" ? b.email : "",
     });
     // Only re-seed the form when the org itself changes, not on every save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org?.id]);
+  // Where a blank "Send to" delivers (org email, else the owner's seat) —
+  // resolved by the server exactly as a send resolves it. Keyed on the
+  // company email (editable above), which feeds that default.
+  const { data: backupSettings } = useQuery<{ defaultEmail: string | null }>({
+    queryKey: ["/api/crm/backups/settings", org?.email ?? null],
+    queryFn: async () => (await apiRequest("GET", "/api/crm/backups/settings")).json(),
+    enabled: isOwner && !!org,
+  });
+  const backupDefaultEmail = backupSettings?.defaultEmail ?? null;
+  const backupEmailMissing = !backupForm.email.trim() && !backupDefaultEmail;
 
   const saveBackup = useMutation({
     mutationFn: async () =>
@@ -619,9 +631,10 @@ export default function CrmSettingsPage() {
       })).json(),
     onSuccess: () => {
       invalidateOrg();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/backups/settings"] });
       toast({ title: "Export settings saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save export settings", description: apiErrorMessage(e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save export settings", description: apiIssueMessage(e, { email: "Send to" }), variant: "destructive" }),
   });
 
   const sendBackupNow = useMutation({
@@ -1683,17 +1696,25 @@ export default function CrmSettingsPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="backup-email">Send to</Label>
                 <Input id="backup-email" type="email" className="w-64"
-                  data-testid="input-backup-email" placeholder="you@company.com"
+                  data-testid="input-backup-email" placeholder={backupDefaultEmail ?? "you@company.com"}
                   value={backupForm.email}
                   onChange={(e) => setBackupForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
               <Button onClick={() => saveBackup.mutate()}
-                disabled={saveBackup.isPending || !backupForm.email.trim()}
+                disabled={saveBackup.isPending || (backupForm.enabled && backupEmailMissing)}
                 data-testid="button-save-backup">
                 {saveBackup.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Save export settings
               </Button>
             </div>
+            {backupSettings && (
+              <p className={`text-xs ${backupEmailMissing ? "text-destructive" : "text-muted-foreground"}`}
+                data-testid="text-backup-email-hint">
+                {backupDefaultEmail
+                  ? `Leave "Send to" blank to send exports to ${backupDefaultEmail}.`
+                  : `Add a "Send to" address — there's no company or owner email to send exports to.`}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-3 border-t pt-4">
               <Button variant="outline" onClick={() => sendBackupNow.mutate()}
                 disabled={sendBackupNow.isPending}
@@ -1964,9 +1985,15 @@ export default function CrmSettingsPage() {
               <Input readOnly value={calFeed?.url ?? ""} data-testid="input-calendar-feed-url"
                 onFocus={(e) => e.target.select()} />
               <Button size="sm" variant="outline" className="shrink-0" data-testid="button-copy-calendar-feed"
-                onClick={() => {
-                  if (calFeed?.url) navigator.clipboard?.writeText(calFeed.url).catch(() => {});
-                  toast({ title: "Copied" });
+                disabled={!calFeed?.url}
+                onClick={async () => {
+                  if (!calFeed?.url) return;
+                  try {
+                    await navigator.clipboard.writeText(calFeed.url);
+                    toast({ title: "Copied" });
+                  } catch {
+                    toast({ title: "Copy failed", description: "Select the feed URL and copy it by hand.", variant: "destructive" });
+                  }
                 }}>
                 <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
               </Button>

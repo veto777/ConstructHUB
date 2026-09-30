@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import {
   Check, Crown, Zap, Shield, Star, Loader2, ExternalLink,
   Search, Camera, BarChart3, Building2, Clock, Users,
@@ -111,7 +111,7 @@ export default function PricingPage() {
       if (data.url) window.location.href = data.url;
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -124,7 +124,7 @@ export default function PricingPage() {
       if (data.url) window.location.href = data.url;
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 

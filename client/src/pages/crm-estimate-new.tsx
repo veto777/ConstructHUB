@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,6 +128,25 @@ function writeDraft(draft: SavedDraft | null) {
   } catch { /* storage blocked — the builder just won't survive a reload */ }
 }
 
+/**
+ * Whether step 1's Back can return to the previous page without leaving the
+ * app. `history.length` can't tell: a fresh tab or an embedded webview may
+ * hold a blank entry behind this page, and history.back() would land there.
+ * The Navigation API lists only same-origin entries, so an entry before ours
+ * is a page of this app. Without that API, Back goes to the Estimates list.
+ */
+function canStepBackInApp(): boolean {
+  try {
+    const nav = (window as any).navigation;
+    const idx = nav?.currentEntry?.index;
+    if (typeof idx !== "number" || idx < 1) return false;
+    const prev = nav.entries?.()?.[idx - 1];
+    return !!prev?.url && new URL(prev.url).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 interface DoneState {
   id?: string;
   sent: boolean;
@@ -142,6 +161,7 @@ interface DoneState {
 
 export default function CrmEstimateNewPage() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   // Read once: a reload lands back on the same step with the same cart.
   const [restored] = useState(readDraft);
   const [step, setStep] = useState<1 | 2 | 3>(restored?.step ?? 1);
@@ -455,7 +475,8 @@ export default function CrmEstimateNewPage() {
           onClick={() => {
             if (step === 3) setStep(2);
             else if (step === 2) setStep(1);
-            else if (window.history.length > 1) window.history.back();
+            else if (canStepBackInApp()) window.history.back();
+            else navigate("/crm/estimates");
           }}
           aria-label="Back"
         >

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// The Stripe SDK is mocked, but server/stripe.ts refuses to build a client
+// without a key (PaymentsNotConfiguredError → 503). Any value will do here.
+process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_mocked_stripe";
 // Server-side guard for cart checkout: a crafted or stale cart must not pay
 // twice for the same service (a duplicate item, or a bundle plus one of the
 // parts it already includes). Stripe and the database are mocked.

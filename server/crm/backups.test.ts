@@ -23,7 +23,7 @@ import type { BackupSection } from "./backups";
 
 const {
   backupConfigOf, isBackupDue, csvCell, toCsv, toSpreadsheetXml,
-  centsToDollars, buildAttachments,
+  centsToDollars, buildAttachments, backupSettingsSchema,
 } = await import("./backups");
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
@@ -197,6 +197,40 @@ describe("backup due calculation", () => {
     expect(c.format).toBe("csv");
     expect(backupConfigOf(null).enabled).toBe(false);
     expect(backupConfigOf(undefined).lastSentAt).toBe(null);
+  });
+});
+
+// ── Pure: the settings body (PUT /api/crm/backups/settings) ─────────────────────
+
+describe("backup settings schema", () => {
+  const base = { enabled: false, frequency: "weekly", format: "csv" } as const;
+
+  it("a blank or missing Send-to clears the saved address (→ default recipient)", () => {
+    // Kimi QA: once set, the address could never be removed.
+    for (const email of ["", "   ", null, undefined]) {
+      const r = backupSettingsSchema.safeParse({ ...base, email });
+      expect(r.success, `email=${JSON.stringify(email)}`).toBe(true);
+      if (r.success) expect(r.data.email).toBeNull();
+    }
+    const omitted = backupSettingsSchema.safeParse(base);
+    expect(omitted.success && omitted.data.email).toBeNull();
+  });
+
+  it("keeps a real address (trimmed) and rejects a malformed one with a field message", () => {
+    const ok = backupSettingsSchema.safeParse({ ...base, email: "  owner@example.com " });
+    expect(ok.success && ok.data.email).toBe("owner@example.com");
+
+    const bad = backupSettingsSchema.safeParse({ ...base, email: "not-an-email" });
+    expect(bad.success).toBe(false);
+    if (!bad.success) {
+      expect(bad.error.issues[0].path).toEqual(["email"]);
+      expect(bad.error.issues[0].message).toBe("Enter a valid email address, or leave it blank");
+    }
+  });
+
+  it("custom frequency still needs its day count", () => {
+    expect(backupSettingsSchema.safeParse({ ...base, frequency: "custom", email: "" }).success).toBe(false);
+    expect(backupSettingsSchema.safeParse({ ...base, frequency: "custom", customDays: 3, email: "" }).success).toBe(true);
   });
 });
 
