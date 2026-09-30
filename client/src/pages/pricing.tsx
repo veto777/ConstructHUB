@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
+import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 
 const PLAN_ICONS: Record<string, any> = {
   standard: Zap,
@@ -60,6 +61,23 @@ const PLAN_CHECK_COLORS: Record<string, string> = {
   platinum: "text-yellow-500",
 };
 
+/** Bring a section to the top of whatever scrolls it: the app's own pane when
+ *  signed in (scrollIntoView would also scroll the window and push the top bar
+ *  out of view), the window when signed out. Either way the section's
+ *  scroll-margin is the gap left above it (clear of the signed-out sticky
+ *  header), the same gap the sidebar's own fragment scroll leaves. */
+function scrollToSection(el: HTMLElement) {
+  let pane = el.parentElement;
+  while (pane && !(pane.scrollHeight > pane.clientHeight && /(auto|scroll)/.test(getComputedStyle(pane).overflowY))) {
+    pane = pane.parentElement;
+  }
+  const gap = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+  if (pane) pane.scrollTop += el.getBoundingClientRect().top - pane.getBoundingClientRect().top - gap;
+  else el.scrollIntoView({ block: "start" });
+}
+
+const LOCATION_EVENTS = ["pushState", "replaceState", "popstate", "hashchange"] as const;
+
 export default function PricingPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -67,11 +85,11 @@ export default function PricingPage() {
   const success = params.get("success");
   const canceled = params.get("canceled");
 
-  const { data: plans } = useQuery<Record<string, { name: string; price: number; features: string[] }>>({
+  const { data: plans, isPending: plansPending } = useQuery<Record<string, { name: string; price: number; features: string[] }>>({
     queryKey: ["/api/stripe/plans"],
   });
 
-  const { data: subscription } = useQuery<{
+  const { data: subscription, isPending: subscriptionPending } = useQuery<{
     plan: string;
     status: string;
     currentPeriodEnd?: string;
@@ -123,7 +141,40 @@ export default function PricingPage() {
   const currentPlan = subscription?.plan || "free";
   const isActive = subscription?.status === "active";
 
+  // Deep links such as /pricing#done-for-you (the landing hero, the sidebar's
+  // "SEO Services", the empty cart's "Services") land on that section. The
+  // browser's own hash jump misses it: the page mounts behind the sign-in
+  // check, the plan cards above the section only render once the plans load,
+  // and an in-app link changes the URL without a page load. So jump once the
+  // plans and subscription have settled (loaded or failed), and again on each
+  // later in-app navigation to a hash on this page — never on a refetch, so a
+  // visitor who has scrolled away is not yanked back.
+  const [navCount, setNavCount] = useState(0);
+  useEffect(() => {
+    const bump = () => setNavCount((n) => n + 1);
+    LOCATION_EVENTS.forEach((e) => window.addEventListener(e, bump));
+    return () => LOCATION_EVENTS.forEach((e) => window.removeEventListener(e, bump));
+  }, []);
+  const hashHandledFor = useRef(-1);
+  const pageSettled = !plansPending && !subscriptionPending;
+  useEffect(() => {
+    if (!pageSettled || hashHandledFor.current === navCount) return;
+    let id = "";
+    try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
+    if (!id) return;
+    const frame = requestAnimationFrame(() => {
+      hashHandledFor.current = navCount;
+      const el = document.getElementById(id);
+      if (el) scrollToSection(el);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pageSettled, navCount]);
+
   return (
+    <>
+    {/* Signed out, this page has no app frame: the header brings the way home,
+        sign-in and the cart the Add to Cart buttons below fill. */}
+    <PublicPageHeader next="/pricing" cart />
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         <div className="text-center space-y-2">
@@ -271,7 +322,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <div id="comparison" className="border-t border-border/50 pt-12 mt-8 space-y-6">
+        <div id="comparison" className="border-t border-border/50 pt-12 mt-8 space-y-6 scroll-mt-16">
           <div className="text-center space-y-3">
             <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 px-3 py-1">
               <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
@@ -422,7 +473,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <div id="done-for-you" className="border-t border-border/50 pt-12 mt-8 space-y-8">
+        <div id="done-for-you" className="border-t border-border/50 pt-12 mt-8 space-y-8 scroll-mt-16">
           <div className="text-center space-y-3">
             <Badge className="bg-[#F97316]/10 text-[#F97316] border-[#F97316]/20 px-3 py-1">
               <Briefcase className="w-3.5 h-3.5 mr-1.5" />
@@ -832,6 +883,8 @@ export default function PricingPage() {
           </Card>
         </div>
       </div>
+      <PublicPageFooter />
     </div>
+    </>
   );
 }

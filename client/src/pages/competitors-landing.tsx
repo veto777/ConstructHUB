@@ -465,34 +465,37 @@ export default function CompetitorsLandingPage() {
             </p>
           </div>
           <div className="space-y-5">
+            {/* Every tool lives in the Intel dashboard (Gold & Platinum); signed out,
+                a card starts sign-up — the same targets as the hero CTA. */}
             {tools.map((tool, i) => (
-              <Card
-                key={tool.title}
-                className={`group bg-muted/50 dark:bg-white/[0.02] ${tool.border} hover:border-border dark:hover:border-white/[0.12] p-6 transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm cursor-pointer animate-in-delay-${Math.min(i + 1, 5)}`}
-                data-testid={`card-tool-${i}`}
-              >
-                <div className="flex flex-col sm:flex-row items-start gap-5">
-                  <div className={`h-14 w-14 rounded-xl bg-gradient-to-br ${tool.gradient} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
-                    <tool.icon className="h-7 w-7 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <h3 className="text-lg font-semibold">{tool.title}</h3>
-                      <Badge className={`${tool.badgeColor} text-[10px] px-2 py-0`}>{tool.badge}</Badge>
+              <Link key={tool.title} href={user ? "/competitors" : "/auth?mode=signup"} className="block rounded-xl" data-testid={`link-tool-${i}`}>
+                <Card
+                  className={`group bg-muted/50 dark:bg-white/[0.02] ${tool.border} hover:border-border dark:hover:border-white/[0.12] p-6 transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm cursor-pointer animate-in-delay-${Math.min(i + 1, 5)}`}
+                  data-testid={`card-tool-${i}`}
+                >
+                  <div className="flex flex-col sm:flex-row items-start gap-5">
+                    <div className={`h-14 w-14 rounded-xl bg-gradient-to-br ${tool.gradient} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                      <tool.icon className="h-7 w-7 text-white" />
                     </div>
-                    <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mb-3">{tool.description}</p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {tool.features.map(f => (
-                        <div key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground dark:text-white/50">
-                          <CheckCircle2 className="h-3 w-3 text-yellow-400 shrink-0" />
-                          {f}
-                        </div>
-                      ))}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <h3 className="text-lg font-semibold">{tool.title}</h3>
+                        <Badge className={`${tool.badgeColor} text-[10px] px-2 py-0`}>{tool.badge}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mb-3">{tool.description}</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {tool.features.map(f => (
+                          <div key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground dark:text-white/50">
+                            <CheckCircle2 className="h-3 w-3 text-yellow-400 shrink-0" />
+                            {f}
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground dark:text-white/20 group-hover:text-foreground/60 dark:group-hover:text-white/60 group-hover:translate-x-1 transition-all mt-1 shrink-0 hidden sm:block" />
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground dark:text-white/20 group-hover:text-foreground/60 dark:group-hover:text-white/60 group-hover:translate-x-1 transition-all mt-1 shrink-0 hidden sm:block" />
-                </div>
-              </Card>
+                </Card>
+              </Link>
             ))}
           </div>
         </div>
