@@ -149,6 +149,16 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  "delete-location": {
+    title: "Delete this location from ConstructHUB",
+    body: [
+      "This only removes the location from ConstructHUB. It does not delete, close or change your listing on Google Business Profile — your Google listing, its reviews and its photos stay exactly as they are.",
+      "What goes away is ConstructHUB's copy: the synced reviews and stats stored here, Profile Guard settings and history, AI reply settings, scheduled posts and photos, and citation campaigns for this location.",
+      "Changed your mind later? You can bring the location back with Add Location(s) → Import from GBP. Its ConstructHUB history won't come back, but everything on Google re-syncs.",
+      "To remove a listing from Google itself, do that in Google Business Profile — ConstructHUB never deletes Google listings.",
+    ],
+  },
+
   "quick-bid": {
     title: "Quick Bid",
     body: [

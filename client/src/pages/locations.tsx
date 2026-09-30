@@ -1,5 +1,6 @@
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection, GbpLinkCell } from "@/components/gbp-connection";
+import { InfoTip } from "@/components/info-tip";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -873,8 +874,11 @@ function SettingsTab({ location }: { location: BusinessLocation }) {
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-destructive">Delete Location</p>
-              <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm font-medium text-destructive">Delete Location</p>
+                <InfoTip k="delete-location" />
+              </div>
+              <p className="text-xs text-muted-foreground">Removes it from ConstructHUB only — your Google Business Profile listing is not affected. This cannot be undone.</p>
             </div>
             <Button
               variant="destructive"
