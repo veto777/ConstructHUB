@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
 const selectClass = "border rounded-md p-2 bg-background";
+// Mirrors the server's domainName check (server/domains/types.ts).
+const domainPattern = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 export default function DomainsPage() {
   const [q, setQ] = useState(""),
     [page, setPage] = useState(1),
@@ -19,6 +21,7 @@ export default function DomainsPage() {
     [key, setKey] = useState(""),
     [secret, setSecret] = useState(""),
     [manual, setManual] = useState(""),
+    [manualError, setManualError] = useState(""),
     [ns, setNs] = useState("");
   const [kind, setKind] = useState("create"),
     [type, setType] = useState("A"),
@@ -210,23 +213,44 @@ export default function DomainsPage() {
             className="flex gap-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (
-                await act("/manual", {
-                  domains: manual.split(/[\s,]+/).filter(Boolean),
-                })
-              )
-                setManual("");
+              // Checked here so blank or malformed entries are named without a round trip.
+              const domains = manual.split(/[\s,]+/).filter(Boolean);
+              const invalid = domains.filter(
+                (d) => d.length > 253 || !domainPattern.test(d.toLowerCase()),
+              );
+              if (!domains.length || invalid.length || domains.length > 100) {
+                setManualError(
+                  !domains.length
+                    ? "Enter at least one domain, like example.com."
+                    : invalid.length
+                      ? `Not a valid domain name: ${invalid.slice(0, 5).join(", ")}${invalid.length > 5 ? ` and ${invalid.length - 5} more` : ""}. Use the bare domain, like example.com.`
+                      : "Add up to 100 domains at a time.",
+                );
+                return;
+              }
+              setManualError("");
+              if (await act("/manual", { domains })) setManual("");
             }}
           >
             <Input
               aria-label="Manual domains"
               placeholder="example.com, client.example"
               value={manual}
-              onChange={(e) => setManual(e.target.value)}
+              onChange={(e) => {
+                setManual(e.target.value);
+                setManualError("");
+              }}
+              aria-invalid={!!manualError}
+              aria-describedby={manualError ? "manual-domains-error" : undefined}
               required
             />
             <Button disabled={busy}>Add domains</Button>
           </form>
+          {manualError && (
+            <p id="manual-domains-error" role="alert" className="mt-2 text-sm text-destructive">
+              {manualError}
+            </p>
+          )}
         </CardContent>
       </Card>
       <Card>

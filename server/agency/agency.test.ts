@@ -81,6 +81,27 @@ describe('Agency access and 5,000-location scale',()=>{
       await middleware({path,method:'GET',user:{id:member},session:{agencyOwner:owner}},res,()=>{next=true;});expect(status).toBe(want);expect(next).toBe(want===200);if(next)expect(res.locals.agencyOwner).toBe(owner);
     }
   });
+  it('leaves the owner\'s per-business Social workbench to the Social routes and never answers a business with mixed posts',async()=>{
+    const social=async(actor:number,query:any)=>{
+      let status=200,data:any,next=false;const res:any={locals:{},status(n:number){status=n;return res;},json(v:any){data=v;return res;}};
+      await middleware({path:'/api/social',method:'GET',query,user:{id:actor},session:{agencyOwner:owner}},res,()=>{next=true;});return {status,data,next};
+    };
+    // Owner: the workbench (with or without a business) is served by server/social/routes.ts.
+    for(const query of [{businessId:'99999'},{businessId:String(loc)},{}]) expect((await social(owner,query)).next,JSON.stringify(query)).toBe(true);
+    // An explicit agency client filter still gets the agency list.
+    const filtered=await social(owner,{clientId:String(client)});expect(filtered.next).toBe(false);expect(filtered.data.total).toBe(1000);
+    // Delegated members keep the agency list; a business-scoped request is not answered with every client's posts.
+    expect((await social(member,{})).data.total).toBe(1000);
+    const scoped=await social(member,{businessId:String(loc)});expect(scoped.next).toBe(false);expect(scoped.status).toBe(404);
+  });
+  it('names the field a rejected agency form is missing instead of a generic "Invalid input"',async()=>{
+    expect((await call('post','/api/agency/clients',owner,{name:'  '})).data).toEqual({message:'Enter a name (1 to 200 characters).'});
+    expect((await call('put','/api/agency/team',owner,{email:'',role:'viewer'})).data.message).toBe('Enter the email address of a registered ConstructHUB user.');
+    const noAccount=await call('post','/api/agency/onboarding',owner,{clientId:client,subject:'',businessName:'Fixture',address:'1 Main St'});
+    expect(noAccount.status).toBe(400);expect(noAccount.data.message).toMatch(/connect the agency Google account first/);
+    // Refinements written for people pass through unchanged.
+    expect((await call('post','/api/agency/onboarding',owner,{clientId:client,subject:'agency',businessName:'Fixture'})).data.message).toBe('Provide an address or Place ID');
+  });
   it('freezes select-all matching scope, deduplicates requests and rechecks permissions at execution',async()=>{
     const a=await accessFor(member,owner),requestKey=crypto.randomUUID();
     const b={requestKey,action:'assign',selection:{allMatching:true,filters:{q:'fixture 00'}},payload:{clientId:client}};
