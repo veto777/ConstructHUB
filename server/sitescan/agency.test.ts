@@ -58,6 +58,11 @@ beforeAll(async () => {
     ],
   );
   [user, other] = rows.map((r) => r.id);
+  // Site Scans come from the plan's monthly allowance: Agency includes one per location.
+  await pool.query(
+    "INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'agency','active'),($2,'agency','active')",
+    [user, other],
+  );
   ids = (
     await pool.query(
       `INSERT INTO business_locations(user_id,business_name,website,gbp_location_name)
@@ -89,7 +94,17 @@ afterAll(async () => {
   ]);
   await pool.query("DELETE FROM users WHERE id=ANY($1)", [[user, other]]);
   await pool.query("DELETE FROM growth_budgets WHERE key=ANY($1)", [
-    [`sitescan:bulk:${user}`, `sitescan:email:${user}`],
+    [`sitescan:bulk:${user}`, `sitescan:email:${user}`, `sitescan:bulk:${other}`],
+  ]);
+  await pool.query(
+    "DELETE FROM growth_budgets WHERE key LIKE ANY($1)",
+    [[`quota:user:${user}:%`, `quota:user:${other}:%`]],
+  );
+  await pool.query("DELETE FROM sitescan_jobs WHERE user_id=ANY($1)", [
+    [user, other],
+  ]);
+  await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1)", [
+    [user, other],
   ]);
   await pool.end();
 });
@@ -151,10 +166,49 @@ it("paginates/searches 1,000 owned locations and queues the whole agency in one 
     { locationId: ids[0] },
   );
   expect(scoped.body.total).toBe(1);
+  // 1,000 locations = 1,000 Site Scans a month on Agency, all used by the bulk run above.
+  const monthly = await call("post", "/api/sitescan/bulk", {
+    locationIds: [ids[0]],
+  });
+  expect(monthly.status).toBe(403);
+  expect(monthly.body).toMatchObject({
+    code: "limit_reached",
+    feature: "siteScans",
+    limit: 1000,
+  });
+  expect(monthly.body.message).toContain("1,000 Site Scans");
+  // The daily agency queue budget still applies, and a refused bulk gives its monthly scans back.
+  const [own] = (
+    await pool.query(
+      "INSERT INTO business_locations(user_id,business_name,website,gbp_location_name) VALUES($1,'Agency fixture other','https://agency-fixture.test/other','locations/agency-fixture-other') RETURNING id",
+      [other],
+    )
+  ).rows.map((r) => r.id);
+  await pool.query(
+    "INSERT INTO gbp_sync_status(location_id,kind,last_success,profile_snapshot) VALUES($1,'profile',now(),jsonb_build_object('business_name','Agency fixture other','website','https://agency-fixture.test/other'))",
+    [own],
+  );
+  await pool.query(
+    "INSERT INTO growth_budgets(key,period,used) VALUES($1,$2,1000)",
+    [`sitescan:bulk:${other}`, String(Math.floor(Date.now() / 86400000))],
+  );
   expect(
-    (await call("post", "/api/sitescan/bulk", { locationIds: [ids[0]] }))
-      .status,
+    (
+      await call(
+        "post",
+        "/api/sitescan/bulk",
+        { locationIds: [own] },
+        {},
+        {},
+        other,
+      )
+    ).status,
   ).toBe(429);
+  const { rows: quota } = await pool.query(
+    "SELECT used FROM growth_budgets WHERE key LIKE $1",
+    [`quota:user:${other}:siteScans:%`],
+  );
+  expect(quota.map((r) => Number(r.used))).toEqual([0]);
   await pool.query(
     "UPDATE sitescan_jobs SET status='failed' WHERE user_id=$1",
     [user],

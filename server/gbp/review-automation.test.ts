@@ -20,8 +20,11 @@ beforeAll(async()=>{
   await ensureGbpSchema();await ensureAccountEventsSchema();await ensureProfileGuardSchema();
   const {rows}=await pool.query("INSERT INTO users(email) VALUES('ai-'||gen_random_uuid()||'@example.invalid'),('ai-'||gen_random_uuid()||'@example.invalid') RETURNING id");[user,other]=rows.map(r=>r.id);
   id=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name) VALUES($1,'AI fixture','accounts/ai','locations/ai') RETURNING id",[user])).rows[0].id;
+  // Automatic publishing is a plan feature (Pro and up): the queue tests run on a Pro account.
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'pro','active')",[user]);
 });
-afterAll(async()=>{await pool.query('DELETE FROM google_profile_reviews WHERE user_id=$1',[user]);await pool.query('DELETE FROM business_locations WHERE user_id=$1',[user]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[user,other]]);await pool.end();});
+const planUsers:number[]=[];
+afterAll(async()=>{const all=[user,other,...planUsers];await pool.query('DELETE FROM google_profile_reviews WHERE user_id=ANY($1)',[all]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[all]);await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1)',[all]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[all]);await pool.end();});
 describe('AI reply settings and queue with injected AI/publisher',()=>{
   it('defaults to off and low rating drafts; rejects unsafe settings',()=>{
     expect(defaults.mode).toBe('off');expect(shouldAutoPublish({...defaults,mode:'auto'},2)).toBe(false);expect(shouldAutoPublish({...defaults,mode:'auto'},5)).toBe(true);expect(shouldAutoPublish({...defaults,mode:'auto',allowLowRatingAuto:true},1)).toBe(true);
@@ -124,5 +127,33 @@ describe('AI reply settings and queue with injected AI/publisher',()=>{
     const report=await reportFor(user,'reviews',r);
     expect(report.text).toContain('Business: Not linked to an imported listing');expect(report.text).toContain('Local record (not verified on Google)');expect(report.text).toContain('Manual review text');expect(report.listingUrl).toBeNull();
     await expect(reportFor(other,'reviews',r)).rejects.toMatchObject({status:404});
+  });
+});
+describe('AI replies follow the plan (shared/plans.ts autoPublishAiReplies)',()=>{
+  it('drafts only on a plan without automatic publishing, and does no AI work without a plan',async()=>{
+    const {rows:[u]}=await pool.query("INSERT INTO users(email) VALUES('ai-plan-'||gen_random_uuid()||'@example.invalid') RETURNING id");planUsers.push(u.id);
+    await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active')",[u.id]);
+    const loc=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name) VALUES($1,'AI plan fixture','accounts/ai-plan','locations/ai-plan') RETURNING id",[u.id])).rows[0].id;
+    const review=async()=>(await pool.query(`INSERT INTO google_profile_reviews(user_id,location_id,google_review_id,reviewer_name,rating,comment,review_date)
+      VALUES($1,$2,'accounts/ai-plan/locations/ai-plan/reviews/'||gen_random_uuid(),'AI plan fixture',5,'Great work',now()) RETURNING id`,[u.id,loc])).rows[0].id;
+    await review();await notifyNewReviews(u.id,loc);
+    // An 'auto' mode saved on Starter (e.g. before a downgrade) keeps drafting.
+    await saveReplySettings(u.id,loc,{...defaults,mode:'auto',scope:'existing'});
+    const preview=await previewBackfill(u.id,loc);expect(preview.reviews.map(r=>r.action)).toEqual(['draft for approval']);
+    const fresh=await review();await notifyNewReviews(u.id,loc);
+    const gen=vi.fn(async()=> 'Thank you for the kind words.'),pub=vi.fn(async()=>({replyStatus:'posted'}));
+    await processReplies(u.id,loc,gen,pub as any);
+    expect(gen).toHaveBeenCalledTimes(1);expect(pub).not.toHaveBeenCalled();
+    expect((await state(fresh)).ai_status).toBe('draft');
+    // Pro publishes the same review type automatically.
+    await pool.query("UPDATE subscriptions SET plan='pro' WHERE user_id=$1",[u.id]);
+    const proReview=await review();await notifyNewReviews(u.id,loc);
+    await processReplies(u.id,loc,gen,pub as any);
+    expect(pub).toHaveBeenCalledTimes(1);expect((await state(proReview)).ai_status).toBe('posted');
+    // A lapsed plan stops AI work entirely.
+    await pool.query("UPDATE subscriptions SET status='canceled' WHERE user_id=$1",[u.id]);
+    const lapsed=await review();await notifyNewReviews(u.id,loc);
+    await processReplies(u.id,loc,gen,pub as any);
+    expect(gen).toHaveBeenCalledTimes(2);expect((await state(lapsed)).ai_status).toBeNull();
   });
 });

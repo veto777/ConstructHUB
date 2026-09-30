@@ -26,8 +26,6 @@ import {
   crmNotificationChannel,
   crmNotifications,
   crmSmsOptouts,
-  subscriptions,
-  users,
   type CrmNotificationPref,
 } from "@shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -35,7 +33,8 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl } from "../site-context";
-import { isPlatformAdminEmail } from "../admin";
+import { getEntitlements } from "../entitlements";
+import { PLANS, PLAN_KEYS, type PlanKey, type PlanLimits } from "@shared/plans";
 import { logEvent, presentEstimate } from "./entities";
 
 type GetUser = (req: any, res: any) => any;
@@ -77,30 +76,38 @@ export function smsStatus(orgCustomFields?: unknown) {
 
 // ── Plan entitlement ────────────────────────────────────────────────────────
 
-/** Texting (client texts, reminders, alert texts) is a Premium-and-up feature. */
-export const SMS_PLANS: ReadonlySet<string> = new Set(["premium", "gold", "platinum"]);
+/** Texting (client texts, reminders, alert texts) comes with plans that include
+ *  team text alerts or client texting (shared/plans.ts): Pro, Growth, Agency. */
+export const planIncludesTexting = (l: PlanLimits) => l.teamTextSegments !== 0 || l.clientTexting !== "none";
+const TEXTING_PLANS = PLAN_KEYS.filter((k) => planIncludesTexting(PLANS[k].limits));
+/** The cheapest plan with texting, for the 402 upgrade prompt. */
+export const SMS_REQUIRED_PLAN: PlanKey = TEXTING_PLANS[0] ?? PLAN_KEYS[PLAN_KEYS.length - 1];
+const listNames = (names: string[]) => names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names.join("");
 export const SMS_NEEDS_PLAN =
-  "Text messaging is included with the Premium, Gold and Platinum plans. Upgrade in Pricing to turn it on.";
+  `Text messaging is included with the ${listNames(TEXTING_PLANS.map((k) => PLANS[k].name))} plans. Upgrade in Pricing to turn it on.`;
+/** The 402 body when an org's plan has no texting. */
+export const smsPlanRequired = () => ({ code: "plan_required", requiredPlan: SMS_REQUIRED_PLAN, message: SMS_NEEDS_PLAN, planAllowsSms: false });
 
 const entitlementCache = new Map<string, { ok: boolean; at: number }>();
 
-/** True when the org owner's ConstructHUB plan includes texting (active or
- *  trialing Premium / Gold / Platinum), or the owner is a platform admin.
- *  Cached for a minute; a lookup failure denies (texts cost money). */
+/** True when the org owner's ConstructHUB plan includes texting (an active or
+ *  trialing plan; legacy Premium / Gold / Platinum map through LEGACY_PLAN_MAP),
+ *  or the owner is a platform admin. Cached for a minute; a lookup failure
+ *  denies (texts cost money). */
 export async function orgSmsEntitled(orgId: string): Promise<boolean> {
   const hit = entitlementCache.get(orgId);
   if (hit && Date.now() - hit.at < 60_000) return hit.ok;
   let ok = false;
   try {
-    const [row] = await db
-      .select({ email: users.email, plan: subscriptions.plan, status: subscriptions.status })
+    const [org] = await db
+      .select({ ownerUserId: crmOrgs.ownerUserId })
       .from(crmOrgs)
-      .innerJoin(users, eq(users.id, crmOrgs.ownerUserId))
-      .leftJoin(subscriptions, eq(subscriptions.userId, crmOrgs.ownerUserId))
       .where(eq(crmOrgs.id, orgId))
       .limit(1);
-    ok = !!row && (isPlatformAdminEmail(row.email) ||
-      (SMS_PLANS.has(row.plan ?? "") && (row.status === "active" || row.status === "trialing")));
+    if (org) {
+      const ent = await getEntitlements(org.ownerUserId);
+      ok = ent.isPlatformAdmin || (!!ent.allowances && planIncludesTexting(ent.allowances));
+    }
   } catch (e: any) {
     console.error("[sms] plan check failed (not sending):", e?.message || e);
     return false;
@@ -624,7 +631,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageIntegrations")) return;
-    if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json({ message: SMS_NEEDS_PLAN, planAllowsSms: false });
+    if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json(smsPlanRequired());
 
     const parsed = z.object({
       mode: z.enum(["platform", "dedicated", "byo"]),
@@ -677,7 +684,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageIntegrations")) return;
-    if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json({ message: SMS_NEEDS_PLAN, planAllowsSms: false });
+    if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json(smsPlanRequired());
 
     if (!smsConfigured()) {
       return res.status(503).json({

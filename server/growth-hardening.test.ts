@@ -20,6 +20,8 @@ let a: string, b: string;
 async function account() {
   const { rows: [user] } = await pool.query("insert into users(email,display_name,email_verified) values($1,'Hardening fixture',true) returning id", [`${randomUUID()}@example.invalid`]);
   users.push(user.id);
+  // Click Guard and review templates are plan features; Growth covers 3 protected websites.
+  await pool.query("insert into subscriptions(user_id,plan,status) values($1,'growth','active')", [user.id]);
   const sid = randomUUID(); sids.push(sid);
   await pool.query("insert into session(sid,sess,expire) values($1,$2,now()+interval '1 hour')", [sid, JSON.stringify({ cookie: { maxAge: 3600000 }, passport: { user: user.id } })]);
   const sig = createHmac("sha256", secret).update(sid).digest("base64").replace(/=+$/, "");
@@ -56,6 +58,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("route hardening (a
     await pool.query("delete from review_requests where user_id=any($1::int[])", [users]);
     await pool.query("delete from review_templates where user_id=any($1::int[])", [users]);
     await pool.query("delete from review_reminder_settings where user_id=any($1::int[])", [users]);
+    await pool.query("delete from subscriptions where user_id=any($1::int[])", [users]);
     await pool.query("delete from users where id=any($1::int[])", [users]);
     await pool.query("delete from session where sid=any($1::text[])", [sids]);
     await pool.end();

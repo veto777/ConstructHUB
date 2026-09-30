@@ -27,7 +27,7 @@ process.env.DATABASE_URL =
 let sendSms: any, resolveSmsSender: any, orgCanTextClients: any, smsStatus: any,
   recordSmsOptout: any, clearSmsOptout: any, isSmsOptedOut: any,
   smsLamlReply: any, signalwireSignatureOk: any, CLIENT_TEXT_NEEDS_OWN_NUMBER: string,
-  SMS_NEEDS_PLAN: string, clearSmsEntitlementCache: any;
+  SMS_NEEDS_PLAN: string, clearSmsEntitlementCache: any, orgSmsEntitled: any, smsPlanRequired: any;
 let placeEmailNudgeCall: any, voiceNudgeOnEstimate: any, emailNudgeTwiml: any;
 
 beforeAll(async () => {
@@ -35,7 +35,7 @@ beforeAll(async () => {
     sendSms, resolveSmsSender, orgCanTextClients, smsStatus,
     recordSmsOptout, clearSmsOptout, isSmsOptedOut,
     smsLamlReply, signalwireSignatureOk, CLIENT_TEXT_NEEDS_OWN_NUMBER,
-    SMS_NEEDS_PLAN, clearSmsEntitlementCache,
+    SMS_NEEDS_PLAN, clearSmsEntitlementCache, orgSmsEntitled, smsPlanRequired,
   } = await import("./sms"));
   ({ placeEmailNudgeCall, voiceNudgeOnEstimate, emailNudgeTwiml } = await import("./voice"));
   // The table is created by the dev server's ensureCrmSchema; create it here
@@ -125,9 +125,11 @@ describe("orgCanTextClients (pure)", () => {
 });
 
 describe("opt-out suppression seam (real test DB)", () => {
-  // Texting is a Premium-and-up feature: orgs A and B belong to a Premium owner,
-  // orgFree to an owner with no plan.
+  // Texting comes with Pro, Growth and Agency (legacy Premium / Gold / Platinum map
+  // onto them): orgs A and B belong to a legacy Premium owner, orgFree to an owner
+  // with no plan, and the rest cover the new plans and the legacy map.
   let orgA = "", orgB = "", orgFree = "";
+  const byPlan: Record<string, string> = {};
   const owners: number[] = [];
   const phone = "+15550199999";
 
@@ -144,6 +146,9 @@ describe("opt-out suppression seam (real test DB)", () => {
     orgA = await org(premium, "vitest-sms-seam-a");
     orgB = await org(premium, "vitest-sms-seam-b");
     orgFree = await org(await mk(null), "vitest-sms-seam-free");
+    for (const plan of ["starter", "pro", "growth", "agency", "standard", "gold", "platinum"]) {
+      byPlan[plan] = await org(await mk(plan), `vitest-sms-plan-${plan}`);
+    }
   });
   afterAll(async () => {
     await pool.query(`delete from crm_orgs where owner_user_id = any($1)`, [owners]);
@@ -151,7 +156,15 @@ describe("opt-out suppression seam (real test DB)", () => {
     await pool.query(`delete from users where id = any($1)`, [owners]);
   });
 
-  it("orgs without a Premium/Gold/Platinum plan cannot text; a lapsed plan stops texting", async () => {
+  it("texting follows the plan: Pro, Growth and Agency, legacy plans through the map", async () => {
+    clearSmsEntitlementCache();
+    const entitled = Object.fromEntries(await Promise.all(Object.entries(byPlan).map(async ([plan, id]) => [plan, await orgSmsEntitled(id)])));
+    expect(entitled).toEqual({ starter: false, pro: true, growth: true, agency: true, standard: false, gold: true, platinum: true });
+    expect(SMS_NEEDS_PLAN).toBe("Text messaging is included with the Pro, Growth and Agency plans. Upgrade in Pricing to turn it on.");
+    expect(smsPlanRequired()).toEqual({ code: "plan_required", requiredPlan: "pro", message: SMS_NEEDS_PLAN, planAllowsSms: false });
+  });
+
+  it("orgs without a texting plan cannot text; a lapsed plan stops texting", async () => {
     await withSwEnv({}, async () => {
       const refused = await sendSms(phone, "hello", undefined, orgFree);
       expect(refused.ok).toBe(false);

@@ -1,29 +1,182 @@
+/**
+ * Monthly plan quotas (permit searches, ranking-grid credits, Site Scans,
+ * Competitor Intel scans) read from shared/plans.ts through server/entitlements.
+ * No active plan means no quota: the caller gets the 402 plan_required body,
+ * never a silent fallback plan. Quotas belong to the paying account — an agency
+ * member acting in the owner's workspace spends the owner's allowance.
+ *
+ * Reservations are atomic (growth_budgets) and refundable when the work never ran.
+ */
 import type { Request, Response } from "express";
-import { PLANS } from "./stripe";
 import { pool } from "./db";
-import { actorKey, takeBudget } from "./growth-limits";
-export type MeteredFeature = "photos" | "searches" | "rankings";
-export function planLimit(plan: string, feature: MeteredFeature): number {
-  return (PLANS[plan as keyof typeof PLANS] || PLANS.standard).limits[feature];
-}
-export async function reserveMonthlyQuota(req: Request, res: Response, feature: MeteredFeature, amount = 1): Promise<boolean> {
-  const { rows } = req.user ? await pool.query("select plan,status from subscriptions where user_id=$1 limit 1", [req.user.id]) : { rows: [] };
-  const subscription = rows[0];
-  const plan = subscription && ["active", "trialing"].includes(subscription.status) ? subscription.plan : "standard";
-  const limit = planLimit(plan, feature);
-  const month = new Date().toISOString().slice(0, 7);
-  const key = `quota:${actorKey(req)}:${feature}:${month}`;
-  const allowed = await takeBudget(key, limit === -1 ? 2147483647 : limit, amount, Number.MAX_SAFE_INTEGER);
-  if (allowed) { res.locals ||= {}; res.locals.growthQuota = { key, remaining: amount }; }
-  if (!allowed) res.status(403).json({ message: `Monthly ${feature} limit reached (${limit}). Your quota resets next calendar month.`, limit, feature });
-  return allowed;
+import { takeBudget } from "./growth-limits";
+import {
+  getEntitlements, cheapestPlanWhere, raiseHint, plural, billedLocationCount, TOP_PLAN,
+  type Entitlements, type CountLimit,
+} from "./entitlements";
+import { PLANS, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
+
+export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos";
+
+type Meter = {
+  /** Upgrade prompt subject: "<what> is included with the Starter plan". */
+  what: string;
+  /** The counted unit, singular and plural. */
+  unit: [string, string?];
+  /** The plan limit this meter reads (per month); undefined = fair use on any paid plan. */
+  limit?: CountLimit;
+  /** Per-location allowance (Agency), multiplied by the billed locations. */
+  perLocation?: CountLimit;
+  addon?: AddonKey;
+};
+
+export const METERS: Record<MeteredFeature, Meter> = {
+  searches: { what: "Permit search", unit: ["permit search", "permit searches"], limit: "permitSearches" },
+  rankings: { what: "The ranking grid", unit: ["ranking-grid credit"], limit: "gridCredits", perLocation: "gridCreditsPerLocation" },
+  siteScans: { what: "Site Scan", unit: ["Site Scan"], limit: "siteScans", perLocation: "siteScansPerLocation" },
+  competitorScans: { what: "Competitor Intel", unit: ["Competitor Intel scan"], limit: "competitorScans", addon: "competitor_pack" },
+  // The photo optimizer is included on every paid plan (fair use: the growth
+  // processing rate limit is the only cap), so it has no monthly count.
+  photos: { what: "The Photo Optimizer", unit: ["photo"] },
+};
+
+/**
+ * Ranking-grid credits a grid costs: one credit per 25 grid points, rounded up
+ * (3x3 and 5x5 = 1, 7x7 = 2, 9x9 = 4, 11x11 = 5, 13x13 = 7, 15x15 = 9). The
+ * Places cost of a grid grows with its points, so credits do too.
+ */
+export function gridCreditCost(gridSize: number): number {
+  const size = Math.max(1, Math.floor(Number(gridSize) || 3));
+  return Math.ceil((size * size) / 25);
 }
 
-export async function refundQuota(res: Response, amount: number) {
-  const reservation = res.locals?.growthQuota;
+/** Does this plan's allowance include the feature at all? */
+const includes = (meter: Meter) => (l: PlanLimits) =>
+  !meter.limit || l[meter.limit] === -1 || l[meter.limit] > 0 || (!!meter.perLocation && l[meter.perLocation] > 0);
+
+/**
+ * Monthly allowance for a feature: -1 = unlimited / fair use, 0 = not in the plan.
+ * `locations` is the billed location count (billedLocationCount), not every row.
+ */
+export function monthlyLimit(ent: Entitlements, feature: MeteredFeature, locations = 0): number {
+  const meter = METERS[feature], a = ent.allowances;
+  if (!a) return 0;
+  if (!meter.limit) return -1;
+  const base = a[meter.limit];
+  if (base === -1) return -1;
+  // Per-location plans are billed for at least their included locations.
+  const billed = Math.max(locations, ent.limits?.locations ?? 0);
+  return base + (meter.perLocation ? a[meter.perLocation] * billed : 0);
+}
+
+export const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
+export const quotaKey = (userId: number, feature: MeteredFeature, month = monthKey()) => `quota:user:${userId}:${feature}:${month}`;
+/** First instant of next month (UTC), when every monthly count resets. */
+export function resetsAt(d = new Date()): string {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString();
+}
+
+/** A reservation still holding `remaining` units that can be given back. */
+export type QuotaReservation = { key: string; remaining: number };
+export type QuotaResult =
+  | { ok: true; reservation: QuotaReservation; ent: Entitlements; limit: number }
+  | { ok: false; status: 401 | 402 | 403; body: Record<string, unknown> };
+
+async function allowanceFor(userId: number, feature: MeteredFeature) {
+  const ent = await getEntitlements(userId);
+  const meter = METERS[feature];
+  const locations = meter.perLocation && ent.allowances?.[meter.perLocation] ? await billedLocationCount(userId) : 0;
+  return { ent, limit: monthlyLimit(ent, feature, locations) };
+}
+
+function planRequiredBody(feature: MeteredFeature) {
+  const meter = METERS[feature];
+  const requiredPlan: PlanKey = cheapestPlanWhere(includes(meter)) ?? TOP_PLAN;
+  return {
+    code: "plan_required",
+    requiredPlan,
+    message: `${meter.what} is included with the ${PLANS[requiredPlan].name} plan. Upgrade in Pricing to use it.`,
+  };
+}
+
+function limitBody(ent: Entitlements, feature: MeteredFeature, limit: number, used: number, amount: number) {
+  const meter = METERS[feature];
+  const plan = PLANS[ent.accessPlan!].name;
+  const units = (n: number) => plural(n, meter.unit[0], meter.unit[1]);
+  let raise = meter.limit ? raiseHint(ent, meter.limit, meter.unit, meter.addon) : { text: "", upgradePlan: null, addon: null };
+  if (!raise.text && meter.perLocation && ent.allowances?.[meter.perLocation]) {
+    raise = { ...raise, text: `${plan} includes ${units(ent.allowances[meter.perLocation])} per linked Google Business Profile location, so linking more locations raises it.` };
+  }
+  const left = Math.max(0, limit - used);
+  const what = left === 0
+    ? `You've used all ${units(limit)} your ${plan} plan includes this month.`
+    : `This needs ${units(amount)}, and ${left.toLocaleString("en-US")} of the ${units(limit)} your ${plan} plan includes this month ${left === 1 ? "is" : "are"} left.`;
+  return {
+    code: "limit_reached",
+    feature,
+    limit,
+    used,
+    upgradePlan: raise.upgradePlan,
+    addon: raise.addon,
+    resetsAt: resetsAt(),
+    message: `${what} The count resets on the 1st (UTC). ${raise.text}`.trim(),
+  };
+}
+
+/** Reserve `amount` of a monthly quota for an account (no request needed: workers use this too). */
+export async function reserveQuotaFor(userId: number, feature: MeteredFeature, amount = 1): Promise<QuotaResult> {
+  const { ent, limit } = await allowanceFor(userId, feature);
+  if (!ent.accessPlan || limit === 0) return { ok: false, status: 402, body: planRequiredBody(feature) };
+  const key = quotaKey(userId, feature);
+  if (limit === -1) return { ok: true, reservation: { key, remaining: 0 }, ent, limit };
+  const allowed = await takeBudget(key, limit, amount, Number.MAX_SAFE_INTEGER);
+  if (!allowed) {
+    const { rows: [row] } = await pool.query("SELECT used FROM growth_budgets WHERE key=$1 AND period='0'", [key]);
+    return { ok: false, status: 403, body: limitBody(ent, feature, limit, Number(row?.used ?? 0), amount) };
+  }
+  return { ok: true, reservation: { key, remaining: amount }, ent, limit };
+}
+
+/** The account a request spends quota for: the workspace owner for an agency member. */
+export function quotaUserId(req: Request, res: Response): number | null {
+  return res.locals?.agencyOwner ?? (req.user as any)?.id ?? null;
+}
+
+/** Route helper: reserve or answer 401/402/403. The reservation is kept on res.locals for refundQuota. */
+export async function reserveMonthlyQuota(req: Request, res: Response, feature: MeteredFeature, amount = 1): Promise<boolean> {
+  const userId = quotaUserId(req, res);
+  if (!userId) {
+    res.status(401).json({ message: "Sign in to use this. It's included with every paid plan." });
+    return false;
+  }
+  const result = await reserveQuotaFor(userId, feature, amount);
+  if (!result.ok) {
+    res.status(result.status).json(result.body);
+    return false;
+  }
+  res.locals ||= {};
+  res.locals.growthQuota = result.reservation;
+  return true;
+}
+
+/** Give back up to `amount` units of a reservation (work that never ran). */
+export async function refundReservation(reservation: QuotaReservation | undefined, amount: number) {
   if (!reservation || amount <= 0) return;
   const refund = Math.min(amount, reservation.remaining);
   if (refund <= 0) return;
-  await pool.query("UPDATE growth_budgets SET used=greatest(0,used-$2) WHERE key=$1 AND period='0'", [reservation.key, refund]);
   reservation.remaining -= refund;
+  await pool.query("UPDATE growth_budgets SET used=greatest(0,used-$2) WHERE key=$1 AND period='0'", [reservation.key, refund]);
+}
+
+export async function refundQuota(res: Response, amount: number) {
+  await refundReservation(res.locals?.growthQuota, amount);
+}
+
+/** This month's use of each counted feature, for the plan summary. */
+export async function monthlyUsage(userId: number, ent: Entitlements) {
+  const counted = (Object.keys(METERS) as MeteredFeature[]).filter((f) => METERS[f].limit);
+  const locations = await billedLocationCount(userId);
+  const { rows } = await pool.query("SELECT key,used FROM growth_budgets WHERE key=ANY($1::text[]) AND period='0'", [counted.map((f) => quotaKey(userId, f))]);
+  const used = new Map(rows.map((r: any) => [r.key, Number(r.used)]));
+  return Object.fromEntries(counted.map((f) => [f, { used: used.get(quotaKey(userId, f)) ?? 0, limit: monthlyLimit(ent, f, locations) }]));
 }

@@ -1,6 +1,8 @@
 import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmentPortal, governmentPermitForDisplay } from "@shared/government-links";
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
-import { reserveMonthlyQuota, refundQuota } from "./growth-quotas";
+import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
+import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
+import { PLANS } from "@shared/plans";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
@@ -31,8 +33,8 @@ import { registerSiteAssistantRoutes } from "./site-assistant";
 import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
-import { db } from "./db";
-import { searchQueries, scrapeSchedules, permitDatabases, subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
+import { db, pool } from "./db";
+import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
@@ -165,6 +167,107 @@ export async function registerRoutes(
     return null;
   }
 
+  // Count limits (locations, protected sites) are checked and inserted under one
+  // per-account lock, so two requests at the limit can't both get through.
+  async function withAccountLock<T>(userId: number, fn: (tx: any) => Promise<T>): Promise<T> {
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(7170, ${userId})`);
+      return fn(tx);
+    });
+  }
+  const planCheckFailed = (res: any, err: unknown) => {
+    console.error("Plan check failed:", err);
+    if (!res.headersSent) res.status(500).json({ message: "Could not check your plan. Please try again." });
+  };
+
+  /**
+   * Plan gates in front of routes other modules register: Business Profile
+   * import (location count), Profile Guard (a paid feature, one guard per
+   * covered location) and the AI reply mode (automatic publishing needs a plan
+   * that includes it). Registered after the agency access check, so the
+   * workspace owner's plan applies, and before those routes.
+   */
+  function registerPlanGates() {
+    app.post("/api/gbp/import", async (req, res, next) => {
+      const user = getDevUser(req, res);
+      if (!user) return;
+      try {
+        const ent = await requirePlan(res, user.id, "Google Business Profile management");
+        if (!ent) return;
+        const names = Array.isArray(req.body?.locations)
+          ? [...new Set<string>(req.body.locations.map((l: any) => l?.gbpName).filter((n: unknown): n is string => typeof n === "string" && n.length > 0 && n.length <= 300))].slice(0, 100)
+          : [];
+        if (!names.length) return next(); // the import route validates the selection itself
+        // A listing adds a location unless it is already linked, or links in place to a Places-added row.
+        const { rows: [r] } = await pool.query(
+          `SELECT count(*)::int adding FROM unnest($2::text[]) n(name)
+            WHERE NOT EXISTS (SELECT 1 FROM business_locations l WHERE l.user_id=$1 AND l.gbp_location_name=n.name)
+              AND NOT EXISTS (SELECT 1 FROM agency_discovery d JOIN business_locations l ON l.user_id=d.user_id AND l.gbp_location_name IS NULL AND l.place_id=d.data->>'placeId'
+                               WHERE d.user_id=$1 AND d.location=n.name)`, [user.id, names]);
+        const used = await locationCount(user.id);
+        if (r.adding > 0 && used + r.adding > ent.allowances!.locations) return void sendLocationLimit(res, ent, used, r.adding);
+        next();
+      } catch (err) { planCheckFailed(res, err); }
+    });
+
+    app.put("/api/gbp/locations/:id/guard", async (req, res, next) => {
+      const user = getDevUser(req, res);
+      if (!user) return;
+      if (req.body?.mode === "off") return next();
+      try {
+        const ent = await requirePlan(res, user.id, "Profile Guard");
+        if (!ent) return;
+        const id = Number(req.params.id);
+        const { rows: [r] } = await pool.query("SELECT count(*)::int n FROM gbp_guard WHERE user_id=$1 AND mode<>'off' AND location_id<>$2", [user.id, Number.isSafeInteger(id) ? id : 0]);
+        const limit = ent.allowances!.locations;
+        if (r.n >= limit) {
+          const raise = raiseHint(ent, "locations", ["location"], "extra_location");
+          return void sendLimitReached(res, {
+            feature: "guardedLocations", limit, used: r.n, upgradePlan: raise.upgradePlan, addon: raise.addon,
+            message: `Profile Guard is on for ${plural(r.n, "location")}, and your ${PLANS[ent.accessPlan!].name} plan covers ${plural(limit, "location")}. Turn Guard off on another location first. ${raise.text}`.trim(),
+          });
+        }
+        next();
+      } catch (err) { planCheckFailed(res, err); }
+    });
+
+    app.put("/api/gbp/locations/:id/ai-replies", async (req, res, next) => {
+      const user = getDevUser(req, res);
+      if (!user) return;
+      const mode = req.body?.mode;
+      if (mode === undefined || mode === "off") return next();
+      try {
+        const ent = await requirePlan(res, user.id, "Drafting AI review replies");
+        if (!ent) return;
+        if (mode === "auto" && !ent.allowances!.autoPublishAiReplies) {
+          return void sendPlanRequired(res, cheapestPlanWhere((l) => l.autoPublishAiReplies) ?? TOP_PLAN, "Publishing AI review replies automatically", {
+            message: `Your ${PLANS[ent.accessPlan!].name} plan drafts AI replies for you to approve. Publishing them automatically is included with the ${PLANS[cheapestPlanWhere((l) => l.autoPublishAiReplies) ?? TOP_PLAN].name} plan.`,
+          });
+        }
+        next();
+      } catch (err) { planCheckFailed(res, err); }
+    });
+
+    // What the account's plan includes and how much of each monthly count is used.
+    app.get("/api/entitlements", async (req, res) => {
+      const user = getDevUser(req, res);
+      if (!user) return;
+      try {
+        const ent = await getEntitlements(user.id);
+        const [locations, usage] = await Promise.all([locationCount(user.id), monthlyUsage(user.id, ent)]);
+        res.setHeader("Cache-Control", "no-store");
+        res.json({
+          plan: ent.plan, storedPlan: ent.storedPlan, accessPlan: ent.accessPlan,
+          planName: ent.accessPlan ? PLANS[ent.accessPlan].name : null,
+          isPlatformAdmin: ent.isPlatformAdmin, grantEndsAt: ent.grantEndsAt,
+          limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addons: ent.addons,
+          locations: { used: locations, limit: ent.allowances?.locations ?? 0 },
+          usage, resetsAt: resetsAt(),
+        });
+      } catch (err) { planCheckFailed(res, err); }
+    });
+  }
+
   const { ensureAccountEventsSchema, registerAccountEventRoutes } = await import("./account-events");
   await ensureAccountEventsSchema();
   registerAccountEventRoutes(app, getDevUser);
@@ -176,6 +279,7 @@ export async function registerRoutes(
   registerAgencyAccess(app);
   const { registerAgencyRoutes } = await import("./agency/routes");
   registerAgencyRoutes(app);
+  registerPlanGates();
   const { ensureAdsSchema } = await import("./ads/schema");
   await ensureAdsSchema();
   const { registerAdsRoutes } = await import("./ads/routes");
@@ -2092,15 +2196,21 @@ Rules:
           .where(eq(subscriptions.userId, user.id))
           .limit(1);
 
-        if (sub && sub.status === "trialing") {
+        // The self-serve card trial (a Stripe subscription still trialing) runs one grid. A trial
+        // code is an admin grant of the full Agency plan, so its monthly credits apply as they are.
+        const trialLive = !!sub && sub.status === "trialing" && !!sub.stripeSubscriptionId;
+        if (trialLive) {
           const existingScans = await storage.getRankingGridScans({ id: user.id, admin: false });
           if (existingScans.length >= 1) {
-            return res.status(403).json({ message: "Free trial is limited to 1 GMB Ranking Grid report. Upgrade your plan for unlimited scans." });
+            return res.status(403).json({ code: "limit_reached", feature: "rankings", limit: 1, message: "During the trial you can run 1 ranking grid report. Your plan's monthly ranking-grid credits apply once the paid plan starts." });
           }
         }
       }
 
-      if (!(await reserveMonthlyQuota(req, res, "rankings"))) return;
+      // Bigger grids make more Places calls, so they cost more credits.
+      const credits = gridCreditCost(Number(gridSize || 3));
+      if (!(await reserveMonthlyQuota(req, res, "rankings", credits))) return;
+      const reservation: QuotaReservation | undefined = res.locals.growthQuota;
       const scan = await storage.createRankingGridScan({
         userId: user.id,
         businessName,
@@ -2115,7 +2225,9 @@ Rules:
         averageRank: null,
       });
 
+      // A grid that fails gives its credits back.
       runRankingGridScan(scan.id, placeId, parseFloat(lat), parseFloat(lon), gridSize || 3, parseFloat(gridDistance || "1"), keyword)
+        .then(ok => { if (!ok) return refundReservation(reservation, credits); })
         .catch(err => console.error("Ranking grid scan error:", err));
 
       res.json(scan);
@@ -2136,11 +2248,12 @@ Rules:
     }
   });
 
-  async function runRankingGridScan(scanId: number, targetPlaceId: string, centerLat: number, centerLon: number, gridSize: number, distanceMiles: number, keyword: string) {
+  /** Runs a grid; resolves false when the scan failed (its credits are then refunded). */
+  async function runRankingGridScan(scanId: number, targetPlaceId: string, centerLat: number, centerLon: number, gridSize: number, distanceMiles: number, keyword: string): Promise<boolean> {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
       await storage.updateRankingGridScan(scanId, { status: "failed" });
-      return;
+      return false;
     }
 
     try {
@@ -2224,8 +2337,10 @@ Rules:
         status: "completed",
         averageRank: avgRank,
       });
+      return true;
     } catch (err) {
       await storage.updateRankingGridScan(scanId, { status: "failed" });
+      return false;
     }
   }
 
@@ -2246,23 +2361,18 @@ Rules:
     }
   });
 
-  // Competitor Intelligence Routes (Gold and Platinum)
-  async function requirePlatinum(req: any, res: any): Promise<boolean> {
-    const user = req.user;
-    if (!user) {
+  // Competitor Intelligence routes: plans with Competitor Intel scans (shared/plans.ts).
+  async function requireCompetitorIntel(req: any, res: any): Promise<boolean> {
+    if (!req.user) {
       res.status(401).json({ message: "Login required" }); return false;
     }
-    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
-    if (!sub || !["gold", "platinum"].includes(sub.plan) || (sub.status !== "active" && sub.status !== "trialing")) {
-      if (DEV_AUTH_BYPASS) return true;
-      res.status(403).json({ message: "Competitor Intelligence requires a Gold or Platinum membership. Upgrade your plan to access this feature." });
-      return false;
-    }
-    return true;
+    try {
+      return !!(await requirePlan(res, req.user.id, "Competitor Intel", (a) => a.competitorScans > 0));
+    } catch (err) { planCheckFailed(res, err); return false; }
   }
 
   app.get("/api/competitors/scans", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const scans = await db.select().from(competitorScans).where(eq(competitorScans.userId, userId)).orderBy(desc(competitorScans.createdAt));
@@ -2271,7 +2381,7 @@ Rules:
   });
 
   app.get("/api/competitors/scans/:id", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
@@ -2283,13 +2393,16 @@ Rules:
   });
 
   app.post("/api/competitors/scans", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const parsed = z.object({ industry: z.string().trim().min(1).max(120), location: z.string().trim().min(1).max(250), radius: z.number().int().min(1).max(100).default(25) }).safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Provide industry, location and a radius from 1 to 100 miles." });
       const { industry, location, radius } = parsed.data;
       const lat = null, lon = null;
+      // Each scan uses one of the plan's monthly Competitor Intel scans (plus scan packs).
+      if (!(await reserveMonthlyQuota(req, res, "competitorScans"))) return;
+      const reservation: QuotaReservation | undefined = res.locals.growthQuota;
 
       const [scan] = await db.insert(competitorScans).values({
         userId,
@@ -2301,7 +2414,9 @@ Rules:
         status: "running",
       }).returning();
 
+      // A scan that fails gives its scan back.
       runCompetitorScan(scan.id, userId, industry, location, lat, lon, radius || 25)
+        .then(ok => { if (!ok) return refundReservation(reservation, 1); })
         .catch(err => console.error("Competitor scan error:", err));
 
       res.json(scan);
@@ -2309,7 +2424,7 @@ Rules:
   });
 
   app.delete("/api/competitors/scans/:id", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
@@ -2329,7 +2444,7 @@ Rules:
   });
 
   app.get("/api/ad-spy/keywords", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const keywords = await db.select().from(adSpyKeywords).where(eq(adSpyKeywords.userId, userId)).orderBy(desc(adSpyKeywords.createdAt));
@@ -2353,7 +2468,7 @@ Rules:
   });
 
   app.post("/api/ad-spy/keywords", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const { keyword, location, device } = req.body;
@@ -2372,7 +2487,7 @@ Rules:
   });
 
   app.delete("/api/ad-spy/keywords/:id", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const keywordId = parseInt(req.params.id);
@@ -2385,7 +2500,7 @@ Rules:
   });
 
   app.get("/api/ad-spy/keywords/:id/advertisers", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const keywordId = parseInt(req.params.id);
@@ -2410,7 +2525,7 @@ Rules:
   });
 
   app.post("/api/ad-spy/keywords/:id/refresh", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
       const keywordId = parseInt(req.params.id);
@@ -2468,11 +2583,12 @@ Rules:
     }
   }
 
-  async function runCompetitorScan(scanId: number, userId: number, industry: string, location: string, lat: string | null, lon: string | null, radius: number) {
+  /** Runs a competitor scan; resolves false when it failed (the scan is then refunded). */
+  async function runCompetitorScan(scanId: number, userId: number, industry: string, location: string, lat: string | null, lon: string | null, radius: number): Promise<boolean> {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
       await db.update(competitorScans).set({ status: "failed", errorMessage: "Google Places is not configured." }).where(eq(competitorScans.id, scanId));
-      return;
+      return false;
     }
 
     try {
@@ -2523,25 +2639,22 @@ Rules:
       }
 
       await db.update(competitorScans).set({ status: "completed", totalFound: allPlaces.length }).where(eq(competitorScans.id, scanId));
+      return true;
     } catch (err: any) {
       console.error("Competitor scan failed:", err);
       await db.delete(competitorListings).where(eq(competitorListings.scanId, scanId));
       await db.update(competitorScans).set({ status: "failed", totalFound: 0, errorMessage: err.message || "Provider request failed." }).where(eq(competitorScans.id, scanId));
+      return false;
     }
   }
 
-  async function requirePremiumPlus(req: any, res: any): Promise<boolean> {
-    const user = req.user;
-    if (!user) {
-      res.status(401).json({ message: "Login required" }); return false;
-    }
-    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
-    if (!sub || !["premium", "gold", "platinum"].includes(sub.plan) || (sub.status !== "active" && sub.status !== "trialing")) {
-      if (DEV_AUTH_BYPASS) return true;
-      res.status(403).json({ message: "This feature requires a Premium, Gold, or Platinum plan. Upgrade to access it." });
-      return false;
-    }
-    return true;
+  // Citation campaigns come with every paid plan; the paying account is the workspace owner.
+  async function requireCitationsPlan(req: any, res: any): Promise<boolean> {
+    const user = getDevUser(req, res);
+    if (!user) return false;
+    try {
+      return !!(await requirePlan(res, user.id, "Running citation campaigns"));
+    } catch (err) { planCheckFailed(res, err); return false; }
   }
 
   app.get("/api/locations", async (req, res) => {
@@ -2565,13 +2678,28 @@ Rules:
   });
 
   app.post("/api/locations", async (req, res) => {
-    if (!(await requirePlatinum(req, res))) return;
+    const user = getDevUser(req, res);
+    if (!user) return;
+    let parsed: any;
     try {
-      const user = (req as any).user;
-      const parsed = insertBusinessLocationSchema.omit({ gbpAccountName: true, gbpLocationName: true }).parse({ ...req.body, userId: user.id });
-      const [location] = await db.insert(businessLocations).values(parsed as any).returning();
-      res.json(location);
-    } catch (err: any) { res.status(400).json({ message: err.message }); }
+      parsed = insertBusinessLocationSchema.omit({ gbpAccountName: true, gbpLocationName: true }).parse({ ...req.body, userId: user.id });
+    } catch (err: any) { return res.status(400).json({ message: err.message }); }
+    try {
+      const ent = await requirePlan(res, user.id, "Adding business locations");
+      if (!ent) return;
+      // Every location counts toward the plan's Google Business Profile locations (plus Extra location add-ons).
+      const outcome = await withAccountLock(user.id, async (tx) => {
+        const [{ n: used }] = await tx.select({ n: count() }).from(businessLocations).where(eq(businessLocations.userId, user.id));
+        if (used >= ent.allowances!.locations) return { used, location: null };
+        const [location] = await tx.insert(businessLocations).values(parsed).returning();
+        return { used, location };
+      });
+      if (!outcome.location) return void sendLocationLimit(res, ent, outcome.used);
+      res.json(outcome.location);
+    } catch (err) {
+      console.error("Error adding location:", err);
+      if (!res.headersSent) res.status(500).json({ message: "Could not add the location. Please try again." });
+    }
   });
 
   app.put("/api/locations/:id", async (req, res) => {
@@ -2922,7 +3050,7 @@ Rules:
   });
 
   app.post("/api/citations/campaigns", async (req, res) => {
-    if (!(await requirePremiumPlus(req, res))) return;
+    if (!(await requireCitationsPlan(req, res))) return;
     try {
       const user = getDevUser(req, res);
       const parsed = insertCitationCampaignSchema.parse({ ...req.body, userId: user.id });
@@ -3004,7 +3132,7 @@ Rules:
   // directory, and guessing is fabrication (CLAUDE.md). So the owner verifies each site via a Google site:
   // search and records the result; only the Google Business Profile row is filled from real linked data.
   app.post("/api/citations/campaigns/:id/run", async (req, res) => {
-    if (!(await requirePremiumPlus(req, res))) return;
+    if (!(await requireCitationsPlan(req, res))) return;
     try {
       const user = (req as any).user;
       const id = parseInt(req.params.id);
@@ -3372,16 +3500,26 @@ Rules:
       const { name } = req.body ?? {};
       const domain = normalizeTrackedDomain(req.body?.domain);
       if (!domain) return res.status(400).json({ message: "Enter a valid domain, for example yourcompany.com" });
+      // Click Guard, IP Tracker and VPN Shield share one list of protected websites per plan.
+      const ent = await requirePlan(res, user.id, "Click-fraud protection (Click Guard, IP Tracker and VPN Shield)", (a) => a.protectedSites !== 0);
+      if (!ent) return;
       const label = typeof name === "string" && name.trim() ? name.trim().slice(0, 200) : domain;
       const trackingId = randomUUID();
-      const newDomain = await storage.createTrackedDomain({
-        userId: user.id,
-        domain,
-        trackingId,
-        name: label,
-        isActive: true,
+      const limit = ent.allowances!.protectedSites;
+      const outcome = await withAccountLock(user.id, async (tx) => {
+        const [{ n: used }] = await tx.select({ n: count() }).from(trackedDomains).where(eq(trackedDomains.userId, user.id));
+        if (limit !== -1 && used >= limit) return { used, domain: null };
+        const [created] = await tx.insert(trackedDomains).values({ userId: user.id, domain, trackingId, name: label, isActive: true }).returning();
+        return { used, domain: created };
       });
-      res.json(newDomain);
+      if (!outcome.domain) {
+        const raise = raiseHint(ent, "protectedSites", ["website"], "protected_site");
+        return sendLimitReached(res, {
+          feature: "protectedSites", limit, used: outcome.used, upgradePlan: raise.upgradePlan, addon: raise.addon,
+          message: `Your ${PLANS[ent.accessPlan!].name} plan protects ${plural(limit, "website")} with Click Guard, IP Tracker and VPN Shield, and ${inUse(outcome.used)}. ${raise.text}`.trim(),
+        });
+      }
+      res.json(outcome.domain);
     } catch (err: any) {
       console.error("Error creating domain:", err);
       res.status(500).json({ message: "Failed to create domain" });
@@ -4862,15 +5000,16 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
+      const ent = await requirePlan(res, user.id, "Saving review request templates", (a) => a.reviewTemplates !== 0);
+      if (!ent) return;
       const existing = await storage.getReviewTemplatesByUser(user.id);
-      const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
-      const plan = sub?.plan || "free";
-      const planLimits: Record<string, number> = {
-        free: 1, standard: 1, professional: 5, business: 5, premium: 20, gold: 20, platinum: 20
-      };
-      const max = planLimits[plan] || 1;
-      if (existing.length >= max) {
-        return res.status(403).json({ message: `Template limit reached (${max}). Upgrade your plan for more.`, limit: max });
+      const max = ent.allowances!.reviewTemplates;
+      if (max !== -1 && existing.length >= max) {
+        const raise = raiseHint(ent, "reviewTemplates", ["template"]);
+        return sendLimitReached(res, {
+          feature: "reviewTemplates", limit: max, used: existing.length, upgradePlan: raise.upgradePlan, addon: null,
+          message: `Your ${PLANS[ent.accessPlan!].name} plan includes ${plural(max, "review request template")} and ${inUse(existing.length)}. Delete one you no longer use. ${raise.text}`.trim(),
+        });
       }
 
       const { name, googleProfileUrl, projectDescription, isDefault } = req.body;
@@ -5466,15 +5605,9 @@ function main() {
       const code = await storage.revokeBetaAccessCode(id);
       if (!code) return res.status(404).json({ message: "Code not found" });
 
-      if (code.redeemedByUserId) {
-        const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, code.redeemedByUserId)).limit(1);
-        if (sub && sub.plan === "platinum" && !sub.stripeSubscriptionId) {
-          await db.update(subscriptions).set({
-            status: "canceled",
-            currentPeriodEnd: new Date(),
-          }).where(eq(subscriptions.id, sub.id));
-        }
-      }
+      // Only the trial this code is keeping alive ends (see endRevokedTrial): a paid plan, an
+      // open-ended manual grant, or a newer code's trial is never cut short by a revoke.
+      await endRevokedTrial(code);
 
       res.json({ message: "Trial revoked", code });
     } catch (err: any) {
@@ -5496,31 +5629,13 @@ function main() {
       if (betaCode.redeemedByUserId) return res.status(400).json({ message: "This code has already been used." });
       if (new Date(betaCode.expiresAt) < new Date()) return res.status(400).json({ message: "This code has expired." });
 
-      const redeemed = await storage.redeemBetaAccessCode(betaCode.id, user.id);
-
-      const isUnlimited = betaCode.trialDays === 0;
-      const trialEnd = isUnlimited ? new Date("2099-12-31T23:59:59Z") : new Date(Date.now() + betaCode.trialDays * 24 * 60 * 60 * 1000);
-
-      const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
-      if (existingSub) {
-        await db.update(subscriptions).set({
-          plan: "platinum",
-          status: "active",
-          currentPeriodEnd: trialEnd,
-        }).where(eq(subscriptions.id, existingSub.id));
-      } else {
-        await db.insert(subscriptions).values({
-          userId: user.id,
-          plan: "platinum",
-          status: "active",
-          currentPeriodEnd: trialEnd,
-        });
-      }
-
-      const msg = isUnlimited
-        ? "Trial activated! You have unlimited Platinum access."
-        : `Trial activated! You have full Platinum access for ${betaCode.trialDays} day${betaCode.trialDays > 1 ? "s" : ""}.`;
-      res.json({ message: msg, expiresAt: trialEnd });
+      const outcome = await redeemTrialCode(user.id, betaCode);
+      if ("refused" in outcome) return res.status(outcome.status).json({ message: outcome.refused });
+      const planName = PLANS[TRIAL_CODE_PLAN].name;
+      const msg = outcome.unlimited
+        ? `Trial activated! You have ${planName} access until an admin ends it.`
+        : `Trial activated! You have full ${planName} access for ${betaCode.trialDays} day${betaCode.trialDays > 1 ? "s" : ""}.`;
+      res.json({ message: msg, plan: TRIAL_CODE_PLAN, expiresAt: outcome.trialEnd });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to redeem code" });
     }
@@ -5531,9 +5646,15 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
-      const active = await storage.getActiveBetaAccess(user.id);
-      if (active && !active.revoked) {
-        res.json({ active: true, expiresAt: active.expiresAt, trialDays: active.trialDays });
+      // The trial is the subscription grant the code created: live until its end date (the
+      // code's own expiresAt is only the window for redeeming it).
+      const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
+      // A revoke may leave a trial another code still covers (endRevokedTrial): report the newest unrevoked code.
+      const [code] = await db.select().from(betaAccessCodes).where(and(eq(betaAccessCodes.redeemedByUserId, user.id), eq(betaAccessCodes.revoked, false))).orderBy(desc(betaAccessCodes.redeemedAt)).limit(1);
+      const grantLive = !!sub && !sub.stripeSubscriptionId && !!sub.currentPeriodEnd
+        && ["trialing", "active"].includes(sub.status) && new Date(sub.currentPeriodEnd).getTime() > Date.now();
+      if (grantLive && code) {
+        res.json({ active: true, expiresAt: sub.currentPeriodEnd, trialDays: code.trialDays, plan: sub.plan });
       } else {
         res.json({ active: false });
       }

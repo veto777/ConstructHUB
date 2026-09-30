@@ -10,11 +10,12 @@
  * request body.
  */
 import { db } from "../db";
-import { crmOrgs, crmMembers, subscriptions, users, crmEffectivePermissions } from "@shared/schema";
+import { crmOrgs, crmMembers, users, crmEffectivePermissions } from "@shared/schema";
 import type { CrmPermission } from "@shared/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
-import { PLANS } from "../stripe";
+import { PLANS } from "@shared/plans";
+import { getEntitlements, raiseHint, cheapestPlanWhere, plural, inUse } from "../entitlements";
 
 export type OrgContext = {
   org: typeof crmOrgs.$inferSelect;
@@ -196,27 +197,32 @@ export async function getSeatUsage(org: typeof crmOrgs.$inferSelect) {
       used,
       remaining: -1,
       canAddSeat: true,
+      message: "Beta accounts have unlimited CRM seats.",
     };
   }
 
-  const [sub] = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.userId, org.ownerUserId))
-    .limit(1);
-
-  const planKey = (sub?.plan ?? "free") as keyof typeof PLANS;
-  const active = sub?.status === "active" || sub?.status === "trialing";
-  const plan = active ? PLANS[planKey] : undefined;
-  // Unknown/free/inactive plans get a single seat (the owner).
-  const limit = (plan?.limits as { users?: number } | undefined)?.users ?? 1;
+  // CRM seats come with every paid plan (crmSeats, plus Extra seat add-ons);
+  // the org owner's plan applies. Without a plan the owner keeps their own seat.
+  const ent = await getEntitlements(org.ownerUserId);
+  const limit = ent.allowances?.crmSeats ?? 1;         // -1 means unlimited
+  const planName = ent.accessPlan ? PLANS[ent.accessPlan].name : "current";
+  const canAddSeat = limit < 0 || used < limit;
+  let message = `Your ${planName} plan includes ${limit < 0 ? "unlimited CRM seats" : plural(limit, "CRM seat")} and ${inUse(used)}.`;
+  if (!ent.accessPlan) {
+    const starter = cheapestPlanWhere((l) => l.crmSeats > 1);
+    message += ` The CRM is included with every paid plan${starter ? `, and ${PLANS[starter].name} includes ${plural(PLANS[starter].limits.crmSeats, "seat")}` : ""}. Choose a plan in Pricing to add your team.`;
+  } else if (!canAddSeat) {
+    const raise = raiseHint(ent, "crmSeats", ["seat"], "extra_seat");
+    if (raise.text) message += ` ${raise.text}`;
+  }
 
   return {
-    plan: planKey,
-    planName: plan?.name ?? "Free",
-    limit,                                   // -1 means unlimited
+    plan: ent.accessPlan ?? "none",
+    planName,
+    limit,
     used,
     remaining: limit < 0 ? -1 : Math.max(0, limit - used),
-    canAddSeat: limit < 0 || used < limit,
+    canAddSeat,
+    message,
   };
 }
