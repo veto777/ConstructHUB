@@ -1,10 +1,11 @@
-import type { Express } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { randomBytes } from "node:crypto";
 import { pool } from "../db";
 import { requireRecentAuth } from "../account-security";
 import { encryptToken, decryptToken } from "../gbp/token-crypto";
 import { oauthBaseUrl } from "../site-context";
 import { rateLimit, takeBudget } from "../growth-limits";
+import { getEntitlements, requireModule } from "../entitlements";
 import { logActivity } from "../account-events";
 import { GMAIL_QUERY, classifyMail, parseMail } from "./classify";
 import { storeMatched, purgeExpiredMail, hash } from "./service";
@@ -20,12 +21,42 @@ declare module "express-session" {
     };
   }
 }
+/** Removing a saved Gmail connection (list + disconnect) never needs the plan: an account without the module
+ * must still be able to delete the Google tokens it saved earlier. Both /api/mail-alerts gates use this. */
+export const gmailRemovalRoute = (req: Request) => {
+  const path = req.baseUrl + req.path;
+  return (
+    (req.method === "GET" &&
+      path === "/api/mail-alerts/oauth/saved-connections") ||
+    (req.method === "POST" && path === "/api/mail-alerts/oauth/disconnect")
+  );
+};
+export const requireMailModule = () => {
+  const gate = requireModule("domainsMailAlerts");
+  return (req: Request, res: Response, next: NextFunction) =>
+    gmailRemovalRoute(req) ? next() : gate(req, res, next);
+};
 export function registerGmailOAuth(
   app: Express,
   auth: (req: any, res: any) => any,
   http: typeof fetch = fetch,
 ) {
-  app.use("/api/mail-alerts/oauth", rateLimit("gmail-oauth", 10, 30));
+  // Gated here as well, so the OAuth routes never depend on registration order with registerMailAlertRoutes.
+  app.use(
+    "/api/mail-alerts/oauth",
+    rateLimit("gmail-oauth", 10, 30),
+    requireMailModule(),
+  );
+  // Only what identifies each saved Gmail account (for the plan_required card's Disconnect buttons).
+  app.get("/api/mail-alerts/oauth/saved-connections", async (req, res) => {
+    const u = auth(req, res);
+    if (!u) return;
+    const { rows } = await pool.query(
+      "SELECT google_subject subject,email FROM mail_alert_grants WHERE user_id=$1 ORDER BY email LIMIT 100",
+      [u.id],
+    );
+    res.json({ items: rows });
+  });
   app.get("/api/mail-alerts/oauth/connect", async (req, res) => {
     const u = auth(req, res);
     if (!u) return;
@@ -244,7 +275,11 @@ export async function syncGmail(g: any, http: typeof fetch = fetch) {
     ],
   );
 }
-export async function runMailWorker(http: typeof fetch = fetch) {
+/** `onlyUser` narrows the Gmail sync to one owner (tests on a shared database); expired mail is always purged. */
+export async function runMailWorker(
+  http: typeof fetch = fetch,
+  onlyUser?: number,
+) {
   await purgeExpiredMail();
   if (process.env.GMAIL_OAUTH_ENABLED !== "true") return;
   const c = await pool.connect();
@@ -255,11 +290,22 @@ export async function runMailWorker(http: typeof fetch = fetch) {
     } = await c.query("SELECT pg_try_advisory_lock(8189,8) locked");
     locked = r.locked;
     if (!locked) return;
-    const {
-      rows: [g],
-    } = await c.query(
-      "SELECT * FROM mail_alert_grants WHERE NOT needs_reconnect AND next_sync<=now() ORDER BY next_sync LIMIT 1",
+    // One Gmail sync per tick, for an owner whose plan still includes the module; others wait an hour.
+    const { rows: due } = await c.query(
+      "SELECT * FROM mail_alert_grants WHERE NOT needs_reconnect AND next_sync<=now() AND ($1::int IS NULL OR user_id=$1) ORDER BY next_sync LIMIT 10",
+      [onlyUser ?? null],
     );
+    let g: any;
+    for (const row of due) {
+      if ((await getEntitlements(row.user_id)).modules.domainsMailAlerts) {
+        g = row;
+        break;
+      }
+      await c.query(
+        "UPDATE mail_alert_grants SET next_sync=now()+interval '1 hour' WHERE user_id=$1 AND google_subject=$2",
+        [row.user_id, row.google_subject],
+      );
+    }
     if (!g) return;
     try {
       await syncGmail(g, http);

@@ -17,6 +17,14 @@ import {
 } from "./types";
 import { dnsSnapshot, verify, normalize } from "./dns";
 import { websiteHealth, type Health } from "./health";
+import { getEntitlements } from "../entitlements";
+import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
+/** Queued domain work and daily monitoring run only while the owner's plan includes the module. */
+export const domainsAllowed = async (user: number) =>
+  (await getEntitlements(user)).modules.domainsMailAlerts;
+export const DOMAINS_PLAN_PAUSED = `Not run: ${MODULE_NAMES.domainsMailAlerts} is included with the ${PLANS[planForModule("domainsMailAlerts")].name} plan.`;
+/** A change already made at the registrar was run; only the follow-up DNS check stopped. */
+export const DOMAINS_VERIFY_PAUSED = `Applied at the registrar, but verification stopped: ${MODULE_NAMES.domainsMailAlerts} is included with the ${PLANS[planForModule("domainsMailAlerts")].name} plan.`;
 export type Dependencies = {
   adapter?: (connection: any) => RegistrarAdapter;
   http?: typeof fetch;
@@ -456,7 +464,10 @@ export async function processJob(job: any, deps: Dependencies = {}) {
     severity: "warning",
   });
 }
-export async function runDomainWorker(deps: Dependencies = {}) {
+/** `deps.onlyUser` narrows a run to one owner (tests on a shared database). */
+export async function runDomainWorker(
+  deps: Dependencies & { onlyUser?: number } = {},
+) {
   const c = await pool.connect();
   let locked = false;
   try {
@@ -472,9 +483,23 @@ export async function runDomainWorker(deps: Dependencies = {}) {
     const {
       rows: [job],
     } = await c.query(
-      "SELECT * FROM domain_jobs WHERE status IN ('queued','previewing','verifying') AND run_at<=now() ORDER BY CASE kind WHEN 'change' THEN 0 WHEN 'discover' THEN 1 ELSE 2 END,run_at,created_at LIMIT 1",
+      "SELECT * FROM domain_jobs WHERE status IN ('queued','previewing','verifying') AND run_at<=now() AND ($1::int IS NULL OR user_id=$1) ORDER BY CASE kind WHEN 'change' THEN 0 WHEN 'discover' THEN 1 ELSE 2 END,run_at,created_at LIMIT 1",
+      [deps.onlyUser ?? null],
     );
     if (!job) return false;
+    if (!(await domainsAllowed(job.user_id))) {
+      // Nothing reaches the registrar. An applied change awaiting verification keeps that distinction.
+      await c.query(
+        "UPDATE domain_jobs SET status=CASE WHEN status='verifying' THEN 'verification_failed' ELSE 'failed' END,error=CASE WHEN status='verifying' THEN $3 ELSE $2 END,updated_at=now() WHERE id=$1",
+        [job.id, DOMAINS_PLAN_PAUSED, DOMAINS_VERIFY_PAUSED],
+      );
+      if (job.kind === "monitor")
+        await c.query(
+          "UPDATE managed_domains SET next_check=now()+interval '1 day' WHERE id=$1",
+          [job.domain_id],
+        );
+      return true;
+    }
     if (job.kind === "monitor")
       await c.query(
         "UPDATE managed_domains SET next_check=now()+interval '1 day' WHERE id=$1",
@@ -504,9 +529,30 @@ export async function runDomainWorker(deps: Dependencies = {}) {
     c.release();
   }
 }
-export async function scheduleMonitors() {
-  await pool.query(`INSERT INTO domain_jobs(id,user_id,domain_id,connection_id,kind,status)
- SELECT gen_random_uuid(),user_id,id,connection_id,'monitor','queued' FROM managed_domains WHERE next_check<=now() ORDER BY next_check LIMIT 100 ON CONFLICT DO NOTHING`);
+/** `onlyUser` narrows a run to one owner (tests on a shared database). */
+export async function scheduleMonitors(onlyUser?: number) {
+  // Daily monitoring only for owners whose plan still includes the module; others are looked at again tomorrow.
+  const due =
+    "d.next_check<=now() AND NOT EXISTS(SELECT 1 FROM domain_jobs j WHERE j.domain_id=d.id AND j.kind='monitor' AND j.status IN ('queued','working'))";
+  const { rows } = await pool.query(
+    `SELECT DISTINCT d.user_id FROM managed_domains d WHERE ${due} AND ($1::int IS NULL OR d.user_id=$1) LIMIT 100`,
+    [onlyUser ?? null],
+  );
+  const allowed: number[] = [],
+    paused: number[] = [];
+  for (const r of rows)
+    ((await domainsAllowed(r.user_id)) ? allowed : paused).push(r.user_id);
+  if (paused.length)
+    await pool.query(
+      `UPDATE managed_domains d SET next_check=now()+interval '1 day' WHERE ${due} AND d.user_id=ANY($1::int[])`,
+      [paused],
+    );
+  if (allowed.length)
+    await pool.query(
+      `INSERT INTO domain_jobs(id,user_id,domain_id,connection_id,kind,status)
+ SELECT gen_random_uuid(),d.user_id,d.id,d.connection_id,'monitor','queued' FROM managed_domains d WHERE ${due} AND d.user_id=ANY($1::int[]) ORDER BY d.next_check LIMIT 100 ON CONFLICT DO NOTHING`,
+      [allowed],
+    );
 }
 export function startDomainWorker() {
   if (process.env.DOMAINS_WORKER_ENABLED !== "true") return;

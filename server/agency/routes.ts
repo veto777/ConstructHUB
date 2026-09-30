@@ -8,13 +8,20 @@ import { grantStatus } from '../gbp/grants';
 import { takeBudget, rateLimit } from '../growth-limits';
 import { logActivity } from '../account-events';
 import { guardRecentAuthOk } from '../gbp/guard-routes';
-import { accessFor, clientAccess, dashboard, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireWrite, type AgencyAccess } from './access';
+import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
 import { bulkInput, queueBulk } from './jobs';
 import { createOnboarding, hash, instructions, onboardingLink } from './onboarding';
 declare module 'express-session' { interface SessionData { agencyOwner?:number } }
 export async function requestAccess(req:Request):Promise<AgencyAccess> {
   if(!req.user)throw new GoogleError('auth','Not authenticated',401);
-  return accessFor(req.user.id,req.session?.agencyOwner??req.user.id);
+  const actor=req.user.id,owner=req.session?.agencyOwner;
+  if(!owner||owner===actor)return accessFor(actor);
+  // A delegation the owner can no longer grant (their plan no longer includes the agency workspace, or the
+  // membership was removed) ends here: the member carries on as their own account instead of being locked out.
+  const a=await accessFor(actor,owner).catch(e=>{if(e instanceof GoogleError&&e.status===404)return null;throw e;});
+  if(a&&await workspaceEntitled(a.owner,a.actor))return a;
+  if(req.session)delete req.session.agencyOwner;
+  return accessFor(actor);
 }
 const clientInput=z.object({name:z.string().trim().min(1).max(200),contactEmail:z.string().trim().email().max(254).nullable().default(null),notes:z.string().max(10000).default(''),tags:z.array(z.string().trim().min(1).max(100)).max(30).default([]),folder:z.string().trim().max(100).nullable().default(null)}).strict();
 // Curated, field-specific messages: raw Zod text is never echoed, and refinements written for people
@@ -43,18 +50,29 @@ export function agencyInputMessage(e:z.ZodError):string {
 }
 export const csvCell=(value:unknown)=>'"'+String(value??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';
 export function registerAgencyRoutes(app:Express) {
-  const route=(method:'get'|'post'|'put'|'delete',path:string,fn:(req:Request,res:Response,a:AgencyAccess)=>Promise<any>)=>app[method]('/api/agency'+path,async(req,res)=>{
+  // Every agency route needs the workspace owner's Agency plan (402 plan_required otherwise), except /me and
+  // /workspace, which a member with no plan of their own uses to find and open a workspace they belong to.
+  const route=(method:'get'|'post'|'put'|'delete',path:string,fn:(req:Request,res:Response,a:AgencyAccess)=>Promise<any>,planGate=true)=>app[method]('/api/agency'+path,async(req,res)=>{
     try {const a=await requestAccess(req);res.setHeader('Cache-Control','no-store');
+      if(planGate&&!await workspaceEntitled(a.owner,a.actor))return void agencyPlanRequired(res);
       if(method!=='get'&&!await takeBudget(`agency-route:${a.actor}`,100))throw new GoogleError('quota','Request limit reached',429);
       await fn(req,res,a);
     }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json({message:e instanceof z.ZodError?agencyInputMessage(e):e instanceof GoogleError?e.message:'Agency operation failed'});}
   });
+  // Answers every signed-in user (pages use `entitled` to choose the agency or the personal view); workspaces
+  // whose owner's plan no longer includes the agency workspace are not offered.
   route('get','/me',async(req,res,a)=>{
     const {rows}=await pool.query('SELECT w.user_id,w.name FROM agency_workspaces w WHERE w.user_id=$1 OR EXISTS(SELECT 1 FROM agency_members m WHERE m.user_id=w.user_id AND m.member_id=$1) ORDER BY w.user_id LIMIT 50',[a.actor]);
+    const [entitled,open]=await Promise.all([workspaceEntitled(a.owner,a.actor),Promise.all(rows.map(w=>w.user_id===a.actor||workspaceEntitled(w.user_id,a.actor)))]);
     const {rows:[workspace]}=await pool.query('SELECT * FROM agency_workspaces WHERE user_id=$1',[a.owner]);
-    res.json({...a,workspace,workspaces:rows});
-  });
-  route('post','/workspace',async(req,res,a)=>{const b=z.object({owner:positiveId}).strict().parse(req.body);await accessFor(a.actor,b.owner);req.session.agencyOwner=b.owner;res.json({ok:true});});
+    res.json({...a,workspace,workspaces:rows.filter((_,i)=>open[i]),entitled,...(entitled?{}:{requiredPlan:agencyPlan})});
+  },false);
+  route('post','/workspace',async(req,res,a)=>{
+    const b=z.object({owner:positiveId}).strict().parse(req.body),t=await accessFor(a.actor,b.owner);
+    // Returning to your own account is always allowed; opening someone else's workspace needs its owner's plan.
+    if(t.owner!==t.actor&&!await workspaceEntitled(t.owner,t.actor))return void agencyPlanRequired(res);
+    req.session.agencyOwner=b.owner;res.json({ok:true});
+  },false);
   route('put','/settings',async(req,res,a)=>{
     if(a.role!=='owner')throw missing();
     const b=z.object({name:z.string().trim().min(1).max(200),autoAcceptAll:z.boolean().default(false)}).strict().parse(req.body);

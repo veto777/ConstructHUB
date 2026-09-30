@@ -8,6 +8,7 @@ import { registerAgencyRoutes,csvCell } from './routes';
 import { registerAgencyAccess } from './middleware';
 import { GoogleClient,GBP_SCOPE,Limiter } from '../gbp/client';
 import { saveGrant } from '../gbp/grants';
+import { planForModule } from '@shared/plans';
 vi.mock('../email',()=>({sendWithFallback:vi.fn(async()=>({accepted:['fixture@example.invalid']}))}));
 let owner:number,member:number,other:number,client:number,hidden:number,loc:number,hiddenLoc:number;
 const handlers=new Map<string,Function>();let middleware:Function;
@@ -24,6 +25,8 @@ beforeAll(async()=>{
     const id=(await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id",[`agency-${key}-${crypto.randomUUID()}@example.invalid`])).rows[0].id;
     if(key==='owner')owner=id;else if(key==='member')member=id;else other=id;
   }
+  // The workspace owner is on the plan that includes the agency workspace; members need no plan of their own.
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,'active')",[owner,planForModule('agencyWorkspace')]);
   await pool.query('INSERT INTO agency_workspaces(user_id,name) VALUES($1,$2)',[owner,'Test agency']);
   client=(await pool.query("INSERT INTO agency_clients(user_id,name,contact_email,tags,folder) VALUES($1,'Fixture client','client@example.invalid',ARRAY['roofing'],'West') RETURNING id",[owner])).rows[0].id;
   hidden=(await pool.query("INSERT INTO agency_clients(user_id,name) VALUES($1,'Hidden client') RETURNING id",[owner])).rows[0].id;
@@ -35,7 +38,7 @@ beforeAll(async()=>{
   const app:any={get:(p:string,...h:Function[])=>handlers.set('get '+p,h.at(-1)!),post:(p:string,...h:Function[])=>handlers.set('post '+p,h.at(-1)!),put:(p:string,...h:Function[])=>handlers.set('put '+p,h.at(-1)!),delete:(p:string,...h:Function[])=>handlers.set('delete '+p,h.at(-1)!)};
   registerAgencyRoutes(app);registerAgencyAccess({use:(fn:Function)=>{middleware=fn;}} as any);
 });
-afterAll(async()=>{await pool.query('DELETE FROM google_profile_reviews WHERE user_id=$1',[owner]);await pool.query('DELETE FROM citation_campaigns WHERE user_id=$1',[owner]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1::int[])',[[owner,member,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1::int[])',[[owner,member,other]]);await pool.end();});
+afterAll(async()=>{await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1::int[])',[[owner,member,other]]);await pool.query('DELETE FROM google_profile_reviews WHERE user_id=$1',[owner]);await pool.query('DELETE FROM citation_campaigns WHERE user_id=$1',[owner]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1::int[])',[[owner,member,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1::int[])',[[owner,member,other]]);await pool.end();});
 describe('Agency access and 5,000-location scale',()=>{
   it('paginates and filters 5,000 rows in SQL and only exposes the 1,000 assigned locations',async()=>{
     const start=performance.now(),a=await accessFor(member,owner);
@@ -70,7 +73,8 @@ describe('Agency access and 5,000-location scale',()=>{
     expect((await call('post','/api/agency/clients',member,{name:'Forbidden'})).status).toBe(404);
     expect((await call('post','/api/agency/clients',owner,{name:'',userId:other})).status).toBe(400);
     expect((await call('put','/api/agency/team',member,{email:'other@example.invalid',role:'admin',allClients:true})).status).toBe(404);
-    expect((await call('get','/api/agency/locations',other)).status).toBe(404);
+    // A non-member's stale workspace choice falls back to their own account, which has no Agency plan.
+    const foreign=await call('get','/api/agency/locations',other);expect(foreign.status).toBe(402);expect(foreign.data.items).toBeUndefined();
     await pool.query("UPDATE agency_members SET role='viewer' WHERE user_id=$1 AND member_id=$2",[owner,member]);
     expect((await call('post','/api/agency/bulk',member,{requestKey:crypto.randomUUID(),action:'sync',selection:{ids:[loc]}})).status).toBe(404);
     await pool.query("UPDATE agency_members SET role='manager' WHERE user_id=$1 AND member_id=$2",[owner,member]);
@@ -114,12 +118,14 @@ describe('Agency access and 5,000-location scale',()=>{
     await pool.query('DELETE FROM agency_jobs WHERE user_id=$1',[owner]);
   });
   it('rotates queued work fairly between owners and gives explicit work priority',async()=>{
+    await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,'active')",[other,planForModule('agencyWorkspace')]);
     const otherLoc=(await pool.query("INSERT INTO business_locations(user_id,business_name) VALUES($1,'Fairness fixture') RETURNING id",[other])).rows[0].id;
     for(const [user,id,priority] of [[owner,loc,20],[owner,loc+1,10],[other,otherLoc,10],[other,otherLoc,20]])await pool.query("INSERT INTO agency_jobs(id,user_id,actor_id,location_id,action,batch_id,priority) VALUES(gen_random_uuid(),$1,$1,$2,'assign',gen_random_uuid(),$3)",[user,id,priority]);
     const calls:any[]=[];await runAgencyJobs(async(j:any)=>{calls.push(j);return {};},4);
     expect(new Set(calls.slice(0,2).map(j=>j.user_id)).size).toBe(2);
     expect(calls.filter(j=>j.user_id===owner).map(j=>j.priority)).toEqual([10,20]);
     await pool.query('DELETE FROM agency_jobs WHERE user_id=ANY($1::int[])',[[owner,other]]);
+    await pool.query('DELETE FROM subscriptions WHERE user_id=$1',[other]);
   });
   it('executes Guard, AI settings, content, scans and unlink through the existing services without external calls',async()=>{
     const id=(await pool.query("INSERT INTO business_locations(user_id,agency_client_id,business_name,gbp_account_name,gbp_location_name) VALUES($1,$2,'Action fixture','accounts/fixture','locations/actions') RETURNING id",[owner,client])).rows[0].id;

@@ -2,6 +2,7 @@ import { beforeAll, afterAll, it, expect, vi } from "vitest";
 import { pool } from "../db";
 import { ensureDomainsSchema } from "./schema";
 import { registerDomainRoutes } from "./routes";
+import { planForModule } from "@shared/plans";
 import {
   saveConnection,
   preview,
@@ -102,6 +103,11 @@ beforeAll(async () => {
     "INSERT INTO users(email) VALUES('a7-domains-'||gen_random_uuid()||'@example.test'),('a7-domains-other-'||gen_random_uuid()||'@example.test') RETURNING id",
   );
   [user, other] = rows.map((r) => r.id);
+  // The fixture owner is on the plan that includes Domains + Gmail alerts (the worker checks it per job).
+  await pool.query(
+    "INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,'active')",
+    [user, planForModule("domainsMailAlerts")],
+  );
   const locations = await pool.query(
     "INSERT INTO business_locations(user_id,business_name,website) SELECT $1,'Fixture client '||n,'https://fixture-'||lpad(n::text,4,'0')||'.example.test' FROM generate_series(1,1000) n RETURNING id",
     [user],
@@ -135,6 +141,9 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
+  await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1)", [
+    [user, other],
+  ]);
   await pool.query("DELETE FROM managed_domains WHERE user_id=ANY($1)", [
     [user, other],
   ]);

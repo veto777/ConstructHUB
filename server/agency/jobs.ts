@@ -10,7 +10,7 @@ import { replySettingsSchema, saveReplySettings } from '../gbp/review-automation
 import { enqueue as enqueueContent, itemInput, scheduleInput } from '../gbp/content';
 import { enqueue as enqueueScan, profileFor } from '../sitescan/worker';
 import { siteUrl } from '../sitescan/http';
-import { accessFor, filters, locationAccess, locationFilter, locationJoin, positiveId, requireWrite, clientAccess, type AgencyAccess } from './access';
+import { accessFor, agencyPlanPaused, filters, locationAccess, locationFilter, locationJoin, positiveId, requireWrite, clientAccess, workspaceEntitled, type AgencyAccess } from './access';
 export const bulkInput = z.object({
   requestKey:z.string().uuid(), action:z.enum(['sync','unlink','link','guard','ai-replies','content','scan','assign']),
   selection:z.object({allMatching:z.boolean().default(false),ids:z.array(positiveId).max(50).default([]),filters:filters.default({})}).strict(),
@@ -100,18 +100,24 @@ export async function performJob(j:any) {
     default: throw new GoogleError('invalid','Unknown queued action',400);
   }
 }
-/** Cross-process lock avoids duplicate dispatch; oldest tenant turn + priority aging prevent starvation. */
-export async function runAgencyJobs(perform=performJob,limit=10) {
+/** Cross-process lock avoids duplicate dispatch; oldest tenant turn + priority aging prevent starvation.
+ * `onlyUser` narrows a run to one owner (tests on a shared database). */
+export async function runAgencyJobs(perform=performJob,limit=10,onlyUser?:number) {
   const c=await pool.connect();let locked=false;
   try {
     locked=(await c.query('SELECT pg_try_advisory_lock(7161,1) locked')).rows[0].locked;if(!locked)return;
-    await c.query(`UPDATE agency_jobs SET status=CASE WHEN action='scan' THEN 'failed' ELSE 'queued' END,error='Worker interrupted; check results',due_at=now() WHERE status='running'`);
+    await c.query(`UPDATE agency_jobs SET status=CASE WHEN action='scan' THEN 'failed' ELSE 'queued' END,error='Worker interrupted; check results',due_at=now() WHERE status='running' AND ($1::int IS NULL OR user_id=$1)`,[onlyUser??null]);
     for(let i=0;i<limit;i++) {
       const {rows:[j]}=await c.query(`UPDATE agency_jobs SET status='running',started_at=now(),attempts=attempts+1 WHERE id=(
-        SELECT j.id FROM agency_jobs j LEFT JOIN agency_worker_turns t ON t.user_id=j.user_id WHERE j.status='queued' AND j.due_at<=now()
-        ORDER BY COALESCE(t.last_at,'epoch'),(j.priority-LEAST(20,EXTRACT(EPOCH FROM(now()-j.created_at))/1800)),j.created_at,j.id LIMIT 1) RETURNING *`);
+        SELECT j.id FROM agency_jobs j LEFT JOIN agency_worker_turns t ON t.user_id=j.user_id WHERE j.status='queued' AND j.due_at<=now() AND ($1::int IS NULL OR j.user_id=$1)
+        ORDER BY COALESCE(t.last_at,'epoch'),(j.priority-LEAST(20,EXTRACT(EPOCH FROM(now()-j.created_at))/1800)),j.created_at,j.id LIMIT 1) RETURNING *`,[onlyUser??null]);
       if(!j)break;
       await c.query('INSERT INTO agency_worker_turns(user_id,last_at) VALUES($1,clock_timestamp()) ON CONFLICT(user_id) DO UPDATE SET last_at=clock_timestamp()',[j.user_id]);
+      // Bulk actions belong to the agency workspace and follow the owner's current plan. Syncs are every plan's
+      // own Google sync queue (scheduleSyncs, queueSync) and always run.
+      if(j.action!=='sync'&&!await workspaceEntitled(j.user_id,j.actor_id)) {
+        await c.query("UPDATE agency_jobs SET status='failed',error=$2,finished_at=now() WHERE id=$1",[j.id,agencyPlanPaused]);continue;
+      }
       try {
         const result=await perform(j);
         await c.query("UPDATE agency_jobs SET status='done',finished_at=now(),result=$2,error=NULL WHERE id=$1",[j.id,JSON.stringify(result??{})]);

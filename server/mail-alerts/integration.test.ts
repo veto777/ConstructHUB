@@ -11,6 +11,7 @@ import {
 import { syncGmail } from "./gmail";
 import { GMAIL_QUERY } from "./classify";
 import { encryptToken } from "../gbp/token-crypto";
+import { planForModule } from "@shared/plans";
 vi.mock("../account-events", () => ({
   notifyUser: vi.fn(async () => {}),
   logActivity: vi.fn(async () => {}),
@@ -26,6 +27,11 @@ beforeAll(async () => {
     "INSERT INTO users(email) VALUES('a7-mail-'||gen_random_uuid()||'@example.test'),('a7-mail-other-'||gen_random_uuid()||'@example.test') RETURNING id",
   );
   [user, other] = rows.map((r) => r.id);
+  // Both fixture owners are on the plan that includes Domains + Gmail alerts (forwarded mail is kept only then).
+  await pool.query(
+    "INSERT INTO subscriptions(user_id,plan,status) SELECT unnest($1::int[]),$2,'active'",
+    [[user, other], planForModule("domainsMailAlerts")],
+  );
   location = (
     await pool.query(
       "INSERT INTO business_locations(user_id,business_name,website) VALUES($1,'Fixture Agency Client','https://client.example.test') RETURNING id",
@@ -40,6 +46,9 @@ beforeAll(async () => {
   address = (await forwardingAddress(user))!;
 });
 afterAll(async () => {
+  await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1)", [
+    [user, other],
+  ]);
   await pool.query("DELETE FROM managed_domains WHERE user_id=ANY($1)", [
     [user, other],
   ]);
