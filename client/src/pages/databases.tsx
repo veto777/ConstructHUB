@@ -139,7 +139,7 @@ export default function DatabasesPage() {
     return p.toString();
   }, [currentPage, jurisdictionFilter, selectedCountyId, selectedState, searchQuery]);
 
-  const { data: result, isLoading, isFetching } = useQuery<FilteredResult>({
+  const { data: result, isLoading, isFetching, isPlaceholderData } = useQuery<FilteredResult>({
     queryKey: ["/api/databases", queryParams],
     queryFn: async () => {
       const res = await fetch(`/api/databases?${queryParams}`);
@@ -152,6 +152,12 @@ export default function DatabasesPage() {
   const databases = result?.databases ?? [];
   const totalResults = result?.total ?? 0;
   const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+
+  // A page past the end (stale or shared link, data changed since) opens the last page
+  // instead of claiming nothing matches.
+  useEffect(() => {
+    if (result && !isPlaceholderData && totalPages > 0 && currentPage > totalPages) setCurrentPage(totalPages);
+  }, [result, isPlaceholderData, totalPages, currentPage]);
 
   const countyMap = useMemo(() => {
     const map = new Map<number, County>();

@@ -116,7 +116,7 @@ export interface PermitRowRepairReport {
   unmatched: number;
   /** Seeded city rows that duplicated another row for the same jurisdiction + county, removed. */
   duplicatesRemoved: number;
-  /** Duplicates kept because saved search results or schedules point at them. */
+  /** Duplicates kept because saved search results, schedules or CRM projects point at them. */
   duplicatesKept: number;
   /** Seeded rows whose templated note / office name / searchable field / Active flag was cleared. */
   placeholdersCleaned: number;
@@ -128,7 +128,8 @@ export interface PermitRowRepairReport {
  *  1. City rows seeded with all-cities.json's old Replit `countyId` are moved to the
  *     county the same JSON row names (Glendale, CA → Los Angeles, not Fairfield, CT).
  *  2. A seeded row that then duplicates another row for the same jurisdiction and county
- *     is removed, unless saved results or schedules reference it.
+ *     is removed, unless saved results, schedules or a CRM project's permit portal
+ *     reference it.
  *  3. Templated placeholders are made honest: the invented "Contact … Building
  *     Department" note is cleared; a row with no portal gets its jurisdiction as its
  *     name, no searchable fields, isActive=false and link status "none".
@@ -231,10 +232,19 @@ export async function repairSeededPermitRows(opts: { dryRun?: boolean } = {}): P
       for (const id of ids) if (id !== keep && seededIds.has(id)) dropCandidates.push(id);
     }
     const referenced = new Set<number>();
+    // crm_projects.permit_portal_id also stores a permit_databases id. The CRM schema is
+    // created after the boot seed (routes.ts), so only consult it when the column exists.
+    const crmColumn = dropCandidates.length ? await tx.execute(sql`select 1 from information_schema.columns
+      where table_name = 'crm_projects' and column_name = 'permit_portal_id' limit 1`) : null;
     for (const part of chunks(dropCandidates)) {
       const r1 = await tx.selectDistinct({ id: searchResults.databaseId }).from(searchResults).where(inArray(searchResults.databaseId, part));
       const r2 = await tx.selectDistinct({ id: scrapeSchedules.databaseId }).from(scrapeSchedules).where(inArray(scrapeSchedules.databaseId, part));
       for (const r of [...r1, ...r2]) referenced.add(r.id);
+      if (crmColumn?.rows.length) {
+        const r3 = await tx.execute(sql`select distinct permit_portal_id as id from crm_projects
+          where permit_portal_id in (${sql.join(part.map((id) => sql`${id}`), sql`, `)})`);
+        for (const r of r3.rows as { id: number }[]) referenced.add(Number(r.id));
+      }
     }
     const drop = dropCandidates.filter((id) => !referenced.has(id));
     const dropSet = new Set(drop);
@@ -268,7 +278,7 @@ export async function repairSeededPermitRows(opts: { dryRun?: boolean } = {}): P
   const changed = report.repointed + report.duplicatesRemoved + report.placeholdersCleaned;
   if (changed || report.unmatched || report.duplicatesKept || opts.dryRun) {
     console.log(`${opts.dryRun ? "[dry run] " : ""}Permit rows: ${report.repointed} cities moved to their real county, ${report.duplicatesRemoved} seeded duplicates removed` +
-      `${report.duplicatesKept ? ` (${report.duplicatesKept} kept — referenced by results/schedules)` : ""}, ${report.placeholdersCleaned} placeholders cleaned` +
+      `${report.duplicatesKept ? ` (${report.duplicatesKept} kept — referenced by results, schedules or projects)` : ""}, ${report.placeholdersCleaned} placeholders cleaned` +
       `${report.unmatched ? `, ${report.unmatched} seeded cities with no matching county left as-is` : ""}.`);
   }
   return report;
