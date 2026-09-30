@@ -585,8 +585,12 @@ export default function CrmPriceBookPage() {
                         </tr>
                         {seeCosts && preview.marginBps != null && (
                           <tr className="border-t text-xs text-muted-foreground">
-                            <td className={crmTable.td} colSpan={4}>
-                              cost {money(preview.totalCostCents)} · margin {(preview.marginBps / 100).toFixed(1)}%
+                            <td className={crmTable.td} colSpan={4} data-testid={`preview-margin-${i.id}`}>
+                              {/* A blank SKU cost is saved as null (unknown); the server
+                                  totals it as $0, which would read as a 100% margin. */}
+                              {preview.lines?.some((l: any) => l.unitCostCents === null)
+                                ? "No cost on file for this SKU, so no margin is shown."
+                                : `cost ${money(preview.totalCostCents)} · margin ${(preview.marginBps / 100).toFixed(1)}%`}
                             </td>
                           </tr>
                         )}

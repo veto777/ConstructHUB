@@ -62,6 +62,8 @@ interface ReportRow {
 
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
 const PAGE = 25;
+/** GET /api/crm/reports returns at most this many (newest first). */
+const LIST_CAP = 500;
 const fmt = (v: number | null | undefined, suffix = "") =>
   v === null || v === undefined ? "—" : `${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}${suffix}`;
 
@@ -392,12 +394,17 @@ export default function CrmReportsPage() {
                 </tbody>
               </table>
             </div>
-            {reports.length > shown && (
+            {(reports.length > shown || reports.length >= LIST_CAP) && (
               <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
-                <span data-testid="text-report-count">Showing {shown} of {reports.length}</span>
-                <Button variant="outline" size="sm" onClick={() => setShown((n) => n + PAGE)} data-testid="button-more-reports">
-                  Show {Math.min(PAGE, reports.length - shown)} more
-                </Button>
+                {/* At the server's cap there may be older imports, so don't present 500 as the total. */}
+                <span data-testid="text-report-count">
+                  Showing {Math.min(shown, reports.length)} of {reports.length >= LIST_CAP ? `the latest ${LIST_CAP}` : reports.length}
+                </span>
+                {reports.length > shown && (
+                  <Button variant="outline" size="sm" onClick={() => setShown((n) => n + PAGE)} data-testid="button-more-reports">
+                    Show {Math.min(PAGE, reports.length - shown)} more
+                  </Button>
+                )}
               </div>
             )}
           </>
