@@ -168,10 +168,12 @@ export default function SearchPage() {
     queryKey: ["/api/databases/county-state", scopeState],
     queryFn: async () => {
       if (scopeState === "all") return [];
-      const res = await fetch(`/api/databases?filtered=true&stateCode=${scopeState}&limit=5000`);
+      // Only the state's live-searchable portals (the same set the search runs
+      // against). The paged directory list stops at 100 rows, which cut the
+      // count and the city picker short in states with more portals.
+      const res = await fetch(`/api/databases?searchable=true&stateCode=${encodeURIComponent(scopeState)}`);
       if (!res.ok) return [];
-      const result = await res.json();
-      return result.databases;
+      return res.json();
     },
     enabled: scopeState !== "all",
   });
@@ -523,8 +525,14 @@ export default function SearchPage() {
   const isSearching = searchMutation.isPending || (liveStatus?.status === "running");
   const isComplete = liveStatus?.status === "completed";
 
-  const completedDbs = liveStatus?.databases.filter(d => d.status === "completed").length ?? 0;
+  // A portal is finished whether it was searched or failed; only "completed"
+  // means it was actually searched. Failed portals are counted and named, so
+  // an empty result never reads as "no permits exist" when nothing was queried.
+  const finishedDbs = liveStatus?.databases.filter(d => d.status === "completed" || d.status === "error" || d.status === "skipped").length ?? 0;
+  const failedDbs = liveStatus?.databases.filter(d => d.status === "error").length ?? 0;
+  const searchedDbs = liveStatus?.databases.filter(d => d.status === "completed").length ?? 0;
   const totalDbs = liveStatus?.databases.length ?? 0;
+  const portalWord = (n: number) => `${n} portal${n === 1 ? "" : "s"}`;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -771,15 +779,25 @@ export default function SearchPage() {
                   <div className="flex items-center gap-2.5">
                     {isSearching ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : (
+                    ) : failedDbs === 0 ? (
                       <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    ) : searchedDbs === 0 ? (
+                      <XCircle className="h-4 w-4 text-destructive" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     )}
-                    <span className="text-sm font-semibold">
-                      {isSearching ? "Searching databases..." : "Search complete"}
+                    <span className="text-sm font-semibold" role="status" data-testid="text-search-status">
+                      {isSearching
+                        ? "Searching databases..."
+                        : failedDbs === 0
+                          ? "Search complete"
+                          : searchedDbs === 0
+                            ? `Search failed: ${failedDbs === 1 ? "the portal" : `none of the ${portalWord(failedDbs)}`} could be searched`
+                            : `Search finished: ${portalWord(failedDbs)} of ${totalDbs} could not be searched`}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="tabular-nums">{completedDbs}/{totalDbs}</span>
+                    <span className="tabular-nums" title="Portals finished">{finishedDbs}/{totalDbs}</span>
                     {liveStatus.elapsedMs > 0 && (
                       <span className="tabular-nums">{(liveStatus.elapsedMs / 1000).toFixed(1)}s</span>
                     )}
@@ -789,7 +807,7 @@ export default function SearchPage() {
                 <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
                   <div
                     className="bg-foreground h-full rounded-full transition-all duration-500"
-                    style={{ width: `${totalDbs > 0 ? (completedDbs / totalDbs) * 100 : 0}%` }}
+                    style={{ width: `${totalDbs > 0 ? (finishedDbs / totalDbs) * 100 : 0}%` }}
                   />
                 </div>
 
@@ -797,28 +815,34 @@ export default function SearchPage() {
                   {liveStatus.databases.map((db) => (
                     <div
                       key={db.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded text-xs"
+                      className="flex items-start gap-2 px-2 py-1.5 rounded text-xs"
                       data-testid={`status-db-${db.id}`}
+                      data-status={db.status}
                     >
                       {db.status === "completed" && (
-                        <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 flex-shrink-0" />
+                        <CheckCircle2 className="h-3 w-3 mt-0.5 text-green-600 dark:text-green-400 flex-shrink-0" aria-label="Searched" />
                       )}
                       {db.status === "running" && (
-                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />
+                        <Loader2 className="h-3 w-3 mt-0.5 animate-spin text-muted-foreground flex-shrink-0" aria-label="Searching" />
                       )}
                       {db.status === "pending" && (
-                        <Database className="h-3 w-3 text-muted-foreground/30 flex-shrink-0" />
+                        <Database className="h-3 w-3 mt-0.5 text-muted-foreground/30 flex-shrink-0" aria-label="Waiting" />
                       )}
                       {db.status === "error" && (
-                        <XCircle className="h-3 w-3 text-destructive flex-shrink-0" />
+                        <XCircle className="h-3 w-3 mt-0.5 text-destructive flex-shrink-0" aria-label="Not searched" />
                       )}
                       {db.status === "skipped" && (
-                        <SkipForward className="h-3 w-3 text-muted-foreground/30 flex-shrink-0" />
+                        <SkipForward className="h-3 w-3 mt-0.5 text-muted-foreground/30 flex-shrink-0" aria-label="Skipped" />
                       )}
-                      <span className={`truncate ${db.status === "running" ? "font-medium" : db.status === "pending" || db.status === "skipped" ? "text-muted-foreground/60" : ""}`}>
-                        {db.name}
-                      </span>
-                      {db.status === "completed" && db.resultsFound > 0 && (
+                      <div className="min-w-0 flex-1">
+                        <span className={`block truncate ${db.status === "running" ? "font-medium" : db.status === "pending" || db.status === "skipped" ? "text-muted-foreground/60" : ""}`}>
+                          {db.name}
+                        </span>
+                        {db.status === "error" && db.message && (
+                          <span className="block text-destructive break-words" data-testid={`status-db-message-${db.id}`}>{db.message}</span>
+                        )}
+                      </div>
+                      {(db.status === "completed" || db.status === "error") && db.resultsFound > 0 && (
                         <span className="ml-auto font-semibold tabular-nums flex-shrink-0">{db.resultsFound}</span>
                       )}
                     </div>
@@ -1074,14 +1098,28 @@ export default function SearchPage() {
             )}
 
             {isComplete && rawResults.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-scale-in">
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-scale-in" data-testid="empty-search-results">
                 <AlertCircle className="h-6 w-6 text-muted-foreground/40" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">No results found</p>
-                  <p className="text-xs text-muted-foreground max-w-sm">
-                    Try a different search term or search type.
-                  </p>
-                </div>
+                {searchedDbs === 0 && failedDbs > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">No portal could be searched</p>
+                    <p className="text-xs text-muted-foreground max-w-sm">
+                      The live search didn't reach any portal, so there may be permits it couldn't see. Try again later, or open a portal directly from the Directory.
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="mt-2">
+                      <Link href="/databases" data-testid="link-browse-directory-failed">Browse the Directory</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">No results found</p>
+                    <p className="text-xs text-muted-foreground max-w-sm">
+                      {failedDbs > 0
+                        ? `${portalWord(searchedDbs)} searched with no matches; ${portalWord(failedDbs)} could not be searched, so results may be incomplete.`
+                        : "Try a different search term or search type."}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

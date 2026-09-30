@@ -99,6 +99,19 @@ const FRAUD_TABS = ["Blocked IPs", "Countries", "Multi-Clicks", "Devices", "Brow
 const PAGE_TABS = ["dashboard", "traffic", "fraud", "tools", "settings", "link-ads"] as const;
 type PageTab = typeof PAGE_TABS[number];
 
+// Clipboard writes can be refused (no permission, insecure context, some
+// browsers). Report what happened instead of announcing a copy that failed.
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (!navigator.clipboard?.writeText) return false;
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+const COPY_BLOCKED = "Your browser blocked clipboard access. Select the text and copy it manually.";
+
 export default function ClickGuardPage() {
   const appOrigin = useAppOrigin();
   const { toast } = useToast();
@@ -184,14 +197,17 @@ export default function ClickGuardPage() {
       await apiRequest("DELETE", `/api/click-guard/domains/${id}`);
       return id;
     },
-    onSuccess: (deletedId) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"] });
+    onSuccess: async (deletedId) => {
       const remaining = domains.filter(d => d.id !== deletedId);
-      if (remaining.length > 0) {
-        setSelectedDomainId(remaining[0].id);
-      } else {
-        setSelectedDomainId(null);
-      }
+      // Drop the deleted domain from the cached list first, so nothing is
+      // selected (or refetched) under its id, then forget its per-domain
+      // queries — a prefix invalidation used to refetch its analytics,
+      // visits and blocked IPs and get three 404s.
+      queryClient.setQueryData<DomainWithStats[]>(["/api/click-guard/domains"], old => old?.filter(d => d.id !== deletedId));
+      await queryClient.cancelQueries({ queryKey: ["/api/click-guard/domains", deletedId] });
+      queryClient.removeQueries({ queryKey: ["/api/click-guard/domains", deletedId] });
+      setSelectedDomainId(remaining.length > 0 ? remaining[0].id : null);
+      queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"], exact: true });
       toast({ title: "Domain removed" });
     },
     onError: (e: unknown) => {
@@ -230,9 +246,9 @@ export default function ClickGuardPage() {
     ? `<script src="${appOrigin}/api/click-guard/script/${selectedDomain.trackingId}" async></script>`
     : "";
 
-  const copyScript = () => {
-    navigator.clipboard.writeText(scriptSnippet);
-    toast({ title: "Copied!", description: "Tracking script copied to clipboard." });
+  const copyScript = async () => {
+    if (await copyToClipboard(scriptSnippet)) toast({ title: "Copied!", description: "Tracking script copied to clipboard." });
+    else toast({ title: "Couldn't copy", description: COPY_BLOCKED, variant: "destructive" });
   };
 
   const threatColor = analytics?.threatLevel === "critical" ? "text-red-400" : analytics?.threatLevel === "substantial" ? "text-blue-500" : "text-emerald-400";
@@ -512,33 +528,37 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
     ? `<!-- Click Guard by ConstructHUB -->\n<script src="${appOrigin}/api/click-guard/script/${trackingId}" async></script>`
     : "";
 
-  const copyScript = () => {
-    if (scriptData?.script) {
-      navigator.clipboard.writeText(scriptData.script);
-      setScriptCopied(true);
-      toast({ title: "Script copied!", description: "Paste this into Google Ads Scripts." });
-      setTimeout(() => setScriptCopied(false), 3000);
+  const copyScript = async () => {
+    if (!scriptData?.script) return;
+    if (!(await copyToClipboard(scriptData.script))) {
+      toast({ title: "Couldn't copy the script", description: COPY_BLOCKED, variant: "destructive" });
+      return;
     }
+    setScriptCopied(true);
+    toast({ title: "Script copied!", description: "Paste this into Google Ads Scripts." });
+    setTimeout(() => setScriptCopied(false), 3000);
   };
 
-  const copyTrackingSnippet = () => {
-    navigator.clipboard.writeText(trackingSnippet);
+  const copyTrackingSnippet = async () => {
+    if (!(await copyToClipboard(trackingSnippet))) {
+      toast({ title: "Couldn't copy the tracking code", description: COPY_BLOCKED, variant: "destructive" });
+      return;
+    }
     setTrackingCopied(true);
     toast({ title: "Tracking code copied!", description: "Add this to your website's header or footer." });
     setTimeout(() => setTrackingCopied(false), 3000);
   };
 
-  const copyIpList = () => {
+  const copyIpList = async () => {
     const ipList = blockedIps.filter(b => b.isActive).map(b => b.ipAddress).join("\n");
-    navigator.clipboard.writeText(ipList);
-    toast({ title: "IP list copied!", description: `${activeBlockedCount} IPs copied to clipboard.` });
+    if (await copyToClipboard(ipList)) toast({ title: "IP list copied!", description: `${activeBlockedCount} IPs copied to clipboard.` });
+    else toast({ title: "Couldn't copy the IP list", description: "Your browser blocked clipboard access. The same IPs are listed under Traffic Signals → Blocked IPs.", variant: "destructive" });
   };
 
-  const copyExclusionUrl = () => {
-    if (scriptData?.exclusionUrl) {
-      navigator.clipboard.writeText(scriptData.exclusionUrl);
-      toast({ title: "API URL copied!", description: "Use this URL to fetch your blocked IP list." });
-    }
+  const copyExclusionUrl = async () => {
+    if (!scriptData?.exclusionUrl) return;
+    if (await copyToClipboard(scriptData.exclusionUrl)) toast({ title: "API URL copied!", description: "Use this URL to fetch your blocked IP list." });
+    else toast({ title: "Couldn't copy the URL", description: COPY_BLOCKED, variant: "destructive" });
   };
 
   return (
@@ -1687,6 +1707,15 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
   const exclusionRateError = rangeError(exclusionListRate, "Exclusion list length", 50, 500);
   const [manualExcludeIps, setManualExcludeIps] = useState(settings.manualExcludeIps || "");
   const [whitelistIps, setWhitelistIps] = useState(settings.whitelistIps || "");
+  // The server rejects the whole list when any line is not a valid IP/range;
+  // keep its reason next to the box (until the text changes), not only in a toast.
+  const [ipListErrors, setIpListErrors] = useState<{ manualExcludeIps?: string; whitelistIps?: string }>({});
+  const saveIpList = (key: "manualExcludeIps" | "whitelistIps", value: string) => {
+    updateSetting.mutate({ [key]: value }, {
+      onSuccess: () => setIpListErrors(prev => ({ ...prev, [key]: undefined })),
+      onError: (e: unknown) => setIpListErrors(prev => ({ ...prev, [key]: `${apiErrorMessage(e).replace(/\.\s*$/, "")}. Nothing was saved.` })),
+    });
+  };
 
   // Save the value the Switch reports. Negating the stored value sent `true`
   // for an unsaved key whose Switch already showed ON (default-on keys), so
@@ -2120,20 +2149,26 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <h3 className="text-base font-semibold text-foreground">Manually Exclude IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Added first to the exclusion list your Google Ads script downloads. One IP, CIDR range or 1.2.3.* per line; invalid entries are skipped.
+            Added first to the exclusion list your Google Ads script downloads. One IP, CIDR range or 1.2.3.* per line. Every line must be valid: if one isn&rsquo;t, nothing is saved and that line is named here.
           </p>
           <Textarea
             value={manualExcludeIps}
-            onChange={e => setManualExcludeIps(e.target.value)}
+            onChange={e => { setManualExcludeIps(e.target.value); setIpListErrors(prev => ({ ...prev, manualExcludeIps: undefined })); }}
             placeholder="72.12.230.50"
             className="mt-3 bg-card border-border text-foreground font-mono text-sm min-h-[100px]"
+            aria-invalid={!!ipListErrors.manualExcludeIps}
+            aria-describedby={ipListErrors.manualExcludeIps ? "error-manual-exclude" : undefined}
             data-testid="textarea-manual-exclude"
           />
+          {ipListErrors.manualExcludeIps && (
+            <p id="error-manual-exclude" role="alert" className="mt-2 text-sm text-destructive" data-testid="error-manual-exclude">{ipListErrors.manualExcludeIps}</p>
+          )}
           <Button
             size="sm"
             variant="outline"
             className="mt-3 border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
-            onClick={() => updateSetting.mutate({ manualExcludeIps })}
+            onClick={() => saveIpList("manualExcludeIps", manualExcludeIps)}
+            disabled={updateSetting.isPending}
             data-testid="button-update-exclude"
           >
             Update
@@ -2145,20 +2180,26 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <h3 className="text-base font-semibold text-foreground">Whitelist IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Removed from the exclusion list your Google Ads script downloads (an IP inside a whitelisted range is removed too; a blocked range is removed only if the same range is whitelisted). Automatic blocking still records these IPs on the Blocked IPs tab. The script only adds exclusions, so an IP it already excluded in Google Ads stays excluded until you remove it there (campaign settings &rarr; IP exclusions).
+            Removed from the exclusion list your Google Ads script downloads (an IP inside a whitelisted range is removed too; a blocked range is removed only if the same range is whitelisted). Automatic blocking still records these IPs on the Blocked IPs tab. The script only adds exclusions, so an IP it already excluded in Google Ads stays excluded until you remove it there (campaign settings &rarr; IP exclusions). One IP, CIDR range or 1.2.3.* per line; every line must be valid to save.
           </p>
           <Textarea
             value={whitelistIps}
-            onChange={e => setWhitelistIps(e.target.value)}
+            onChange={e => { setWhitelistIps(e.target.value); setIpListErrors(prev => ({ ...prev, whitelistIps: undefined })); }}
             placeholder="Enter IPs to whitelist..."
             className="mt-3 bg-card border-border text-foreground font-mono text-sm min-h-[100px]"
+            aria-invalid={!!ipListErrors.whitelistIps}
+            aria-describedby={ipListErrors.whitelistIps ? "error-whitelist" : undefined}
             data-testid="textarea-whitelist"
           />
+          {ipListErrors.whitelistIps && (
+            <p id="error-whitelist" role="alert" className="mt-2 text-sm text-destructive" data-testid="error-whitelist">{ipListErrors.whitelistIps}</p>
+          )}
           <Button
             size="sm"
             variant="outline"
             className="mt-3 border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
-            onClick={() => updateSetting.mutate({ whitelistIps })}
+            onClick={() => saveIpList("whitelistIps", whitelistIps)}
+            disabled={updateSetting.isPending}
             data-testid="button-update-whitelist"
           >
             Update

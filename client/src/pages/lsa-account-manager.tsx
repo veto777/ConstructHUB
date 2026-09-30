@@ -20,6 +20,7 @@ import {
   Loader2, ShieldCheck,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useUrlParam } from "@/hooks/use-url-param";
 
 type ManagerStatus = {
   connected: boolean;
@@ -97,11 +98,15 @@ type AuditEntry = {
 };
 
 type Tab = "manager" | "accounts" | "invitations" | "audit";
+const TABS: readonly Tab[] = ["manager", "accounts", "invitations", "audit"];
 
 export default function LsaAccountManagerPage() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<Tab>("manager");
+  // The tab lives in the URL (?tab=invitations) so a reload or a shared link keeps it.
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const activeTab: Tab = (TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as Tab) : "manager";
+  const setActiveTab = (tab: Tab) => setTabParam(tab === "manager" ? null : tab);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
   // Who counts as a platform admin is the server's decision (server/admin.ts,
@@ -281,11 +286,12 @@ function ManagerConnectionTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/lsa/manager"] });
-      toast({ title: "Manager account connected" });
+      toast({ title: "Manager account connected", description: "Google accepted the refresh token. The manager ID is checked when you sync child accounts." });
       setShowConnect(false);
       setManagerId(""); setRefreshToken(""); setDeveloperToken("");
     },
-    onError: (e: any) => toast({ title: "Connection failed", description: e.message, variant: "destructive" }),
+    // The dialog stays open with the entered values so the admin can correct them.
+    onError: (e: unknown) => toast({ title: "Connection failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const disconnectMutation = useMutation({
@@ -308,7 +314,7 @@ function ManagerConnectionTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/lsa/accounts"] });
       toast({ title: `Synced ${data.synced} child accounts` });
     },
-    onError: (e: any) => toast({ title: "Sync failed", description: e.message, variant: "destructive" }),
+    onError: (e: unknown) => toast({ title: "Sync failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   return (
@@ -397,7 +403,7 @@ function ManagerConnectionTab() {
         </CardContent>
       </Card>
 
-      <Dialog open={showConnect} onOpenChange={setShowConnect}>
+      <Dialog open={showConnect} onOpenChange={open => { setShowConnect(open); if (!open) connectMutation.reset(); }}>
         <DialogContent data-testid="dialog-connect-manager">
           <DialogHeader>
             <DialogTitle>Connect Central Manager Account</DialogTitle>
@@ -424,7 +430,7 @@ function ManagerConnectionTab() {
                 onChange={e => setRefreshToken(e.target.value)}
                 data-testid="input-refresh-token"
               />
-              <p className="text-xs text-muted-foreground">Obtained via OAuth with access_type=offline + prompt=consent.</p>
+              <p className="text-xs text-muted-foreground">Obtained via OAuth with access_type=offline + prompt=consent. Checked with Google before anything is saved.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="developerToken">Developer Token <span className="text-muted-foreground">(optional)</span></Label>
@@ -438,9 +444,12 @@ function ManagerConnectionTab() {
               />
               <p className="text-xs text-muted-foreground">Falls back to GOOGLE_ADS_DEVELOPER_TOKEN env var if left blank.</p>
             </div>
+            {connectMutation.isError && (
+              <p role="alert" className="text-sm text-destructive" data-testid="error-connect-manager">{apiErrorMessage(connectMutation.error)}</p>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowConnect(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setShowConnect(false); connectMutation.reset(); }}>Cancel</Button>
             <Button
               onClick={() => connectMutation.mutate()}
               disabled={!managerId || !refreshToken || connectMutation.isPending}

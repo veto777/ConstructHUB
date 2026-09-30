@@ -7,13 +7,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { useUrlParam } from '@/hooks/use-url-param';
 type Tab='accounts'|'invitations'|'plans'|'jobs'|'findings';
 const labels:Record<Tab,string>={accounts:'Client accounts',invitations:'Access invitations',plans:'Protection previews',jobs:'Queue',findings:'Health audit'};
 const defaults=['jobs','careers','salary','training','DIY','tutorial','free','cheap'];
 function Pager({page,total,setPage}:{page:number;total:number;setPage:(n:number)=>void}) {return <div className="flex items-center gap-3"><Button variant="outline" disabled={page<=1} onClick={()=>setPage(page-1)}>Previous</Button><span>Page {page} · {total} results</span><Button variant="outline" disabled={page*25>=total} onClick={()=>setPage(page+1)}>Next</Button></div>;}
 export default function AdsManagerPage() {
   const qc=useQueryClient();
-  const [tab,setTab]=useState<Tab>('accounts'),[q,setQ]=useState(''),[filter,setFilter]=useState(''),[lsa,setLsa]=useState(''),[page,setPage]=useState(1);
+  // The section lives in the URL (?tab=jobs) so a reload or a shared link keeps it.
+  const [tabParam,setTabParam]=useUrlParam('tab');
+  const tab:Tab=(Object.keys(labels) as string[]).includes(tabParam??'')?tabParam as Tab:'accounts';
+  const setTab=(t:Tab)=>setTabParam(t==='accounts'?null:t);
+  const [q,setQ]=useState(''),[filter,setFilter]=useState(''),[lsa,setLsa]=useState(''),[page,setPage]=useState(1);
   const [selected,setSelected]=useState<string[]>([]),[all,setAll]=useState(false),[message,setMessage]=useState(''),[manager,setManager]=useState('');
   const [kind,setKind]=useState('presence'),[keywords,setKeywords]=useState(defaults.join('\n')),[listName,setListName]=useState('Contractor starter negatives'),[placements,setPlacements]=useState('');
   const [schedule,setSchedule]=useState('MONDAY,09:00,17:00\nTUESDAY,09:00,17:00\nWEDNESDAY,09:00,17:00\nTHURSDAY,09:00,17:00\nFRIDAY,09:00,17:00'),[campaignIds,setCampaignIds]=useState('');

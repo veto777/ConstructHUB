@@ -83,6 +83,11 @@ export function getBaseUrl(req: any): string {
   return siteBaseUrl(req);
 }
 
+/** Google sign-in is offered only when both OAuth client values are set. */
+export function googleSignInConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim());
+}
+
 export async function setupAuth(app: Express) {
   const PgStore = connectPgSimple(session);
 
@@ -130,7 +135,13 @@ export async function setupAuth(app: Express) {
     return user;
   }));
 
-  passport.use(
+  // Google sign-in needs both OAuth client values. Without them passport
+  // cannot build the strategy (it throws, which used to stop the whole server
+  // from booting), so it is skipped and the Google routes below send people
+  // back to the sign-in page with an honest "not available" message.
+  const googleConfigured = googleSignInConfigured();
+  if (!googleConfigured) console.warn("GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in is disabled.");
+  if (googleConfigured) passport.use(
     new GoogleStrategy(
       {
         clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -232,6 +243,15 @@ export async function setupAuth(app: Express) {
   app.get("/api/auth/google", (req, res, next) => {
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
     if (req.query.gbp === "1") return res.redirect("/api/gbp/connect");
+    if (!googleConfigured) {
+      // A step-up returns to its page with the usual failure flag; a sign-in
+      // lands on /auth, which explains that Google sign-in is unavailable.
+      if (req.query.reauth === "1" && req.user) {
+        const back = safeNextPath(typeof req.query.next === "string" ? req.query.next : undefined) ?? "/settings?tab=security";
+        return res.redirect(`${back}${back.includes("?") ? "&" : "?"}reauth=google-failed`);
+      }
+      return res.redirect("/auth?error=google-unavailable");
+    }
     const gbp = false;
     // A CRM beta invite survives the OAuth round-trip in the session.
     if (typeof req.query.beta === "string" && req.query.beta) {
@@ -265,6 +285,7 @@ export async function setupAuth(app: Express) {
   app.get(
     "/api/auth/google/callback",
     (req, res, next) => {
+      if (!googleConfigured) return res.redirect("/auth?error=google-unavailable");
       const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
       // Read here, cleared in the callback: the verify function above must
       // still see it to stay in step-up mode (no account create/link/switch).

@@ -139,6 +139,18 @@ export default function SettingsPage() {
   );
 }
 
+// Clipboard writes can be refused (no permission, insecure context, some
+// browsers); report the outcome instead of assuming the copy worked.
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (!navigator.clipboard?.writeText) return false;
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function ProfileSection({ user }: { user: any }) {
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState(user?.displayName || "");
@@ -200,8 +212,8 @@ function ProfileSection({ user }: { user: any }) {
         await apiRequest("PATCH", "/api/auth/profile", { avatarUrl: data.url });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         toast({ title: "Profile photo updated" });
-      } catch {
-        toast({ title: "Failed to upload photo", variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Failed to upload photo", description: apiErrorMessage(err), variant: "destructive" });
       } finally {
         setAvatarUploading(false);
       }
@@ -237,9 +249,11 @@ function ProfileSection({ user }: { user: any }) {
         const data = await res.json();
         setCompanyLogoUrl(data.url);
         toast({ title: "Logo uploaded" });
-      } catch {
+      } catch (err) {
+        // The profile accepts an inline image, so the logo is still kept — but
+        // only once the form is saved.
         setCompanyLogoUrl(dataUrl);
-        toast({ title: "Upload failed, using local preview", variant: "destructive" });
+        toast({ title: "Logo not uploaded to storage", description: `${apiErrorMessage(err).replace(/\.?\s*$/, ".")} The image is kept in this form; click Save Changes to store it with your profile.`, variant: "destructive" });
       } finally {
         setLogoUploading(false);
       }
@@ -823,11 +837,13 @@ function BetaAccessSection({ user }: { user: any }) {
       });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/beta-codes"] });
-      navigator.clipboard.writeText(data.code);
       const emailMsg = recipientEmail.trim() ? ` and emailed to ${recipientEmail}` : "";
-      toast({ title: "Trial Code Created & Copied!", description: `Code: ${data.code}${emailMsg}` });
+      const copied = await copyToClipboard(data.code);
+      toast(copied
+        ? { title: "Trial Code Created & Copied!", description: `Code: ${data.code}${emailMsg}` }
+        : { title: "Trial Code Created", description: `Code: ${data.code}${emailMsg}. It couldn't be copied automatically; select it in the list below to copy it.` });
       setRecipientEmail("");
       setRecipientName("");
       setShowCreateForm(false);
@@ -851,9 +867,9 @@ function BetaAccessSection({ user }: { user: any }) {
     },
   });
 
-  const copyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    toast({ title: "Code copied to clipboard" });
+  const copyCode = async (code: string) => {
+    if (await copyToClipboard(code)) toast({ title: "Code copied to clipboard" });
+    else toast({ title: "Couldn't copy the code", description: `Your browser blocked clipboard access. Select the code (${code}) and copy it manually.`, variant: "destructive" });
   };
 
   const getTimeRemaining = (expiresAt: string) => {
@@ -1024,7 +1040,7 @@ function BetaAccessSection({ user }: { user: any }) {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-sm font-semibold tracking-wider" data-testid={`text-beta-code-${c.id}`}>{c.code}</code>
-                          <button onClick={() => copyCode(c.code)} className="text-muted-foreground hover:text-foreground" data-testid={`button-copy-code-${c.id}`}>
+                          <button type="button" onClick={() => copyCode(c.code)} aria-label={`Copy code ${c.code}`} className="text-muted-foreground hover:text-foreground" data-testid={`button-copy-code-${c.id}`}>
                             <Copy className="h-3.5 w-3.5" />
                           </button>
                           <Badge variant="outline" className="text-xs">{c.trialDays === 0 ? "∞" : `${c.trialDays || 2}d`}</Badge>
@@ -1240,9 +1256,9 @@ function TwoFactorSection({ user }: { user: any }) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(setupData.secret);
-                    toast({ title: "Secret key copied" });
+                  onClick={async () => {
+                    if (await copyToClipboard(setupData.secret)) toast({ title: "Secret key copied" });
+                    else toast({ title: "Couldn't copy the key", description: "Your browser blocked clipboard access. Select the key shown here and copy it manually.", variant: "destructive" });
                   }}
                   data-testid="button-copy-2fa-secret"
                 >
