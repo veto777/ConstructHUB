@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   Blocks, KeyRound, Webhook, Ruler, Loader2, Copy, Trash2, ArrowRight,
   RefreshCw, Unplug, CreditCard, CalendarDays, Sparkles, Magnet,
@@ -73,7 +73,7 @@ export default function CrmIntegrationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/integrations/lead-capture"] });
       toast({ title: "Lead form link rotated", description: "Every old copy of the form link stopped working." });
     },
-    onError: (e: any) => toast({ title: "Could not rotate the link", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not rotate the link", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── API keys ──────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export default function CrmIntegrationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/api-keys"] });
       toast({ title: "API key created" });
     },
-    onError: (e: any) => toast({ title: "Could not create key", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not create key", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const revokeKey = useMutation({
@@ -97,7 +97,7 @@ export default function CrmIntegrationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/api-keys"] });
       toast({ title: "API key revoked" });
     },
-    onError: (e: any) => toast({ title: "Could not revoke key", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not revoke key", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Webhooks ──────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ export default function CrmIntegrationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/webhooks"] });
       toast({ title: "Webhook added" });
     },
-    onError: (e: any) => toast({ title: "Could not add webhook", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not add webhook", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const deleteHook = useMutation({
@@ -126,7 +126,7 @@ export default function CrmIntegrationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/webhooks"] });
       toast({ title: "Webhook deleted" });
     },
-    onError: (e: any) => toast({ title: "Could not delete webhook", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not delete webhook", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── HOVER ─────────────────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ export default function CrmIntegrationsPage() {
         ? { title: "Webhook registration failed", variant: "destructive" }
         : { title: r.state === "verified" ? "HOVER webhook is live" : "HOVER webhook registered — verifying…" });
     },
-    onError: (e: any) => toast({ title: "Could not register webhook", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not register webhook", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const hoverSync = useMutation({
@@ -163,7 +163,7 @@ export default function CrmIntegrationsPage() {
         description: `${r.scanned ?? 0} scanned — ${attached} matched to clients, ${r.created ?? 0} created, ${r.duplicates ?? 0} already up to date${r.ambiguous ? `, ${r.ambiguous} ambiguous` : ""}${r.errors?.length ? `, ${r.errors.length} failed` : ""}.`,
       });
     },
-    onError: (e: any) => toast({ title: "HOVER sync failed", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "HOVER sync failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const hoverSchedule = useMutation({
@@ -173,7 +173,7 @@ export default function CrmIntegrationsPage() {
       hoverInvalidate();
       toast({ title: "Auto-sync schedule saved" });
     },
-    onError: (e: any) => toast({ title: "Could not save schedule", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save schedule", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const hoverDisconnect = useMutation({
@@ -182,7 +182,7 @@ export default function CrmIntegrationsPage() {
       hoverInvalidate();
       toast({ title: "HOVER disconnected" });
     },
-    onError: (e: any) => toast({ title: "Could not disconnect", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not disconnect", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   if (meLoading) {
@@ -542,7 +542,12 @@ export default function CrmIntegrationsPage() {
                           {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ""}
                         </div>
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => revokeKey.mutate(k.id)}
+                      <Button size="sm" variant="ghost"
+                        onClick={() => {
+                          if (window.confirm(`Revoke the API key "${k.name}"? Anything using it stops working immediately. This can't be undone.`)) {
+                            revokeKey.mutate(k.id);
+                          }
+                        }}
                         disabled={revokeKey.isPending} data-testid={`button-revoke-api-key-${k.id}`}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -629,7 +634,12 @@ export default function CrmIntegrationsPage() {
                         <StatusPill tone={w.active ? "success" : "danger"}>
                           {w.active ? "active" : "disabled"}
                         </StatusPill>
-                        <Button size="sm" variant="ghost" onClick={() => deleteHook.mutate(w.id)}
+                        <Button size="sm" variant="ghost"
+                          onClick={() => {
+                            if (window.confirm(`Delete the webhook to ${w.url}? It stops receiving events. This can't be undone.`)) {
+                              deleteHook.mutate(w.id);
+                            }
+                          }}
                           disabled={deleteHook.isPending} data-testid={`button-delete-webhook-${w.id}`}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Loader2, UserPlus, AlertTriangle, HardHat } from "lucide-react";
 import { StatusPill, roleTone } from "@/components/crm-ui";
 
@@ -44,7 +44,11 @@ export default function CrmJoinPage() {
     queryKey: ["/api/crm/invitations/lookup", token],
     queryFn: async () => {
       const r = await fetch(`/api/crm/invitations/lookup/${token}`, { credentials: "include" });
-      if (!r.ok) throw new Error((await r.text()) || "Invitation not found");
+      if (!r.ok) {
+        // The server answers { message } — show that sentence, never raw JSON.
+        const body = await r.json().catch(() => null);
+        throw new Error(body?.message || "Invitation not found");
+      }
       return r.json();
     },
     enabled: !!token,
@@ -71,7 +75,7 @@ export default function CrmJoinPage() {
         toAuth("login");
         return;
       }
-      toast({ title: "Could not accept", description: msg, variant: "destructive" });
+      toast({ title: "Could not accept", description: apiErrorMessage(e), variant: "destructive" });
     },
   });
 
@@ -101,8 +105,14 @@ export default function CrmJoinPage() {
               <UserPlus className="h-5 w-5" strokeWidth={1.8} />
             </div>
             <CardTitle>Join the team</CardTitle>
-            <CardDescription>
-              {data?.orgName ? `${data.orgName} invited you to ConstructHub CRM.` : "Checking your invitation…"}
+            <CardDescription data-testid="text-invite-description">
+              {data?.orgName
+                ? `${data.orgName} invited you to ConstructHub CRM.`
+                : error
+                  ? "This invitation link can't be used. Ask your admin to resend it from Team & Company."
+                  : isLoading
+                    ? "Checking your invitation…"
+                    : "You've been invited to ConstructHub CRM."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -118,6 +128,23 @@ export default function CrmJoinPage() {
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>{String((error as Error).message)}</span>
               </div>
+            )}
+
+            {/* A dead link must never dead-end: signed in → your workspace;
+                signed out → sign in. */}
+            {error && (
+              me ? (
+                <Button className="w-full" variant="outline" onClick={() => navigate("/")}
+                  data-testid="button-invite-error-home">
+                  Go to my dashboard
+                </Button>
+              ) : (
+                <Button className="w-full" variant="outline"
+                  onClick={() => { window.location.href = "/auth?mode=login"; }}
+                  data-testid="button-invite-error-signin">
+                  Go to sign in
+                </Button>
+              )
             )}
 
             {data && (

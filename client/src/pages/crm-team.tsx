@@ -13,7 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { marketingUrl } from "@/lib/site";
 import {
   Users, Building2, UserCircle, ShieldCheck, Mail, Loader2, Trash2,
   Copy, AlertTriangle, Plus, Check, ArrowRight, RefreshCw, KeyRound, History,
@@ -102,6 +103,12 @@ interface Invitation {
   expiresAt: string | null;
   createdAt: string | null;
 }
+
+/** The nullable company fields the Company tab edits (the business name is sent separately). */
+const COMPANY_FORM_FIELDS = [
+  "legalEntityName", "licenseNumber", "licenseState", "phone", "website",
+  "addressLine1", "city", "state", "postalCode", "termsAndConditions", "warrantyText",
+] as const;
 
 const ROLE_BLURB: Record<string, string> = {
   owner: "Full control, holds the subscription. Cannot be removed or demoted.",
@@ -211,7 +218,7 @@ function MyGoogleCalendarCard() {
   const connect = useMutation({
     mutationFn: async () => (await apiRequest("GET", "/api/crm/calendar/google/connect?scope=me")).json(),
     onSuccess: (r: any) => { if (r.url) window.location.href = r.url; },
-    onError: (e: any) => toast({ title: "Couldn't start Google connect", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Couldn't start Google connect", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const syncNow = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/calendar/google/sync?scope=me", {})).json(),
@@ -219,7 +226,7 @@ function MyGoogleCalendarCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
       toast({ title: "Calendar synced", description: `${r.upserted ?? 0} updated · ${r.deleted ?? 0} removed.` });
     },
-    onError: (e: any) => toast({ title: "Sync failed", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Sync failed", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const disconnect = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/calendar/google/disconnect?scope=me", {})).json(),
@@ -227,7 +234,7 @@ function MyGoogleCalendarCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/calendar/google/status"] });
       toast({ title: "Google Calendar disconnected" });
     },
-    onError: (e: any) => toast({ title: "Couldn't disconnect", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Couldn't disconnect", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   if (status && !status.configured) return null; // server has no Google OAuth app set up
@@ -345,15 +352,28 @@ export default function CrmTeamPage() {
     }
   }, [me?.member?.id]);
 
+  // Same rule as the server: blank clears it, otherwise digits and the usual
+  // + ( ) - . separators with 7–15 digits. The server stores it as E.164.
+  const phoneError = (() => {
+    const t = profile.phone.trim();
+    if (!t) return null;
+    const digits = t.replace(/[^\d]/g, "").length;
+    return /^[+\d\s().-]+$/.test(t) && digits >= 7 && digits <= 15
+      ? null
+      : "Enter a valid mobile number, e.g. +1 555 123 4567.";
+  })();
+
   const saveProfile = useMutation({
     mutationFn: async () => (await apiRequest("PATCH", "/api/crm/profile", profile)).json(),
-    onSuccess: () => {
+    onSuccess: (saved: any) => {
+      // Show the number the way it was stored (normalized to +1…).
+      setProfile((p) => ({ ...p, phone: saved?.phone ?? "" }));
       queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/members"] });
       toast({ title: "Profile saved" });
       advance();
     },
-    onError: (e: any) => toast({ title: "Could not save profile", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save profile", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Company ────────────────────────────────────────────────────────────────
@@ -364,15 +384,23 @@ export default function CrmTeamPage() {
 
   const saveOrg = useMutation({
     mutationFn: async () => {
-      const { id, ...rest } = org as Org;
-      return (await apiRequest("PATCH", "/api/crm/org", rest)).json();
+      // Only the fields this form edits. `org` is seeded from the cached
+      // /api/crm/me snapshot, so PATCHing the whole object wrote stale
+      // footers, deposit/tax defaults, industry etc. back over newer saves.
+      const body: Record<string, string | null> = { name: (org.name ?? "").trim() };
+      for (const k of COMPANY_FORM_FIELDS) {
+        const v = (org[k] ?? "").trim();
+        body[k] = v === "" ? null : v;
+      }
+      return (await apiRequest("PATCH", "/api/crm/org", body)).json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
       toast({ title: "Company profile saved" });
       advance();
     },
-    onError: (e: any) => toast({ title: "Could not save company", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not save company", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Team ───────────────────────────────────────────────────────────────────
@@ -408,7 +436,7 @@ export default function CrmTeamPage() {
             : data.emailed ? undefined : "Email delivery failed — copy the link below instead.",
       });
     },
-    onError: (e: any) => toast({ title: "Could not invite", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not invite", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const revoke = useMutation({
@@ -418,7 +446,7 @@ export default function CrmTeamPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/members"] });
       toast({ title: "Invitation revoked" });
     },
-    onError: (e: any) => toast({ title: "Could not revoke", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not revoke", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const resendInvite = useMutation({
@@ -433,7 +461,7 @@ export default function CrmTeamPage() {
         description: data.emailed ? undefined : "Email delivery failed — copy the link below instead.",
       });
     },
-    onError: (e: any) => toast({ title: "Could not resend", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not resend", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const updateMember = useMutation({
@@ -443,7 +471,7 @@ export default function CrmTeamPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/members"] });
       toast({ title: "Team member updated" });
     },
-    onError: (e: any) => toast({ title: "Could not update", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not update", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const sendPasswordReset = useMutation({
@@ -460,7 +488,7 @@ export default function CrmTeamPage() {
         });
       }
     },
-    onError: (e: any) => toast({ title: "Could not send reset email", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not send reset email", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const removeMember = useMutation({
@@ -471,7 +499,7 @@ export default function CrmTeamPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invitations"] });
       toast({ title: "Team member deactivated" });
     },
-    onError: (e: any) => toast({ title: "Could not remove", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not remove", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -572,8 +600,14 @@ export default function CrmTeamPage() {
                 </div>
                 <div>
                   <Label htmlFor="p-phone">Mobile</Label>
-                  <Input id="p-phone" data-testid="input-profile-phone" value={profile.phone}
+                  <Input id="p-phone" type="tel" data-testid="input-profile-phone" value={profile.phone}
+                    aria-invalid={!!phoneError} aria-describedby={phoneError ? "p-phone-error" : undefined}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
+                  {phoneError && (
+                    <p id="p-phone-error" className="text-xs text-destructive mt-1" data-testid="text-profile-phone-error">
+                      {phoneError}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Role</Label>
@@ -582,7 +616,7 @@ export default function CrmTeamPage() {
                   </div>
                 </div>
               </div>
-              <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending} data-testid="button-save-profile">
+              <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending || !!phoneError} data-testid="button-save-profile">
                 {saveProfile.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save profile
               </Button>
             </CardContent>
@@ -703,7 +737,9 @@ export default function CrmTeamPage() {
                 <SectionTitle
                   infoKey="team-invite"
                   title="Invite someone"
-                  description="They'll get an email with a link that expires in 14 days — add a mobile to text it too."
+                  description={`They'll get an email with a link that expires in 14 days${
+                    smsStatus?.configured ? " — add a mobile to text it too" : ""
+                  }.`}
                 />
               </CardHeader>
               <CardContent className="space-y-3">
@@ -749,7 +785,12 @@ export default function CrmTeamPage() {
                 <p className="text-xs text-muted-foreground">{ROLE_BLURB[inviteRole]}</p>
                 {!seats.canAddSeat && (
                   <p className="text-sm text-destructive" data-testid="text-seat-limit">
-                    You've used every seat on the {seats.planName} plan. Upgrade to add more.
+                    You've used every seat on the {seats.planName} plan.{" "}
+                    {/* Plans live on the main site — the portal host has no /pricing route. */}
+                    <a href={marketingUrl("/pricing")} className="underline font-medium" data-testid="link-seat-upgrade">
+                      Upgrade to add more
+                    </a>
+                    .
                   </p>
                 )}
                 {lastLink && (
@@ -791,7 +832,12 @@ export default function CrmTeamPage() {
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                       <Button size="sm" variant="ghost" title="Revoke invitation"
-                        onClick={() => revoke.mutate(inv.id)}
+                        onClick={() => {
+                          if (window.confirm(`Revoke the invitation for ${inv.email}? Their invite link stops working.`)) {
+                            revoke.mutate(inv.id);
+                          }
+                        }}
+                        disabled={revoke.isPending}
                         data-testid={`button-revoke-${inv.id}`}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -869,7 +915,14 @@ export default function CrmTeamPage() {
                             </Button>
                             <Button size="sm" variant="ghost"
                               title={m.status === "invited" ? "Revoke invite and remove" : "Remove from team"}
-                              onClick={() => removeMember.mutate(m.id)}
+                              onClick={() => {
+                                const who = m.displayName || m.email;
+                                const question = m.status === "invited"
+                                  ? `Revoke ${who}'s invitation and remove them from the team?`
+                                  : `Remove ${who} from the team? They lose access right away; their job history stays.`;
+                                if (window.confirm(question)) removeMember.mutate(m.id);
+                              }}
+                              disabled={removeMember.isPending}
                               data-testid={`button-remove-${m.id}`}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
