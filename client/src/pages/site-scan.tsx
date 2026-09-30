@@ -1,3 +1,8 @@
+import {
+  FixChecklist,
+  ReportFilters,
+  initialReportFilters,
+} from "@/components/site-scan-fixes";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -35,10 +40,26 @@ function Copy({ text }: { text: string }) {
     </Button>
   );
 }
-export function ScanReport({ report, draft, summary = false }: { report: any; draft?: string; summary?: boolean }) {
+export function ScanReport({
+  report,
+  draft,
+  summary = false,
+  onDone,
+}: {
+  report: any;
+  draft?: string;
+  summary?: boolean;
+  onDone?: (keys: string[], done: boolean) => void;
+}) {
   if (!report) return null;
   return (
     <div className="space-y-5">
+      {!summary && !report.version && (
+        <p>
+          Older report: rescan to add cited guidance, evidence, platform steps
+          and verified fix tracking.
+        </p>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {Object.entries({
           overall: report.scores.overall,
@@ -57,10 +78,37 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
         ))}
       </div>
       <p className="text-sm text-muted-foreground">
-        {report.pages} pages checked. {summary
+        {report.pages} pages checked.{" "}
+        {summary
           ? "Preview shows up to five findings. Verify your email for all findings and coverage details."
-          : `${report.remaining || 0} URLs remain outside this report.`} Scores describe observed checks, not search rankings.
+          : `${report.remaining || 0} URLs remain outside this report.`}{" "}
+        Scores describe observed checks, not search rankings.
       </p>
+      {report.scoreExplanation && (
+        <details>
+          <summary>What raised or lowered these scores?</summary>
+          {Object.entries(report.scoreExplanation).map(([k, v]) => (
+            <p key={k} className="my-2">
+              <strong>{k}:</strong> {String(v)}
+            </p>
+          ))}
+        </details>
+      )}
+      {report.scores.categories.performance === null && (
+        <div role="note" className="border rounded p-3">
+          <strong>Why Performance is N/A</strong>
+          {report.psi?.map((p: any, i: number) => (
+            <p key={i}>
+              {p.strategy}: {p.unavailable || "No measurement returned"}
+            </p>
+          ))}
+          <p>
+            Server owner: add PAGESPEED_API_KEY and enable the PageSpeed
+            Insights API. Use Rescan / retry PageSpeed after correcting
+            configuration or waiting for quota.
+          </p>
+        </div>
+      )}
       {["technical", "performance", "local", "content", "ai-readiness"].map(
         (category) => (
           <section key={category}>
@@ -72,7 +120,22 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
                 .filter((f: any) => f.category === category)
                 .sort(
                   (a: any, b: any) =>
-                    severityOrder[a.severity] - severityOrder[b.severity],
+                    (a.guidance
+                      ? (
+                          { High: 0, Medium: 1, Low: 2 } as Record<
+                            string,
+                            number
+                          >
+                        )[a.guidance.impact]
+                      : severityOrder[a.severity]) -
+                    (b.guidance
+                      ? (
+                          { High: 0, Medium: 1, Low: 2 } as Record<
+                            string,
+                            number
+                          >
+                        )[b.guidance.impact]
+                      : severityOrder[b.severity]),
                 )
                 .map((f: any) => (
                   <Card key={f.id}>
@@ -85,15 +148,44 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
                               : "text-amber-600"
                           }
                         >
-                          {f.severity.toUpperCase()}
+                          {f.guidance
+                            ? `${f.guidance.impact.toUpperCase()} IMPACT`
+                            : f.severity.toUpperCase()}
                         </span>{" "}
                         · {f.title}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
-                      <p>{f.why}</p>
                       <p>
-                        <strong>How to fix:</strong> {f.fix}
+                        <strong>Why it matters for SEO:</strong>{" "}
+                        {f.guidance
+                          ? `${f.guidance.impact} impact — ${f.guidance.reason}`
+                          : f.why}
+                      </p>
+                      {f.guidance && (
+                        <>
+                          <a
+                            className="underline"
+                            href={f.guidance.source}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Authoritative guidance:{" "}
+                            {new URL(f.guidance.source).hostname}
+                          </a>
+                          <ol className="list-decimal pl-5">
+                            {f.guidance.steps.map((step: string, i: number) => (
+                              <li key={i}>{step}</li>
+                            ))}
+                          </ol>
+                        </>
+                      )}
+                      <p>
+                        {!f.guidance && (
+                          <>
+                            <strong>How to fix:</strong> {f.fix}
+                          </>
+                        )}
                       </p>
                       <details>
                         <summary>Affected URLs ({f.urls.length})</summary>
@@ -108,18 +200,25 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
                 ))}
               {!report.findings.some((f: any) => f.category === category) && (
                 <p className="text-sm text-muted-foreground">
-                  {summary ? "Verify your email to see all findings in this category." : "No findings from available checks."}
+                  {summary
+                    ? "Verify your email to see all findings in this category."
+                    : report.findingTotal
+                      ? "No findings in this category on the current results page. Use filters or Next findings to see more."
+                      : "No findings from available checks."}
                 </p>
               )}
             </div>
           </section>
         ),
       )}
-      {!summary && <p className="text-sm text-muted-foreground">
-        {report.profile
-          ? `GBP comparison: ${report.profile.business_name}; profile last synced ${new Date(report.profile.synced_at).toLocaleString()}.`
-          : "No synced GBP profile: NAP, service and service-area comparisons were not assessed."}
-      </p>}
+      {!summary && <FixChecklist report={report} onDone={onDone} />}
+      {!summary && (
+        <p className="text-sm text-muted-foreground">
+          {report.profile
+            ? `GBP comparison: ${report.profile.business_name}; profile last synced ${new Date(report.profile.synced_at).toLocaleString()}.`
+            : "No synced GBP profile: NAP, service and service-area comparisons were not assessed."}
+        </p>
+      )}
       {report.psi?.length > 0 && (
         <details>
           <summary>PageSpeed measurements and field data</summary>
@@ -171,8 +270,35 @@ export function ScanReport({ report, draft, summary = false }: { report: any; dr
 }
 export default function SiteScanPage() {
   const cache = useQueryClient();
+  const [filters, setFilters] = useState(initialReportFilters);
+  const [historyQ, setHistoryQ] = useState(""),
+    [historyStatus, setHistoryStatus] = useState(""),
+    [historyOffset, setHistoryOffset] = useState(0);
+  const [locationQ, setLocationQ] = useState(""),
+    [locationOffset, setLocationOffset] = useState(0),
+    [clientFilter, setClientFilter] = useState("");
+  const [checked, setChecked] = useState<number[]>([]),
+    [email, setEmail] = useState(""),
+    [mailResult, setMailResult] = useState("");
+  const [agencyName, setAgencyName] = useState(""),
+    [logo, setLogo] = useState<string | null>(null);
+  const listParams = new URLSearchParams({
+    q: historyQ,
+    status: historyStatus,
+    offset: String(historyOffset),
+    locationQ,
+    locationOffset: String(locationOffset),
+    ...(clientFilter ? { locationId: clientFilter } : {}),
+  });
+  const reportParams = new URLSearchParams({
+    ...filters,
+    offset: String(filters.offset),
+  });
+
   const [scanParam, setScanParam] = useUrlParam("scan");
-  const selected = scanParam ?? "", setSelected = (v: string | number) => setScanParam(v === "" ? null : String(v), true);
+  const selected = scanParam ?? "",
+    setSelected = (v: string | number) =>
+      setScanParam(v === "" ? null : String(v), true);
   const [url, setUrl] = useState(""),
     [locationId, setLocationId] = useState(""),
     [cap, setCap] = useState(150),
@@ -181,7 +307,8 @@ export default function SiteScanPage() {
     [busy, setBusy] = useState(false),
     [share, setShare] = useState("");
   const { data } = useQuery<any>({
-    queryKey: ["/api/sitescan"],
+    queryKey: ["/api/sitescan", listParams.toString()],
+    queryFn: () => api("GET", "/api/sitescan?" + listParams),
     refetchInterval: (q) =>
       q.state.data?.jobs?.some((j: any) =>
         ["queued", "running"].includes(j.status),
@@ -190,7 +317,9 @@ export default function SiteScanPage() {
         : false,
   });
   const { data: job } = useQuery<any>({
-    queryKey: ["/api/sitescan/jobs/" + selected],
+    queryKey: ["/api/sitescan/jobs/" + selected, reportParams.toString()],
+    queryFn: () =>
+      api("GET", "/api/sitescan/jobs/" + selected + "?" + reportParams),
     enabled: !!selected,
     refetchInterval: (q) =>
       ["completed", "failed"].includes(q.state.data?.status) ? false : 3000,
@@ -228,6 +357,99 @@ export default function SiteScanPage() {
       </div>
       <Card>
         <CardContent className="pt-6 space-y-4">
+          <label className="block">
+            Search client locations
+            <Input
+              value={locationQ}
+              onChange={(e) => {
+                setLocationQ(e.target.value);
+                setLocationOffset(0);
+              }}
+            />
+          </label>
+          <div className="flex gap-2 items-center">
+            <Button
+              variant="outline"
+              disabled={!locationOffset}
+              onClick={() =>
+                setLocationOffset(Math.max(0, locationOffset - 25))
+              }
+            >
+              Previous locations
+            </Button>
+            <span>
+              {locationOffset + 1}–
+              {Math.min(locationOffset + 25, data?.locationTotal || 0)} of{" "}
+              {data?.locationTotal || 0}
+            </span>
+            <Button
+              variant="outline"
+              disabled={locationOffset + 25 >= (data?.locationTotal || 0)}
+              onClick={() => setLocationOffset(locationOffset + 25)}
+            >
+              Next locations
+            </Button>
+          </div>
+          <details>
+            <summary>
+              Bulk scan client sites ({checked.length} selected)
+            </summary>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setChecked([
+                  ...new Set([
+                    ...checked,
+                    ...(data?.locations || [])
+                      .filter((l: any) => l.website)
+                      .map((l: any) => l.id),
+                  ]),
+                ])
+              }
+            >
+              Select this page
+            </Button>
+            <Button variant="outline" onClick={() => setChecked([])}>
+              Clear selection
+            </Button>
+            {data?.locations.map((l: any) => (
+              <label key={l.id} className="block">
+                <input
+                  type="checkbox"
+                  checked={checked.includes(l.id)}
+                  onChange={(e) =>
+                    setChecked(
+                      e.target.checked
+                        ? [...checked, l.id]
+                        : checked.filter((id) => id !== l.id),
+                    )
+                  }
+                />{" "}
+                {l.business_name} — {l.website || "No website"}
+              </label>
+            ))}
+            <Button
+              disabled={busy || !checked.length}
+              onClick={() =>
+                action(async () => {
+                  const r = await api("POST", "/api/sitescan/bulk", {
+                    locationIds: checked,
+                    pageCap: cap,
+                    psiPages: psi,
+                  });
+                  setChecked([]);
+                  setSelected(r.jobs[0].id);
+                })
+              }
+            >
+              Queue selected sites
+            </Button>
+            <p>
+              Up to 1,000 sites per day. Each selected location needs a synced
+              GBP website. Work runs in the background with shared provider
+              budgets.
+            </p>
+          </details>
           <label className="block">
             Linked GBP location
             <select
@@ -331,6 +553,68 @@ export default function SiteScanPage() {
       )}
       <section>
         <h2 className="text-xl font-semibold mb-2">History & score trend</h2>
+        <label>
+          Search history
+          <Input
+            value={historyQ}
+            onChange={(e) => {
+              setHistoryQ(e.target.value);
+              setHistoryOffset(0);
+            }}
+          />
+        </label>
+        <label>
+          Status{" "}
+          <select
+            className="border p-2 bg-background"
+            value={historyStatus}
+            onChange={(e) => {
+              setHistoryStatus(e.target.value);
+              setHistoryOffset(0);
+            }}
+          >
+            {["", "queued", "running", "completed", "failed"].map((v) => (
+              <option key={v} value={v}>
+                {v || "All statuses"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setClientFilter(locationId);
+            setHistoryOffset(0);
+          }}
+        >
+          History for selected client
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setClientFilter("");
+            setHistoryOffset(0);
+          }}
+        >
+          All clients
+        </Button>
+        <div className="flex gap-2 my-2">
+          <Button
+            variant="outline"
+            disabled={!historyOffset}
+            onClick={() => setHistoryOffset(Math.max(0, historyOffset - 25))}
+          >
+            Previous scans
+          </Button>
+          <span>{data?.total || 0} scans</span>
+          <Button
+            variant="outline"
+            disabled={historyOffset + 25 >= (data?.total || 0)}
+            onClick={() => setHistoryOffset(historyOffset + 25)}
+          >
+            Next scans
+          </Button>
+        </div>
         <div className="flex flex-wrap gap-2">
           {data?.jobs.map((j: any, index: number) => (
             <Button
@@ -429,7 +713,116 @@ export default function SiteScanPage() {
                   </a>
                 </p>
               )}
-              <ScanReport report={job.report} draft={job.aiDraft} />
+              <div className="space-y-3 border rounded p-4">
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    action(async () => {
+                      const r = await api(
+                        "POST",
+                        `/api/sitescan/jobs/${selected}/retry`,
+                      );
+                      setSelected(r.id);
+                      setFilters(initialReportFilters);
+                    })
+                  }
+                >
+                  Rescan / retry PageSpeed
+                </Button>
+                <label>
+                  Send to my web person — email
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
+                <Button
+                  disabled={busy || !email}
+                  onClick={() =>
+                    action(async () => {
+                      const r = await api(
+                        "POST",
+                        `/api/sitescan/jobs/${selected}/email`,
+                        { email },
+                      );
+                      setMailResult(
+                        r.sink
+                          ? "Checklist saved to local email sink."
+                          : "Checklist email sent.",
+                      );
+                    })
+                  }
+                >
+                  Send prioritized checklist
+                </Button>
+                {mailResult && <p role="status">{mailResult}</p>}
+                <details>
+                  <summary>White-label PDF branding</summary>
+                  <label>
+                    Agency name
+                    <Input
+                      value={agencyName}
+                      onChange={(e) => setAgencyName(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Agency logo (PNG/JPEG, up to 200 KB)
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        if (f.size > 200000) {
+                          setError("Logo must be under 200 KB");
+                          return;
+                        }
+                        const r = new FileReader();
+                        r.onload = () => setLogo(String(r.result));
+                        r.readAsDataURL(f);
+                      }}
+                    />
+                  </label>
+                  <Button
+                    disabled={busy || !agencyName}
+                    onClick={() =>
+                      action(async () => {
+                        await api("POST", "/api/sitescan/branding", {
+                          name: agencyName,
+                          logo,
+                        });
+                      })
+                    }
+                  >
+                    Save PDF branding
+                  </Button>
+                  <p>
+                    Branding is applied on the next PDF download. No remote logo
+                    URL is fetched.
+                  </p>
+                </details>
+              </div>
+              <ReportFilters
+                filters={filters}
+                setFilters={setFilters}
+                total={Math.max(
+                  job.report.fixTotal || 0,
+                  job.report.findingTotal || 0,
+                )}
+              />
+              <ScanReport
+                report={job.report}
+                draft={job.aiDraft}
+                onDone={(keys, done) => {
+                  void action(async () => {
+                    await api("POST", `/api/sitescan/jobs/${selected}/fixes`, {
+                      keys,
+                      done,
+                    });
+                  });
+                }}
+              />
             </>
           )}
         </section>
@@ -438,15 +831,29 @@ export default function SiteScanPage() {
   );
 }
 export function SharedSiteScanPage() {
+  const [filters, setFilters] = useState(initialReportFilters);
+  const params = new URLSearchParams({
+    ...filters,
+    offset: String(filters.offset),
+  });
   const token = window.location.pathname.split("/").pop();
   const { data, error } = useQuery<any>({
-    queryKey: ["/api/sitescan/shared/" + token],
+    queryKey: ["/api/sitescan/shared/" + token, params.toString()],
+    queryFn: () => api("GET", "/api/sitescan/shared/" + token + "?" + params),
     retry: false,
   });
   return (
     <main className="max-w-6xl mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Shared Site Scan</h1>
       {error && <p role="alert">This report link is unavailable or revoked.</p>}
+      <ReportFilters
+        filters={filters}
+        setFilters={setFilters}
+        total={Math.max(
+          data?.report?.fixTotal || 0,
+          data?.report?.findingTotal || 0,
+        )}
+      />
       <ScanReport report={data?.report} draft={data?.aiDraft} />
     </main>
   );
@@ -557,7 +964,13 @@ export function FreeSiteScanPage() {
             />
           </label>
           <div id="sitescan-captcha" />
-          <Button disabled={busy || !config || (!!config.captchaSiteKey && !captchaToken)}>Scan my website</Button>
+          <Button
+            disabled={
+              busy || !config || (!!config.captchaSiteKey && !captchaToken)
+            }
+          >
+            Scan my website
+          </Button>
           <p className="text-xs">
             We use your email to deliver this report.{" "}
             <a href="/privacy" className="underline">
