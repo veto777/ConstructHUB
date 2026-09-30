@@ -78,6 +78,12 @@ export function CrmTermsPage() {
         construction work, pricing, licensing, insurance coverage or workmanship, and we make no
         representation about any Contractor's or Client's identity, qualifications or conduct.
       </P>
+      <P>
+        The CRM is included with every ConstructHUB plan — there is no separate CRM membership. A
+        Contractor's plan sets how many team seats the workspace has, and extra seats are an add-on.
+        Plans, trials, billing and cancellation are governed by the{" "}
+        <a href="/terms" className="text-primary hover:underline" data-testid="link-crm-terms-plans">ConstructHUB Terms of Use</a>.
+      </P>
 
       <H>2. Accounts and sign-in security — protect your email</H>
       <P>

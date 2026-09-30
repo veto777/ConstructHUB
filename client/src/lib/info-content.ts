@@ -4,6 +4,13 @@
  * you'd bother, and one concrete example. Every mounted <InfoTip k="…" />
  * must have an entry here — server/crm/info-content.test.ts enforces it.
  */
+import { TEXTING_PLANS, planNamesWhere } from "@shared/plan-copy";
+
+/** Which plans text, read from the price book (shared/plans.ts). */
+const TEXTING_NOTE =
+  `Texting comes with the ${TEXTING_PLANS} plans: team text alerts on every one of them, and client texts from ` +
+  `your own SignalWire number or a texting-number add-on (${planNamesWhere((plan) => plan.limits.clientTexting === "included")} ` +
+  `includes one number).`;
 
 export interface InfoEntry {
   title: string;
@@ -460,6 +467,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
       "Text messages instead of (or alongside) email for the moments that matter: send a client a text nudge about their bid, and get a text yourself the instant a client re-opens their estimate.",
       "A bid reminder by text gets read in minutes, where an email can sit all weekend. The hot-lead alert means you call while they're literally reading your proposal.",
       "Example: Mrs. Patel hasn't responded in five days. One tap sends a polite text nudge; she opens the bid that evening, your phone buzzes, and you call while the job's on her mind.",
+      TEXTING_NOTE,
     ],
   },
 

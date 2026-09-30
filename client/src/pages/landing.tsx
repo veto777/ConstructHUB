@@ -9,9 +9,9 @@ import { CHLogo } from "@/components/ch-logo";
 import { CartSheet } from "@/components/cart-sheet";
 import { Settings } from "lucide-react";
 import {
-  ArrowRight, Search, Camera, BarChart3, Shield, Users, Zap,
-  MapPin, Phone, Building2, CheckCircle2, Star, TrendingUp,
-  Clock, Eye, FileText, Globe, LayoutDashboard, GraduationCap,
+  ArrowRight, Search, Camera, BarChart3, Users, Zap,
+  MapPin, Phone, Building2, CheckCircle2,
+  Eye, Globe, LayoutDashboard, GraduationCap,
   Grid3X3, ShieldAlert, Crosshair, Link2, Monitor, Briefcase,
   Megaphone, Package,
 } from "lucide-react";
@@ -19,10 +19,12 @@ import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
 import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
 import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 
 const SECTION_LINKS = [
   { href: "#services", label: "Services" },
-  { href: "#consulting", label: "Consulting" },
+  { href: "#plans", label: "Plans" },
   { href: "#stats", label: "Results" },
   { href: "#coverage", label: "Coverage" },
 ] as const;
@@ -218,8 +220,8 @@ const services = [
   },
   {
     icon: Users,
-    title: "Expert Consulting",
-    description: "Platinum members work 1-on-1 with industry consultants who specialize in construction. Get personalized strategies for SEO, GMB, lead generation, and scaling.",
+    title: "Contractor CRM",
+    description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — included with every plan.",
     gradient: "from-cyan-500/20 to-sky-500/20",
     border: "border-cyan-500/20",
   },
@@ -334,11 +336,11 @@ export default function LandingPage() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-3">
             <Link href="/auth?mode=signup" data-testid="link-hero-signup">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-8 h-12 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
-                Create a Free Account <ArrowRight className="h-4 w-4 ml-2" />
+                Create Your Account <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <Link href="/free-site-scan" className="underline font-semibold">Free 60-second website scan</Link>
-            <Link href="/pricing#done-for-you" data-testid="link-hero-dfy">
+            <Link href={SALES_HREF} data-testid="link-hero-dfy">
               <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 px-8 h-12 text-base">
                 <Package className="h-4 w-4 mr-2" /> Done-For-You Services
               </Button>
@@ -428,7 +430,7 @@ export default function LandingPage() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <h3 className="text-lg font-semibold">Business Formation & Filing</h3>
-                    <span className="text-xl font-extrabold text-[#4A6CF7]">$5,500</span>
+                    <span className="text-sm font-semibold text-[#4A6CF7]" data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
                   </div>
                   <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">LLC, licensing paperwork, bonding, insurance processing, tax registration</p>
                 </div>
@@ -442,7 +444,7 @@ export default function LandingPage() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <h3 className="text-lg font-semibold">GMB & Website Setup</h3>
-                    <span className="text-xl font-extrabold text-[#4A6CF7]">$15,000</span>
+                    <span className="text-sm font-semibold text-[#4A6CF7]" data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
                   </div>
                   <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">Full Google Business Profile, professional website, content</p>
                 </div>
@@ -456,7 +458,7 @@ export default function LandingPage() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <h3 className="text-lg font-semibold">SEO & Ad Campaigns</h3>
-                    <span className="text-xl font-extrabold text-[#4A6CF7]">$7,500</span>
+                    <span className="text-sm font-semibold text-[#4A6CF7]" data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
                   </div>
                   <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">Local SEO, Google Ads, LSA setup, citation building</p>
                 </div>
@@ -469,13 +471,12 @@ export default function LandingPage() {
               <div className="flex items-center justify-center gap-3 mb-3 flex-wrap">
                 <h3 className="text-2xl sm:text-3xl font-extrabold">Complete Business Build</h3>
               </div>
-              <div className="text-4xl font-extrabold text-foreground dark:text-white mb-3">$29,999</div>
               <p className="text-muted-foreground dark:text-white/40 max-w-xl mx-auto mb-6">
                 Everything above as one package. Paid upfront. 4-6 months from start to finish. Excludes licensing exams and prerequisites.
               </p>
-              <Link href="/pricing#done-for-you" data-testid="link-dfy-pricing">
+              <Link href={SALES_HREF} data-testid="link-dfy-pricing">
                 <Button size="lg" className="bg-[#F07C22] hover:bg-[#E06B15] text-white px-8 shadow-lg shadow-orange-500/25">
-                  View Full Pricing <ArrowRight className="h-4 w-4 ml-2" />
+                  {SALES_REP_LABEL} <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </Link>
             </div>
@@ -483,87 +484,50 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Consulting CTA */}
-      <section id="consulting" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <Card className="relative overflow-hidden bg-gradient-to-br from-[#4A6CF7]/10 via-muted/50 dark:via-[#1a1f3a]/50 to-[#F07C22]/10 border-border dark:border-white/[0.08] p-8 sm:p-12 backdrop-blur-sm">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#4A6CF7]/5 to-[#F07C22]/5 animate-pulse" style={{ animationDuration: "4s" }} />
-            <div className="relative z-10 flex flex-col lg:flex-row items-center gap-8">
-              <div className="flex-1 text-center lg:text-left">
-                <Badge className="mb-4 bg-orange-500/10 text-orange-400 border-orange-500/20">
-                  <Star className="h-3 w-3 mr-1" /> Platinum Benefit
-                </Badge>
-                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
-                  Talk With a Professional
-                  <span className="bg-gradient-to-r from-[#F07C22] to-[#FFB347] bg-clip-text text-transparent"> Consultant</span>
-                </h2>
-                <p className="text-muted-foreground dark:text-white/50 mb-6 leading-relaxed">
-                  Our expert consultants specialize in the construction industry. Get personalized 
-                  strategies for SEO, Google My Business, lead generation, and scaling your contracting business. 
-                  In-person or virtual sessions available.
-                </p>
-                <div className="flex flex-wrap items-center gap-4 justify-center lg:justify-start mb-6">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/60">
-                    <Clock className="h-4 w-4 text-orange-400" /> 1-on-1 Sessions
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/60">
-                    <Shield className="h-4 w-4 text-orange-400" /> Industry Experts
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/60">
-                    <TrendingUp className="h-4 w-4 text-orange-400" /> Proven Results
-                  </div>
+      {/* Plans — every number comes from the price book (shared/plans.ts). */}
+      <section id="plans" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8" data-testid="section-plans">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <Badge className="mb-4 bg-blue-500/10 text-blue-400 border-blue-500/20">Plans</Badge>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+              One Plan for Every
+              <span className="bg-gradient-to-r from-[#4A6CF7] to-[#6B8CFF] bg-clip-text text-transparent"> Stage</span>
+            </h2>
+            <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-2xl mx-auto">
+              Every plan starts with a {TRIAL_LABEL} and includes the CRM. Pay monthly, or yearly at 10 times the monthly price.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {PLAN_KEYS.map((key) => (
+              <Card key={key} className="bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] p-5 backdrop-blur-sm" data-testid={`card-plan-${key}`}>
+                <h3 className="text-lg font-semibold">{PLANS[key].name}</h3>
+                <div className="mt-1 text-3xl font-extrabold text-foreground dark:text-white">
+                  {formatUsd(PLANS[key].monthlyCents)}<span className="text-sm font-normal text-muted-foreground dark:text-white/40">/month</span>
                 </div>
-                <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-                  <div className="text-center sm:text-left">
-                    <div className="text-4xl font-extrabold text-foreground dark:text-white">$250<span className="text-lg font-normal text-muted-foreground dark:text-white/40"> first session</span></div>
-                    <p className="text-xs text-muted-foreground dark:text-white/30 mt-1" data-testid="text-consulting-terms">
-                      Platinum members only · 30 minutes · $500 per session after the first · In-person or virtual
-                    </p>
-                  </div>
-                  <Link href="/pricing" data-testid="link-consulting-book">
-                    <Button size="lg" className="bg-[#F07C22] hover:bg-[#E06B15] text-white px-8 shadow-lg shadow-orange-500/25">
-                      See the Platinum Plan <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-              <div className="hidden lg:flex flex-col gap-4 w-64">
-                <div className="bg-muted/50 dark:bg-white/[0.04] rounded-xl p-4 border border-border dark:border-white/[0.06]">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <Globe className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium">GMB Strategy</p>
-                      <p className="text-[10px] text-muted-foreground dark:text-white/40">Optimize your listing</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-muted/50 dark:bg-white/[0.04] rounded-xl p-4 border border-border dark:border-white/[0.06]">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                      <TrendingUp className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium">Lead Generation</p>
-                      <p className="text-[10px] text-muted-foreground dark:text-white/40">Win more bids</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-muted/50 dark:bg-white/[0.04] rounded-xl p-4 border border-border dark:border-white/[0.06]">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="h-8 w-8 rounded-full bg-orange-500/20 flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-orange-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium">Business Growth</p>
-                      <p className="text-[10px] text-muted-foreground dark:text-white/40">Scale operations</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
+                <p className="text-sm text-muted-foreground dark:text-white/40 mt-2 leading-relaxed">{PLANS[key].tagline}</p>
+                {key === "agency" && (
+                  <p className="text-xs text-muted-foreground dark:text-white/50 mt-2" data-testid="text-agency-locations">
+                    {PLANS.agency.limits.locations} locations included, then per-location pricing.
+                  </p>
+                )}
+              </Card>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-sm text-muted-foreground dark:text-white/50" data-testid="text-agency-modules">
+            Only the {PLANS.agency.name} plan includes the {joinNames(AGENCY_ONLY_MODULES)}.
+          </p>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href="/pricing" data-testid="link-plans-pricing">
+              <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-8 shadow-lg shadow-blue-500/25">
+                See Plans &amp; Pricing <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+            <Link href={SALES_HREF} data-testid="link-plans-sales">
+              <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 px-8">
+                {SALES_REP_LABEL}
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -608,14 +572,14 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/auth?mode=signup" data-testid="link-cta-signup">
               <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-10 h-13 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
-                Create Your Free Account <ArrowRight className="h-4 w-4 ml-2" />
+                Create Your Account <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
-            <a href="#consulting" data-testid="link-cta-consulting">
+            <Link href={SALES_HREF} data-testid="link-cta-consulting">
               <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 px-8 h-13 text-base">
-                Talk to an Expert
+                {SALES_REP_LABEL}
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       </section>

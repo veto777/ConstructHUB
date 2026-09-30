@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
 import { formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
+import { PLANS } from "@shared/plans";
+import { AGENCY_ONLY_MODULES, STARTING_MONTHLY_CENTS, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 
 function FloatingParticles({ color = "#d4d4d8" }: { color?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -157,9 +159,10 @@ export default function HomePage() {
         <CardContent className="p-8 text-center space-y-4">
           <Award className="w-10 h-10 text-muted-foreground mx-auto" />
           <h2 className="text-2xl font-extrabold">Ready to Get the Advantage?</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Plans start at $15/month, with more of these {toolCount} tools unlocked on each tier —
-            or go all-in with our Gold and Platinum plans for complete market domination.
+          <p className="text-muted-foreground max-w-2xl mx-auto" data-testid="text-plans-summary">
+            Plans start at {formatUsd(STARTING_MONTHLY_CENTS)}/month with a {TRIAL_LABEL}, and every plan
+            includes the CRM. Each tier unlocks more of these {toolCount} tools, and the {PLANS.agency.name} plan
+            adds the {joinNames(AGENCY_ONLY_MODULES)}.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Button
@@ -168,13 +171,6 @@ export default function HomePage() {
               data-testid="button-view-plans"
             >
               <Crown className="w-4 h-4 mr-2" /> View Plans & Pricing
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setLocation("/individual-pricing")}
-              data-testid="button-individual-tools"
-            >
-              <Zap className="w-4 h-4 mr-2" /> À La Carte Tools
             </Button>
           </div>
         </CardContent>

@@ -1,0 +1,124 @@
+/**
+ * Plan and price wording for pages, prompts and emails outside the pricing
+ * page. Every number here is read from the price book (shared/plans.ts), so
+ * copy can never drift from what checkout and entitlements enforce.
+ */
+import {
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
+  TRIAL_DAYS, SALES_THRESHOLD_CENTS, MODULE_NAMES, planForModule, showsPrice,
+  type Plan, type PlanKey, type ModuleKey,
+} from "./plans";
+
+/** "Talk to a sales rep" — the label for anything at or above SALES_THRESHOLD_CENTS. */
+export const SALES_REP_LABEL = "Talk to a sales rep";
+/** Where a sales conversation starts: the services section of the pricing page (inquiry form). */
+export const SALES_HREF = "/pricing#services";
+
+/** Cents to "$29", "$1,990" or "$0.02". */
+export function formatUsd(cents: number): string {
+  const whole = cents % 100 === 0;
+  return "$" + (cents / 100).toLocaleString("en-US", {
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** A price when it is under the sales threshold, otherwise the sales-rep label. */
+export function priceOrSalesRep(cents: number): string {
+  return showsPrice(cents) ? formatUsd(cents) : SALES_REP_LABEL;
+}
+
+/** "Pro", "Pro and Growth", "Pro, Growth and Agency". */
+export function joinNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** Plan keys, cheapest first, whose plan satisfies `test`. */
+export function plansWhere(test: (plan: Plan) => boolean): PlanKey[] {
+  return PLAN_KEYS.filter((key) => test(PLANS[key]));
+}
+
+/** Plan names, cheapest first, whose plan satisfies `test` ("Pro, Growth and Agency"). */
+export function planNamesWhere(test: (plan: Plan) => boolean): string {
+  return joinNames(plansWhere(test).map((key) => PLANS[key].name));
+}
+
+/** The cheapest plan's monthly price. */
+export const STARTING_MONTHLY_CENTS = Math.min(...PLAN_KEYS.map((key) => PLANS[key].monthlyCents));
+
+/** "1-day trial". */
+export const TRIAL_LABEL = `${TRIAL_DAYS}-day trial`;
+
+/** "$1,000". */
+export const SALES_THRESHOLD_LABEL = formatUsd(SALES_THRESHOLD_CENTS);
+
+/** "$29/month or $290/year". */
+export function planPriceLine(key: PlanKey): string {
+  const plan = PLANS[key];
+  return `${formatUsd(plan.monthlyCents)}/month or ${formatUsd(plan.annualCents)}/year`;
+}
+
+/** "Starter 1, Pro 3, Growth 10 and Agency 10". */
+export const CRM_SEATS_LINE = joinNames(PLAN_KEYS.map((key) => `${PLANS[key].name} ${PLANS[key].limits.crmSeats}`));
+
+/** Module names that only the Agency plan includes, in display order. */
+export const AGENCY_ONLY_MODULES: string[] = (Object.keys(MODULE_NAMES) as ModuleKey[])
+  .filter((module) => planForModule(module) === "agency")
+  .map((module) => MODULE_NAMES[module]);
+
+/** Graduated Agency location bands: "$15/month each for locations 11–50, …". */
+export function agencyBandsLine(): string {
+  const parts: string[] = [];
+  let from = 1;
+  for (const band of AGENCY_LOCATION_BANDS) {
+    if (band.centsPerLocation > 0) {
+      parts.push(`${formatUsd(band.centsPerLocation)}/month each for locations ${from}–${band.upTo}`);
+    }
+    from = band.upTo + 1;
+  }
+  return `${joinNames(parts)}; above ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations the Agency plan is quoted by a sales rep`;
+}
+
+/** "Extra location — $19/month or $190/year (Starter, Pro and Growth)". */
+export function addonLines(): string[] {
+  return Object.values(ADDONS).map((addon) => {
+    const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
+    const on = joinNames(addon.availableOn.map((key) => PLANS[key].name));
+    return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}`;
+  });
+}
+
+/** Competitor Intel is on every plan with a monthly scan allowance. */
+export const COMPETITOR_INTEL_PLANS = planNamesWhere((plan) => plan.limits.competitorScans > 0);
+/** Click Guard + IP Tracker + VPN Shield come with every plan that protects at least one site. */
+export const PROTECTED_SITE_PLANS = planNamesWhere((plan) => plan.limits.protectedSites > 0);
+/** Plans with team text alerts. */
+export const TEXTING_PLANS = planNamesWhere((plan) => plan.limits.teamTextSegments > 0);
+
+/**
+ * The price book as plain text for the AI assistants' system prompts. It lists
+ * only what shared/plans.ts sells, and tells the model to send anything priced
+ * at the sales threshold or above to a sales rep instead of quoting it.
+ */
+export function pricingKnowledge(): string {
+  const plans = PLAN_KEYS.map((key) => {
+    const plan = PLANS[key];
+    const agency = key === "agency" ? ` Locations above ${plan.limits.locations}: ${agencyBandsLine()}.` : "";
+    return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}${agency}\n  Includes: ${plan.features.join("; ")}.`;
+  }).join("\n");
+  return `## Plans and pricing (the ConstructHUB price book)
+There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at 10 times the monthly price.
+${plans}
+
+Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}.
+The CRM (clients, estimates, invoices, payments, pipeline) is included in every plan. CRM seats per plan: ${CRM_SEATS_LINE}.
+Competitor Intel is included with ${COMPETITOR_INTEL_PLANS}. Click Guard, IP Tracker and VPN Shield are included with ${PROTECTED_SITE_PLANS}. Texting is included with ${TEXTING_PLANS}.
+
+### Add-ons (single features are sold only as add-ons to a plan)
+${addonLines().map((line) => `- ${line}`).join("\n")}
+
+### Services and anything priced at ${SALES_THRESHOLD_LABEL} or more
+SEO programs, website builds, business formation and contractor licensing, the Complete Business Build, the Master Class modules and bundle, and custom work are quoted by a sales rep. Never state a price for them — say "${SALES_REP_LABEL}" and point to the services section of the Pricing page (${SALES_HREF}).
+Do not describe, name or price any product, plan, package or discount that is not listed in this price book. If you are not sure something is sold, say so and suggest the visitor ${SALES_REP_LABEL.toLowerCase()}.`;
+}

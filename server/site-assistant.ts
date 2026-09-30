@@ -2,58 +2,48 @@ import { chatInput, rateLimit, siteChatGate } from "./growth-limits";
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 import { aiModel } from "./ai-config";
+import { pricingKnowledge, SALES_REP_LABEL, SALES_THRESHOLD_LABEL, TRIAL_LABEL, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PLANS } from "@shared/plan-copy";
 
-const openai = new OpenAI({
+// Created on first use so importing this module (e.g. to test the prompt)
+// never needs an API key.
+let openaiClient: OpenAI | null = null;
+const openai = () => openaiClient ??= new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const KNOWLEDGE_BASE = `
+/**
+ * What the site assistant knows. Plans, prices and add-ons come from the price
+ * book (shared/plans.ts via pricingKnowledge()) — never type a plan or price
+ * here. Services at or above the sales threshold are described without prices.
+ */
+export const SITE_ASSISTANT_KNOWLEDGE = `
 # ConstructHUB — Complete Platform Knowledge Base
 
-ConstructHUB (constructhub.us) is the one-stop shop for construction professionals — whether you're starting a construction business from scratch or scaling an existing one. It's everything you need in one platform: permit data, Google Business tools, advertising protection, competitor intelligence, and complete business education from LLC formation to marketing domination. No experience needed. We take you from zero to a fully operational, lead-generating construction business.
+ConstructHUB (constructhub.us) is the one-stop shop for construction professionals — whether you're starting a construction business from scratch or scaling an existing one. It's everything you need in one platform: permit data, Google Business tools, advertising protection, competitor intelligence, a contractor CRM, and business education from LLC formation to marketing. No experience needed.
 
-## Pricing & Plans
-- **Standard Plan**: $15/month — 50 permit searches, 5 GMB photo optimizations, 3 ranking grids, basic monitoring, email support
-- **Professional Plan**: $30/month — 200 permit searches, 25 GMB photo optimizations, 10 ranking grids, property records, priority email support
-- **Business Plan**: $50/month — 350 permit searches, 50 GMB photo optimizations, 15 ranking grids, scrape scheduling, property records, Google Click Guard (1 site), priority support
-- **Premium Plan**: $100/month — 500 permit searches, unlimited photos, 25 ranking grids, Click Guard (3 sites), IP Tracker (1 site), dedicated support
-- **Gold Plan**: $499/month — Unlimited everything, IP Tracker, VPN Shield, Competitor Intel (1 site), 2 users, priority support
-- **Platinum Plan**: $995/month — Unlimited everything, Competitor Intel (10 sites), IP Tracker (10 sites), VPN Shield (10 sites), expert consulting, 5 users, dedicated support
-- **First Page SEO**: $3,000/month (6-month minimum) — 1-2 keywords on Google's first page in 4-6 months.
-- **SEO Growth**: $6,000/month (6-month minimum) — Guaranteed top 3 positions for 1-2 keywords in 6-9 months. Bank account payment available.
-- **SEO Domination**: $10,000/month (6-month minimum) — Guaranteed top 3 positions for 3-5 keywords in 6-9 months. Bank account payment available.
-- **Done-For-You Business Formation**: Starting at $5,500 — LLC setup, licensing, bonding, insurance handled for you
-- **Done-For-You Marketing Management**: Starting at $9,999 — Complete digital marketing management
-- Free trial available for new users to explore the platform
+${pricingKnowledge()}
+
+### Services with a published price (under ${SALES_THRESHOLD_LABEL})
+- **GBP Reinstatement**: $599 per project — request it on the reinstatement page.
 
 ## Permits & Databases
-ConstructHUB aggregates permit databases from all 50 states plus DC. The platform covers 3,139 counties with 32,864 permit database entries spanning 29,838 cities and 3,026 county-level jurisdictions.
+ConstructHUB lists county and city permit offices across all 50 states plus DC. A permit portal link is shown only once it has been checked; links we could not confirm are labeled, and where no official portal is known the directory offers a web search instead of a guessed link.
 
 ### Permit Search
-- Cross-database search across all 50 states
+- Search across the listed jurisdictions in all 50 states
 - Filter by state, county, city, permit type
-- Real-time and scheduled scraping of government permit systems
-- Data deduplication ensures clean results
+- Live search on the portals that support it
 - Search history tracking to revisit past queries
 
 ### Database Directory
-- Filterable directory of all 32,864 permit databases
-- Direct portal links to official government permit systems
-- Coverage information for each jurisdiction
+- Filterable directory of county and city permit offices
+- Links to official government permit portals once checked
 - Organized by state and county
 
-### Property Records
-- Access to county property appraiser records nationwide (3,139 counties covered — every US county)
-- Look up ownership details, assessed values, construction history, tax records
-- Direct links to official government property appraiser portals
-- Searchable fields include owner info, LLC status, property values, lot size, sales records, tax details, exemptions
-
-### Scrape Schedules
-- Schedule automated data collection from permit databases
-- Set frequency (daily, weekly, monthly)
-- Monitor scrape status and results
-- Automatic data deduplication
+### Property Records (county assessor finder)
+- Finds the official county property appraiser / assessor office for an address (sourced from NETR Online)
+- Ownership, assessed values and tax records are looked up on the county's own site through that link
 
 ## Google Business Profile (GBP) Tools
 
@@ -108,6 +98,10 @@ Helps investigate unusual traffic to your landing pages:
 - Google Ads IP exclusion integration
 - Configurable detection thresholds and settings
 - No fraud-detection accuracy or advertising savings are guaranteed. Google Ads IP exclusions require the separate Ads script.
+- Click Guard, IP Tracker and VPN Shield are included with the ${PROTECTED_SITE_PLANS} plans (the number of protected websites depends on the plan; more are an add-on).
+
+### Google Ads & LSA manager (Agency plan only)
+- Part of the Agency plan: work with a Google Ads manager account and apply IP exclusions from one place.
 
 ### Google Ad Fraud (Exposé Page)
 Educational content revealing the truth about click fraud in Google Ads:
@@ -158,14 +152,15 @@ A browser-based tool for reviewing possible proxy traffic:
 - Does not identify visitors as competitors or establish their intent
 - Red/orange accent color scheme
 
-## Competitor Intelligence (Gold and Platinum Plans)
+## Competitor Intelligence (${COMPETITOR_INTEL_PLANS} plans)
 - Market scans to track competitor activity
 - Public ad activity is unavailable; competitor scans use public business listings only
 - Detailed review analysis of competitor businesses
 - Heuristic review signals worth a closer look, with sample-size limitations
-- Available to Gold and Platinum subscribers
+- Included with the ${COMPETITOR_INTEL_PLANS} plans, with a monthly number of scans per plan; more scans are an add-on
 
 ## Master Class — State-by-State Business Guide
+The Master Class modules and the complete bundle are priced at ${SALES_THRESHOLD_LABEL} or more, so they are sold through a sales rep: ${SALES_REP_LABEL}. Any Master Class purchase also unlocks the Google Ads Master Class guide.
 A comprehensive guide for starting and running a construction business, covering:
 - LLC formation process state by state
 - Licensing requirements for each state
@@ -186,14 +181,14 @@ A comprehensive guide for starting and running a construction business, covering
 - Theme toggle (light/dark mode)
 - Session management
 
-## Done-For-You Services (Premium)
-For contractors who want everything handled:
-- **Business Formation Package** ($5,500+): LLC creation, state licensing, bonding, insurance, bank account setup
-- **Marketing Management** ($9,999+): Complete Google Ads management, SEO, GBP optimization, review management
-- **First Page SEO** ($3,000/month × 6 months): 1-2 keywords on Google's first page in 4-6 months
-- **SEO Growth** ($6,000/month × 6 months): Guaranteed top 3 for 1-2 keywords in 6-9 months
-- **SEO Domination** ($10,000/month × 6 months): Guaranteed top 3 for 3-5 keywords in 6-9 months
-- **Consulting**: One-on-one strategy sessions with construction marketing experts
+## Done-For-You Services (quoted by a sales rep)
+For contractors who want the work done for them. Every one of these is priced at ${SALES_THRESHOLD_LABEL} or more, so never quote a price — the visitor should ${SALES_REP_LABEL.toLowerCase()}:
+- **Business Formation & Filing**: LLC, licensing paperwork, bonding, insurance processing, tax registration (you still take any licensing exams yourself)
+- **GMB & Website Setup**: full Google Business Profile, professional website, content
+- **SEO & Ad Campaigns**: local SEO, Google Ads, LSA setup, citation building
+- **SEO programs** (6-month minimum, signed contract): First Page SEO, SEO Growth, SEO Domination. No ranking result is guaranteed.
+- **Complete Business Build**: the services above as one package
+- **Custom work**: anything not listed here
 
 ## Technical Details
 - Platform runs as a modern web application with React frontend and Express backend
@@ -204,7 +199,7 @@ For contractors who want everything handled:
 - Mobile-responsive design that works on all devices
 `;
 
-const SYSTEM_PROMPT = `You are the ConstructHUB AI Assistant — a helpful, knowledgeable guide to the ConstructHUB platform. You help visitors understand that ConstructHUB is the ONE-STOP SHOP for construction professionals — whether they're starting a business from absolute scratch or scaling an existing one.
+export const SITE_ASSISTANT_PROMPT = `You are the ConstructHUB AI Assistant — a helpful, knowledgeable guide to the ConstructHUB platform. You help visitors understand that ConstructHUB is the ONE-STOP SHOP for construction professionals — whether they're starting a business from absolute scratch or scaling an existing one.
 
 Your knowledge comes exclusively from the ConstructHUB platform knowledge base. You provide clear, friendly, and informative answers.
 
@@ -214,16 +209,17 @@ Key personality traits:
 - You are welcoming and professional — you make visitors feel like they've found exactly what they need
 - You explain features in simple, non-technical language
 - You highlight the value and ROI of ConstructHUB's tools when relevant
-- You use real numbers and specifics from the knowledge base (e.g., "32,864 permit databases across all 50 states, covering 3,139 counties")
+- You use real numbers and specifics from the knowledge base only — never estimate, round up or invent a number
 - You keep answers concise — 2-3 paragraphs typically
 - You suggest relevant features when a visitor describes their needs
-- If asked about pricing, give specific plan details
+- If asked about pricing, give the plan, add-on and trial details exactly as the price book states them. Never offer a discount, a free plan or a product the price book does not list
+- For anything priced at ${SALES_THRESHOLD_LABEL} or more (SEO programs, websites, business formation, the Complete Business Build, the Master Class, custom work), do not state a price: say "${SALES_REP_LABEL}" and point to the services section of the Pricing page
 - When someone asks "what does ConstructHUB do" — lead with the fact that it's a complete platform to START and RUN a construction business, not just grow one
 - If someone asks about something not covered in your knowledge base, say so honestly and suggest they contact the ConstructHUB team
 
 Always format responses in plain text with clear structure. Use line breaks between paragraphs. Bold key terms with **double asterisks** when helpful.
 
-You should enthusiastically but naturally guide visitors toward trying the platform. When appropriate, mention the free trial.`;
+You should enthusiastically but naturally guide visitors toward trying the platform. When appropriate, mention that a new subscription starts with a ${TRIAL_LABEL}.`;
 
 export function registerSiteAssistantRoutes(app: Express) {
   app.post("/api/site-assistant/chat", rateLimit("site-assistant"), async (req: Request, res: Response) => {
@@ -241,11 +237,11 @@ export function registerSiteAssistantRoutes(app: Express) {
         content: m.content,
       }));
 
-      const completion = await openai.chat.completions.create({
+      const completion = await openai().chat.completions.create({
         model: aiModel(),
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "system", content: `Here is your complete knowledge base. Use this to answer all questions:\n\n${KNOWLEDGE_BASE}` },
+          { role: "system", content: SITE_ASSISTANT_PROMPT },
+          { role: "system", content: `Here is your complete knowledge base. Use this to answer all questions:\n\n${SITE_ASSISTANT_KNOWLEDGE}` },
           ...userMessages,
         ],
         temperature: 0.7,
