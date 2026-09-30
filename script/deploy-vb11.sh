@@ -52,6 +52,10 @@ if "${RSYNC[@]}" --dry-run --out-format='%n' package.json package-lock.json \
 else
   echo "dependencies unchanged — node_modules on $HOST already matches"
 fi
+# Live permit search launches Chromium through playwright-core; each version
+# expects its own browser build. Idempotent: a no-op when the build is present.
+"${SSH[@]}" "cd $APP_DIR && npx --no-install playwright-core install chromium-headless-shell >/dev/null" \
+  || { echo "ABORT: could not install the headless browser playwright-core needs" >&2; exit 1; }
 
 echo "== restart =="
 "${SSH[@]}" "systemctl --user restart constructhub.service"
