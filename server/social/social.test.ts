@@ -299,8 +299,10 @@ describe("real Postgres, mocked Blotato publishing", () => {
     ).toHaveLength(1);
   });
   it("rejects changed retries and duplicate destinations without changing queued content", async () => {
-    const input = request({ draft: true });
+    const input = request({ draft: true, tweaks: { twitter: "Fixture tweak", linkedin: "Unused tweak" } });
     const [p] = await createPosts(userId, input);
+    expect(p.request_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect((await createPosts(userId, { ...input, tweaks: { linkedin: "Unused tweak", twitter: "Fixture tweak" } }))[0].id).toBe(p.id);
     for (const change of [{ text: "Changed" }, { draft: false }, { mediaUrls: ["https://example.com/new.jpg"] }, { destinations: [] }]) {
       await expect(createPosts(userId, { ...input, ...change })).rejects.toThrow();
     }

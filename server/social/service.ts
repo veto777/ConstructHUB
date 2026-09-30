@@ -1,5 +1,5 @@
 import { syncGbpSources } from "./gbp-sources";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import OpenAI from "openai";
 import { pool } from "../db";
@@ -142,6 +142,11 @@ export async function discoverPages(
     return { items };
   });
 }
+function requestFingerprint(input: ReturnType<typeof postSchema.parse>) {
+  // Zod fixes object field order; normalize the free-form tweak keys too.
+  const tweaks = Object.fromEntries(Object.keys(input.tweaks).sort().map(key => [key, input.tweaks[key]]));
+  return createHash("sha256").update(JSON.stringify({ ...input, tweaks })).digest("hex");
+}
 export async function insertPosts(
   c: PoolClient,
   userId: number,
@@ -162,7 +167,7 @@ export async function insertPosts(
     const {
       rows: [row],
     } = await c.query(
-      `INSERT INTO social_posts(id,user_id,request_id,destination_key,payload,state,due_at,ai_generated,auto_generated,source,scheduled_at,request_payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,request_id,destination_key) DO UPDATE SET request_id=EXCLUDED.request_id RETURNING *`,
+      `INSERT INTO social_posts(id,user_id,request_id,destination_key,payload,state,due_at,ai_generated,auto_generated,source,scheduled_at,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,request_id,destination_key) DO UPDATE SET request_id=EXCLUDED.request_id RETURNING *`,
       [
         randomUUID(),
         userId,
@@ -175,7 +180,7 @@ export async function insertPosts(
         automatic,
         source || null,
         input.scheduledTime || null,
-        JSON.stringify(input),
+        requestFingerprint(input),
       ],
     );
     result.push(row);
@@ -186,8 +191,8 @@ export async function createPosts(userId: number, raw: unknown) {
   const input = postSchema.parse(raw);
   return userLock(userId, async (c) => {
     const { rows: existing } = await c.query(
-      "SELECT *, request_payload = $3::jsonb AS same_request FROM social_posts WHERE user_id=$1 AND request_id=$2",
-      [userId, input.requestId, JSON.stringify(input)],
+      "SELECT *, request_hash = $3 AS same_request FROM social_posts WHERE user_id=$1 AND request_id=$2",
+      [userId, input.requestId, requestFingerprint(input)],
     );
     if (existing.length) {
       if (existing.length !== input.destinations.length || existing.some((p) => !p.same_request))
