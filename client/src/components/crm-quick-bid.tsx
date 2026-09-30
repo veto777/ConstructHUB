@@ -163,7 +163,8 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}.` });
       } else {
         // Only say "copied" when the clipboard took it; otherwise show the link.
-        const url = r.link ? window.location.origin + r.link : null;
+        // The send route returns an absolute link — resolve, never prefix it.
+        const url = r.link ? new URL(r.link, window.location.origin).toString() : null;
         let copied = false;
         if (url) {
           try { await navigator.clipboard.writeText(url); copied = true; } catch { /* shown below */ }
