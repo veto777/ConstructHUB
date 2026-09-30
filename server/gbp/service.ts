@@ -1,3 +1,4 @@
+import { logActivity } from '../account-events';
 import { pool } from '../db';
 import { GoogleClient, GoogleError, mapLocation, mapPerformance, mapProfile, performancePath, resource, PROFILE_READ_MASK } from './client';
 import { accessToken, grantUsable, invalidate, soleSubject } from './grants';
@@ -168,7 +169,7 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
     return result;
   });
 }
-export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client?: GoogleClient) {
+export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client?: GoogleClient,req?: any) {
   if(typeof comment !== 'string' || comment.length > 4096 || (action==='publish' && !comment.trim())) throw new GoogleError('invalid','Reply must contain 1–4096 characters',400);
   const {rows:[review]} = await pool.query('SELECT * FROM google_profile_reviews WHERE id=$1 AND user_id=$2',[id,userId]);
   if(!review) throw new GoogleError('invalid','Review not found',404);
@@ -189,6 +190,7 @@ export async function reply(userId: number,id: number,comment: string, action: '
       if(action==='publish' && typeof response.comment !== 'string') throw new GoogleError('transient','Google did not confirm the reply. Sync before retrying.',503);
       const {rows:[r]} = await c.query(`UPDATE google_profile_reviews SET reply_comment=$2,reply_date=$3,reply_status=$4,reply_draft=NULL,reply_error=NULL,updated_at=now() WHERE id=$1 RETURNING *`,
         [id,action==='delete'?null:response.comment,action==='delete'?null:response.updateTime||new Date(),action==='delete'?'draft':'posted']);
+      await logActivity(req ?? null,userId,action==='delete'?'gbp.reply_deleted':'gbp.reply_posted',{reviewId:id,locationId:l.id});
       return {replyStatus:r.reply_status,replyComment:r.reply_comment};
     } catch(e) {
       await c.query('UPDATE google_profile_reviews SET reply_error=$2 WHERE id=$1',[id,publicError(e).message]);

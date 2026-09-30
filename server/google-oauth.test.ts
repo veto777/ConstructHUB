@@ -1,3 +1,5 @@
+import { pool } from "./db";
+import { randomBytes, createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 const base = process.env.CRM_TEST_BASE_URL || "http://127.0.0.1:8149";
 describe("Google OAuth request binding", () => {
@@ -19,12 +21,18 @@ describe("Google OAuth request binding", () => {
   it("binds GBP consent separately and rejects invalid state before token exchange", async () => {
     const legacy = await fetch(`${base}/api/auth/google?gbp=1`, {redirect:"manual"});
     expect(legacy.headers.get("location")).toBe("/api/gbp/connect");
-    const start = await fetch(`${base}/api/gbp/connect`, {redirect:"manual"});
+    const denied = await fetch(`${base}/api/gbp/connect`, {redirect:"manual"});
+    expect(denied.status).toBe(403);expect(await denied.json()).toMatchObject({reauth:true});
+    const sid=randomBytes(24).toString('hex');
+    await pool.query(`INSERT INTO session(sid,sess,expire) VALUES($1,$2,now()+interval '5 minutes')`,[sid,JSON.stringify({cookie:{maxAge:300000},passport:{user:1},recentAuth:{userId:1,at:Date.now()}})]);
+    const signed='s:'+sid+'.'+createHmac('sha256',process.env.SESSION_SECRET!).update(sid).digest('base64').replace(/=+$/,'');
+    const cookie='connect.sid='+encodeURIComponent(signed);
+    const start = await fetch(`${base}/api/gbp/connect`, {redirect:"manual",headers:{cookie}});
     const url = new URL(start.headers.get("location")!);
     expect(url.searchParams.get("scope")).toContain("business.manage");
     expect(url.searchParams.get("redirect_uri")).toContain("/api/gbp/callback");
-    const cookie = start.headers.get("set-cookie")!.split(";")[0];
     const callback = await fetch(`${base}/api/gbp/callback?code=fixture&state=wrong`,{redirect:"manual",headers:{cookie}});
     expect(callback.headers.get("location")).toBe("/locations?gbp=consent-failed");
+    await pool.query("DELETE FROM session WHERE sid=$1",[sid]);
   });
 });
