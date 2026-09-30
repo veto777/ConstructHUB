@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Search, Loader2, Trash2, AlertTriangle, Shield, TrendingUp,
   Star, MapPin, Globe, Phone, ChevronDown, ChevronUp, Lock,
@@ -100,7 +103,7 @@ export default function CompetitorsPage() {
       toast({ title: "Scan started", description: "Indexing competitors in your market. This may take a moment." });
     },
     onError: (err: Error) => {
-      toast({ title: "Scan failed", description: err.message, variant: "destructive" });
+      toast({ title: "Scan failed", description: apiErrorMessage(err, "The scan could not be started. Please try again."), variant: "destructive" });
     },
   });
 
@@ -113,12 +116,15 @@ export default function CompetitorsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/competitors/scans"] });
       toast({ title: "Scan deleted" });
     },
+    onError: (err: Error) => {
+      toast({ title: "Could not delete scan", description: apiErrorMessage(err), variant: "destructive" });
+    },
   });
 
   const handleScan = () => {
     if (!industry) { toast({ title: "Select an industry", variant: "destructive" }); return; }
-    if (!location) { toast({ title: "Enter a location", variant: "destructive" }); return; }
-    scanMutation.mutate({ industry, location, radius: parseInt(radius) });
+    if (!location.trim()) { toast({ title: "Enter a location", variant: "destructive" }); return; }
+    scanMutation.mutate({ industry, location: location.trim(), radius: parseInt(radius) });
   };
 
   if (!isPlatinum && !isDev) {
@@ -260,6 +266,8 @@ export default function CompetitorsPage() {
                 onToggle={() => setExpandedScan(expandedScan === scan.id ? null : scan.id)}
                 onDelete={() => deleteMutation.mutate(scan.id)}
                 deleting={deleteMutation.isPending}
+                onRetry={() => scanMutation.mutate({ industry: scan.industry, location: scan.location, radius: scan.radius })}
+                retrying={scanMutation.isPending}
               />
             ))}
           </TabsContent>
@@ -729,14 +737,17 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
   );
 }
 
-function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
+function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retrying }: {
   scan: any;
   expanded: boolean;
   onToggle: () => void;
   onDelete: () => void;
   deleting: boolean;
+  onRetry: () => void;
+  retrying: boolean;
 }) {
   const [expandedListing, setExpandedListing] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { data, isLoading } = useQuery<{ scan: any; listings: any[] }>({
     queryKey: ["/api/competitors/scans", scan.id],
     enabled: expanded,
@@ -752,19 +763,19 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
   return (
     <Card data-testid={`card-scan-${scan.id}`}>
       <CardHeader className="pb-2 cursor-pointer" onClick={onToggle}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-yellow-500/10 hidden sm:flex items-center justify-center shrink-0">
               <BarChart3 className="w-5 h-5 text-yellow-500" />
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-base">{scan.industry} — {scan.location}</CardTitle>
               <CardDescription className="text-xs">
                 {scan.radius} mile radius • {new Date(scan.createdAt).toLocaleDateString()} • {scan.totalFound || 0} competitors found
               </CardDescription>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {isRunning && (
               <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
                 <Loader2 className="w-3 h-3 animate-spin mr-1" />
@@ -777,15 +788,59 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
               </Badge>
             )}
             {scan.status === "failed" && (
-              <span className="text-sm text-destructive" role="alert">{scan.errorMessage || "Scan failed. Please try again."}</span>
+              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                Failed
+              </Badge>
             )}
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={deleting} data-testid={`button-delete-scan-${scan.id}`}>
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} disabled={deleting} aria-label="Delete scan" data-testid={`button-delete-scan-${scan.id}`}>
               <Trash2 className="w-4 h-4" />
             </Button>
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </div>
+        {/* Full-width row under the title so a long provider error stays readable on phones. */}
+        {scan.status === "failed" && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2">
+            <span className="text-sm text-destructive" role="alert" data-testid={`text-scan-error-${scan.id}`}>{scan.errorMessage || "Scan failed. Please try again."}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={(e) => { e.stopPropagation(); onRetry(); }}
+              disabled={retrying}
+              data-testid={`button-retry-scan-${scan.id}`}
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Run this scan again
+            </Button>
+          </div>
+        )}
+        {scan.status === "completed" && scan.errorMessage && (
+          <p className="text-xs text-muted-foreground pt-2" data-testid={`text-scan-note-${scan.id}`}>{scan.errorMessage}</p>
+        )}
       </CardHeader>
+
+      {/* Outside the clickable header: dialog clicks bubble through the React tree. */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent data-testid={`dialog-delete-scan-${scan.id}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this scan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the {scan.industry} scan for {scan.location} and its competitor data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid={`button-cancel-delete-scan-${scan.id}`}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={onDelete}
+              data-testid={`button-confirm-delete-scan-${scan.id}`}
+            >
+              Delete scan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {expanded && (
         <CardContent className="space-y-4">
@@ -798,7 +853,10 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting }: {
           {isRunning && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Indexing competitors and analyzing reviews...</p>
-              <Progress value={30} className="h-2" />
+              {/* Indeterminate: the scan row reports no progress, so show activity, not a fake percentage. */}
+              <div className="h-2 w-full rounded-full bg-secondary overflow-hidden" role="progressbar" aria-label="Scan in progress" aria-busy="true">
+                <div className="h-full w-full rounded-full bg-primary/60 animate-pulse" />
+              </div>
             </div>
           )}
 

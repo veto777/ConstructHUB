@@ -1,11 +1,17 @@
 import { useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
+import { useAppOrigin } from "@/lib/app-origin";
 import {
   Fingerprint, Globe, Eye, Users, Monitor, Smartphone, Tablet,
   Search, ChevronRight, ChevronDown, Activity, MapPin,
@@ -131,6 +137,47 @@ const tabs = [
 
 type TabId = typeof tabs[number]["id"];
 
+/** Tab and site live in the query string (?site=10&tab=platforms) so a reload or shared link keeps them. */
+function useUrlState() {
+  const search = useSearch();
+  const [path, navigate] = useLocation();
+  const set = (key: string, value: string | null) => {
+    // Read the live query string so two updates in one handler both land.
+    const next = new URLSearchParams(window.location.search);
+    if (value === null) next.delete(key); else next.set(key, value);
+    const qs = next.toString();
+    navigate(qs ? `${path}?${qs}` : path, { replace: true });
+  };
+  return { params: new URLSearchParams(search), set };
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const localDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const daysAgo = (now: Date, n: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - n);
+
+/** Local midnight that covers both the 14-day chart and "This Month". */
+function dashboardSince(now = new Date()) {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const chartStart = daysAgo(now, 13);
+  return monthStart < chartStart ? monthStart : chartStart;
+}
+
+/**
+ * The server buckets days in UTC; regroup its UTC hour buckets ("2026-09-29T23") by the
+ * viewer's local day so "Today" rolls over at local midnight. Exact for whole-hour offsets;
+ * half-hour zones can shift up to 30 minutes of visits across midnight.
+ */
+function localDailyVisits(hourly: Record<string, number> | undefined) {
+  const daily: Record<string, number> = {};
+  for (const [hour, count] of Object.entries(hourly || {})) {
+    const at = new Date(`${hour}:00:00Z`);
+    if (Number.isNaN(at.getTime())) continue;
+    const key = localDayKey(at);
+    daily[key] = (daily[key] || 0) + count;
+  }
+  return daily;
+}
+
 function formatTimeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -178,25 +225,94 @@ function StatCard({ label, value, icon: Icon, sub }: { label: string; value: str
   );
 }
 
+function OnlineCell({ domainId }: { domainId: number }) {
+  const { data, isError } = useQuery<{ count: number }>({
+    queryKey: ["/api/click-guard/domains", domainId, "online"],
+  });
+  return (
+    <td className="text-right p-3 tabular-nums" data-testid={`text-online-${domainId}`} title="Distinct IPs in the last 20 minutes">
+      {data ? data.count : isError ? "Unavailable" : "…"}
+    </td>
+  );
+}
+
+function InstallCard({ domain }: { domain: DomainWithStats }) {
+  const appOrigin = useAppOrigin();
+  const { toast } = useToast();
+  const noVisits = domain.stats.totalVisits === 0;
+  const [open, setOpen] = useState(noVisits);
+  const snippet = `<script src="${appOrigin}/api/click-guard/script/${domain.trackingId}" async></script>`;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(snippet);
+      toast({ title: "Tracking code copied", description: "Paste it into your site's <head> or just before </body>." });
+    } catch {
+      toast({ title: "Could not copy", description: "Select the code and copy it manually.", variant: "destructive" });
+    }
+  };
+
+  return (
+    <Card className={`bg-card ${noVisits ? "border-blue-500/40" : "border-border"}`} data-testid="card-install-tracking">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-foreground">Tracking code for {domain.domain}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-install-status">
+              {noVisits
+                ? "No visits recorded yet. Visits appear here only after this code runs on your site."
+                : `${domain.stats.totalVisits.toLocaleString()} visit${domain.stats.totalVisits !== 1 ? "s" : ""} recorded so far.`}
+            </p>
+          </div>
+          {!noVisits && (
+            <Button size="sm" variant="ghost" className="text-xs" onClick={() => setOpen(o => !o)} data-testid="button-toggle-install">
+              {open ? "Hide code" : "Show code"}
+            </Button>
+          )}
+        </div>
+        {open && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Add this tag to the <code className="bg-muted px-1 py-0.5 rounded text-foreground">&lt;head&gt;</code> or just before the closing <code className="bg-muted px-1 py-0.5 rounded text-foreground">&lt;/body&gt;</code> tag of every page you want to track.
+            </p>
+            <div className="relative">
+              <pre className="bg-muted rounded-md p-3 pr-12 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap break-all" data-testid="text-tracking-snippet">{snippet}</pre>
+              <Button size="icon" variant="ghost" className="absolute top-1.5 right-1.5" onClick={copy} aria-label="Copy tracking code" data-testid="button-copy-tracking-snippet">
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DashboardView({ domainId, analytics, domains }: { domainId: number | null; analytics: Analytics | undefined; domains: DomainWithStats[] }) {
   const { data: online } = useQuery<{ count: number; visitors: any[] }>({
     queryKey: ["/api/click-guard/domains", domainId, "online"],
     enabled: !!domainId,
   });
+  const domain = domains.find(d => d.id === domainId);
 
-  const dailyEntries = analytics?.dailyVisits ? Object.entries(analytics.dailyVisits).sort((a, b) => a[0].localeCompare(b[0])) : [];
-  const maxDaily = Math.max(...dailyEntries.map(([, v]) => v), 1);
+  const now = new Date();
+  const daily = localDailyVisits(analytics?.hourlyVisits);
+  const chartDays = Array.from({ length: 14 }, (_, i) => {
+    const key = localDayKey(daysAgo(now, 13 - i));
+    return [key, daily[key] || 0] as const;
+  });
+  const maxDaily = Math.max(...chartDays.map(([, v]) => v), 1);
 
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-  const todayVisits = analytics?.dailyVisits?.[today] || 0;
-  const yesterdayVisits = analytics?.dailyVisits?.[yesterday] || 0;
-
-  const last7 = dailyEntries.slice(-7).reduce((s, [, v]) => s + v, 0);
-  const thisMonth = dailyEntries.reduce((s, [, v]) => s + v, 0);
+  const todayVisits = daily[localDayKey(now)] || 0;
+  const yesterdayVisits = daily[localDayKey(daysAgo(now, 1))] || 0;
+  const last7 = chartDays.slice(-7).reduce((s, [, v]) => s + v, 0);
+  const monthPrefix = localDayKey(now).slice(0, 7);
+  const thisMonth = Object.entries(daily).filter(([k]) => k.startsWith(monthPrefix)).reduce((s, [, v]) => s + v, 0);
 
   return (
     <div className="space-y-6">
+      {domain && <InstallCard key={domain.id} domain={domain} />}
+
       {online && online.count > 0 && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex items-center gap-3" data-testid="banner-online">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -212,17 +328,17 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
         <StatCard label="Yesterday" value={yesterdayVisits} icon={Clock} />
         <StatCard label="Last 7 Days" value={last7} icon={BarChart3} />
         <StatCard label="This Month" value={thisMonth} icon={Globe} />
-        <StatCard label="Total" value={analytics?.totalVisits ?? 0} icon={Users} />
+        <StatCard label="Total" value={domain?.stats.totalVisits ?? 0} icon={Users} sub="All time" />
       </div>
 
-      {dailyEntries.length > 0 && (
+      {chartDays.some(([, v]) => v > 0) && (
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Daily Visits</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="flex items-end gap-1 h-32">
-              {dailyEntries.slice(-14).map(([date, count]) => (
+              {chartDays.map(([date, count]) => (
                 <div key={date} className="flex-1 flex flex-col items-center gap-1">
                   <div
                     className="w-full bg-primary/80 rounded-t hover:bg-primary transition-colors min-h-[2px]"
@@ -230,7 +346,7 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
                     title={`${date}: ${count} visits`}
                   />
                   <span className="text-[8px] text-muted-foreground truncate w-full text-center">
-                    {new Date(date).getDate()}
+                    {Number(date.slice(8, 10))}
                   </span>
                 </div>
               ))}
@@ -263,7 +379,7 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
                         <div className="font-medium text-foreground">{d.name || d.domain}</div>
                         <div className="text-xs text-muted-foreground">{d.domain}</div>
                       </td>
-                      <td className="text-right p-3 tabular-nums">-</td>
+                      <OnlineCell domainId={d.id} />
                       <td className="text-right p-3 tabular-nums font-medium">{d.stats.totalVisits.toLocaleString()}</td>
                       <td className="text-right p-3 tabular-nums">{d.stats.uniqueVisitors.toLocaleString()}</td>
                       <td className="text-right p-3 tabular-nums">{d.stats.blockedIps}</td>
@@ -473,13 +589,16 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
   );
 }
 
-function TrafficSourcesView({ domainId, analytics }: { domainId: number | null; analytics: Analytics | undefined }) {
+function TrafficSourcesView({ domainId, analytics, since }: { domainId: number | null; analytics: Analytics | undefined; since: Date }) {
   const sources = analytics?.trafficSources || [];
   const totalLoads = sources.reduce((s, t) => s + t.pageLoads, 0);
   const totalVisitors = sources.reduce((s, t) => s + t.visitors, 0);
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground" data-testid="text-traffic-range">
+        Visits since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
+      </p>
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Total Sources" value={sources.length} icon={Globe} />
         <StatCard label="Total Page Loads" value={totalLoads.toLocaleString()} icon={FileText} />
@@ -703,36 +822,64 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
 }
 
 export default function IpTrackerPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
-  const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
+  const { params, set: setUrlParam } = useUrlState();
+  const tabParam = params.get("tab");
+  const activeTab: TabId = tabs.some(t => t.id === tabParam) ? (tabParam as TabId) : "dashboard";
+  const setActiveTab = (tab: TabId) => setUrlParam("tab", tab === "dashboard" ? null : tab);
+  const selectedDomainId = Number(params.get("site")) || null;
+  const setSelectedDomainId = (id: number | null) => setUrlParam("site", id ? String(id) : null);
   const [showAddDomain, setShowAddDomain] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [newDomain, setNewDomain] = useState("");
   const [newDomainName, setNewDomainName] = useState("");
   const { toast } = useToast();
 
-  const { data: domains = [] } = useQuery<DomainWithStats[]>({
+  const { data: domains = [], isLoading: domainsLoading } = useQuery<DomainWithStats[]>({
     queryKey: ["/api/click-guard/domains"],
   });
 
-  const domainId = selectedDomainId || domains[0]?.id || null;
-  const selectedDomain = domains.find(d => d.id === domainId);
+  // A stale or removed ?site= falls back to the first site rather than an id that no longer exists.
+  const selectedDomain = domains.find(d => d.id === selectedDomainId) ?? domains[0];
+  const domainId = selectedDomain?.id ?? null;
 
+  const since = dashboardSince();
+  const sinceIso = since.toISOString();
   const { data: analytics } = useQuery<Analytics>({
-    queryKey: ["/api/click-guard/domains", domainId, "analytics"],
+    queryKey: ["/api/click-guard/domains", domainId, "analytics", sinceIso],
+    queryFn: async () => (await apiRequest("GET", `/api/click-guard/domains/${domainId}/analytics?start=${encodeURIComponent(sinceIso)}`)).json(),
     enabled: !!domainId,
   });
 
   const addDomainMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/click-guard/domains", { domain: newDomain, name: newDomainName || undefined }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"] });
+    mutationFn: async () => (await apiRequest("POST", "/api/click-guard/domains", { domain: newDomain.trim(), name: newDomainName.trim() || undefined })).json(),
+    onSuccess: (created: DomainWithStats) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"], exact: true });
+      queryClient.invalidateQueries({ queryKey: ["/api/vpn-shield/domains"], exact: true });
       setNewDomain("");
       setNewDomainName("");
       setShowAddDomain(false);
-      toast({ title: "Domain added", description: "Tracking is now active for this domain." });
+      if (created?.id) setSelectedDomainId(created.id);
+      setActiveTab("dashboard");
+      toast({ title: "Site added", description: "Install the tracking code below to start collecting visits." });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to add domain", variant: "destructive" });
+      toast({ title: "Could not add site", description: apiErrorMessage(err, "Failed to add site"), variant: "destructive" });
+    },
+  });
+
+  const removeDomainMutation = useMutation({
+    mutationFn: async (id: number) => (await apiRequest("DELETE", `/api/click-guard/domains/${id}`)).json(),
+    onSuccess: (_res, id) => {
+      setSelectedDomainId(null);
+      // Drop the site now and refresh only the lists: the removed site's own queries would 404.
+      queryClient.setQueryData<DomainWithStats[]>(["/api/click-guard/domains"], old => old?.filter(d => d.id !== id));
+      queryClient.removeQueries({ queryKey: ["/api/click-guard/domains", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"], exact: true });
+      queryClient.invalidateQueries({ queryKey: ["/api/vpn-shield/domains"], exact: true });
+      toast({ title: "Site removed" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not remove site", description: apiErrorMessage(err, "Failed to remove site"), variant: "destructive" });
     },
   });
 
@@ -761,16 +908,29 @@ export default function IpTrackerPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               {selectedDomain && domains.length > 0 && (
-                <select
-                  className="bg-card border border-border text-foreground text-sm rounded-md px-3 py-2 outline-none min-w-0 max-w-[200px]"
-                  value={domainId || ""}
-                  onChange={(e) => setSelectedDomainId(Number(e.target.value))}
-                  data-testid="select-domain"
-                >
-                  {domains.map(d => (
-                    <option key={d.id} value={d.id}>{d.name || d.domain}</option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    className="bg-card border border-border text-foreground text-sm rounded-md px-3 py-2 outline-none min-w-0 max-w-[200px]"
+                    value={domainId || ""}
+                    onChange={(e) => setSelectedDomainId(Number(e.target.value))}
+                    aria-label="Site"
+                    data-testid="select-domain"
+                  >
+                    {domains.map(d => (
+                      <option key={d.id} value={d.id}>{d.name || d.domain}</option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmRemove(true)}
+                    disabled={removeDomainMutation.isPending}
+                    aria-label="Remove site"
+                    data-testid="button-remove-domain"
+                  >
+                    <Trash2 className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Remove site</span>
+                  </Button>
+                </>
               )}
               <Button
                 size="sm"
@@ -782,6 +942,27 @@ export default function IpTrackerPage() {
               </Button>
             </div>
           </div>
+
+          <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+            <AlertDialogContent data-testid="dialog-remove-domain">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove {selectedDomain?.name || selectedDomain?.domain || "this site"}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This stops tracking {selectedDomain?.domain ?? "this site"} in IP Tracker, Click Guard and VPN Shield, and permanently deletes its recorded visits and blocked IPs. Remove the tracking code from your site as well. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-remove-domain">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => { if (domainId) removeDomainMutation.mutate(domainId); }}
+                  data-testid="button-confirm-remove-domain"
+                >
+                  Remove site
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {showAddDomain && (
             <Card className="bg-card border-border mb-6" data-testid="card-add-domain">
@@ -806,7 +987,7 @@ export default function IpTrackerPage() {
                       size="sm"
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                       onClick={() => addDomainMutation.mutate()}
-                      disabled={!newDomain || addDomainMutation.isPending}
+                      disabled={!newDomain.trim() || addDomainMutation.isPending}
                       data-testid="button-save-domain"
                     >
                       {addDomainMutation.isPending ? "Adding..." : "Add"}
@@ -826,11 +1007,14 @@ export default function IpTrackerPage() {
             </Card>
           )}
 
-          <div className="flex items-center gap-1 mb-6 bg-card border border-border rounded-lg p-1 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 sm:w-fit scrollbar-none">
+          {/* Wraps instead of scrolling so every tab stays visible at phone width. */}
+          <div className="flex flex-wrap items-center gap-1 mb-6 bg-card border border-border rounded-lg p-1 sm:w-fit" role="tablist">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                role="tab"
+                aria-selected={activeTab === tab.id}
                 className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
                   activeTab === tab.id
                     ? "bg-blue-600 text-white"
@@ -845,7 +1029,9 @@ export default function IpTrackerPage() {
             ))}
           </div>
 
-          {!domainId && !showAddDomain ? (
+          {domainsLoading ? (
+            <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
+          ) : !domainId && !showAddDomain ? (
             <Card className="bg-card border-border p-12 text-center">
               <Fingerprint className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-xl font-bold text-foreground mb-2">No Sites Being Tracked</h2>
@@ -860,7 +1046,7 @@ export default function IpTrackerPage() {
             <>
               {activeTab === "dashboard" && <DashboardView domainId={domainId} analytics={analytics} domains={domains} />}
               {activeTab === "visitors" && <VisitorListView domainId={domainId} />}
-              {activeTab === "traffic" && <TrafficSourcesView domainId={domainId} analytics={analytics} />}
+              {activeTab === "traffic" && <TrafficSourcesView domainId={domainId} analytics={analytics} since={since} />}
               {activeTab === "pages" && <PagesView domainId={domainId} />}
               {activeTab === "geo" && <GeoView domainId={domainId} />}
               {activeTab === "platforms" && <PlatformsView domainId={domainId} />}
