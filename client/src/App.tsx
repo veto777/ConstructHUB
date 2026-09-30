@@ -85,7 +85,6 @@ import { isPortal, isClientPortal, CRM_NAME } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
 import CrmGatewayPage from "@/pages/crm-gateway";
 import VpnShieldPage from "@/pages/vpn-shield";
-import IndividualPricingPage from "@/pages/individual-pricing";
 import HomePage from "@/pages/home";
 import ContractSignPage from "@/pages/contract-sign";
 import GoogleReviewsPage from "@/pages/google-reviews";
@@ -100,6 +99,13 @@ import MediaLibraryPage from "@/pages/media-library";
 import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
+
+/** The old à-la-carte tools page: single features are add-ons on /pricing now. */
+function IndividualPricingRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => { setLocation("/pricing#add-ons", { replace: true }); }, [setLocation]);
+  return null;
+}
 
 function DashboardRouter() {
   return (
@@ -140,7 +146,7 @@ function DashboardRouter() {
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
-      <Route path="/individual-pricing" component={IndividualPricingPage} />
+      <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
       <Route path="/master-class-landing" component={MasterClassLandingPage} />
       {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews" component={GoogleReviewsPage} />}
@@ -190,7 +196,7 @@ function PublicRouter() {
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
-      <Route path="/individual-pricing" component={IndividualPricingPage} />
+      <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/permits-landing" component={PermitsLandingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
       <Route path="/master-class-landing" component={MasterClassLandingPage} />
@@ -243,7 +249,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
-  "/vpn-shield": "VPN Shield", "/individual-pricing": "Individual Tools", "/google-reviews": "Google Reviews",
+  "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews",
   "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in",
 };
 

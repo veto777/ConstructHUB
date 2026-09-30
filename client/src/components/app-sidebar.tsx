@@ -3,7 +3,7 @@ import {
   Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
   Eye, Grid3X3, CreditCard, Shield, MapPin, GraduationCap, ChevronRight,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
-  Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Zap, Star,
+  Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
   KanbanSquare, ArrowRight, Bell,
 } from "lucide-react";
@@ -242,7 +242,7 @@ const pricingGroup: NavGroup = {
   logo: priceLogo,
   children: [
     { title: "Subscription Plans", url: "/pricing", icon: Layers },
-    { title: "Individual Tools", url: "/individual-pricing", icon: Zap },
+    { title: "Add-ons", url: "/pricing#add-ons", icon: PlusCircle },
     { title: "Master Class", url: "/master-class-landing", icon: BookOpen, testId: "link-nav-pricing-master-class" },
     // The done-for-you SEO packages section of the pricing page.
     { title: "SEO Services", url: "/pricing#done-for-you", icon: Rocket },
