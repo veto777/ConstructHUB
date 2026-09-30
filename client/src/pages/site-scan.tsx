@@ -51,7 +51,9 @@ function fieldMetric(key: string, m: any) {
   const value =
     typeof m?.percentile !== "number"
       ? ""
-      : key.endsWith("_MS")
+      : key.endsWith("_MS") ||
+          // CrUX reports these in milliseconds without the _MS suffix.
+          ["INTERACTION_TO_NEXT_PAINT", "EXPERIMENTAL_TIME_TO_FIRST_BYTE"].includes(key)
         ? ` (75th percentile ${m.percentile} ms)`
         : key === "CUMULATIVE_LAYOUT_SHIFT_SCORE"
           ? ` (75th percentile ${(m.percentile / 100).toFixed(2)})`
@@ -422,6 +424,9 @@ export default function SiteScanPage() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [share, setShare] = useState("");
+  // Same cached query AgencyWorkspace uses: a delegated member acts through a business.
+  const { data: agencyMe } = useQuery<any>({ queryKey: ["/api/agency/me"] });
+  const delegated = !!agencyMe && agencyMe.owner !== agencyMe.actor;
   const { data, error: listError } = useQuery<any>({
     queryKey: ["/api/sitescan", listParams.toString()],
     queryFn: () => api("GET", "/api/sitescan?" + listParams),
@@ -709,7 +714,17 @@ export default function SiteScanPage() {
                       size="sm"
                       aria-label={`Disable schedule for ${s.url}`}
                       disabled={busy}
-                      onClick={() => scheduleFor(s.url, false)}
+                      // Agency members may only change a schedule through its business;
+                      // the owner disables by URL, which also covers a deleted business.
+                      onClick={() =>
+                        scheduleFor(
+                          s.url,
+                          false,
+                          delegated && s.location_id
+                            ? { locationId: s.location_id }
+                            : {},
+                        )
+                      }
                     >
                       Disable
                     </Button>

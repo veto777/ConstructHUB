@@ -397,25 +397,13 @@ export function registerSiteScanRoutes(
     try {
       for (const batch of batches)
         sections.push(await deps.provider.generate(batch));
-      const draft = sections
-        .map(
-          (text, i) =>
-            `AI DRAFT — page batch ${i + 1}/${sections.length}\n\n${text}`,
-        )
-        .join("\n\n");
-      await pool.query(
-        "UPDATE sitescan_jobs SET ai_draft=$3 WHERE id=$1 AND user_id=$2",
-        [j.id, user, draft],
-      );
-      await logActivity(req, user, "sitescan.plan_drafted", { id: j.id });
-      res.json({ draft, label: "AI draft — review before publishing" });
     } catch {
       // No draft was produced: give back the draft and every call that did not complete.
       const unused = batches.length - sections.length;
       await refundBudget(draftKey, 1, period);
       await refundBudget(callsKey, unused, period);
       await refundBudget(globalKey, unused, period);
-      res.status(503).json({
+      return res.status(503).json({
         message:
           "AI provider unavailable, so no draft was created and your daily AI draft allowance was not used. The audit remains available" +
           (j.report.jsonLdDraft
@@ -423,6 +411,19 @@ export function registerSiteScanRoutes(
             : "."),
       });
     }
+    // Only a provider failure is refunded; a storage error after generation is not an outage.
+    const draft = sections
+      .map(
+        (text, i) =>
+          `AI DRAFT — page batch ${i + 1}/${sections.length}\n\n${text}`,
+      )
+      .join("\n\n");
+    await pool.query(
+      "UPDATE sitescan_jobs SET ai_draft=$3 WHERE id=$1 AND user_id=$2",
+      [j.id, user, draft],
+    );
+    await logActivity(req, user, "sitescan.plan_drafted", { id: j.id });
+    res.json({ draft, label: "AI draft — review before publishing" });
   });
   owner("post", "/api/sitescan/jobs/:id/share", async (req, res, user) => {
     const j = await getJob(req, res, user);
