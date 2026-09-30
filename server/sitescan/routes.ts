@@ -192,7 +192,7 @@ export function registerSiteScanRoutes(
         .status(400)
         .json({ message: "Enter a public HTTP or HTTPS website URL." });
     }
-    if (body.locationId && !(await profileFor(user, body.locationId)))
+    if (body.enabled && body.locationId && !(await profileFor(user, body.locationId)))
       return res.status(404).json({ message: "Synced profile not found" });
     if (body.enabled) {
       const c = await pool.connect();

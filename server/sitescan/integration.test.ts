@@ -333,3 +333,12 @@ it("failed CAPTCHA attempts do not exhaust scan budgets or capture leads", async
     else process.env.RECAPTCHA_SECRET_KEY = previous;
   }
 });
+
+it("allows stopping a rescan after its linked profile becomes unavailable", async () => {
+  const url = "https://sitescan-disconnected.test/";
+  await pool.query("INSERT INTO sitescan_schedules(user_id,url,location_id) VALUES(1,$1,2147483647)", [url]);
+  expect((await call("post", "/api/sitescan/schedule", {
+    body: { url, locationId: 2147483647, enabled: false },
+  })).status).toBe(200);
+  expect((await pool.query("SELECT * FROM sitescan_schedules WHERE url=$1", [url])).rows).toHaveLength(0);
+});
