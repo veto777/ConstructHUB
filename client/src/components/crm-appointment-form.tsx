@@ -8,8 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+  ClientSearchPicker, ListSearchPicker, type PickOption,
+} from "@/components/crm-search-picker";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 
@@ -44,6 +44,8 @@ export const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.g
 export const isoDay = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 export const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+/** Picker id for "linked to a client we only know by name": keep it as is. */
+const KEEP_CUSTOMER = "__keep__";
 
 // ── Appointment create/edit dialog ──────────────────────────────────────────
 
@@ -54,7 +56,9 @@ export function AppointmentForm({
   defaultDate: Date | null;
   members: any[];
   projects: any[];
-  customers: any[];
+  /** A fixed client list (the client page passes just that client). Omit it
+   *  to search every client in the org — the API's list is capped at 500. */
+  customers?: any[];
   onClose: () => void;
   /** Fired after a successful CREATE with the new row, so the calendar can
    *  make sure the visit is actually on screen. */
@@ -69,8 +73,28 @@ export function AppointmentForm({
   const [endTime, setEndTime] = useState(
     initial?.endsAt && !initial.allDay ? hhmm(new Date(initial.endsAt)) : "10:00",
   );
-  const [projectId, setProjectId] = useState(initial?.projectId ?? "");
-  const [customerId, setCustomerId] = useState(initial?.customerId ?? "");
+  const projectOption = (p: any): PickOption =>
+    ({ id: p.id, label: p.name, detail: p.number ?? null });
+  const [project, setProject] = useState<PickOption | null>(() => {
+    if (!initial?.projectId) return null;
+    const p = projects.find((x) => x.id === initial.projectId);
+    return p ? projectOption(p)
+      : { id: initial.projectId, label: initial.projectName ?? "Linked project", detail: initial.projectNumber };
+  });
+  const [customer, setCustomer] = useState<PickOption | null>(() => {
+    if (!initial?.customerId) {
+      // The agenda feed (/api/crm/schedule) names the client but sends no
+      // customerId. Show the name and leave the link alone on save; sending
+      // null would silently unlink the visit from its client.
+      return initial && initial.customerId === undefined && initial.customerName
+        ? { id: KEEP_CUSTOMER, label: initial.customerName }
+        : null;
+    }
+    const c = customers?.find((x) => x.id === initial.customerId);
+    return { id: initial.customerId, label: c?.displayName ?? initial.customerName ?? "Linked client" };
+  });
+  // Delete is a hard DELETE — ask once before it happens.
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [crew, setCrew] = useState<string[]>(initial?.dispatchedMemberIds ?? []);
   const [notes, setNotes] = useState(initial?.notes ?? "");
 
@@ -130,8 +154,9 @@ export function AppointmentForm({
       endsAt: endsAt && !isNaN(endsAt.getTime()) ? endsAt.toISOString() : null,
       allDay,
       notes: notes.trim() || null,
-      projectId: projectId || null,
-      customerId: customerId || null,
+      projectId: project?.id ?? null,
+      // Unchanged link whose id we never had → omit it (PATCH keeps it).
+      ...(customer?.id === KEEP_CUSTOMER ? {} : { customerId: customer?.id ?? null }),
       dispatchedMemberIds: crew,
     });
   };
@@ -176,23 +201,24 @@ export function AppointmentForm({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label>Project</Label>
-            <Select value={projectId || "none"} onValueChange={(v) => setProjectId(v === "none" ? "" : v)}>
-              <SelectTrigger data-testid="select-appt-project"><SelectValue placeholder="No project" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No project</SelectItem>
-                {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ListSearchPicker value={project} onChange={setProject}
+              options={projects.map(projectOption)}
+              placeholder="Search projects (optional)" clearLabel="No project"
+              emptyText={projects.length ? "No projects match." : "No projects yet."}
+              testid="select-appt-project" />
           </div>
           <div>
             <Label>Customer</Label>
-            <Select value={customerId || "none"} onValueChange={(v) => setCustomerId(v === "none" ? "" : v)}>
-              <SelectTrigger data-testid="select-appt-customer"><SelectValue placeholder="No customer" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No customer</SelectItem>
-                {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.displayName}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {customers ? (
+              <ListSearchPicker value={customer} onChange={setCustomer}
+                options={customers.map((c) => ({ id: c.id, label: c.displayName }))}
+                placeholder="Search clients (optional)" clearLabel="No customer"
+                testid="select-appt-customer" />
+            ) : (
+              <ClientSearchPicker value={customer} onChange={setCustomer}
+                placeholder="Search clients (optional)" clearLabel="No customer"
+                testid="select-appt-customer" />
+            )}
           </div>
         </div>
         {members.length > 0 && (
@@ -219,21 +245,41 @@ export function AppointmentForm({
             onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Gate code, ladder needed…" />
         </div>
       </div>
-      <DialogFooter className="gap-2 sm:justify-between">
-        {initial ? (
-          <Button type="button" variant="destructive" size="sm"
-            data-testid="button-appt-delete"
-            onClick={() => del.mutate()} disabled={del.isPending || save.isPending}>
-            {del.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
-            Delete
+      {initial && confirmDelete ? (
+        // While confirming, the footer is ONLY the question — no Save beside it.
+        <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between"
+          data-testid="appt-delete-confirm">
+          <span className="text-sm">Delete this visit? This can't be undone.</span>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="sm" data-testid="button-appt-delete-cancel"
+              onClick={() => setConfirmDelete(false)} disabled={del.isPending}>
+              Keep it
+            </Button>
+            <Button type="button" variant="destructive" size="sm"
+              data-testid="button-appt-delete-confirm"
+              onClick={() => del.mutate()} disabled={del.isPending || save.isPending}>
+              {del.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+              Delete for good
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <DialogFooter className="gap-2 sm:justify-between">
+          {initial ? (
+            <Button type="button" variant="destructive" size="sm"
+              data-testid="button-appt-delete"
+              onClick={() => setConfirmDelete(true)} disabled={del.isPending || save.isPending}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          ) : <span />}
+          <Button type="button" data-testid="button-appt-save" onClick={submit}
+            disabled={!title.trim() || !date || save.isPending || del.isPending}>
+            {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {initial ? "Save changes" : "Schedule it"}
           </Button>
-        ) : <span />}
-        <Button type="button" data-testid="button-appt-save" onClick={submit}
-          disabled={!title.trim() || !date || save.isPending || del.isPending}>
-          {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {initial ? "Save changes" : "Schedule it"}
-        </Button>
-      </DialogFooter>
+        </DialogFooter>
+      )}
     </>
   );
 }

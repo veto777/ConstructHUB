@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   CalendarDays, Loader2, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
 } from "lucide-react";
@@ -55,7 +55,18 @@ function weekStart(d: Date): Date {
  */
 export default function CrmSchedulePage() {
   const { toast } = useToast();
-  const [view, setView] = useState<View>("month");
+  // The view lives in the URL (?view=week|agenda; month is the bare path) so
+  // a reload, a shared link or Back lands on the same view.
+  const [location, navigate] = useLocation();
+  const search = useSearch();
+  const urlView = new URLSearchParams(search).get("view");
+  const view: View = urlView === "week" || urlView === "agenda" ? urlView : "month";
+  const setView = (v: View) => {
+    const p = new URLSearchParams(search);
+    if (v === "month") p.delete("view"); else p.set("view", v);
+    const qs = p.toString();
+    navigate(`${location}${qs ? `?${qs}` : ""}`, { replace: true });
+  };
   const [cursor, setCursor] = useState(() => new Date());
   const [days, setDays] = useState<number>(14);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -119,9 +130,8 @@ export default function CrmSchedulePage() {
   const { data: projectsData } = useQuery<any>({
     queryKey: ["/api/crm/projects"], enabled: canManage,
   });
-  const { data: customers } = useQuery<any[]>({
-    queryKey: ["/api/crm/customers"], enabled: canManage,
-  });
+  // No client list here: the appointment form searches every client server-
+  // side (the list endpoint is capped at the newest 500).
 
   const members: { id: string; displayName?: string | null; email?: string | null }[] =
     membersData?.members ?? [];
@@ -493,7 +503,6 @@ export default function CrmSchedulePage() {
             defaultDate={defaultDate}
             members={membersData?.members ?? []}
             projects={projectsData?.projects ?? []}
-            customers={customers ?? []}
             onClose={() => setDialogOpen(false)}
             onCreated={onCreated}
           />

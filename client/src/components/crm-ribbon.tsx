@@ -151,8 +151,11 @@ export function CrmRibbon() {
             <SheetDescription className="sr-only">The rest of your workspace.</SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-1">
-            {/* The global Create menu — same items as the sidebar's button. */}
+            {/* The global Create menu — same items as the sidebar's button.
+                Anything it navigates to closes the sheet, like the links below
+                (its dialogs live inside the sheet, so only close on leaving). */}
             <CrmCreateMenu
+              onNavigate={() => setMoreOpen(false)}
               trigger={
                 <button
                   type="button"

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Inbox, Loader2, Eye, CheckCircle2, XCircle, CreditCard, AlertTriangle, Undo2,
@@ -18,18 +18,29 @@ import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar } from "@/
 const money = (c: number) =>
   `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
+/**
+ * API timestamp → Date. The thread list is raw SQL, so it carries Postgres's
+ * zone-less "2026-09-29 23:41:11.123456" — UTC (server/db.ts pins every
+ * session to UTC) — which a browser would otherwise read as LOCAL time and
+ * show a fresh reply as hours old or "just now" in the future.
+ */
+function apiDate(ts: string): Date {
+  const naive = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(ts);
+  return new Date(naive ? `${ts.replace(" ", "T").replace(/(\.\d{3})\d+$/, "$1")}Z` : ts);
+}
+
 function relTime(iso: string): string {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  const s = Math.max(0, (Date.now() - apiDate(iso).getTime()) / 1000);
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 7 * 86400) return `${Math.floor(s / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return apiDate(iso).toLocaleDateString();
 }
 
 /** How long a client message has sat unanswered — hours matter here. */
 function waitingFor(iso: string): { label: string; urgent: boolean } {
-  const h = (Date.now() - new Date(iso).getTime()) / 3600_000;
+  const h = (Date.now() - apiDate(iso).getTime()) / 3600_000;
   if (h < 1) return { label: `waiting ${Math.max(1, Math.floor(h * 60))}m`, urgent: false };
   if (h < 24) return { label: `waiting ${Math.floor(h)}h`, urgent: h >= 2 };
   return { label: `waiting ${Math.floor(h / 24)}d`, urgent: true };
@@ -104,13 +115,21 @@ function MessagesPane({ selected }: { selected: string | null }) {
   const sendReply = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/inbox/${selected}/reply`, { body: reply })).json(),
-    onSuccess: () => {
+    onSuccess: (res: { emailed?: boolean }) => {
       setReply("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/inbox"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/inbox", selected] });
-      toast({ title: "Reply sent", description: "It's in their portal and their email inbox." });
+      // Only claim the email copy when there is one. The server emails only
+      // when the client has an address on file; `emailed` (when the server
+      // reports it) says whether that send actually went out.
+      const email: string | null = thread?.customer?.email ?? null;
+      toast(!email
+        ? { title: "Reply sent", description: "It's in their client portal. No email on file, so no email copy went out." }
+        : res?.emailed === false
+          ? { title: "Reply saved to their portal", description: `The email copy to ${email} didn't go through — they'll see it next time they open the portal.`, variant: "destructive" }
+          : { title: "Reply sent", description: `It's in their client portal, with an email copy to ${email}.` });
     },
-    onError: (e: any) => toast({ title: "Could not send", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const threads = inbox?.threads ?? [];
@@ -238,7 +257,9 @@ function MessagesPane({ selected }: { selected: string | null }) {
         <Textarea
           rows={2}
           className="resize-none"
-          placeholder="Reply — it lands in their portal and their email…"
+          placeholder={thread?.customer && !thread.customer.email
+            ? "Reply — it lands in their client portal (no email on file)…"
+            : "Reply — it lands in their portal and their email…"}
           value={reply}
           disabled={!thread || threadError}
           onChange={(e) => setReply(e.target.value)}
@@ -375,7 +396,17 @@ export default function CrmInboxPage() {
   // wouter's useLocation only tracks the pathname — a ?c= change wouldn't
   // re-render the page. useSearch subscribes to the query string instead.
   const search = useSearch();
-  const selected = new URLSearchParams(search).get("c");
+  const [location, navigate] = useLocation();
+  const params = new URLSearchParams(search);
+  const selected = params.get("c");
+  // The tab lives in the URL too (?tab=activity) so a reload keeps it.
+  const tab = params.get("tab") === "activity" ? "activity" : "messages";
+  const setTab = (t: string) => {
+    const p = new URLSearchParams(search);
+    if (t === "activity") p.set("tab", "activity"); else p.delete("tab");
+    const qs = p.toString();
+    navigate(`${location}${qs ? `?${qs}` : ""}`, { replace: true });
+  };
 
   const { data: inbox } = useQuery<{ unreadTotal: number }>({ queryKey: ["/api/crm/inbox"] });
   const unread = inbox?.unreadTotal ?? 0;
@@ -388,7 +419,7 @@ export default function CrmInboxPage() {
         infoKey="inbox"
         subtitle="Every client message in one place — reply fast; a client left waiting is a client shopping elsewhere."
       />
-      <Tabs defaultValue="messages">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="messages" data-testid="tab-inbox-messages">
             Messages{unread > 0 ? ` (${unread})` : ""}

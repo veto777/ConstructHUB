@@ -19,6 +19,7 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -73,6 +74,10 @@ const NAV: {
 
 export function CrmSidebar() {
   const [location] = useLocation();
+  // On a phone the sidebar is a sheet over the page — close it whenever you
+  // pick somewhere to go, or it keeps covering the page you just opened.
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeOnPhone = () => { if (isMobile) setOpenMobile(false); };
 
   const { data: user } = useQuery<{ email: string; displayName: string | null; avatarUrl: string | null } | null>({
     queryKey: ["/api/auth/me"],
@@ -101,7 +106,7 @@ export function CrmSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-4 pt-5 pb-4">
-        <Link href="/" className="flex items-center gap-2.5 cursor-pointer min-w-0" data-testid="link-portal-home">
+        <Link href="/" onClick={closeOnPhone} className="flex items-center gap-2.5 cursor-pointer min-w-0" data-testid="link-portal-home">
           {/* Full brand lockup (mark + CRM badge); collapses to the bare mark. */}
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <CrmLogo height={26} testid="text-crm-brand" />
@@ -122,6 +127,7 @@ export function CrmSidebar() {
 
         {/* The global Create menu — estimate, invoice, lead, message, client. */}
         <CrmCreateMenu
+          onNavigate={closeOnPhone}
           trigger={
             <button
               type="button"
@@ -156,7 +162,8 @@ export function CrmSidebar() {
                     tooltip={item.title}
                     className="h-9 rounded-lg px-3 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:shadow-sm"
                   >
-                    <Link href={item.url} data-testid={item.testid} className="flex items-center gap-3 w-full">
+                    <Link href={item.url} data-testid={item.testid} onClick={closeOnPhone}
+                      className="flex items-center gap-3 w-full">
                       <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.9} />
                       <span className="text-[13px] font-medium">{item.title}</span>
                       {item.url === "/crm/inbox" && msgUnread > 0 && (
