@@ -91,6 +91,12 @@ describe('Profile Guard with real lane Postgres and mocked Google',()=>{
     await writeOwnerProfile(user,id,{'profile.description':'Owner supplied description'},client);await checkGuard(user,id,client);expect(await changes()).toHaveLength(n);
     expect((await pool.query('SELECT snapshot FROM gbp_guard WHERE location_id=$1',[id])).rows[0].snapshot['profile.description']).toBe('Owner supplied description');
   });
+  it('does not approve an owner edit that Google did not confirm', async () => {
+    const before = (await pool.query('SELECT snapshot FROM gbp_guard WHERE location_id=$1', [id])).rows[0].snapshot;
+    const ignored = new GoogleClient(async () => 'fixture', async () => new Response(JSON.stringify(live)), new Limiter(() => 0, async () => {}), async () => {});
+    await expect(writeOwnerProfile(user, id, {title: 'Requested new name'}, ignored)).rejects.toMatchObject({status: 503});
+    expect((await pool.query('SELECT snapshot FROM gbp_guard WHERE location_id=$1', [id])).rows[0].snapshot).toEqual(before);
+  });
   it('watch toggles and Off avoid unwanted alerts/writes; worker respects 15 minutes',async()=>{
     await configureGuard(user,id,'notify',['title']);live.phoneNumbers={primaryPhone:'unwatched'};const n=(await changes()).length;await checkGuard(user,id,client);expect(await changes()).toHaveLength(n);
     const check=vi.fn();await runGuardWorker(check);expect(check).not.toHaveBeenCalled();

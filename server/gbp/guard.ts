@@ -139,8 +139,11 @@ export async function writeOwnerProfile(userId:number,id:number,fields:Record<st
   return withLocationLock(id,async()=>{
     const body:any={}; Object.entries(fields).forEach(([f,v])=>setField(body,f,v));
     const response=await (client??clientFor(userId,l.gbp_google_subject)).request('information',`/v1/${l.gbp_location_name}?updateMask=${Object.keys(fields).join(',')}`,'PATCH',body);
-    if(response.name!==l.gbp_location_name) throw new GoogleError('transient','Google did not confirm the profile edit',503);
-    const g=await guardRow(userId,id),confirmed=snapshotOf(response);
+    const confirmed=snapshotOf(response), requested=snapshotOf(body);
+    if(response.name!==l.gbp_location_name || Object.keys(fields).some(f=>!same(confirmed[f],requested[f]))) {
+      throw new GoogleError('transient','Google did not confirm the profile edit. Check the profile before retrying.',503);
+    }
+    const g=await guardRow(userId,id);
     if(g.snapshot) {
       for(const f of Object.keys(fields)) {g.snapshot[f]=confirmed[f]; delete g.observed[f];}
       await pool.query('UPDATE gbp_guard SET snapshot=$3,observed=$4 WHERE user_id=$1 AND location_id=$2',[userId,id,JSON.stringify(g.snapshot),JSON.stringify(g.observed)]);
