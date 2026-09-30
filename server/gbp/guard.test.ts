@@ -28,7 +28,7 @@ const http=vi.fn(async(input:any,options:any)=>{
 });
 const client=new GoogleClient(async()=>'fixture',http,new Limiter(()=>0,async()=>{}),async()=>{});
 beforeAll(async()=>{
-  const url=new URL(process.env.DATABASE_URL!);if(url.pathname!=='/constructhub_dev_a2'||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a2 only');
+  const url=new URL(process.env.DATABASE_URL!);if(!/^\/constructhub_dev_a[1-5]$/.test(url.pathname)||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('requires a local audit lane database');
   await ensureGbpSchema();await ensureAccountEventsSchema();await ensureProfileGuardSchema();await ensureProfileGuardSchema();
   const {rows}=await pool.query("INSERT INTO users(email,password_hash) VALUES('guard-'||gen_random_uuid()||'@example.invalid',$1),('guard-'||gen_random_uuid()||'@example.invalid',null) RETURNING id",[await bcrypt.hash('test-password',4)]);[user,other]=rows.map(r=>r.id);
   id=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,place_id) VALUES($1,'Guard fixture','accounts/guardfixture','locations/guardfixture','fixture-place') RETURNING id",[user])).rows[0].id;
@@ -42,6 +42,23 @@ describe('Profile Guard with real lane Postgres and mocked Google',()=>{
     expect(()=>ownerProfileInput.parse({fields:{metadata:{hasGoogleUpdated:false}}})).toThrow();
     expect(()=>ownerProfileInput.parse({fields:{'openInfo.status':'not-a-status'}})).toThrow();
     expect(ownerProfileInput.parse({fields:{title:'Owner name','profile.description':null}}).fields.title).toBe('Owner name');
+  });
+  it('records legacy Guard verification and attributes mode changes to the request', async () => {
+    const handlers = new Map<string, any>();
+    const app: any = {};
+    for (const method of ['get', 'post', 'put', 'patch']) app[method] = (path: string, fn: any) => handlers.set(`${method} ${path}`, fn);
+    registerProfileGuardRoutes(app, req => req.user);
+    const req: any = { user: { id: user }, ip: '192.0.2.8', headers: { 'user-agent': 'Audit fixture' }, session: {}, body: { password: 'test-password' } };
+    const res: any = { json: vi.fn(), status: vi.fn().mockReturnThis() };
+    await handlers.get('post /api/gbp/guard/reauth')(req, res);
+    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    req.params = { id: String(id) }; req.body = { mode: 'off', watched: ['title'] };
+    await handlers.get('put /api/gbp/locations/:id/guard')(req, res);
+    const { rows } = await pool.query('SELECT kind,ip,user_agent FROM account_activity WHERE user_id=$1', [user]);
+    expect(rows).toEqual(expect.arrayContaining([
+      { kind: 'security.reauthenticated', ip: '192.0.2.8', user_agent: 'Audit fixture' },
+      { kind: 'gbp.profile_change', ip: '192.0.2.8', user_agent: 'Audit fixture' },
+    ]));
   });
   it('normalizes output-only category details and object ordering',()=>{
     const approved=snapshotOf({...live,title:'Accepted Google edit'});

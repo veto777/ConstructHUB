@@ -63,7 +63,7 @@ export async function previewSnapshot(userId:number,id:number,client?:GoogleClie
     return {snapshot,token};
   });
 }
-export async function configureGuard(userId:number,id:number,mode:string,watched:string[],token?:string) {
+export async function configureGuard(userId:number,id:number,mode:string,watched:string[],token?:string,req:any=null) {
   return withLocationLock(id,async()=>{
     const g=await guardRow(userId,id);
     if(!g.snapshot && mode!=='off' && (!token||g.preview_token!==token||new Date(g.preview_expires).getTime()<Date.now())) throw new GoogleError('invalid','Preview and approve the current Google values first',409);
@@ -71,7 +71,7 @@ export async function configureGuard(userId:number,id:number,mode:string,watched
     // Re-baselining an established guard uses individual Approve actions, preserving pending evidence.
     if(token && g.snapshot) throw new GoogleError('invalid','A snapshot already exists. Approve individual changes instead.',409);
     await pool.query(`UPDATE gbp_guard SET mode=$3,watched=$4,snapshot=COALESCE(snapshot,$5::jsonb),preview=NULL,preview_token=NULL,updated_at=now() WHERE user_id=$1 AND location_id=$2`,[userId,id,mode,watched,token?JSON.stringify(g.preview):null]);
-    await logActivity(null,userId,'gbp.profile_change',{locationId:id,action:'guard-settings',mode,watched});
+    await logActivity(req,userId,'gbp.profile_change',{locationId:id,action:'guard-settings',mode,watched});
   });
 }
 async function resolveLocked(userId:number,l:any,g:any,change:any,action:'approve'|'reject'|'auto-revert',client:GoogleClient,req:any=null) {
@@ -134,7 +134,7 @@ export async function checkGuard(userId:number,id:number,client?:GoogleClient) {
   });
 }
 /** Use this path for owner profile writes: lock, confirm with Google, then change only the written snapshot fields. */
-export async function writeOwnerProfile(userId:number,id:number,fields:Record<string,any>,client?:GoogleClient) {
+export async function writeOwnerProfile(userId:number,id:number,fields:Record<string,any>,client?:GoogleClient,req:any=null) {
   const l=await ownedLocation(userId,id);
   return withLocationLock(id,async()=>{
     const body:any={}; Object.entries(fields).forEach(([f,v])=>setField(body,f,v));
@@ -146,7 +146,7 @@ export async function writeOwnerProfile(userId:number,id:number,fields:Record<st
       await pool.query('UPDATE gbp_guard SET snapshot=$3,observed=$4 WHERE user_id=$1 AND location_id=$2',[userId,id,JSON.stringify(g.snapshot),JSON.stringify(g.observed)]);
       await pool.query("UPDATE gbp_guard_changes SET status='owner-edited',resolved_at=now() WHERE user_id=$1 AND location_id=$2 AND field=ANY($3) AND status='pending'",[userId,id,Object.keys(fields)]);
     }
-    await logActivity(null,userId,'gbp.profile_change',{locationId:id,action:'owner-edit',fields:Object.keys(fields)});
+    await logActivity(req,userId,'gbp.profile_change',{locationId:id,action:'owner-edit',fields:Object.keys(fields)});
     return response;
   });
 }

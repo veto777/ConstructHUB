@@ -1,3 +1,4 @@
+import { logActivity } from '../account-events';
 import { ownerProfileInput } from './profile-input';
 import type { Express, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
@@ -58,7 +59,7 @@ export function registerProfileGuardRoutes(app:Express,auth:(req:any,res:any)=>a
       }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json(e instanceof z.ZodError?{message:'Invalid input'}:publicError(e));}
     });
   };
-  route('post','/api/gbp/guard/reauth',async(req,res,u)=>{await verifyGuardIdentity(u,req.body);req.session.profileGuardAuth={userId:u,at:Date.now()};markRecentAuth(req,u);res.json({ok:true});});
+  route('post','/api/gbp/guard/reauth',async(req,res,u)=>{await verifyGuardIdentity(u,req.body);req.session.profileGuardAuth={userId:u,at:Date.now()};markRecentAuth(req,u);await logActivity(req,u,'security.reauthenticated',{method:'profile-guard'});res.json({ok:true});});
   route('get','/api/gbp/guard/status',async(_req,res,u)=>{
     const {rows}=await pool.query(`SELECT l.id,COALESCE(g.mode,'off') AS mode,g.checked_at,g.last_error,(SELECT count(*)::int FROM gbp_guard_changes c WHERE c.location_id=l.id AND c.user_id=$1 AND c.status='pending') AS pending
       FROM business_locations l LEFT JOIN gbp_guard g ON g.location_id=l.id AND g.user_id=$1 WHERE l.user_id=$1`,[u]);res.json(rows);
@@ -70,7 +71,7 @@ export function registerProfileGuardRoutes(app:Express,auth:(req:any,res:any)=>a
     const input=configSchema.parse(req.body),id=idParam.parse(req.params.id);
     // {reauth:true} makes the app's request helper open the shared verification modal and retry.
     if(!guardRecentAuthOk(req,u)){res.status(403).json({reauth:true,message:'Verify your identity to change Profile Guard mode'});return;}
-    await configureGuard(u,id,input.mode,[...new Set(input.watched)],input.token);
+    await configureGuard(u,id,input.mode,[...new Set(input.watched)],input.token,req);
     if(input.mode==='lockdown')await checkGuard(u,id);
     res.json({ok:true});
   });
@@ -79,7 +80,7 @@ export function registerProfileGuardRoutes(app:Express,auth:(req:any,res:any)=>a
     const {action}=z.object({action:z.enum(['approve','reject'])}).strict().parse(req.body);
     await resolveChange(u,idParam.parse(req.params.id),idParam.parse(req.params.changeId),action,undefined,req);res.json({ok:true});
   });
-  route('patch','/api/gbp/locations/:id/profile',async(req,res,u)=>{const {fields}=ownerProfileInput.parse(req.body);res.json(await writeOwnerProfile(u,idParam.parse(req.params.id),fields));});
+  route('patch','/api/gbp/locations/:id/profile',async(req,res,u)=>{const {fields}=ownerProfileInput.parse(req.body);res.json(await writeOwnerProfile(u,idParam.parse(req.params.id),fields,undefined,req));});
   for(const type of ['changes','reviews'] as const) {
     route('get',`/api/gbp/reports/${type}/:id`,async(req,res,u)=>res.json(await reportFor(u,type,idParam.parse(req.params.id))));
     route('post',`/api/gbp/reports/${type}/:id`,async(req,res,u)=>{
