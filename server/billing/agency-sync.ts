@@ -86,12 +86,29 @@ export async function syncAgencyLocations(opts: { stripe?: Stripe; log?: Log } =
 let started = false;
 let running = false;
 
-/** Schedules the sync (5 minutes after boot, then daily). Not in tests; logs and stays off without a Stripe key. */
+/**
+ * Why the scheduled sync must stay off here, or null when it may run. It
+ * changes what real customers are billed from this server's database, so it
+ * runs only in production (`npm start`), or on another server that sets
+ * AGENCY_SYNC_ALLOW_NONPROD=1 on purpose. Otherwise a dev server started with
+ * the checkout's .env (which can hold the live Stripe key) and a copied
+ * database would re-bill live Agency subscriptions from stale location counts.
+ */
+export function agencySyncOffReason(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (!env.STRIPE_SECRET_KEY) return "STRIPE_SECRET_KEY is not set";
+  if (env.NODE_ENV !== "production" && env.AGENCY_SYNC_ALLOW_NONPROD !== "1") {
+    return "this is not a production server (set AGENCY_SYNC_ALLOW_NONPROD=1 to run it anyway)";
+  }
+  return null;
+}
+
+/** Schedules the sync (5 minutes after boot, then daily). Not in tests; logs and stays off without a Stripe key or outside production. */
 export function startAgencyLocationSync(): void {
   if (started || process.env.NODE_ENV === "test" || process.env.VITEST) return;
   started = true;
-  if (!stripeConfigured()) {
-    console.log("[billing] Agency location sync is off: STRIPE_SECRET_KEY is not set.");
+  const off = agencySyncOffReason();
+  if (off) {
+    console.log(`[billing] Agency location sync is off: ${off}.`);
     return;
   }
   const run = async () => {

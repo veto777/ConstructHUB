@@ -15,7 +15,7 @@ vi.mock("../db", () => ({
     },
   },
 }));
-import { syncAgencyLocations } from "./agency-sync";
+import { syncAgencyLocations, agencySyncOffReason } from "./agency-sync";
 import { resetPriceCache } from "./prices";
 
 const planItem = { id: "si_plan", quantity: 1, price: { id: "price_agency", metadata: { chub_kind: "plan", chub_key: "agency" }, recurring: { interval: "month" } } };
@@ -117,5 +117,13 @@ describe("Agency location sync", () => {
     expect(select.values[0]).toEqual(expect.arrayContaining(["active", "trialing", "past_due"]));
     expect(select.values[0]).not.toContain("canceled");
     expect(mocks.queries.find((q) => /FROM business_locations/.test(q.sql))!.sql).toMatch(/count\(DISTINCT gbp_location_name\)/);
+  });
+
+  it("the daily schedule runs only in production with a Stripe key (a dev server with the .env key never re-bills)", () => {
+    expect(agencySyncOffReason({ NODE_ENV: "production" })).toMatch(/STRIPE_SECRET_KEY is not set/);
+    expect(agencySyncOffReason({ NODE_ENV: "development", STRIPE_SECRET_KEY: "sk_x" })).toMatch(/not a production server/);
+    expect(agencySyncOffReason({ STRIPE_SECRET_KEY: "sk_x" })).toMatch(/not a production server/);
+    expect(agencySyncOffReason({ NODE_ENV: "development", STRIPE_SECRET_KEY: "sk_x", AGENCY_SYNC_ALLOW_NONPROD: "1" })).toBeNull();
+    expect(agencySyncOffReason({ NODE_ENV: "production", STRIPE_SECRET_KEY: "sk_x" })).toBeNull();
   });
 });
