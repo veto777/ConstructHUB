@@ -177,6 +177,12 @@ export async function registerRoutes(
   registerGbpRoutes(app, getDevUser);
   const { startGbpWorker } = await import("./gbp/service");
   startGbpWorker();
+  const { ensureSocialSchema } = await import("./social/schema");
+  await ensureSocialSchema();
+  const { registerSocialRoutes } = await import("./social/routes");
+  registerSocialRoutes(app, getDevUser);
+  const { startSocialWorker } = await import("./social/service");
+  startSocialWorker();
 
   // CRM tenancy layer (orgs, crews, roles, invitations).
   try {

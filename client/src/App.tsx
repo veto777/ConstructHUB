@@ -1,5 +1,7 @@
 import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
+import SocialMediaPage from "@/pages/social-media";
+import GuidesPage from "@/pages/guides";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
@@ -109,6 +111,8 @@ function DashboardRouter() {
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/locations" component={LocationsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
+      <Route path="/social-media" component={SocialMediaPage} />
+      <Route path="/guides" component={GuidesPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />

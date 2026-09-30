@@ -53,7 +53,8 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect")) {
+      // Auth/consent bodies (QR seeds, recovery codes) and social bodies (signed upload URLs) never reach logs.
+      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

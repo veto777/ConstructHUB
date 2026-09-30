@@ -125,6 +125,8 @@ const googleGroups: NavGroup[] = [
     children: [
       { title: "Locations", url: "/locations", icon: MapPin },
       { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
+      { title: "Social Media", url: "/social-media", icon: Megaphone },
+      { title: "Guides", url: "/guides", icon: FileText },
       { title: "GBP Monitor", url: "/gmb-monitor", icon: Eye },
       { title: "Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },
       { title: "Photo Optimizer", url: "/photos", icon: Camera, subChildren: [
