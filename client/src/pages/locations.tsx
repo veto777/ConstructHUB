@@ -682,12 +682,13 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
     enabled: linked,
   });
   // Photo counts come only from a Business Profile sync. Unlinked, the stored value is the schema default (0)
-  // or an old capped Places value, so show unknown instead of a number.
+  // or an old capped Places value, so show unknown instead of a number. A linked count Google never
+  // reported (null) is unknown too, never 0.
   const tile = (n: number | null | undefined, label: string, which: "business" | "customer") => (
     <button type="button" onClick={() => { setSource(which); setLimit(60); }}
       className={`rounded-lg border p-4 text-center transition-colors ${source === which ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
       data-testid={`tab-photos-${which}`}>
-      <p className="text-2xl font-bold" data-testid={`text-${which}-photo-count`}>{linked ? (n ?? 0) : "—"}</p>
+      <p className="text-2xl font-bold" data-testid={`text-${which}-photo-count`}>{linked && n != null ? n : "—"}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
       {!linked && <p className="text-[11px] text-muted-foreground mt-1">Link to Google Business Profile to see photo counts</p>}
     </button>

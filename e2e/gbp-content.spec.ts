@@ -197,6 +197,15 @@ test('profile Photos tab points to the shipped publisher and shows unknown count
     await expect(page).toHaveURL(/\/gbp-content$/);
 });
 
+test('profile Photos tab distinguishes a count Google never reported from zero on a linked location', async ({ page }) => {
+    await page.route('**/api/locations/99885', route => route.fulfill({json:{id:99885,businessName:'Photos linked fixture',gbpLocationName:'locations/fixture',gbpAccountName:'accounts/fixture',businessPhotoCount:null,customerPhotoCount:0}}));
+    await page.route(/\/api\/gbp\/locations\/99885\/media/, route => route.fulfill({json:{total:0,syncedAt:null,items:[]}}));
+    await page.goto('/locations?location=99885&tab=photos');
+    await expect(page.getByTestId('text-business-photo-count')).toHaveText('—');
+    await expect(page.getByTestId('text-customer-photo-count')).toHaveText('0');
+    await expect(page.getByText('Link to Google Business Profile to see photo counts')).toHaveCount(0);
+});
+
 test('unlinked Places import remains available and renders weekday text without array indexes', async ({ page }) => {
     const fixture = {id:99885,businessName:'Unlinked audit fixture',placeId:'fixture-place',gbpLocationName:null,hours:['Monday: 8:00 AM – 5:00 PM','Tuesday: Closed']};
     let imported = false;
