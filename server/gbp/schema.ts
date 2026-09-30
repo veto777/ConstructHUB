@@ -22,6 +22,8 @@ export async function ensureGbpSchema() {
     ALTER TABLE business_locations ADD COLUMN IF NOT EXISTS gbp_google_subject text;
     -- Set when the contractor unlinks a location: connecting a Google account must not silently re-link it.
     ALTER TABLE business_locations ADD COLUMN IF NOT EXISTS gbp_unlinked_by_user boolean NOT NULL DEFAULT false;
+    -- Only a Business Profile sync knows whether a business is open; new manual and Places locations start unknown (NULL).
+    ALTER TABLE business_locations ALTER COLUMN open_status DROP DEFAULT;
     UPDATE business_locations l SET gbp_google_subject=g.google_subject FROM gbp_grants g
       WHERE l.user_id=g.user_id AND l.gbp_location_name IS NOT NULL AND l.gbp_google_subject IS NULL
       AND (SELECT count(*) FROM gbp_grants x WHERE x.user_id=l.user_id)=1;

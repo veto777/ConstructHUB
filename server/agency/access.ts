@@ -39,7 +39,7 @@ const statusSql: Record<Filters['status'],string> = {
 };
 export function locationFilter(a: AgencyAccess, f: Filters) {
   const v=visibility(a), values=[...v.values,f.clientId??null,`%${f.q.replace(/[\\%_]/g,'\\$&')}%`,f.folder??null,f.tag??null];
-  return {values,sql:`${v.sql} AND ($4::int IS NULL OR l.agency_client_id=$4) AND ($5='%%' OR concat_ws(' ',l.business_name,l.address,l.city,l.state,l.place_id,c.name) ILIKE $5) AND ($6::text IS NULL OR c.folder=$6) AND ($7::text IS NULL OR $7=ANY(c.tags)) AND (${statusSql[f.status]})`};
+  return {values,sql:`${v.sql} AND ($4::int IS NULL OR l.agency_client_id=$4) AND ($5='%%' OR concat_ws(' ',l.business_name,l.address,l.city,l.state,l.zip_code,l.place_id,c.name) ILIKE $5) AND ($6::text IS NULL OR c.folder=$6) AND ($7::text IS NULL OR $7=ANY(c.tags)) AND (${statusSql[f.status]})`};
 }
 export const locationJoin='business_locations l LEFT JOIN agency_clients c ON c.user_id=l.user_id AND c.id=l.agency_client_id';
 export const camel = (r: Record<string,any>) => Object.fromEntries(Object.entries(r).map(([k,v])=>[k.replace(/_([a-z])/g,(_,s)=>s.toUpperCase()),v]));

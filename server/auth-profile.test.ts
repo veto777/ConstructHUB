@@ -21,3 +21,24 @@ describe("PATCH /api/auth/profile display name", () => {
     expect(after.displayName).toBe(before.displayName);
   });
 });
+
+describe("PATCH /api/auth/profile default review link", () => {
+  it.each([["https://example.com/review"], ["https://www.google.com/"], ["javascript:alert(1)"]])(
+    "rejects a link that is not a Google review link (%j) and leaves the profile unchanged",
+    async (googleProfileUrl) => {
+      const before = await (await fetch(`${base}/api/auth/me`)).json();
+      const res = await patch({ googleProfileUrl });
+      expect(res.status).toBe(400);
+      expect((await res.json()).message).toMatch(/^Paste your Google review link/);
+      const after = await (await fetch(`${base}/api/auth/me`)).json();
+      expect(after.googleProfileUrl).toBe(before.googleProfileUrl);
+    },
+  );
+});
+
+describe("GET /api/auth/me", () => {
+  it("says whether the user is a platform admin, so the client needs no hard-coded admin list", async () => {
+    const me = await (await fetch(`${base}/api/auth/me`)).json();
+    expect(typeof me.isPlatformAdmin).toBe("boolean");
+  });
+});

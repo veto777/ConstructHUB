@@ -26,6 +26,9 @@ export function requireRecentAuth(req: Request, res: Response, next?: NextFuncti
 }
 export function markRecentAuth(req: Request, userId: number) { req.session.recentAuth = { userId, at: Date.now() }; }
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+/** "veto@gmail.com" -> "v***@gmail.com": names where a code went without printing the whole address. */
+export const maskEmail = (email: unknown): string | null =>
+  typeof email === 'string' && email.includes('@') ? email.replace(/^(.)[^@]*(@.*)$/, '$1***$2') : null;
 export async function ensureAccountSecuritySchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS account_recovery_codes (
     user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE, code_hash text NOT NULL,
@@ -105,8 +108,9 @@ export async function securityChanged(req: Request, userId: number, kind: Notifi
 export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res: any)=>any) {
   app.get('/api/auth/reauth', async (req,res) => {
     const u=auth(req,res); if(!u) return;
-    const {rows:[user]}=await pool.query('SELECT password_hash,totp_enabled FROM users WHERE id=$1',[u.id]);
-    res.json({ method:user.totp_enabled?'totp':user.password_hash?'password':'email' });
+    const {rows:[user]}=await pool.query('SELECT password_hash,totp_enabled,google_id,email FROM users WHERE id=$1',[u.id]);
+    // google: an email-code account can also confirm through its linked Google sign-in.
+    res.json({ method:user.totp_enabled?'totp':user.password_hash?'password':'email', google:!!user.google_id, email:maskEmail(user.email) });
   });
   app.post('/api/auth/reauth/email', rateLimit('security-email',3,10,15*60_000), async(req,res)=>{
     const u=auth(req,res); if(!u) return;
@@ -115,7 +119,7 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
     const code=String(randomInt(100000,1000000));
     req.session.reauthEmail={userId:u.id,hash:hash(code),expires:Date.now()+10*60_000,attempts:0};
     await sendWithFallback({to:user.email,subject:'ConstructHUB verification code',text:`Your verification code is ${code}. It expires in 10 minutes.`,html:`<p>Your verification code is <strong>${code}</strong>. It expires in 10 minutes.</p>`});
-    res.json({ok:true});
+    res.json({ok:true,sentTo:maskEmail(user.email)});
   });
   app.post('/api/auth/reauth', rateLimit('security-verify',10,30,15*60_000), async(req,res)=>{
     const u=auth(req,res); if(!u) return;

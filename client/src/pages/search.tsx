@@ -1,6 +1,7 @@
 import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { Button } from "@/components/ui/button";
@@ -135,6 +136,8 @@ export default function SearchPage() {
   const restoredSearchRef = useRef(searchId !== null);
   const [liveStatus, setLiveStatus] = useState<LiveSearchStatus | null>(null);
   const [initialResults, setInitialResults] = useState<any[] | null>(null);
+  // Set when nothing in the chosen area can be searched live: nothing ran, so there is no search to poll.
+  const [noPortalsMessage, setNoPortalsMessage] = useState<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [expandedResults, setExpandedResults] = useState<Set<number>>(new Set());
@@ -300,10 +303,16 @@ export default function SearchPage() {
       return res.json();
     },
     onSuccess: (data) => {
+      setLiveStatus(null);
+      if (data.noSearchablePortals) {
+        setInitialResults(null);
+        setNoPortalsMessage(data.message || "No permit portal in this area supports live search yet.");
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/search-queries"] });
+      setNoPortalsMessage(null);
       setInitialResults(data.results);
       setSearchId(data.searchId);
-      setLiveStatus(null);
     },
     onError: (err: Error) => {
       toast({ title: "Search failed", description: err.message, variant: "destructive" });
@@ -360,6 +369,7 @@ export default function SearchPage() {
     setSearchId(null);
     setLiveStatus(null);
     setInitialResults(null);
+    setNoPortalsMessage(null);
     searchMutation.mutate({
       searchType,
       searchValue: searchValue.trim(),
@@ -1071,7 +1081,20 @@ export default function SearchPage() {
           </div>
         )}
 
-        {!searchId && !searchMutation.isPending && (
+        {!searchId && !searchMutation.isPending && noPortalsMessage && (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center" role="status" data-testid="empty-no-searchable-portals">
+            <Database className="h-8 w-8 text-muted-foreground/30" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Nothing to search here yet</p>
+              <p className="text-xs text-muted-foreground max-w-sm">{noPortalsMessage}</p>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/databases" data-testid="link-browse-directory">Browse the Directory</Link>
+            </Button>
+          </div>
+        )}
+
+        {!searchId && !searchMutation.isPending && !noPortalsMessage && (
           <div className="flex flex-col items-center justify-center py-20 gap-3 animate-in-delay-2">
             <Search className="h-8 w-8 text-muted-foreground/20" />
             <div className="text-center space-y-1">

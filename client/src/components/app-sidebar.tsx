@@ -223,8 +223,6 @@ const googleGroups: NavGroup[] = [
   },
 ];
 
-const ADMIN_EMAILS = ["support@constructhub.us", "alpinesidingcompany@gmail.com"];
-
 const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", icon: Star, logoComponent: GoogleGIcon, badge: "best" as BadgeType };
 
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
@@ -336,7 +334,7 @@ export function AppSidebar() {
     queryKey: ["/api/counties"],
   });
 
-  const { data: user } = useQuery<{ id: number; email: string; displayName: string | null; avatarUrl: string | null } | null>({
+  const { data: user } = useQuery<{ id: number; email: string; displayName: string | null; avatarUrl: string | null; isPlatformAdmin?: boolean } | null>({
     queryKey: ["/api/auth/me"],
   });
 
@@ -418,7 +416,8 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-              {user && ADMIN_EMAILS.includes(user.email) && (
+              {/* The server decides who is a platform admin (/api/auth/me). */}
+              {user?.isPlatformAdmin === true && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild data-active={location === "/lsa-account-manager"}>
                     <Link href="/lsa-account-manager" data-testid="link-nav-lsa-account-manager" className="flex items-center gap-2 w-full">

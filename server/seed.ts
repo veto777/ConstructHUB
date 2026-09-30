@@ -3,7 +3,7 @@ import { counties, permitDatabases } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { seedExpandedStates } from "./seed-all-states";
 import { seedAllCounties } from "./seed-all-counties";
-import { seedAllCities } from "./seed-all-cities";
+import { seedAllCities, repairSeededPermitRows } from "./seed-all-cities";
 import { seedAllAppraisers } from "./seed-all-appraisers";
 import { seedPermitPortals } from "./seed-permit-portals";
 import { seedReferenceData } from "./seed-reference-data";
@@ -18,6 +18,14 @@ export async function seedDatabase() {
     if (totalDbs < 20000) {
       console.log(`Counties done (${existing.length}), but only ${totalDbs} permit databases. Seeding cities...`);
       await seedAllCities();
+    }
+    // Existing databases (production included) only get city rows moved to their real county,
+    // seeded duplicates removed and placeholders cleaned here. Idempotent: a clean database
+    // changes nothing. Reference data only; a failure is logged and retried on the next boot.
+    try {
+      await repairSeededPermitRows();
+    } catch (err: any) {
+      console.error("Permit row repair failed (will retry on next boot):", err?.message || err);
     }
     await seedAllAppraisers();
     await seedPermitPortals();

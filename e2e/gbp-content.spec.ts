@@ -185,16 +185,25 @@ test('100-file boundary uploads sequentially and refuses 101 before any request'
     expect(uploads).toBe(100);
 });
 
-test('profile Photos tab points to the shipped publisher and distinguishes unknown counts from zero', async ({ page }) => {
-    await page.route('**/api/locations', route => route.fulfill({json:[{id:99884,businessName:'Photos audit fixture',businessPhotoCount:null,customerPhotoCount:0}]}));
-    await page.goto('/locations');
-    await page.getByText('Photos audit fixture',{exact:true}).click();
-    await page.getByTestId('tab-photos').click();
-    await expect(page.getByTestId('text-business-photo-count')).toHaveText('Unavailable');
-    await expect(page.getByTestId('text-customer-photo-count')).toHaveText('0');
+test('profile Photos tab points to the shipped publisher and shows unknown counts for an unlinked location', async ({ page }) => {
+    // Photo counts come only from a Business Profile sync; unlinked, the stored 0 (or an old capped Places 10) is not a count.
+    await page.route('**/api/locations/99884', route => route.fulfill({json:{id:99884,businessName:'Photos audit fixture',gbpLocationName:null,businessPhotoCount:10,customerPhotoCount:0}}));
+    await page.goto('/locations?location=99884&tab=photos');
+    await expect(page.getByTestId('text-business-photo-count')).toHaveText('—');
+    await expect(page.getByTestId('text-customer-photo-count')).toHaveText('—');
+    await expect(page.getByText('Link to Google Business Profile to see photo counts').first()).toBeVisible();
     await expect(page.getByText('we do not currently support photo uploads',{exact:false})).toHaveCount(0);
     await page.getByTestId('button-posts-photos').click();
     await expect(page).toHaveURL(/\/gbp-content$/);
+});
+
+test('profile Photos tab distinguishes a count Google never reported from zero on a linked location', async ({ page }) => {
+    await page.route('**/api/locations/99885', route => route.fulfill({json:{id:99885,businessName:'Photos linked fixture',gbpLocationName:'locations/fixture',gbpAccountName:'accounts/fixture',businessPhotoCount:null,customerPhotoCount:0}}));
+    await page.route(/\/api\/gbp\/locations\/99885\/media/, route => route.fulfill({json:{total:0,syncedAt:null,items:[]}}));
+    await page.goto('/locations?location=99885&tab=photos');
+    await expect(page.getByTestId('text-business-photo-count')).toHaveText('—');
+    await expect(page.getByTestId('text-customer-photo-count')).toHaveText('0');
+    await expect(page.getByText('Link to Google Business Profile to see photo counts')).toHaveCount(0);
 });
 
 test('unlinked Places import remains available and renders weekday text without array indexes', async ({ page }) => {
@@ -209,4 +218,50 @@ test('unlinked Places import remains available and renders weekday text without 
     await page.getByTestId('button-import-google').click();
     await expect(page.getByText('Google data imported',{exact:true})).toBeVisible();
     expect(imported).toBe(true);
+});
+
+test.describe('route-mocked location states', () => {
+    const LINKED = { id: 99701, businessName: 'Content linked fixture', gbpLocationName: 'locations/fixture', gbpAccountName: 'accounts/fixture' };
+    const UNLINKED = { id: 99702, businessName: 'Content unlinked fixture', gbpLocationName: null };
+    test.beforeEach(async ({ page }) => {
+        await page.route(/\/api\/locations(\?|$)/, route => route.fulfill({ json: [LINKED, UNLINKED] }));
+        await page.route(/\/api\/gbp\/status/, route => route.fulfill({ json: { connected: false, accounts: [], locations: [] } }));
+        await page.route(/\/api\/gbp\/linkage/, route => route.fulfill({ json: { accounts: [], locations: [], errors: [] } }));
+        await page.route(/\/api\/gbp\/content\/99701/, route => {
+            const path = new URL(route.request().url()).pathname;
+            return route.fulfill({ json: path.endsWith('/photos') ? [] : { jobs: [], style: null, workerEnabled: false } });
+        });
+    });
+    test('an unlinked location offers the Locations link instead of the editor', async ({ page }) => {
+        await page.goto(`/gbp-content?location=${UNLINKED.id}`);
+        await expect(page.getByTestId('gbp-content-location-unavailable')).toContainText("Content unlinked fixture isn't linked to Google Business Profile.");
+        await expect(page.getByRole('link', { name: 'Link it in Locations' })).toHaveAttribute('href', `/locations?location=${UNLINKED.id}`);
+        await expect(page.getByRole('button', { name: 'Generate post draft' })).toHaveCount(0);
+    });
+    test('an unknown location says so', async ({ page }) => {
+        await page.goto('/gbp-content?location=999999');
+        await expect(page.getByTestId('gbp-content-location-unavailable')).toContainText('Location not found.');
+        await expect(page.getByRole('link', { name: 'Link it in Locations' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Generate post draft' })).toHaveCount(0);
+    });
+    test('items per period 0 is refused before queueing', async ({ page }) => {
+        await page.goto(`/gbp-content?location=${LINKED.id}`);
+        await page.getByLabel('Post draft').fill('Fixture update');
+        await page.getByLabel('Items per period').fill('0');
+        await expect(page.locator('#items-per-period-error')).toHaveText('Items per period must be a whole number from 1 to 100.');
+        await expect(page.getByRole('button', { name: 'Approve & queue post' })).toBeDisabled();
+        await page.getByLabel('Items per period').fill('3');
+        await expect(page.locator('#items-per-period-error')).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Approve & queue post' })).toBeEnabled();
+    });
+    test('Queue and Calendar toggles report which view is on', async ({ page }) => {
+        await page.goto(`/gbp-content?location=${LINKED.id}`);
+        const queue = page.getByRole('button', { name: 'Queue', exact: true });
+        const calendar = page.getByRole('button', { name: 'Calendar', exact: true });
+        await expect(queue).toHaveAttribute('aria-pressed', 'true');
+        await expect(calendar).toHaveAttribute('aria-pressed', 'false');
+        await calendar.click();
+        await expect(queue).toHaveAttribute('aria-pressed', 'false');
+        await expect(calendar).toHaveAttribute('aria-pressed', 'true');
+    });
 });

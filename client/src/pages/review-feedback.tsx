@@ -114,30 +114,6 @@ export default function ReviewFeedbackPage() {
   const restored = useRef(false);
   const skipTrackStep = useRef<Step | null>(null);
 
-  useEffect(() => {
-    if (skipTrackStep.current === step) {
-      skipTrackStep.current = null;
-      return;
-    }
-    if (token && step !== "rating") {
-      fetch(`/api/review/${token}/track-step`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step }),
-      }).catch(() => {});
-    }
-  }, [step, token]);
-
-  useEffect(() => {
-    if (!isHighRating || isCompleted) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isHighRating, isCompleted]);
-
   const positiveSteps: Step[] = ["describe", "review"];
   const getStepProgress = () => {
     if (!isHighRating) return null;
@@ -156,12 +132,43 @@ export default function ReviewFeedbackPage() {
     },
     enabled: !!token,
   });
+  // The signed-in owner opening their own link (the eye icon): the server records nothing,
+  // so the page sends nothing either and always starts at the rating step.
+  const preview = reviewData?.preview === true;
+  /** Customer-progress beacons; never sent from the owner's preview. */
+  const track = (path: string, body?: unknown, keepalive = false) => {
+    if (preview || !token) return;
+    void fetch(`/api/review/${token}/${path}`, {
+      method: "POST",
+      ...(body !== undefined ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+      keepalive,
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!isHighRating || isCompleted || preview) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isHighRating, isCompleted, preview]);
+
+  useEffect(() => {
+    if (skipTrackStep.current === step) {
+      skipTrackStep.current = null;
+      return;
+    }
+    if (step !== "rating") track("track-step", { step });
+  }, [step, token, preview]);
 
   // A reload (or a second visit) resumes after the rating that was already
   // saved instead of asking for it again.
   useEffect(() => {
     if (restored.current || !reviewData) return;
     restored.current = true;
+    if (reviewData.preview === true) return;
     const saved = Number(reviewData.feedbackRating);
     if (!Number.isInteger(saved) || saved < 1 || saved > 10) return;
     const next: Step = reviewData.lastStep === "done" || reviewData.lastStep === "bonus_reviews"
@@ -173,6 +180,7 @@ export default function ReviewFeedbackPage() {
   }, [reviewData]);
 
   const postFeedback = async () => {
+    if (preview) return { success: true, preview: true, recorded: false };
     const res = await fetch(`/api/review/${token}/feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -187,19 +195,7 @@ export default function ReviewFeedbackPage() {
   };
 
   const feedbackMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/review/${token}/feedback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rating,
-          categories: selectedCategories.length > 0 ? selectedCategories : undefined,
-          comments: comments || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error("Unable to save your request. Please try again.");
-      return res.json();
-    },
+    mutationFn: postFeedback,
     onSuccess: () => {
       if (isHighRating) {
         setStep(reviewData?.referralOffer ? "referral" : "describe");
@@ -250,11 +246,12 @@ export default function ReviewFeedbackPage() {
   const acceptOwnWords = () => {
     generateMutation.reset();
     setGeneratedReview(highlights);
-    fetch(`/api/review/${token}/track-review-method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: "own" }) }).catch(() => {});
+    track("track-review-method", { method: "own" });
   };
 
   const completeFlowMutation = useMutation({
     mutationFn: async () => {
+      if (preview) return { success: true, preview: true, recorded: false };
       const res = await fetch(`/api/review/${token}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -272,9 +269,7 @@ export default function ReviewFeedbackPage() {
     },
   });
 
-  const trackGoogleOpen = () => {
-    void fetch(`/api/review/${token}/google-link-opened`, { method: "POST", keepalive: true });
-  };
+  const trackGoogleOpen = () => track("google-link-opened", undefined, true);
 
   const handleCopyReview = () => {
     if (hasPhotos && !photosDownloaded) {
@@ -374,6 +369,11 @@ export default function ReviewFeedbackPage() {
     <div className="min-h-screen bg-white dark:bg-gray-950 relative">
       <FloatingParticles color={THEME_COLOR} />
       <div className="max-w-xl mx-auto px-4 py-6 sm:py-10 relative z-10">
+        {preview && (
+          <div role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 px-4 py-3 text-sm text-amber-900 dark:text-amber-200" data-testid="banner-review-preview">
+            <strong>Preview</strong> — nothing you do here is recorded for your customer.
+          </div>
+        )}
 
         <div className="text-center mb-6 sm:mb-8">
           <div className="relative inline-block mb-4">
@@ -831,7 +831,7 @@ export default function ReviewFeedbackPage() {
                 onClick={() => {
                   setSkippedDescribe(true);
                   setStep("review");
-                  fetch(`/api/review/${token}/track-review-method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: "own" }) }).catch(() => {});
+                  track("track-review-method", { method: "own" });
                 }}
                 data-testid="button-skip-describe"
               >
@@ -1000,7 +1000,7 @@ export default function ReviewFeedbackPage() {
                               a.click();
                             });
                             setPhotosDownloaded(true);
-                            fetch(`/api/review/${token}/track-photos`, { method: "POST" }).catch(() => {});
+                            track("track-photos");
                           }}
                           data-testid="button-download-all-photos"
                         >
@@ -1271,7 +1271,7 @@ export default function ReviewFeedbackPage() {
                     a.click();
                   });
                   setPhotosDownloaded(true);
-                  fetch(`/api/review/${token}/track-photos`, { method: "POST" }).catch(() => {});
+                  track("track-photos");
                   setShowPhotoReminder(false);
                   navigator.clipboard.writeText(generatedReview);
                   setCopied(true);

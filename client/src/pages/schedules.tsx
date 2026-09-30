@@ -55,10 +55,10 @@ export default function SchedulesPage() {
     queryKey: ["/api/scrape-schedules"],
   });
 
-  // ?scrapable=true lets the server send only live-searchable portals; the filter below
-  // keeps the picker to those portals whichever list comes back.
+  // ?searchable=true returns only the portals a schedule can run against (verified live link
+  // plus a live-search adapter); the filter below re-checks whichever list comes back.
   const { data: databaseRows, isLoading: databasesLoading } = useQuery<PermitDatabase[]>({
-    queryKey: ["/api/databases?scrapable=true"],
+    queryKey: ["/api/databases?searchable=true"],
     enabled: !!schedules,
   });
 
@@ -239,7 +239,7 @@ export default function SchedulesPage() {
             <div className="text-center space-y-1">
               <p className="text-sm font-medium text-muted-foreground">No schedules yet</p>
               <p className="text-xs text-muted-foreground/70 max-w-sm">
-                Create automated scrape schedules to monitor permit databases daily.
+                Schedules run automatically on their frequency against portals that support live search.
               </p>
             </div>
           </div>

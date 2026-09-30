@@ -106,8 +106,9 @@ function ListingCard({ listing }: { listing: GmbListing }) {
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings", listing.id, "history"] });
       const changeCount = data.changes?.length || 0;
-      toast(isBaseline
-        ? { title: "Baseline captured", description: "Later checks compare the listing against today's Google data." }
+      // The server says whether this check was the first (baseline); older servers omit it.
+      toast((data.baseline ?? isBaseline)
+        ? { title: "Baseline captured from Google", description: "Future checks compare against this snapshot." }
         : {
             title: changeCount > 0 ? `${changeCount} change(s) detected` : "No changes detected",
             description: changeCount > 0 ? "Changes have been logged to edit history." : "Your listing matches the current Google data.",
@@ -503,7 +504,7 @@ export default function GmbMonitorPage() {
         try {
           const res = await apiRequest("POST", `/api/gmb/listings/${listing.id}/check`);
           const data = await res.json();
-          if (!listing.lastCheckedAt) baselines++;
+          if (data.baseline ?? !listing.lastCheckedAt) baselines++;
           totalChanges += data.changes?.length || 0;
         } catch (err) {
           failed++;
@@ -517,7 +518,7 @@ export default function GmbMonitorPage() {
       const checked = total - failed;
       const parts: string[] = [];
       if (totalChanges) parts.push(`${totalChanges} change(s) detected.`);
-      if (baselines) parts.push(`${baselines} baseline(s) captured.`);
+      if (baselines) parts.push(`${baselines} listing(s) got their first baseline.`);
       if (failed > 0) {
         // Never report "no changes" for a listing that was not actually checked.
         if (checked > 0 && !totalChanges) parts.push(`No changes in the ${checked} checked.`);

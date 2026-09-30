@@ -4,7 +4,19 @@ import { pool } from '../db';
 import { z } from 'zod';
 import { GoogleError } from '../gbp/client';
 import { requestAccess } from './routes';
-import { camel, clientAccess, filters, listLocations, locationAccess, locationFilter, missing, requireWrite } from './access';
+import { camel, clientAccess, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, requireWrite } from './access';
+import { firstZodMessage, locationUpdateInput } from '../route-guards';
+const sitescanList=z.object({
+  status:z.enum(['','queued','running','completed','failed']).default(''),
+  locationId:z.coerce.number().int().positive().max(2147483647).optional(),
+  locationQ:z.string().trim().max(200).default(''),
+  locationOffset:z.coerce.number().int().min(0).max(1000000).default(0),
+  // 50 keeps the agency list contract; the Site Scan page pages by 25.
+  limit:z.coerce.number().int().min(1).max(100).default(50),
+});
+// What an agency member may edit on a location: the owner's rules for these fields (blank social links,
+// null notification email = account-level settings), never provider links or ownership.
+const memberLocationUpdate=locationUpdateInput.pick({businessName:true,notificationEmail:true,gbpManagementEnabled:true,socialProfiles:true});
 /** Closed allowlist: delegated identity is supplied ONLY after an object check. Unknown routes never
  * inherit the owner's authority. Personal account/security/CRM routes retain the real actor. */
 export function registerAgencyAccess(app:Express) {
@@ -34,12 +46,19 @@ export function registerAgencyAccess(app:Express) {
         return void res.json(req.query.paged==='true'?{items:rows.map(camel),...stats,offset:f.offset,pageSize:50}:rows.map(camel));
       }
       if(req.path==='/api/sitescan'&&req.method==='GET') {
-        const f=filters.parse(req.query),w=locationFilter(a,{...f,q:''});
-        const params=[...w.values,`%${f.q.replace(/[\\%_]/g,'\\$&')}%`,f.offset];
-        const {rows:jobs}=await pool.query(`SELECT j.id,j.url,j.status,j.error,j.created_at,j.completed_at,j.report->'scores' scores,jsonb_array_length(j.state->'pages') pages,j.page_cap,count(*) OVER()::int total FROM sitescan_jobs j LEFT JOIN business_locations l ON l.id=(j.profile->>'id')::int AND l.user_id=j.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ((${w.sql}) OR ($2::boolean AND $4::int IS NULL AND j.user_id=$1 AND j.profile IS NULL)) AND concat_ws(' ',j.url,l.business_name) ILIKE $8 ORDER BY j.created_at DESC,j.id LIMIT 50 OFFSET $9`,params);
-        const locations=await listLocations(a,filters.parse({...req.query,offset:0}));
-        const {rows:schedules}=await pool.query(`SELECT s.* FROM sitescan_schedules s JOIN business_locations l ON l.id=s.location_id AND l.user_id=s.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ${w.sql} ORDER BY s.url LIMIT 50`,w.values);
-        return void res.json({jobs,locations:locations.items.map(l=>({id:l.id,business_name:l.businessName,website:l.website})),schedules,total:jobs[0]?.total??0});
+        // Site Scan's own list params: status is a scan status (not the agency location status), locationId
+        // narrows history to one business, locationQ/locationOffset page the business picker.
+        const {status,locationId,locationQ,locationOffset,limit,...rest}=req.query as Record<string,unknown>;
+        const s=sitescanList.parse({status,locationId,locationQ,locationOffset,limit});
+        const f=filters.parse(rest),w=locationFilter(a,{...f,q:''});
+        const like=(v:string)=>`%${v.replace(/[\\%_]/g,'\\$&')}%`;
+        const params=[...w.values,like(f.q),f.offset,s.status,s.locationId??null,s.limit];
+        const {rows:jobs}=await pool.query(`SELECT j.id,j.url,j.status,j.error,j.created_at,j.completed_at,j.report->'scores' scores,jsonb_array_length(j.state->'pages') pages,j.page_cap,j.profile->>'business_name' client,count(*) OVER()::int total FROM sitescan_jobs j LEFT JOIN business_locations l ON l.id=(j.profile->>'id')::int AND l.user_id=j.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ((${w.sql}) OR ($2::boolean AND $4::int IS NULL AND j.user_id=$1 AND j.profile IS NULL)) AND concat_ws(' ',j.url,l.business_name) ILIKE $8 AND ($10='' OR j.status=$10) AND ($11::int IS NULL OR l.id=$11) ORDER BY j.created_at DESC,j.id LIMIT $12 OFFSET $9`,params);
+        // Only Business Profile-linked locations can be compared (the scan reads their synced profile).
+        const {rows:locations}=await pool.query(`SELECT l.id,l.business_name,l.website,count(*) OVER()::int total FROM ${locationJoin} WHERE ${w.sql} AND l.gbp_location_name IS NOT NULL AND concat_ws(' ',l.business_name,l.website) ILIKE $8 ORDER BY l.id LIMIT $9 OFFSET $10`,[...w.values,like(s.locationQ),s.limit,s.locationOffset]);
+        // URL-only schedules (no location, or a deleted one) belong to the owner, like profile-less jobs above.
+        const {rows:schedules}=await pool.query(`SELECT s.* FROM sitescan_schedules s LEFT JOIN business_locations l ON l.id=s.location_id AND l.user_id=s.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ((${w.sql}) OR ($2::boolean AND $4::int IS NULL AND s.user_id=$1 AND l.id IS NULL)) ORDER BY s.url LIMIT 50`,w.values);
+        return void res.json({jobs,locations:locations.map(({total,...l})=>l),locationTotal:locations[0]?.total??0,schedules,total:jobs[0]?.total??0});
       }
       if(req.path==='/api/citations/campaigns'&&req.method==='GET') {
         const f=filters.parse(req.query),w=locationFilter(a,f),id=req.query.locationId?z.coerce.number().int().positive().parse(req.query.locationId):null;
@@ -91,7 +110,9 @@ export function registerAgencyAccess(app:Express) {
       if(req.path.endsWith('/guard')&&req.method!=='GET')throw missing();
       // Block fields that could cross ownership or alter provider links through generic local editing.
       if(req.method==='PUT'&&/^\/api\/locations\/\d+$/.test(req.path)) {
-        req.body=z.object({businessName:z.string().min(1).max(300).optional(),notificationEmail:z.string().email().optional(),gbpManagementEnabled:z.boolean().optional(),socialProfiles:z.record(z.string().url()).optional()}).strict().parse(req.body);
+        const parsed=memberLocationUpdate.safeParse(req.body??{});
+        if(!parsed.success)return void res.status(400).json({message:firstZodMessage(parsed.error)});
+        req.body=parsed.data;
       }
       res.locals.agencyOwner=a.owner;next();
     }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json({message:e instanceof z.ZodError?'Invalid input':e instanceof GoogleError?e.message:'Access check failed'});}
