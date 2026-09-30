@@ -4,8 +4,8 @@ const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let location: number;
 test.beforeAll(async () => {
     const target = new URL(process.env.DATABASE_URL!);
-    if (target.pathname !== '/constructhub_dev_a3' || !['localhost', '127.0.0.1'].includes(target.hostname))
-        throw new Error('a3 DB required');
+    if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(target.pathname) || !['localhost', '127.0.0.1'].includes(target.hostname))
+        throw new Error('a local development DB is required');
     location = (await db.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name) VALUES(1,'Content browser fixture','accounts/browser','locations/browser') RETURNING id")).rows[0].id;
 });
 test.afterAll(async () => { await db.query('DELETE FROM business_locations WHERE id=$1', [location]); await db.end(); });

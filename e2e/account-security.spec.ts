@@ -6,7 +6,7 @@ const pool=new pg.Pool({connectionString:process.env.DATABASE_URL});
 let id:number,email:string;
 const password='Security-fixture-password-27';
 test.beforeAll(async()=>{
- const target=new URL(process.env.DATABASE_URL!);if(target.pathname!=='/constructhub_dev_a1'||!['127.0.0.1','localhost'].includes(target.hostname))throw new Error('Lane a1 required');
+ const target=new URL(process.env.DATABASE_URL!);if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(target.pathname)||!['127.0.0.1','localhost'].includes(target.hostname))throw new Error('a local development DB is required');
  email=`security-browser-${Date.now()}@example.invalid`;
  ({rows:[{id}]}=await pool.query('INSERT INTO users(email,password_hash,email_verified) VALUES($1,$2,true) RETURNING id',[email,await bcrypt.hash(password,4)]));
 });
@@ -25,9 +25,9 @@ test('enrolls with QR, uses recovery sign-in, remembers/revokes device, and veri
  await page.getByLabel('Authenticator or recovery code').fill(codes[0]);await page.getByLabel('Remember this device for 30 days').check();await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/auth/2fa/login')),page.getByRole('button',{name:'Verify sign-in'}).click()]);
  expect((await page.request.get('/api/gbp/connect?format=json')).status()).toBe(403);
  const otherBrowser=await page.context().browser()!.newContext();
- const firstFactor=await otherBrowser.request.post('http://127.0.0.1:8129/api/auth/login',{data:{email,password}});expect((await firstFactor.json()).requires2FA).toBe(true);
- expect((await otherBrowser.request.post('http://127.0.0.1:8129/api/auth/2fa/login',{data:{code:codes[0]}})).status()).toBe(401);
- expect((await otherBrowser.request.post('http://127.0.0.1:8129/api/auth/2fa/login',{data:{code:totp.generate()}})).status()).toBe(200);await otherBrowser.close();
+ const firstFactor=await otherBrowser.request.post(`http://127.0.0.1:${process.env.E2E_PORT ?? '8129'}/api/auth/login`,{data:{email,password}});expect((await firstFactor.json()).requires2FA).toBe(true);
+ expect((await otherBrowser.request.post(`http://127.0.0.1:${process.env.E2E_PORT ?? '8129'}/api/auth/2fa/login`,{data:{code:codes[0]}})).status()).toBe(401);
+ expect((await otherBrowser.request.post(`http://127.0.0.1:${process.env.E2E_PORT ?? '8129'}/api/auth/2fa/login`,{data:{code:totp.generate()}})).status()).toBe(200);await otherBrowser.close();
  await page.goto('/settings?tab=security');await expect(page.getByRole('button',{name:'Revoke device'})).toBeVisible();
  // Expire only this fixture user's step-up verification; the modal must retry the original action.
  await pool.query(`UPDATE session SET sess=(sess::jsonb-'recentAuth')::json WHERE sess->'passport'->>'user'=$1`,[String(id)]);
