@@ -668,6 +668,10 @@ describe("route authentication, owner scope and key redaction", () => {
       expect((await call("get", "/media", otherId)).body.map((p: any) => p.name)).toEqual(["Public fixture"]);
       const source = await call("post", "/sources", otherId, { kind: "offers", text: "Fixture offer" });
       expect(source.status).toBe(201);
+      expect(await call("post", "/sources", otherId, { kind: "offers", text: "Fixture offer", mediaUrls: ["http://insecure.example.com/a.jpg"] }))
+        .toEqual({ status: 400, body: { message: "Use a public HTTPS media URL" } });
+      expect((await call("post", "/sources", otherId, { kind: "offers", text: "Fixture offer", mediaUrls: ["not a url"] })).body.message)
+        .toBe("Media URLs must be public HTTPS links (up to 10).");
       expect((await call("delete", "/sources/:id", userId, {}, { id: source.body.id })).status).toBe(404);
       expect((await call("get", "/sources", otherId)).body).toHaveLength(1);
       expect((await call("delete", "/sources/:id", otherId, {}, { id: source.body.id })).status).toBe(200);

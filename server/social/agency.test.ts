@@ -212,5 +212,13 @@ describe('agency business scope',()=>{
     expect((await call('put','/settings',owner,{enabled:true,destinations:[x]})).status).toBe(400);
     expect((await call('post','/posts',owner,request())).status).toBe(400);
   });
+  it('names the invalid auto setting instead of a generic input error',async()=>{
+    const put=(body:any)=>call('put','/settings',owner,body,{businessId:a});
+    expect(await put({enabled:true})).toEqual({status:400,body:{message:'Choose accounts before enabling auto mode'}});
+    expect((await put({cadence:99})).body.message).toBe('Posts per period must be a whole number from 1 to 7.');
+    expect((await put({timezone:'Mars/Olympus'})).body.message).toBe('Enter a valid timezone, for example America/New_York.');
+    expect((await put({aiDailyBudget:25})).body.message).toBe('Daily AI budget must be a whole number from 0 to 20.');
+    expect((await put({unexpected:true})).body.message).toBe('Invalid Social Media input');
+  });
 
 });
