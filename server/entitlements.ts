@@ -329,7 +329,7 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
     await c.query("SELECT pg_advisory_xact_lock(7170, $1)", [userId]);
     const { rows: [sub] } = await c.query(
       `SELECT * FROM subscriptions x WHERE x.user_id=$1 ${SUBSCRIPTION_ORDER}`, [userId, ACCESS_STATUSES]);
-    const grantEnd = sub &&!sub.stripe_subscription_id && sub.current_period_end != null && ["trialing", "active"].includes(sub.status)
+    const grantEnd = sub && !sub.stripe_subscription_id && sub.current_period_end != null && ["trialing", "active"].includes(sub.status)
       ? new Date(sub.current_period_end) : null;
     if (!grantEnd || grantEnd <= now || grantEnd.getTime() > ownEnd.getTime() + TRIAL_END_SLACK_MS) {
       await c.query("ROLLBACK");

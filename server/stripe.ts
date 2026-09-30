@@ -145,7 +145,7 @@ async function writeSubscriptionRow(where: { id: number } | { userId: number }, 
  * rejects the update and nothing changes (error_if_incomplete).
  */
 async function applyToSubscription(userId: number, row: SubscriptionRow, sub: Stripe.Subscription, current: ReturnType<typeof describeSubscription>, order: PlanOrder) {
-  const change = await subscriptionChange(stripe, current, order);
+  const change = await subscriptionChange(stripe, current, order, row.plan);
   if (!change.items.length && !change.addInvoiceItems.length) {
     return { changed: false, subscription: subscriptionSummary(row, cancellationOf(sub)) };
   }

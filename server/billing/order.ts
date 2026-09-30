@@ -167,20 +167,28 @@ const SALES_SET_UP = () => new BillingRequestError(409,
  * second subscription). Setup fees are charged once per newly added unit.
  *
  * Items on prices we did not create are never removed by a self-serve change:
- *   - a subscription with no plan item of ours and exactly one other item is a
+ *   - a subscription with no plan item of ours and exactly one other item, on
+ *     an account whose stored plan is a legacy key (LEGACY_PLAN_MAP), is a
  *     legacy checkout (one ad-hoc plan price); that item is repriced to the new plan;
- *   - any other such item (e.g. something a sales rep added and priced) is kept
- *     as it is; if the change would leave it on a different billing interval
- *     (Stripe bills every item on one interval), or it's unclear which item is
- *     the plan, the change is refused as a sales conversation.
+ *   - any other such item (e.g. something a sales rep added and priced, or a
+ *     sales-quoted subscription made of one custom price) is kept as it is; if
+ *     the change would leave it on a different billing interval (Stripe bills
+ *     every item on one interval), or it's unclear which item is the plan, the
+ *     change is refused as a sales conversation.
  * A second item on one of OUR prices (a duplicate plan or add-on) is removed.
+ *
+ * `storedPlan` is the account's subscriptions.plan as stored (a legacy row keeps
+ * its legacy key: the webhook never rewrites the plan of a legacy price).
  */
-export async function subscriptionChange(stripe: Stripe, current: SubscriptionShape, order: PlanOrder):
+export async function subscriptionChange(stripe: Stripe, current: SubscriptionShape, order: PlanOrder, storedPlan?: string | null):
   Promise<{ items: ItemChange[]; addInvoiceItems: InvoiceItem[] }> {
   const items: ItemChange[] = [];
   const foreign = current.otherItems.filter((item) => !roleOfPrice(item.price));
   const duplicates = current.otherItems.filter((item) => !!roleOfPrice(item.price));
   if (!current.planItem && foreign.length > 1) throw SALES_SET_UP();
+  // A lone custom price is only a legacy plan when the account was sold a legacy plan.
+  const legacyRow = typeof storedPlan === "string" && Object.hasOwn(LEGACY_PLAN_MAP, storedPlan);
+  if (!current.planItem && foreign.length === 1 && !legacyRow) throw SALES_SET_UP();
   const planSlot = current.planItem ?? foreign[0] ?? null;
   const kept = foreign.filter((item) => item !== planSlot);
   if (kept.some((item) => item.price?.recurring?.interval && item.price.recurring.interval !== order.interval)) throw SALES_SET_UP();

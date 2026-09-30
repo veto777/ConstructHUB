@@ -494,6 +494,17 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     expect(unclear.code).toBe(409);
     expect(unclear.body.message).toMatch(/sales rep set up/);
     expect(mocks.update).not.toHaveBeenCalled();
+
+    // One custom price and no plan item of ours, on an account that was never sold a legacy plan
+    // (e.g. a sales-quoted Agency above 500 locations): not repriced to a self-serve plan — refused.
+    for (const plan of ["free", "agency", null]) {
+      mocks.current = subscription([item("si_quoted", "price_quoted_agency_800_locations")]);
+      mocks.rows.push([liveRow({ plan })]);
+      const quoted = await request("/api/stripe/change-plan", { plan: "agency", locations: 10 });
+      expect(quoted.code, String(plan)).toBe(409);
+      expect(quoted.body.code).toBe("talk_to_sales");
+    }
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("a duplicate item on one of our own prices is removed", async () => {

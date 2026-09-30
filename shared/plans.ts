@@ -219,8 +219,10 @@ export const LEGACY_PLAN_MAP: Record<string, PlanKey> = {
 /**
  * Subscription statuses that keep the plan's features. `past_due` is a Stripe
  * subscription whose renewal payment failed while Stripe retries the card:
- * access stays on through the retries, and Stripe moves the subscription to
- * canceled or unpaid (both without access) if the retries fail. `incomplete`
+ * access stays on through the retries. When the retries fail, Stripe moves the
+ * subscription to canceled or unpaid (both without access) only if the Stripe
+ * Dashboard's failed-payment setting says so; "leave the subscription past-due"
+ * would keep access on with no end, so that setting must not be chosen. `incomplete`
  * (the first payment never went through), `incomplete_expired`, `unpaid`,
  * `paused` and `canceled` have no access.
  */
