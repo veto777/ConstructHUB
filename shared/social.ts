@@ -39,11 +39,13 @@ export const publicMediaUrl = z
         !u.username &&
         !u.password &&
         !u.hostname.includes(":") &&
+        (!u.port || u.port === "443") &&
+        !/^\d+\.\d+\.\d+\.\d+$/.test(u.hostname) &&
         !/^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
           u.hostname,
         ) &&
         u.hostname.includes(".") &&
-        !/\.(local|internal)$/.test(u.hostname)
+        !/\.(local|internal|localhost|home\.arpa)\.?$/.test(u.hostname)
       );
     } catch {
       return false;
@@ -67,7 +69,10 @@ export const postSchema = z
   .object({
     requestId: z.string().uuid(),
     text: z.string().trim().min(1).max(63206),
-    destinations: z.array(destinationSchema).min(1).max(20),
+    destinations: z.array(destinationSchema).min(1).max(20).refine(
+      (items) => new Set(items.map((d) => [d.accountId, d.pageId || "", d.boardId || ""].join(":"))).size === items.length,
+      "Choose each destination only once",
+    ),
     tweaks: z.record(z.string().max(63206)).default({}),
     mediaUrls: z.array(publicMediaUrl).max(10).default([]),
     scheduledTime: z.string().datetime({ offset: true }).optional(),

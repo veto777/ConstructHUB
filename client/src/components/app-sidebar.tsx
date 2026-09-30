@@ -123,11 +123,8 @@ const googleGroups: NavGroup[] = [
     logoComponent: GoogleBusinessIcon,
     landingUrl: "/google-business",
     children: [
-      { title: "Site Scan", url: "/site-scan", icon: Search },
       { title: "Locations", url: "/locations", icon: MapPin },
       { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
-      { title: "Social Media", url: "/social-media", icon: Megaphone },
-      { title: "Guides", url: "/guides", icon: FileText },
       { title: "GBP Monitor", url: "/gmb-monitor", icon: Eye },
       { title: "Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },
       { title: "Photo Optimizer", url: "/photos", icon: Camera, subChildren: [
@@ -156,6 +153,9 @@ const ADMIN_EMAILS = ["support@constructhub.us", "alpinesidingcompany@gmail.com"
 const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", icon: Star, logoComponent: GoogleGIcon, badge: "best" as BadgeType };
 
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
+  { title: "Social Media", url: "/social-media", icon: Megaphone },
+  { title: "Site Scan", url: "/site-scan", icon: Search },
+  { title: "Guides", url: "/guides", icon: BookOpen },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/competitors-landing" }] : []),
@@ -185,6 +185,7 @@ function CollapsibleNavGroup({ group }: { group: NavGroup }) {
         <SidebarMenuButton
           className="cursor-pointer flex-1"
           onClick={() => setOpen(!open)}
+          aria-expanded={open}
           data-testid={`link-nav-group-${group.label.toLowerCase().replace(/\s+/g, "-")}`}
         >
           {group.logoComponent ? (

@@ -1,5 +1,5 @@
 import { syncGbpSources } from "./gbp-sources";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import OpenAI from "openai";
 import { pool } from "../db";
@@ -142,6 +142,11 @@ export async function discoverPages(
     return { items };
   });
 }
+function requestFingerprint(input: ReturnType<typeof postSchema.parse>) {
+  // Zod fixes object field order; normalize the free-form tweak keys too.
+  const tweaks = Object.fromEntries(Object.keys(input.tweaks).sort().map(key => [key, input.tweaks[key]]));
+  return createHash("sha256").update(JSON.stringify({ ...input, tweaks })).digest("hex");
+}
 export async function insertPosts(
   c: PoolClient,
   userId: number,
@@ -162,7 +167,7 @@ export async function insertPosts(
     const {
       rows: [row],
     } = await c.query(
-      `INSERT INTO social_posts(id,user_id,request_id,destination_key,payload,state,due_at,ai_generated,auto_generated,source,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(user_id,request_id,destination_key) DO UPDATE SET request_id=EXCLUDED.request_id RETURNING *`,
+      `INSERT INTO social_posts(id,user_id,request_id,destination_key,payload,state,due_at,ai_generated,auto_generated,source,scheduled_at,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,request_id,destination_key) DO UPDATE SET request_id=EXCLUDED.request_id RETURNING *`,
       [
         randomUUID(),
         userId,
@@ -175,6 +180,7 @@ export async function insertPosts(
         automatic,
         source || null,
         input.scheduledTime || null,
+        requestFingerprint(input),
       ],
     );
     result.push(row);
@@ -183,9 +189,18 @@ export async function insertPosts(
 }
 export async function createPosts(userId: number, raw: unknown) {
   const input = postSchema.parse(raw);
-  if (input.scheduledTime && Date.parse(input.scheduledTime) < Date.now())
-    throw new SocialError("Choose a future schedule time");
   return userLock(userId, async (c) => {
+    const { rows: existing } = await c.query(
+      "SELECT *, request_hash = $3 AS same_request FROM social_posts WHERE user_id=$1 AND request_id=$2",
+      [userId, input.requestId, requestFingerprint(input)],
+    );
+    if (existing.length) {
+      if (existing.length !== input.destinations.length || existing.some((p) => !p.same_request))
+        throw new SocialError("This request ID was already used. Check the queue before composing a new post.", 409);
+      return existing.map(({ same_request, ...post }) => post);
+    }
+    if (input.scheduledTime && Date.parse(input.scheduledTime) < Date.now())
+      throw new SocialError("Choose a future schedule time");
     await validateDestinations(userId, input.destinations);
     for (const d of input.destinations) {
       try {
@@ -231,7 +246,11 @@ export async function changePost(
         platform,
         ...p.payload.post.target,
       };
-      postPayload(d, text, p.payload.post.content.mediaUrls, p.ai_generated);
+      try {
+        postPayload(d, text, p.payload.post.content.mediaUrls, p.ai_generated);
+      } catch (e) {
+        throw new SocialError((e as Error).message);
+      }
       p.payload.post.content.text = text;
     }
     const {
@@ -296,7 +315,17 @@ export const generateText: Generate = async (context) => {
   return text;
 };
 async function sourceFor(userId: number, kind: string, sequence: number) {
-  if (kind === "gbp") await syncGbpSources(userId);
+  let manualOnly = false;
+  if (kind === "gbp") {
+    try {
+      await syncGbpSources(userId);
+    } catch (e) {
+      // A manually entered published update does not require a Google connection.
+      // Do not reuse stale imports after disconnection or hide provider failures.
+      if (!(e instanceof SocialError) || e.status !== 409) throw e;
+      manualOnly = true;
+    }
+  }
   if (kind === "tips")
     return {
       source: "Business profile; general educational tip",
@@ -329,8 +358,8 @@ async function sourceFor(userId: number, kind: string, sequence: number) {
     return { source: `Google review ${p.id}`, mediaUrls: [], text: p.comment };
   }
   const { rows } = await pool.query(
-    "SELECT * FROM social_sources WHERE user_id=$1 AND kind=$2 AND created_at>now()-interval '30 days' ORDER BY created_at DESC LIMIT 30",
-    [userId, kind],
+    "SELECT * FROM social_sources WHERE user_id=$1 AND kind=$2 AND created_at>now()-interval '30 days' AND (NOT $3 OR external_key IS NULL) ORDER BY created_at DESC LIMIT 30",
+    [userId, kind, manualOnly],
   );
   if (!rows.length)
     throw new SocialError(
@@ -375,7 +404,15 @@ export async function generateDue(
   if (!business)
     throw new SocialError("Add a business in Locations before generating");
   const kind = s.mix[row.sequence % s.mix.length],
-    source = await sourceFor(userId, kind, row.sequence);
+    source = await sourceFor(userId, kind, Math.floor(row.sequence / s.mix.length));
+  // Reject known target/media problems before charging for text generation.
+  for (const d of s.destinations) {
+    try {
+      postPayload(d, "Draft", source.mediaUrls, true);
+    } catch (e) {
+      throw new SocialError((e as Error).message);
+    }
+  }
   if (!(await takeBudget(`social-ai:${userId}`, s.aiDailyBudget, 1, 86400000)))
     throw new SocialError("Daily social AI budget reached", 429);
   const text = await generate({

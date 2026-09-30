@@ -22,6 +22,8 @@ import {
 } from "./service";
 import {
   autoSchema,
+  platforms,
+  socialLimits,
   postPayload,
   destinationSchema,
   inBlackout,
@@ -140,6 +142,20 @@ describe("social validation and HTTP boundary", () => {
       isAiGenerated: true,
     });
   });
+  it.each(platforms)("enforces the %s text boundary and builds its target", (platform) => {
+    const d = destinationSchema.parse({ accountId: "fixture", platform, ...(platform === "facebook" ? { pageId: "page" } : {}), ...(platform === "pinterest" ? { boardId: "board" } : {}), title: "Fixture title" });
+    const media = ["https://example.com/fixture.mp4"];
+    expect(postPayload(d, "x".repeat(socialLimits[platform]), media).post.target.targetType).toBe(platform);
+    expect(() => postPayload(d, "x".repeat(socialLimits[platform] + 1), media)).toThrow("exceeds");
+    expect(() => postPayload(d, " ", media)).toThrow("required");
+    if (["instagram", "tiktok", "youtube", "pinterest"].includes(platform))
+      expect(() => postPayload(d, "Fixture", [])).toThrow("media");
+  });
+  it("keeps YouTube privacy and TikTok commercial disclosures explicit", () => {
+    expect(postPayload({ ...destination, platform: "youtube", title: "Title", privacy: "unlisted" }, "Fixture", ["https://example.com/video.mp4"], true).post.target).toMatchObject({ privacyStatus: "unlisted", containsSyntheticMedia: true });
+    expect(postPayload({ ...destination, platform: "tiktok", tiktokPublic: true, isBrandedContent: true, isYourBrand: true }, "Fixture", ["https://example.com/video.mp4"]).post.target).toMatchObject({ privacyLevel: "PUBLIC_TO_EVERYONE", isBrandedContent: true, isYourBrand: true });
+    expect(() => postPayload({ ...destination, platform: "pinterest" }, "Fixture", ["https://example.com/photo.jpg"])).toThrow("board");
+  });
   it("rejects private URL literals and overnight blackout handles timezone", () => {
     for (const url of [
       "http://example.com/a",
@@ -147,6 +163,13 @@ describe("social validation and HTTP boundary", () => {
       "https://192.168.0.1/a",
       "https://user:pass@example.com/a",
       "https://[::1]/a",
+      "https://0.0.0.0/a",
+      "https://100.100.100.200/a",
+      "https://2130706433/a",
+      "https://0x7f000001/a",
+      "https://printer.localhost/a",
+      "https://printer.home.arpa/a",
+      "https://example.com:8443/a",
     ])
       expect(publicMediaUrl.safeParse(url).success).toBe(false);
     const s = autoSchema.parse({ timezone: "America/New_York" });
@@ -166,6 +189,18 @@ describe("social validation and HTTP boundary", () => {
       ["fixture-rate"],
     );
     expect(r.busy).toBe(true);
+  });
+  it("persists provider 429 cooldown across client instances without retrying HTTP", async () => {
+    const limited = vi.fn(async () => new Response("{}", { status: 429, headers: { "Retry-After": "120" } }));
+    const key = `fixture-rate-${crypto.randomUUID()}`;
+    const client = new BlotatoClient(key, limited);
+    try {
+      await expect(client.request("/posts", {})).rejects.toMatchObject({ status: 429 });
+      const cooldown = (await pool.query("SELECT next_at > now() + interval '110 seconds' AS active FROM social_rate WHERE key_hash=$1", [client.hash])).rows[0];
+      expect(cooldown.active).toBe(true);
+      await expect(new BlotatoClient(key, limited).request("/posts", {})).rejects.toMatchObject({ status: 429 });
+      expect(limited).toHaveBeenCalledTimes(1);
+    } finally { await pool.query("DELETE FROM social_rate WHERE key_hash=$1", [client.hash]); }
   });
   it("never retries a POST and never exposes provider bodies", async () => {
     const failed = vi.fn(async () => {
@@ -262,6 +297,19 @@ describe("real Postgres, mocked Blotato publishing", () => {
         )
       ).rows,
     ).toHaveLength(1);
+  });
+  it("rejects changed retries and duplicate destinations without changing queued content", async () => {
+    const input = request({ draft: true, tweaks: { twitter: "Fixture tweak", linkedin: "Unused tweak" } });
+    const [p] = await createPosts(userId, input);
+    expect(p.request_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect((await createPosts(userId, { ...input, tweaks: { linkedin: "Unused tweak", twitter: "Fixture tweak" } }))[0].id).toBe(p.id);
+    for (const change of [{ text: "Changed" }, { draft: false }, { mediaUrls: ["https://example.com/new.jpg"] }, { destinations: [] }]) {
+      await expect(createPosts(userId, { ...input, ...change })).rejects.toThrow();
+    }
+    await changePost(userId, p.id, "approve", "Approved edit");
+    expect((await createPosts(userId, input))[0].payload.post.content.text).toBe("Approved edit");
+    await expect(createPosts(userId, request({ destinations: [destination, destination] }))).rejects.toThrow("once");
+    await changePost(userId, p.id, "cancel");
   });
   it("keeps scheduled posts and drafts local until due or approved; rejects other owner actions", async () => {
     const [p] = await createPosts(userId, request({ draft: true }));
@@ -462,6 +510,78 @@ describe("real Postgres, mocked Blotato publishing", () => {
       ).rows,
     ).toHaveLength(0);
   });
+  it("rotates sources within each content category instead of repeating the same offer", async () => {
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    await pool.query("INSERT INTO social_sources(user_id,kind,text,created_at) VALUES($1,'offers','Fixture offer A',now()),($1,'offers','Fixture offer B',now()-interval '1 second')", [userId]);
+    await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["offers", "tips"], aiDailyBudget: 5 }));
+    await pool.query("UPDATE social_settings SET sequence=0 WHERE user_id=$1", [userId]);
+    const generate = vi.fn(async (_context: any) => "Fixture rotation draft");
+    for (let i = 0; i < 3; i++) await userLock(userId, (c) => generateDue(c, userId, generate, true));
+    expect(generate.mock.calls.map(([context]) => context.source)).toEqual([
+      "Fixture offer A", "General non-project-specific maintenance tip; no claims about completed work.", "Fixture offer B",
+    ]);
+  });
+  it("does not spend AI budget on a destination missing required fields", async () => {
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    await saveSettings(userId, autoSchema.parse({ destinations: [{ ...destination, accountId: "fixture-facebook", platform: "facebook" }] }));
+    const generate = vi.fn(async () => "Never called");
+    await expect(userLock(userId, (c) => generateDue(c, userId, generate, true))).rejects.toMatchObject({ status: 400, message: "Facebook requires a Page" });
+    expect(generate).not.toHaveBeenCalled();
+    expect((await pool.query("SELECT * FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`])).rows).toHaveLength(0);
+  });
+  it("uses manually entered GBP updates without a Google connection and excludes stale imports", async () => {
+    await pool.query("DELETE FROM gbp_grants WHERE user_id=$1", [userId]);
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    await pool.query("INSERT INTO social_sources(user_id,kind,text,external_key) VALUES($1,'gbp','Stale import','accounts/stale/locations/stale/localPosts/old')", [userId]);
+    await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["gbp"] }));
+    const generate = vi.fn(async (_context: any) => "Manual GBP fixture draft");
+    await expect(userLock(userId, c => generateDue(c, userId, generate, true))).rejects.toThrow("No recent GBP");
+    expect(generate).not.toHaveBeenCalled();
+    await pool.query("INSERT INTO social_sources(user_id,kind,text) VALUES($1,'gbp','Manually supplied published fixture')", [userId]);
+    await userLock(userId, c => generateDue(c, userId, generate, true));
+    expect(generate.mock.calls[0][0].source).toBe("Manually supplied published fixture");
+  });
+  it("returns an actionable validation error and keeps overlength approval edits as drafts", async () => {
+    const [p] = await createPosts(userId, request({ draft: true }));
+    await expect(changePost(userId, p.id, "approve", "x".repeat(281))).rejects.toMatchObject({ status: 400, message: "twitter: text exceeds 280 characters" });
+    expect((await rows()).find(row => row.id === p.id).state).toBe("draft");
+  });
+  it("uses project photos and synced review comments as distinct factual sources", async () => {
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    const location = (await pool.query("SELECT id FROM business_locations WHERE user_id=$1 LIMIT 1", [userId])).rows[0].id;
+    const generate = vi.fn(async (_context: any) => "Factual fixture draft");
+    try {
+      await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["project"], aiDailyBudget: 5 }));
+      await expect(userLock(userId, c => generateDue(c, userId, generate, true))).rejects.toThrow("No public project photos");
+      await pool.query("INSERT INTO media_photos(user_id,folder_id,name,url) VALUES($1,0,'Fixture project source','https://example.com/project.jpg')", [userId]);
+      const photos = await userLock(userId, c => generateDue(c, userId, generate, true));
+      expect(photos?.[0].payload.post.content.mediaUrls).toEqual(["https://example.com/project.jpg"]);
+      expect(generate.mock.calls[0][0].source).toBe("Fixture project source");
+      await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["reviews"], aiDailyBudget: 5 }));
+      await expect(userLock(userId, c => generateDue(c, userId, generate, true))).rejects.toThrow("No synced Google reviews");
+      await pool.query("INSERT INTO google_profile_reviews(user_id,location_id,google_review_id,reviewer_name,rating,comment,review_date) VALUES($1,$2,'accounts/fixture/locations/fixture/reviews/fixture','Fixture reviewer',5,'Explicit fixture review source',now())", [userId, location]);
+      await userLock(userId, c => generateDue(c, userId, generate, true));
+      expect(generate.mock.calls[1][0].source).toBe("Explicit fixture review source");
+      expect(generate).toHaveBeenCalledTimes(2);
+    } finally {
+      await pool.query("DELETE FROM media_photos WHERE user_id=$1", [userId]);
+      await pool.query("DELETE FROM google_profile_reviews WHERE user_id=$1", [userId]);
+    }
+  });
+  it("rechecks blackout on queued automatic work while allowing a manual post", async () => {
+    const hour = new Date().getUTCHours();
+    await saveSettings(userId, autoSchema.parse({ enabled: true, mode: "automatic", destinations: [destination], timezone: "UTC", blackoutStart: hour, blackoutEnd: (hour + 1) % 24 }));
+    await pool.query("UPDATE social_settings SET next_at=now()+interval '1 day' WHERE user_id=$1", [userId]);
+    const [automatic] = await createPosts(userId, request());
+    const [manual] = await createPosts(userId, request());
+    await pool.query("UPDATE social_posts SET auto_generated=true WHERE id=$1", [automatic.id]);
+    const generate = vi.fn(async () => "Never generated in blackout");
+    await workerUser(userId, make, generate);
+    expect((await rows()).find(p => p.id === automatic.id).state).toBe("queued");
+    expect((await rows()).find(p => p.id === manual.id).state).toBe("submitted");
+    expect(generate).not.toHaveBeenCalled();
+    await saveSettings(userId, autoSchema.parse({ destinations: [destination] }));
+  });
   it("disconnect cancels unsent work, disables generation, deletes the encrypted key, and logs activity", async () => {
     await disconnect(userId, null);
     expect(
@@ -506,6 +626,59 @@ describe("route authentication, owner scope and key redaction", () => {
       await r.handlers[0]({}, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
       expect(next).not.toHaveBeenCalled();
+    }
+  });
+  it("discovers Pinterest boards and LinkedIn pages without crossing owners", async () => {
+    const discovery = vi.fn(async (url: any) => {
+      if (String(url).endsWith("/users/me/accounts")) return response({ items: [{ id: "pin", platform: "pinterest" }, { id: "li", platform: "linkedin" }] });
+      return response({ items: [{ id: "verified-target", name: "Fixture destination" }] });
+    });
+    const factory = (key: string) => new BlotatoClient(key, discovery, async () => {});
+    await connect(otherId, "fixture-discovery-key", null, factory);
+    for (const [accountId, platform, field] of [["pin", "pinterest", "boardId"], ["li", "linkedin", "pageId"]]) {
+      const d = { ...destination, accountId, platform, [field]: "verified-target" };
+      await expect(createPosts(otherId, request({ destinations: [d], mediaUrls: ["https://example.com/photo.jpg"], draft: true }))).rejects.toThrow("verified");
+      await discoverPages(otherId, accountId, factory);
+      const [p] = await createPosts(otherId, request({ destinations: [d], mediaUrls: ["https://example.com/photo.jpg"], draft: true }));
+      expect(p.payload.post.target[field]).toBe("verified-target");
+      await expect(changePost(userId, p.id, "cancel")).rejects.toMatchObject({ status: 404 });
+    }
+    expect(discovery.mock.calls.some(([url]) => String(url).endsWith("/social/pinterest/boards?accountId=pin"))).toBe(true);
+    await disconnect(otherId, null);
+    await pool.query("DELETE FROM social_posts WHERE user_id=$1", [otherId]);
+  });
+  it("scopes library and source routes and returns only safe upload URLs", async () => {
+    const uploadHttp = vi.fn(async () => response({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://example.com/fixture-put?signature=fixture" }));
+    const factory = (key: string) => new BlotatoClient(key, uploadHttp, async () => {});
+    await connect(otherId, "fixture-upload-key", null, make);
+    const routes = new Map<string, any>();
+    const app: any = {};
+    for (const method of ["get", "post", "put", "delete"])
+      app[method] = (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+    registerSocialRoutes(app, () => true, factory);
+    const call = async (method: string, path: string, owner: number, body = {}, params = {}) => {
+      const res: any = { setHeader: vi.fn(), status: vi.fn().mockReturnThis(), json: vi.fn() };
+      await routes.get(`${method} /api/social${path}`)({ user: { id: owner }, body, params }, res);
+      return { body: res.json.mock.calls[0][0], status: res.status.mock.calls[0]?.[0] ?? 200 };
+    };
+    try {
+      await pool.query("INSERT INTO media_photos(user_id,folder_id,name,url) VALUES($1,0,'Private fixture','https://127.0.0.1/a'),($1,0,'Public fixture','https://example.com/library.jpg'),($2,0,'Other owner fixture','https://example.com/other.jpg')", [otherId, userId]);
+      expect((await call("get", "/media", otherId)).body.map((p: any) => p.name)).toEqual(["Public fixture"]);
+      const source = await call("post", "/sources", otherId, { kind: "offers", text: "Fixture offer" });
+      expect(source.status).toBe(201);
+      expect((await call("delete", "/sources/:id", userId, {}, { id: source.body.id })).status).toBe(404);
+      expect((await call("get", "/sources", otherId)).body).toHaveLength(1);
+      expect((await call("delete", "/sources/:id", otherId, {}, { id: source.body.id })).status).toBe(200);
+      const upload = await call("post", "/uploads", otherId, { filename: "fixture.jpg" });
+      expect(upload.body).toEqual({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://example.com/fixture-put?signature=fixture" });
+      expect(JSON.stringify(upload.body)).not.toContain("fixture-upload-key");
+      expect((await call("post", "/uploads", otherId, { filename: "../fixture.exe" })).status).toBe(400);
+      expect(uploadHttp).toHaveBeenCalledTimes(1);
+      uploadHttp.mockResolvedValueOnce(response({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://0.0.0.0/upload" }));
+      expect((await call("post", "/uploads", otherId, { filename: "fixture.jpg" })).status).toBe(400);
+    } finally {
+      await pool.query("DELETE FROM media_photos WHERE user_id=ANY($1)", [[userId, otherId]]);
+      await disconnect(otherId, null);
     }
   });
   it("returns no key and no other owner posts from the dashboard", async () => {
