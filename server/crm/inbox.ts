@@ -34,6 +34,25 @@ type GetUser = (req: any, res: any) => any;
 const esc = (s?: string | null) =>
   String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
 
+/**
+ * Raw-SQL `timestamp` (no time zone) values come back as naive strings
+ * ("2026-09-30 14:05:00.123456"). They are UTC (the server's session zone),
+ * so they go out as ISO with an explicit Z, never left for a browser to read
+ * as local time (or, in Safari, as Invalid Date).
+ */
+export function isoUtc(v: unknown): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.toISOString();
+  let s = String(v).trim().replace(" ", "T").replace(/(\.\d{3})\d+/, "$1");
+  // Postgres writes offsets as "+00" / "-0400"; JS Date wants "+00:00".
+  const tz = /(Z|[+-]\d{2}(:?\d{2})?)$/i.exec(s.slice(10))?.[0];
+  if (!tz) s += "Z";
+  else if (/^[+-]\d{2}$/.test(tz)) s += ":00";
+  else if (/^[+-]\d{4}$/.test(tz)) s = `${s.slice(0, -2)}:${s.slice(-2)}`;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 async function estimateRefs(orgId: string, ids: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (!ids.length) return map;
@@ -70,7 +89,11 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
       ORDER BY max(c.created_at) DESC
       LIMIT 200
     `);
-    const rows = (threads as any).rows ?? threads;
+    const rows = (((threads as any).rows ?? threads) as any[]).map((r) => ({
+      ...r,
+      lastAt: isoUtc(r.lastAt),
+      oldestUnreadAt: isoUtc(r.oldestUnreadAt),
+    }));
     // The list above is capped at 200 rows — count unread over the WHOLE org
     // so the badge doesn't silently undercount when the page is full.
     const unreadRows = (await db.execute(sql`
@@ -185,24 +208,35 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
       ));
 
     // The client is not sitting in the portal — the reply goes to their email
-    // too, from the member who wrote it (reply-to their address).
+    // too, from the member who wrote it (reply-to their address). The portal
+    // post above has already landed; `emailed` says whether the email copy
+    // did too, so the CRM never claims a send that failed.
+    let emailed = false;
+    let emailError: string | null = null;
     if (cust.email) {
       const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, ctx.org.id)).limit(1);
       const from = ctx.member.displayName || org?.name || "Your contractor";
-      await sendWithFallback({
-        to: cust.email,
-        subject: `💬 New message from ${org?.name ?? from}`,
-        replyTo: ctx.member.email || org?.email || undefined,
-        html: `
-          <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
-            <p style="font-size:16px"><strong>${esc(from)}</strong> replied to your message:</p>
-            <blockquote style="border-left:3px solid #4f46e5;margin:16px 0;padding:8px 14px;color:#333;white-space:pre-wrap">${esc(parsed.data.body.trim())}</blockquote>
-            <p style="font-size:14px;color:#555">You can reply to this email directly, or answer from your client portal.</p>
-          </div>`,
-      } as any).catch((e: any) => console.error("[crm] inbox reply email failed:", String(e?.message || e).slice(0, 300)));
+      try {
+        await sendWithFallback({
+          to: cust.email,
+          subject: `💬 New message from ${org?.name ?? from}`,
+          replyTo: ctx.member.email || org?.email || undefined,
+          html: `
+            <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
+              <p style="font-size:16px"><strong>${esc(from)}</strong> replied to your message:</p>
+              <blockquote style="border-left:3px solid #4f46e5;margin:16px 0;padding:8px 14px;color:#333;white-space:pre-wrap">${esc(parsed.data.body.trim())}</blockquote>
+              <p style="font-size:14px;color:#555">You can reply to this email directly, or answer from your client portal.</p>
+            </div>`,
+        } as any);
+        emailed = true;
+      } catch (e: any) {
+        console.error("[crm] inbox reply email failed:", String(e?.message || e).slice(0, 300));
+        // User-safe wording only: the raw SMTP/provider text stays in the log.
+        emailError = "The email copy could not be delivered — they'll still see it in their portal.";
+      }
     }
 
-    res.status(201).json({ id: row.id, createdAt: row.createdAt });
+    res.status(201).json({ id: row.id, createdAt: row.createdAt, emailed, emailError });
   });
 
   // ── Client portal: the people on my job + how to reach the office ─────────

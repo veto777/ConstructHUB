@@ -80,7 +80,7 @@ export function smsStatus(orgCustomFields?: unknown) {
 /** Texting (client texts, reminders, alert texts) is a Premium-and-up feature. */
 export const SMS_PLANS: ReadonlySet<string> = new Set(["premium", "gold", "platinum"]);
 export const SMS_NEEDS_PLAN =
-  "Text messaging is included with the Premium and Platinum plans. Upgrade in Pricing to turn it on.";
+  "Text messaging is included with the Premium, Gold and Platinum plans. Upgrade in Pricing to turn it on.";
 
 const entitlementCache = new Map<string, { ok: boolean; at: number }>();
 

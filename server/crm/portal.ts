@@ -45,6 +45,7 @@ import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDi
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
 import { storeGeneratedPdf } from "./attachments";
+import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
@@ -139,20 +140,23 @@ export async function requireDocSession(req: any, res: any, customerId: string):
 
 // ── Contractor preview ──────────────────────────────────────────────────────
 // Org members preview the client page WITHOUT a client session. The bypass is
-// an HMAC-signed 15-minute grant bound to ONE estimate id (SESSION_SECRET
-// keyed, stateless) and is READ-ONLY: respond/pay/engagement still require the
-// client session, and preview opens never touch view tracking.
+// an HMAC-signed 15-minute grant bound to ONE document — the kind is part of
+// the signed string, so an estimate grant never opens an invoice with the same
+// id or vice versa (SESSION_SECRET keyed, stateless). It is READ-ONLY:
+// respond/pay/engagement still require the client session, and preview opens
+// never touch view tracking.
 const PREVIEW_TTL_MS = 15 * 60 * 1000;
 const previewSecret = () => process.env.SESSION_SECRET || "";
+type PreviewDoc = "estimate" | "invoice";
 
-function mintPreviewGrant(estimateId: string): string {
+function mintPreviewGrant(kind: PreviewDoc, docId: string): string {
   const exp = Date.now() + PREVIEW_TTL_MS;
   const sig = createHmac("sha256", previewSecret())
-    .update(`estimate-preview:${estimateId}:${exp}`).digest("hex").slice(0, 32);
+    .update(`${kind}-preview:${docId}:${exp}`).digest("hex").slice(0, 32);
   return `${exp}.${sig}`;
 }
 
-function previewGrantValid(estimateId: string, grant: string): boolean {
+function previewGrantValid(kind: PreviewDoc, docId: string, grant: string): boolean {
   const secret = previewSecret();
   if (!secret) return false;
   const m = /^(\d{10,16})\.([0-9a-f]{32})$/.exec(grant);
@@ -160,7 +164,7 @@ function previewGrantValid(estimateId: string, grant: string): boolean {
   const exp = Number(m[1]);
   if (!Number.isFinite(exp) || exp < Date.now()) return false;
   const expected = createHmac("sha256", secret)
-    .update(`estimate-preview:${estimateId}:${exp}`).digest("hex").slice(0, 32);
+    .update(`${kind}-preview:${docId}:${exp}`).digest("hex").slice(0, 32);
   const a = Buffer.from(m[2]);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
@@ -528,7 +532,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // THE GATE — ahead of everything, expiry included. A contractor preview
     // grant bypasses it (read-only, untracked); everyone else needs a client
     // session covering this estimate's customer.
-    const preview = previewGrantValid(est.id, String(req.query?.preview || ""));
+    const preview = previewGrantValid("estimate", est.id, String(req.query?.preview || ""));
     if (!preview && !(await requireDocSession(req, res, est.customerId))) return;
 
     // Expired and never answered: 410 BEFORE any document content is loaded.
@@ -1152,7 +1156,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (!est) return res.status(404).json({ message: "Estimate not found" });
 
     res.json({
-      url: `${getBaseUrl(req)}/e/${est.publicToken}?preview=${mintPreviewGrant(est.id)}`,
+      url: `${getBaseUrl(req)}/e/${est.publicToken}?preview=${mintPreviewGrant("estimate", est.id)}`,
       expiresAt: new Date(Date.now() + PREVIEW_TTL_MS),
     });
   });
@@ -1335,6 +1339,36 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     await db.update(crmCustomers).set({ portalLastSeenAt: new Date() })
       .where(eq(crmCustomers.id, cust.id)).catch(() => {});
 
+    // "Pay" only where the pay route (payments.ts) would actually take the
+    // money: at least its 50-cent minimum due, and the same account +
+    // org-policy rail check (the ACH-only threshold depends on the amount),
+    // resolved once per distinct amount due.
+    const dueOf = (i: typeof crmInvoices.$inferSelect) =>
+      Math.max(0, i.totalCents - (i.retainageCents ?? 0) - (i.paidCents ?? 0));
+    const railsByDue = new Map<number, Promise<boolean>>();
+    const payOnlineFor = (due: number) => {
+      if (!railsByDue.has(due)) {
+        railsByDue.set(due, onlinePaymentRails(org, due)
+          .then((r) => r.ach || r.card)
+          .catch((e: any) => {
+            console.error("[crm] portal payment rails lookup failed:", String(e?.message || e).slice(0, 300));
+            return false;
+          }));
+      }
+      return railsByDue.get(due)!;
+    };
+    const invoiceRows = await Promise.all(invoices.map(async (i) => {
+      const dueCents = dueOf(i);
+      return {
+        id: i.id, number: i.number, title: i.title, status: i.status,
+        totalCents: i.totalCents,
+        dueCents,
+        dueAt: i.dueAt, paidAt: i.paidAt, sentAt: i.sentAt,
+        payOnline: dueCents >= 50 ? await payOnlineFor(dueCents) : false,
+        link: `/i/${i.publicToken}`,
+      };
+    }));
+
     res.json({
       customer: { displayName: cust.displayName, email: cust.email, phone: cust.phone },
       company: {
@@ -1347,13 +1381,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         declinedAt: e.declinedAt, expiresAt: e.expiresAt,
         link: `/e/${e.publicToken}`,
       })),
-      invoices: invoices.map((i) => ({
-        id: i.id, number: i.number, title: i.title, status: i.status,
-        totalCents: i.totalCents,
-        dueCents: Math.max(0, i.totalCents - (i.retainageCents ?? 0) - (i.paidCents ?? 0)),
-        dueAt: i.dueAt, paidAt: i.paidAt, sentAt: i.sentAt,
-        link: `/i/${i.publicToken}`,
-      })),
+      invoices: invoiceRows,
       projects: projects.map((p) => ({
         id: p.id, number: p.number, name: p.name, status: p.status,
         stageLabel: CRM_PROJECT_STAGE_META[p.status]?.label ?? p.status,
@@ -1728,25 +1756,64 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     res.json({ invoice: row, link, emailed, emailError });
   });
 
-  /** Public invoice — email-gated like the estimate. Records opens. */
+  /** Contractor preview: mint a 15-minute read-only grant for the client
+   *  invoice page, like the estimate preview-link above. The public page is
+   *  behind the client's email, so the CRM opens THIS instead. Preview opens
+   *  never count as views or engagement, and the grant cannot pay. */
+  app.post("/api/crm/invoices/:id/preview-link", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageInvoices")) return;
+    // The preview is the full priced invoice; a price-blind seat (seePrices
+    // overridden off) is refused the invoice list, so it can't mint one either.
+    if (!requirePermission(res, ctx, "seePrices")) return;
+    if (!previewSecret()) return res.status(503).json({ message: "Preview is not configured on this server." });
+
+    const [inv] = await db.select().from(crmInvoices)
+      .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
+    if (!inv) return res.status(404).json({ message: "Invoice not found" });
+
+    res.json({
+      url: `${getBaseUrl(req)}/i/${inv.publicToken}?preview=${mintPreviewGrant("invoice", inv.id)}`,
+      expiresAt: new Date(Date.now() + PREVIEW_TTL_MS),
+    });
+  });
+
+  /** Public invoice — email-gated like the estimate. Records opens (never
+   *  for a contractor preview). */
   app.get("/api/public/invoices/:token", async (req: any, res) => {
     const t = String(req.params.token || "");
     if (t.length < 24) return res.status(404).json({ message: "Not found" });
     const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
     if (!inv) return res.status(404).json({ message: "This invoice link is no longer valid." });
 
-    // THE GATE — ahead of everything, the voided state included.
-    if (!(await requireDocSession(req, res, inv.customerId))) return;
-    if (inv.voidedAt) return res.status(410).json({ message: "This invoice has been voided." });
+    // THE GATE — ahead of everything, the voided state included. A contractor
+    // preview grant bypasses it (read-only, untracked); everyone else needs a
+    // client session covering this invoice's customer.
+    const preview = previewGrantValid("invoice", inv.id, String(req.query?.preview || ""));
+    if (!preview && !(await requireDocSession(req, res, inv.customerId))) return;
 
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
+    const division = await resolveInvoiceDivision(inv);
+    // Voided: 410 with only what the page needs to name the company and how
+    // to reach it — never line items or totals (as with an expired estimate).
+    if (inv.voidedAt) {
+      const branding = org ? companyBranding(org, division) : null;
+      return res.status(410).json({
+        message: "This invoice has been voided.",
+        company: { name: branding?.name ?? null, phone: branding?.phone ?? null, email: branding?.email ?? null },
+      });
+    }
+
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
     if (!org || !cust) return res.status(404).json({ message: "Not found" });
-    const division = await resolveInvoiceDivision(inv);
     const items = await db.select().from(crmInvoiceItems)
       .where(eq(crmInvoiceItems.invoiceId, inv.id)).orderBy(asc(crmInvoiceItems.sortOrder));
 
-    if (inv.sentAt && !inv.paidAt) {
+    // Open tracking — a preview-grant open is the contractor, so it skips this.
+    if (!preview && inv.sentAt && !inv.paidAt) {
       const first = inv.firstViewedAt ?? new Date();
       await db.update(crmInvoices).set({
         firstViewedAt: first, viewCount: (inv.viewCount ?? 0) + 1,
@@ -1759,6 +1826,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const [refundSummary] = await invoiceRefundTotals(inv.orgId, [inv]);
     const due = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
     res.json({
+      preview: preview || undefined, // read-only: the page hides pay
       invoice: {
         number: inv.number, title: inv.title, status: inv.status,
         subtotalCents: inv.subtotalCents, discountCents: inv.discountCents,
