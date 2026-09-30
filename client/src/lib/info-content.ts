@@ -149,6 +149,16 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  citations: {
+    title: "Citations",
+    body: [
+      "A citation is any website that lists your business name, address and phone number — directories like Yelp, BBB, Angi, HomeAdvisor, Apple Maps and Bing Places.",
+      "Why it matters: Google checks other sites to confirm your business is real and where it is. Being listed on the important sites — with exactly the same name, address and phone everywhere — helps you rank higher in Google Maps. Mismatched details (an old phone number, a different spelling) do the opposite.",
+      "How to use this: create a campaign, click Build checklist, then for each site click Search. It looks for your business on that site through Google. Mark what you found — listed and correct, listed with wrong info, or not listed — and paste the link to your listing if you have it.",
+      "Then fix anything marked wrong on that site itself, and add your business to the sites where you're not listed. ConstructHUB never guesses: a site stays “Not checked” until you mark it. The Google row fills in automatically when this location is linked to your Google Business Profile.",
+    ],
+  },
+
   "delete-location": {
     title: "Delete this location from ConstructHUB",
     body: [

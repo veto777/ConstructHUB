@@ -2711,38 +2711,41 @@ Rules:
   });
 
   const CITATION_DIRECTORIES = [
-    { name: "Yelp", url: "yelp.com", category: "Review Site", da: 94 },
-    { name: "BBB", url: "bbb.org", category: "Business Directory", da: 91 },
-    { name: "Yellow Pages", url: "yellowpages.com", category: "Business Directory", da: 86 },
-    { name: "Angi", url: "angi.com", category: "Home Services", da: 88 },
-    { name: "HomeAdvisor", url: "homeadvisor.com", category: "Home Services", da: 85 },
-    { name: "Houzz", url: "houzz.com", category: "Home & Design", da: 90 },
-    { name: "Facebook", url: "facebook.com", category: "Social Media", da: 96 },
-    { name: "Nextdoor", url: "nextdoor.com", category: "Community", da: 81 },
-    { name: "Thumbtack", url: "thumbtack.com", category: "Home Services", da: 82 },
-    { name: "MapQuest", url: "mapquest.com", category: "Maps & Navigation", da: 84 },
-    { name: "Superpages", url: "superpages.com", category: "Business Directory", da: 72 },
-    { name: "DexKnows", url: "dexknows.com", category: "Business Directory", da: 60 },
-    { name: "CitySearch", url: "citysearch.com", category: "Local Search", da: 65 },
-    { name: "Manta", url: "manta.com", category: "Business Directory", da: 70 },
-    { name: "MerchantCircle", url: "merchantcircle.com", category: "Business Directory", da: 55 },
-    { name: "Foursquare", url: "foursquare.com", category: "Local Search", da: 88 },
-    { name: "Apple Maps", url: "maps.apple.com", category: "Maps & Navigation", da: 95 },
-    { name: "Bing Places", url: "bing.com", category: "Search Engine", da: 97 },
-    { name: "TripAdvisor", url: "tripadvisor.com", category: "Review Site", da: 93 },
-    { name: "Buildzoom", url: "buildzoom.com", category: "Home Services", da: 62 },
-    { name: "Porch", url: "porch.com", category: "Home Services", da: 70 },
-    { name: "Bark", url: "bark.com", category: "Home Services", da: 65 },
-    { name: "Expertise", url: "expertise.com", category: "Business Directory", da: 68 },
-    { name: "Chamber of Commerce", url: "chamberofcommerce.com", category: "Business Directory", da: 55 },
-    { name: "HotFrog", url: "hotfrog.com", category: "Business Directory", da: 50 },
-    { name: "Brownbook", url: "brownbook.net", category: "Business Directory", da: 52 },
-    { name: "ShowMeLocal", url: "showmelocal.com", category: "Business Directory", da: 48 },
-    { name: "EZLocal", url: "ezlocal.com", category: "Business Directory", da: 45 },
-    { name: "Local.com", url: "local.com", category: "Local Search", da: 58 },
-    { name: "Google My Business", url: "google.com", category: "Search Engine", da: 99 },
+    { name: "Yelp", url: "yelp.com", category: "Review Site" },
+    { name: "BBB", url: "bbb.org", category: "Business Directory" },
+    { name: "Yellow Pages", url: "yellowpages.com", category: "Business Directory" },
+    { name: "Angi", url: "angi.com", category: "Home Services" },
+    { name: "HomeAdvisor", url: "homeadvisor.com", category: "Home Services" },
+    { name: "Houzz", url: "houzz.com", category: "Home & Design" },
+    { name: "Facebook", url: "facebook.com", category: "Social Media" },
+    { name: "Nextdoor", url: "nextdoor.com", category: "Community" },
+    { name: "Thumbtack", url: "thumbtack.com", category: "Home Services" },
+    { name: "MapQuest", url: "mapquest.com", category: "Maps & Navigation" },
+    { name: "Superpages", url: "superpages.com", category: "Business Directory" },
+    { name: "DexKnows", url: "dexknows.com", category: "Business Directory" },
+    { name: "CitySearch", url: "citysearch.com", category: "Local Search" },
+    { name: "Manta", url: "manta.com", category: "Business Directory" },
+    { name: "MerchantCircle", url: "merchantcircle.com", category: "Business Directory" },
+    { name: "Foursquare", url: "foursquare.com", category: "Local Search" },
+    { name: "Apple Maps", url: "maps.apple.com", category: "Maps & Navigation" },
+    { name: "Bing Places", url: "bing.com", category: "Search Engine" },
+    { name: "TripAdvisor", url: "tripadvisor.com", category: "Review Site" },
+    { name: "Buildzoom", url: "buildzoom.com", category: "Home Services" },
+    { name: "Porch", url: "porch.com", category: "Home Services" },
+    { name: "Bark", url: "bark.com", category: "Home Services" },
+    { name: "Expertise", url: "expertise.com", category: "Business Directory" },
+    { name: "Chamber of Commerce", url: "chamberofcommerce.com", category: "Business Directory" },
+    { name: "HotFrog", url: "hotfrog.com", category: "Business Directory" },
+    { name: "Brownbook", url: "brownbook.net", category: "Business Directory" },
+    { name: "ShowMeLocal", url: "showmelocal.com", category: "Business Directory" },
+    { name: "EZLocal", url: "ezlocal.com", category: "Business Directory" },
+    { name: "Local.com", url: "local.com", category: "Local Search" },
+    { name: "Google My Business", url: "google.com", category: "Search Engine" },
   ];
 
+  // Citation checklist. There is no reliable free API that tells us whether a business is listed on each
+  // directory, and guessing is fabrication (CLAUDE.md). So the owner verifies each site via a Google site:
+  // search and records the result; only the Google Business Profile row is filled from real linked data.
   app.post("/api/citations/campaigns/:id/run", async (req, res) => {
     if (!(await requirePremiumPlus(req, res))) return;
     try {
@@ -2750,100 +2753,59 @@ Rules:
       const id = parseInt(req.params.id);
       const [campaign] = await db.select().from(citationCampaigns).where(and(eq(citationCampaigns.id, id), eq(citationCampaigns.userId, user.id)));
       if (!campaign) return res.status(404).json({ message: "Campaign not found" });
-
-      await db.delete(citations).where(eq(citations.campaignId, id));
-
-      runCitationScan(id, campaign.businessName, campaign.address || "", campaign.phone || "")
-        .catch(err => console.error("Citation scan error:", err));
-
-      res.json({ message: "Citation scan started", campaignId: id });
+      const existing = await db.select().from(citations).where(eq(citations.campaignId, id));
+      const have = new Set(existing.map(c => c.siteName));
+      const [loc] = campaign.locationId ? await db.select().from(businessLocations).where(and(eq(businessLocations.id, campaign.locationId), eq(businessLocations.userId, user.id))) : [];
+      for (const dir of CITATION_DIRECTORIES) {
+        if (have.has(dir.name)) continue;
+        const isGoogle = dir.url === "google.com";
+        const linked = isGoogle && !!loc?.gbpLocationName;
+        await db.insert(citations).values({
+          campaignId: id, siteName: dir.name, siteUrl: `https://${dir.url}`,
+          listingUrl: linked ? loc!.googleCid || null : null,
+          isFound: linked ? true : null, napConsistent: null,
+          category: dir.category, domainAuthority: null, lastChecked: linked ? new Date() : null,
+        });
+      }
+      await recountCitations(id);
+      res.json({ message: "Checklist ready", campaignId: id });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
-  async function runCitationScan(campaignId: number, businessName: string, address: string, phone: string) {
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-    let citationsFound = 0;
-    let opportunitiesFound = 0;
-
-    try {
-      for (const dir of CITATION_DIRECTORIES) {
-        try {
-          let isFound = false;
-          let listingUrl: string | null = null;
-          let napConsistent: boolean | null = null;
-
-          if (apiKey) {
-            const searchTerms = [businessName];
-            if (address) searchTerms.push(address.split(",")[0]);
-            const query = `site:${dir.url} ${searchTerms.join(" ")}`;
-            const searchUrl = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${apiKey}&cx=partner-pub-0000000000000000:0000000000&num=3`;
-
-            try {
-              const googleSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${businessName} ${dir.name}`)}&key=${apiKey}`;
-              const searchRes = await fetch(googleSearchUrl);
-              const searchData = await searchRes.json() as any;
-              if (searchData.status === "OK" && searchData.results?.length > 0) {
-                const match = searchData.results.find((r: any) =>
-                  r.name?.toLowerCase().includes(businessName.toLowerCase().substring(0, 10))
-                );
-                if (match) {
-                  isFound = true;
-                  napConsistent = true;
-                  if (address && match.formatted_address) {
-                    const normalizedAddr = address.toLowerCase().replace(/[^a-z0-9]/g, "");
-                    const matchAddr = match.formatted_address.toLowerCase().replace(/[^a-z0-9]/g, "");
-                    napConsistent = matchAddr.includes(normalizedAddr.substring(0, 15));
-                  }
-                }
-              }
-            } catch {
-              isFound = Math.random() > 0.5;
-              napConsistent = isFound ? Math.random() > 0.3 : null;
-            }
-          } else {
-            isFound = Math.random() > 0.4;
-            napConsistent = isFound ? Math.random() > 0.3 : null;
-          }
-
-          if (isFound) citationsFound++;
-          else opportunitiesFound++;
-
-          await db.insert(citations).values({
-            campaignId,
-            siteName: dir.name,
-            siteUrl: `https://${dir.url}`,
-            listingUrl,
-            isFound,
-            napConsistent,
-            category: dir.category,
-            domainAuthority: dir.da,
-            lastChecked: new Date(),
-          });
-
-          await new Promise(r => setTimeout(r, 100));
-        } catch {
-          await db.insert(citations).values({
-            campaignId,
-            siteName: dir.name,
-            siteUrl: `https://${dir.url}`,
-            isFound: false,
-            category: dir.category,
-            domainAuthority: dir.da,
-            lastChecked: new Date(),
-          });
-          opportunitiesFound++;
-        }
-      }
-
-      await db.update(citationCampaigns).set({
-        citationsFound,
-        opportunitiesFound,
-        lastRunAt: new Date(),
-      }).where(eq(citationCampaigns.id, campaignId));
-    } catch (err) {
-      console.error("Citation scan failed:", err);
-    }
+  async function recountCitations(campaignId: number) {
+    const rows = await db.select().from(citations).where(eq(citations.campaignId, campaignId));
+    await db.update(citationCampaigns).set({
+      citationsFound: rows.filter(r => r.isFound === true).length,
+      opportunitiesFound: rows.filter(r => r.isFound === false).length,
+      lastRunAt: new Date(),
+    }).where(eq(citationCampaigns.id, campaignId));
   }
+
+  app.patch("/api/citations/:id", async (req, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    try {
+      const id = parseInt(req.params.id);
+      const body = z.object({
+        status: z.enum(["listed", "wrong", "missing", "unchecked"]),
+        listingUrl: z.string().trim().max(500).url().refine(u => /^https:\/\//i.test(u), "Use an https link").nullable().optional(),
+      }).parse(req.body);
+      const [row] = await db.select({ c: citations, owner: citationCampaigns.userId }).from(citations)
+        .innerJoin(citationCampaigns, eq(citationCampaigns.id, citations.campaignId)).where(eq(citations.id, id));
+      if (!row || row.owner !== user.id) return res.status(404).json({ message: "Not found" });
+      const map = { listed: [true, true], wrong: [true, false], missing: [false, null], unchecked: [null, null] } as const;
+      const [isFound, napConsistent] = map[body.status];
+      const [updated] = await db.update(citations).set({
+        isFound, napConsistent, lastChecked: body.status === "unchecked" ? null : new Date(),
+        ...(body.listingUrl !== undefined ? { listingUrl: body.listingUrl } : {}),
+      }).where(eq(citations.id, id)).returning();
+      await recountCitations(row.c.campaignId);
+      res.json(updated);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message || "Invalid input" });
+      res.status(500).json({ message: err.message });
+    }
+  });
 
   app.get("/api/state-guides", async (_req, res) => {
     const guides = await db.select().from(stateGuides).orderBy(asc(stateGuides.stateName));

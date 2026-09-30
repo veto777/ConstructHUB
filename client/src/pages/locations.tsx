@@ -953,7 +953,13 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-base font-semibold">Citation Campaigns</h3>
+        <div>
+          <div className="flex items-center gap-1">
+            <h3 className="text-base font-semibold">Citation Campaigns</h3>
+            <InfoTip k="citations" />
+          </div>
+          <p className="text-xs text-muted-foreground max-w-xl">A citation is any website that lists your business name, address and phone number — Yelp, BBB, Angi, Apple Maps and so on. Being listed, with the same details everywhere, helps you show up in Google Maps.</p>
+        </div>
         <Button size="sm" onClick={() => setShowNewCampaign(true)} data-testid="button-new-campaign">
           <Plus className="w-4 h-4 mr-1" /> New Campaign
         </Button>
@@ -967,7 +973,7 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
               <Input
                 value={campaignName}
                 onChange={e => setCampaignName(e.target.value)}
-                placeholder="e.g. Q1 2025 Citation Audit"
+                placeholder="e.g. Spring 2026 listings check"
                 data-testid="input-campaign-name"
               />
             </div>
@@ -1012,7 +1018,7 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
                   <div>
                     <p className="text-sm font-medium" data-testid={`text-campaign-name-${campaign.id}`}>{campaign.campaignName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {campaign.citationsFound || 0} found &middot; {campaign.opportunitiesFound || 0} opportunities
+                      {campaign.citationsFound || 0} listed &middot; {campaign.opportunitiesFound || 0} to add
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1040,31 +1046,41 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
 
 function CampaignDetail({ campaign, onBack }: { campaign: CitationCampaign; onBack: () => void }) {
   const { toast } = useToast();
+  const key = ["/api/citations/campaigns", campaign.id, "results"];
+  const { data, isLoading } = useQuery<{ campaign: CitationCampaign; citations: Citation[] }>({ queryKey: key });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: key });
+    queryClient.invalidateQueries({ queryKey: ["/api/citations/campaigns"] });
+  };
 
-  const { data: results, isLoading } = useQuery<Citation[]>({
-    queryKey: ["/api/citations/campaigns", campaign.id, "results"],
+  const buildMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/citations/campaigns/${campaign.id}/run`)).json(),
+    onSuccess: () => { refresh(); toast({ title: "Checklist ready", description: "Use Search on each site, then mark what you find." }); },
+    onError: (err: Error) => toast({ title: "Could not build checklist", description: err.message, variant: "destructive" }),
+  });
+  type Status = "listed" | "wrong" | "missing" | "unchecked";
+  const markMutation = useMutation({
+    mutationFn: async (v: { id: number; status: Status; listingUrl?: string | null }) =>
+      (await apiRequest("PATCH", `/api/citations/${v.id}`, { status: v.status, ...(v.listingUrl !== undefined ? { listingUrl: v.listingUrl } : {}) })).json(),
+    onSuccess: refresh,
+    onError: (err: Error) => toast({ title: "Could not save", description: err.message, variant: "destructive" }),
   });
 
-  const runMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/citations/campaigns/${campaign.id}/run`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/citations/campaigns", campaign.id, "results"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/citations/campaigns"] });
-      toast({ title: "Citation scan complete" });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Scan failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const citations = results || [];
-  const found = citations.filter(c => c.isFound);
-  const notFound = citations.filter(c => !c.isFound);
-  const consistent = found.filter(c => c.napConsistent);
-  const inconsistent = found.filter(c => c.napConsistent === false);
+  const rows = data?.citations ?? [];
+  const statusOf = (c: Citation): Status =>
+    c.isFound === true ? (c.napConsistent === false ? "wrong" : "listed") : c.isFound === false ? "missing" : "unchecked";
+  const count = (st: Status) => rows.filter((r) => statusOf(r) === st).length;
+  const city = campaign.address?.split(",")[1]?.trim() ?? "";
+  const searchUrl = (c: Citation) => {
+    const site = (c.siteUrl || "").replace(/^https?:\/\//, "");
+    return `https://www.google.com/search?q=${encodeURIComponent(`site:${site} "${campaign.businessName}" ${city}`.trim())}`;
+  };
+  const tiles: [Status, string, string][] = [
+    ["listed", "Listed & correct", "text-green-600"],
+    ["wrong", "Listed, wrong info", "text-yellow-600"],
+    ["missing", "Not listed", "text-red-600"],
+    ["unchecked", "Not checked yet", "text-muted-foreground"],
+  ];
 
   return (
     <div className="space-y-4">
@@ -1077,124 +1093,95 @@ function CampaignDetail({ campaign, onBack }: { campaign: CitationCampaign; onBa
           <p className="text-xs text-muted-foreground">{campaign.businessName}</p>
         </div>
         <div className="ml-auto">
-          <Button
-            size="sm"
-            onClick={() => runMutation.mutate()}
-            disabled={runMutation.isPending}
-            data-testid="button-run-scan"
-          >
-            {runMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-            Run Scan
+          <Button size="sm" onClick={() => buildMutation.mutate()} disabled={buildMutation.isPending} data-testid="button-run-scan">
+            {buildMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            {rows.length ? "Update checklist" : "Build checklist"}
           </Button>
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        For each site, click <strong>Search</strong> — it looks for your business on that site through Google. Then mark what you
+        found. ConstructHUB doesn't guess: a site stays “Not checked” until you mark it.
+      </p>
 
-      <div className="grid grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold" data-testid="text-total-checked">{citations.length}</p>
-            <p className="text-[10px] text-muted-foreground">Total Checked</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-green-500" data-testid="text-found-consistent">{consistent.length}</p>
-            <p className="text-[10px] text-muted-foreground">Found & Consistent</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-yellow-500" data-testid="text-found-inconsistent">{inconsistent.length}</p>
-            <p className="text-[10px] text-muted-foreground">Found & Inconsistent</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <p className="text-xl font-bold text-red-500" data-testid="text-not-found">{notFound.length}</p>
-            <p className="text-[10px] text-muted-foreground">Not Found</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {tiles.map(([st, label, color]) => (
+          <Card key={st}>
+            <CardContent className="p-3 text-center">
+              <p className={`text-xl font-bold ${color}`} data-testid={`text-citations-${st}`}>{count(st)}</p>
+              <p className="text-[10px] text-muted-foreground">{label}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {isLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
-      ) : citations.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          <p className="text-sm">No results yet. Click "Run Scan" to check citation directories.</p>
+          <p className="text-sm">Click “Build checklist” to list the 30 sites contractors should be on.</p>
         </div>
       ) : (
-        <Card>
+        <Card className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Directory</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>NAP Consistent</TableHead>
-                <TableHead>Domain Authority</TableHead>
-                <TableHead>Listing</TableHead>
+                <TableHead>Site</TableHead>
+                <TableHead>Find it</TableHead>
+                <TableHead>What you found</TableHead>
+                <TableHead>Your listing</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {citations.map(cit => {
-                let statusColor = "text-red-500";
-                let statusBg = "bg-red-500/10";
-                if (cit.isFound && cit.napConsistent) {
-                  statusColor = "text-green-500";
-                  statusBg = "bg-green-500/10";
-                } else if (cit.isFound && !cit.napConsistent) {
-                  statusColor = "text-yellow-500";
-                  statusBg = "bg-yellow-500/10";
-                }
-
-                return (
-                  <TableRow key={cit.id} data-testid={`row-citation-${cit.id}`}>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm font-medium">{cit.siteName}</p>
-                        {cit.siteUrl && (
-                          <p className="text-[10px] text-muted-foreground">{cit.siteUrl}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`text-[10px] ${statusBg} ${statusColor}`}>
-                        {cit.isFound ? "Found" : "Not Found"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {cit.isFound ? (
-                        cit.napConsistent ? (
-                          <Check className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <X className="w-4 h-4 text-yellow-500" />
-                        )
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{cit.domainAuthority || "-"}</span>
-                    </TableCell>
-                    <TableCell>
-                      {cit.listingUrl ? (
-                        <a
-                          href={cit.listingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 text-xs flex items-center gap-1"
-                          data-testid={`link-listing-${cit.id}`}
-                        >
-                          View <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {rows.map((c) => (
+                <TableRow key={c.id} data-testid={`row-citation-${c.id}`}>
+                  <TableCell>
+                    <p className="text-sm font-medium">{c.siteName}</p>
+                    <p className="text-[10px] text-muted-foreground">{c.category}</p>
+                  </TableCell>
+                  <TableCell>
+                    <a href={searchUrl(c)} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs inline-flex items-center gap-1" data-testid={`link-search-${c.id}`}>
+                      Search <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </TableCell>
+                  <TableCell>
+                    <select
+                      className="border rounded px-2 py-1 text-xs bg-background"
+                      value={statusOf(c)}
+                      disabled={markMutation.isPending}
+                      onChange={(e) => markMutation.mutate({ id: c.id, status: e.target.value as Status })}
+                      data-testid={`select-citation-${c.id}`}
+                      aria-label={`Status on ${c.siteName}`}
+                    >
+                      <option value="unchecked">Not checked</option>
+                      <option value="listed">Listed ✓ (details correct)</option>
+                      <option value="wrong">Listed — wrong name/address/phone</option>
+                      <option value="missing">Not listed</option>
+                    </select>
+                  </TableCell>
+                  <TableCell>
+                    {c.listingUrl ? (
+                      <a href={c.listingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs inline-flex items-center gap-1" data-testid={`link-listing-${c.id}`}>
+                        View <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : statusOf(c) === "listed" || statusOf(c) === "wrong" ? (
+                      <Input
+                        className="h-7 text-xs"
+                        placeholder="Paste listing link (https://…)"
+                        onBlur={(e) => {
+                          const v = e.target.value.trim();
+                          if (v) markMutation.mutate({ id: c.id, status: statusOf(c), listingUrl: v });
+                        }}
+                        data-testid={`input-listing-${c.id}`}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </Card>
