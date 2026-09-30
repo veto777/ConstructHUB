@@ -165,6 +165,14 @@ export async function registerRoutes(
   const { registerContentUpload } = await import("./gbp/content-upload");
   registerContentUpload(app, getDevUser);
   startContentWorker();
+  const { ensureProfileGuardSchema } = await import("./gbp/guard-schema");
+  await ensureProfileGuardSchema();
+  const { registerProfileGuardRoutes } = await import("./gbp/guard-routes");
+  registerProfileGuardRoutes(app, getDevUser);
+  const { startGuardWorker } = await import("./gbp/guard");
+  const { startReplyWorker } = await import("./gbp/review-automation");
+  startGuardWorker();
+  startReplyWorker();
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
   const { startGbpWorker } = await import("./gbp/service");

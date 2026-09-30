@@ -1,5 +1,5 @@
-import { logActivity } from '../account-events';
 import { pool } from '../db';
+import { logActivity, notifyUser } from '../account-events';
 import { GoogleClient, GoogleError, mapLocation, mapPerformance, mapProfile, performancePath, resource, PROFILE_READ_MASK } from './client';
 import { accessToken, grantUsable, invalidate, soleSubject } from './grants';
 import type { PoolClient } from 'pg';
@@ -73,7 +73,7 @@ export async function ownedLocation(userId: number, id: number) {
   resource(l.gbp_account_name,'accounts'); resource(l.gbp_location_name,'locations'); return l;
 }
 // A session advisory lock serializes sync and reply changes across worker/manual requests and processes.
-async function withLocationLock<T>(id: number, fn: (connection: PoolClient) => Promise<T>) {
+export async function withLocationLock<T>(id: number, fn: (connection: PoolClient) => Promise<T>) {
   const c = await pool.connect();
   try {
     const {rows:[r]} = await c.query('SELECT pg_try_advisory_lock(7142,$1) AS locked',[id]);
@@ -133,6 +133,8 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           } catch(e) { await c.query('ROLLBACK'); throw e; }
           await c.query(`UPDATE business_locations SET review_count=s.n,avg_rating=s.avg,updated_at=now() FROM
             (SELECT count(*)::int n, round(avg(rating)::numeric,2)::real avg FROM google_profile_reviews WHERE user_id=$2 AND location_id=$1 AND NOT google_deleted AND google_review_id LIKE 'accounts/%') s WHERE id=$1`,[id,userId]);
+          const { notifyNewReviews } = await import('./review-automation');
+          await notifyNewReviews(userId,id);
           result.reviews = {count:reviews.length};
         } else {
           const {rows:[s]} = await c.query('SELECT cursor_date::text FROM gbp_sync_status WHERE location_id=$1 AND kind=$2',[id,kind]);
@@ -169,13 +171,17 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
     return result;
   });
 }
-export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client?: GoogleClient,req?: any) {
+export async function reply(userId: number,id: number,comment: string, action: 'draft'|'publish'|'delete',client?: GoogleClient, opts: { req?: any; expectedDraft?: string } = {}) {
+  const { req, expectedDraft } = opts;
   if(typeof comment !== 'string' || comment.length > 4096 || (action==='publish' && !comment.trim())) throw new GoogleError('invalid','Reply must contain 1–4096 characters',400);
   const {rows:[review]} = await pool.query('SELECT * FROM google_profile_reviews WHERE id=$1 AND user_id=$2',[id,userId]);
   if(!review) throw new GoogleError('invalid','Review not found',404);
   if(action==='draft') {
-    const {rows:[r]} = await pool.query('UPDATE google_profile_reviews SET reply_draft=$3,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *',[id,userId,comment||null]);
-    return {replyStatus:r.reply_status,replyDraft:r.reply_draft};
+    const save = async () => {
+      const {rows:[r]} = await pool.query('UPDATE google_profile_reviews SET reply_draft=$3,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *',[id,userId,comment||null]);
+      return {replyStatus:r.reply_status,replyDraft:r.reply_draft};
+    };
+    return review.location_id ? withLocationLock(review.location_id,save) : save();
   }
   const l = await ownedLocation(userId,review.location_id);
   const subject = l.gbp_google_subject ?? await soleSubject(userId);
@@ -183,6 +189,10 @@ export async function reply(userId: number,id: number,comment: string, action: '
   client ??= clientFor(userId, subject);
   if(review.google_deleted || !review.google_review_id?.startsWith(`${l.gbp_account_name}/${l.gbp_location_name}/reviews/`)) throw new GoogleError('invalid','This review is not an active Google review. Save a draft instead.',400);
   return withLocationLock(l.id,async c => {
+    if(expectedDraft!==undefined) {
+      const {rows:[fresh]}=await c.query('SELECT reply_comment,reply_draft,google_deleted FROM google_profile_reviews WHERE id=$1 AND user_id=$2',[id,userId]);
+      if(!fresh||fresh.reply_comment||fresh.google_deleted||fresh.reply_draft!==expectedDraft)throw new GoogleError('invalid','Review changed while generating. Review it manually.',409);
+    }
     // Keep the last confirmed reply intact until Google acknowledges the operation.
     if(action==='publish') await c.query('UPDATE google_profile_reviews SET reply_draft=$2 WHERE id=$1',[id,comment]);
     try {
@@ -190,7 +200,8 @@ export async function reply(userId: number,id: number,comment: string, action: '
       if(action==='publish' && typeof response.comment !== 'string') throw new GoogleError('transient','Google did not confirm the reply. Sync before retrying.',503);
       const {rows:[r]} = await c.query(`UPDATE google_profile_reviews SET reply_comment=$2,reply_date=$3,reply_status=$4,reply_draft=NULL,reply_error=NULL,updated_at=now() WHERE id=$1 RETURNING *`,
         [id,action==='delete'?null:response.comment,action==='delete'?null:response.updateTime||new Date(),action==='delete'?'draft':'posted']);
-      await logActivity(req ?? null,userId,action==='delete'?'gbp.reply_deleted':'gbp.reply_posted',{reviewId:id,locationId:l.id});
+      await logActivity(req ?? null,userId,action==='delete'?'gbp.reply_deleted':'gbp.reply_posted',{reviewId:id,locationId:l.id,ai:expectedDraft!==undefined});
+      if(action==='publish') await notifyUser(userId,'gbp.reply_posted',{title:'Reply posted to Google',body:l.business_name,link:'/google-reviews'});
       return {replyStatus:r.reply_status,replyComment:r.reply_comment};
     } catch(e) {
       await c.query('UPDATE google_profile_reviews SET reply_error=$2 WHERE id=$1',[id,publicError(e).message]);
@@ -229,6 +240,7 @@ export async function autoLinkAndSync(userId: number, subject: string) {
 
 /** Stop syncing one location: drop its Google link and the Google data synced for it; keep the row. */
 export async function unlinkLocation(userId: number, id: number) {
+  return withLocationLock(id, async () => {
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
@@ -237,7 +249,11 @@ export async function unlinkLocation(userId: number, id: number) {
     await c.query(`DELETE FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'`,[userId,id]);
     await c.query('DELETE FROM gbp_daily_metrics WHERE location_id=$1',[id]);
     await c.query('DELETE FROM gbp_sync_status WHERE location_id=$1',[id]);
+    await c.query('DELETE FROM gbp_guard WHERE user_id=$1 AND location_id=$2',[userId,id]);
+    await c.query('DELETE FROM gbp_guard_changes WHERE user_id=$1 AND location_id=$2',[userId,id]);
+    await c.query('DELETE FROM gbp_reply_settings WHERE user_id=$1 AND location_id=$2',[userId,id]);
     await c.query('COMMIT');
   } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
   return { unlinked: true };
+  });
 }

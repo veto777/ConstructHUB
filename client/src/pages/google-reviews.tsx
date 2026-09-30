@@ -1,3 +1,5 @@
+import { GoogleReport } from "@/components/profile-guard";
+import { AiReplySettings } from "@/components/ai-review-replies";
 import { GbpConnection } from "@/components/gbp-connection";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1918,6 +1920,7 @@ function GoogleProfileReviewsTab() {
   return (
     <div className="space-y-6 relative z-10">
       <GbpConnection />
+      <AiReplySettings locations={locations} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Search</Label>
@@ -2254,6 +2257,7 @@ function GoogleProfileReviewsTab() {
                       </div>
                     )}
 
+                    <GoogleReport type="reviews" id={review.id} />
                     {!review.googleReviewId && <p className="text-xs text-muted-foreground">Manually entered record — not synced from Google.</p>}
                     {review.replyDraft && <p className="p-3 text-sm">Draft saved in ConstructHUB: {review.replyDraft}</p>}
                     {review.replyError && <p role="alert" className="text-destructive">{review.replyError}</p>}

@@ -98,8 +98,8 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
   });
   route('post','/api/gbp/locations/:id/unlink',async(req,res,id)=>res.json(await unlinkLocation(id,Number(req.params.id))));
   route('post','/api/gbp/locations/:id/sync',async(req,res,id)=>res.json(await syncLocation(id,Number(req.params.id))));
-  route('patch','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),req.body.replyComment,req.body.action==='publish'?'publish':'draft',undefined,req)));
-  route('delete','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),'','delete',undefined,req)));
+  route('patch','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),req.body.replyComment,req.body.action==='publish'?'publish':'draft',undefined,{req})));
+  route('delete','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),'','delete',undefined,{req})));
   route('get','/api/gbp/locations/:id/performance',async(req,res,userId)=>{
     const id=Number(req.params.id);
     const {rows:[l]}=await pool.query('SELECT id FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);
