@@ -12,7 +12,9 @@ export const replySettingsSchema=z.object({
   maxLength:z.number().int().min(100).max(2000).default(600),
   allowLowRatingAuto:z.boolean().default(false),
   starRules:z.object({'1':z.string().max(500).default('Acknowledge concerns without promises'), '2':z.string().max(500).default('Acknowledge concerns without promises'), '3':z.string().max(500).default(''), '4':z.string().max(500).default(''), '5':z.string().max(500).default('')}).default({}),
-}).strict();
+}).strict().refine(s=>s.signOff.length<=s.maxLength, {
+  path:['signOff'],message:'Sign-off must fit within the maximum reply length',
+});
 export type ReplySettings=z.infer<typeof replySettingsSchema>;
 export const defaults=replySettingsSchema.parse({});
 export const shouldAutoPublish=(s:ReplySettings,rating:number)=>s.mode==='auto'&&(rating>2||s.allowLowRatingAuto);
