@@ -161,6 +161,24 @@ describe('real lane DB and mocked provider integration', () => {
         expect(row.status).toBe('queued');
         expect(new Date(row.due_at).getTime()).toBeGreaterThan(Date.now());
     });
+    it('moves a later moderation rejection out of published history and alerts only once', async () => {
+        const [job] = await enqueue(user, location, { requestKey: randomUUID(), items: [{ kind: 'post', summary: 'Moderation fixture' }], schedule: due });
+        await runContentWorker(make);
+        const rejectedApp = express();
+        registerContentRoutes(rejectedApp, () => ({ id: user }), ai, () => ({request: async () => ({state:'REJECTED'})}) as any);
+        const originalApp = app;
+        app = rejectedApp;
+        try {
+            await call('/refresh', {});
+            const row = (await pool.query('SELECT * FROM gbp_content_jobs WHERE id=$1',[job.id])).rows[0];
+            expect(row).toMatchObject({status:'rejected',google_status:'REJECTED'});
+            expect(row.error).toContain('corrected post');
+            const count = async () => Number((await pool.query("SELECT count(*) FROM user_notifications WHERE user_id=$1 AND kind='gbp.post_failed'",[user])).rows[0].count);
+            const first = await count();
+            await call('/refresh', {});
+            expect(await count()).toBe(first);
+        } finally { app = originalApp; }
+    });
     it('honors provider failure details and redacts the bearer token', async () => {
         const request = vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Invalid photo size; fixture-secret', code: 400 } }), { status: 400 }));
         const c = new GoogleClient(async () => 'fixture-secret', request, new Limiter(() => 0, async () => { }));

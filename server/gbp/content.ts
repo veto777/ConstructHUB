@@ -283,7 +283,15 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
                 continue;
             try {
                 const post = await client.request('reviews', `/v4/${job.google_name}`);
-                await pool.query('UPDATE gbp_content_jobs SET google_status=$2,error=NULL WHERE id=$1', [job.id, post.state || null]);
+                if (post.state === 'REJECTED') {
+                    const changed = await pool.query("UPDATE gbp_content_jobs SET google_status=$2,status='rejected',error=$3 WHERE id=$1 AND status='published' RETURNING id", [job.id, post.state,
+                        'Google rejected this post. Review Google content policies and compose a corrected post.']);
+                    if (!changed.rowCount) continue;
+                    await notifyUser(u, 'gbp.post_failed', { title: 'Google rejected your post', body: 'Review the content and compose a corrected post.', link: '/gbp-content', severity: 'warning' }).catch(() => {});
+                    await logActivity(null, u, 'gbp.content_rejected', { jobId: job.id, locationId: l, googleName: job.google_name }).catch(() => {});
+                } else {
+                    await pool.query('UPDATE gbp_content_jobs SET google_status=$2,error=NULL WHERE id=$1', [job.id, post.state || null]);
+                }
             }
             catch (e) {
                 await pool.query('UPDATE gbp_content_jobs SET error=$2 WHERE id=$1', [job.id, e instanceof GoogleError ? e.message : 'Google status unavailable']);
