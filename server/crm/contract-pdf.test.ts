@@ -11,6 +11,7 @@ import {
   contractAdminRecipients,
   contractFileName,
   selectedDiscountDetails,
+  pdfText,
   type ContractPdfInput,
 } from "./contract-pdf";
 
@@ -224,5 +225,81 @@ describe("selectedDiscountDetails", () => {
     expect(selectedDiscountDetails(null)).toEqual([]);
     expect(selectedDiscountDetails("junk")).toEqual([]);
     expect(selectedDiscountDetails([{ code: "x" }])).toEqual([]);
+  });
+});
+
+/** Each text object's baseline y (PDF units, up is +) and its decoded text. */
+function positioned(pdf: Buffer): { y: number; text: string }[] {
+  const out: { y: number; text: string }[] = [];
+  for (const m of pdf.toString("latin1").matchAll(/BT([\s\S]*?)ET/g)) {
+    const tm = /([\d.-]+) ([\d.-]+) Tm/.exec(m[1]);
+    let t = "";
+    for (const a of m[1].matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+      for (const h of a[1].matchAll(/<([0-9a-fA-F]+)>/g)) t += Buffer.from(h[1], "hex").toString("latin1");
+    }
+    if (tm) out.push({ y: Number(tm[2]), text: t });
+  }
+  return out;
+}
+
+describe("pdfText — WinAnsi-safe text", () => {
+  it("turns tabs into spaces, CRLF into LF, drops control chars, and maps U+2212", () => {
+    expect(pdfText("1)\tChecks.")).toBe("1)    Checks.");
+    expect(pdfText("a\r\nb\rc")).toBe("a\nb\nc");
+    expect(pdfText("x\u0007y−z")).toBe("xy-z");
+    expect(pdfText(null)).toBe("");
+  });
+});
+
+describe("contract totals block (QA c13 F05)", () => {
+  const oneDiscount: ContractPdfInput = {
+    ...INPUT,
+    estimate: {
+      ...INPUT.estimate,
+      subtotalCents: 25_000_00, discountCents: 0, taxCents: 0, totalCents: 25_000_00,
+      approvedTotalCents: 24_500_00,
+      selectedDiscounts: [{ id: "d2", code: "military", label: "Military discount", percentBps: 200 }],
+      termsText: "TERMS AND CONDITIONS:\n1)\tChecks. All checks shall be made payable to Aspire.\n2)\tTime Frame.",
+    },
+    terms: null,
+    approval: { optionalDiscountCents: 500_00, taxCents: 0 },
+  };
+
+  it("terms with TAB characters print as readable text", async () => {
+    const t = flat(await buildContractPdf(oneDiscount, { compress: false }));
+    expect(t).toContain("1) Checks. All checks shall be made payable to Aspire.");
+    expect(t).toContain("2) Time Frame.");
+  });
+
+  it("the optional-discount row prints its amount, and the next row starts below its wrapped label", async () => {
+    const rows = positioned(await buildContractPdf(oneDiscount, { compress: false }));
+    const label = rows.filter((r) => /Optional discount|discount \(-2%\)/.test(r.text));
+    const approved = rows.find((r) => r.text === "Approved total");
+    expect(label.length).toBeGreaterThan(0);
+    expect(approved).toBeTruthy();
+    // PDF y grows upward: every line of the wrapped label sits ABOVE the next row.
+    for (const l of label) expect(l.y).toBeGreaterThan(approved!.y + 5);
+    expect(rows.some((r) => r.text === "-$500.00")).toBe(true);
+    expect(rows.some((r) => r.text === "$24,500.00")).toBe(true);
+  });
+
+  it("several discounts: labels only per offer, one combined amount, and the reduced-base tax", async () => {
+    const pdf = await buildContractPdf({
+      ...INPUT,
+      approval: { optionalDiscountCents: 330_00, taxCents: 1_067_00 },
+    }, { compress: false });
+    const t = flat(pdf);
+    expect(t).toContain("Marketing discount");
+    expect(t).toContain("Military discount");
+    expect(t).toContain("Optional discounts");
+    expect(t).toContain("-$330.00");
+    expect(t).toContain("$1,067.00"); // tax on the reduced base, not the quoted $1,100.00
+    expect(t).not.toContain("$1,100.00");
+  });
+
+  it("without a verified breakdown it prints labels only — never an invented amount", async () => {
+    const t = flat(await buildContractPdf({ ...oneDiscount, approval: null }, { compress: false }));
+    expect(t).toContain("Military discount");
+    expect(t).not.toContain("-$500.00");
   });
 });

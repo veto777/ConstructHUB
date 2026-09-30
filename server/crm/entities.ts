@@ -22,11 +22,15 @@ import {
   crmEstimateEvents, crmLeadSources, crmInvoices, crmInvoiceItems,
   crmEstimateOptions, crmEstimateDiscounts, crmEngagementSessions,
   crmPayments, crmCustomerNotes, crmClientComments, crmFinanceClicks,
-  crmAttachments,
+  crmAttachments, crmAppointments, crmChangeOrders, crmPunchItems,
+  crmDailyLogs, crmSelections, crmBudgetLines, crmCommitments,
+  crmCostEntries, crmPhases, crmMeasurements,
   CRM_PROJECT_STATUSES, CRM_JOB_STATUSES, CRM_LINE_ITEM_KINDS,
   CRM_PROJECT_STAGE_META, CRM_ESTIMATE_STATUSES, CRM_INVOICE_STATUSES,
 } from "@shared/schema";
-import { and, eq, desc, asc, ilike, or, sql, isNull, inArray, gte, lte } from "drizzle-orm";
+import {
+  and, eq, desc, asc, ilike, or, sql, isNull, isNotNull, inArray, gte, lte, lt,
+} from "drizzle-orm";
 import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
@@ -53,6 +57,108 @@ interface DocQuery {
   to: Date | null;
   q: string;
   sort: "newest" | "oldest" | "largest";
+  /** Page window. The default (500 from 0) is the historical cap. */
+  limit: number;
+  offset: number;
+}
+
+/**
+ * A user's search text as a LIKE/ILIKE "contains" pattern. %, _ and \ are
+ * escaped, so a search for "%" finds a literal percent sign instead of
+ * matching every row.
+ */
+export function likeContains(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+}
+
+// ── Estimate expiry ─────────────────────────────────────────────────────────
+
+/**
+ * Sent estimates expire. Default: 7 days from the moment it is sent — long
+ * enough to decide, short enough that pricing doesn't go stale. Stamped at
+ * send time (not at create), so a draft sitting in the pipeline doesn't burn
+ * its validity window before the client ever sees it. (portal.ts re-exports
+ * both — the send route is their main user.)
+ */
+export const ESTIMATE_EXPIRY_DAYS = 7;
+export function estimateExpiryOnSend(sentAt: Date, days: number = ESTIMATE_EXPIRY_DAYS): Date {
+  return new Date(sentAt.getTime() + days * 86_400_000);
+}
+
+/**
+ * "Expired" is DERIVED, never written by a job: an estimate that went out
+ * (sent/viewed), was never answered, and is past its expiry date. Same idea
+ * as an invoice's derived "overdue".
+ */
+export function estimateIsExpired(
+  e: { status: string; expiresAt: Date | null; approvedAt: Date | null; declinedAt: Date | null },
+  now: Date = new Date(),
+): boolean {
+  if (e.status === "expired") return true;
+  return (e.status === "sent" || e.status === "viewed") &&
+    !!e.expiresAt && e.expiresAt.getTime() < now.getTime() &&
+    !e.approvedAt && !e.declinedAt;
+}
+
+// ── Estimate totals (pure) ──────────────────────────────────────────────────
+
+type TotalsLine = { kind: string; unitPriceCents: number; quantityMilli: number; taxable: boolean };
+
+/** The recalcEstimate math as a pure function — integer cents, rounded once per step. */
+export function estimateTotals(items: TotalsLine[], taxRateBps: number) {
+  let subtotal = 0, taxable = 0, discount = 0;
+  for (const i of items) {
+    const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
+    if (i.kind === "discount") { discount += Math.abs(line); continue; }
+    subtotal += line;
+    if (i.taxable) taxable += line;
+  }
+  const taxBase = Math.max(0, taxable - discount);
+  const tax = Math.round((taxBase * (taxRateBps || 0)) / 10000);
+  const total = Math.max(0, subtotal - discount + tax);
+  return { subtotalCents: subtotal, discountCents: discount, taxCents: tax, totalCents: total };
+}
+
+const usd = (c: number) =>
+  `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Why a deposit is not acceptable, or null. The public pay route charges the
+ * deposit whenever one is set, so a deposit above the total would bill the
+ * client more than the whole job.
+ */
+export function depositRefusal(depositCents: number | null | undefined, totalCents: number): string | null {
+  if (!depositCents || depositCents <= 0) return null;
+  if (depositCents > totalCents) {
+    return `The deposit (${usd(depositCents)}) can't be more than the estimate total (${usd(totalCents)}).`;
+  }
+  return null;
+}
+
+// ── Document numbers ────────────────────────────────────────────────────────
+
+/**
+ * The next per-org document number ("E-1234", "P-1001"): one more than the
+ * highest number already issued with that prefix, taken under a per-org,
+ * per-prefix transaction advisory lock. Call it INSIDE the transaction that
+ * inserts the row, so two concurrent creates serialise on the lock instead of
+ * reading the same value — and a hard delete can never hand out a number that
+ * is still in use (count(*)+1 did both). The first number is base+1.
+ */
+export async function nextDocNumber(
+  tx: any,
+  table: typeof crmEstimates | typeof crmProjects,
+  orgId: string,
+  prefix: string,
+  base = 1000,
+): Promise<string> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`crm-doc-number:${orgId}:${prefix}`}))`);
+  const pattern = `^${prefix}-([0-9]{1,15})$`;
+  const [row] = await tx.select({
+    max: sql<string | number | null>`max((substring(${table.number} from ${pattern}))::bigint)`,
+  }).from(table).where(eq(table.orgId, orgId));
+  const highest = Number(row?.max ?? 0) || 0;
+  return `${prefix}-${Math.max(highest, base) + 1}`;
 }
 
 /**
@@ -91,6 +197,10 @@ function parseDocQuery(
   };
 
   const sortRaw = String(query.sort || "newest");
+  const int = (v: any, dflt: number, min: number, max: number) => {
+    const n = parseInt(String(v ?? ""), 10);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : dflt;
+  };
   return {
     statuses,
     dateField: query.dateField === "sent" ? "sent" : "created",
@@ -98,6 +208,8 @@ function parseDocQuery(
     to: parseDate(query.to, true),
     q: String(query.q || "").trim().slice(0, 200),
     sort: sortRaw === "oldest" || sortRaw === "largest" ? sortRaw : "newest",
+    limit: int(query.limit, 500, 1, 500),
+    offset: int(query.offset, 0, 0, 1_000_000),
   };
 }
 
@@ -129,12 +241,24 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     taxCents: money ? e.taxCents : undefined,
     totalCents: money ? e.totalCents : undefined,
     depositCents: money ? e.depositCents : undefined,
+    // What the client actually signed for: the total after any optional
+    // discounts they ticked (null until approval), and those discounts.
+    approvedTotalCents: money ? e.approvedTotalCents : undefined,
+    selectedDiscounts: money ? e.selectedDiscounts : undefined,
     sentAt: e.sentAt, sentToEmail: e.sentToEmail,
     firstViewedAt: e.firstViewedAt, lastViewedAt: e.lastViewedAt, viewCount: e.viewCount,
     approvedAt: e.approvedAt, declinedAt: e.declinedAt, declineReason: e.declineReason,
     signatureName: e.signatureName, expiresAt: e.expiresAt,
+    // Derived: out, unanswered and past its expiry date (see estimateIsExpired).
+    expired: estimateIsExpired(e),
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
+}
+
+/** Documents Center rows: the list never renders intro/terms, so they don't ship. */
+function presentEstimateRow(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
+  const { introText: _intro, termsText: _terms, ...row } = presentEstimate(e, ctx);
+  return row;
 }
 
 function presentProject(p: typeof crmProjects.$inferSelect, ctx: OrgContext) {
@@ -156,20 +280,10 @@ async function recalcEstimate(orgId: string, estimateId: string) {
     .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.id, estimateId))).limit(1);
   if (!est) return null;
 
-  let subtotal = 0, taxable = 0, discount = 0;
-  for (const i of items) {
-    const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
-    if (i.kind === "discount") { discount += Math.abs(line); continue; }
-    subtotal += line;
-    if (i.taxable) taxable += line;
-  }
-  const taxBase = Math.max(0, taxable - discount);
-  const tax = Math.round((taxBase * (est.taxRateBps || 0)) / 10000);
-  const total = Math.max(0, subtotal - discount + tax);
-
+  const t = estimateTotals(items, est.taxRateBps || 0);
   const [row] = await db.update(crmEstimates).set({
-    subtotalCents: subtotal, discountCents: discount, taxCents: tax,
-    totalCents: total, updatedAt: new Date(),
+    subtotalCents: t.subtotalCents, discountCents: t.discountCents, taxCents: t.taxCents,
+    totalCents: t.totalCents, updatedAt: new Date(),
   }).where(eq(crmEstimates.id, estimateId)).returning();
   return row;
 }
@@ -311,39 +425,80 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
   app.get("/api/crm/customers", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
-    const q = String(req.query.q || "").trim();
+    const q = String(req.query.q || "").trim().slice(0, 200);
     const where = [eq(crmCustomers.orgId, ctx.org.id), isNull(crmCustomers.archivedAt)];
     if (q) {
-      where.push(or(
-        ilike(crmCustomers.displayName, `%${q}%`),
-        ilike(crmCustomers.email, `%${q}%`),
-        ilike(crmCustomers.phone, `%${q}%`),
-        ilike(crmCustomers.addressLine1, `%${q}%`),
-      ) as any);
+      // Wildcards in the search text are literal; city / ZIP / company match
+      // too; and a phone typed any way ("5035599433", "(503) 559-9433")
+      // matches the stored number digit-for-digit.
+      const pat = likeContains(q);
+      const conds: any[] = [
+        ilike(crmCustomers.displayName, pat),
+        ilike(crmCustomers.email, pat),
+        ilike(crmCustomers.phone, pat),
+        ilike(crmCustomers.addressLine1, pat),
+        ilike(crmCustomers.city, pat),
+        ilike(crmCustomers.postalCode, pat),
+        ilike(crmCustomers.companyName, pat),
+      ];
+      const digits = q.replace(/\D/g, "");
+      if (digits.length >= 4 && /^[\d\s().+-]+$/.test(q)) {
+        conds.push(sql`regexp_replace(coalesce(${crmCustomers.phone}, ''), '[^0-9]', '', 'g') like ${`%${digits}%`}`);
+      }
+      where.push(or(...conds) as any);
     }
+
+    // Bid outcome per client, for the Won / Undecided / Declined tabs: any
+    // approved estimate wins; else an open (sent/viewed) one means undecided;
+    // else any declined means declined; no bids → "none".
+    const outcomesFor = async (ids: string[]) => {
+      const outcome = new Map<string, string>();
+      for (let i = 0; i < ids.length; i += 1000) {
+        const chunk = ids.slice(i, i + 1000);
+        const agg = await db.select({
+          customerId: crmEstimates.customerId,
+          approved: sql<number>`count(*) filter (where ${crmEstimates.status} = 'approved')::int`,
+          open: sql<number>`count(*) filter (where ${crmEstimates.status} in ('sent','viewed'))::int`,
+          declined: sql<number>`count(*) filter (where ${crmEstimates.status} = 'declined')::int`,
+        }).from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.customerId, chunk)))
+          .groupBy(crmEstimates.customerId);
+        for (const a of agg) {
+          outcome.set(a.customerId,
+            a.approved > 0 ? "won" : a.open > 0 ? "undecided" : a.declined > 0 ? "declined" : "none");
+        }
+      }
+      return outcome;
+    };
+    // The client list itself is shareable with a PM; pricing lives elsewhere.
+    const present = (rows: (typeof crmCustomers.$inferSelect)[], outcome: Map<string, string>) =>
+      rows.map((c) => ({ ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none" }));
+
+    // Paged mode (opt-in with ?paged=1, or any limit/offset): { rows, total,
+    // bidCounts, limit, offset }. total and bidCounts cover EVERY client the
+    // caller may see (under the same search), not just the returned page, so
+    // the list can say "Showing 100 of 2,527" and the tabs count the whole book.
+    const paged = req.query.paged === "1" || req.query.limit !== undefined || req.query.offset !== undefined;
+    if (paged) {
+      const int = (v: any, dflt: number, min: number, max: number) => {
+        const n = parseInt(String(v ?? ""), 10);
+        return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : dflt;
+      };
+      const limit = int(req.query.limit, 100, 1, 500);
+      const offset = int(req.query.offset, 0, 0, 1_000_000);
+      const all = await objectPolicy(ctx).filter("customers",
+        await db.select().from(crmCustomers).where(and(...where)).orderBy(desc(crmCustomers.createdAt)));
+      const outcome = await outcomesFor(all.map((c) => c.id));
+      const bidCounts = { won: 0, undecided: 0, declined: 0, none: 0 } as Record<string, number>;
+      for (const c of all) bidCounts[outcome.get(c.id) ?? "none"] += 1;
+      const page = all.slice(offset, offset + limit);
+      return res.json({ rows: present(page, outcome), total: all.length, bidCounts, limit, offset });
+    }
+
+    // Legacy shape: bare array of the newest 500 (every picker relies on it).
     let rows = await db.select().from(crmCustomers).where(and(...where))
       .orderBy(desc(crmCustomers.createdAt)).limit(500);
     rows = await objectPolicy(ctx).filter("customers", rows);
-    // Bid outcome per client, for the Won / Undecided / Declined tabs: any
-    // approved estimate wins; else an open (sent/viewed) one means undecided;
-    // else any declined means declined; no bids → null. Scoped to the listed
-    // page — aggregating the whole org's estimates on every list call is
-    // wasted work once an org outgrows the 500-row page.
-    const listedIds = rows.map((c) => c.id);
-    const agg = listedIds.length === 0 ? [] : await db.select({
-      customerId: crmEstimates.customerId,
-      approved: sql<number>`count(*) filter (where ${crmEstimates.status} = 'approved')::int`,
-      open: sql<number>`count(*) filter (where ${crmEstimates.status} in ('sent','viewed'))::int`,
-      declined: sql<number>`count(*) filter (where ${crmEstimates.status} = 'declined')::int`,
-    }).from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.customerId, listedIds)))
-      .groupBy(crmEstimates.customerId);
-    const outcome = new Map<string, string>();
-    for (const a of agg) {
-      outcome.set(a.customerId,
-        a.approved > 0 ? "won" : a.open > 0 ? "undecided" : a.declined > 0 ? "declined" : "none");
-    }
-    // The client list itself is shareable with a PM; pricing lives elsewhere.
-    res.json(rows.map((c) => ({ ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none" })));
+    res.json(present(rows, await outcomesFor(rows.map((c) => c.id))));
   });
 
   app.post("/api/crm/customers", async (req: any, res) => {
@@ -462,7 +617,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
    * flag), for cleaning up test records. A client with ANY estimates, invoices
    * or projects is refused with 409 unless ?force=1 is passed, which deletes
    * the whole tree transactionally (documents, line items, payments, jobs,
-   * notes, comments — everything under the client).
+   * the projects' change orders / punch list / daily logs / selections /
+   * budget, costs and phases, measurements, notes, comments — everything
+   * under the client). The client's calendar visits always go with it.
    */
   app.delete("/api/crm/customers/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
@@ -481,12 +638,26 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const estimates = await countOf(crmEstimates, crmEstimates.customerId);
     const invoices = await countOf(crmInvoices, crmInvoices.customerId);
     const projects = await countOf(crmProjects, crmProjects.customerId);
+    // Visits on the calendar — the client's own, or booked against one of
+    // their projects. They always go with the client (no FK would catch
+    // them, and a visit for a deleted client is an orphan on the schedule);
+    // the count is reported so the confirm can name them.
+    const [{ n: appointments }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmAppointments)
+      .where(and(
+        eq(crmAppointments.orgId, orgId),
+        or(
+          eq(crmAppointments.customerId, c.id),
+          sql`${crmAppointments.projectId} in (select ${crmProjects.id} from ${crmProjects} where ${crmProjects.orgId} = ${orgId} and ${crmProjects.customerId} = ${c.id})`,
+        ),
+      ));
     const force = req.query.force === "1";
     if ((estimates || invoices || projects) && !force) {
       return res.status(409).json({
-        message: `This client has ${estimates} estimate(s), ${invoices} invoice(s) and ${projects} project(s). ` +
-          "Deleting removes the entire tree — call DELETE again with ?force=1 to confirm.",
-        estimates, invoices, projects,
+        message: `This client has ${estimates} estimate(s), ${invoices} invoice(s), ${projects} project(s) ` +
+          `and ${appointments} scheduled visit(s). Deleting removes the entire tree — every document, ` +
+          "project record (change orders, punch list, daily logs, selections, budget and costs) and visit — " +
+          "call DELETE again with ?force=1 to confirm.",
+        estimates, invoices, projects, appointments,
       });
     }
 
@@ -514,7 +685,45 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         await tx.delete(crmEstimates)
           .where(and(eq(crmEstimates.orgId, orgId), inArray(crmEstimates.id, estIds)));
       }
+      // Calendar visits: the client's own, plus any booked against their projects.
+      await tx.delete(crmAppointments)
+        .where(and(
+          eq(crmAppointments.orgId, orgId),
+          projIds.length
+            ? or(eq(crmAppointments.customerId, c.id), inArray(crmAppointments.projectId, projIds))
+            : eq(crmAppointments.customerId, c.id),
+        ));
+      await tx.delete(crmMeasurements)
+        .where(and(
+          eq(crmMeasurements.orgId, orgId),
+          projIds.length
+            ? or(eq(crmMeasurements.customerId, c.id), inArray(crmMeasurements.projectId, projIds))
+            : eq(crmMeasurements.customerId, c.id),
+        ));
+      await tx.delete(crmChangeOrders)
+        .where(and(eq(crmChangeOrders.orgId, orgId), eq(crmChangeOrders.customerId, c.id)));
       if (projIds.length) {
+        // Everything hanging off the projects — "the entire tree" means the
+        // field and job-cost records too, or a public change-order link keeps
+        // serving a deleted client's work.
+        await tx.delete(crmChangeOrders)
+          .where(and(eq(crmChangeOrders.orgId, orgId), inArray(crmChangeOrders.projectId, projIds)));
+        await tx.delete(crmPunchItems)
+          .where(and(eq(crmPunchItems.orgId, orgId), inArray(crmPunchItems.projectId, projIds)));
+        await tx.delete(crmDailyLogs)
+          .where(and(eq(crmDailyLogs.orgId, orgId), inArray(crmDailyLogs.projectId, projIds)));
+        await tx.delete(crmSelections)
+          .where(and(eq(crmSelections.orgId, orgId), inArray(crmSelections.projectId, projIds)));
+        await tx.delete(crmCostEntries)
+          .where(and(eq(crmCostEntries.orgId, orgId), inArray(crmCostEntries.projectId, projIds)));
+        await tx.delete(crmCommitments)
+          .where(and(eq(crmCommitments.orgId, orgId), inArray(crmCommitments.projectId, projIds)));
+        await tx.delete(crmBudgetLines)
+          .where(and(eq(crmBudgetLines.orgId, orgId), inArray(crmBudgetLines.projectId, projIds)));
+        await tx.delete(crmPhases)
+          .where(and(eq(crmPhases.orgId, orgId), inArray(crmPhases.projectId, projIds)));
+        await tx.delete(crmAttachments)
+          .where(and(eq(crmAttachments.orgId, orgId), inArray(crmAttachments.refId, projIds)));
         await tx.delete(crmJobs)
           .where(and(eq(crmJobs.orgId, orgId), inArray(crmJobs.projectId, projIds)));
         await tx.delete(crmProjects)
@@ -533,7 +742,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     });
 
     console.log(`[crm] owner ${ctx.member.id} deleted customer ${c.id} (${c.displayName}) in org ${orgId}` +
-      (force ? ` — force tree: ${estimates} estimates, ${invoices} invoices, ${projects} projects` : ""));
+      (force ? ` — force tree: ${estimates} estimates, ${invoices} invoices, ${projects} projects, ${appointments} visits` : ""));
     logActivity(ctx, "customer.deleted", {
       entityType: "customer", entityId: c.id, customerId: c.id,
       meta: { name: c.displayName, force },
@@ -595,11 +804,15 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
 
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmProjects)
-      .where(eq(crmProjects.orgId, ctx.org.id));
-    const [row] = await db.insert(crmProjects).values({
-      ...parsed.data, divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx.member), orgId: ctx.org.id, number: `P-${1000 + n + 1}`,
-    } as any).returning();
+    // Number and insert in one transaction under the per-org number lock —
+    // never count(*)+1, which repeats after a delete and races.
+    const row = await db.transaction(async (tx) => {
+      const number = await nextDocNumber(tx, crmProjects, ctx.org.id, "P");
+      const [inserted] = await tx.insert(crmProjects).values({
+        ...parsed.data, divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx.member), orgId: ctx.org.id, number,
+      } as any).returning();
+      return inserted;
+    });
     res.status(201).json(presentProject(row, ctx));
   });
 
@@ -721,14 +934,31 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const dateCol = dq.dateField === "sent" ? crmEstimates.sentAt : crmEstimates.createdAt;
     const where: any[] = [eq(crmEstimates.orgId, ctx.org.id)];
     if (req.query.customerId) where.push(eq(crmEstimates.customerId, String(req.query.customerId)));
-    if (dq.statuses.length) where.push(inArray(crmEstimates.status, dq.statuses));
+    if (dq.statuses.length) {
+      // "expired" is derived (nothing writes it on a timer): a sent/viewed,
+      // unanswered estimate past its expiry — plus any row a person marked
+      // expired by hand. `lt` binds through the column, so the timestamp
+      // comparison happens in the same (UTC) terms the rows were written in.
+      const conds: any[] = [inArray(crmEstimates.status, dq.statuses)];
+      if (dq.statuses.includes("expired")) {
+        conds.push(and(
+          inArray(crmEstimates.status, ["sent", "viewed"]),
+          isNotNull(crmEstimates.expiresAt),
+          lt(crmEstimates.expiresAt, new Date()),
+          isNull(crmEstimates.approvedAt),
+          isNull(crmEstimates.declinedAt),
+        ));
+      }
+      where.push(conds.length === 1 ? conds[0] : (or(...conds) as any));
+    }
     if (dq.from) where.push(gte(dateCol, dq.from));
     if (dq.to) where.push(lte(dateCol, dq.to));
     if (dq.q) {
+      const pat = likeContains(dq.q);
       where.push(or(
-        ilike(crmEstimates.number, `%${dq.q}%`),
-        ilike(crmEstimates.title, `%${dq.q}%`),
-        ilike(crmCustomers.displayName, `%${dq.q}%`),
+        ilike(crmEstimates.number, pat),
+        ilike(crmEstimates.title, pat),
+        ilike(crmCustomers.displayName, pat),
       ) as any);
     }
     const order = dq.sort === "oldest" ? asc(crmEstimates.createdAt)
@@ -751,12 +981,14 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const ids = new Set((await access.filter("estimates", all.map(r => r.doc))).map(r => r.id));
       const visible = all.filter(r => ids.has(r.doc.id));
       filtered = visible.length;
-      rows = visible.slice(0, 500);
+      rows = visible.slice(dq.offset, dq.offset + dq.limit);
       total = (await access.filter("estimates", await db.select().from(crmEstimates).where(eq(crmEstimates.orgId, ctx.org.id)))).length;
     } else {
+      // A stable tiebreak (id) so pages never repeat or skip a row that
+      // shares a timestamp/total with its neighbour.
       rows = await db.select({ doc: crmEstimates, customerName: crmCustomers.displayName })
         .from(crmEstimates).leftJoin(crmCustomers, joinCust)
-        .where(and(...where)).orderBy(order).limit(500);
+        .where(and(...where)).orderBy(order, asc(crmEstimates.id)).limit(dq.limit).offset(dq.offset);
       const [{ n: f }] = await db.select({ n: sql<number>`count(*)::int` })
         .from(crmEstimates).leftJoin(crmCustomers, joinCust).where(and(...where));
       filtered = f;
@@ -765,9 +997,13 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       total = t;
     }
     res.json({
-      rows: rows.map((r) => ({ ...presentEstimate(r.doc, ctx), customerName: r.customerName ?? null })),
+      // List rows are slim — no intro/terms text (a 2,700-row org was
+      // shipping 5 MB of terms the table never shows).
+      rows: rows.map((r) => ({ ...presentEstimateRow(r.doc, ctx), customerName: r.customerName ?? null })),
       total,
       filtered,
+      limit: dq.limit,
+      offset: dq.offset,
     });
   });
 
@@ -814,10 +1050,11 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (dq.from) where.push(gte(dateCol, dq.from));
     if (dq.to) where.push(lte(dateCol, dq.to));
     if (dq.q) {
+      const pat = likeContains(dq.q);
       where.push(or(
-        ilike(crmInvoices.number, `%${dq.q}%`),
-        ilike(crmInvoices.title, `%${dq.q}%`),
-        ilike(crmCustomers.displayName, `%${dq.q}%`),
+        ilike(crmInvoices.number, pat),
+        ilike(crmInvoices.title, pat),
+        ilike(crmCustomers.displayName, pat),
       ) as any);
     }
     const order = dq.sort === "oldest" ? asc(crmInvoices.createdAt)
@@ -845,12 +1082,12 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const ids = new Set((await access.filter("invoices", all.map(r => r.doc))).map(r => r.id));
       const visible = all.filter(r => ids.has(r.doc.id));
       filtered = visible.length;
-      rows = visible.slice(0, 500);
+      rows = visible.slice(dq.offset, dq.offset + dq.limit);
       total = (await access.filter("invoices", await db.select().from(crmInvoices).where(eq(crmInvoices.orgId, ctx.org.id)))).length;
     } else {
       rows = await db.select({ doc: crmInvoices, customerName: crmCustomers.displayName })
         .from(crmInvoices).leftJoin(crmCustomers, joinCust)
-        .where(and(...where)).orderBy(order).limit(500);
+        .where(and(...where)).orderBy(order, asc(crmInvoices.id)).limit(dq.limit).offset(dq.offset);
       const [{ n: f }] = await db.select({ n: sql<number>`count(*)::int` })
         .from(crmInvoices).leftJoin(crmCustomers, joinCust).where(and(...where));
       filtered = f;
@@ -862,6 +1099,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       rows: await invoiceRefundTotals(ctx.org.id, rows.map((r) => ({ ...r.doc, customerName: r.customerName ?? null, overdue: isOverdue(r.doc) }))),
       total,
       filtered,
+      limit: dq.limit,
+      offset: dq.offset,
     });
   });
 
@@ -901,19 +1140,23 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const floorMsg = await priceFloorViolation(ctx, d.items);
     if (floorMsg) return res.status(422).json({ message: floorMsg });
 
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEstimates)
-      .where(eq(crmEstimates.orgId, ctx.org.id));
+    const depositMsg = depositRefusal(d.depositCents, estimateTotals(d.items, d.taxRateBps).totalCents);
+    if (depositMsg) return res.status(400).json({ message: depositMsg });
 
-    const [est] = await db.insert(crmEstimates).values({
-      orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
-      divisionId: d.divisionId ?? divisionScopeOf(ctx.member),
-      number: `E-${1000 + n + 1}`, title: d.title, introText: d.introText ?? null,
-      termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
-      taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,
-      publicToken: token(), createdByMemberId: ctx.member.id,
-      // No expiry on a draft — the 7-day clock starts when it is SENT
-      // (portal.ts), so a draft never burns its validity window unsent.
-    } as any).returning();
+    const est = await db.transaction(async (tx) => {
+      const number = await nextDocNumber(tx, crmEstimates, ctx.org.id, "E");
+      const [row] = await tx.insert(crmEstimates).values({
+        orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
+        divisionId: d.divisionId ?? divisionScopeOf(ctx.member),
+        number, title: d.title, introText: d.introText ?? null,
+        termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
+        taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,
+        publicToken: token(), createdByMemberId: ctx.member.id,
+        // No expiry on a draft — the 7-day clock starts when it is SENT
+        // (portal.ts), so a draft never burns its validity window unsent.
+      } as any).returning();
+      return row;
+    });
 
     if (d.items.length) {
       await db.insert(crmEstimateItems).values(
@@ -973,6 +1216,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     // Price-floor lock: non-owners may price above the floor, never below.
     const floorMsg = await priceFloorViolation(ctx, parsed.data.items);
     if (floorMsg) return res.status(422).json({ message: floorMsg });
+
+    const depositMsg = depositRefusal(e.depositCents, estimateTotals(parsed.data.items, e.taxRateBps).totalCents);
+    if (depositMsg) return res.status(400).json({ message: `${depositMsg} Lower the deposit first.` });
 
     await db.delete(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, e.id)));
@@ -1036,13 +1282,55 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (floorMsg) return res.status(422).json({ message: floorMsg });
     }
 
+    // Status by hand: only transitions a person can truthfully make. "viewed"
+    // and "expired" are facts the system records (a client open, a lapsed
+    // expiry) — an estimate may keep one, never be switched to it here.
+    const statusTo = d.status !== undefined && d.status !== e.status ? d.status : undefined;
+    if (statusTo === "viewed" || statusTo === "expired") {
+      return res.status(400).json({
+        message: statusTo === "viewed"
+          ? "\"Viewed\" is recorded automatically when the client opens the estimate."
+          : "\"Expired\" follows from the expiry date — use Extend to change it, or Send to start a fresh window.",
+      });
+    }
+
+    // The deposit is what the pay route charges, so it can never exceed the
+    // total. Checked against the totals this PATCH would produce, whenever it
+    // touches the deposit, the lines or the tax rate.
+    if (d.depositCents !== undefined || d.items || d.taxRateBps !== undefined) {
+      const lines = d.items ?? await db.select().from(crmEstimateItems)
+        .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, e.id)));
+      const total = estimateTotals(lines, d.taxRateBps ?? e.taxRateBps ?? 0).totalCents;
+      const depositMsg = depositRefusal(d.depositCents !== undefined ? d.depositCents : e.depositCents, total);
+      if (depositMsg) return res.status(400).json({ message: depositMsg });
+    }
+
     const { items, ...fields } = d;
     const patch: any = { updatedAt: new Date() };
     for (const k of ["title", "introText", "termsText", "taxRateBps", "depositCents", "projectId", "divisionId", "status"] as const) {
       if (fields[k] !== undefined) patch[k] = fields[k];
     }
+    const now = new Date();
+    if (statusTo === "sent") {
+      // Marked sent outside the app (handed over on paper, emailed from
+      // elsewhere): the send clock starts now, exactly as a real send does,
+      // so the rest of the system (tracking strip, expiry, filters) agrees.
+      if (!e.sentAt) patch.sentAt = now;
+      if (!e.expiresAt || e.expiresAt.getTime() < now.getTime()) patch.expiresAt = estimateExpiryOnSend(now);
+    }
+    if (statusTo === "declined" && !e.declinedAt) patch.declinedAt = now;
+    if (statusTo && statusTo !== "declined" && (e.declinedAt || e.status === "declined")) {
+      // Leaving "declined" clears the old decline — the same revival a re-send does.
+      patch.declinedAt = null;
+      patch.declineReason = null;
+    }
     await db.update(crmEstimates).set(patch)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, e.id)));
+    if (statusTo) {
+      await logEvent(ctx.org.id, e.id, `marked_${statusTo}`, ctx.member.id, req, {
+        from: e.status, to: statusTo, manual: true,
+      });
+    }
 
     if (items) {
       await db.delete(crmEstimateItems)

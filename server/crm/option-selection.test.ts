@@ -80,6 +80,10 @@ async function makeCustomer(tag: string) {
   return r.body.id as string;
 }
 
+/** A never-sent draft can't be answered; mark it sent by hand (no email). */
+const markSent = (estimateId: string) =>
+  api(`/api/crm/estimates/${estimateId}`, { method: "PATCH", body: JSON.stringify({ status: "sent" }) }, cookie);
+
 const scope = (name: string, cents: number, taxable = true) => ({
   kind: "labor", name, quantityMilli: 1000, unitPriceCents: cents, taxable,
 });
@@ -100,6 +104,8 @@ describe("client-selectable estimate options (dev server)", () => {
     expect(est.status).toBe(201);
     const estId = est.body.id as string;
     const originalTotal = est.body.totalCents;
+    // Only an estimate that went out can be answered — mark it sent by hand.
+    expect((await markSent(estId)).status).toBe(200);
 
     // Three scopes. o3 mixes a taxable and a non-taxable line so the tax
     // assertion actually discriminates.
@@ -215,11 +221,18 @@ describe("client-selectable estimate options (dev server)", () => {
       `select approved_total_cents from crm_estimates where id = $1`, [sel.body.estimateId]).then((r) => r.rows);
     expect(approvedRow.approved_total_cents).toBe(7334_00);
 
-    // Selecting from an answered original is closed.
+    // One job, one contract: once the selection estimate is signed, the
+    // original can no longer be approved (or re-selected from) — and its page
+    // says why, pointing at the signed estimate.
     const oOrig = await api(`/api/public/estimates/${token}/respond`, {
       method: "POST", body: JSON.stringify({ decision: "approve", signatureName: "Vitest Signer" }),
     }, cookieA);
-    expect(oOrig.status).toBe(200);
+    expect(oOrig.status).toBe(409);
+    expect(oOrig.body.code).toBe("superseded");
+    expect(oOrig.body.link).toBe(`/e/${sel.body.token}`);
+    const origPage = await api(`/api/public/estimates/${token}`, {}, cookieA);
+    expect(origPage.status).toBe(200);
+    expect(origPage.body.answerBlock?.code).toBe("superseded");
     const tooLate = await api(`/api/public/estimates/${token}/select-options`, {
       method: "POST", body: JSON.stringify({ optionIds: [o1.body.id] }),
     }, cookieA);
@@ -238,6 +251,7 @@ describe("client-selectable estimate options (dev server)", () => {
     }, cookie);
     expect(est.status).toBe(201);
     const estId = est.body.id as string;
+    expect((await markSent(estId)).status).toBe(200);
     const o1 = await api(`/api/crm/estimates/${estId}/options`, {
       method: "POST", body: JSON.stringify({ name: "Scope one", tier: 1, items: [scope("Scope one", 1000_00)] }),
     }, cookie);

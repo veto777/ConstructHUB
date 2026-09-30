@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cartSubtotalCents, lineTotalCents, milliToQty, money, priceToCents, qtyToMilli,
+  priceTextError, qtyTextError,
 } from "../../client/src/lib/estimate-math";
 
 // The mobile estimate builder's client-side math. The server recomputes on
@@ -45,5 +46,29 @@ describe("estimate-math (mobile builder)", () => {
     expect(money(0)).toBe("$0.00");
     expect(money(null)).toBe("—");
     expect(milliToQty(1500)).toBe("1.5");
+  });
+});
+
+// Garbage must be SAID, not silently priced at $0 (QA c13 F28): forms show
+// these messages and hold Save/Send while any line has one.
+describe("estimate-math — typed price/qty validation", () => {
+  it("accepts dollars with $ and thousands separators, and converts them the same way", () => {
+    expect(priceTextError("185.50")).toBeNull();
+    expect(priceTextError("$1,500")).toBeNull();
+    expect(priceToCents("$1,500")).toBe(150000);
+    expect(qtyToMilli("1,200")).toBe(1_200_000);
+  });
+  it("names what is wrong with a price", () => {
+    expect(priceTextError("abc")).toMatch(/dollars/);
+    expect(priceTextError("12.3.4")).toMatch(/dollars/);
+    expect(priceTextError("")).toMatch(/Enter a price/);
+    expect(priceTextError("", true)).toBeNull();
+    expect(priceTextError("2000000")).toMatch(/limit/);
+  });
+  it("names what is wrong with a quantity", () => {
+    expect(qtyTextError("2.5")).toBeNull();
+    expect(qtyTextError("0")).toMatch(/more than 0/);
+    expect(qtyTextError("two")).toMatch(/number/);
+    expect(qtyTextError("")).toMatch(/quantity/);
   });
 });

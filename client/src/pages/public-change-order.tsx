@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { apiErrorMessage } from "@/lib/queryClient";
 import { Loader2, CheckCircle2, XCircle, Phone, Mail } from "lucide-react";
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
 
@@ -20,6 +21,10 @@ export default function PublicChangeOrderPage() {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [done, setDone] = useState<"approved" | "declined" | null>(null);
+  // Declining is two steps, like the estimate page: the first tap only
+  // reveals the confirm — one stray tap on a phone must not decline the
+  // change order.
+  const [showDecline, setShowDecline] = useState(false);
 
   const { data, isLoading, error } = useQuery<any>({
     queryKey: [`/api/public/change-orders/${token}`], enabled: !!token, retry: false,
@@ -49,7 +54,8 @@ export default function PublicChangeOrderPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
-        <ErrorCard title="This link isn't valid" description={String((error as Error).message)} />
+        <ErrorCard title="This link isn't valid"
+          description={apiErrorMessage(error, "This link is no longer valid.")} />
       </div>
     );
   }
@@ -139,10 +145,29 @@ export default function PublicChangeOrderPage() {
                 </Button>
                 <Button variant="outline" className="w-full sm:w-auto h-12 sm:h-10"
                   disabled={respond.isPending}
-                  onClick={() => respond.mutate("decline")} data-testid="button-decline">
+                  onClick={() => setShowDecline(!showDecline)} data-testid="button-show-decline">
                   Decline
                 </Button>
               </div>
+
+              {showDecline && (
+                <div className="space-y-2 border-t pt-3" data-testid="decline-confirm">
+                  <p className="text-sm">
+                    Decline this change order? Your answer is recorded for {company.name} — contact
+                    them instead if you'd like to discuss changes.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="destructive" size="sm" disabled={respond.isPending}
+                      onClick={() => respond.mutate("decline")} data-testid="button-decline">
+                      {respond.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Confirm decline
+                    </Button>
+                    <Button variant="ghost" size="sm" disabled={respond.isPending}
+                      onClick={() => setShowDecline(false)} data-testid="button-cancel-decline">
+                      Keep it open
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

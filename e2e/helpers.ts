@@ -221,9 +221,15 @@ export async function sweepPage(
 
 /** Create a throwaway customer + one-line estimate through the real API;
  *  returns ids and the public token (read from the DB). */
+/**
+ * A throwaway customer + estimate for the public-page specs. The estimate is
+ * MARKED SENT (PATCH status "sent" — no email) because a client can only
+ * answer an estimate that went out: a never-sent draft renders read-only.
+ * Pass `draft: true` for a spec that needs the draft itself.
+ */
 export async function makeEstimate(
   page: Page,
-  opts: { name?: string; unitPriceCents?: number } = {},
+  opts: { name?: string; unitPriceCents?: number; draft?: boolean } = {},
 ): Promise<{ customerId: string; estimateId: string; token: string }> {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const cust = await page.request.post("/api/crm/customers", {
@@ -247,8 +253,16 @@ export async function makeEstimate(
   });
   if (!est.ok()) throw new Error(`create estimate: ${est.status()} ${await est.text()}`);
   const estimate = await est.json();
+  if (!opts.draft) await markEstimateSent(page, estimate.id);
 
   const rows = await import("./db").then((m) =>
     m.q<{ public_token: string }>(`select public_token from crm_estimates where id = $1`, [estimate.id]));
   return { customerId: customer.id, estimateId: estimate.id, token: rows[0].public_token };
+}
+
+/** Mark an estimate sent by hand (PATCH status "sent": stamps sentAt and the
+ *  7-day expiry, sends no email) — the precondition for a client answer. */
+export async function markEstimateSent(page: Page, estimateId: string): Promise<void> {
+  const r = await page.request.patch(`/api/crm/estimates/${estimateId}`, { data: { status: "sent" } });
+  if (!r.ok()) throw new Error(`mark sent: ${r.status()} ${await r.text()}`);
 }

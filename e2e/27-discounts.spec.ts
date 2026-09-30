@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoCrm, grantClientSession, ORGS, switchOrg, watchPage } from "./helpers";
+import { gotoCrm, grantClientSession, markEstimateSent, ORGS, switchOrg, watchPage } from "./helpers";
 import { q } from "./db";
 
 test.beforeEach(async ({ page }) => switchOrg(page, ORGS.aspire));
@@ -31,6 +31,7 @@ async function makeTaxedEstimate(
   });
   if (!est.ok()) throw new Error(`create estimate: ${est.status()} ${await est.text()}`);
   const estimate = await est.json();
+  await markEstimateSent(page, estimate.id); // a never-sent draft can't be answered
   const rows = await q<{ public_token: string }>(
     `select public_token from crm_estimates where id = $1`, [estimate.id]);
   return { customerId: customer.id, estimateId: estimate.id, token: rows[0].public_token };

@@ -6,7 +6,8 @@ import { gotoCrm, ORGS, sweepPage, switchOrg, watchPage } from "./helpers";
  * complaint was no filtering, and their migrated estimates were invisible
  * because lists were per-client only. These specs pin: checkbox multi-status
  * filters combine (OR), date ranges narrow, search matches number AND
- * customer, sort orders, and rows navigate to the client detail.
+ * customer, sort orders, and rows navigate (an estimate to its own detail
+ * page, an invoice to its client).
  *
  * Ground truth comes from the API itself (same session cookies), so the UI
  * assertions never hardcode seeded counts.
@@ -78,10 +79,10 @@ test.describe("/crm/estimates", { tag: "@serial" }, () => {
       "data-testid", `doc-row-${largest.rows[0].id}`,
     );
 
-    // A row carries you to that client.
+    // An estimate's number opens the estimate itself (its detail page).
     await page.getByTestId(`doc-link-${largest.rows[0].id}`).click();
-    await expect(page).toHaveURL(new RegExp(`/crm/clients/${largest.rows[0].customerId}`));
-    await expect(page.locator("h1")).toContainText(largest.rows[0].customerName ?? "", { timeout: 15_000 });
+    await expect(page).toHaveURL(new RegExp(`/crm/estimates/${largest.rows[0].id}`));
+    await expect(page.getByTestId("estimate-detail")).toBeVisible({ timeout: 15_000 });
 
     guards.assertClean("estimates curated");
   });
