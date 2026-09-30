@@ -473,6 +473,17 @@ describe("real Postgres, mocked Blotato publishing", () => {
       ).rows,
     ).toHaveLength(0);
   });
+  it("rotates sources within each content category instead of repeating the same offer", async () => {
+    await pool.query("DELETE FROM growth_budgets WHERE key=$1", [`social-ai:${userId}`]);
+    await pool.query("INSERT INTO social_sources(user_id,kind,text,created_at) VALUES($1,'offers','Fixture offer A',now()),($1,'offers','Fixture offer B',now()-interval '1 second')", [userId]);
+    await saveSettings(userId, autoSchema.parse({ destinations: [destination], mix: ["offers", "tips"], aiDailyBudget: 5 }));
+    await pool.query("UPDATE social_settings SET sequence=0 WHERE user_id=$1", [userId]);
+    const generate = vi.fn(async (_context: any) => "Fixture rotation draft");
+    for (let i = 0; i < 3; i++) await userLock(userId, (c) => generateDue(c, userId, generate, true));
+    expect(generate.mock.calls.map(([context]) => context.source)).toEqual([
+      "Fixture offer A", "General non-project-specific maintenance tip; no claims about completed work.", "Fixture offer B",
+    ]);
+  });
   it("disconnect cancels unsent work, disables generation, deletes the encrypted key, and logs activity", async () => {
     await disconnect(userId, null);
     expect(

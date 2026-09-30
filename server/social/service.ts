@@ -385,7 +385,7 @@ export async function generateDue(
   if (!business)
     throw new SocialError("Add a business in Locations before generating");
   const kind = s.mix[row.sequence % s.mix.length],
-    source = await sourceFor(userId, kind, row.sequence);
+    source = await sourceFor(userId, kind, Math.floor(row.sequence / s.mix.length));
   if (!(await takeBudget(`social-ai:${userId}`, s.aiDailyBudget, 1, 86400000)))
     throw new SocialError("Daily social AI budget reached", 429);
   const text = await generate({
