@@ -36,6 +36,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { useToast } from "@/hooks/use-toast";
 import type { County, PermitDatabase } from "@shared/schema";
 import { useEffect } from "react";
@@ -53,23 +54,44 @@ interface DbCounts {
   total: number;
   county: number;
   city: number;
+  /** Rows with a usable official portal link — shown only when the server reports it. */
+  withPortal?: number;
 }
 
+/** Old seeders wrote this line into every placeholder row; it is a template, not a source. */
+const SEEDED_PLACEHOLDER_NOTE = /^Contact .+ Building Department for permit information\./;
+
 export default function DatabasesPage() {
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedState, setSelectedState] = useState("all");
-  const [selectedCountyId, setSelectedCountyId] = useState<string>("all");
-  const [jurisdictionFilter, setJurisdictionFilter] = useState<JurisdictionFilter>("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  // Filters live in the address bar (?state=WA&county=12&type=city&q=…&page=2) so a
+  // refresh or shared link reopens the same view.
+  const [searchInput, setSearchInput] = useState(() => readQueryParam("q") ?? "");
+  const [searchQuery, setSearchQuery] = useState(() => readQueryParam("q") ?? "");
+  const [selectedState, setSelectedState] = useState(() => readQueryParam("state")?.toUpperCase() || "all");
+  const [selectedCountyId, setSelectedCountyId] = useState<string>(() => String(readQueryInt("county") ?? "all"));
+  const [jurisdictionFilter, setJurisdictionFilter] = useState<JurisdictionFilter>(() => {
+    const type = readQueryParam("type");
+    return type === "county" || type === "city" ? type : "all";
+  });
+  const [currentPage, setCurrentPage] = useState(() => readQueryInt("page") ?? 1);
 
   useEffect(() => {
+    if (searchInput === searchQuery) return;
     const timer = setTimeout(() => {
       setSearchQuery(searchInput);
       setCurrentPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => {
+    replaceQueryParams({
+      state: selectedState !== "all" ? selectedState : null,
+      county: selectedCountyId !== "all" ? selectedCountyId : null,
+      type: jurisdictionFilter !== "all" ? jurisdictionFilter : null,
+      q: searchQuery || null,
+      page: currentPage > 1 ? currentPage : null,
+    });
+  }, [selectedState, selectedCountyId, jurisdictionFilter, searchQuery, currentPage]);
 
   const { data: counties } = useQuery<County[]>({
     queryKey: ["/api/counties"],
@@ -79,20 +101,28 @@ export default function DatabasesPage() {
     queryKey: ["/api/databases/counts"],
   });
 
-  const stateMap = useMemo(() => {
+  const allStates = useMemo(() => {
     const map = new Map<string, string>();
-    (counties ?? []).forEach(c => { if (c.stateCode && c.state) map.set(c.state, c.stateCode); });
-    return map;
+    (counties ?? []).forEach(c => { if (c.stateCode && c.state) map.set(c.stateCode, c.state); });
+    return Array.from(map, ([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [counties]);
 
-  const allStates = useMemo(() =>
-    Array.from(new Set((counties ?? []).map(c => c.state).filter(Boolean))).sort(),
-    [counties]
-  );
+  // A link may carry only a county (or a stale code): show the matching state so the
+  // county select is visible, and drop values this directory doesn't know.
+  useEffect(() => {
+    if (!counties) return;
+    if (selectedCountyId !== "all") {
+      const county = counties.find(c => String(c.id) === selectedCountyId);
+      if (!county) setSelectedCountyId("all");
+      else if (county.stateCode !== selectedState) setSelectedState(county.stateCode);
+    } else if (selectedState !== "all" && !counties.some(c => c.stateCode === selectedState)) {
+      setSelectedState("all");
+    }
+  }, [counties]);
 
   const stateCountiesForDropdown = useMemo(() =>
     selectedState !== "all"
-      ? (counties ?? []).filter(c => c.state === selectedState).sort((a, b) => a.name.localeCompare(b.name))
+      ? (counties ?? []).filter(c => c.stateCode === selectedState).sort((a, b) => a.name.localeCompare(b.name))
       : [],
     [selectedState, counties]
   );
@@ -103,14 +133,13 @@ export default function DatabasesPage() {
     if (selectedCountyId !== "all") {
       p.set("countyId", selectedCountyId);
     } else if (selectedState !== "all") {
-      const sc = stateMap.get(selectedState);
-      if (sc) p.set("stateCode", sc);
+      p.set("stateCode", selectedState);
     }
     if (searchQuery) p.set("search", searchQuery);
     return p.toString();
-  }, [currentPage, jurisdictionFilter, selectedCountyId, selectedState, searchQuery, stateMap]);
+  }, [currentPage, jurisdictionFilter, selectedCountyId, selectedState, searchQuery]);
 
-  const { data: result, isLoading, isFetching } = useQuery<FilteredResult>({
+  const { data: result, isLoading, isFetching, isPlaceholderData } = useQuery<FilteredResult>({
     queryKey: ["/api/databases", queryParams],
     queryFn: async () => {
       const res = await fetch(`/api/databases?${queryParams}`);
@@ -123,6 +152,12 @@ export default function DatabasesPage() {
   const databases = result?.databases ?? [];
   const totalResults = result?.total ?? 0;
   const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+
+  // A page past the end (stale or shared link, data changed since) opens the last page
+  // instead of claiming nothing matches.
+  useEffect(() => {
+    if (result && !isPlaceholderData && totalPages > 0 && currentPage > totalPages) setCurrentPage(totalPages);
+  }, [result, isPlaceholderData, totalPages, currentPage]);
 
   const countyMap = useMemo(() => {
     const map = new Map<number, County>();
@@ -144,17 +179,20 @@ export default function DatabasesPage() {
           </h1>
           <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
           <p className="text-sm text-muted-foreground max-w-lg">
-            Browse our nationwide directory of permit databases covering counties and cities across all 50 states.
+            Browse US counties and cities for permit offices. Where an official permit portal is on record it is linked; otherwise use “Find permit portal” to search the web.
           </p>
           {counts && (
             <p className="text-sm text-muted-foreground" data-testid="text-database-count">
-              {counts.total.toLocaleString()} databases — {counts.county.toLocaleString()} counties, {counts.city.toLocaleString()} cities
+              {counts.total.toLocaleString()} jurisdictions listed — {counts.county.toLocaleString()} counties, {counts.city.toLocaleString()} cities
+              {typeof counts.withPortal === "number" && (
+                <span data-testid="text-portal-count"> · {counts.withPortal.toLocaleString()} with a permit portal on record</span>
+              )}
             </p>
           )}
         </div>
 
         <div className="space-y-3 animate-in">
-          <div className="flex gap-1.5 p-1 bg-muted/50 rounded-lg w-fit" data-testid="filter-jurisdiction-type">
+          <div className="flex flex-wrap gap-1.5 p-1 bg-muted/50 rounded-lg w-fit max-w-full" data-testid="filter-jurisdiction-type">
             {([
               { key: "all" as const, label: "All", icon: Database, count: counts?.total },
               { key: "county" as const, label: "Counties", icon: Landmark, count: counts?.county },
@@ -173,7 +211,7 @@ export default function DatabasesPage() {
                 <Icon className="h-3.5 w-3.5" />
                 {label}
                 {count != null && (
-                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4 tabular-nums">
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4 tabular-nums hidden sm:inline-flex">
                     {count.toLocaleString()}
                   </Badge>
                 )}
@@ -205,7 +243,7 @@ export default function DatabasesPage() {
               <SelectContent>
                 <SelectItem value="all">All States ({allStates.length})</SelectItem>
                 {allStates.map((state) => (
-                  <SelectItem key={state} value={state}>{state}</SelectItem>
+                  <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -355,6 +393,15 @@ function PaginationControls({
 
 function DatabaseCard({ database, index, countyName }: { database: PermitDatabase; index: number; countyName?: string }) {
   const [scrapeOpen, setScrapeOpen] = useState(false);
+  // "Active", searchable fields and notes describe a portal; a jurisdiction with no
+  // usable portal on record gets none of them (never a templated placeholder).
+  const hasPortal = governmentLinksAvailable(database) && !!(database.portalUrl || database.searchUrl);
+  const notes = database.notes && !SEEDED_PLACEHOLDER_NOTE.test(database.notes) ? database.notes : null;
+  // Seeded placeholders were titled "City of X" / "X County Building Department" — an
+  // office nobody verified. Without a portal, name the place itself.
+  const templatedName = database.name === `City of ${database.jurisdiction.replace(/, [A-Z]{2}$/, "")}`
+    || database.name === `${database.jurisdiction.replace(/, [A-Z]{2}$/, "")} Building Department`;
+  const title = !hasPortal && templatedName ? database.jurisdiction : database.name;
 
   return (
     <>
@@ -374,16 +421,16 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
               ) : (
                 <Building2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               )}
-              <h3 className="text-sm font-semibold">{database.name}</h3>
-              {database.isActive ? (
-                <span className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400">
+              <h3 className="text-sm font-semibold">{title}</h3>
+              {hasPortal ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400" data-testid={`status-portal-${database.id}`}>
                   <span className="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400"></span>
                   Active
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" data-testid={`status-portal-${database.id}`}>
                   <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
-                  Inactive
+                  No portal on record
                 </span>
               )}
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 capitalize">
@@ -466,7 +513,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
           )}
         </div>
 
-        {database.searchableFields && database.searchableFields.length > 0 && (
+        {hasPortal && database.searchableFields && database.searchableFields.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {database.searchableFields.map((field) => (
               <span key={field} className="text-[11px] px-2 py-0.5 rounded-md bg-muted capitalize text-muted-foreground">
@@ -482,8 +529,8 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
           </p>
         )}
 
-        {database.notes && (
-          <p className="text-xs text-muted-foreground border-t border-border/40 pt-3">{database.notes}</p>
+        {notes && (
+          <p className="text-xs text-muted-foreground border-t border-border/40 pt-3">{notes}</p>
         )}
       </Card>
 
