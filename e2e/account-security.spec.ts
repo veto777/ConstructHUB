@@ -55,3 +55,26 @@ test('Google security alert opens account remediation, step-up retries disconnec
  await page.route('https://accounts.google.com/**',r=>r.fulfill({contentType:'text/html',body:'<h1>Mock Google consent</h1>'}));
  await page.goto('/locations');await page.getByRole('link',{name:'Connect Google Business Profile',exact:true}).click();await expect(page.getByRole('heading',{name:'Verify your identity'})).toBeVisible();await page.getByLabel('Verification',{exact:true}).fill(password);await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.getByRole('heading',{name:'Mock Google consent'})).toBeVisible();
 });
+
+test('mobile notification preferences expose every kind and the bell fits the viewport', async ({ page }) => {
+ await page.setViewportSize({ width: 320, height: 740 });
+ await page.goto('/auth');
+ await page.getByTestId('input-login-email').fill(email);
+ await page.getByTestId('input-login-password').fill(password);
+ await Promise.all([page.waitForResponse(r => r.url().endsWith('/api/auth/login')), page.getByTestId('button-login').click()]);
+ await page.goto('/settings?tab=notifications');
+ for (const label of ['A Google post or photo failed', 'Site Scan completed', 'Site Scan score dropped or new critical issue']) {
+  const toggle = page.getByRole('switch', { name: `${label}: In app`, exact: true });
+  await expect(toggle).toBeVisible();
+  await toggle.click(); await expect(toggle).not.toBeChecked();
+ }
+ await page.reload();
+ await expect(page.getByRole('switch', { name: 'Site Scan completed: In app', exact: true })).not.toBeChecked();
+ await page.getByRole('button', { name: /Notifications \(/ }).click();
+ const panel = page.locator('[data-radix-popper-content-wrapper]');
+ await expect(panel).toBeVisible();
+ const box = await panel.boundingBox();
+ expect(box!.x).toBeGreaterThanOrEqual(0);
+ expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+ await expect(page.getByRole('button', { name: 'Mark all read' })).toBeVisible();
+});
