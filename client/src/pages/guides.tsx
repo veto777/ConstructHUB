@@ -1,4 +1,5 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Redirect } from "wouter";
 const guides = [
   {
     title: "Connect Blotato",
@@ -91,33 +92,34 @@ const guides = [
     ],
   },
 ];
-export default function GuidesPage() {
+/** The walkthroughs, shown as the Guides tab of Social Media. */
+export function GuidesContent() {
   return (
-    <div className="h-full overflow-y-auto">
-      <section aria-label="Guides walkthroughs" className="max-w-4xl mx-auto p-6 space-y-6">
-        <h1 className="text-3xl font-bold">Guides</h1>
-        <p className="text-muted-foreground">
-          Step-by-step help for the business tools available in ConstructHUB.
-        </p>
-        <a className="underline text-primary" href="/social-media">
-          Open Social Media
-        </a>
-        {guides.map((g) => (
-          <Card key={g.title}>
-            <CardHeader>
-              <CardTitle>{g.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <a className="inline-block underline text-primary mb-3" href={g.href}>Open {g.title === "Security" ? "Security & activity" : g.title === "Profile Guard" ? "Locations" : g.title === "AI review replies" ? "Google Reviews" : g.title.startsWith("Posts & Photos") ? "Posts & Photos" : g.title === "Site Scan" ? "Site Scan" : "Social Media"}</a>
-              <ol className="list-decimal pl-5 space-y-3">
-                {g.steps.map((s) => (
-                  <li key={s}>{s}</li>
-                ))}
-              </ol>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-    </div>
+    <section aria-label="Guides walkthroughs" className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Guides</h2>
+        <p className="text-muted-foreground">Step-by-step help for the business tools available in ConstructHUB.</p>
+      </div>
+      {guides.map((g) => (
+        <Card key={g.title}>
+          <CardHeader>
+            <CardTitle>{g.title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <a className="inline-block underline text-primary mb-3" href={g.href}>Open {g.title === "Security" ? "Security & activity" : g.title === "Profile Guard" ? "Locations" : g.title === "AI review replies" ? "Google Reviews" : g.title.startsWith("Posts & Photos") ? "Posts & Photos" : g.title === "Site Scan" ? "Site Scan" : "Social Media"}</a>
+            <ol className="list-decimal pl-5 space-y-3">
+              {g.steps.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      ))}
+    </section>
   );
+}
+
+/** Old /guides links land on the Social Media Guides tab. */
+export default function GuidesPage() {
+  return <Redirect to="/social-media?tab=guides" replace />;
 }

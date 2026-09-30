@@ -14,7 +14,8 @@ import {
   type AutoSettings,
   type Destination,
 } from "@shared/social";
-import { CalendarDays, Send, Sparkles, Link2 } from "lucide-react";
+import { CalendarDays, Send, Sparkles, Link2, BookOpen } from "lucide-react";
+import { GuidesContent } from "@/pages/guides";
 import { useUrlParam } from "@/hooks/use-url-param";
 const refresh = () =>
   queryClient.invalidateQueries({ queryKey: ["/api/social"] });
@@ -164,8 +165,8 @@ export default function SocialMediaPage() {
               Compose once. Review, schedule, and follow every destination.
             </p>
           </div>
-          <a className="text-primary underline" href="/guides">
-            Guides
+          <a className="text-primary underline" href="/social-media?tab=guides" onClick={(e) => { e.preventDefault(); setTab("guides"); }}>
+            How it works
           </a>
         </header>
         {isLoading && <p>Loading Social Media…</p>}
@@ -252,6 +253,7 @@ export default function SocialMediaPage() {
             ["compose", "Compose", Send],
             ["queue", "Calendar & queue", CalendarDays],
             ["auto", "Auto mode", Sparkles],
+            ["guides", "Guides", BookOpen],
           ].map(([key, label, Icon]: any) => (
             <Button
               key={key}
@@ -868,6 +870,7 @@ export default function SocialMediaPage() {
             </Card>
           </>
         )}
+        {tab === "guides" && <GuidesContent />}
       </div>
     </div>
   );

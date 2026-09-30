@@ -35,6 +35,33 @@ import { apiRequest } from "@/lib/queryClient";
 import type { County } from "@shared/schema";
 import { CHLogo } from "@/components/ch-logo";
 
+/** Round orange badges matching the IP Tracker / Pricing artwork. */
+function SocialMediaIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#F1592F" />
+      <path d="M12 21.5h5l12-7v19l-12-7h-5a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2z" fill="#fff" />
+      <path d="M15 26.5l2.2 7.5h3.6l-1.8-7.5z" fill="#3F4650" />
+      <rect x="29" y="14.5" width="3" height="19" rx="1.5" fill="#3F4650" />
+      <path d="M35 19.5c1.6 1.2 2.5 2.8 2.5 4.5s-.9 3.3-2.5 4.5" stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SiteScanIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#F1592F" />
+      <rect x="9" y="12" width="26" height="20" rx="2.5" fill="#fff" />
+      <rect x="9" y="12" width="26" height="5" rx="2.5" fill="#3F4650" />
+      <rect x="13" y="21" width="10" height="2.2" rx="1.1" fill="#F1592F" />
+      <rect x="13" y="25.5" width="7" height="2.2" rx="1.1" fill="#3F4650" />
+      <circle cx="29" cy="28" r="6" fill="#fff" stroke="#3F4650" strokeWidth="2.6" />
+      <path d="M33.3 32.3l4.7 4.7" stroke="#3F4650" strokeWidth="3.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function GoogleGIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none">
@@ -153,9 +180,8 @@ const ADMIN_EMAILS = ["support@constructhub.us", "alpinesidingcompany@gmail.com"
 const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", icon: Star, logoComponent: GoogleGIcon, badge: "best" as BadgeType };
 
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
-  { title: "Social Media", url: "/social-media", icon: Megaphone },
-  { title: "Site Scan", url: "/site-scan", icon: Search },
-  { title: "Guides", url: "/guides", icon: BookOpen },
+  { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },
+  { title: "Site Scan", url: "/site-scan", icon: Search, logoComponent: SiteScanIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/competitors-landing" }] : []),

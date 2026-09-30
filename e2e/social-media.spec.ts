@@ -171,8 +171,11 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
 });
 
 test("guides match shipped approval controls and link to every walkthrough", async ({ page }) => {
+  // Old /guides links now open the Guides tab of Social Media.
   await page.goto("/guides");
+  await expect(page).toHaveURL(/\/social-media\?tab=guides$/);
   const main = page.getByRole("region", { name: "Guides walkthroughs" });
+  await expect(main).toBeVisible();
   for (const [label, href] of [
     ["Open Locations", "/locations"], ["Open Google Reviews", "/google-reviews"],
     ["Open Posts & Photos", "/gbp-content"], ["Open Security & activity", "/settings?tab=security"],
@@ -189,7 +192,7 @@ test("growth tools remain discoverable with Google Business collapsed", async ({
   await page.goto("/guides");
   const google = page.getByTestId("link-nav-group-google-business");
   await expect(google).toHaveAttribute("aria-expanded", "false");
-  for (const name of ["social-media", "site-scan", "guides"])
+  for (const name of ["social-media", "site-scan"])
     await expect(page.getByTestId(`link-nav-${name}`)).toBeVisible();
   await google.click();
   await expect(google).toHaveAttribute("aria-expanded", "true");
@@ -200,7 +203,7 @@ test("social tabs and guides fit a narrow phone viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/social**", route => route.fulfill({ json: route.request().url().endsWith("/social") ? { connected: false, accounts: [], settings: autoSchema.parse({}), posts: [] } : [] }));
   await page.goto("/social-media");
-  for (const name of ["Compose", "Calendar & queue", "Auto mode"]) {
+  for (const name of ["Compose", "Calendar & queue", "Auto mode", "Guides"]) {
     await page.getByRole("button", { name, exact: true }).click();
     const overflowing = await page.locator("main button, main input, main select").evaluateAll(elements => elements.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1; }).map(e => e.textContent || e.getAttribute("aria-label")));
     expect(overflowing).toEqual([]);
