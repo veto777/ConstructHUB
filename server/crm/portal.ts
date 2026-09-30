@@ -1766,6 +1766,9 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageInvoices")) return;
+    // The preview is the full priced invoice; a price-blind seat (seePrices
+    // overridden off) is refused the invoice list, so it can't mint one either.
+    if (!requirePermission(res, ctx, "seePrices")) return;
     if (!previewSecret()) return res.status(503).json({ message: "Preview is not configured on this server." });
 
     const [inv] = await db.select().from(crmInvoices)
