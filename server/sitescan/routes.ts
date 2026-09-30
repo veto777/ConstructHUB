@@ -353,7 +353,7 @@ export function registerSiteScanRoutes(
       if (!r.ok || c.success !== true)
         return res.status(400).json({ message: "CAPTCHA failed." });
     }
-    const job = await enqueue(null, url, 11, 0),
+    const job = await enqueue(null, url, 11, 1),
       verify = token(),
       access = token();
     await pool.query(

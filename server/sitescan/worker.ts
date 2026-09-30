@@ -61,6 +61,8 @@ export async function runSiteScanWorker(deps = workerDependencies) {
   heartbeat.unref();
   try {
     const checkpoint = async (state: CrawlState) => {
+      if (Buffer.byteLength(JSON.stringify(state)) > 25_000_000)
+        throw new Error("Crawl checkpoint exceeds 25 MB");
       const r = await pool.query(
         "UPDATE sitescan_jobs SET state=$3,lease_until=now()+interval '2 minutes' WHERE id=$1 AND lease_token=$2",
         [job.id, token, state],
@@ -243,7 +245,7 @@ export async function runSiteScanWorker(deps = workerDependencies) {
     }
   } catch {
     await pool.query(
-      "UPDATE sitescan_jobs SET status='failed',error='Scan could not complete. Check website availability and robots policy, then retry.',lease_until=NULL WHERE id=$1 AND lease_token=$2 AND status='running'",
+      "UPDATE sitescan_jobs SET status='failed',error='Scan could not complete. Check website availability, robots policy and scan limits; lower the page cap and retry.',lease_until=NULL WHERE id=$1 AND lease_token=$2 AND status='running'",
       [job.id, token],
     );
   } finally {

@@ -1,3 +1,4 @@
+import SiteScanPage, { FreeSiteScanPage, SharedSiteScanPage } from "@/pages/site-scan";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
@@ -105,6 +106,7 @@ function DashboardRouter() {
       <Route path="/pricing" component={PricingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/site-scan" component={SiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
@@ -154,6 +156,7 @@ function PublicRouter() {
       <Route path="/photos" component={PhotosPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/site-scan" component={SiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
@@ -300,6 +303,9 @@ function AppContent() {
     document.documentElement.classList.toggle("crm-theme", on);
     return () => document.documentElement.classList.remove("crm-theme");
   }, [portal, clientPortal]);
+
+  if (location === "/free-site-scan") return <FreeSiteScanPage />;
+  if (location.startsWith("/site-scan/report/")) return <SharedSiteScanPage />;
 
   // The client portal never touches the platform session: a homeowner has no
   // ConstructHUB account. Handle it before the /api/auth/me gate entirely.

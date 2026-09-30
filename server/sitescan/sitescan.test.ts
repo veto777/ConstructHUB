@@ -252,3 +252,17 @@ it("accepts robots canonical HTTPS/www redirects and persists the crawl origin",
   expect(state.origin).toBe("https://www.fixture.test");
   expect(state.pages).toHaveLength(1);
 });
+
+it("allows ordinary public IPv4/IPv6 hosting while excluding reserved /24 ranges", () => {
+  for (const ip of [
+    "8.8.8.8",
+    "1.1.1.1",
+    "192.0.78.24",
+    "192.2.1.1",
+    "2001:4860:4860::8888",
+    "2606:4700:4700::1111",
+  ])
+    expect(publicIP(ip)).toBe(true);
+  for (const ip of ["192.0.0.1", "192.0.2.1", "192.88.99.1"])
+    expect(publicIP(ip)).toBe(false);
+});

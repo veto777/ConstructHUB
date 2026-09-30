@@ -123,6 +123,7 @@ const googleGroups: NavGroup[] = [
     logoComponent: GoogleBusinessIcon,
     landingUrl: "/google-business",
     children: [
+      { title: "Site Scan", url: "/site-scan", icon: Search },
       { title: "Locations", url: "/locations", icon: MapPin },
       { title: "GBP Monitor", url: "/gmb-monitor", icon: Eye },
       { title: "Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },

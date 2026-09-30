@@ -341,6 +341,7 @@ export default function LandingPage() {
                 Start Free Trial <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
+            <Link href="/free-site-scan" className="underline font-semibold">Free 60-second website scan</Link>
             <Link href="/pricing#done-for-you" data-testid="link-hero-dfy">
               <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 px-8 h-12 text-base">
                 <Package className="h-4 w-4 mr-2" /> Done-For-You Services

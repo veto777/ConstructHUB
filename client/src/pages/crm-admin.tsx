@@ -1,3 +1,4 @@
+import { SiteScanLeads } from "./site-scan";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -299,6 +300,8 @@ export default function CrmAdminPage() {
         infoKey="admin"
         subtitle="Every account and organization on ConstructHub — read-only monitoring."
       />
+
+      <SiteScanLeads />
 
       {/* ── Overview ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="section-overview">
