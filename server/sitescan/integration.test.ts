@@ -60,7 +60,7 @@ async function call(
 }
 beforeAll(async () => {
   if (
-    !new URL(process.env.DATABASE_URL!).pathname.endsWith("constructhub_dev_a5")
+    !/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)
   )
     throw new Error("a5 DB only");
   await ensureSiteScanSchema();
