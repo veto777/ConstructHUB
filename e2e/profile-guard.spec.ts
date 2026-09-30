@@ -10,18 +10,27 @@ test('owner previews a snapshot, reauthenticates, changes guard mode, approves/r
   await common(page);let verified=false,saved=false,mode='off',reported=false;
   const changes=[{id:11,field:'title',old_value:'Approved name',new_value:'Outside name',source:'Google update',status:'pending',detected_at:'2026-09-29T12:00:00Z'},
     {id:12,field:'websiteUri',old_value:'https://example.invalid',new_value:'https://other.invalid',source:'owner-edit-outside-ConstructHUB (inferred; actor unavailable)',status:'pending',detected_at:'2026-09-29T12:00:00Z'}];
-  await page.route('**/api/gbp/guard/reauth',r=>{verified=true;return r.fulfill({json:{ok:true}});});
+  await page.route('**/api/auth/reauth',r=>{
+    if(r.request().method()==='POST'){expect(r.request().postDataJSON().value).toBe('123456');verified=true;return r.fulfill({json:{ok:true}});}
+    return r.fulfill({json:{method:'email'}});
+  });
+  await page.route('**/api/auth/reauth/email',r=>r.fulfill({json:{ok:true}}));
   await page.route('**/api/gbp/locations/987/guard**',r=>{
     const path=new URL(r.request().url()).pathname;
     if(path.endsWith('/preview'))return r.fulfill({json:{snapshot:{title:'Approved name',websiteUri:'https://example.invalid'},token:'fixture-preview'}});
     if(path.includes('/changes/')){const c=changes.find(c=>String(c.id)===path.split('/').at(-1))!;c.status=r.request().postDataJSON().action==='approve'?'approved':'reverted';return r.fulfill({json:{ok:true}});}
-    if(r.request().method()==='PUT'){expect(verified).toBe(true);expect(r.request().postDataJSON().token).toBe('fixture-preview');saved=true;mode=r.request().postDataJSON().mode;return r.fulfill({json:{ok:true}});}
+    if(r.request().method()==='PUT'){if(!verified)return r.fulfill({status:403,json:{reauth:true}});expect(verified).toBe(true);expect(r.request().postDataJSON().token).toBe('fixture-preview');saved=true;mode=r.request().postDataJSON().mode;return r.fulfill({json:{ok:true}});}
     return r.fulfill({json:{mode,watched:['title','websiteUri'],snapshot:saved?{title:'Approved name'}:null,changes:saved?changes:[]}});
   });
   await page.route('**/api/gbp/reports/changes/11',r=>{if(r.request().method()==='POST')reported=true;return r.fulfill({json:{text:'Business: Guard browser fixture\nApproved name → Outside name\nDetected: 2026-09-29',formUrl:'https://support.google.com/business/contact/business_redressal_form',listingUrl:'https://www.google.com/maps?cid=1',reportedAt:reported?'2026-09-29':null}})});
   await page.goto('/locations');await page.getByTestId('button-cookies-decline').click();await expect(page.getByText('Guard: notify · 1 pending')).toBeVisible();await page.getByText(location.businessName,{exact:true}).click();await page.getByTestId('tab-guard').click();
   await page.getByLabel('Guard mode').selectOption('notify');await page.getByRole('button',{name:'Preview current Google values'}).click();await expect(page.getByText('Approved name',{exact:true})).toBeVisible();
-  await page.getByLabel('Account password').fill('test-fixture-password');await page.getByRole('button',{name:'Verify identity',exact:true}).click();await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();await expect(page.getByText('Current mode: notify.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Google-only accounts need an authenticator or password configured in Settings.',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();
+  await expect(page.getByRole('dialog')).toContainText('Verification lasts 12 hours');
+  await page.getByRole('button',{name:'Email a verification code'}).click();
+  await page.getByLabel('Verification',{exact:true}).fill('123456');
+  await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.getByText('Current mode: notify.',{exact:false})).toBeVisible();
   const first=page.locator('article').filter({hasText:'Outside name'});await first.getByRole('button',{name:'Approve',exact:true}).click();await expect(first).toContainText('approved');
   const second=page.locator('article').filter({hasText:'https://other.invalid'});await second.getByRole('button',{name:'Reject',exact:true}).click();await expect(second).toContainText('reverted');
   await first.getByRole('button',{name:'Report',exact:true}).click();await expect(page.getByText("Google receives this report only when you submit Google's form.",{exact:false})).toBeVisible();await expect(page.getByRole('link',{name:"Open Google's official form"})).toHaveAttribute('href','https://support.google.com/business/contact/business_redressal_form');

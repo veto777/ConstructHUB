@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +34,6 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
   const url=`/api/gbp/locations/${locationId}/guard`,{toast}=useToast();
   const {data,error}=useQuery<any>({queryKey:[url],enabled:linked,refetchInterval:30000});
   const [mode,setMode]=useState<string|null>(null),[watched,setWatched]=useState<string[]|null>(null),[preview,setPreview]=useState<any>(null);
-  const [password,setPassword]=useState(''),[code,setCode]=useState(''),[verified,setVerified]=useState(false);
   const mutation=useMutation({mutationFn:async({method,path,body}:{method:string;path:string;body?:any})=>(await apiRequest(method,path,body)).json(),onSuccess:()=>{void queryClient.invalidateQueries({queryKey:[url]});void queryClient.invalidateQueries({queryKey:['/api/gbp/guard/status']});},onError:(e:Error)=>toast({title:'Profile Guard',description:e.message,variant:'destructive'})});
   if(!linked)return <p>Link this location to Google Business Profile to use Profile Guard.</p>;
   if(error)return <p role="alert">Unable to load Profile Guard.</p>;
@@ -50,12 +48,7 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
     <fieldset className="grid grid-cols-2 gap-2"><legend>Watched fields</legend>{Object.entries(fieldLabels).map(([f,label])=><label key={f} className="text-sm flex gap-2"><input type="checkbox" checked={selected.includes(f)} onChange={e=>setWatched(e.target.checked?[...selected,f]:selected.filter(x=>x!==f))}/>{label}</label>)}</fieldset>
     {!data.snapshot&&<Button disabled={mutation.isPending} onClick={()=>act('POST',url+'/preview').then(setPreview).catch(()=>{})}>Preview current Google values</Button>}
     {(data.snapshot||preview)&&<details open={!data.snapshot}><summary>{data.snapshot?'Owner-approved snapshot':'Review these values before approving your snapshot'}</summary><dl>{Object.entries(data.snapshot??preview.snapshot).map(([f,v])=><div key={f} className="border-b py-2"><dt className="font-medium">{fieldLabels[f]}</dt><dd className="whitespace-pre-wrap break-all text-sm">{pretty(v)}</dd></div>)}</dl></details>}
-    <fieldset className="space-y-2 border rounded p-3"><legend>Verify identity to save settings (valid for 5 minutes)</legend>
-      <Input aria-label="Account password" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Account password"/>
-      <Input aria-label="Authenticator code" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value)} placeholder="Authenticator code, if enabled"/>
-      <p className="text-xs">Google-only accounts need an authenticator or password configured in Settings.</p>
-      <Button variant="outline" disabled={mutation.isPending} onClick={()=>act('POST','/api/gbp/guard/reauth',{...(password?{password}:{}),...(code?{code}:{})}).then(()=>{setVerified(true);setPassword('');setCode('');}).catch(()=>{})}>{verified?'Verify again':'Verify identity'}</Button>
-    </fieldset>
+    <p className="text-sm">Saving settings may ask you to verify your identity using your account's password, authenticator, or email code. Shared verification lasts 12 hours.</p>
     <Button disabled={mutation.isPending} onClick={()=>act('PUT',url,{mode:mode??data.mode,watched:selected,...(!data.snapshot&&preview?{token:preview.token}:{})}).then(()=>{setPreview(null);toast({title:'Profile Guard settings saved'});}).catch(()=>{})}>{!data.snapshot&&preview?'Approve snapshot and save settings':'Save guard settings'}</Button>
     <Button className="ml-2" variant="outline" disabled={mutation.isPending||data.mode==='off'} onClick={()=>act('POST',url+'/check').catch(()=>{})}>Check now</Button>
     <h3 className="font-semibold">Pending changes and history</h3>
