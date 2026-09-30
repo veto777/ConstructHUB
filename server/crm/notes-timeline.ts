@@ -102,6 +102,39 @@ export function formatDurationSecs(secs: number): string {
   return rem ? `${m}m ${rem}s` : `${m}m`;
 }
 
+const quote = (body: string) => `“${body.length > 80 ? `${body.slice(0, 80)}…` : body}”`;
+
+/**
+ * One thread message on the timeline. crm_client_comments is two-way:
+ * authorMemberId null = the client wrote it from the portal; set = a team
+ * member's reply — which must never read as the client's message.
+ */
+export function commentTimelineText(
+  c: { body: string; authorMemberId: string | null },
+  viewerMemberId: string | null,
+  authorName: string | null,
+): string {
+  if (!c.authorMemberId) return `Sent a message from the portal — ${quote(c.body)}`;
+  const who = c.authorMemberId === viewerMemberId ? "You" : authorName?.trim() || "A team member";
+  return `${who} replied — ${quote(c.body)}`;
+}
+
+/**
+ * Who put a photo on the client's shelf, read from the stored name (there is
+ * no uploader column): the CRM upload always tags a stage ("progress--" /
+ * "finished--"), HOVER imports are "hover-<job>-<image>.jpg", and the client
+ * portal stores the homeowner's own file name untouched.
+ */
+export function photoTimelineText(fileName: string): string {
+  const stage = fileName.startsWith("progress--") ? "progress" : fileName.startsWith("finished--") ? "finished" : null;
+  if (stage) {
+    const label = stage === "finished" ? "finished" : "in progress";
+    return `Your team added a project photo (${label}) — ${fileName.slice(stage.length + 2)}`;
+  }
+  if (/^hover-[^-]+-.+\.jpg$/i.test(fileName)) return `HOVER photo imported — ${fileName}`;
+  return `Client shared a photo — ${fileName}`;
+}
+
 /** Email the org owner(s) when a client taps a financing link. */
 async function notifyFinanceClick(
   org: typeof crmOrgs.$inferSelect,
@@ -412,10 +445,18 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       });
     }
 
-    for (const c of await access.filter("client-comments", comments)) {
+    const visibleComments = await access.filter("client-comments", comments);
+    const replierIds = [...new Set(visibleComments.map((c) => c.authorMemberId).filter(Boolean))] as string[];
+    const repliers = replierIds.length
+      ? await db.select({ id: crmMembers.id, displayName: crmMembers.displayName, email: crmMembers.email })
+          .from(crmMembers)
+          .where(and(eq(crmMembers.orgId, orgId), inArray(crmMembers.id, replierIds)))
+      : [];
+    const replierName = new Map(repliers.map((m) => [m.id, m.displayName || m.email || null]));
+    for (const c of visibleComments) {
       entries.push({
-        id: `com-${c.id}`, kind: "comment", verb: "comment",
-        text: `Sent a message from the portal — “${c.body.length > 80 ? `${c.body.slice(0, 80)}…` : c.body}”`,
+        id: `com-${c.id}`, kind: "comment", verb: c.authorMemberId ? "reply" : "comment",
+        text: commentTimelineText(c, ctx.member.id, c.authorMemberId ? replierName.get(c.authorMemberId) ?? null : null),
         ref: null,
         at: (c.createdAt ?? new Date()).toISOString(),
       });
@@ -436,7 +477,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     for (const a of photos) {
       entries.push({
         id: `att-${a.id}`, kind: "attachment", verb: "attachment",
-        text: `Shared a photo — ${a.fileName}`,
+        text: photoTimelineText(a.fileName),
         ref: null,
         at: (a.createdAt ?? new Date()).toISOString(),
       });

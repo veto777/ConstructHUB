@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { EMAIL_RE, customerErrorMessage, duplicateMatches, type DuplicateMatch } from "@/lib/crm-customer-errors";
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
 
@@ -42,6 +43,18 @@ const BID_PILL: Record<string, { label: string; cls: string }> = {
   declined: { label: "Declined", cls: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
 };
 
+type BidTab = (typeof BID_TABS)[number]["key"];
+
+/** The tab + search live in the URL (?tab=won&q=kane) so a reload or Back keeps them. */
+function readListParams(): { tab: BidTab; q: string } {
+  const p = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
+  const t = p.get("tab");
+  return {
+    tab: BID_TABS.some((b) => b.key === t) ? (t as BidTab) : "all",
+    q: p.get("q") ?? "",
+  };
+}
+
 const EMPTY = {
   displayName: "", firstName: "", lastName: "", companyName: "",
   email: "", phone: "", addressLine1: "", city: "", state: "", postalCode: "", notes: "",
@@ -50,16 +63,32 @@ const EMPTY = {
 export default function CrmClientsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [q, setQ] = useState("");
+  const [initial] = useState(readListParams);
+  const [q, setQ] = useState(initial.q);
   // Debounce so each keystroke doesn't fire its own server request.
-  const [qDebounced, setQDebounced] = useState("");
+  const [qDebounced, setQDebounced] = useState(initial.q);
   useEffect(() => {
     const t = setTimeout(() => setQDebounced(q), 250);
     return () => clearTimeout(t);
   }, [q]);
-  const [tab, setTab] = useState<(typeof BID_TABS)[number]["key"]>("all");
+  const [tab, setTab] = useState<BidTab>(initial.tab);
+  // Mirror tab + search into the URL without adding history entries.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (qDebounced.trim()) params.set("q", qDebounced); else params.delete("q");
+    if (tab !== "all") params.set("tab", tab); else params.delete("tab");
+    const search = params.toString();
+    const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(window.history.state, "", next);
+    }
+  }, [qDebounced, tab]);
+  const clearSearch = () => { setQ(""); setQDebounced(""); };
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
+  // A 409 names the existing client(s) sharing that email/phone — shown
+  // inline with a link to each and a deliberate "Create anyway".
+  const [dupes, setDupes] = useState<DuplicateMatch[] | null>(null);
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canManage = me?.permissions?.manageCustomers === true;
@@ -74,23 +103,33 @@ export default function CrmClientsPage() {
   });
 
   const create = useMutation({
-    mutationFn: async () => {
+    // force=true is the user's explicit "Create anyway" after a duplicate warning.
+    mutationFn: async (force: boolean) => {
       const body: any = { ...form };
+      for (const k of Object.keys(body)) {
+        if (typeof body[k] === "string") body[k] = body[k].trim();
+      }
       // Fall back to a sensible display name rather than rejecting the form.
-      if (!body.displayName.trim()) {
-        body.displayName = [form.firstName, form.lastName].filter(Boolean).join(" ").trim() || form.companyName;
+      if (!body.displayName) {
+        body.displayName = [body.firstName, body.lastName].filter(Boolean).join(" ").trim() || body.companyName;
       }
       for (const k of Object.keys(body)) if (body[k] === "") body[k] = null;
-      if (!body.displayName) throw new Error("A client name is required");
-      return (await apiRequest("POST", "/api/crm/customers", body)).json();
+      if (!body.displayName) throw new Error("A client name is required.");
+      if (body.email && !EMAIL_RE.test(body.email)) throw new Error("Enter a valid email address.");
+      return (await apiRequest("POST", `/api/crm/customers${force ? "?force=1" : ""}`, body)).json();
     },
     onSuccess: () => {
       setOpen(false);
       setForm({ ...EMPTY });
+      setDupes(null);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       toast({ title: "Client created", description: "Their portal was created automatically." });
     },
-    onError: (e: any) => toast({ title: "Could not create client", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => {
+      const matches = duplicateMatches(e);
+      if (matches) { setDupes(matches); return; }
+      toast({ title: "Could not create client", description: customerErrorMessage(e), variant: "destructive" });
+    },
   });
 
   return (
@@ -101,7 +140,7 @@ export default function CrmClientsPage() {
         infoKey="clients"
         subtitle="Every client gets their own portal the moment you create them."
         actions={canManage ? (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDupes(null); }}>
             <DialogTrigger asChild>
               <Button data-testid="button-new-client"><Plus className="h-4 w-4 mr-2" /> New client</Button>
             </DialogTrigger>
@@ -111,43 +150,43 @@ export default function CrmClientsPage() {
                 <div className="sm:col-span-2">
                   <Label htmlFor="c-name">Client name *</Label>
                   <Input id="c-name" data-testid="input-client-name" value={form.displayName}
-                    placeholder="Joe & Mary Kane"
+                    placeholder="Joe & Mary Kane" maxLength={200}
                     onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="c-company">Company (optional)</Label>
-                  <Input id="c-company" value={form.companyName}
+                  <Input id="c-company" value={form.companyName} maxLength={200}
                     onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="c-email">Email</Label>
                   <Input id="c-email" type="email" data-testid="input-client-email" value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                    onChange={(e) => { setForm({ ...form, email: e.target.value }); setDupes(null); }} />
                 </div>
                 <div>
                   <Label htmlFor="c-phone">Phone</Label>
-                  <Input id="c-phone" value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  <Input id="c-phone" type="tel" value={form.phone} maxLength={40}
+                    onChange={(e) => { setForm({ ...form, phone: e.target.value }); setDupes(null); }} />
                 </div>
                 <div>
                   <Label htmlFor="c-addr">Service address</Label>
-                  <Input id="c-addr" value={form.addressLine1}
+                  <Input id="c-addr" value={form.addressLine1} maxLength={200}
                     onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="c-city">City</Label>
-                  <Input id="c-city" value={form.city}
+                  <Input id="c-city" value={form.city} maxLength={120}
                     onChange={(e) => setForm({ ...form, city: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label htmlFor="c-state">State</Label>
-                    <Input id="c-state" value={form.state}
+                    <Input id="c-state" value={form.state} maxLength={40}
                       onChange={(e) => setForm({ ...form, state: e.target.value })} />
                   </div>
                   <div>
                     <Label htmlFor="c-zip">ZIP</Label>
-                    <Input id="c-zip" value={form.postalCode}
+                    <Input id="c-zip" value={form.postalCode} maxLength={20}
                       onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
                   </div>
                 </div>
@@ -156,12 +195,44 @@ export default function CrmClientsPage() {
                   <Textarea id="c-notes" rows={3} value={form.notes}
                     placeholder="Where's the leak? What did they ask for?"
                     onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Shows as intake notes on the client's page. Only your team sees it.
+                  </p>
                 </div>
               </div>
+              {dupes && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40"
+                  role="alert" data-testid="notice-duplicate-client">
+                  <p className="font-medium">A client with that email or phone already exists</p>
+                  <ul className="mt-1.5 space-y-1">
+                    {dupes.map((m) => (
+                      <li key={m.id} className="min-w-0 truncate">
+                        <Link href={`/crm/clients/${m.id}`} onClick={() => setOpen(false)}
+                          className="font-medium text-primary hover:underline" data-testid={`link-duplicate-${m.id}`}>
+                          {m.displayName}
+                        </Link>
+                        {(m.email || m.phone) && (
+                          <span className="text-muted-foreground"> · {[m.email, m.phone].filter(Boolean).join(" · ")}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-muted-foreground">
+                    Open the existing client, or create a separate one anyway — for example a spouse who shares the phone.
+                  </p>
+                </div>
+              )}
               <DialogFooter>
-                <Button onClick={() => create.mutate()} disabled={create.isPending} data-testid="button-save-client">
-                  {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Create client
-                </Button>
+                {dupes ? (
+                  <Button variant="outline" onClick={() => create.mutate(true)} disabled={create.isPending}
+                    data-testid="button-create-anyway">
+                    {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Create anyway
+                  </Button>
+                ) : (
+                  <Button onClick={() => create.mutate(false)} disabled={create.isPending} data-testid="button-save-client">
+                    {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Create client
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -198,6 +269,19 @@ export default function CrmClientsPage() {
         <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : isError ? (
         <ErrorCard title="Couldn't load clients" description="Check your connection and refresh the page." />
+      ) : !clients?.length && qDebounced.trim() ? (
+        <Card>
+          <EmptyState
+            icon={Search}
+            title={`No clients match “${qDebounced.trim()}”`}
+            description="Search looks at the client name, email, phone and street address."
+            action={
+              <Button variant="outline" onClick={clearSearch} data-testid="button-clear-search">
+                Clear search
+              </Button>
+            }
+          />
+        </Card>
       ) : !clients?.length ? (
         <Card>
           <EmptyState
@@ -237,26 +321,33 @@ export default function CrmClientsPage() {
               )}
               {shown.map((c) => (
                 <tr key={c.id} className={`${crmTable.tr} ${crmTableCards.tr} cursor-pointer`}
-                  onClick={() => navigate(`/crm/clients/${c.id}`)}
+                  // The name/chevron links navigate on their own — letting the
+                  // click bubble here pushed the same URL a second time.
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("a")) return;
+                    navigate(`/crm/clients/${c.id}`);
+                  }}
                   data-testid={`client-${c.id}`}>
                   <td className={crmTableCards.td}>
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 max-w-[16rem] sm:max-w-[14rem]">
                       <InitialAvatar name={c.displayName} />
                       <div className="min-w-0">
                         <Link href={`/crm/clients/${c.id}`}>
                           <span className="font-medium truncate text-primary hover:underline cursor-pointer block">{c.displayName}</span>
                         </Link>
-                        {c.companyName && (
+                        {c.companyName && c.companyName !== c.displayName && (
                           <div className="text-xs text-muted-foreground truncate">{c.companyName}</div>
                         )}
                       </div>
                     </div>
                   </td>
                   <td className={crmTableCards.td}>
-                    <div className="space-y-0.5 text-sm">
+                    {/* Capped widths (here, Client and Address) so one long
+                        email or street can't push Bid/Added off-screen. */}
+                    <div className="space-y-0.5 text-sm min-w-0 max-w-[16rem] sm:max-w-[12rem]">
                       {c.email && (
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Mail className="h-3 w-3 shrink-0" /><span className="truncate">{c.email}</span>
+                        <div className="flex items-center gap-1.5 text-muted-foreground" title={c.email}>
+                          <Mail className="h-3 w-3 shrink-0" /><span className="truncate min-w-0">{c.email}</span>
                         </div>
                       )}
                       {c.phone && (
@@ -269,9 +360,10 @@ export default function CrmClientsPage() {
                   </td>
                   <td className={`${crmTable.td} hidden sm:table-cell`}>
                     {(c.addressLine1 || c.city) ? (
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground max-w-[12rem]"
+                        title={[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}>
                         <MapPin className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}</span>
+                        <span className="truncate min-w-0">{[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}</span>
                       </div>
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
@@ -287,7 +379,7 @@ export default function CrmClientsPage() {
                     {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
                   </td>
                   <td className="hidden sm:table-cell sm:px-4 sm:py-3 sm:pr-3 align-middle">
-                    <Link href={`/crm/clients/${c.id}`}>
+                    <Link href={`/crm/clients/${c.id}`} aria-label={`Open ${c.displayName}`}>
                       <ChevronRight className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                     </Link>
                   </td>

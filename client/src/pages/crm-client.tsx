@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { EMAIL_RE, customerErrorMessage } from "@/lib/crm-customer-errors";
 import { milliToQty, priceToCents, qtyToMilli } from "@/lib/estimate-math";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -434,6 +435,39 @@ function mapsHref(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
+/** datetime-local input value in the browser's own timezone. */
+const toLocalInput = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+/** Default visit slot: tomorrow 9–10 AM local. "Now + 24h" copied the current
+ *  hour, so a late-evening click prefilled an 11 PM–midnight visit. */
+function nextVisitSlot(): { start: Date; end: Date } {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  start.setHours(9, 0, 0, 0);
+  return { start, end: new Date(start.getTime() + 3600000) };
+}
+
+/** Send links come back absolute from the server; never prefix the origin twice. */
+const absoluteLink = (link: string) =>
+  /^https?:\/\//i.test(link) ? link : new URL(link, window.location.origin).toString();
+
+/** Clipboard write that reports whether it actually happened (denied/insecure → false). */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Edit-dialog fields; only the ones that actually changed are PATCHed. */
+const EDIT_FIELDS = [
+  "displayName", "companyName", "email", "phone", "addressLine1", "city", "state", "postalCode", "notes",
+] as const;
+type EditForm = Record<(typeof EDIT_FIELDS)[number], string>;
+
 export default function CrmClientPage() {
   const [, params] = useRoute("/crm/clients/:id");
   const id = params?.id;
@@ -451,10 +485,13 @@ export default function CrmClientPage() {
   // button simply doesn't render for admin/pm/office seats.
   const isOwner = me?.member?.role === "owner";
 
-  const { data, isLoading, isError } = useQuery<any>({
+  const { data, isLoading, isError, error } = useQuery<any>({
     queryKey: [`/api/crm/customers/${id}`],
     enabled: !!id,
   });
+  // The default queryFn throws "404: …" for a missing client — that is "not
+  // found", not a connection problem.
+  const notFound = isError && /^404:/.test(String((error as any)?.message ?? ""));
 
   const { data: invoices, isError: invoicesError } = useQuery<any[]>({
     queryKey: [`/api/crm/invoices?customerId=${id}`],
@@ -548,10 +585,25 @@ export default function CrmClientPage() {
   const sendReply = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/inbox/${id}/reply`, { body: replyBody.trim() })).json(),
-    onSuccess: () => {
+    onSuccess: (r: any) => {
       setReplyBody("");
       queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
-      toast({ title: "Message sent", description: "The client gets it by email and in their portal." });
+      // Word the toast from what actually happened: the portal post always
+      // lands; the email copy only goes out when there's an address on file.
+      const email: string | null = data?.customer?.email ?? null;
+      if (r?.emailed === true) {
+        toast({ title: "Message sent", description: `Posted to their portal and emailed to ${email ?? "the client"}.` });
+      } else if (!email) {
+        toast({ title: "Posted to their portal", description: "No email on file, so no email copy was sent. Add one with Edit." });
+      } else if (r?.emailed === false) {
+        toast({
+          title: "Posted to their portal — email failed",
+          description: r.emailError ? String(r.emailError) : `The email copy to ${email} didn't go out.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Posted to their portal", description: `We also tried emailing a copy to ${email}.` });
+      }
     },
     onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -592,7 +644,7 @@ export default function CrmClientPage() {
         description: parts.length ? parts.join(" + ") : "Nothing to send — the client has no reachable contact.",
       });
     },
-    onError: (e: any) => toast({ title: "Could not send reminder", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not send reminder", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Invoices ──────────────────────────────────────────────────────────────
@@ -606,13 +658,18 @@ export default function CrmClientPage() {
   const sendInvoice = useMutation({
     mutationFn: async (invoiceId: string) =>
       (await apiRequest("POST", `/api/crm/invoices/${invoiceId}/send`, {})).json(),
-    onSuccess: (r: any) => {
+    onSuccess: async (r: any) => {
       refresh();
       if (r.emailed) {
         toast({ title: "Invoice sent" });
       } else {
-        navigator.clipboard?.writeText(window.location.origin + r.link);
-        toast({ title: "Email failed — payment link copied", description: "Send it to your client directly.", variant: "destructive" });
+        const link = absoluteLink(r.link);
+        const copied = await copyText(link);
+        toast({
+          title: copied ? "Email failed — payment link copied" : "Email failed",
+          description: copied ? "Send it to your client directly." : `Send this payment link to your client directly: ${link}`,
+          variant: "destructive",
+        });
       }
     },
     onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
@@ -663,36 +720,41 @@ export default function CrmClientPage() {
   // ── Edit client — the send flow tells the contractor "add an email first";
   // without this dialog there was no UI anywhere to do that. ─────────────────
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({
-    displayName: "", email: "", phone: "",
-    addressLine1: "", city: "", state: "", postalCode: "",
-  });
+  const [editForm, setEditForm] = useState<EditForm>(
+    () => Object.fromEntries(EDIT_FIELDS.map((k) => [k, ""])) as EditForm,
+  );
   const openEdit = () => {
     const c = data?.customer ?? {};
-    setEditForm({
-      displayName: c.displayName ?? "", email: c.email ?? "", phone: c.phone ?? "",
-      addressLine1: c.addressLine1 ?? "", city: c.city ?? "", state: c.state ?? "",
-      postalCode: c.postalCode ?? "",
-    });
+    setEditForm(Object.fromEntries(EDIT_FIELDS.map((k) => [k, c[k] ?? ""])) as EditForm);
     setEditOpen(true);
   };
   const updateClient = useMutation({
-    mutationFn: async () =>
-      (await apiRequest("PATCH", `/api/crm/customers/${id}`, {
-        displayName: editForm.displayName.trim(),
-        email: editForm.email.trim() || null,
-        phone: editForm.phone.trim() || null,
-        addressLine1: editForm.addressLine1.trim() || null,
-        city: editForm.city.trim() || null,
-        state: editForm.state.trim() || null,
-        postalCode: editForm.postalCode.trim() || null,
-      })).json(),
-    onSuccess: () => {
+    mutationFn: async () => {
+      // Only what changed goes up — the activity log names the fields sent,
+      // so a City fix must not read as "updated name, email, phone, …".
+      const c = data?.customer ?? {};
+      const norm = (v: unknown) => String(v ?? "").trim() || null;
+      const patch: Record<string, string | null> = {};
+      for (const k of EDIT_FIELDS) {
+        const next = norm(editForm[k]);
+        if (next !== norm(c[k])) patch[k] = next;
+      }
+      if (patch.email && !EMAIL_RE.test(patch.email)) throw new Error("Enter a valid email address.");
+      if (!Object.keys(patch).length) return { unchanged: true };
+      return (await apiRequest("PATCH", `/api/crm/customers/${id}`, patch)).json();
+    },
+    onSuccess: (r: any) => {
       setEditOpen(false);
+      if (r?.unchanged) {
+        toast({ title: "Nothing to save", description: "No details were changed." });
+        return;
+      }
       refresh();
+      // The clients list caches too (staleTime Infinity) — keep its row current.
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       toast({ title: "Client updated" });
     },
-    onError: (e: any) => toast({ title: "Could not update client", description: apiErrorMessage(e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not update client", description: customerErrorMessage(e), variant: "destructive" }),
   });
 
   // ── Estimate builder ──────────────────────────────────────────────────────
@@ -739,16 +801,17 @@ export default function CrmClientPage() {
   const send = useMutation({
     mutationFn: async (estimateId: string) =>
       (await apiRequest("POST", `/api/crm/estimates/${estimateId}/send`, { sms: alsoText })).json(),
-    onSuccess: (r: any) => {
+    onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
       if (r.emailed) {
         const textPart = r.texted ? " and texted" : r.smsError ? ` (text failed: ${r.smsError})` : "";
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}${textPart}.` });
       } else {
-        navigator.clipboard?.writeText(window.location.origin + r.link);
+        const link = absoluteLink(r.link);
+        const copied = await copyText(link);
         toast({
-          title: "Email failed — link copied",
-          description: "Send this link to your client directly.",
+          title: copied ? "Email failed — link copied" : "Email failed",
+          description: copied ? "Send this link to your client directly." : `Send this link to your client directly: ${link}`,
           variant: "destructive",
         });
       }
@@ -770,10 +833,11 @@ export default function CrmClientPage() {
   }
 
   if (isError || !data) {
+    const connectionProblem = isError && !notFound;
     return (
       <ErrorCard
-        title={isError ? "Couldn't load this client" : "Client not found"}
-        description={isError ? "Check your connection and refresh the page." : "This client may have been removed."}
+        title={connectionProblem ? "Couldn't load this client" : "Client not found"}
+        description={connectionProblem ? "Check your connection and refresh the page." : "This client may have been removed."}
       >
         <Link href="/crm/clients">
           <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> All clients</Button>
@@ -784,6 +848,15 @@ export default function CrmClientPage() {
 
   const c = data.customer;
   const estimates = data.estimates ?? [];
+
+  // One prefill for both Schedule buttons.
+  const openSchedule = () => {
+    const { start, end } = nextVisitSlot();
+    setApptTitle(`${c.displayName} — site visit`);
+    setApptStart(toLocalInput(start));
+    setApptEnd(toLocalInput(end));
+    setApptOpen(true);
+  };
 
   return (
     <CrmPage>
@@ -804,7 +877,9 @@ export default function CrmClientPage() {
                   <h1 className="text-2xl font-semibold tracking-tight">{c.displayName}</h1>
                   <InfoTip k="client-detail" />
                 </div>
-                {c.companyName && <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>}
+                {c.companyName && c.companyName !== c.displayName && (
+                  <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>
+                )}
                 <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
                   {c.email && (
                     <span className="flex items-center gap-1.5">
@@ -851,6 +926,14 @@ export default function CrmClientPage() {
                     );
                   })()}
                 </div>
+                {/* The New-client dialog's Notes land on the customer row —
+                    this is the one place they show (team-only, never the portal). */}
+                {typeof c.notes === "string" && c.notes.trim() && (
+                  <div className="mt-3 max-w-2xl rounded-md border bg-muted/40 px-3 py-2" data-testid="client-intake-notes">
+                    <div className="text-xs font-medium text-muted-foreground">Intake notes</div>
+                    <p className="mt-0.5 max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-sm">{c.notes.trim()}</p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -861,13 +944,18 @@ export default function CrmClientPage() {
                     <Pencil className="h-4 w-4 mr-2" /> Edit
                   </Button>
                   <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                    <DialogContent className="max-w-md" data-testid="dialog-edit-client">
+                    <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-client">
                       <DialogHeader><DialogTitle>Edit {c.displayName}</DialogTitle></DialogHeader>
                       <div className="space-y-3">
                         <div>
                           <Label htmlFor="edit-name">Name</Label>
-                          <Input id="edit-name" value={editForm.displayName} data-testid="input-edit-name"
+                          <Input id="edit-name" value={editForm.displayName} data-testid="input-edit-name" maxLength={200}
                             onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-company">Company (optional)</Label>
+                          <Input id="edit-company" value={editForm.companyName} data-testid="input-edit-company" maxLength={200}
+                            onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })} />
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div>
@@ -878,31 +966,37 @@ export default function CrmClientPage() {
                           </div>
                           <div>
                             <Label htmlFor="edit-phone">Phone</Label>
-                            <Input id="edit-phone" type="tel" value={editForm.phone} data-testid="input-edit-phone"
+                            <Input id="edit-phone" type="tel" value={editForm.phone} data-testid="input-edit-phone" maxLength={40}
                               onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
                           </div>
                         </div>
                         <div>
                           <Label htmlFor="edit-address">Address</Label>
-                          <Input id="edit-address" value={editForm.addressLine1} data-testid="input-edit-address"
+                          <Input id="edit-address" value={editForm.addressLine1} data-testid="input-edit-address" maxLength={200}
                             onChange={(e) => setEditForm({ ...editForm, addressLine1: e.target.value })} />
                         </div>
                         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
                           <div className="col-span-2 sm:col-span-1">
                             <Label htmlFor="edit-city">City</Label>
-                            <Input id="edit-city" value={editForm.city}
+                            <Input id="edit-city" value={editForm.city} maxLength={120}
                               onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
                           </div>
                           <div>
                             <Label htmlFor="edit-state">State</Label>
-                            <Input id="edit-state" value={editForm.state}
+                            <Input id="edit-state" value={editForm.state} maxLength={40}
                               onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} />
                           </div>
                           <div>
                             <Label htmlFor="edit-zip">ZIP</Label>
-                            <Input id="edit-zip" value={editForm.postalCode}
+                            <Input id="edit-zip" value={editForm.postalCode} maxLength={20}
                               onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })} />
                           </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-notes">Intake notes</Label>
+                          <Textarea id="edit-notes" rows={3} value={editForm.notes} data-testid="input-edit-notes"
+                            placeholder="Only your team sees these."
+                            onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
                         </div>
                       </div>
                       <DialogFooter>
@@ -918,9 +1012,11 @@ export default function CrmClientPage() {
               )}
               {data.portalPath && (
                 <Button variant="outline" size="sm" data-testid="button-copy-portal"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(window.location.origin + data.portalPath);
-                    toast({ title: "Client portal link copied" });
+                  onClick={async () => {
+                    const link = absoluteLink(data.portalPath);
+                    toast(await copyText(link)
+                      ? { title: "Client portal link copied" }
+                      : { title: "Couldn't copy the link", description: link, variant: "destructive" });
                   }}>
                   <Copy className="h-4 w-4 mr-2" /> Copy portal link
                 </Button>
@@ -975,16 +1071,7 @@ export default function CrmClientPage() {
             <span className="text-sm font-medium text-muted-foreground mr-1">Quick actions</span>
             {canManageJobs && (
               <Button size="sm" variant="outline" data-testid="button-schedule-appointment"
-                onClick={() => {
-                  const start = new Date(Date.now() + 86400000);
-                  start.setMinutes(0, 0, 0);
-                  const toLocal = (d: Date) =>
-                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                  setApptTitle(`${c.displayName} — site visit`);
-                  setApptStart(toLocal(start));
-                  setApptEnd(toLocal(new Date(start.getTime() + 3600000)));
-                  setApptOpen(true);
-                }}>
+                onClick={openSchedule}>
                 <Calendar className="h-4 w-4 mr-2" /> Schedule appointment
               </Button>
             )}
@@ -1084,16 +1171,7 @@ export default function CrmClientPage() {
           />
           {canManageJobs && (
             <Button size="sm" variant="outline" data-testid="button-schedule-appointment-section"
-              onClick={() => {
-                const start = new Date(Date.now() + 86400000);
-                start.setMinutes(0, 0, 0);
-                const toLocal = (d: Date) =>
-                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                setApptTitle(`${c.displayName} — site visit`);
-                setApptStart(toLocal(start));
-                setApptEnd(toLocal(new Date(start.getTime() + 3600000)));
-                setApptOpen(true);
-              }}>
+              onClick={openSchedule}>
               <Calendar className="h-4 w-4 mr-2" /> Schedule appointment
             </Button>
           )}
@@ -1428,11 +1506,15 @@ export default function CrmClientPage() {
                           <Send className="h-4 w-4 mr-2" /> {inv.sentAt ? "Resend" : "Send"}
                         </Button>
                       )}
-                      {inv.publicToken && (
+                      {/* A voided invoice's link answers 410 — never offer to copy it. */}
+                      {inv.publicToken && !inv.voidedAt && (
                         <Button size="sm" variant="ghost" data-testid={`button-copy-invoice-${inv.id}`}
-                          onClick={() => {
-                            navigator.clipboard?.writeText(`${window.location.origin}/i/${inv.publicToken}`);
-                            toast({ title: "Payment link copied" });
+                          aria-label={`Copy payment link for ${inv.number}`} title="Copy payment link"
+                          onClick={async () => {
+                            const link = absoluteLink(`/i/${inv.publicToken}`);
+                            toast(await copyText(link)
+                              ? { title: "Payment link copied" }
+                              : { title: "Couldn't copy the link", description: link, variant: "destructive" });
                           }}>
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -1448,6 +1530,7 @@ export default function CrmClientPage() {
                       )}
                       {canInvoice && !inv.voidedAt && !(inv.paidCents > 0) && (
                         <Button size="sm" variant="ghost" data-testid={`button-void-invoice-${inv.id}`}
+                          aria-label={`Void invoice ${inv.number}`} title="Void invoice"
                           disabled={voidInvoice.isPending}
                           onClick={() => {
                             if (window.confirm(`Void ${inv.number}? This can't be undone.`)) voidInvoice.mutate(inv.id);
@@ -1528,7 +1611,7 @@ export default function CrmClientPage() {
             <SectionTitle
               icon={MessageSquare}
               title="Messages"
-              description="The client's thread — replies land in their email and their portal."
+              description="The client's thread — replies land in their portal, and in their email when one is on file."
             />
           </CardHeader>
           <CardContent className="space-y-3">
