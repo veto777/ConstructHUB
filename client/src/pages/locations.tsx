@@ -681,13 +681,13 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold" data-testid="text-business-photo-count">{location.businessPhotoCount || 0}</p>
+            <p className="text-2xl font-bold" data-testid="text-business-photo-count">{location.businessPhotoCount ?? "Unavailable"}</p>
             <p className="text-xs text-muted-foreground">Business uploads</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold" data-testid="text-customer-photo-count">{location.customerPhotoCount || 0}</p>
+            <p className="text-2xl font-bold" data-testid="text-customer-photo-count">{location.customerPhotoCount ?? "Unavailable"}</p>
             <p className="text-xs text-muted-foreground">Customer uploads</p>
           </CardContent>
         </Card>
@@ -696,7 +696,7 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
       <Card className="border-blue-500/20 bg-blue-500/5">
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">
-            Due to limitations imposed by Google, we do not currently support photo uploads. To upload photos, we suggest using{" "}
+            Use Posts &amp; Photos to upload, caption and schedule approved photos for a linked Google Business Profile. You can also use{" "}
             <a
               href="https://business.google.com"
               target="_blank"
@@ -710,6 +710,9 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
         </CardContent>
       </Card>
 
+      <Button className="w-full gap-2" onClick={() => window.location.href = "/gbp-content"} data-testid="button-posts-photos">
+        Open Posts &amp; Photos
+      </Button>
       <Button
         variant="outline"
         className="w-full gap-2"
@@ -717,7 +720,7 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
         data-testid="button-photo-optimizer"
       >
         <Image className="w-4 h-4" />
-        Upload via Photo Optimizer
+        Open Photo Optimizer
         <ExternalLink className="w-3 h-3" />
       </Button>
     </div>

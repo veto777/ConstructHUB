@@ -159,3 +159,40 @@ test('partial upload exposes saved photos immediately and allows retrying the re
     await expect(page.getByLabel('Caption for Saved 3.jpg')).toBeVisible();
     await expect(page.getByText('2 selected',{exact:true})).toBeVisible();
 });
+
+test('100-file boundary uploads sequentially and refuses 101 before any request', async ({ page }) => {
+    let uploads = 0;
+    const photos: any[] = [];
+    await page.route(`**/api/gbp/content/${location}**`, async route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/upload')) {
+            uploads++;
+            const photo = {id:uploads,name:`Boundary fixture ${uploads}.jpg`,url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'};
+            photos.push(photo);
+            return route.fulfill({json:photo});
+        }
+        return route.fulfill({json:path.endsWith('/photos')?photos:{jobs:[],style:null,workerEnabled:false}});
+    });
+    await page.goto('/gbp-content');
+    await page.getByLabel('Location', {exact:true}).selectOption(String(location));
+    const files = Array.from({length:101}, (_,i)=>({name:`fixture-${i}.jpg`,mimeType:'image/jpeg',buffer:Buffer.from('fixture')}));
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files);
+    await expect(page.getByRole('alert')).toContainText('Choose at most 100 photos');
+    expect(uploads).toBe(0);
+    await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files.slice(0,100));
+    await expect(page.getByText('100 selected',{exact:true})).toBeVisible();
+    await expect(page.getByText('100 photos uploaded. Review captions before publishing.',{exact:true})).toBeVisible();
+    expect(uploads).toBe(100);
+});
+
+test('profile Photos tab points to the shipped publisher and distinguishes unknown counts from zero', async ({ page }) => {
+    await page.route('**/api/locations', route => route.fulfill({json:[{id:99884,businessName:'Photos audit fixture',businessPhotoCount:null,customerPhotoCount:0}]}));
+    await page.goto('/locations');
+    await page.getByText('Photos audit fixture',{exact:true}).click();
+    await page.getByTestId('tab-photos').click();
+    await expect(page.getByTestId('text-business-photo-count')).toHaveText('Unavailable');
+    await expect(page.getByTestId('text-customer-photo-count')).toHaveText('0');
+    await expect(page.getByText('we do not currently support photo uploads',{exact:false})).toHaveCount(0);
+    await page.getByTestId('button-posts-photos').click();
+    await expect(page).toHaveURL(/\/gbp-content$/);
+});
