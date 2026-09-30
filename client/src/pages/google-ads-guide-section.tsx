@@ -417,7 +417,7 @@ const SECTIONS: Record<string, SectionData> = {
     blocks: [
       { type: "heading", content: "Set Up Google Click Guard Immediately" },
       { type: "text", content: "IP exclusions are one of the most important settings in your campaign. Every time a fraudulent IP clicks your ad, you lose $30-50. Without a system to detect and block these IPs automatically, you're bleeding money every single day." },
-      { type: "text", content: "That's what our Google Click Guard is for. Go to Google Click Guard in the sidebar to set up your tracking script. It records visitors to your website that run the script and flags unusual patterns. To apply the resulting IP list, paste the script from the 'Google Ads Script' tab into your own Google Ads account (Tools → Bulk actions → Scripts) and schedule it hourly. No Google sign-in to ConstructHUB is needed." },
+      { type: "text", content: "That's what our Google Click Guard is for. Go to Google Click Guard in the sidebar to set up your tracking script. It records visitors to your website that run the script and flags unusual patterns. To apply the resulting IP list, paste the script from the 'Google Ads Script' tab into your own Google Ads account (Tools → Bulk actions → Scripts) and schedule it hourly. This script method needs no Google sign-in to ConstructHUB." },
       { type: "text", content: "Add the tracking script to your website, then install and schedule the separate Google Ads script to apply your IP list on supported campaigns. Review execution logs to verify it runs." },
       { type: "image", src: imgIpExclusions, caption: "IP Exclusions section in Campaign Settings — verify exclusions after running the separate Google Ads script" },
 
@@ -532,7 +532,7 @@ const SECTIONS: Record<string, SectionData> = {
         "Automatic listing — a flagged IP with more than 10 visits in an hour is added to your Blocked IPs list",
       ] },
       { type: "text", content: "The VPN, behavior-analysis, threshold and aggressive-blocking options in Domain Settings are saved preferences only; they do not change these rules yet." },
-      { type: "text", content: "To apply your Blocked IPs list in Google Ads, copy the script from the 'Google Ads Script' tab, paste it into Google Ads → Tools → Bulk actions → Scripts, and schedule it to run hourly. Check the script's Logs tab to confirm it ran. ConstructHUB does not sign in to your Google Ads account." },
+      { type: "text", content: "To apply your Blocked IPs list in Google Ads, copy the script from the 'Google Ads Script' tab, paste it into Google Ads → Tools → Bulk actions → Scripts, and schedule it to run hourly. Check the script's Logs tab to confirm it ran. The script runs inside your own Google Ads account, so this method needs no Google sign-in to ConstructHUB." },
     ],
   },
 

@@ -57,7 +57,7 @@ export default function GoogleAdFraudPage() {
       content: [
         {
           heading: "In Sessions We Reviewed, Most Looked Automated",
-          text: "In our own experience, we installed screen recording software that captures visitors' mouse movements, clicks, scrolls, and behavior on client websites. In the Google Ads sessions we reviewed, we judged roughly 80% of the recorded behavior to be not human. This is our observation from the accounts we worked on, not an independent audit, and your traffic may differ. These weren't real people — they were bots. The behavior was unmistakable: instant bounces, robotic mouse movements that covered just enough distance to mimic a real user, or completely static sessions with zero interaction. These bots are sophisticated enough to trigger a \"click\" in Google's system but provide zero value to the advertiser."
+          text: "In our own experience, we installed screen recording software that captures visitors' mouse movements, clicks, scrolls, and behavior on client websites. In the Google Ads sessions we reviewed, we judged roughly 80% of the recorded behavior to be not human. This is our observation from the accounts we worked on, not an independent audit, and your traffic may differ. We classed those sessions as bots because of their behavior: instant bounces, robotic mouse movements that covered just enough distance to mimic a real user, or completely static sessions with zero interaction. These bots are sophisticated enough to trigger a \"click\" in Google's system but provide zero value to the advertiser."
         },
         {
           heading: "Google Can Track Bots — It Chooses Not To",

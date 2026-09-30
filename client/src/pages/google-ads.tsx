@@ -450,7 +450,7 @@ export default function ClickGuardPage() {
                       domain={selectedDomain}
                       domains={domains}
                       deleteDomainMutation={deleteDomainMutation}
-                      selectedDomainId={selectedDomainId}
+                      selectedDomainId={selectedDomain.id}
                       setSelectedDomainId={setSelectedDomainId}
                       setShowAddDomain={setShowAddDomain}
                     />
@@ -543,7 +543,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
           Apply Your IP List in Google Ads
         </h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Click Guard records script-observed visits and flags unusual patterns. To apply its IP exclusion list, you paste a script into your own Google Ads account (Tools &rarr; Bulk actions &rarr; Scripts) and schedule it. There is no Google sign-in here &mdash; ConstructHUB does not connect to your Google Ads account.
+          Click Guard records script-observed visits and flags unusual patterns. To apply its IP exclusion list, you paste a script into your own Google Ads account (Tools &rarr; Bulk actions &rarr; Scripts) and schedule it. This tab has no Google sign-in; the script runs inside your own Google Ads account. Agencies with a Google Ads manager (MCC) account can instead connect it with Google under Agency Ads &amp; LSA and apply Click Guard exclusions to mapped client accounts from there.
         </p>
       </div>
 
@@ -675,7 +675,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#4285F4] to-[#3367D6] flex items-center justify-center text-white font-bold text-sm">2</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Click Guard Detects Fraud Automatically</CardTitle>
+                  <CardTitle className="text-foreground text-base">Click Guard Flags Unusual Traffic Automatically</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">No action needed — this happens on ConstructHUB's servers</p>
                 </div>
               </div>
@@ -683,10 +683,10 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { icon: MousePointerClick, label: "Multi-click detection", desc: "Same IP clicking your ad 5+ times in an hour" },
+                  { icon: MousePointerClick, label: "Multi-click detection", desc: "More than 5 visits from one IP in an hour" },
                   { icon: Bot, label: "Bot detection", desc: "Known bot user agents, headless browsers, crawlers" },
                   { icon: Fingerprint, label: "VPN hopping", desc: "Same device fingerprint appearing from different IPs" },
-                  { icon: Ban, label: "Auto-blocking", desc: "Suspicious IPs are automatically added to your block list" },
+                  { icon: Ban, label: "Auto-blocking", desc: "A flagged IP with more than 10 visits in an hour is added to your Blocked IPs list" },
                 ].map((item, i) => (
                   <div key={i} className="flex items-start gap-3 bg-card rounded-lg p-3">
                     <item.icon className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -713,7 +713,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             <CardContent className="space-y-4">
               <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). This script runs every hour, calls ConstructHUB's API, gets your latest blocked IPs, and adds them as IP exclusions on all your active campaigns. Google applies IP exclusions where supported; changing IPs and campaign limitations can reduce their effectiveness.
+                  <span className="text-emerald-400 font-semibold">How it works:</span> You paste a script into your Google Ads account (under Scripts). Scheduled hourly, each run calls ConstructHUB's API, gets your latest blocked IPs, and adds them as IP exclusions on all your active campaigns. Google applies IP exclusions where supported; changing IPs and campaign limitations can reduce their effectiveness.
                 </p>
               </div>
 
