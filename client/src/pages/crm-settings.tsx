@@ -1226,7 +1226,16 @@ export default function CrmSettingsPage() {
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1">
-              {smsStatus?.configured ? (
+              {smsStatus?.planAllowsSms === false ? (
+                <>
+                  <div className="font-medium" data-testid="text-sms-plan">Texting is a Premium and Platinum feature</div>
+                  <div className="text-xs text-muted-foreground">
+                    {smsStatus.planMessage} Includes text reminders to clients, quick texts, and a text to you when a bid is
+                    signed, money lands, or a client re-opens their estimate. Emails keep working on every plan.
+                  </div>
+                  <a href="/pricing" className="text-xs text-primary underline" data-testid="link-sms-upgrade">See plans</a>
+                </>
+              ) : smsStatus?.configured ? (
                 <>
                   <div className="font-medium" data-testid="text-sms-configured">
                     Texting via SignalWire from {smsStatus.fromNumber}
@@ -1258,11 +1267,11 @@ export default function CrmSettingsPage() {
             </div>
             {smsStatus && (
               <StatusPill tone={smsStatus.configured ? "success" : "neutral"} data-testid="pill-sms-status">
-                {smsStatus.configured ? "Configured" : "Not configured"}
+                {smsStatus.planAllowsSms === false ? "Upgrade to enable" : smsStatus.configured ? "Configured" : "Not configured"}
               </StatusPill>
             )}
           </div>
-          {canIntegrations && (
+          {canIntegrations && smsStatus?.planAllowsSms !== false && (
             <div className="border-t pt-3 space-y-3" data-testid="section-sms-sender">
               <div>
                 <div className="text-sm font-medium">Which number your texts come from</div>

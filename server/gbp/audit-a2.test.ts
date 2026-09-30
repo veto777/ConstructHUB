@@ -40,7 +40,7 @@ afterAll(async()=>{
   await pool.query('DELETE FROM users WHERE id=$1',[user]);
   await pool.end();
 });
-it('uses each location grant for Guard, review sync, reply publish/delete and never duplicates import notices',async()=>{
+it('uses each location grant for Guard, review sync, reply publish/delete and never alerts on imported history',async()=>{
   for(const id of locations) {
     const preview=await previewSnapshot(user,id);
     await configureGuard(user,id,'notify',['title'],preview.token);
@@ -51,7 +51,8 @@ it('uses each location grant for Guard, review sync, reply publish/delete and ne
     await reply(user,review,'Fixture reply','publish');await reply(user,review,'','delete');
     await saveReplySettings(user,id,{...defaults,mode:'draft'});
   }
-  expect((await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND kind='gbp.new_review'",[user])).rows[0].n).toBe(2);
+  // First imports are history (and the fixture review is from 2020): no review alerts at all.
+  expect((await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND kind='gbp.new_review'",[user])).rows[0].n).toBe(0);
   expect(calls.filter(c=>c.method==='PUT')).toHaveLength(2);
   expect(calls.filter(c=>c.method==='DELETE')).toHaveLength(2);
 });

@@ -25,6 +25,8 @@ import {
   crmNotificationChannel,
   crmNotifications,
   crmSmsOptouts,
+  subscriptions,
+  users,
   type CrmNotificationPref,
 } from "@shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -32,6 +34,7 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl } from "../site-context";
+import { isPlatformAdminEmail } from "../admin";
 import { logEvent, presentEstimate } from "./entities";
 
 type GetUser = (req: any, res: any) => any;
@@ -69,6 +72,52 @@ export function smsStatus(orgCustomFields?: unknown) {
      *  (a brand texting its own users) stay allowed either way. */
     canTextClients: orgCanTextClients(orgCustomFields),
   };
+}
+
+// ── Plan entitlement ────────────────────────────────────────────────────────
+
+/** Texting (client texts, reminders, alert texts) is a Premium-and-up feature. */
+export const SMS_PLANS: ReadonlySet<string> = new Set(["premium", "gold", "platinum"]);
+export const SMS_NEEDS_PLAN =
+  "Text messaging is included with the Premium and Platinum plans. Upgrade in Pricing to turn it on.";
+
+const entitlementCache = new Map<string, { ok: boolean; at: number }>();
+
+/** True when the org owner's ConstructHUB plan includes texting (active or
+ *  trialing Premium / Gold / Platinum), or the owner is a platform admin.
+ *  Cached for a minute; a lookup failure denies (texts cost money). */
+export async function orgSmsEntitled(orgId: string): Promise<boolean> {
+  const hit = entitlementCache.get(orgId);
+  if (hit && Date.now() - hit.at < 60_000) return hit.ok;
+  let ok = false;
+  try {
+    const [row] = await db
+      .select({ email: users.email, plan: subscriptions.plan, status: subscriptions.status })
+      .from(crmOrgs)
+      .innerJoin(users, eq(users.id, crmOrgs.ownerUserId))
+      .leftJoin(subscriptions, eq(subscriptions.userId, crmOrgs.ownerUserId))
+      .where(eq(crmOrgs.id, orgId))
+      .limit(1);
+    ok = !!row && (isPlatformAdminEmail(row.email) ||
+      (SMS_PLANS.has(row.plan ?? "") && (row.status === "active" || row.status === "trialing")));
+  } catch (e: any) {
+    console.error("[sms] plan check failed (not sending):", e?.message || e);
+    return false;
+  }
+  entitlementCache.set(orgId, { ok, at: Date.now() });
+  return ok;
+}
+
+/** Tests and plan changes: forget cached answers. */
+export function clearSmsEntitlementCache(): void {
+  entitlementCache.clear();
+}
+
+/** smsStatus plus the plan gate: an org without texting reads as not configured. */
+export async function orgSmsStatus(org: { id: string; customFields: unknown }) {
+  const status = smsStatus(org.customFields);
+  if (await orgSmsEntitled(org.id)) return { ...status, planAllowsSms: true };
+  return { ...status, configured: false, canTextClients: false, fromNumber: null, planAllowsSms: false, planMessage: SMS_NEEDS_PLAN };
 }
 
 // ── Per-org sender: shared platform number, own number, or own account ─────
@@ -286,6 +335,9 @@ export async function sendSms(
   orgId?: string,
 ): Promise<SmsResult> {
   const sender = resolveSmsSender(orgCustomFields);
+  if (orgId && orgId !== "*" && !(await orgSmsEntitled(orgId))) {
+    return { ok: false, provider: sender ? "signalwire" : "log", sid: null, error: SMS_NEEDS_PLAN };
+  }
   if (orgId) {
     try {
       if (await isSmsOptedOut(orgId, to)) {
@@ -556,7 +608,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    res.json(smsStatus(ctx.org.customFields));
+    res.json(await orgSmsStatus(ctx.org));
   });
 
   /** Send a real test text — manageIntegrations only. Honest 503 when the
@@ -571,6 +623,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageIntegrations")) return;
+    if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json({ message: SMS_NEEDS_PLAN, planAllowsSms: false });
 
     const parsed = z.object({
       mode: z.enum(["platform", "dedicated", "byo"]),
@@ -614,7 +667,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     const [row] = await db.update(crmOrgs)
       .set({ customFields: cf, updatedAt: new Date() })
       .where(eq(crmOrgs.id, ctx.org.id)).returning();
-    res.json(smsStatus(row.customFields));
+    res.json(await orgSmsStatus(row));
   });
 
   app.post("/api/crm/sms/test", async (req: any, res) => {
@@ -623,6 +676,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageIntegrations")) return;
+    if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json({ message: SMS_NEEDS_PLAN, planAllowsSms: false });
 
     if (!smsConfigured()) {
       return res.status(503).json({

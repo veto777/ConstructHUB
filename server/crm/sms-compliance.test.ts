@@ -11,7 +11,7 @@
  * env shims so its db pool points at the test database (CRM_TEST_*).
  * Part 2 exercises the running dev server (CRM_TEST_BASE_URL).
  */
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import pg from "pg";
@@ -26,7 +26,8 @@ process.env.DATABASE_URL =
 
 let sendSms: any, resolveSmsSender: any, orgCanTextClients: any, smsStatus: any,
   recordSmsOptout: any, clearSmsOptout: any, isSmsOptedOut: any,
-  smsLamlReply: any, signalwireSignatureOk: any, CLIENT_TEXT_NEEDS_OWN_NUMBER: string;
+  smsLamlReply: any, signalwireSignatureOk: any, CLIENT_TEXT_NEEDS_OWN_NUMBER: string,
+  SMS_NEEDS_PLAN: string, clearSmsEntitlementCache: any;
 let placeEmailNudgeCall: any, voiceNudgeOnEstimate: any, emailNudgeTwiml: any;
 
 beforeAll(async () => {
@@ -34,6 +35,7 @@ beforeAll(async () => {
     sendSms, resolveSmsSender, orgCanTextClients, smsStatus,
     recordSmsOptout, clearSmsOptout, isSmsOptedOut,
     smsLamlReply, signalwireSignatureOk, CLIENT_TEXT_NEEDS_OWN_NUMBER,
+    SMS_NEEDS_PLAN, clearSmsEntitlementCache,
   } = await import("./sms"));
   ({ placeEmailNudgeCall, voiceNudgeOnEstimate, emailNudgeTwiml } = await import("./voice"));
   // The table is created by the dev server's ensureCrmSchema; create it here
@@ -123,9 +125,44 @@ describe("orgCanTextClients (pure)", () => {
 });
 
 describe("opt-out suppression seam (real test DB)", () => {
-  const orgA = "vitest-sms-seam-a";
-  const orgB = "vitest-sms-seam-b";
+  // Texting is a Premium-and-up feature: orgs A and B belong to a Premium owner,
+  // orgFree to an owner with no plan.
+  let orgA = "", orgB = "", orgFree = "";
+  const owners: number[] = [];
   const phone = "+15550199999";
+
+  beforeAll(async () => {
+    const mk = async (plan: string | null) => {
+      const { rows: [u] } = await pool.query(`insert into users(email) values ('sms-plan-'||gen_random_uuid()||'@example.invalid') returning id`);
+      owners.push(u.id);
+      if (plan) await pool.query(`insert into subscriptions(user_id, plan, status) values ($1, $2, 'active')`, [u.id, plan]);
+      return u.id as number;
+    };
+    const org = async (owner: number, name: string) =>
+      (await pool.query(`insert into crm_orgs(name, owner_user_id) values ($1, $2) returning id`, [name, owner])).rows[0].id as string;
+    const premium = await mk("premium");
+    orgA = await org(premium, "vitest-sms-seam-a");
+    orgB = await org(premium, "vitest-sms-seam-b");
+    orgFree = await org(await mk(null), "vitest-sms-seam-free");
+  });
+  afterAll(async () => {
+    await pool.query(`delete from crm_orgs where owner_user_id = any($1)`, [owners]);
+    await pool.query(`delete from subscriptions where user_id = any($1)`, [owners]);
+    await pool.query(`delete from users where id = any($1)`, [owners]);
+  });
+
+  it("orgs without a Premium/Gold/Platinum plan cannot text; a lapsed plan stops texting", async () => {
+    await withSwEnv({}, async () => {
+      const refused = await sendSms(phone, "hello", undefined, orgFree);
+      expect(refused.ok).toBe(false);
+      expect(refused.error).toBe(SMS_NEEDS_PLAN);
+      await pool.query(`update subscriptions set status = 'canceled' where user_id = $1`, [owners[0]]);
+      clearSmsEntitlementCache();
+      expect((await sendSms(phone, "hello", undefined, orgA)).error).toBe(SMS_NEEDS_PLAN);
+      await pool.query(`update subscriptions set status = 'active' where user_id = $1`, [owners[0]]);
+      clearSmsEntitlementCache();
+    });
+  });
   const outbox = path.join(process.cwd(), "tmp", `sms-seam-test-${Date.now()}.jsonl`);
 
   afterEach(async () => {
