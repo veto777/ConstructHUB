@@ -25,6 +25,7 @@ import {
   CrmPage, MetricCard, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
+import { ClientSearchPicker } from "@/components/crm-search-picker";
 
 interface Step {
   key: string;
@@ -93,6 +94,11 @@ function HeadlineCard({ icon: Icon, label, stat, showMoney, href, testid }: {
 const money0 = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
+/** Stages that are off the live board: nothing left to win or collect. */
+const CLOSED_STAGES = new Set(["cancelled", "paid"]);
+/** GET /api/crm/customers returns at most this many rows. */
+const CLIENT_LIST_CAP = 500;
+
 /** Portal landing page. Never a dead end: it always offers the next action. */
 export default function CrmHomePage() {
   const { toast } = useToast();
@@ -159,13 +165,39 @@ export default function CrmHomePage() {
 
   const stages: any[] = pipeline?.stages ?? [];
   const projects: any[] = pipeline?.projects ?? [];
+  // Uncapped per-stage COUNTs from the server; `projects` is the newest 2,000.
+  const stageCounts: Record<string, number> | null = pipeline?.stageCounts ?? null;
+  const countWhere = (keep: (status: string) => boolean, fallback: number) =>
+    stageCounts
+      ? Object.entries(stageCounts).reduce((n, [k, c]) => n + (keep(k) ? c : 0), 0)
+      : fallback;
   const stageOf = (key: string) => stages.find((s) => s.key === key);
   const firstGroup = stages[0]?.group;
+  const firstStageKey: string | undefined = stages[0]?.key;
   // Leads = anything still sitting in the first swimlane (Prospect). Guard
   // against an empty stage list — undefined === undefined would make EVERY
   // project a lead.
-  const leads = projects.filter((p) => firstGroup != null && stageOf(p.status)?.group === firstGroup);
-  const pipelineValue = projects.reduce((s, p) => s + (p.contractValueCents ?? 0), 0);
+  const isLead = (status: string) => firstGroup != null && stageOf(status)?.group === firstGroup;
+  const leads = projects.filter((p) => isLead(p.status));
+  const leadCount = countWhere(isLead, leads.length);
+  // The open book: every project still in play. Cancelled and paid jobs are
+  // closed — summing them made "Pipeline value" grow forever.
+  const isOpen = (status: string) => !CLOSED_STAGES.has(status);
+  const openProjects = projects.filter((p) => isOpen(p.status));
+  const openCount = countWhere(isOpen, openProjects.length);
+  // Server-side SUM when /api/crm/stats provides it; otherwise the loaded
+  // cards, labelled as partial when the 2,000-card list is truncated.
+  const openPipeline: { count: number; totalCents: number } | undefined = stats?.openPipeline;
+  const pipelineValue = openPipeline?.totalCents
+    ?? openProjects.reduce((s, p) => s + (p.contractValueCents ?? 0), 0);
+  const pipelineCount = openPipeline?.count ?? openCount;
+  const pipelinePartial = !openPipeline && openCount > openProjects.length;
+  // The client list endpoint caps at the newest 500 rows — prefer a real
+  // count, and never present the cap as the total.
+  const clientCount: number | undefined = stats?.clients?.count;
+  const clientsValue = clientCount != null
+    ? clientCount.toLocaleString()
+    : clients ? (clients.length >= CLIENT_LIST_CAP ? `${CLIENT_LIST_CAP}+` : clients.length) : "—";
   const recent = [...projects]
     .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
     .slice(0, 5);
@@ -256,10 +288,12 @@ export default function CrmHomePage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <HeadlineCard icon={FileText} label="Open estimates" stat={stats?.openEstimates}
           showMoney={canSeePrices} href="/crm/estimates" testid="card-stat-open-estimates" />
+        {/* Jobs won counts APPROVED ESTIMATES — link to that list, not the board. */}
         <HeadlineCard icon={Trophy} label="Jobs won" stat={stats?.jobsWon}
-          showMoney={canSeePrices} href="/crm/pipeline" testid="card-stat-jobs-won" />
+          showMoney={canSeePrices} href="/crm/estimates?status=approved" testid="card-stat-jobs-won" />
+        {/* Unscheduled = the board's Approved column; land on (and ring) it. */}
         <HeadlineCard icon={CalendarClock} label="Unscheduled jobs" stat={stats?.unscheduledJobs}
-          showMoney={canSeePrices} href="/crm/pipeline" testid="card-stat-unscheduled" />
+          showMoney={canSeePrices} href="/crm/pipeline?stage=approved" testid="card-stat-unscheduled" />
         <HeadlineCard icon={ReceiptText} label="Open invoices" stat={stats?.openInvoices}
           showMoney={canSeePrices} href={canSeePrices ? "/crm/invoices" : undefined} testid="card-stat-open-invoices" />
       </div>
@@ -269,7 +303,7 @@ export default function CrmHomePage() {
         <MetricCard
           icon={Users}
           label="Clients"
-          value={clients?.length ?? "—"}
+          value={clientsValue}
           context="in your book — each with its own portal"
           href="/crm/clients"
         />
@@ -278,24 +312,26 @@ export default function CrmHomePage() {
             icon={DollarSign}
             label="Pipeline value"
             value={money0(pipelineValue)}
-            context={`across ${projects.length} open project${projects.length === 1 ? "" : "s"}`}
+            context={pipelinePartial
+              ? `newest ${openProjects.length.toLocaleString()} of ${pipelineCount.toLocaleString()} open projects`
+              : `across ${pipelineCount.toLocaleString()} open project${pipelineCount === 1 ? "" : "s"} (not cancelled or paid)`}
             href="/crm/pipeline"
           />
         ) : (
           <MetricCard
             icon={KanbanSquare}
             label="Open projects"
-            value={projects.length}
-            context="across every stage of the board"
+            value={openCount}
+            context="on the board — not cancelled or paid"
             href="/crm/pipeline"
           />
         )}
         <MetricCard
           icon={AlertCircle}
           label="Leads to follow up"
-          value={leads.length}
-          context={leads.length ? "sitting in the first stage — first touch wins" : "nothing waiting on you"}
-          href="/crm/pipeline"
+          value={leadCount}
+          context={leadCount ? "sitting in the first stage — first touch wins" : "nothing waiting on you"}
+          href={firstStageKey ? `/crm/pipeline?stage=${firstStageKey}` : "/crm/pipeline"}
         />
       </div>
 
@@ -560,21 +596,13 @@ export default function CrmHomePage() {
           </div>
           <div className="space-y-1.5 pt-1">
             <Label>Add a client (starts weekly)</Label>
-            <Select
-              value=""
-              onValueChange={(id) => id && followUpMut.mutate({ customerId: id, cadenceDays: 7 })}
-            >
-              <SelectTrigger data-testid="select-add-follow-up">
-                <SelectValue placeholder="Pick a client…" />
-              </SelectTrigger>
-              <SelectContent>
-                {(clients ?? [])
-                  .filter((c: any) => !(followUpsData?.followUps ?? []).some((f: any) => f.customerId === c.id))
-                  .map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>{c.displayName}</SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+            {/* Searches every client — the plain list is only the newest 500. */}
+            <ClientSearchPicker
+              value={null}
+              onChange={(c) => c && followUpMut.mutate({ customerId: c.id, cadenceDays: 7 })}
+              exclude={new Set((followUpsData?.followUps ?? []).map((f: any) => f.customerId))}
+              testid="select-add-follow-up"
+            />
           </div>
         </DialogContent>
       </Dialog>

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -18,16 +18,17 @@ import {
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard } from "@/components/crm-ui";
 import { Button } from "@/components/ui/button";
+import { ClientSearchPicker, type PickOption } from "@/components/crm-search-picker";
+import { parseDollarInput, dollarInputError } from "@/lib/dollar-input";
+import { cn } from "@/lib/utils";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "" : `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
-/** Loose "$12,500" / "12500" → cents; blank → null. */
-const dollarsToCents = (s: string): number | null => {
-  const n = parseFloat(s.replace(/[$,\s]/g, ""));
-  if (!isFinite(n) || n < 0) return null;
-  return Math.round(n * 100);
-};
+// Money inputs parse strictly ("$12,500", "12500", "12.5k"; blank → null) and
+// an unreadable value blocks the save with an inline message — never a
+// silent $12 for "12k" or a wiped value for a typo.
+const moneyError = (s: string) => (s.trim() ? dollarInputError(s) : null);
 
 /** One accent per swimlane, falling back by position for custom groups. */
 const GROUP_COLORS = [
@@ -44,26 +45,27 @@ const groupColor = (group: string, idx: number) =>
 // ── New lead ────────────────────────────────────────────────────────────────
 
 function NewLeadDialog({
-  open, onOpenChange, customers, firstStage, canSeePrices,
+  open, onOpenChange, firstStage, canSeePrices,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  customers: any[];
   firstStage: string;
   canSeePrices: boolean;
 }) {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [mode, setMode] = useState<"existing" | "new">("new");
-  const [customerId, setCustomerId] = useState("");
+  // Existing client: searched server-side — the plain list is the newest 500.
+  const [customer, setCustomer] = useState<PickOption | null>(null);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [value, setValue] = useState("");
+  const valueError = canSeePrices ? moneyError(value) : null;
 
-  const reset = () => { setName(""); setMode("new"); setCustomerId(""); setNewCustomerName(""); setValue(""); };
+  const reset = () => { setName(""); setMode("new"); setCustomer(null); setNewCustomerName(""); setValue(""); };
 
   const create = useMutation({
     mutationFn: async () => {
-      let custId = customerId;
+      let custId = customer?.id ?? "";
       if (mode === "new") {
         const c = await (await apiRequest("POST", "/api/crm/customers", {
           displayName: newCustomerName.trim(),
@@ -71,8 +73,8 @@ function NewLeadDialog({
         custId = c.id;
       }
       const body: any = { customerId: custId, name: name.trim(), status: firstStage };
-      const cents = dollarsToCents(value);
-      if (cents !== null) body.contractValueCents = cents;
+      const cents = canSeePrices ? parseDollarInput(value) : null;
+      if (cents !== null && !Number.isNaN(cents)) body.contractValueCents = cents;
       return (await apiRequest("POST", "/api/crm/projects", body)).json();
     },
     onSuccess: () => {
@@ -89,7 +91,7 @@ function NewLeadDialog({
     }),
   });
 
-  const ready = name.trim() && (mode === "existing" ? customerId : newCustomerName.trim());
+  const ready = name.trim() && (mode === "existing" ? customer : newCustomerName.trim()) && !valueError;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -99,7 +101,7 @@ function NewLeadDialog({
           <div>
             <Label htmlFor="lead-name">Lead name</Label>
             <Input id="lead-name" data-testid="input-lead-name" value={name}
-              onChange={(e) => setName(e.target.value)} placeholder="Smith kitchen remodel" autoFocus />
+              onChange={(e) => setName(e.target.value)} placeholder="Smith kitchen remodel" maxLength={200} autoFocus />
           </div>
           <RadioGroup value={mode} onValueChange={(v) => setMode(v as "existing" | "new")} className="flex gap-4">
             <label className="flex items-center gap-2 text-sm" data-testid="radio-lead-new-customer">
@@ -113,24 +115,23 @@ function NewLeadDialog({
             <div>
               <Label htmlFor="lead-customer-name">Client name</Label>
               <Input id="lead-customer-name" data-testid="input-lead-customer-name" value={newCustomerName}
-                onChange={(e) => setNewCustomerName(e.target.value)} placeholder="Jane Smith" />
+                onChange={(e) => setNewCustomerName(e.target.value)} placeholder="Jane Smith" maxLength={200} />
             </div>
           ) : (
             <div>
               <Label>Client</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
-                <SelectTrigger data-testid="select-lead-customer"><SelectValue placeholder="Pick a client…" /></SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.displayName}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ClientSearchPicker value={customer} onChange={setCustomer} testid="select-lead-customer" />
             </div>
           )}
           {canSeePrices && (
             <div>
               <Label htmlFor="lead-value">Estimated value (optional)</Label>
               <Input id="lead-value" data-testid="input-lead-value" value={value}
+                aria-invalid={!!valueError || undefined}
                 onChange={(e) => setValue(e.target.value)} placeholder="$12,500" inputMode="decimal" />
+              {valueError && (
+                <p className="mt-1 text-xs text-destructive" data-testid="error-lead-value">{valueError}</p>
+              )}
             </div>
           )}
         </div>
@@ -164,11 +165,13 @@ function EditProjectDialog({
   const [value, setValue] = useState(
     project.contractValueCents != null ? String(project.contractValueCents / 100) : "",
   );
+  // Blank clears the value on purpose; an unreadable one blocks the save.
+  const valueError = canSeePrices ? moneyError(value) : null;
 
   const save = useMutation({
     mutationFn: async () => {
       const body: any = { name: name.trim(), status, projectManagerMemberId: owner || null };
-      if (canSeePrices) body.contractValueCents = dollarsToCents(value);
+      if (canSeePrices) body.contractValueCents = parseDollarInput(value);
       return (await apiRequest("PATCH", `/api/crm/projects/${project.id}`, body)).json();
     },
     onSuccess: () => {
@@ -196,7 +199,11 @@ function EditProjectDialog({
           <div>
             <Label htmlFor="edit-value">Contract value</Label>
             <Input id="edit-value" data-testid="input-edit-value" value={value}
+              aria-invalid={!!valueError || undefined}
               onChange={(e) => setValue(e.target.value)} placeholder="$12,500" inputMode="decimal" />
+            {valueError && (
+              <p className="mt-1 text-xs text-destructive" data-testid="error-edit-value">{valueError}</p>
+            )}
           </div>
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -225,7 +232,7 @@ function EditProjectDialog({
       </div>
       <DialogFooter>
         <Button data-testid="button-save-edit" onClick={() => save.mutate()}
-          disabled={!name.trim() || save.isPending}>
+          disabled={!name.trim() || !!valueError || save.isPending}>
           {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           Save changes
         </Button>
@@ -252,9 +259,15 @@ export default function CrmPipelinePage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const { data: customers } = useQuery<any[]>({
-    queryKey: ["/api/crm/customers"], enabled: canMove,
-  });
+  // Deep link to one column (/crm/pipeline?stage=approved — the home page's
+  // "Unscheduled jobs" card): scroll it into view and ring it.
+  const focusStage = new URLSearchParams(useSearch()).get("stage");
+  const boardLoaded = !!data;
+  useEffect(() => {
+    if (!focusStage || !boardLoaded) return;
+    document.querySelector(`[data-testid="stage-col-${CSS.escape(focusStage)}"]`)
+      ?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+  }, [focusStage, boardLoaded]);
   const { data: membersData } = useQuery<any>({
     queryKey: ["/api/crm/members"], enabled: canMove,
   });
@@ -330,16 +343,22 @@ export default function CrmPipelinePage() {
                     onDrop={(e) => {
                       if (!canMove) return;
                       const id = e.dataTransfer.getData("text/plain");
-                      if (id) move.mutate({ id, status: s.key });
+                      // Dropped back where it started: nothing moved, so no
+                      // PATCH (it would reset the card's time-in-stage).
+                      if (!id || projects.find((p) => p.id === id)?.status === s.key) return;
+                      move.mutate({ id, status: s.key });
                     }}
                     data-testid={`stage-col-${s.key}`}>
                     <div className="flex items-center justify-between px-1.5 pb-2">
-                      <span className="text-sm font-medium">{s.label}</span>
+                      <span className={cn("text-sm font-medium", focusStage === s.key && "text-primary")}>{s.label}</span>
                       <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
                         {stageTotal}
                       </span>
                     </div>
-                    <div className="space-y-2 min-h-[80px] rounded-xl border border-border/50 bg-muted/40 p-2">
+                    <div className={cn(
+                      "space-y-2 min-h-[80px] rounded-xl border border-border/50 bg-muted/40 p-2",
+                      focusStage === s.key && "ring-2 ring-inset ring-primary/70",
+                    )} data-focused={focusStage === s.key || undefined}>
                       {visible.map((p) => (
                         <div key={p.id}
                           draggable={canMove}
@@ -448,7 +467,6 @@ export default function CrmPipelinePage() {
       <NewLeadDialog
         open={newLeadOpen}
         onOpenChange={setNewLeadOpen}
-        customers={customers ?? []}
         firstStage={firstStage}
         canSeePrices={canSeePrices}
       />

@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { parseDollarInput, dollarInputError } from "@/lib/dollar-input";
 import {
   FileText, ReceiptText, UserPlus, MessageSquare, Users, Loader2, Mail, Phone,
 } from "lucide-react";
@@ -23,16 +24,46 @@ import {
  * Message / Customer. Each item takes the shortest honest path:
  *
  *   - Estimate → /crm/estimates/new (the existing flow).
- *   - Invoice  → pick a client; a draft invoice is created via the existing
- *     POST /api/crm/invoices and you land on the client page to finish it.
+ *   - Invoice  → pick a client, say what it's for and the amount; a draft
+ *     invoice with that one line is created via POST /api/crm/invoices and
+ *     you land on the client page to send it.
  *   - Lead     → a small dialog that creates the client (dedupe idiom) plus a
  *     project in the FIRST pipeline stage ("lead") — there is no lead entity
  *     by design (brain doc §3), the pipeline's first swimlane IS the lead list.
  *   - Message  → quick-message composer: email always works; the Text channel
- *     is grayed out with a pointer to Settings → Integrations when SMS isn't
+ *     is grayed out with a pointer to Settings → SMS when SMS isn't
  *     configured — never a clickable dead button.
  *   - Customer → the same small client dialog (portal auto-created).
+ *
+ * `onNavigate` fires whenever an action leaves the page (a link, or a dialog
+ * that lands you somewhere) so a host sheet — the ribbon's More sheet, the
+ * phone sidebar — can close instead of covering the page it just opened.
  */
+
+type OnNavigate = (() => void) | undefined;
+
+// Same shape the server's zod .email() accepts, checked before the round trip.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** A typed-but-malformed email (blank is fine — email is optional). */
+const emailInvalid = (email: string) => email.trim() !== "" && !EMAIL_RE.test(email.trim());
+
+/**
+ * A create call's error as a sentence. A 400 carries zod `issues` — name the
+ * field ("Enter a valid email address.") instead of "Invalid customer".
+ */
+function createErrorMessage(e: any): string {
+  try {
+    const body = JSON.parse(String(e?.message ?? "").replace(/^\d{3}:\s*/, ""));
+    const fields: string[] = (body?.issues ?? []).map((i: any) => String(i?.path?.[0] ?? ""));
+    if (fields.includes("email")) return "Enter a valid email address.";
+    if (fields.includes("phone")) return "That phone number is too long.";
+    if (fields.includes("displayName")) return "Enter a name (up to 200 characters).";
+  } catch { /* not JSON — fall through */ }
+  return apiErrorMessage(e);
+}
+
+const money = (c?: number | null) =>
+  c == null ? "" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 type ClientLite = {
   id: string; displayName: string; email: string | null; phone: string | null;
@@ -105,34 +136,45 @@ function ClientFields({ form, setForm, idPrefix, showNote }: {
   idPrefix: string;
   showNote?: boolean;
 }) {
+  // Flag a malformed email once they've left the field, not mid-typing.
+  const [emailTouched, setEmailTouched] = useState(false);
+  const badEmail = emailTouched && emailInvalid(form.email);
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <Label htmlFor={`${idPrefix}-name`}>Name *</Label>
         <Input id={`${idPrefix}-name`} data-testid={`input-${idPrefix}-name`} value={form.displayName}
-          placeholder="Joe & Mary Kane"
+          placeholder="Joe & Mary Kane" maxLength={200}
           onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
       </div>
       <div>
         <Label htmlFor={`${idPrefix}-email`}>Email</Label>
         <Input id={`${idPrefix}-email`} type="email" data-testid={`input-${idPrefix}-email`} value={form.email}
+          aria-invalid={badEmail || undefined} onBlur={() => setEmailTouched(true)}
           onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        {badEmail && (
+          <p className="mt-1 text-xs text-destructive" data-testid={`error-${idPrefix}-email`}>
+            Enter a valid email address, like joe@example.com.
+          </p>
+        )}
       </div>
       <div>
         <Label htmlFor={`${idPrefix}-phone`}>Phone</Label>
         <Input id={`${idPrefix}-phone`} data-testid={`input-${idPrefix}-phone`} value={form.phone}
+          maxLength={40} inputMode="tel"
           onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       </div>
       <div className="sm:col-span-2">
         <Label htmlFor={`${idPrefix}-addr`}>Address</Label>
         <Input id={`${idPrefix}-addr`} data-testid={`input-${idPrefix}-addr`} value={form.addressLine1}
+          maxLength={200}
           onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
       </div>
       {showNote && (
         <div className="sm:col-span-2">
           <Label htmlFor={`${idPrefix}-note`}>Note</Label>
           <Textarea id={`${idPrefix}-note`} rows={3} data-testid={`input-${idPrefix}-note`} value={form.note}
-            placeholder="Where's the leak? What did they ask for?"
+            placeholder="Where's the leak? What did they ask for?" maxLength={20000}
             onChange={(e) => setForm({ ...form, note: e.target.value })} />
         </div>
       )}
@@ -140,8 +182,9 @@ function ClientFields({ form, setForm, idPrefix, showNote }: {
   );
 }
 
-/** The dedupe idiom: a 409 names the existing client(s) — link, don't force. */
-function DupeError({ error }: { error: any }) {
+/** The dedupe idiom: a 409 names the existing client(s) — link, don't force.
+ *  Following a link closes the dialog (it would otherwise stay on top). */
+function DupeError({ error, onOpen }: { error: any; onOpen: () => void }) {
   let matches: { id: string; displayName: string }[] = [];
   try {
     // apiRequest errors read "409: {json}" — strip the status prefix.
@@ -153,7 +196,7 @@ function DupeError({ error }: { error: any }) {
       data-testid="dupe-error">
       A client with that email or phone already exists.
       {matches.map((m) => (
-        <Link key={m.id} href={`/crm/clients/${m.id}`}
+        <Link key={m.id} href={`/crm/clients/${m.id}`} onClick={onOpen}
           data-testid={`link-dupe-client-${m.id}`}
           className="block text-primary hover:underline font-medium">
           Open {m.displayName} →
@@ -163,24 +206,31 @@ function DupeError({ error }: { error: any }) {
   );
 }
 
-function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+/** The shared create-client body; throws a readable error before the POST. */
+function clientBody(form: typeof EMPTY_CLIENT, nameRequired: string) {
+  const body: any = {
+    displayName: form.displayName.trim(),
+    email: form.email.trim() || null,
+    phone: form.phone.trim() || null,
+    addressLine1: form.addressLine1.trim() || null,
+    notes: form.note.trim() || null,
+  };
+  if (!body.displayName) throw new Error(nameRequired);
+  if (body.email && !EMAIL_RE.test(body.email)) throw new Error("Enter a valid email address.");
+  return body;
+}
+
+function CustomerDialog({ open, onOpenChange, onNavigate }: {
+  open: boolean; onOpenChange: (v: boolean) => void; onNavigate: OnNavigate;
+}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ ...EMPTY_CLIENT });
   const [dupe, setDupe] = useState<any>(null);
 
   const create = useMutation({
-    mutationFn: async () => {
-      const body: any = {
-        displayName: form.displayName.trim(),
-        email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        addressLine1: form.addressLine1.trim() || null,
-        notes: form.note.trim() || null,
-      };
-      if (!body.displayName) throw new Error("A client name is required");
-      return (await apiRequest("POST", "/api/crm/customers", body)).json();
-    },
+    mutationFn: async () =>
+      (await apiRequest("POST", "/api/crm/customers", clientBody(form, "A client name is required."))).json(),
     onSuccess: (c: any) => {
       onOpenChange(false);
       setForm({ ...EMPTY_CLIENT });
@@ -188,10 +238,11 @@ function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       toast({ title: "Client created", description: "Their portal was created automatically." });
       navigate(`/crm/clients/${c.id}`);
+      onNavigate?.();
     },
     onError: (e: any) => {
-      if (String(e?.message ?? "").includes("409")) { setDupe(e); return; }
-      toast({ title: "Could not create client", description: String(e.message ?? e), variant: "destructive" });
+      if (String(e?.message ?? "").startsWith("409")) { setDupe(e); return; }
+      toast({ title: "Could not create client", description: createErrorMessage(e), variant: "destructive" });
     },
   });
 
@@ -200,7 +251,10 @@ function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       <DialogContent data-testid="dialog-create-customer">
         <DialogHeader><DialogTitle>New client</DialogTitle></DialogHeader>
         <ClientFields form={form} setForm={setForm} idPrefix="customer" />
-        {dupe && <DupeError error={dupe} />}
+        {dupe && (
+          <DupeError error={dupe}
+            onOpen={() => { onOpenChange(false); setDupe(null); onNavigate?.(); }} />
+        )}
         <DialogFooter>
           <Button onClick={() => create.mutate()} disabled={create.isPending} data-testid="button-save-customer">
             {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Create client
@@ -211,7 +265,9 @@ function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
   );
 }
 
-function LeadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function LeadDialog({ open, onOpenChange, onNavigate }: {
+  open: boolean; onOpenChange: (v: boolean) => void; onNavigate: OnNavigate;
+}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [form, setForm] = useState({ ...EMPTY_CLIENT });
@@ -219,19 +275,13 @@ function LeadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
 
   const create = useMutation({
     mutationFn: async () => {
-      const body: any = {
-        displayName: form.displayName.trim(),
-        email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        addressLine1: form.addressLine1.trim() || null,
-        notes: form.note.trim() || null,
-      };
-      if (!body.displayName) throw new Error("A name is required");
+      const body = clientBody(form, "A name is required.");
       const customer = await (await apiRequest("POST", "/api/crm/customers", body)).json();
       // A lead IS a project in the first pipeline stage — no separate entity.
+      // (Project names cap at 200 characters, like client names.)
       const project = await (await apiRequest("POST", "/api/crm/projects", {
         customerId: customer.id,
-        name: `${body.displayName} — lead`,
+        name: `${body.displayName.slice(0, 193)} — lead`,
         status: "lead",
         addressLine1: body.addressLine1,
       })).json();
@@ -245,10 +295,11 @@ function LeadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
       toast({ title: "Lead added", description: "It's on the pipeline in the Lead column." });
       navigate("/crm/pipeline");
+      onNavigate?.();
     },
     onError: (e: any) => {
-      if (String(e?.message ?? "").includes("409")) { setDupe(e); return; }
-      toast({ title: "Could not create lead", description: String(e.message ?? e), variant: "destructive" });
+      if (String(e?.message ?? "").startsWith("409")) { setDupe(e); return; }
+      toast({ title: "Could not create lead", description: createErrorMessage(e), variant: "destructive" });
     },
   });
 
@@ -260,7 +311,10 @@ function LeadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
           Lands on the pipeline in the Lead column — ready to estimate.
         </p>
         <ClientFields form={form} setForm={setForm} idPrefix="lead" showNote />
-        {dupe && <DupeError error={dupe} />}
+        {dupe && (
+          <DupeError error={dupe}
+            onOpen={() => { onOpenChange(false); setDupe(null); onNavigate?.(); }} />
+        )}
         <DialogFooter>
           <Button onClick={() => create.mutate()} disabled={create.isPending} data-testid="button-save-lead">
             {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Add lead
@@ -273,27 +327,51 @@ function LeadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
 
 // ── Invoice ─────────────────────────────────────────────────────────────────
 
-function InvoiceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+/**
+ * A quick invoice is ONE line: what it's for + the amount. There is no draft
+ * line-item editor after creation (the draft card offers Send / Copy / Void),
+ * so the dialog collects the line up front rather than creating a $0.00 draft
+ * with a promise to "add line items" later. Itemized invoices come from an
+ * approved estimate.
+ */
+function InvoiceDialog({ open, onOpenChange, onNavigate }: {
+  open: boolean; onOpenChange: (v: boolean) => void; onNavigate: OnNavigate;
+}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [client, setClient] = useState<ClientLite | null>(null);
   const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const cents = parseDollarInput(amount);
+  const amountError = amount.trim() ? dollarInputError(amount) : null;
+  const ready = !!client && title.trim().length > 0 && cents !== null && !Number.isNaN(cents) && cents > 0;
+
+  const reset = () => { setClient(null); setTitle(""); setAmount(""); };
 
   const create = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", "/api/crm/invoices", {
         customerId: client!.id,
-        title: title.trim() || "Invoice",
+        title: title.trim(),
+        items: [{ name: title.trim(), quantityMilli: 1000, unitPriceCents: cents }],
       })).json(),
     onSuccess: (inv: any) => {
+      const customerId = client!.id;
       onOpenChange(false);
-      setClient(null);
-      setTitle("");
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
-      toast({ title: `Draft ${inv.number ?? "invoice"} created`, description: "Add line items, then send it from the client page." });
-      navigate(`/crm/clients/${client!.id}`);
+      reset();
+      // Every invoice list key starts with this path — the client page's is
+      // `/api/crm/invoices?customerId=…`, a different first element.
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/crm/invoices"),
+      });
+      toast({
+        title: `Draft ${inv.number ?? "invoice"} created${inv.totalCents != null ? ` — ${money(inv.totalCents)}` : ""}`,
+        description: "Review it and send it from the client page.",
+      });
+      navigate(`/crm/clients/${customerId}`);
+      onNavigate?.();
     },
-    onError: (e: any) => toast({ title: "Could not create invoice", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Could not create invoice", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   return (
@@ -302,14 +380,30 @@ function InvoiceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
         <DialogHeader><DialogTitle>New invoice</DialogTitle></DialogHeader>
         <ClientPicker value={client} onChange={setClient} />
         {client && (
-          <div>
-            <Label htmlFor="inv-title">Title</Label>
-            <Input id="inv-title" data-testid="input-invoice-title" value={title}
-              placeholder="Invoice" onChange={(e) => setTitle(e.target.value)} />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <Label htmlFor="inv-title">What's it for? *</Label>
+              <Input id="inv-title" data-testid="input-invoice-title" value={title} maxLength={200}
+                placeholder="Gutter repair — labor and materials" onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="inv-amount">Amount *</Label>
+              <Input id="inv-amount" data-testid="input-invoice-amount" value={amount} inputMode="decimal"
+                placeholder="$1,250" aria-invalid={!!amountError || undefined}
+                onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            {amountError && (
+              <p className="sm:col-span-3 -mt-1 text-xs text-destructive" data-testid="error-invoice-amount">
+                {amountError}
+              </p>
+            )}
+            <p className="sm:col-span-3 text-xs text-muted-foreground">
+              One line, no tax. For an itemized invoice, invoice an approved estimate from the client page.
+            </p>
           </div>
         )}
         <DialogFooter>
-          <Button onClick={() => create.mutate()} disabled={!client || create.isPending}
+          <Button onClick={() => create.mutate()} disabled={!ready || create.isPending}
             data-testid="button-save-invoice">
             {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Create draft invoice
           </Button>
@@ -321,8 +415,12 @@ function InvoiceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
 
 // ── Message ─────────────────────────────────────────────────────────────────
 
-function MessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function MessageDialog({ open, onOpenChange, onNavigate }: {
+  open: boolean; onOpenChange: (v: boolean) => void; onNavigate: OnNavigate;
+}) {
   const { toast } = useToast();
+  // The Settings links leave the page — close this dialog (and any host sheet).
+  const leave = () => { onOpenChange(false); onNavigate?.(); };
   const [client, setClient] = useState<ClientLite | null>(null);
   const [channel, setChannel] = useState<"email" | "text">("email");
   const [body, setBody] = useState("");
@@ -344,7 +442,7 @@ function MessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${client!.id}/notes`] });
       toast({ title: channel === "email" ? "Email sent" : "Text sent", description: `It's on ${client!.displayName}'s timeline.` });
     },
-    onError: (e: any) => toast({ title: "Message not sent", description: String(e.message ?? e), variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Message not sent", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const noEmail = client != null && !client.email;
@@ -387,18 +485,18 @@ function MessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
                   {smsStatus?.configured && smsStatus?.canTextClients === false ? (
                     <>
                       Texting clients needs your own number — connect one in{" "}
-                      <Link href="/crm/settings" data-testid="link-enable-texting"
+                      <Link href="/crm/settings#sms" data-testid="link-enable-texting" onClick={leave}
                         className="text-primary hover:underline font-medium">
-                        Settings → Text messaging
+                        Settings → SMS
                       </Link>{" "}
                       (your own carrier registration).
                     </>
                   ) : (
                     <>
                       Texting is off — enable it in{" "}
-                      <Link href="/crm/settings" data-testid="link-enable-texting"
+                      <Link href="/crm/settings#sms" data-testid="link-enable-texting" onClick={leave}
                         className="text-primary hover:underline font-medium">
-                        Settings → Integrations
+                        Settings → SMS
                       </Link>
                     </>
                   )}
@@ -439,7 +537,11 @@ function MessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
 
 // ── The menu ────────────────────────────────────────────────────────────────
 
-export function CrmCreateMenu({ trigger }: { trigger: React.ReactNode }) {
+export function CrmCreateMenu({ trigger, onNavigate }: {
+  trigger: React.ReactNode;
+  /** Called after any Create action navigates away (close a host sheet). */
+  onNavigate?: () => void;
+}) {
   const [, navigate] = useLocation();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const perms = me?.permissions ?? {};
@@ -456,7 +558,7 @@ export function CrmCreateMenu({ trigger }: { trigger: React.ReactNode }) {
         <DropdownMenuContent align="start" className="w-52" data-testid="create-menu">
           {/* Estimate is ungated, like the ribbon's one-tap "New estimate". */}
           <DropdownMenuItem data-testid="create-item-estimate"
-            onSelect={() => navigate("/crm/estimates/new")}>
+            onSelect={() => { navigate("/crm/estimates/new"); onNavigate?.(); }}>
             <FileText className="h-4 w-4 mr-2" /> Estimate
           </DropdownMenuItem>
           {perms.manageInvoices === true && (
@@ -482,10 +584,10 @@ export function CrmCreateMenu({ trigger }: { trigger: React.ReactNode }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <CustomerDialog open={customerOpen} onOpenChange={setCustomerOpen} />
-      <LeadDialog open={leadOpen} onOpenChange={setLeadOpen} />
-      <InvoiceDialog open={invoiceOpen} onOpenChange={setInvoiceOpen} />
-      <MessageDialog open={messageOpen} onOpenChange={setMessageOpen} />
+      <CustomerDialog open={customerOpen} onOpenChange={setCustomerOpen} onNavigate={onNavigate} />
+      <LeadDialog open={leadOpen} onOpenChange={setLeadOpen} onNavigate={onNavigate} />
+      <InvoiceDialog open={invoiceOpen} onOpenChange={setInvoiceOpen} onNavigate={onNavigate} />
+      <MessageDialog open={messageOpen} onOpenChange={setMessageOpen} onNavigate={onNavigate} />
     </>
   );
 }
