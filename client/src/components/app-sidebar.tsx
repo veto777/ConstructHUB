@@ -124,6 +124,7 @@ const googleGroups: NavGroup[] = [
     landingUrl: "/google-business",
     children: [
       { title: "Locations", url: "/locations", icon: MapPin },
+      { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
       { title: "GBP Monitor", url: "/gmb-monitor", icon: Eye },
       { title: "Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },
       { title: "Photo Optimizer", url: "/photos", icon: Camera, subChildren: [

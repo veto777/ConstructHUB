@@ -28,6 +28,7 @@ import GmbMonitorPage from "@/pages/gmb-monitor";
 import RankingGridPage from "@/pages/ranking-grid";
 import PricingPage from "@/pages/pricing";
 import CompetitorsPage from "@/pages/competitors";
+import GbpContentPage from "@/pages/gbp-content";
 import LocationsPage from "@/pages/locations";
 import MasterClassPage from "@/pages/master-class";
 import ReinstatementPage from "@/pages/reinstatement";
@@ -105,6 +106,7 @@ function DashboardRouter() {
       <Route path="/pricing" component={PricingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
@@ -154,6 +156,7 @@ function PublicRouter() {
       <Route path="/photos" component={PhotosPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
