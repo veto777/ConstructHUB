@@ -12,7 +12,7 @@ import { CHLogo } from "@/components/ch-logo";
 import { CrmLogo } from "@/components/crm-logo";
 import { isPortal } from "@/lib/site";
 
-type AuthMode = "login" | "signup" | "forgot-password" | "reset-password";
+type AuthMode = "2fa" | "login" | "signup" | "forgot-password" | "reset-password";
 
 export default function AuthPage() {
   const { toast } = useToast();
@@ -41,15 +41,18 @@ export default function AuthPage() {
     // already-signed-in browser into its existing workspace made it look
     // like the invite "shared" that workspace's data — never redirect here;
     // the choice card below handles it instead.
-    if (user && !betaParam) setLocation(nextParam ?? "/");
+    if (user && !betaParam && modeParam !== "forgot-password") setLocation(nextParam ?? "/");
   }, [user, betaParam, nextParam, setLocation]);
 
   const initialMode: AuthMode =
+    modeParam === "2fa" ? "2fa" :
     modeParam === "reset-password" && tokenParam ? "reset-password" :
     modeParam === "forgot-password" ? "forgot-password" :
     modeParam === "signup" || betaParam ? "signup" : "login";
 
   const [mode, setMode] = useState<AuthMode>(initialMode);
+  const [code, setCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -111,7 +114,8 @@ export default function AuthPage() {
         email: email.trim(),
         password,
       });
-      await res.json();
+      const result = await res.json();
+      if(result.requires2FA) { setMode("2fa"); return; }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation(nextParam ?? "/");
     } catch (err: any) {
@@ -236,6 +240,10 @@ export default function AuthPage() {
         </div>
 
         <Card className="p-6 space-y-5" style={{ boxShadow: "var(--shadow-sm)" }}>
+          {mode === "2fa" && <form className="space-y-4" onSubmit={async e=>{e.preventDefault();setLoading(true);try {await apiRequest('POST','/api/auth/2fa/login',{code,rememberDevice});queryClient.invalidateQueries({queryKey:['/api/auth/me']});setLocation(nextParam??'/');}catch(e){toast({title:apiErrorMessage(e),variant:'destructive'});}finally{setLoading(false);}}}>
+            <h1 className="text-xl font-semibold">Two-factor sign-in</h1><Label htmlFor="two-factor-code">Authenticator or recovery code</Label><Input id="two-factor-code" value={code} onChange={e=>setCode(e.target.value)} autoComplete="one-time-code" maxLength={16}/>
+            <label className="flex gap-2"><input type="checkbox" checked={rememberDevice} onChange={e=>setRememberDevice(e.target.checked)}/>Remember this device for 30 days</label><Button disabled={loading||!code}>Verify sign-in</Button>
+          </form>}
           {mode === "login" && (
             <>
               <div className="space-y-1">

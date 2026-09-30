@@ -1,3 +1,5 @@
+import { NotificationBell } from "@/components/account-security";
+import { RecentAuthModal } from "@/components/recent-auth";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
@@ -462,6 +464,7 @@ function AppContent() {
           <header className="flex items-center justify-between gap-1 px-4 h-12 border-b border-border/40 bg-background sticky top-0 z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-1">
+              <RecentAuthModal /><NotificationBell />
               <Link href="/settings" data-testid="link-header-settings">
                 <button className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" data-testid="button-header-settings">
                   <Settings className="h-4 w-4" />

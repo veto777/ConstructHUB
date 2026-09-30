@@ -12,13 +12,18 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
+  if (res.status === 403 && (await res.clone().json().catch(() => ({}))).reauth === true) {
+    const { requestRecentAuth } = await import('@/components/recent-auth');
+    await requestRecentAuth();
+    res = await fetch(url, { method, headers: data ? { "Content-Type": "application/json" } : {}, body: data ? JSON.stringify(data) : undefined, credentials: "include" });
+  }
   await throwIfResNotOk(res);
   return res;
 }
