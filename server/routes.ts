@@ -7,12 +7,14 @@ import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-ana
 import { competitorPlaces, placesResponse } from "./competitor-provider";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
 import { ownedBy } from "./ownership";
+import { escapeHtml, oneLine, firstZodMessage, visitorIp, edgeGeo, normalizeBlockedIp, isPublicIpv4, safeRedirectUrl, normalizeTrackedDomain, clickGuardSettingsInput, exclusionListKey, exclusionKeyMatches, placeStreetLine, SOCIAL_PROFILE_KEYS, locationUpdateInput, isOwnerPreview, GOOGLE_REVIEW_LINK_MESSAGE, googleReviewLink } from "./route-guards";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { reviewDraftPrompt } from "./review-draft";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
 import { randomUUID } from "crypto";
+import { isIP } from "net";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -28,10 +30,10 @@ import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, e
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { db } from "./db";
-import { searchQueries, subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
+import { searchQueries, scrapeSchedules, permitDatabases, subscriptions, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
-import { eq, and, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
+import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed } from "./crm/admin";
 import { aiModel } from "./ai-config";
@@ -59,6 +61,17 @@ if (DEMO_AUTOLOGIN) {
 }
 
 const growthCostLimit = rateLimit("growth-processing", 30, 60);
+// Anonymous contact forms that email staff: 5 per hour per IP (and per signed-in user).
+const seoInquiryLimit = rateLimit("seo-inquiry", 5, 5, 3600_000);
+const reinstatementLimit = rateLimit("reinstatement", 5, 5, 3600_000);
+
+// Review template links: resolve Google short links, then accept only Google hosts.
+async function resolveReviewLink(input: unknown): Promise<string | null> {
+  let v = String(input ?? "").trim();
+  if (!v || v.length > 2000) return null;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = `https://${v}`;
+  return googleReviewLink(await resolveGoogleUrl(v));
+}
 
 const photoOpenai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -257,20 +270,36 @@ export async function registerRoutes(
   });
 
   app.get("/api/databases", async (req, res) => {
-    if (req.query.filtered === "true") {
-      const params = {
-        stateCode: req.query.stateCode as string | undefined,
-        countyId: req.query.countyId ? parseInt(req.query.countyId as string) : undefined,
-        jurisdictionType: req.query.jurisdictionType as string | undefined,
-        search: req.query.search as string | undefined,
-        page: req.query.page ? parseInt(req.query.page as string) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : 25,
-      };
-      const result = await storage.getDatabasesFiltered(params);
-      res.json({ ...result, databases: result.databases.map(governmentPermitForDisplay) });
-    } else {
-      const databases = await storage.getDatabases();
-      res.json(databases.map(governmentPermitForDisplay));
+    try {
+      if (req.query.filtered === "true") {
+        const text = (v: unknown) => typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : undefined;
+        const countyId = parseInt(String(req.query.countyId ?? ""), 10);
+        const search = text(req.query.search);
+        const params = {
+          stateCode: text(req.query.stateCode),
+          countyId: Number.isInteger(countyId) && countyId > 0 ? countyId : undefined,
+          jurisdictionType: text(req.query.jurisdictionType),
+          // LIKE wildcards in user text are literal characters, not patterns.
+          search: search?.replace(/[\\%_]/g, "\\$&"),
+          page: Math.max(1, parseInt(String(req.query.page ?? ""), 10) || 1),
+          limit: Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? ""), 10) || 25)),
+        };
+        const result = await storage.getDatabasesFiltered(params);
+        res.json({ ...result, databases: result.databases.map(governmentPermitForDisplay) });
+      } else if (req.query.searchable === "true") {
+        // Only portals with a verified live link AND a live-search adapter — the
+        // ones a search or a refresh schedule can actually run against.
+        const databases = (await storage.getDatabases())
+          .filter(d => governmentLinksAvailable(d) && canScrapeGovernmentPortal(d))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        res.json(databases.map(governmentPermitForDisplay));
+      } else {
+        const databases = await storage.getDatabases();
+        res.json(databases.map(governmentPermitForDisplay));
+      }
+    } catch (err) {
+      console.error("Error listing permit databases:", err);
+      res.status(500).json({ message: "Could not load permit databases. Please try again." });
     }
   });
 
@@ -312,14 +341,6 @@ export async function registerRoutes(
 
       const parsedCountyId = scopeCountyId ? parseInt(scopeCountyId) : null;
 
-      if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
-      const query = await storage.createSearchQuery({
-        userId: req.user!.id,
-        searchType,
-        searchValue,
-        countyId: parsedCountyId,
-      });
-
       const counties = await storage.getCounties();
       const countyMap = new Map(counties.map(c => [c.id, c.name]));
 
@@ -334,9 +355,32 @@ export async function registerRoutes(
       }
 
       const scopeDbIds = new Set(databases.map(db => db.id));
+      // Work out what can actually run before charging the search quota.
+      const searchable = databases.filter(db => governmentLinksAvailable(db) && canScrapeGovernmentPortal(db));
 
       const localResults = await storage.searchLocalResults(searchType, searchValue);
       const filteredResults = localResults.filter((r: any) => scopeDbIds.has(r.databaseId));
+
+      if (searchable.length === 0 && filteredResults.length === 0) {
+        // Nothing was searched: no quota, no history row, and say so plainly.
+        return res.json({
+          noSearchablePortals: true,
+          searchId: null,
+          results: [],
+          totalResults: 0,
+          source: "none",
+          message: "No permit portal in this area supports live search yet. Browse the Directory for the official portal links.",
+        });
+      }
+
+      // Only a live portal search uses the monthly quota; showing saved results does not.
+      if (searchable.length > 0 && !(await reserveMonthlyQuota(req, res, "searches"))) return;
+      const query = await storage.createSearchQuery({
+        userId: req.user!.id,
+        searchType,
+        searchValue,
+        countyId: parsedCountyId,
+      });
 
       const enrichedResults = filteredResults.map((r: any) => ({
         ...r,
@@ -344,7 +388,7 @@ export async function registerRoutes(
       }));
 
       const searchId = randomUUID().slice(0, 8);
-      startLiveSearch(searchId, query.id, searchType, searchValue, databases.map(governmentLinksForDisplay) as any)
+      startLiveSearch(searchId, query.id, searchType, searchValue, searchable.map(governmentLinksForDisplay) as any)
         .catch((err) => console.error("Live search init error:", err));
 
       res.json({
@@ -353,9 +397,11 @@ export async function registerRoutes(
         results: enrichedResults,
         totalResults: filteredResults.length,
         source: filteredResults.length > 0 ? "local" : "none",
+        searchablePortals: searchable.length,
       });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      console.error("Permit search failed:", err);
+      res.status(500).json({ message: "Search failed. Please try again." });
     }
   });
 
@@ -523,29 +569,111 @@ export async function registerRoutes(
     res.json(schedules);
   });
 
+  const scheduleInput = z.object({
+    databaseId: z.number({ required_error: "Choose a permit portal", invalid_type_error: "Choose a permit portal" }).int().positive("Choose a permit portal"),
+    searchType: z.enum(["address", "name", "company", "license", "permit"], { errorMap: () => ({ message: "Choose a search type" }) }),
+    searchValue: z.string({ required_error: "Enter what to search for" }).trim().min(1, "Enter what to search for").max(200, "Search value is too long"),
+    frequency: z.enum(["daily", "weekly", "monthly"], { errorMap: () => ({ message: "Frequency must be daily, weekly or monthly" }) }).default("daily"),
+    isActive: z.boolean().default(true),
+  });
+  // A schedule can only run against a portal with a verified live link and a live-search adapter.
+  async function schedulablePortal(databaseId: number) {
+    const [portal] = await db.select().from(permitDatabases).where(eq(permitDatabases.id, databaseId));
+    return portal && governmentLinksAvailable(portal) && canScrapeGovernmentPortal(portal) ? portal : null;
+  }
+  const NOT_SCHEDULABLE = "This portal does not support automated search. Choose a portal from the searchable list.";
+
   app.post("/api/scrape-schedules", async (req, res) => {
     try {
-      const schedule = await storage.createScrapeSchedule(req.body);
+      const parsed = scheduleInput.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
+      if (!(await schedulablePortal(parsed.data.databaseId))) return res.status(400).json({ message: NOT_SCHEDULABLE });
+      const schedule = await storage.createScrapeSchedule({ ...parsed.data, nextRunAt: new Date() });
       res.json(schedule);
     } catch (err: any) {
-      res.status(400).json({ message: err.message });
+      console.error("Error creating scrape schedule:", err);
+      res.status(500).json({ message: "Could not save the schedule. Please try again." });
     }
   });
 
   app.patch("/api/scrape-schedules/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const updated = await storage.updateScrapeSchedule(id, req.body);
-    if (!updated) {
-      return res.status(404).json({ message: "Schedule not found" });
+    try {
+      const id = parseInt(req.params.id);
+      if (!Number.isInteger(id)) return res.status(404).json({ message: "Schedule not found" });
+      const parsed = scheduleInput.partial().strict().safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
+      const changes: Partial<typeof parsed.data> = {};
+      for (const [key, value] of Object.entries(parsed.data)) if (key in (req.body ?? {})) (changes as any)[key] = value;
+      if (Object.keys(changes).length === 0) return res.status(400).json({ message: "Nothing to update" });
+      if (changes.databaseId !== undefined && !(await schedulablePortal(changes.databaseId))) {
+        return res.status(400).json({ message: NOT_SCHEDULABLE });
+      }
+      const updated = await storage.updateScrapeSchedule(id, changes);
+      if (!updated) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Error updating scrape schedule:", err);
+      res.status(500).json({ message: "Could not update the schedule. Please try again." });
     }
-    res.json(updated);
   });
 
   app.delete("/api/scrape-schedules/:id", async (req, res) => {
     const id = parseInt(req.params.id);
-    await storage.deleteScrapeSchedule(id);
+    if (!Number.isInteger(id)) return res.status(404).json({ message: "Schedule not found" });
+    const removed = await db.delete(scrapeSchedules).where(eq(scrapeSchedules.id, id)).returning({ id: scrapeSchedules.id });
+    if (removed.length === 0) return res.status(404).json({ message: "Schedule not found" });
     res.json({ success: true });
   });
+
+  // Scheduled portal refreshes. Every 15 minutes, each due active schedule is
+  // claimed atomically (moving nextRunAt forward, so a second server process
+  // cannot run it too) and searched once against its portal. Results go into
+  // the shared permit cache under a query with no owner, like the directory.
+  // lastRunAt is written only after a search actually ran.
+  const SCHEDULE_INTERVAL_MS: Record<string, number> = { daily: 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000 };
+  async function runDueScrapeSchedules() {
+    const now = new Date();
+    const stillDue = or(isNull(scrapeSchedules.nextRunAt), lte(scrapeSchedules.nextRunAt, now));
+    const due = await db.select().from(scrapeSchedules)
+      .where(and(eq(scrapeSchedules.isActive, true), stillDue)).orderBy(asc(scrapeSchedules.id)).limit(5);
+    for (const schedule of due) {
+      const nextRunAt = new Date(now.getTime() + (SCHEDULE_INTERVAL_MS[schedule.frequency] ?? SCHEDULE_INTERVAL_MS.daily));
+      const [claimed] = await db.update(scrapeSchedules).set({ nextRunAt })
+        .where(and(eq(scrapeSchedules.id, schedule.id), eq(scrapeSchedules.isActive, true), stillDue)).returning({ id: scrapeSchedules.id });
+      if (!claimed) continue;
+      const portal = await schedulablePortal(schedule.databaseId);
+      if (!portal) {
+        console.warn(`Scrape schedule ${schedule.id}: portal ${schedule.databaseId} is not searchable now; skipped.`);
+        continue;
+      }
+      if (portal.platform === "SmartGov" && !["address", "permit"].includes(schedule.searchType)) {
+        console.warn(`Scrape schedule ${schedule.id}: SmartGov portals only support address search; skipped.`);
+        continue;
+      }
+      try {
+        const query = await storage.createSearchQuery({ userId: null, searchType: schedule.searchType, searchValue: schedule.searchValue, countyId: portal.countyId });
+        const found = await scrapeByPlatform(portal.platform!, (portal.searchUrl || portal.portalUrl)!, schedule.searchValue,
+          portal.platform === "SmartGov" ? "address" : schedule.searchType, portal.id, portal.name, query.id, `schedule-${schedule.id}-${Date.now()}`);
+        console.log(`Scrape schedule ${schedule.id} ran on ${portal.name}: ${found.length} results.`);
+      } catch (err: any) {
+        console.error(`Scrape schedule ${schedule.id} failed on ${portal.name}:`, err?.message || err);
+      }
+      await db.update(scrapeSchedules).set({ lastRunAt: new Date() }).where(eq(scrapeSchedules.id, schedule.id));
+    }
+  }
+  if (process.env.SCRAPE_SCHEDULER_DISABLED !== "true") {
+    let scheduleBusy = false;
+    const tick = async () => {
+      if (scheduleBusy) return;
+      scheduleBusy = true;
+      try { await runDueScrapeSchedules(); } catch (err) { console.error("Scrape schedule runner failed:", err); }
+      finally { scheduleBusy = false; }
+    };
+    setInterval(tick, 15 * 60 * 1000).unref();
+    setTimeout(tick, 60 * 1000).unref();
+  }
 
   app.get("/api/property-appraisers", async (_req, res) => {
     const appraisers = await storage.getPropertyAppraisers();
@@ -1515,6 +1643,7 @@ The description should naturally incorporate the service keyword and location. I
     }
   });
 
+  const MEDIA_STORAGE_UNAVAILABLE = "Photo storage is unavailable right now. Please try again later.";
   app.post("/api/media/save-processed", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1555,7 +1684,9 @@ The description should naturally incorporate the service keyword and location. I
 
       res.json({ saved, count: saved.length });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      // Storage errors carry internal hostnames and SDK text — log them, show a plain message.
+      console.error("Media library save failed:", err);
+      res.status(500).json({ message: MEDIA_STORAGE_UNAVAILABLE });
     }
   });
 
@@ -1590,7 +1721,9 @@ The description should naturally incorporate the service keyword and location. I
       }
       res.json({ saved, count: saved.length });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      // Storage errors carry internal hostnames and SDK text — log them, show a plain message.
+      console.error("Media library save failed:", err);
+      res.status(500).json({ message: MEDIA_STORAGE_UNAVAILABLE });
     }
   });
 
@@ -1610,6 +1743,7 @@ The description should naturally incorporate the service keyword and location. I
     }
   });
 
+  const GENERIC_PLACE_TYPES = new Set(["establishment", "point_of_interest", "premise", "political", "store", "food", "health", "finance", "place_of_worship", "local_government_office"]);
   // GMB Edit Monitoring Routes
   app.get("/api/gmb/listings", async (req, res) => {
     const user = getDevUser(req, res);
@@ -1672,12 +1806,21 @@ The description should naturally incorporate the service keyword and location. I
       }
 
       const r = detailsData.result;
+      // Places "types" are raw ids ("roofing_contractor", "establishment"). Use the
+      // specific ones as readable labels, and keep the listing's own category when
+      // it already names one of them (or when Google only returns generic types).
+      const typeLabels: string[] = (Array.isArray(r.types) ? r.types : [])
+        .filter((t: string) => !GENERIC_PLACE_TYPES.has(t))
+        .map((t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()));
+      const knownCategory = listing.category && (typeLabels.length === 0
+        || typeLabels.some(label => listing.category!.toLowerCase().includes(label.toLowerCase())));
+      const category = knownCategory ? listing.category : (typeLabels[0] || listing.category || null);
       const currentData: Record<string, string | null> = {
         businessName: r.name || null,
         address: r.formatted_address || null,
         phone: r.formatted_phone_number || null,
         website: r.website || null,
-        category: r.types?.[0] || null,
+        category,
         hours: r.opening_hours?.weekday_text?.join("; ") || null,
         photoCount: r.photos?.length?.toString() || null,
         rating: r.rating?.toString() || null,
@@ -1726,9 +1869,12 @@ The description should naturally incorporate the service keyword and location. I
         lastCheckedAt: new Date(),
       });
 
-      res.json({ changes, currentData });
+      // The first check only records Google's current data as the baseline; it
+      // compares nothing, so it must not be reported as "no changes".
+      res.json({ changes, currentData, baseline: !listing.lastCheckedAt });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      console.error("GMB listing check failed:", err);
+      res.status(500).json({ message: "Could not check this listing right now. Please try again." });
     }
   });
 
@@ -2401,10 +2547,22 @@ Rules:
       const id = parseInt(req.params.id);
       const [existing] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
       if (!existing) return res.status(404).json({ message: "Location not found" });
-      const { id: _id, userId: _userId, createdAt: _createdAt, gbpAccountName: _gbpAccount, gbpLocationName: _gbpLocation, ...updateFields } = req.body;
-      const [updated] = await db.update(businessLocations).set({ ...updateFields, updatedAt: new Date() }).where(eq(businessLocations.id, id)).returning();
+      const parsed = locationUpdateInput.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
+      const { socialProfiles, ...updateFields } = parsed.data;
+      const changes: Record<string, unknown> = { ...updateFields, updatedAt: new Date() };
+      if (socialProfiles) {
+        // Replace the seven editable platform links; keep any other keys (e.g. from a GBP sync).
+        const kept = Object.fromEntries(Object.entries((existing.socialProfiles as Record<string, unknown>) || {})
+          .filter(([key]) => !(SOCIAL_PROFILE_KEYS as readonly string[]).includes(key)));
+        changes.socialProfiles = { ...kept, ...Object.fromEntries(Object.entries(socialProfiles).filter(([, v]) => v)) };
+      }
+      const [updated] = await db.update(businessLocations).set(changes).where(eq(businessLocations.id, id)).returning();
       res.json(updated);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) {
+      console.error("Error updating location:", err);
+      res.status(500).json({ message: "Could not save the location. Please try again." });
+    }
   });
 
   app.delete("/api/locations/:id", async (req, res) => {
@@ -2414,8 +2572,13 @@ Rules:
       const id = parseInt(req.params.id);
       const [existing] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
       if (!existing) return res.status(404).json({ message: "Location not found" });
-      await db.delete(citationCampaigns).where(eq(citationCampaigns.locationId, id));
-      await db.delete(businessLocations).where(eq(businessLocations.id, id));
+      await db.transaction(async (tx) => {
+        // citations has no FK to its campaign: remove the checklist rows first or they are orphaned.
+        const campaignIds = tx.select({ id: citationCampaigns.id }).from(citationCampaigns).where(eq(citationCampaigns.locationId, id));
+        await tx.delete(citations).where(inArray(citations.campaignId, campaignIds));
+        await tx.delete(citationCampaigns).where(eq(citationCampaigns.locationId, id));
+        await tx.delete(businessLocations).where(eq(businessLocations.id, id));
+      });
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -2518,7 +2681,9 @@ Rules:
               results: [{
                 placeId: d.place_id,
                 businessName: d.name || "",
-                address: d.formatted_address || "",
+                // Street line only: city/state/zip are separate fields below.
+                address: placeStreetLine(d) || "",
+                formattedAddress: d.formatted_address || "",
                 phone: d.formatted_phone_number || "",
                 website: d.website || "",
                 city,
@@ -2645,7 +2810,7 @@ Rules:
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
       if (!apiKey) return res.status(500).json({ message: "Google Places API key not configured" });
 
-      const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${location.placeId}&fields=name,formatted_address,formatted_phone_number,website,types,opening_hours,photos,address_components,url&key=${apiKey}`;
+      const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(location.placeId)}&fields=name,formatted_address,formatted_phone_number,website,types,opening_hours,address_components,url&key=${apiKey}`;
       const detailRes = await fetch(detailUrl);
       const detailData = await detailRes.json() as any;
 
@@ -2669,9 +2834,12 @@ Rules:
 
       const hours = d.opening_hours?.weekday_text || null;
 
+      const street = placeStreetLine(d);
       const updateData: Record<string, any> = {
         businessName: d.name || location.businessName,
-        address: d.formatted_address || location.address,
+        // Street line only (city/state/zip below). A stored copy of the full
+        // formatted address is cleared rather than kept and shown twice.
+        address: street ?? (location.address && location.address === d.formatted_address ? null : location.address),
         city: city || location.city,
         state: state || location.state,
         zipCode: zipCode || location.zipCode,
@@ -2679,7 +2847,8 @@ Rules:
         website: d.website || location.website,
         categories: categories.length > 0 ? categories : location.categories,
         hours: hours ? { weekday_text: hours } : location.hours,
-        businessPhotoCount: d.photos?.length || location.businessPhotoCount,
+        // No businessPhotoCount: Places returns at most 10 photo references, not
+        // the listing's real count. Only the Business Profile media sync sets it.
         googleCid: d.url || location.googleCid,
         updatedAt: new Date(),
       };
@@ -2736,19 +2905,9 @@ Rules:
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
-  app.get("/api/citations/campaigns/:id/results", async (req, res) => {
-    const user = getDevUser(req, res);
-    if (!user) return;
-    try {
-      const id = parseInt(req.params.id);
-      const [campaign] = await db.select().from(citationCampaigns).where(and(eq(citationCampaigns.id, id), eq(citationCampaigns.userId, user.id)));
-      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
-      const results = await db.select().from(citations).where(eq(citations.campaignId, id)).orderBy(desc(citations.createdAt));
-      res.json({ campaign, citations: results });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
+  // Checklist order: Google Business Profile first (it drives local search), then the rest by priority.
   const CITATION_DIRECTORIES = [
+    { name: "Google Business Profile", url: "google.com", category: "Search Engine" },
     { name: "Yelp", url: "yelp.com", category: "Review Site" },
     { name: "BBB", url: "bbb.org", category: "Business Directory" },
     { name: "Yellow Pages", url: "yellowpages.com", category: "Business Directory" },
@@ -2778,8 +2937,29 @@ Rules:
     { name: "ShowMeLocal", url: "showmelocal.com", category: "Business Directory" },
     { name: "EZLocal", url: "ezlocal.com", category: "Business Directory" },
     { name: "Local.com", url: "local.com", category: "Local Search" },
-    { name: "Google My Business", url: "google.com", category: "Search Engine" },
   ];
+  // Checklists built before the rename carry the old name.
+  const LEGACY_CITATION_NAMES: Record<string, string> = { "Google My Business": "Google Business Profile" };
+  const citationRank = new Map(CITATION_DIRECTORIES.map((d, i) => [d.name, i]));
+
+  app.get("/api/citations/campaigns/:id/results", async (req, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    try {
+      const id = parseInt(req.params.id);
+      const [campaign] = await db.select().from(citationCampaigns).where(and(eq(citationCampaigns.id, id), eq(citationCampaigns.userId, user.id)));
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+      const rows = await db.select().from(citations).where(eq(citations.campaignId, id)).orderBy(asc(citations.id));
+      // Directory priority order (Google Business Profile first); unknown names keep insertion order at the end.
+      const results = rows
+        .map(c => ({ ...c, siteName: LEGACY_CITATION_NAMES[c.siteName] ?? c.siteName }))
+        .map((c, i) => ({ c, rank: citationRank.get(c.siteName) ?? CITATION_DIRECTORIES.length + i }))
+        .sort((a, b) => a.rank - b.rank)
+        .map(({ c }) => c);
+      res.json({ campaign, citations: results });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
 
   // Citation checklist. There is no reliable free API that tells us whether a business is listed on each
   // directory, and guessing is fabrication (CLAUDE.md). So the owner verifies each site via a Google site:
@@ -2792,7 +2972,7 @@ Rules:
       const [campaign] = await db.select().from(citationCampaigns).where(and(eq(citationCampaigns.id, id), eq(citationCampaigns.userId, user.id)));
       if (!campaign) return res.status(404).json({ message: "Campaign not found" });
       const existing = await db.select().from(citations).where(eq(citations.campaignId, id));
-      const have = new Set(existing.map(c => c.siteName));
+      const have = new Set(existing.map(c => LEGACY_CITATION_NAMES[c.siteName] ?? c.siteName));
       const [loc] = campaign.locationId ? await db.select().from(businessLocations).where(and(eq(businessLocations.id, campaign.locationId), eq(businessLocations.userId, user.id))) : [];
       for (const dir of CITATION_DIRECTORIES) {
         if (have.has(dir.name)) continue;
@@ -2893,29 +3073,51 @@ Rules:
     }
   });
 
-  app.post("/api/seo-inquiry", async (req, res) => {
-    try {
-      const { name, email, phone, website, services, message } = req.body;
-      if (!name || !email) {
-        return res.status(400).json({ message: "Name and email are required." });
-      }
+  const inquiryText = (label: string, max: number) => z.string({ invalid_type_error: `${label} must be text` }).trim().max(max, `${label} is too long (max ${max} characters)`);
+  const inquiryEmail = z.string({ required_error: "Email is required" }).trim().min(1, "Email is required").max(254).email("Enter a valid email address");
+  const seoInquiryInput = z.object({
+    name: inquiryText("Name", 200).min(1, "Name is required"),
+    email: inquiryEmail,
+    phone: inquiryText("Phone", 50).optional().nullable(),
+    website: inquiryText("Website", 500).optional().nullable(),
+    services: z.array(inquiryText("Service", 100)).max(30).optional().nullable(),
+    message: inquiryText("Message", 5000).optional().nullable(),
+  });
+  const reinstatementInput = z.object({
+    name: inquiryText("Name", 200).min(1, "Please fill in all required fields."),
+    email: inquiryEmail,
+    businessName: inquiryText("Business name", 300).min(1, "Please fill in all required fields."),
+    websiteUrl: inquiryText("Website", 500).optional().nullable(),
+    businessAddress: inquiryText("Business address", 500).min(1, "Please fill in all required fields."),
+    businessType: inquiryText("Business type", 200).min(1, "Please fill in all required fields."),
+    multipleLocations: inquiryText("Multiple locations", 20).optional().nullable(),
+    problemDescription: inquiryText("Problem description", 5000).min(1, "Please fill in all required fields."),
+  });
+  // Multi-line user text: escape, then keep line breaks readable.
+  const escapeBlock = (value: unknown) => escapeHtml(value).replace(/\r?\n/g, "<br>");
 
-      const servicesList = Array.isArray(services) && services.length > 0 ? services.join(", ") : "Not specified";
+  app.post("/api/seo-inquiry", seoInquiryLimit, async (req, res) => {
+    try {
+      const parsed = seoInquiryInput.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
+      const { name, email, phone, website, services, message } = parsed.data;
+
+      const servicesList = services && services.length > 0 ? services.join(", ") : "Not specified";
 
       await sendWithFallback({
         from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
         to: process.env.SMTP_EMAIL,
         replyTo: email,
-        subject: `SEO Services Inquiry — ${name}`,
+        subject: `SEO Services Inquiry — ${oneLine(name).slice(0, 150)}`,
         html: `
           <h2>New SEO Services Inquiry</h2>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Phone:</strong> ${phone || "N/A"}</p>
-          <p><strong>Website:</strong> ${website || "N/A"}</p>
-          <p><strong>Services Requested:</strong> ${servicesList}</p>
+          <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+          <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+          <p><strong>Phone:</strong> ${escapeHtml(phone || "N/A")}</p>
+          <p><strong>Website:</strong> ${escapeHtml(website || "N/A")}</p>
+          <p><strong>Services Requested:</strong> ${escapeHtml(servicesList)}</p>
           <p><strong>Message:</strong></p>
-          <p>${message || "No additional details provided."}</p>
+          <p>${escapeBlock(message || "No additional details provided.")}</p>
         `,
       });
 
@@ -2926,29 +3128,28 @@ Rules:
     }
   });
 
-  app.post("/api/reinstatement/request", async (req, res) => {
+  app.post("/api/reinstatement/request", reinstatementLimit, async (req, res) => {
     try {
-      const { name, email, businessName, websiteUrl, businessAddress, businessType, multipleLocations, problemDescription } = req.body;
-      if (!name || !email || !businessName || !businessAddress || !businessType || !problemDescription) {
-        return res.status(400).json({ message: "Please fill in all required fields." });
-      }
+      const parsed = reinstatementInput.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
+      const { name, email, businessName, websiteUrl, businessAddress, businessType, multipleLocations, problemDescription } = parsed.data;
 
       await sendWithFallback({
         from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
         to: process.env.SMTP_EMAIL,
         replyTo: email,
-        subject: `GBP Reinstatement Request — ${businessName}`,
+        subject: `GBP Reinstatement Request — ${oneLine(businessName).slice(0, 150)}`,
         html: `
           <h2>New GBP Reinstatement Request</h2>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Business:</strong> ${businessName}</p>
-          <p><strong>Website:</strong> ${websiteUrl || "N/A"}</p>
-          <p><strong>Address:</strong> ${businessAddress}</p>
-          <p><strong>Type:</strong> ${businessType}</p>
-          <p><strong>Multiple Locations:</strong> ${multipleLocations}</p>
+          <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+          <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+          <p><strong>Business:</strong> ${escapeHtml(businessName)}</p>
+          <p><strong>Website:</strong> ${escapeHtml(websiteUrl || "N/A")}</p>
+          <p><strong>Address:</strong> ${escapeHtml(businessAddress)}</p>
+          <p><strong>Type:</strong> ${escapeHtml(businessType)}</p>
+          <p><strong>Multiple Locations:</strong> ${escapeHtml(multipleLocations || "Not specified")}</p>
           <p><strong>Problem:</strong></p>
-          <p>${problemDescription}</p>
+          <p>${escapeBlock(problemDescription)}</p>
         `,
       });
 
@@ -2983,10 +3184,7 @@ Rules:
         return res.status(204).end();
       }
 
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
-        || (req.headers["x-real-ip"] as string)
-        || req.socket.remoteAddress
-        || "unknown";
+      const ip = visitorIp(req);
 
       const isBlocked = await storage.isIpBlocked(domain.id, ip);
 
@@ -3027,6 +3225,7 @@ Rules:
       }
 
       const isSuspicious = suspicionReasons.length > 0;
+      const geo = edgeGeo(req);
 
       await storage.createClickVisit({
         domainId: domain.id,
@@ -3043,11 +3242,11 @@ Rules:
         fingerprint: fingerprint || null,
         isSuspicious,
         suspicionReasons: isSuspicious ? suspicionReasons : null,
-        country: null,
-        city: null,
+        country: geo.country,
+        city: geo.city,
       });
 
-      if (isSuspicious && !isBlocked && recentVisits.length >= 10) {
+      if (isSuspicious && !isBlocked && recentVisits.length >= 10 && isIP(ip)) {
         await storage.createBlockedIp({
           domainId: domain.id,
           ipAddress: ip,
@@ -3105,14 +3304,16 @@ Rules:
     const user = getDevUser(req, res);
     if (!user) return;
     try {
-      const { domain, name } = req.body;
-      if (!domain) return res.status(400).json({ message: "Domain is required" });
+      const { name } = req.body ?? {};
+      const domain = normalizeTrackedDomain(req.body?.domain);
+      if (!domain) return res.status(400).json({ message: "Enter a valid domain, for example yourcompany.com" });
+      const label = typeof name === "string" && name.trim() ? name.trim().slice(0, 200) : domain;
       const trackingId = randomUUID();
       const newDomain = await storage.createTrackedDomain({
         userId: user.id,
         domain,
         trackingId,
-        name: name || domain,
+        name: label,
         isActive: true,
       });
       res.json(newDomain);
@@ -3302,8 +3503,12 @@ Rules:
       if (!domain || domain.userId !== user.id) {
         return res.status(404).json({ message: "Domain not found" });
       }
-      const { ipAddress, reason } = req.body;
-      if (!ipAddress) return res.status(400).json({ message: "IP address is required" });
+      const { reason } = req.body ?? {};
+      if (!String(req.body?.ipAddress ?? "").trim()) return res.status(400).json({ message: "IP address is required" });
+      const ipAddress = normalizeBlockedIp(req.body.ipAddress);
+      if (!ipAddress) {
+        return res.status(400).json({ message: "Enter a valid IPv4/IPv6 address, a CIDR range (IPv4 /16–/32) or a wildcard like 203.0.113.*" });
+      }
 
       const alreadyBlocked = await storage.isIpBlocked(domain.id, ipAddress);
       if (alreadyBlocked) return res.status(409).json({ message: "IP already blocked" });
@@ -3311,7 +3516,7 @@ Rules:
       const blocked = await storage.createBlockedIp({
         domainId: domain.id,
         ipAddress,
-        reason: reason || "Manually blocked",
+        reason: typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 500) : "Manually blocked",
         isActive: true,
         source: "manual",
       });
@@ -3330,8 +3535,15 @@ Rules:
       if (!domain || domain.userId !== user.id) {
         return res.status(404).json({ message: "Domain not found" });
       }
+      const parsed = clickGuardSettingsInput.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
+      for (const key of ["manualExcludeIps", "whitelistIps"] as const) {
+        const lines = (parsed.data[key] ?? "").split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+        const bad = lines.find(l => !normalizeBlockedIp(l));
+        if (bad) return res.status(400).json({ message: `"${bad.slice(0, 60)}" is not a valid IP address or range` });
+      }
       const currentSettings = (domain.settings as Record<string, any>) || {};
-      const newSettings = { ...currentSettings, ...req.body };
+      const newSettings = { ...currentSettings, ...parsed.data };
       const updated = await storage.updateTrackedDomain(domainId, { settings: newSettings } as any);
       res.json(updated);
     } catch (err: any) {
@@ -3346,10 +3558,16 @@ Rules:
       if (!domain) {
         return res.status(404).send("Not found");
       }
+      // The trackingId is public (it is in the site's page source); the list of
+      // blocked visitor IPs is only for the owner's Ads Script, which carries the key.
+      if (!exclusionKeyMatches(domain.trackingId, req.query.key)) {
+        return res.status(403).json({ message: "This exclusion-list link is missing its key or is out of date. Copy the Google Ads script again from ConstructHUB → Google Ads → Click Guard." });
+      }
       const blocked = await storage.getBlockedIps(domain.id);
       const ipList = blocked
         .filter(b => b.isActive)
-        .map(b => b.ipAddress)
+        .map(b => normalizeBlockedIp(b.ipAddress))
+        .filter((ip): ip is string => !!ip)
         .slice(0, 500);
       
       const format = req.query.format;
@@ -3382,7 +3600,7 @@ Rules:
       }
       
       const baseUrl = getBaseUrl(req);
-      const exclusionUrl = `${baseUrl}/api/click-guard/exclusion-list/${domain.trackingId}?format=json`;
+      const exclusionUrl = `${baseUrl}/api/click-guard/exclusion-list/${domain.trackingId}?format=json&key=${exclusionListKey(domain.trackingId)}`;
       
       const script = `// Click Guard — Auto IP Exclusion Script for Google Ads
 // Domain: ${domain.domain}
@@ -3474,7 +3692,13 @@ function main() {
       if (!domain || domain.userId !== user.id) {
         return res.status(404).json({ message: "Domain not found" });
       }
-      await storage.deleteBlockedIp(blockId);
+      if (!Number.isInteger(blockId)) return res.status(404).json({ message: "Block not found" });
+      // Scope the delete to the domain the caller owns: block ids are sequential,
+      // so deleting by id alone let any account remove another customer's blocks.
+      const removed = await db.delete(blockedIps)
+        .where(and(eq(blockedIps.id, blockId), eq(blockedIps.domainId, domain.id)))
+        .returning({ id: blockedIps.id });
+      if (removed.length === 0) return res.status(404).json({ message: "Block not found" });
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to unblock IP" });
@@ -3890,10 +4114,7 @@ function main() {
       const domain = await storage.getTrackedDomainByTrackingId(trackingId);
       if (!domain || !domain.isActive) return res.status(204).end();
 
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
-        || (req.headers["x-real-ip"] as string)
-        || req.socket.remoteAddress
-        || "unknown";
+      const ip = visitorIp(req);
 
       const ua = userAgent || req.headers["user-agent"] || "";
 
@@ -3919,16 +4140,21 @@ function main() {
         vpnDetected = true;
       }
 
-      if (vpnSignals) {
-        if (vpnSignals.webrtcLeak) {
+      if (vpnSignals && typeof vpnSignals === "object") {
+        // A leak is a public WebRTC address that differs from the address this
+        // request came from. A normal (non-VPN) STUN answer is the visitor's own
+        // public IP, so it matches and is not flagged. Only IPv4 is compared.
+        // The old boolean webrtcLeak / timezoneMismatch signals (still sent by
+        // cached copies of the previous script) are ignored: they flagged
+        // ordinary visitors.
+        const webrtcIps: string[] = Array.isArray(vpnSignals.webrtcIps)
+          ? vpnSignals.webrtcIps.slice(0, 10).map((v: unknown) => String(v).trim()).filter(isPublicIpv4)
+          : [];
+        if (isIP(ip) === 4 && webrtcIps.some(w => w !== ip)) {
           detectionMethods.push("WebRTC IP leak detected");
           vpnDetected = true;
         }
-        if (vpnSignals.timezoneMismatch) {
-          detectionMethods.push("Timezone/geolocation mismatch");
-          vpnDetected = true;
-        }
-        if (vpnSignals.vpnExtension) {
+        if (vpnSignals.vpnExtension === true) {
           detectionMethods.push("VPN browser extension detected");
           vpnDetected = true;
         }
@@ -3936,7 +4162,9 @@ function main() {
 
       if (vpnDetected) {
         const settings = (domain.settings as any) || {};
-        const blockMode = settings.vpnBlockMode || "block";
+        const blockMode = ["block", "log", "redirect"].includes(settings.vpnBlockMode) ? settings.vpnBlockMode : "block";
+        const redirectUrl = blockMode === "redirect" ? safeRedirectUrl(settings.vpnRedirectUrl) : null;
+        const geo = edgeGeo(req);
 
         await storage.createVpnVisit({
           domainId: domain.id,
@@ -3946,8 +4174,8 @@ function main() {
           browser: browser || null,
           os: os || null,
           deviceType: deviceType || null,
-          country: null,
-          city: null,
+          country: geo.country,
+          city: geo.city,
           referrer: referrer || null,
           landingPage: landingPage || null,
           vpnProvider: provider || "Unknown VPN/Proxy",
@@ -3957,7 +4185,7 @@ function main() {
 
         return res.json({
           blocked: blockMode === "block",
-          redirect: blockMode === "redirect" ? (settings.vpnRedirectUrl || null) : null,
+          redirect: redirectUrl,
           reason: "vpn_detected",
           methods: detectionMethods,
         });
@@ -4138,24 +4366,25 @@ function main() {
     if(ua.indexOf("iPhone")>-1||ua.indexOf("iPad")>-1)return"iOS";
     return"Other";
   }
+  var privateIp=/^(0\\.|10\\.|127\\.|169\\.254\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.)/;
   function checkWebRTC(cb){
+    var ips=[],done=false,pc=null;
+    function finish(){
+      if(done)return;done=true;
+      try{if(pc)pc.close();}catch(e){}
+      cb(ips);
+    }
     try{
-      var pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-      var ips=[];
+      pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
       pc.createDataChannel("");
-      pc.createOffer().then(function(o){pc.setLocalDescription(o);});
       pc.onicecandidate=function(e){
-        if(!e||!e.candidate||!e.candidate.candidate)return;
-        var m=e.candidate.candidate.match(/([0-9]{1,3}(\\.[0-9]{1,3}){3})/);
-        if(m&&m[1]&&ips.indexOf(m[1])===-1){
-          ips.push(m[1]);
-          if(m[1].indexOf("192.168.")!==0&&m[1].indexOf("10.")!==0&&m[1].indexOf("172.")!==0){
-            cb(m[1]);
-          }
-        }
+        if(!e||!e.candidate){finish();return;}
+        var m=(e.candidate.candidate||"").match(/([0-9]{1,3}(\\.[0-9]{1,3}){3})/);
+        if(m&&m[1]&&!privateIp.test(m[1])&&ips.indexOf(m[1])===-1&&ips.length<10)ips.push(m[1]);
       };
-      setTimeout(function(){pc.close();if(ips.length===0)cb(null);},3000);
-    }catch(e){cb(null);}
+      pc.createOffer().then(function(o){return pc.setLocalDescription(o);}).catch(finish);
+      setTimeout(finish,3000);
+    }catch(e){finish();}
   }
   function checkVpnExtensions(){
     var signs=["__vpn_ext","__nordvpn","__expressvpn","__surfshark","__cyberghost","__pia"];
@@ -4181,7 +4410,7 @@ function main() {
         var r=JSON.parse(xhr.responseText);
         if(r.blocked){
           document.documentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#fff;font-family:system-ui"><div style="text-align:center;max-width:500px;padding:40px"><h1 style="font-size:2em;margin-bottom:16px">Access Restricted</h1><p style="color:#999;margin-bottom:24px">VPN or proxy connections are not allowed on this website. Please disable your VPN and try again.</p><p style="color:#666;font-size:12px">Protected by ConstructHUB VPN Shield</p></div></div>';
-        }else if(r.redirect){
+        }else if(r.redirect&&/^https?:\\/\\//i.test(r.redirect)){
           window.location.href=r.redirect;
         }
       }catch(e){}
@@ -4189,16 +4418,12 @@ function main() {
     xhr.send(body);
   }
   function detect(){
-    var signals={webrtcLeak:false,timezoneMismatch:false,vpnExtension:false};
-    signals.vpnExtension=checkVpnExtensions();
-    var tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";
-    var offset=new Date().getTimezoneOffset();
-    var expectedOffsets={"America/New_York":-300,"America/Chicago":-360,"America/Denver":-420,"America/Los_Angeles":-480,"America/Phoenix":-420,"Pacific/Honolulu":-600,"America/Anchorage":-540};
-    if(tz&&expectedOffsets[tz]!==undefined&&Math.abs(offset-expectedOffsets[tz])>60){
-      signals.timezoneMismatch=true;
-    }
-    checkWebRTC(function(webrtcIp){
-      if(webrtcIp){signals.webrtcLeak=true;}
+    // Public WebRTC candidates go to the server, which flags a leak only when one
+    // differs from the address the request itself came from. (A browser time zone
+    // says nothing about the network, so it is not a signal.)
+    var signals={vpnExtension:checkVpnExtensions(),webrtcIps:[]};
+    checkWebRTC(function(ips){
+      signals.webrtcIps=ips;
       send(signals);
     });
   }
@@ -4220,13 +4445,30 @@ function main() {
       const domain = await storage.getTrackedDomainById(id);
       if (!domain || domain.userId !== user.id) return res.status(404).json({ message: "Domain not found" });
 
-      const { vpnBlockMode, vpnRedirectUrl, vpnWhitelistedIps } = req.body;
+      const input = z.object({
+        vpnBlockMode: z.enum(["block", "log", "redirect"], { errorMap: () => ({ message: "Choose Block, Log only or Redirect" }) }).optional(),
+        vpnRedirectUrl: z.string().max(2000).optional().nullable(),
+        vpnWhitelistedIps: z.string().max(20000).optional().nullable(),
+      }).safeParse(req.body ?? {});
+      if (!input.success) return res.status(400).json({ message: firstZodMessage(input.error) });
+      const vpnBlockMode = input.data.vpnBlockMode || "block";
+      const vpnRedirectUrl = String(input.data.vpnRedirectUrl ?? "").trim();
+      if (vpnBlockMode === "redirect" && !safeRedirectUrl(vpnRedirectUrl)) {
+        return res.status(400).json({ message: "Redirect mode needs a full http:// or https:// link" });
+      }
+      if (vpnRedirectUrl && !safeRedirectUrl(vpnRedirectUrl)) {
+        return res.status(400).json({ message: "The redirect link must start with http:// or https://" });
+      }
+      const whitelist = String(input.data.vpnWhitelistedIps ?? "").split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+      const badIp = whitelist.find(ip => !isIP(ip));
+      if (badIp) return res.status(400).json({ message: `"${badIp.slice(0, 60)}" is not a valid IP address (one IPv4 or IPv6 address per line)` });
+      if (whitelist.length > 500) return res.status(400).json({ message: "Whitelist up to 500 IP addresses" });
       const currentSettings = (domain.settings as any) || {};
       const newSettings = {
         ...currentSettings,
-        vpnBlockMode: vpnBlockMode || "block",
-        vpnRedirectUrl: vpnRedirectUrl || "",
-        vpnWhitelistedIps: vpnWhitelistedIps || "",
+        vpnBlockMode,
+        vpnRedirectUrl: vpnRedirectUrl ? safeRedirectUrl(vpnRedirectUrl)! : "",
+        vpnWhitelistedIps: whitelist.join("\n"),
       };
 
       await storage.updateTrackedDomainSettings(id, newSettings);
@@ -4340,7 +4582,8 @@ function main() {
         return res.status(400).json({ message: "You must agree to all terms, termination policy, and arbitration clause" });
       }
 
-      const signerIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+      // Proxy-verified address (trust proxy), not a client-supplied X-Forwarded-For entry.
+      const signerIp = visitorIp(req);
 
       const updated = await storage.updateSeoContract(contract.id, {
         status: "signed",
@@ -4410,8 +4653,10 @@ function main() {
           price_data: {
             currency: "usd",
             product_data: {
-              name: `ConstructHUB ${contract.packageName} — 6-Month Agreement`,
-              description: `${contract.packageName}: $${(contract.monthlyPrice / 100).toLocaleString()}/mo × 6 months. Contract #${contract.id}`,
+              // This checkout is ONE upfront charge for the whole term (mode "payment"),
+              // so say that here rather than implying a monthly subscription.
+              name: `ConstructHUB ${contract.packageName} — ${contract.termMonths}-Month Agreement, paid in full`,
+              description: `One payment today covering all ${contract.termMonths} months (equivalent to $${(contract.monthlyPrice / 100).toLocaleString()}/mo). No monthly charges follow. Contract #${contract.id}`,
             },
             unit_amount: contract.totalPrice,
           },
@@ -4565,7 +4810,8 @@ function main() {
         return res.status(400).json({ message: "Template name and Google Profile URL are required" });
       }
 
-      const resolvedProfileUrl = await resolveGoogleUrl(String(googleProfileUrl).trim());
+      const resolvedProfileUrl = await resolveReviewLink(googleProfileUrl);
+      if (!resolvedProfileUrl) return res.status(400).json({ message: GOOGLE_REVIEW_LINK_MESSAGE });
 
       if (isDefault) {
         for (const t of existing) {
@@ -4604,7 +4850,11 @@ function main() {
       }
       const updateData: any = {};
       if (name !== undefined) updateData.name = String(name).trim();
-      if (googleProfileUrl !== undefined) updateData.googleProfileUrl = await resolveGoogleUrl(String(googleProfileUrl).trim());
+      if (googleProfileUrl !== undefined) {
+        const resolvedProfileUrl = await resolveReviewLink(googleProfileUrl);
+        if (!resolvedProfileUrl) return res.status(400).json({ message: GOOGLE_REVIEW_LINK_MESSAGE });
+        updateData.googleProfileUrl = resolvedProfileUrl;
+      }
       if (projectDescription !== undefined) updateData.projectDescription = projectDescription || null;
       if (isDefault === true) {
         for (const t of templates) {
@@ -4811,6 +5061,14 @@ function main() {
       const baseUrl = getBaseUrl(req);
       await sendReviewRequestEmail(request.clientEmail, request.clientName, request.companyName || "Our Company", companyLogoUrl, request.token, baseUrl, request.emailTheme);
 
+      // A customer who already answered keeps their recorded outcome, and no
+      // reminders are re-armed for them (reminders only go to status 'sent').
+      const answered = request.feedbackRating != null || request.reviewSubmitted || request.lastStep === "done"
+        || ["positive_feedback", "negative_feedback"].includes(request.status);
+      if (answered) {
+        await storage.updateReviewRequest(id, { nextReminderAt: null });
+        return res.json({ success: true, alreadyResponded: true, message: "Email resent. This customer already responded, so their answer is kept and no reminders were scheduled." });
+      }
       const reminderSettings = await storage.getReminderSettings(user.id);
       const nextTime = (reminderSettings?.enabled !== false) ? calculateNextReminderTime(reminderSettings, 0) : null;
       await storage.updateReviewRequest(id, {
@@ -4843,7 +5101,9 @@ function main() {
   app.get("/api/review/:token/click", async (req, res) => {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
-      if (request) {
+      if (request && isOwnerPreview(req, request)) {
+        res.redirect(`/review/${req.params.token}`);
+      } else if (request) {
         const updates: any = {
           linkClicked: true,
           linkClickedAt: new Date(),
@@ -4867,7 +5127,9 @@ function main() {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Review request not found" });
 
-      if (!request.linkClicked) {
+      // The owner's preview (eye icon) opens this same page: never record it as the customer's open/click.
+      const preview = isOwnerPreview(req, request);
+      if (!preview && !request.linkClicked) {
         const updates: any = {
           linkClicked: true,
           linkClickedAt: new Date(),
@@ -4899,6 +5161,7 @@ function main() {
         feedbackRating: request.feedbackRating,
         reviewSubmitted: request.reviewSubmitted,
         referralOffer: await getReferralSettings(request.userId).then(s => s.enabled ? s.offer : null),
+        preview,
       });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to load review" });
@@ -4914,6 +5177,8 @@ function main() {
       if (!Number.isInteger(rating) || rating < 1 || rating > 10) {
         return res.status(400).json({ message: "Rating must be between 1 and 10" });
       }
+
+      if (isOwnerPreview(req, request)) return res.json({ success: true, showReview: true, preview: true, recorded: false });
 
       const status = rating >= 9 ? "positive_feedback" : "negative_feedback";
       await storage.updateReviewRequest(request.id, {
@@ -4933,6 +5198,7 @@ function main() {
   app.post("/api/review/:token/google-link-opened", async (req, res) => {
     const request = await storage.getReviewRequestByToken(String(req.params.token));
     if (!request) return res.status(404).json({ message: "Not found" });
+    if (isOwnerPreview(req, request)) return res.json({ success: true, preview: true, recorded: false });
     await storage.updateReviewRequest(request.id, { googleLinkOpened: true, googleLinkOpenedAt: request.googleLinkOpenedAt || new Date() });
     res.json({ success: true });
   });
@@ -4942,6 +5208,7 @@ function main() {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
+      if (isOwnerPreview(req, request)) return res.json({ success: true, preview: true, recorded: false });
       if (!request.feedbackRating) {
         return res.status(409).json({ message: "Submit a rating first" });
       }
@@ -4963,6 +5230,9 @@ function main() {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
+      if (isOwnerPreview(req, request)) {
+        return res.status(409).json({ message: "Preview only: AI drafts are created from your customer's own link after they rate.", preview: true });
+      }
       if (!request.feedbackRating) {
         return res.status(409).json({ message: "Submit a rating first" });
       }
@@ -4995,6 +5265,7 @@ function main() {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
+      if (isOwnerPreview(req, request)) return res.json({ ok: true, preview: true, recorded: false });
       if (!request.photosDownloaded) {
         await storage.updateReviewRequest(request.id, {
           photosDownloaded: true,
@@ -5011,6 +5282,7 @@ function main() {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
+      if (isOwnerPreview(req, request)) return res.json({ ok: true, preview: true, recorded: false });
       const { method } = req.body;
       if (method === "own" || method === "ai") {
         await storage.updateReviewRequest(request.id, { reviewMethod: method });
@@ -5025,6 +5297,7 @@ function main() {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Not found" });
+      if (isOwnerPreview(req, request)) return res.json({ ok: true, preview: true, recorded: false });
       const { step } = req.body;
       if (step && typeof step === "string") {
         await storage.updateReviewRequest(request.id, { lastStep: step });
