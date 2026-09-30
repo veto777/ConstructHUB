@@ -792,7 +792,7 @@ export default function SearchPage() {
                         : failedDbs === 0
                           ? "Search complete"
                           : searchedDbs === 0
-                            ? `Search failed: ${failedDbs === 1 ? "the portal" : `none of the ${portalWord(failedDbs)}`} could be searched`
+                            ? `Search failed: ${failedDbs === 1 ? "the portal could not be searched" : `none of the ${portalWord(failedDbs)} could be searched`}`
                             : `Search finished: ${portalWord(failedDbs)} of ${totalDbs} could not be searched`}
                     </span>
                   </div>
