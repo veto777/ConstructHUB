@@ -46,3 +46,24 @@ test('AI settings preserve low-rating approval, backfill requires preview and co
   await page.getByRole('button',{name:'Confirm backfill'}).click();await expect(page.getByLabel('Draft for Browser customer')).toHaveValue('Thank you for your feedback.');await page.getByRole('button',{name:'Approve and publish to Google'}).click();await expect(page.getByText('Posted on Google:')).toBeVisible();
   await page.getByRole('button',{name:'Report review',exact:true}).click();await expect(page.getByRole('link',{name:"Open Google's official form"})).toHaveAttribute('href','https://support.google.com/business/workflow/9945796');
 });
+
+test('mobile Guard snapshot and history keep long URLs and report actions within the viewport',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await common(page);
+  const website='https://example.invalid/'+ 'long-path-segment'.repeat(30);
+  await page.route('**/api/gbp/locations/987/guard',r=>r.fulfill({json:{mode:'notify',watched:['websiteUri'],snapshot:{websiteUri:website},changes:[{id:21,field:'websiteUri',old_value:website,new_value:website+'/changed',source:'Google update',status:'pending',detected_at:'2026-09-29T12:00:00Z'}]}}));
+  await page.goto('/locations');
+  await page.getByTestId('button-cookies-decline').click();
+  await page.getByText(location.businessName,{exact:true}).click();
+  await page.getByTestId('tab-guard').click();
+  await page.getByText('Owner-approved snapshot',{exact:true}).click();
+  const guard=page.getByRole('region',{name:'Profile Guard',exact:true});
+  await expect(guard.getByRole('button',{name:'Report',exact:true})).toBeVisible();
+  const overflow=await guard.evaluate(el=>({scroll:el.scrollWidth,width:el.clientWidth}));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width+1);
+  for(const name of ['Approve','Reject','Report']) {
+    const box=await guard.getByRole('button',{name,exact:true}).boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x+box!.width).toBeLessThanOrEqual(390);
+  }
+});

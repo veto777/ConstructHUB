@@ -491,8 +491,8 @@ function LocationDetail({ location, onBack, isPremiumPlus }: {
           </div>
         </div>
 
-        <div className="flex gap-6">
-          <div className="w-48 shrink-0 space-y-1">
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:block md:w-48 shrink-0 gap-1 md:space-y-1">
             {tabItems.map(item => {
               const isLocked = item.value === "citations" && !isPremiumPlus;
               return (
