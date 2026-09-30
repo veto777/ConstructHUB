@@ -1,0 +1,122 @@
+/**
+ * Plan limits that live in the database, against the local lane DB: trial codes
+ * (never overwrite a paid plan, expire, grant Agency) and CRM seats per plan.
+ * Every fixture row is created here and removed in afterAll.
+ */
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { pool } from "./db";
+import { getEntitlements, redeemTrialCode, TRIAL_CODE_PLAN } from "./entitlements";
+import { getSeatUsage } from "./crm/tenancy";
+
+const users: number[] = [], codes: number[] = [], orgs: string[] = [];
+async function account(plan?: string, extra: { status?: string; stripe?: string | null; end?: Date | null; customer?: string } = {}) {
+  const { rows: [u] } = await pool.query("insert into users(email) values($1) returning id", [`p-plan-${randomUUID()}@example.invalid`]);
+  users.push(u.id);
+  if (plan) await pool.query(
+    "insert into subscriptions(user_id,plan,status,stripe_subscription_id,stripe_customer_id,current_period_end) values($1,$2,$3,$4,$5,$6)",
+    [u.id, plan, extra.status ?? "active", extra.stripe === undefined ? `sub_p_${randomUUID()}` : extra.stripe, extra.customer ?? null, extra.end ?? null]);
+  return u.id as number;
+}
+async function code(trialDays = 2) {
+  const { rows: [c] } = await pool.query(
+    "insert into beta_access_codes(code,created_by_user_id,trial_days,expires_at) values($1,$2,$3,now()+interval '1 day') returning id,trial_days",
+    [`TRIAL-P${randomUUID().slice(0, 8).toUpperCase()}`, users[0] ?? 1, trialDays]);
+  codes.push(c.id);
+  return { id: c.id as number, trialDays: c.trial_days as number };
+}
+const sub = async (userId: number) => (await pool.query("select * from subscriptions where user_id=$1", [userId])).rows;
+const redeemedBy = async (id: number) => (await pool.query("select redeemed_by_user_id from beta_access_codes where id=$1", [id])).rows[0].redeemed_by_user_id;
+
+beforeAll(async () => {
+  const url = new URL(process.env.DATABASE_URL!);
+  if (!["localhost", "127.0.0.1"].includes(url.hostname) || !/^\/constructhub_dev(?:_a\d+)?$/.test(url.pathname)) throw new Error("Local lane development database required");
+});
+afterAll(async () => {
+  await pool.query("delete from crm_orgs where id=any($1::text[])", [orgs]);
+  await pool.query("delete from beta_access_codes where id=any($1::int[])", [codes]);
+  await pool.query("delete from subscriptions where user_id=any($1::int[])", [users]);
+  await pool.query("delete from users where id=any($1::int[])", [users]);
+  await pool.end();
+});
+
+describe("trial codes", () => {
+  it("grant the Agency plan for the trial window, then expire", async () => {
+    const user = await account();
+    const now = new Date();
+    const out = await redeemTrialCode(user, await code(2), now);
+    expect("trialEnd" in out && out.trialEnd.getTime()).toBe(now.getTime() + 2 * 86400_000);
+    const [row] = await sub(user);
+    expect(row).toMatchObject({ plan: TRIAL_CODE_PLAN, status: "trialing", stripe_subscription_id: null });
+    const during = await getEntitlements(user);
+    expect(during.plan).toBe("agency");
+    expect(during.modules.adsManager).toBe(true);
+    expect(during.grantEndsAt?.getTime()).toBe(now.getTime() + 2 * 86400_000);
+    // Past the end date the grant counts for nothing.
+    const after = await getEntitlements(user, new Date(now.getTime() + 2 * 86400_000 + 1000));
+    expect(after.plan).toBeNull();
+    expect(after.allowances).toBeNull();
+    expect(after.modules.agencyWorkspace).toBe(false);
+  });
+
+  it("never overwrite a paid subscription or an open-ended grant, and don't burn the code", async () => {
+    const paid = await account("pro");
+    const c = await code();
+    expect(await redeemTrialCode(paid, c)).toMatchObject({ status: 409 });
+    expect(await redeemedBy(c.id)).toBeNull();
+    expect(await sub(paid)).toMatchObject([{ plan: "pro", status: "active" }]);
+
+    const dunning = await account("growth", { status: "past_due" });
+    expect(await redeemTrialCode(dunning, c)).toMatchObject({ status: 409 });
+
+    const granted = await account("platinum", { stripe: null });
+    expect(await redeemTrialCode(granted, c)).toMatchObject({ status: 409 });
+    expect(await sub(granted)).toMatchObject([{ plan: "platinum", current_period_end: null }]);
+    expect(await redeemedBy(c.id)).toBeNull();
+  });
+
+  it("replace an ended Stripe subscription (keeping the customer) and never shorten a live trial", async () => {
+    const lapsed = await account("pro", { status: "canceled", customer: "cus_p_fixture" });
+    expect("trialEnd" in await redeemTrialCode(lapsed, await code(1))).toBe(true);
+    expect(await sub(lapsed)).toMatchObject([{ plan: "agency", status: "trialing", stripe_subscription_id: null, stripe_price_id: null, stripe_customer_id: "cus_p_fixture" }]);
+
+    const now = new Date();
+    const long = await account();
+    await redeemTrialCode(long, await code(14), now);
+    const shorter = await redeemTrialCode(long, await code(1), now);
+    expect("trialEnd" in shorter && shorter.trialEnd.getTime()).toBe(now.getTime() + 14 * 86400_000);
+  });
+
+  it("can be spent once, even when two accounts race for it", async () => {
+    const [a, b] = [await account(), await account()];
+    const c = await code();
+    const results = await Promise.all([redeemTrialCode(a, c), redeemTrialCode(b, c)]);
+    expect(results.filter((r) => "trialEnd" in r)).toHaveLength(1);
+    expect(results.filter((r) => "refused" in r)).toMatchObject([{ status: 400 }]);
+    expect([a, b]).toContain(await redeemedBy(c.id));
+  });
+});
+
+describe("CRM seats follow the owner's plan", () => {
+  const org = async (owner: number) => {
+    const { rows: [o] } = await pool.query("insert into crm_orgs(name,owner_user_id) values('P-seat fixture',$1) returning *", [owner]);
+    orgs.push(o.id);
+    return { ...o, ownerUserId: o.owner_user_id };
+  };
+  it("uses crmSeats per plan, legacy plans through the map, and one owner seat without a plan", async () => {
+    expect(await getSeatUsage(await org(await account("starter")))).toMatchObject({ plan: "starter", planName: "Starter", limit: 1, canAddSeat: true });
+    expect(await getSeatUsage(await org(await account("premium")))).toMatchObject({ plan: "pro", limit: 3 });
+    expect(await getSeatUsage(await org(await account("gold")))).toMatchObject({ plan: "growth", limit: 10 });
+    const none = await getSeatUsage(await org(await account()));
+    expect(none).toMatchObject({ plan: "none", limit: 1 });
+    expect(none.message).toContain("The CRM is included with every paid plan, and Pro includes 3 seats.");
+    const lapsed = await getSeatUsage(await org(await account("growth", { status: "canceled" })));
+    expect(lapsed.limit).toBe(1);
+  });
+
+  it("keeps beta owners unlimited", async () => {
+    const owner = await account("starter");
+    await pool.query("update users set beta_at=now() where id=$1", [owner]);
+    expect(await getSeatUsage(await org(owner))).toMatchObject({ plan: "beta", limit: -1, canAddSeat: true });
+  });
+});

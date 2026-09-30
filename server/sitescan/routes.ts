@@ -4,6 +4,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import PDFDocument from "pdfkit";
 import { pool } from "../db";
 import { takeBudget, rateLimit, ipKey } from "../growth-limits";
+import { reserveQuotaFor, refundReservation } from "../growth-quotas";
 import { logActivity } from "../account-events";
 import { sendWithFallback } from "../email";
 import { requirePlatformAdmin } from "../crm/admin";
@@ -16,7 +17,7 @@ import {
 } from "../site-context";
 import { siteUrl } from "./http";
 import { enqueue, profileFor } from "./worker";
-import { pageInput, reportView, enqueueLocations } from "./agency";
+import { pageInput, reportView, enqueueLocations, bulkInput } from "./agency";
 import { checklist } from "./guidance";
 import { openAIProvider, planBatches } from "./providers";
 export const hashToken = (token: string) =>
@@ -31,6 +32,18 @@ const input = z.object({
 const idSchema = z.string().uuid(),
   tokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const DAY = 86400_000;
+/**
+ * Reserve Site Scans from the account's monthly plan allowance (Agency: per
+ * location). Answers the 402/403 itself and returns null when refused.
+ */
+async function reserveScans(res: any, user: number, count: number) {
+  const quota = await reserveQuotaFor(user, "siteScans", count);
+  if (!quota.ok) {
+    res.status(quota.status).json(quota.body);
+    return null;
+  }
+  return quota.reservation;
+}
 // Return a reservation for work that never ran (provider outage, nothing to draft).
 const refundBudget = async (key: string, amount: number, period: string) => {
   if (amount > 0)
@@ -179,11 +192,23 @@ export function registerSiteScanRoutes(
     });
   });
   owner("post", "/api/sitescan/bulk", async (req, res, user) => {
-    const jobs = await enqueueLocations(user, req.body);
-    if (!jobs)
+    // Validate first (400), then take one monthly Site Scan per selected location.
+    const ids = new Set(bulkInput.parse(req.body).locationIds).size;
+    const reservation = await reserveScans(res, user, ids);
+    if (!reservation) return;
+    let jobs;
+    try {
+      jobs = await enqueueLocations(user, req.body);
+    } catch (e) {
+      await refundReservation(reservation, ids);
+      throw e;
+    }
+    if (!jobs) {
+      await refundReservation(reservation, ids);
       return res
         .status(429)
         .json({ message: "Agency queue budget reached (1,000 sites/day)." });
+    }
     await logActivity(req, user, "sitescan.started", {
       bulk: true,
       count: jobs.length,
@@ -285,10 +310,14 @@ export function registerSiteScanRoutes(
   owner("post", "/api/sitescan/jobs/:id/retry", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
-    if (!(await takeBudget("sitescan:scan:" + user, 5, 1, 86400000)))
+    const reservation = await reserveScans(res, user, 1);
+    if (!reservation) return;
+    if (!(await takeBudget("sitescan:scan:" + user, 5, 1, 86400000))) {
+      await refundReservation(reservation, 1);
       return res
         .status(429)
         .json({ message: "Daily rescan budget reached (5)." });
+    }
     const profile = j.profile?.id ? await profileFor(user, j.profile.id) : null;
     const id = await enqueue(
       user,
@@ -352,10 +381,14 @@ export function registerSiteScanRoutes(
         .status(400)
         .json({ message: "Enter a public HTTP or HTTPS website URL." });
     }
-    if (!(await takeBudget("sitescan:scan:" + user, 5, 1, 86400_000)))
+    const reservation = await reserveScans(res, user, 1);
+    if (!reservation) return;
+    if (!(await takeBudget("sitescan:scan:" + user, 5, 1, 86400_000))) {
+      await refundReservation(reservation, 1);
       return res
         .status(429)
         .json({ message: "Daily scan budget reached (5)." });
+    }
     const id = await enqueue(user, url, body.pageCap, body.psiPages, profile);
     await logActivity(req, user, "sitescan.started", { id, url });
     res.status(202).json({ id });

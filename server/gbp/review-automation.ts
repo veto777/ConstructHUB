@@ -7,6 +7,7 @@ import { logActivity, notifyUser } from '../account-events';
 import { GoogleError } from './client';
 import { ownedLocation, reply, withLocationLock } from './service';
 import {aiModel} from '../ai-config';
+import {getEntitlements} from '../entitlements';
 export const replySettingsSchema=z.object({
   mode:z.enum(['off','draft','auto']).default('off'), scope:z.enum(['future','existing']).default('future'),
   tone:z.string().trim().min(1).max(200).default('Warm and professional'), signOff:z.string().trim().max(150).default(''),
@@ -19,6 +20,16 @@ export const replySettingsSchema=z.object({
 export type ReplySettings=z.infer<typeof replySettingsSchema>;
 export const defaults=replySettingsSchema.parse({});
 export const shouldAutoPublish=(s:ReplySettings,rating:number)=>s.mode==='auto'&&(rating>2||s.allowLowRatingAuto);
+/**
+ * What the account's plan lets AI replies do: nothing without a plan, drafts for
+ * approval on every plan, and publishing without a human only where the plan's
+ * autoPublishAiReplies is true (shared/plans.ts). A saved 'auto' mode on a plan
+ * without it keeps drafting.
+ */
+export async function replyEntitlement(userId:number):Promise<{drafts:boolean;autoPublish:boolean}> {
+  const a=(await getEntitlements(userId)).allowances;
+  return {drafts:!!a,autoPublish:!!a?.autoPublishAiReplies};
+}
 export async function withAutomationLock<T>(id:number,fn:()=>Promise<T>) {
   const c=await pool.connect();
   try {
@@ -49,9 +60,9 @@ export async function previewBackfill(userId:number,id:number) {
       LEFT JOIN gbp_review_automation a ON a.review_id=r.id WHERE r.user_id=$1 AND r.location_id=$2 AND NOT r.google_deleted
       AND r.google_review_id LIKE 'accounts/%/locations/%/reviews/%' AND r.reply_comment IS NULL AND r.reply_draft IS NULL
       AND a.ai_status IS NULL ORDER BY r.id LIMIT 50`,[userId,id]);
-    const token=randomUUID();
+    const token=randomUUID(),{autoPublish}=await replyEntitlement(userId);
     await pool.query("UPDATE gbp_reply_settings SET preview_token=$3,preview_ids=$4,preview_expires=now()+interval '10 minutes' WHERE user_id=$1 AND location_id=$2",[userId,id,token,rows.map(r=>r.id)]);
-    return {token,reviews:rows.map(r=>({...r,action:shouldAutoPublish(s.settings,r.rating)?'auto-publish':'draft for approval'}))};
+    return {token,reviews:rows.map(r=>({...r,action:autoPublish&&shouldAutoPublish(s.settings,r.rating)?'auto-publish':'draft for approval'}))};
   });
 }
 export async function confirmBackfill(userId:number,id:number,token:string) {
@@ -105,6 +116,9 @@ export async function processReplies(userId:number,id:number,generate=generateRe
   return withAutomationLock(id,async()=>{
     const {rows:[config]}=await pool.query('SELECT * FROM gbp_reply_settings WHERE user_id=$1 AND location_id=$2',[userId,id]);
     if(!config||config.settings.mode==='off')return;
+    // No plan, no AI work; a plan without automatic publishing gets drafts only.
+    const plan=await replyEntitlement(userId);
+    if(!plan.drafts)return;
     const s=replySettingsSchema.parse(config.settings);
     const {rows}=await pool.query(`SELECT r.*,a.backfill FROM google_profile_reviews r JOIN gbp_review_automation a ON a.review_id=r.id
       WHERE r.user_id=$1 AND r.location_id=$2 AND NOT r.google_deleted AND r.reply_comment IS NULL AND r.reply_draft IS NULL
@@ -122,7 +136,7 @@ export async function processReplies(userId:number,id:number,generate=generateRe
         });
         if(!saved){await pool.query("UPDATE gbp_review_automation SET ai_status='skipped' WHERE review_id=$1",[r.id]);continue;}
         await pool.query("UPDATE gbp_review_automation SET ai_status='draft' WHERE review_id=$1",[r.id]);
-        if(shouldAutoPublish(s,r.rating)) {
+        if(plan.autoPublish&&shouldAutoPublish(s,r.rating)) {
           // A human reply/draft arriving during generation wins; reply re-checks under its lock.
           await publish(userId,r.id,text,'publish',undefined,{expectedDraft:text,expectedReview:{rating:r.rating,comment:r.comment}});
           await pool.query("UPDATE gbp_review_automation SET ai_status='posted' WHERE review_id=$1",[r.id]);

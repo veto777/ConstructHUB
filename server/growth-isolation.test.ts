@@ -191,7 +191,7 @@ describe("settings validation and photo plan caps", () => {
     const settings = await (await api("/api/review-reminder-settings", a)).json();
     expect(settings.maxReminders).toBe(0); expect(settings.timezone).toBe("Asia/Tokyo");
   });
-  it("rejects a batch above the Standard quota before starting work", async () => {
+  it("refuses photo processing without a plan before starting work (no silent fallback plan)", async () => {
     const sharp = (await import("sharp")).default;
     const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "white" } }).png().toBuffer();
     const form = new FormData(); form.append("photos", new Blob([png], { type: "image/png" }), "fixture.png");
@@ -199,7 +199,7 @@ describe("settings validation and photo plan caps", () => {
     expect(upload.status).toBe(200);
     const { files } = await upload.json();
     const rejected = await api("/api/photos/process", a, "POST", { fileIds: Array(6).fill(files[0].id) });
-    expect(rejected.status).toBe(403); expect((await rejected.json()).limit).toBe(5);
+    expect(rejected.status).toBe(402); expect(await rejected.json()).toMatchObject({ code: "plan_required", requiredPlan: "starter" });
     expect((await api("/api/photos/process", a, "POST", { fileIds: Array(11).fill(files[0].id) })).status).toBe(400);
   });
 });
