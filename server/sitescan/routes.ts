@@ -208,7 +208,9 @@ export function registerSiteScanRoutes(
           .max(300000)
           .regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/)
           .nullable()
-          .default(null),
+          // Omitted keeps the saved logo, so a rename never re-sends it (the stored, normalized PNG
+          // can exceed this upload cap); null removes it.
+          .optional(),
       })
       .strict()
       .parse(req.body);
@@ -232,10 +234,22 @@ export function registerSiteScanRoutes(
         throw new TypeError("Invalid logo");
       }
     }
-    await pool.query(
-      "INSERT INTO sitescan_branding(user_id,name,logo) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET name=$2,logo=$3",
-      [user, b.name, b.logo],
-    );
+    if (b.logo === undefined)
+      await pool.query(
+        "INSERT INTO sitescan_branding(user_id,name) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET name=$2",
+        [user, b.name],
+      );
+    else
+      await pool.query(
+        "INSERT INTO sitescan_branding(user_id,name,logo) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET name=$2,logo=$3",
+        [user, b.name, b.logo],
+      );
+    res.json({ ok: true });
+  });
+  // Removing branding returns PDFs to the ConstructHUB title. Agency members never reach this
+  // (the access layer only delegates object routes), so it only clears the owner's own row.
+  owner("delete", "/api/sitescan/branding", async (_req, res, user) => {
+    await pool.query("DELETE FROM sitescan_branding WHERE user_id=$1", [user]);
     res.json({ ok: true });
   });
   owner("post", "/api/sitescan/jobs/:id/fixes", async (req, res, user) => {
@@ -437,6 +451,18 @@ export function registerSiteScanRoutes(
     );
     await logActivity(req, user, "sitescan.shared", { id: j.id });
     res.json({ path: "/site-scan/report/" + value });
+  });
+  owner("delete", "/api/sitescan/jobs/:id", async (req, res, user) => {
+    const j = await getJob(req, res, user);
+    if (!j) return;
+    // Removes the report, its share link and fix progress. A queued or running scan stops: the
+    // worker's lease-checked writes find no row. The daily scan budget is not refunded.
+    await pool.query("DELETE FROM sitescan_jobs WHERE id=$1 AND user_id=$2", [
+      j.id,
+      user,
+    ]);
+    await logActivity(req, user, "sitescan.deleted", { id: j.id, url: j.url });
+    res.json({ ok: true });
   });
   owner("delete", "/api/sitescan/jobs/:id/share", async (req, res, user) => {
     const j = await getJob(req, res, user);

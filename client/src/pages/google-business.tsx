@@ -126,16 +126,17 @@ export default function GoogleBusinessPage() {
               Check it, optimize it, and compete for the Local Pack with 5 purpose-built tools.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-4">
-              <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-hero-start">
-                <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-8 h-12 text-base shadow-lg shadow-blue-500/25">
+              {/* One interactive element per CTA: the button styles the link itself (no <a><button>). */}
+              <Button asChild size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-8 h-12 text-base shadow-lg shadow-blue-500/25">
+                <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-hero-start">
                   <Eye className="h-4 w-4 mr-2" /> Start Monitoring <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
-              <a href="#tools" data-testid="link-hero-explore">
-                <Button size="lg" variant="outline" className="px-8 h-12 text-base">
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="px-8 h-12 text-base">
+                <a href="#tools" data-testid="link-hero-explore">
                   <Star className="h-4 w-4 mr-2" /> Explore All Tools
-                </Button>
-              </a>
+                </a>
+              </Button>
             </div>
             <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground animate-in-delay-5">
               <div className="flex items-center gap-2">
@@ -262,11 +263,11 @@ export default function GoogleBusinessPage() {
             ))}
           </div>
           <div className="text-center mt-8 animate-in-delay-4">
-            <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-pipeline-cta">
-              <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-8 h-12 shadow-lg shadow-blue-500/25">
+            <Button asChild size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-8 h-12 shadow-lg shadow-blue-500/25">
+              <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-pipeline-cta">
                 <Eye className="h-4 w-4 mr-2" /> Start Monitoring Now
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </div>
       </section>
@@ -367,16 +368,16 @@ export default function GoogleBusinessPage() {
             Use our Google Business Profile Suite to keep your profile accurate, see where you rank, and turn more local searches into calls.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-final-start">
-              <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-10 h-13 text-base shadow-lg shadow-blue-500/25">
+            <Button asChild size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5DE7] text-white px-10 h-13 text-base shadow-lg shadow-blue-500/25">
+              <Link href={user ? "/gmb-monitor" : "/auth?mode=signup"} data-testid="link-final-start">
                 Start Monitoring <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-            <Link href="/pricing" data-testid="link-final-pricing">
-              <Button size="lg" variant="outline" className="px-8 h-13 text-base">
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="px-8 h-13 text-base">
+              <Link href="/pricing" data-testid="link-final-pricing">
                 <Award className="h-4 w-4 mr-2" /> View Plans & Pricing
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </div>
       </section>

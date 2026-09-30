@@ -325,9 +325,14 @@ function ReviewResponseTool() {
     setShowWarning(hasRudeContent);
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(customEdit || generatedResponse);
-    toast({ title: "Copied to clipboard", description: "Paste this response into your Google review reply." });
+  const copyToClipboard = async () => {
+    // Only confirm a copy the browser actually performed; clipboard access can be blocked.
+    try {
+      await navigator.clipboard.writeText(customEdit || generatedResponse);
+      toast({ title: "Copied to clipboard", description: "Paste this response into your Google review reply." });
+    } catch {
+      toast({ title: "Copy failed", description: "Your browser blocked clipboard access. Select the response text and copy it manually.", variant: "destructive" });
+    }
   };
 
   return (
