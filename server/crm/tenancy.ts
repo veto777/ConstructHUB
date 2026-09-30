@@ -9,13 +9,16 @@
  * Every CRM route must go through requireOrg() — never trust an org id from the
  * request body.
  */
+import type { PoolClient } from "pg";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { db, pool } from "../db";
+import * as schema from "@shared/schema";
 import { crmOrgs, crmMembers, users, crmEffectivePermissions } from "@shared/schema";
 import type { CrmPermission } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
 import { PLANS, type AddonKey, type PlanKey } from "@shared/plans";
-import { getEntitlements, raiseHint, cheapestPlanWhere, plural, inUse } from "../entitlements";
+import { getEntitlements, raiseHint, cheapestPlanWhere, plural, inUse, type Entitlements } from "../entitlements";
 
 export type OrgContext = {
   org: typeof crmOrgs.$inferSelect;
@@ -170,9 +173,12 @@ export function requireOwnerRole(res: any, ctx: OrgContext): boolean {
  * review corpus. We enforce a limit but never block hiring silently — the API
  * returns the numbers so the UI can say exactly what is needed.
  */
-export async function getSeatUsage(org: typeof crmOrgs.$inferSelect, adding?: { userId?: number | null; email?: string | null }) {
-  return getOwnerSeatUsage(org.ownerUserId, { adding });
+export async function getSeatUsage(org: typeof crmOrgs.$inferSelect, adding?: { userId?: number | null; email?: string | null }, lock?: SeatLock) {
+  return getOwnerSeatUsage(org.ownerUserId, { adding, client: lock?.client, ent: lock?.ent });
 }
+
+/** Runs SQL: the pool, or the connection holding the seat lock (withSeatLock). */
+type Sql = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 
 /**
  * The people holding seats on an owner's plan, one entry per person: members
@@ -182,8 +188,8 @@ export async function getSeatUsage(org: typeof crmOrgs.$inferSelect, adding?: { 
  * agency team seat"), so someone on both teams holds one seat. An invitation
  * not yet accepted counts by the account its email belongs to, else the email.
  */
-async function seatHolders(ownerUserId: number, withAgencyTeam: boolean): Promise<Set<string>> {
-  const { rows: crm } = await pool.query(
+async function seatHolders(q: Sql, ownerUserId: number, withAgencyTeam: boolean): Promise<Set<string>> {
+  const { rows: crm } = await q.query(
     `SELECT COALESCE('u:' || COALESCE(m.user_id, (SELECT u.id FROM users u WHERE lower(u.email)=lower(m.email) ORDER BY u.id LIMIT 1)),
                      'e:' || lower(m.email)) AS who
        FROM crm_members m JOIN crm_orgs o ON o.id=m.org_id
@@ -193,18 +199,18 @@ async function seatHolders(ownerUserId: number, withAgencyTeam: boolean): Promis
   const holders = new Set<string>(crm.map((r: { who: string }) => r.who));
   if (withAgencyTeam) {
     holders.add(`u:${ownerUserId}`);
-    const { rows: team } = await pool.query("SELECT member_id FROM agency_members WHERE user_id=$1", [ownerUserId]);
+    const { rows: team } = await q.query("SELECT member_id FROM agency_members WHERE user_id=$1", [ownerUserId]);
     for (const r of team) holders.add(`u:${r.member_id}`);
   }
   return holders;
 }
 
 /** A person's seat identity: their account when one exists, else the invited email. */
-async function seatIdentity(person: { userId?: number | null; email?: string | null }): Promise<string | null> {
+async function seatIdentity(q: Sql, person: { userId?: number | null; email?: string | null }): Promise<string | null> {
   if (person.userId) return `u:${person.userId}`;
   const email = person.email?.trim().toLowerCase();
   if (!email) return null;
-  const { rows: [u] } = await pool.query("SELECT id FROM users WHERE lower(email)=$1 ORDER BY id LIMIT 1", [email]);
+  const { rows: [u] } = await q.query("SELECT id FROM users WHERE lower(email)=$1 ORDER BY id LIMIT 1", [email]);
   return u ? `u:${u.id}` : `e:${email}`;
 }
 
@@ -212,25 +218,26 @@ async function seatIdentity(person: { userId?: number | null; email?: string | n
  * Seat usage on an owner's plan; the CRM team and the Agency team share it.
  * `adding` asks about one more person (by account id or email): `canAdd` says
  * whether they can join, which is always true for someone who already holds a
- * seat on the other team.
+ * seat on the other team. Under the seat lock, pass its `client` and `ent`
+ * so every query runs on the connection holding the lock.
  */
-export async function getOwnerSeatUsage(ownerUserId: number, opts: { adding?: { userId?: number | null; email?: string | null } } = {}) {
-  const ent = await getEntitlements(ownerUserId);
+export async function getOwnerSeatUsage(
+  ownerUserId: number,
+  opts: { adding?: { userId?: number | null; email?: string | null }; client?: Sql; ent?: Entitlements } = {},
+) {
+  const q: Sql = opts.client ?? pool;
+  const ent = opts.ent ?? await getEntitlements(ownerUserId);
   const withAgencyTeam = ent.modules.agencyWorkspace;
-  const holders = await seatHolders(ownerUserId, withAgencyTeam);
+  const holders = await seatHolders(q, ownerUserId, withAgencyTeam);
   const used = holders.size;
-  const adding = opts.adding ? await seatIdentity(opts.adding) : null;
+  const adding = opts.adding ? await seatIdentity(q, opts.adding) : null;
   const alreadySeated = !!adding && holders.has(adding);
 
   // Beta accounts (owner signed up through a platform beta invite) get
   // unlimited seats for the duration of the beta — every gate below, and both
   // 402 sites in routes.ts, key off this result, so they never paywall one.
-  const [owner] = await db
-    .select({ betaAt: users.betaAt })
-    .from(users)
-    .where(eq(users.id, ownerUserId))
-    .limit(1);
-  if (owner?.betaAt) {
+  const { rows: [owner] } = await q.query("SELECT beta_at FROM users WHERE id=$1", [ownerUserId]);
+  if (owner?.beta_at) {
     return {
       plan: "beta",
       planName: "Beta",
@@ -284,23 +291,32 @@ export type SeatUsage = Awaited<ReturnType<typeof getOwnerSeatUsage>>;
 
 /** Advisory lock key (with the owner's id) around a seat check and the addition it allows. */
 export const SEAT_LOCK = 7164;
+/** What work under the seat lock runs on: the connection holding it (raw and Drizzle) and the owner's plan. */
+export type SeatLock = { client: PoolClient; db: NodePgDatabase<typeof schema>; ent: Entitlements };
 /**
  * Run a seat check and the addition it allows one at a time per owner, so the
- * CRM team and the Agency team can't race past the shared pool together (the
- * Agency route takes the same key inside its transaction).
+ * CRM team and the Agency team can't race past the shared pool together. It is
+ * one transaction holding pg_advisory_xact_lock, and `fn` must do all of its
+ * SQL through the SeatLock it is given: a request waiting for the lock holds a
+ * pool connection, so work under the lock that needed a second connection from
+ * the pool (10 by default) wedges every query in the process once ten requests
+ * for one owner arrive together. The owner's plan is read before the lock.
  */
-export async function withSeatLock<T>(ownerUserId: number, fn: () => Promise<T>): Promise<T> {
+export async function withSeatLock<T>(ownerUserId: number, fn: (lock: SeatLock) => Promise<T>): Promise<T> {
+  const ent = await getEntitlements(ownerUserId);
   const c = await pool.connect();
   let broken = false;
   try {
-    await c.query("SELECT pg_advisory_lock($1,$2)", [SEAT_LOCK, ownerUserId]);
-    try {
-      return await fn();
-    } finally {
-      await c.query("SELECT pg_advisory_unlock($1,$2)", [SEAT_LOCK, ownerUserId]).catch(() => { broken = true; });
-    }
+    await c.query("BEGIN");
+    await c.query("SELECT pg_advisory_xact_lock($1,$2)", [SEAT_LOCK, ownerUserId]);
+    const result = await fn({ client: c, db: drizzle(c, { schema }), ent });
+    await c.query("COMMIT");
+    return result;
+  } catch (e) {
+    // A connection that can't roll back is closed rather than reused.
+    await c.query("ROLLBACK").catch(() => { broken = true; });
+    throw e;
   } finally {
-    // A connection whose unlock failed may still hold the lock: close it rather than reuse it.
     c.release(broken);
   }
 }

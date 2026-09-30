@@ -21,7 +21,7 @@ import {
 } from "@shared/schema";
 import { isThemeColorId } from "@shared/theme-colors";
 import { and, eq, desc, isNull, sql } from "drizzle-orm";
-import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage, seatLimitBody, withSeatLock } from "./tenancy";
+import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage, seatLimitBody, withSeatLock, type SeatLock } from "./tenancy";
 import { registerCrmEntityRoutes } from "./entities";
 import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./portal";
 import { registerCrmPaymentRoutes } from "./payments";
@@ -780,20 +780,21 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
 
-    const update = async () => (await db
+    const update = async (via: SeatLock["db"] = db) => (await via
       .update(crmMembers)
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(crmMembers.id, target.id))
       .returning())[0];
     // Re-activating a seat has to respect the plan limit (checked and taken
-    // under the owner's seat lock, shared with the Agency team).
+    // under the owner's seat lock, shared with the Agency team; all of it on
+    // the connection holding the lock).
     const reactivating = parsed.data.status === "active" && target.status !== "active";
     const outcome = reactivating
-      ? await withSeatLock(ctx.org.ownerUserId, async () => {
+      ? await withSeatLock(ctx.org.ownerUserId, async (lock) => {
           // Someone already holding a seat (an invitation, or the owner's Agency team) takes no extra one.
-          const seats = await getSeatUsage(ctx.org, { userId: target.userId, email: target.email });
+          const seats = await getSeatUsage(ctx.org, { userId: target.userId, email: target.email }, lock);
           if (!seats.canAdd) return { refused: seatLimitBody(seats) };
-          return { row: await update() };
+          return { row: await update(lock.db) };
         })
       : { row: await update() };
     if ("refused" in outcome) return res.status(402).json(outcome.refused);
@@ -963,13 +964,15 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
     // The seat check and the seat it allows happen under the owner's seat lock,
     // shared with the Agency team (one pool), so concurrent additions can't
-    // pass the limit together.
-    const outcome = await withSeatLock(ctx.org.ownerUserId, async () => {
+    // pass the limit together. Everything under it runs on the connection
+    // holding the lock (lock.db), in one transaction.
+    const outcome = await withSeatLock(ctx.org.ownerUserId, async (lock) => {
+      const tx = lock.db;
       // Someone already seated on the owner's Agency team takes no extra seat.
-      const seats = await getSeatUsage(ctx.org, { email });
+      const seats = await getSeatUsage(ctx.org, { email }, lock);
       if (!seats.canAdd) return { refused: 402, body: seatLimitBody(seats) as object };
 
-      const existing = await db
+      const existing = await tx
         .select()
         .from(crmMembers)
         .where(and(eq(crmMembers.orgId, ctx.org.id), sql`lower(${crmMembers.email}) = ${lower}`))
@@ -978,7 +981,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         return { refused: 409, body: { message: "That person is already on your team" } };
       }
 
-      const [invite] = await db
+      const [invite] = await tx
         .insert(crmInvitations)
         .values({
           orgId: ctx.org.id,
@@ -994,12 +997,12 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
       // Hold the seat immediately so two invites can't race past the limit.
       if (existing.length) {
-        await db
+        await tx
           .update(crmMembers)
           .set({ status: "invited", role, permissions: permissions ?? null, displayName: displayName ?? null, divisionId: divisionId ?? null, updatedAt: new Date() })
           .where(eq(crmMembers.id, existing[0].id));
       } else {
-        await db.insert(crmMembers).values({
+        await tx.insert(crmMembers).values({
           orgId: ctx.org.id,
           userId: null,
           email: lower,

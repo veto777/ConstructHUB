@@ -105,6 +105,31 @@ describe("One seat pool for the CRM team and the Agency team", () => {
     await pool.query("DELETE FROM agency_members WHERE user_id=$1", [owner]);
     await pool.query("DELETE FROM agency_workspaces WHERE user_id=$1", [owner]);
   });
+
+  it("answers every one of more simultaneous additions for one owner than the pg pool has connections", async () => {
+    // A request waiting for the seat lock holds a pool connection (10 by default). Before the work under the lock
+    // ran on the lock's own connection, 12 invitations at once wedged every query in the process.
+    const seats = PLANS.agency.limits.crmSeats;
+    const owner = await account("agency");
+    const emails = await Promise.all(Array.from({ length: 5 }, async () =>
+      (await pool.query("SELECT email FROM users WHERE id=$1", [await account()])).rows[0].email as string));
+    const all = Promise.all([
+      ...Array.from({ length: 9 }, () => call(owner, "/api/crm/invitations", { email: `i-invitee-${randomUUID()}@example.invalid` })),
+      ...emails.map((email) => call(owner, "/api/agency/team", { email, role: "viewer" }, "PUT")),
+    ]);
+    const outcome = await Promise.race([all, new Promise<"wedged">((resolve) => setTimeout(() => resolve("wedged"), 15_000))]);
+    expect(outcome).not.toBe("wedged");
+    const results = outcome as Awaited<typeof all>;
+    // The owner holds one seat; the other seats go to exactly that many of the 14, and the rest are refused.
+    expect(results.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(seats - 1);
+    for (const r of results.filter((r) => r.status !== 200 && r.status !== 201))
+      expect(r.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: seats, used: seats });
+    const { getOwnerSeatUsage } = await import("./tenancy");
+    expect((await getOwnerSeatUsage(owner)).used).toBe(seats);
+    await pool.query("DELETE FROM agency_member_clients WHERE user_id=$1", [owner]);
+    await pool.query("DELETE FROM agency_members WHERE user_id=$1", [owner]);
+    await pool.query("DELETE FROM agency_workspaces WHERE user_id=$1", [owner]);
+  }, 30_000);
 });
 
 describe("Texting a client without a texting plan", () => {
