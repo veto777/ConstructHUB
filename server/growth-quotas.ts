@@ -11,7 +11,7 @@ import type { Request, Response } from "express";
 import { pool } from "./db";
 import { takeBudget } from "./growth-limits";
 import {
-  getEntitlements, cheapestPlanWhere, raiseHint, plural, locationCount, TOP_PLAN,
+  getEntitlements, cheapestPlanWhere, raiseHint, plural, billedLocationCount, TOP_PLAN,
   type Entitlements, type CountLimit,
 } from "./entitlements";
 import { PLANS, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
@@ -54,7 +54,10 @@ export function gridCreditCost(gridSize: number): number {
 const includes = (meter: Meter) => (l: PlanLimits) =>
   !meter.limit || l[meter.limit] === -1 || l[meter.limit] > 0 || (!!meter.perLocation && l[meter.perLocation] > 0);
 
-/** Monthly allowance for a feature: -1 = unlimited / fair use, 0 = not in the plan. */
+/**
+ * Monthly allowance for a feature: -1 = unlimited / fair use, 0 = not in the plan.
+ * `locations` is the billed location count (billedLocationCount), not every row.
+ */
 export function monthlyLimit(ent: Entitlements, feature: MeteredFeature, locations = 0): number {
   const meter = METERS[feature], a = ent.allowances;
   if (!a) return 0;
@@ -82,7 +85,7 @@ export type QuotaResult =
 async function allowanceFor(userId: number, feature: MeteredFeature) {
   const ent = await getEntitlements(userId);
   const meter = METERS[feature];
-  const locations = meter.perLocation && ent.allowances?.[meter.perLocation] ? await locationCount(userId) : 0;
+  const locations = meter.perLocation && ent.allowances?.[meter.perLocation] ? await billedLocationCount(userId) : 0;
   return { ent, limit: monthlyLimit(ent, feature, locations) };
 }
 
@@ -102,7 +105,7 @@ function limitBody(ent: Entitlements, feature: MeteredFeature, limit: number, us
   const units = (n: number) => plural(n, meter.unit[0], meter.unit[1]);
   let raise = meter.limit ? raiseHint(ent, meter.limit, meter.unit, meter.addon) : { text: "", upgradePlan: null, addon: null };
   if (!raise.text && meter.perLocation && ent.allowances?.[meter.perLocation]) {
-    raise = { ...raise, text: `${plan} includes ${units(ent.allowances[meter.perLocation])} per location, so adding locations raises it.` };
+    raise = { ...raise, text: `${plan} includes ${units(ent.allowances[meter.perLocation])} per linked Google Business Profile location, so linking more locations raises it.` };
   }
   const left = Math.max(0, limit - used);
   const what = left === 0
@@ -172,7 +175,7 @@ export async function refundQuota(res: Response, amount: number) {
 /** This month's use of each counted feature, for the plan summary. */
 export async function monthlyUsage(userId: number, ent: Entitlements) {
   const counted = (Object.keys(METERS) as MeteredFeature[]).filter((f) => METERS[f].limit);
-  const locations = await locationCount(userId);
+  const locations = await billedLocationCount(userId);
   const { rows } = await pool.query("SELECT key,used FROM growth_budgets WHERE key=ANY($1::text[]) AND period='0'", [counted.map((f) => quotaKey(userId, f))]);
   const used = new Map(rows.map((r: any) => [r.key, Number(r.used)]));
   return Object.fromEntries(counted.map((f) => [f, { used: used.get(quotaKey(userId, f)) ?? 0, limit: monthlyLimit(ent, f, locations) }]));

@@ -210,6 +210,18 @@ export async function locationCount(userId: number, client: { query: (text: stri
   return r?.n ?? 0;
 }
 
+/**
+ * Locations a per-location plan is billed for: linked Google Business Profile
+ * listings, a listing linked twice counting once (the same count the Agency
+ * billing sync sends to Stripe). Places-only rows count toward the location
+ * limit but are not billed, so they earn no per-location allowance.
+ */
+export async function billedLocationCount(userId: number): Promise<number> {
+  const { rows: [r] } = await pool.query(
+    "SELECT count(DISTINCT gbp_location_name)::int n FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NOT NULL", [userId]);
+  return r?.n ?? 0;
+}
+
 /** The 403 for a full location allowance. */
 export function sendLocationLimit(res: Response, ent: Entitlements, used: number, adding = 1) {
   const limit = ent.allowances?.locations ?? 0;
@@ -275,6 +287,65 @@ export async function redeemTrialCode(userId: number, code: { id: number; trialD
     }
     await c.query("COMMIT");
     return { trialEnd: end, unlimited };
+  } catch (e) {
+    await c.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+
+/** When a redeemed code's own trial window ends (trialDays 0 = until revoked). */
+function codeTrialEnd(code: { redeemedAt: Date | string | null; trialDays: number }): Date | null {
+  if (code.trialDays === 0) return OPEN_ENDED_TRIAL;
+  if (!code.redeemedAt) return null;
+  return new Date(new Date(code.redeemedAt).getTime() + code.trialDays * 86400_000);
+}
+/** Slack between a code's redeemed_at and the end date written for it (older redemptions set them apart). */
+const TRIAL_END_SLACK_MS = 60_000;
+
+/**
+ * After an admin revokes a redeemed trial code: end the trial that code is
+ * keeping alive, and nothing else. Only a Stripe-less grant with an end date is
+ * touched (never a paid plan or an open-ended grant). A code whose own window
+ * has already ended, or whose window is shorter than the grant's end date (the
+ * grant was extended by something else), leaves the grant alone. If another
+ * live code still covers the account, the grant is cut back to that code's end
+ * instead of ending.
+ */
+export async function endRevokedTrial(code: { id: number; redeemedByUserId: number | null; redeemedAt: Date | string | null; trialDays: number }, now = new Date()): Promise<"ended" | "shortened" | "unchanged"> {
+  const userId = code.redeemedByUserId;
+  const ownEnd = codeTrialEnd(code);
+  if (!userId || !ownEnd || ownEnd <= now) return "unchanged";
+  const c = await pool.connect();
+  try {
+    await c.query("BEGIN");
+    await c.query("SELECT pg_advisory_xact_lock(7170, $1)", [userId]);
+    const { rows: [sub] } = await c.query(
+      "SELECT * FROM subscriptions WHERE user_id=$1 ORDER BY (status IN ('active','trialing')) DESC, id DESC LIMIT 1", [userId]);
+    const grantEnd = sub && !sub.stripe_subscription_id && sub.current_period_end != null && ["trialing", "active"].includes(sub.status)
+      ? new Date(sub.current_period_end) : null;
+    if (!grantEnd || grantEnd <= now || grantEnd.getTime() > ownEnd.getTime() + TRIAL_END_SLACK_MS) {
+      await c.query("ROLLBACK");
+      return "unchanged";
+    }
+    const { rows: others } = await c.query(
+      "SELECT redeemed_at, trial_days FROM beta_access_codes WHERE redeemed_by_user_id=$1 AND id<>$2 AND NOT revoked",
+      [userId, code.id]);
+    const stillCovered = others
+      .map((o: any) => codeTrialEnd({ redeemedAt: o.redeemed_at, trialDays: o.trial_days }))
+      .filter((d: Date | null): d is Date => !!d && d > now)
+      .reduce<Date | null>((a, b) => (!a || b > a ? b : a), null);
+    let outcome: "ended" | "shortened" | "unchanged" = "unchanged";
+    if (!stillCovered) {
+      await c.query("UPDATE subscriptions SET status='canceled', current_period_end=$2 WHERE id=$1", [sub.id, now]);
+      outcome = "ended";
+    } else if (stillCovered < grantEnd) {
+      await c.query("UPDATE subscriptions SET current_period_end=$2 WHERE id=$1", [sub.id, stillCovered]);
+      outcome = "shortened";
+    }
+    await c.query("COMMIT");
+    return outcome;
   } catch (e) {
     await c.query("ROLLBACK").catch(() => {});
     throw e;

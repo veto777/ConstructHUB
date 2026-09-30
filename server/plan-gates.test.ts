@@ -117,6 +117,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
       const r = await api("/api/click-guard/domains", who, "POST", { domain: "p-gates.example" });
       expect(r.status).toBe(402);
       expect(r.body.requiredPlan).toBe("pro");
+      expect(r.body.message).toBe("Click-fraud protection (Click Guard, IP Tracker and VPN Shield) is included with the Pro plan. Upgrade in Pricing to use it.");
     }
     expect((await api("/api/click-guard/domains", pro, "POST", { domain: "p-gates-one.example" })).status).toBe(200);
     const second = await api("/api/click-guard/domains", pro, "POST", { domain: "p-gates-two.example" });
@@ -184,6 +185,21 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     expect((await grid(3, starter)).status).toBe(200);
     // No Places key here, so the grid fails and its credit comes back.
     expect(await eventually(async () => (await used(starter.id, "rankings")) === 0)).toBe(true);
+  });
+
+  it("limits the self-serve card trial to one grid, but not a trial-code grant", async () => {
+    const grid = (who: Account) => api("/api/ranking-grid/scans", who, "POST", { businessName: "P-Gates", placeId: "p-gates", lat: 27.95, lon: -82.46, keyword: "roofer", gridSize: 3, gridDistance: 1 });
+    const card = await account();
+    await pool.query("insert into subscriptions(user_id,plan,status,stripe_subscription_id) values($1,'pro','trialing',$2)", [card.id, `sub_p_${randomUUID()}`]);
+    expect((await grid(card)).status).toBe(200);
+    const second = await grid(card);
+    expect(second.status).toBe(403);
+    expect(second.body).toMatchObject({ code: "limit_reached", feature: "rankings", limit: 1 });
+
+    const coded = await account();
+    await pool.query("insert into subscriptions(user_id,plan,status,current_period_end) values($1,'agency','trialing',now()+interval '2 days')", [coded.id]);
+    expect((await grid(coded)).status).toBe(200);
+    expect((await grid(coded)).status).toBe(200);
   });
 
   it("trial codes grant Agency for the trial, never overwrite a paid plan, and expire", async () => {

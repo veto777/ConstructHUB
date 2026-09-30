@@ -6,7 +6,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { pool } from "./db";
-import { getEntitlements, redeemTrialCode, TRIAL_CODE_PLAN } from "./entitlements";
+import { getEntitlements, redeemTrialCode, endRevokedTrial, TRIAL_CODE_PLAN } from "./entitlements";
+import { monthlyUsage } from "./growth-quotas";
 import { getSeatUsage } from "./crm/tenancy";
 
 const users: number[] = [], codes: number[] = [], orgs: string[] = [];
@@ -33,6 +34,7 @@ beforeAll(async () => {
   if (!["localhost", "127.0.0.1"].includes(url.hostname) || !/^\/constructhub_dev(?:_a\d+)?$/.test(url.pathname)) throw new Error("Local lane development database required");
 });
 afterAll(async () => {
+  await pool.query("delete from business_locations where user_id=any($1::int[])", [users]);
   await pool.query("delete from crm_orgs where id=any($1::text[])", [orgs]);
   await pool.query("delete from beta_access_codes where id=any($1::int[])", [codes]);
   await pool.query("delete from subscriptions where user_id=any($1::int[])", [users]);
@@ -94,6 +96,59 @@ describe("trial codes", () => {
     expect(results.filter((r) => "trialEnd" in r)).toHaveLength(1);
     expect(results.filter((r) => "refused" in r)).toMatchObject([{ status: 400 }]);
     expect([a, b]).toContain(await redeemedBy(c.id));
+  });
+});
+
+describe("revoking a trial code ends only the trial it keeps alive", () => {
+  const redeemed = async (id: number) => {
+    const { rows: [c] } = await pool.query("update beta_access_codes set revoked=true, revoked_at=now() where id=$1 returning id, redeemed_by_user_id, redeemed_at, trial_days", [id]);
+    return { id: c.id, redeemedByUserId: c.redeemed_by_user_id, redeemedAt: c.redeemed_at, trialDays: c.trial_days };
+  };
+  it("ends the trial when no other code covers it, and leaves paid or open-ended plans alone", async () => {
+    const user = await account();
+    const c = await code(2);
+    await redeemTrialCode(user, c);
+    expect(await endRevokedTrial(await redeemed(c.id))).toBe("ended");
+    expect(await sub(user)).toMatchObject([{ plan: "agency", status: "canceled" }]);
+    expect((await getEntitlements(user)).plan).toBeNull();
+
+    const paid = await account("pro");
+    const paidCode = await code(2);
+    await pool.query("update beta_access_codes set redeemed_by_user_id=$1, redeemed_at=now() where id=$2", [paid, paidCode.id]);
+    expect(await endRevokedTrial(await redeemed(paidCode.id))).toBe("unchanged");
+    expect(await sub(paid)).toMatchObject([{ plan: "pro", status: "active" }]);
+  });
+
+  it("keeps a newer code's trial when an older, finished code is revoked, and cuts back to another live code", async () => {
+    const now = new Date();
+    const user = await account();
+    const old = await code(1);
+    await redeemTrialCode(user, old, new Date(now.getTime() - 3 * 86400_000));
+    const fresh = await code(2);
+    await redeemTrialCode(user, fresh, now);
+    expect(await endRevokedTrial(await redeemed(old.id), now)).toBe("unchanged");
+    expect((await getEntitlements(user, now)).plan).toBe("agency");
+
+    const other = await account();
+    const long = await code(14), short = await code(1);
+    await redeemTrialCode(other, long, now);
+    await redeemTrialCode(other, short, now);
+    expect(await endRevokedTrial(await redeemed(long.id), now)).toBe("shortened");
+    const [row] = await sub(other);
+    expect(new Date(row.current_period_end).getTime()).toBe(now.getTime() + 86400_000);
+    expect(row.status).toBe("trialing");
+  });
+});
+
+describe("Agency per-location allowances follow billed locations", () => {
+  it("counts linked Business Profile locations (at least the 10 included), not Places-only rows", async () => {
+    const owner = await account("agency");
+    await pool.query(
+      `insert into business_locations(user_id,business_name,gbp_location_name)
+       select $1::int,'P-billed '||i, case when i<=12 then 'locations/p-billed-'||$1::int||'-'||i end from generate_series(1,40) i`, [owner]);
+    const usage: any = await monthlyUsage(owner, await getEntitlements(owner));
+    expect(usage.rankings.limit).toBe(24);
+    expect(usage.siteScans.limit).toBe(12);
   });
 });
 

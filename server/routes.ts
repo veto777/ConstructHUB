@@ -1,7 +1,7 @@
 import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmentPortal, governmentPermitForDisplay } from "@shared/government-links";
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
 import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
-import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
+import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
 import { PLANS } from "@shared/plans";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
@@ -237,7 +237,7 @@ export async function registerRoutes(
       const mode = req.body?.mode;
       if (mode === undefined || mode === "off") return next();
       try {
-        const ent = await requirePlan(res, user.id, "AI review replies");
+        const ent = await requirePlan(res, user.id, "Drafting AI review replies");
         if (!ent) return;
         if (mode === "auto" && !ent.allowances!.autoPublishAiReplies) {
           return void sendPlanRequired(res, cheapestPlanWhere((l) => l.autoPublishAiReplies) ?? TOP_PLAN, "Publishing AI review replies automatically", {
@@ -2196,9 +2196,9 @@ Rules:
           .where(eq(subscriptions.userId, user.id))
           .limit(1);
 
-        // A live trial (Stripe trial, or a trial code before its end date) runs one grid.
-        const trialLive = !!sub && sub.status === "trialing"
-          && (!!sub.stripeSubscriptionId || !sub.currentPeriodEnd || new Date(sub.currentPeriodEnd).getTime() > Date.now());
+        // The self-serve card trial (a Stripe subscription still trialing) runs one grid. A trial
+        // code is an admin grant of the full Agency plan, so its monthly credits apply as they are.
+        const trialLive = !!sub && sub.status === "trialing" && !!sub.stripeSubscriptionId;
         if (trialLive) {
           const existingScans = await storage.getRankingGridScans({ id: user.id, admin: false });
           if (existingScans.length >= 1) {
@@ -2653,7 +2653,7 @@ Rules:
     const user = getDevUser(req, res);
     if (!user) return false;
     try {
-      return !!(await requirePlan(res, user.id, "Citation campaigns"));
+      return !!(await requirePlan(res, user.id, "Running citation campaigns"));
     } catch (err) { planCheckFailed(res, err); return false; }
   }
 
@@ -2685,7 +2685,7 @@ Rules:
       parsed = insertBusinessLocationSchema.omit({ gbpAccountName: true, gbpLocationName: true }).parse({ ...req.body, userId: user.id });
     } catch (err: any) { return res.status(400).json({ message: err.message }); }
     try {
-      const ent = await requirePlan(res, user.id, "Business locations");
+      const ent = await requirePlan(res, user.id, "Adding business locations");
       if (!ent) return;
       // Every location counts toward the plan's Google Business Profile locations (plus Extra location add-ons).
       const outcome = await withAccountLock(user.id, async (tx) => {
@@ -3501,7 +3501,7 @@ Rules:
       const domain = normalizeTrackedDomain(req.body?.domain);
       if (!domain) return res.status(400).json({ message: "Enter a valid domain, for example yourcompany.com" });
       // Click Guard, IP Tracker and VPN Shield share one list of protected websites per plan.
-      const ent = await requirePlan(res, user.id, "Click Guard, IP Tracker and VPN Shield", (a) => a.protectedSites !== 0);
+      const ent = await requirePlan(res, user.id, "Click-fraud protection (Click Guard, IP Tracker and VPN Shield)", (a) => a.protectedSites !== 0);
       if (!ent) return;
       const label = typeof name === "string" && name.trim() ? name.trim().slice(0, 200) : domain;
       const trackingId = randomUUID();
@@ -5000,7 +5000,7 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
-      const ent = await requirePlan(res, user.id, "Review request templates", (a) => a.reviewTemplates !== 0);
+      const ent = await requirePlan(res, user.id, "Saving review request templates", (a) => a.reviewTemplates !== 0);
       if (!ent) return;
       const existing = await storage.getReviewTemplatesByUser(user.id);
       const max = ent.allowances!.reviewTemplates;
@@ -5605,17 +5605,9 @@ function main() {
       const code = await storage.revokeBetaAccessCode(id);
       if (!code) return res.status(404).json({ message: "Code not found" });
 
-      if (code.redeemedByUserId) {
-        // Only the trial grant a code created ends here (no Stripe subscription, an end date); a
-        // paid plan or an open-ended manual grant is never touched by a revoke.
-        const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, code.redeemedByUserId)).limit(1);
-        if (sub && !sub.stripeSubscriptionId && sub.currentPeriodEnd && ["trialing", "active"].includes(sub.status)) {
-          await db.update(subscriptions).set({
-            status: "canceled",
-            currentPeriodEnd: new Date(),
-          }).where(eq(subscriptions.id, sub.id));
-        }
-      }
+      // Only the trial this code is keeping alive ends (see endRevokedTrial): a paid plan, an
+      // open-ended manual grant, or a newer code's trial is never cut short by a revoke.
+      await endRevokedTrial(code);
 
       res.json({ message: "Trial revoked", code });
     } catch (err: any) {
@@ -5657,10 +5649,11 @@ function main() {
       // The trial is the subscription grant the code created: live until its end date (the
       // code's own expiresAt is only the window for redeeming it).
       const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
-      const [code] = await db.select().from(betaAccessCodes).where(eq(betaAccessCodes.redeemedByUserId, user.id)).orderBy(desc(betaAccessCodes.redeemedAt)).limit(1);
+      // A revoke may leave a trial another code still covers (endRevokedTrial): report the newest unrevoked code.
+      const [code] = await db.select().from(betaAccessCodes).where(and(eq(betaAccessCodes.redeemedByUserId, user.id), eq(betaAccessCodes.revoked, false))).orderBy(desc(betaAccessCodes.redeemedAt)).limit(1);
       const grantLive = !!sub && !sub.stripeSubscriptionId && !!sub.currentPeriodEnd
         && ["trialing", "active"].includes(sub.status) && new Date(sub.currentPeriodEnd).getTime() > Date.now();
-      if (grantLive && code && !code.revoked) {
+      if (grantLive && code) {
         res.json({ active: true, expiresAt: sub.currentPeriodEnd, trialDays: code.trialDays, plan: sub.plan });
       } else {
         res.json({ active: false });
