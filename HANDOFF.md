@@ -19,6 +19,34 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🛠 2026-10-01 — audit-4 follow-ups: the four open items (deployed 15:49 UTC)
+- **Texting allowance metered (Kimi A1-3)** — every outbound text with an org (manual client texts, reminders,
+  estimate texts, invites, consent, re-engagement and owner alerts, the Settings test send) reserves its segments
+  from the org owner's monthly `teamTextSegments` allowance through the growth_budgets meter
+  (`quota:user:<ownerUserId>:texts:<YYYY-MM>`, UTC month; server/crm/sms.ts `reserveSmsSegments`, counter in
+  server/crm/sms-segments.ts — GSM-7 160/153, UCS-2 70/67). Carrier failure refunds; manual sends answer the standard
+  403 `limit_reached`; automated alerts skip the text, log once per org per month and fall back to email. Limits &
+  usage shows the running total (`usage.texts`). Platform-level beta-invite texts (no org) are not metered.
+- **F11 closed** — the vision caption works through the production loopback (`127.0.0.1:8250`, 18 s, HTTP 200);
+  the 524 was the public Cloudflare path's 100 s cap, which production never uses.
+- **Demo/ops scripts** (scripts/invite-team.ts, scripts/seed-crm-demo.ts) comp the owner on `agency`, not `platinum`.
+- **F08/F09 — one-time fulfilment** (server/billing/fulfilment.ts `fulfilOneTimePurchase`, called from both
+  `checkout.session.completed` and `checkout.session.async_payment_succeeded`): rows are written only when the
+  verified session says `payment_status === "paid"` (an unpaid completion grants nothing; the later async success
+  grants it; `async_payment_failed` never does), once per session+item via partial unique indexes
+  (`course_purchases(stripe_session_id, COALESCE(module_id,0), COALESCE(is_bundle,false))`,
+  `service_purchases(stripe_session_id, service_type)`; `ON CONFLICT DO NOTHING`), all items of a session in one
+  transaction — a failure rolls back, rethrows, the billing_events claim is released, the webhook answers 400 and
+  Stripe's redelivery re-runs the session. Unreadable metadata throws (no guessed grants). DDL: `FULFILMENT_DDL` in
+  server/billing/schema.ts (also in scripts/apply-schema-migration.ts; mirrored in shared/schema.ts). Live DB had 0
+  purchase rows at deploy, so the indexes created cleanly.
+- **F10 — email outbox**: email_log keeps the dedupe claim on a failed send and becomes `status='pending'` with the
+  rendered message, attempts, next_attempt_at, last_error; `drainEmailOutbox()` runs every 60 s
+  (`startEmailOutboxDrainer()` from server/routes.ts; `FOR UPDATE SKIP LOCKED`, 10-min lease, backoff
+  1m→5m→15m→30m→1h→2h→4h, `failed` after 8 attempts — set `pending` to re-queue). The webhook response never waits
+  on mail; a redelivery finds the claim and never double-sends. Known leftover: server/account/email.ts (unused
+  lane-1 helper) still has the old delete-claim contract — delete it with server/billing/invoices.ts.
+
 ## 🔎 2026-10-01 — audit 4: Codex + Kimi audit of everything since 09-30 (deployed 05:15 UTC)
 - Two independent audits of the price book, TruthCoder AI, account/billing/API work (briefs + full reports with
   evidence in the session scratchpad `audit4/`; branches `audit4/codex`, `audit4/kimi`, merged with `--no-ff`).
