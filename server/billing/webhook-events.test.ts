@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   customers: new Map<string, number>(),
   /** Event ids the ledger already holds. */
   seen: new Set<string>(),
+  /** Invoice ids the ledger already holds as paid/void (an open snapshot of them is stale: the upsert writes nothing). */
+  settledInvoices: new Set<string>(),
   cancelRow: {} as Record<string, unknown>,
   verify: vi.fn(),
   retrieve: vi.fn(),
@@ -52,6 +54,10 @@ vi.mock("../db", () => {
           return { rows: [{ stripe_event_id: values[0] }] };
         }
         if (/DELETE FROM billing_events/.test(text)) { mocks.seen.delete(values[0]); return { rows: [] }; }
+        if (/INSERT INTO billing_invoices/.test(text)) {
+          const stale = mocks.settledInvoices.has(values[0]) && ["draft", "open"].includes(values[3]);
+          return { rows: stale ? [] : [{ id: values[0] }] };
+        }
         if (/SELECT user_id FROM subscriptions WHERE stripe_customer_id/.test(text)) {
           const userId = mocks.customers.get(values[0]);
           return { rows: userId ? [{ user_id: userId }] : [] };
@@ -141,6 +147,7 @@ beforeEach(() => {
   mocks.customers.clear();
   mocks.customers.set("cus_42", 42);
   mocks.seen.clear();
+  mocks.settledInvoices.clear();
   mocks.cancelRow = {};
   mocks.verify.mockReset();
   mocks.retrieve.mockReset();
@@ -167,6 +174,7 @@ describe("invoice events → billing_invoices + billingEvents", () => {
     expect(invoiceUpserts()).toEqual([[
       "in_1", 42, "CHUB-0001", "paid", 7900, 0, "usd", new Date(1700000000 * 1000), new Date(1702592000 * 1000),
       "1 × Pro (at $79.00 / month)", "https://invoice.stripe.com/i/in_1", "https://pay.stripe.com/invoice/in_1/pdf", new Date(1700000000 * 1000),
+      ["paid", "void"], // the settled statuses a stale open/draft snapshot must not overwrite
     ]]);
     expect(paid).toHaveBeenCalledTimes(1);
     expect(paid.mock.calls[0][0]).toMatchObject({
@@ -187,6 +195,23 @@ describe("invoice events → billing_invoices + billingEvents", () => {
     await webhook({ type: "invoice.finalized", data: { object: stripeInvoice({ status: "open", amount_paid: 0, amount_due: 7900 }) } });
     expect(finalized).toHaveBeenCalledTimes(1);
     expect(invoiceUpserts()).toHaveLength(2);
+  });
+
+  it("an open snapshot delivered after the invoice was paid (Stripe doesn't order deliveries) is recorded as seen but emits nothing", async () => {
+    const paid = capture("invoice.paid");
+    const failed = capture("invoice.payment_failed");
+    const finalized = capture("invoice.finalized");
+    await webhook({ id: "evt_order_1", type: "invoice.paid", data: { object: stripeInvoice() } });
+    mocks.settledInvoices.add("in_1");
+    const late = await webhook({ id: "evt_order_2", type: "invoice.finalized", data: { object: stripeInvoice({ status: "open", amount_paid: 0, amount_due: 7900 }) } });
+    expect(late.body).toEqual({ received: true });
+    const lateFailure = await webhook({ id: "evt_order_3", type: "invoice.payment_failed", data: { object: stripeInvoice({ status: "open", amount_paid: 0, amount_due: 7900, attempt_count: 1 }) } });
+    expect(lateFailure.body).toEqual({ received: true });
+    expect(paid).toHaveBeenCalledTimes(1);
+    expect(finalized).not.toHaveBeenCalled();
+    expect(failed).not.toHaveBeenCalled();
+    // Both late events were still claimed and attributed, so a redelivery is a no-op too.
+    expect(attributions()).toEqual([["evt_order_1", 42], ["evt_order_2", 42], ["evt_order_3", 42]]);
   });
 
   it("an invoice for a customer no account owns is not recorded and nothing is emitted (metadata alone can't attribute it)", async () => {
@@ -270,6 +295,18 @@ describe("one Stripe event is processed once", () => {
     await routes.get("/api/stripe/webhook")!({ headers: {}, rawBody: Buffer.from("{}"), body: {} }, res);
     expect(res.code).toBe(400);
     expect(sqlOf(/billing_events/)).toEqual([]);
+  });
+
+  it("a body whose signature doesn't verify is rejected before any claim or handler runs", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_local_mock";
+    const paid = capture("invoice.paid");
+    mocks.verify.mockImplementationOnce(() => { throw new Error("No signatures found matching the expected signature for payload"); });
+    const res: any = { code: 200, status(n: number) { this.code = n; return this; }, json(data: any) { this.body = data; return this; } };
+    await routes.get("/api/stripe/webhook")!({ headers: { "stripe-signature": "t=1,v1=forged" }, rawBody: Buffer.from("{}"), body: {} }, res);
+    expect(res.code).toBe(400);
+    expect(res.body.message).not.toMatch(/whsec|forged/);
+    expect(sqlOf(/billing_events|billing_invoices/)).toEqual([]);
+    expect(paid).not.toHaveBeenCalled();
   });
 });
 
@@ -408,6 +445,14 @@ describe("subscription lifecycle events", () => {
     mocks.rows.push([liveRow()]);
     mocks.cancelRow = { cancel_at_period_end: true, cancel_at: new Date(1893456000 * 1000) };
     await webhook({ type: "customer.subscription.updated", data: { object: proMonthly({ cancel_at_period_end: true }), previous_attributes: { metadata: {} } } });
+    expect(scheduled).not.toHaveBeenCalled();
+    // Stripe updating only the cancellation feedback on an already-scheduled
+    // cancellation is not a second scheduling.
+    mocks.rows.push([liveRow()]);
+    await webhook({ type: "customer.subscription.updated", data: {
+      object: proMonthly({ cancel_at_period_end: true, cancel_at: 1893456000, cancellation_details: { comment: "too pricey", feedback: "too_expensive", reason: "cancellation_requested" } }),
+      previous_attributes: { cancellation_details: { comment: null, feedback: null } },
+    } });
     expect(scheduled).not.toHaveBeenCalled();
   });
 

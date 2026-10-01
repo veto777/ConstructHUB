@@ -49,7 +49,13 @@ export async function syncInvoiceEvent(event: Stripe.Event): Promise<{ userId: n
     return null;
   }
   const invoice = invoiceRowFromStripe(inv, userId);
-  await upsertInvoice(invoice);
+  if (!(await upsertInvoice(invoice))) {
+    // Delivered out of order: the ledger already holds this invoice as paid /
+    // void, so this open snapshot is history. Nobody is told the invoice is
+    // "due" or "failed" after it was paid.
+    console.warn(`[billing] ${event.type} for ${inv.id} arrived after the invoice settled — ledger kept, no notice emitted.`);
+    return { userId, invoice };
+  }
   if (event.type === "invoice.payment_failed") {
     void billingEvents.emit("invoice.payment_failed", {
       userId, invoice, stripeInvoice: inv,
@@ -95,7 +101,11 @@ export function emitSubscriptionStarted(userId: number, sub: Stripe.Subscription
   });
 }
 
-const CANCEL_KEYS = ["cancel_at_period_end", "cancel_at", "cancellation_details"] as const;
+// The fields that say WHEN a subscription ends. cancellation_details (the
+// customer's feedback/comment) is deliberately not one: Stripe can update it
+// on its own, after the cancellation was already scheduled, and that must not
+// read as "scheduled again" (a second "your plan will end" notice).
+const CANCEL_KEYS = ["cancel_at_period_end", "cancel_at"] as const;
 
 /**
  * customer.subscription.updated: did this event schedule the subscription to

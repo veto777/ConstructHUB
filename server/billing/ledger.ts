@@ -82,9 +82,20 @@ export async function billingEventSeen(eventId: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-/** Insert or refresh an invoice row (Stripe sends finalized → paid for the same id). */
-export async function upsertInvoice(row: BillingInvoiceRow): Promise<void> {
-  await pool.query(
+/** Invoice statuses Stripe never leaves again: an `open` snapshot arriving later is stale, not a change. */
+const SETTLED_INVOICE_STATUSES = ["paid", "void"];
+
+/**
+ * Insert or refresh an invoice row (Stripe sends finalized → paid for the
+ * same id). Stripe does not guarantee delivery order, so an `invoice.finalized`
+ * (status open, amount_paid 0) that lands after `invoice.paid` must not turn
+ * the paid row back into an unpaid one: a settled row keeps its values when
+ * the incoming snapshot is still draft/open. Returns false in exactly that
+ * case (the snapshot was stale and nothing was written), true when the row
+ * was inserted or refreshed.
+ */
+export async function upsertInvoice(row: BillingInvoiceRow): Promise<boolean> {
+  const { rows } = await pool.query(
     `INSERT INTO billing_invoices(id, user_id, number, status, amount_paid, amount_due, currency, period_start, period_end,
                                   description, hosted_invoice_url, invoice_pdf, created)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
@@ -93,9 +104,12 @@ export async function upsertInvoice(row: BillingInvoiceRow): Promise<void> {
          number = EXCLUDED.number, status = EXCLUDED.status, amount_paid = EXCLUDED.amount_paid,
          amount_due = EXCLUDED.amount_due, currency = EXCLUDED.currency, period_start = EXCLUDED.period_start,
          period_end = EXCLUDED.period_end, description = EXCLUDED.description,
-         hosted_invoice_url = EXCLUDED.hosted_invoice_url, invoice_pdf = EXCLUDED.invoice_pdf, created = EXCLUDED.created`,
+         hosted_invoice_url = EXCLUDED.hosted_invoice_url, invoice_pdf = EXCLUDED.invoice_pdf, created = EXCLUDED.created
+       WHERE NOT (billing_invoices.status = ANY($14) AND EXCLUDED.status IN ('draft', 'open'))
+       RETURNING id`,
     [row.id, row.userId, row.number, row.status, row.amountPaid, row.amountDue, row.currency, row.periodStart, row.periodEnd,
-      row.description, row.hostedInvoiceUrl, row.invoicePdf, row.created]);
+      row.description, row.hostedInvoiceUrl, row.invoicePdf, row.created, SETTLED_INVOICE_STATUSES]);
+  return rows.length > 0;
 }
 
 /** Insert or refresh a one-time purchase (a late receipt URL updates the row). */

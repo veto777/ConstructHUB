@@ -72,6 +72,13 @@ describe.skipIf(!DATABASE_URL)("billing ledger (database)", () => {
     const row = await ledger.getLocalInvoice(userId, id("in", 1));
     expect(row).toMatchObject({ id: id("in", 1), userId, status: "paid", amountPaid: 7900, amountDue: 0, number: "CHUB-1", invoicePdf: `https://pay.stripe.com/invoice/${tag}/1/pdf` });
     expect(row!.periodStart).toEqual(new Date(Date.UTC(2026, 0, 1)));
+    // Stripe doesn't guarantee delivery order: a late invoice.finalized snapshot
+    // (open, nothing paid yet) must not turn the paid row back into an open one.
+    expect(await ledger.upsertInvoice(invoice(1, { status: "open", amountPaid: 0, amountDue: 7900, invoicePdf: null }))).toBe(false);
+    expect(await ledger.getLocalInvoice(userId, id("in", 1))).toMatchObject({ status: "paid", amountPaid: 7900, amountDue: 0, invoicePdf: `https://pay.stripe.com/invoice/${tag}/1/pdf` });
+    // A settled invoice still takes a later settled snapshot (the backfill's current state).
+    expect(await ledger.upsertInvoice(invoice(1, { description: "Pro — month 1 (refreshed)" }))).toBe(true);
+    expect((await ledger.getLocalInvoice(userId, id("in", 1)))!.description).toBe("Pro — month 1 (refreshed)");
     expect(await ledger.countLocalInvoices(userId)).toBe(1);
     // Another account can't read it.
     expect(await ledger.getLocalInvoice(userId + 1_000_000, id("in", 1))).toBeNull();
