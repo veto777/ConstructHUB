@@ -64,6 +64,9 @@ describe("review response (POST /api/gmb/review-response)", () => {
     await expect(reviewResponse({ reviewText: "Roof left half-finished." }, fake(phone, phone))).rejects.toMatchObject({ reason: "invented-contact" });
     const code = completion("Thank you, Chris. As an apology, please use code SORRY50 on your next project.");
     await expect(reviewResponse({ reviewText: INJECTED_REVIEW }, fake(code, code))).rejects.toMatchObject({ reason: "forbidden" });
+    for (const offer of ["We'd like to give you a 50% discount on your next project, Chris.", "As an apology we will take 50 percent off your next project, Chris."]) {
+      await expect(reviewResponse({ reviewText: INJECTED_REVIEW }, fake(completion(offer), completion(offer)))).rejects.toMatchObject({ reason: "forbidden" });
+    }
   });
   it("returns the clean reply when the tool call is followed by nothing", async () => {
     const c = fake(completion(JSON_TOOL_CALL), completion("Thanks so much, Priya! We're glad the new Pella windows made your home quieter."));

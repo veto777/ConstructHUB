@@ -31,31 +31,40 @@ export const NO_TOOLS_RULE =
 const TOOL_NAMES = ["web_research", "web_search", "read_image", "describe_image", "code_interpreter", "fetch_url", "open_url"];
 const TOOL_ALT = TOOL_NAMES.join("|");
 
+// "Wait..." / "**Wait**" / "Wait, the prompt…" / "Hmm" — not a marketing "Wait!" or "Wait, there's more".
+const WAIT = String.raw`(?:\*\*)?(?:wait(?:\s*(?:\.{2,}|…)|\*\*|,\s+(?:I\b|let me\b|looking\b|actually\b|no\b|the (?:user|prompt|instructions?|rules?|system|review|request|task)\b))|hmm+\b)`;
+
 // Phrases that only appear when the model talks about its task instead of doing it.
 const REASONING_LEAK: RegExp[] = [
   /\bI(?:'m| am) not (?:using|calling) (?:a |any )?tools?\b/i,
   /\bthe (?:system|developer) (?:prompt|message|instructions?)\b/i,
   /\bthe user(?:'s)? (?:prompt|message|request|instructions?) (?:says|asks|wants|contains|is)\b/i,
-  /\bthe user wants\b/i,
+  // At a line start only: an ads answer may well say "whenever the user wants a plumber".
+  /^\s*(?:\*\*)?the user wants\b|\bthe user wants me\b/im,
   /\bprompt injection\b/i,
   /\blet me (?:think|re-?read|reconsider|re-?check|check the (?:prompt|rules|instructions)|look at the prompt)\b/i,
   /\b(?:my (?:rules?|instructions|guidelines|constraints)|the (?:instructions|guidelines|constraints)) (?:say|says|state|states|require|requires)\b/i,
-  // "Wait..." / "**Wait**" / "Hmm" — not a marketing "Wait!".
-  /^\s*(?:\*\*)?(?:wait(?:\s*(?:\.{2,}|…|,)|\*\*)|hmm+\b)/im,
+  new RegExp(`^\\s*${WAIT}`, "im"),
   /\bLAW \d+\b/,
   /\bCITATION CONTRACT\b/i,
 ];
 
-// A leading paragraph that is the model planning its answer.
+// The filler a planning paragraph opens with ("Okay, so …"); what follows it is judged.
+const INTERJECTION = /^(?:okay|ok|alright|so|hmm+|wait)\b[,.…!]*\s+(?:so,?\s+)?/i;
+
+// A leading paragraph that is the model planning its answer. A customer's own review
+// ("The owner gave us a fair quote", "So the customer service was great", "I need to
+// write a thank-you to this crew") must not match.
 const REASONING_START: RegExp[] = [
-  /^(?:okay|ok|alright|so|hmm+|wait)\b[,.…!]*\s+(?:so,?\s+)?(?:the user|the customer|the reviewer|the task|the request|the prompt|I need to|I should|I must|let me think|we need to)/i,
   // Only planning verbs: a chat answer may well open with "Let's do the math".
   /^(?:let me|let's) (?:think|analy[sz]e|reason|draft|look at (?:the|this) (?:prompt|request|review))/i,
   /^I(?:'m| am) not (?:using|calling) (?:a |any )?tools?/i,
-  /^(?:the user|the customer|the reviewer|the business owner|the owner|the request|the task|the prompt|this request|this task)(?:'s)? (?:wants|is asking|asks|asked|has asked|needs|requires|contains|says|provided|gave)\b/i,
-  /^(?:I need to|I should|I must|I have to|I'll need to|My (?:task|job|goal) is to) (?:write|draft|respond|reply|create|generate|produce|answer|craft|make sure|follow|avoid|check|keep|be careful)/i,
+  /^(?:the user|the request|the task|the prompt|this request|this task)(?:'s)? (?:wants|is asking|asks|asked|has asked|needs|requires|contains|says|provided|gave)\b/i,
+  /^(?:the customer|the reviewer|the business owner|the owner)(?:'s)? (?:wants|is asking|has asked) (?:me|us|a|an)\b/i,
+  /^(?:the customer|the reviewer)'s (?:description|review|message|text) (?:says|mentions|contains)\b/i,
+  /^(?:I need to|I should|I must|I have to|I'll need to|My (?:task|job|goal) is to) (?:(?:write|draft|craft|produce|generate|create) (?:a|an|the|this|my) (?:(?:short|brief|concise|professional|polite|public|final|good|warm) )?(?:reply|response|review|post|draft|caption|description|update|plan|answer)\b|respond\b|reply to (?:the|this)\b|answer (?:the|this)\b|make sure (?:not|I|the (?:reply|response|review|post|draft))\b|follow (?:the|these|my) (?:rules|instructions|guidelines)\b|avoid\b|be careful\b)/i,
   /^(?:\*\*)?(?:constraints|thinking|thoughts?|reasoning|drafting(?: the (?:response|reply|post))?)(?:\*\*)?\s*:?(?:\*\*)?\s*(?:$|\n)/i,
-  /^(?:\*\*)?(?:wait(?:\s*(?:\.{2,}|…|,)|\*\*)|hmm+\b)/i,
+  new RegExp(`^${WAIT}`, "i"),
 ];
 
 // "Here's the reply:" / "Final answer:" — what follows is the answer.
@@ -124,7 +133,10 @@ function stripThinking(s: string): string {
   return s.replace(new RegExp(`(?:<(?:${THINK_TAGS})>|\\[(?:${THINK_TAGS})\\])[\\s\\S]*$`, "i"), "");
 }
 
-const isReasoningStart = (p: string) => REASONING_START.some((re) => re.test(p.trim()));
+const isReasoningStart = (p: string) => {
+  const t = p.trim(), rest = t.replace(INTERJECTION, "");
+  return REASONING_START.some((re) => re.test(t) || re.test(rest));
+};
 const isStrongReasoning = (p: string) => REASONING_LEAK.some((re) => re.test(p));
 
 function stripReasoningParagraphs(s: string): string {

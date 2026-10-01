@@ -82,7 +82,7 @@ export function replyPrompt(s:ReplySettings,r:any,business:string) {
 export async function generateReply(s:ReplySettings,r:any,business:string,client?:ChatClient) {
   if(!client&&!process.env.AI_INTEGRATIONS_OPENAI_API_KEY)throw new Error('AI not configured');
   const {text}=await aiComplete(client??aiClient({timeoutFallbackMs:30_000}),{model:aiModel(),messages:replyPrompt(s,r,business),max_tokens:900},
-    {minChars:10,sources:[business,r.comment??'',s.signOff],forbid:[/\b\d{1,3}\s?%\s?off\b/i,/\b(?:coupon|promo(?:tion(?:al)?)?|discount) codes?\b/i]});
+    {minChars:10,sources:[business,r.comment??'',s.signOff],forbid:[/\b\d{1,3}\s?(?:%|percent)\s?(?:off|discount)\b/i,/\b(?:coupon|promo(?:tion(?:al)?)?|discount) codes?\b/i]});
   return text;
 }
 const NEW_REVIEW_WINDOW_MS=14*86400_000;

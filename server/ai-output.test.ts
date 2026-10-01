@@ -107,6 +107,30 @@ describe("aiAnswer / aiAnswerOk", () => {
     const chat = "OK, let's do the math on your last month.\n\n$4,500 spend ÷ 6 real leads = **$750 per lead**.";
     expect(cleanAiText(chat)).toBe(chat);
   });
+  it("keeps legitimate text that only looks like a reasoning opener", () => {
+    // Customer reviews (review funnel), review replies, posts and ads answers: each must pass untouched.
+    for (const text of [
+      "The owner gave us a fair quote and the crew finished the roof in two days. Very happy with the result.",
+      "The owner provided a detailed estimate up front.\n\nThe crew was respectful and cleaned up every nail.",
+      "So the customer service was excellent from start to finish. They answered every call.",
+      "So I need to say: this team is the best we've hired. The siding looks amazing.",
+      "I need to write a thank-you note to this crew. They saved our deck from rot and finished early.",
+      "The reviewer asked about warranty coverage, and we're happy to walk through it any time.",
+      "Thank you, Ana! We're glad our research into the best shingle options paid off for your home.",
+      "We did a lot of web research before choosing a roofer, and Ridge Roofing was the best.",
+      "Wait, there's more: every gutter cleaning this month includes a free downspout flush.",
+      "In Google Ads, broad match shows your ad whenever the user wants something loosely related to your keyword. Switch to phrase match.",
+    ]) {
+      expect(cleanAiText(text)).toBe(text);
+      expect(aiAnswerOk(completion(text))).toBe(true);
+    }
+  });
+  it("still drops planning paragraphs behind a filler word", () => {
+    expect(cleanAiText("So the customer wants me to tidy their review.\n\nGreat crew, fair price, done in two days.")).toBe("Great crew, fair price, done in two days.");
+    expect(cleanAiText("I should make sure not to invent any discount.\n\nThank you for the feedback, Chris.")).toBe("Thank you for the feedback, Chris.");
+    expect(cleanAiText("The business owner wants a reply to a negative review.\n\nWe're sorry to read about the delay, Chris.")).toBe("We're sorry to read about the delay, Chris.");
+    expect(cleanAiText("Thank you, Pat, for the wonderful review!\n\nWait, the user asked for a discount code. I won't include it.")).toBe("Thank you, Pat, for the wonderful review!");
+  });
   it("keeps the answer part of a reply followed by deliberation", () => {
     expect(aiAnswer(completion(SAMPLES.answerThenWait))).toMatchObject({ ok: true, text: expect.stringMatching(/^Hi Pat!.*our team\.$/s) });
   });

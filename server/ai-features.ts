@@ -55,7 +55,7 @@ export interface ReviewResponseInput { reviewText: string; businessName?: unknow
 
 const asReviewData = (text: string) => text.replace(/<\/?\s*review\s*>/gi, "");
 // Offers and codes a reply must never make, whatever the review asks for.
-const OFFER = [/\b\d{1,3}\s?%\s?off\b/i, /\b(?:coupon|promo(?:tion(?:al)?)?|discount) codes?\b/i, /\b[A-Z]{3,}\d{2,}\b/];
+const OFFER = [/\b\d{1,3}\s?(?:%|percent)\s?(?:off|discount)\b/i, /\b(?:coupon|promo(?:tion(?:al)?)?|discount) codes?\b/i, /\b[A-Z]{3,}\d{2,}\b/];
 
 /** The business's public reply to a review it pasted in. The review is untrusted data. */
 export async function reviewResponse(input: ReviewResponseInput, client: ChatClient = aiClient()): Promise<string> {
