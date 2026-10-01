@@ -572,6 +572,10 @@ export function registerStripeRoutes(app: Express) {
         return res.status(400).json({ message: `Webhook signature verification failed` });
       }
 
+      // Connected-account payments belong to the CRM webhook. Their metadata
+      // must never grant platform purchases or change a platform subscription.
+      if (isConnectEvent(event)) return res.json({ received: true, ignored: true });
+
       // One Stripe event is processed once: a retry or a double delivery of
       // an id already in billing_events answers 200 and does nothing (a
       // course row, a ledger row or a receipt email is never duplicated). A
@@ -582,6 +586,7 @@ export function registerStripeRoutes(app: Express) {
       }
       // The account the event turned out to be about (recorded with the event).
       let eventUserId: number | null = null;
+      let sendBillingEmail = true;
 
       try { // wraps the switch: a throw below releases the event claim first
       switch (event.type) {
@@ -672,6 +677,7 @@ export function registerStripeRoutes(app: Express) {
           // payment emails hang off these; the subscription row does not.
           const synced = await syncInvoiceEvent(event);
           eventUserId = synced?.userId ?? null;
+          sendBillingEmail = synced?.applied === true;
           break;
         }
         case "customer.subscription.trial_will_end": {
@@ -703,6 +709,7 @@ export function registerStripeRoutes(app: Express) {
                 stored, set.plan ?? existingSub.plan);
             }
           } else if (existingSub) {
+            sendBillingEmail = false;
             console.warn(`[billing] ${event.type} for ${sub.id} (${sub.status}) ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "a live trial-code grant"}.`);
           }
           break;
@@ -728,6 +735,7 @@ export function registerStripeRoutes(app: Express) {
             await recordCancellation({ id: existingSub.id }, null);
             emitSubscriptionCanceled(existingSub.userId, sub, existingSub.plan);
           } else if (existingSub) {
+            sendBillingEmail = false;
             console.warn(`[billing] deletion of ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "no subscription"}.`);
           }
           break;
@@ -747,7 +755,7 @@ export function registerStripeRoutes(app: Express) {
       // Connect (CRM client payment) event is never a platform email. The
       // in-process billingEvents bus (server/billing/events.ts) carries no
       // email listener — nothing else sends these.
-      if (!isConnectEvent(event)) {
+      if (sendBillingEmail) {
         await onStripeBillingEvent(event, { userId: eventUserId ?? undefined, stripe: stripeConfigured() ? stripe : null });
       }
       res.json({ received: true });

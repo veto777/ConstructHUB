@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   billingEmail: vi.fn(async (..._args: any[]) => [] as any[]),
   /** Stripe event ids the ledger already holds (the idempotency claim fails for them). */
   seenEvents: new Set<string>(),
+  invoiceApplied: true,
 }));
 vi.mock("stripe", () => ({ default: class {
   prices = { list: mocks.pricesList, create: mocks.pricesCreate };
@@ -58,6 +59,7 @@ vi.mock("./db", () => {
         if (/SELECT cancel_at_period_end/.test(text)) return { rows: [mocks.cancelRow] };
         // An event id is new to the ledger (the webhook's idempotency claim succeeds) unless a test marked it seen.
         if (/INSERT INTO billing_events/.test(text)) return { rows: mocks.seenEvents.has(values[0]) ? [] : [{ stripe_event_id: values[0] }] };
+        if (/INSERT INTO billing_invoices/.test(text)) return { rows: mocks.invoiceApplied ? [{ id: values[0] }] : [] };
         return { rows: [] };
       },
     },
@@ -119,6 +121,7 @@ beforeEach(() => {
   mocks.recentAuth = true;
   mocks.billingEmail.mockClear();
   mocks.seenEvents.clear();
+  mocks.invoiceApplied = true;
   resetPriceCache();
   mocks.pricesList.mockReset().mockImplementation(async ({ lookup_keys }: any) => ({
     data: [...mocks.prices.values()].filter((p) => lookup_keys.includes(p.lookup_key)).map((p) => ({ ...p, recurring: p.recurring ?? null })),
@@ -857,6 +860,34 @@ describe("webhook → billing emails: one call per verified platform event, afte
     const res = await webhook({ id: "evt_connect", account: "acct_client", type: "checkout.session.completed", data: { object: { id: "cs_client", mode: "payment", payment_status: "paid", metadata: {} } } });
     expect(res.code).toBe(200);
     expect(mocks.billingEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not email a payment failure after the ledger has already settled the invoice", async () => {
+    mocks.invoiceApplied = false;
+    const res = await webhook({ id: "evt_CODEX_stale_failure", type: "invoice.payment_failed", data: { object: {
+      id: "in_CODEX_paid", customer: "cus_test", status: "open", amount_paid: 0, amount_due: 7900,
+      metadata: { userId: "42" }, created: 1893456000,
+    } } });
+    expect(res.code).toBe(200);
+    expect(mocks.billingEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not email cancellation or plan changes for an ignored stray subscription", async () => {
+    for (const type of ["customer.subscription.updated", "customer.subscription.deleted"]) {
+      mocks.rows.push([liveRow()]);
+      expect((await webhook({ id: `evt_CODEX_${type}`, type, data: { object: proSub("sub_stray", "canceled") } })).code).toBe(200);
+    }
+    expect(mocks.updates).toHaveLength(0);
+    expect(mocks.billingEmail).not.toHaveBeenCalled();
+  });
+
+  it("never fulfills a connected-account checkout as a platform course purchase", async () => {
+    const res = await webhook({ id: "evt_CODEX_connect_purchase", account: "acct_client", type: "checkout.session.completed", data: { object: {
+      id: "cs_client", mode: "payment", payment_status: "paid", metadata: { userId: "42", type: "master_class", moduleId: "1" },
+    } } });
+    expect(res.code).toBe(200);
+    expect(mocks.inserts).toHaveLength(0);
+    expect(mocks.sql.some(s => /INSERT INTO billing_purchases/.test(s.text))).toBe(false);
   });
 
   it("a handler failure releases the claim (Stripe retries) and sends no email for the failed attempt", async () => {
