@@ -10,12 +10,19 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { ensureGrowthSchema } from "../growth-schema";
 import { ensureAccountEventsSchema } from "../account-events";
-import { registerApiKeyRoutes, apiAllowance, apiUnitsForPlan, cheapestApiPlan, parseScopes, parseKeyName, parseUnitLimit, parseUsageDays, bearerFor, MAX_API_KEYS, MAX_USAGE_DAYS, type ApiKeyDeps } from "./api-key-routes";
+import { registerApiKeyRoutes, apiAllowance, apiUnitsForPlan, cheapestApiPlan, parseScopes, parseKeyName, parseUnitLimit, parseUsageDays, bearerFor, normalizeRow, MAX_API_KEYS, MAX_USAGE_DAYS, type ApiKeyDeps } from "./api-key-routes";
 import { PLANS } from "@shared/plans";
 
 vi.mock("../email", () => ({ sendWithFallback: vi.fn(async () => ({ accepted: ["fixture@example.invalid"], rejected: [], response: "mock" })) }));
 import { sendWithFallback } from "../email";
 const sent = sendWithFallback as unknown as ReturnType<typeof vi.fn>;
+// notifyUser passes through to the real one, except where a test makes it fail on purpose.
+vi.mock("../account-events", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../account-events")>();
+  return { ...actual, notifyUser: vi.fn(actual.notifyUser) };
+});
+import { notifyUser } from "../account-events";
+const notify = notifyUser as unknown as ReturnType<typeof vi.fn>;
 
 const users = {} as Record<"pro" | "starter" | "none" | "other" | "member", number>;
 let base = "", server: ReturnType<express.Express["listen"]>;
@@ -36,6 +43,8 @@ const deps: ApiKeyDeps = {
     return { secret, row };
   },
 };
+/** The deps the app under test calls (swapped by the lane-1-shape test). */
+let activeDeps: ApiKeyDeps = deps;
 
 async function call(user: number | null, path: string, method = "GET", body?: unknown, extra: Record<string, string> = {}) {
   const r = await fetch(base + path, {
@@ -84,7 +93,7 @@ beforeAll(async () => {
     next();
   });
   const auth = (req: any, res: any) => req.user ? (res.locals.agencyOwner ? { ...req.user, id: res.locals.agencyOwner } : req.user) : (res.status(401).json({ message: "Not authenticated" }), null);
-  registerApiKeyRoutes(app, auth, deps);
+  registerApiKeyRoutes(app, auth, { createApiKey: (userId, input) => activeDeps.createApiKey(userId, input) });
   await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", () => resolve()); });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -92,6 +101,8 @@ afterAll(async () => {
   await new Promise((resolve) => server?.close(resolve));
   const ids = Object.values(users);
   await pool.query("DELETE FROM account_api_usage WHERE user_id=ANY($1::int[])", [ids]);
+  // Lane 1's real DDL has no FK on user_id, so the keys do not cascade with the users.
+  await pool.query("DELETE FROM account_api_keys WHERE user_id=ANY($1::int[])", [ids]);
   await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1::int[])", [ids]);
   await pool.query("DELETE FROM users WHERE id=ANY($1::int[])", [ids]);
   await pool.end();
@@ -183,7 +194,8 @@ describe("POST /api/account/api-keys", () => {
   });
   it("caps active keys per account", async () => {
     stepUp(users.other);
-    const filler = Array.from({ length: MAX_API_KEYS }, (_, i) => `('key_cap${randomBytes(6).toString("hex")}',${users.other},'ACCT-l5 cap ${i}','cap${i}','0000','hash','{read}')`).join(",");
+    // Prefixes are random: lane 1's DDL puts a unique index on account_api_keys.prefix.
+    const filler = Array.from({ length: MAX_API_KEYS }, (_, i) => `('key_cap${randomBytes(6).toString("hex")}',${users.other},'ACCT-l5 cap ${i}','${randomBytes(4).toString("hex")}','0000','hash','{read}')`).join(",");
     await pool.query(`INSERT INTO account_api_keys(id,user_id,name,prefix,suffix,secret_hash,scopes) VALUES ${filler}`);
     const r = await call(users.other, "/api/account/api-keys", "POST", { name: "one too many", scopes: ["read"] });
     expect(r.status).toBe(403); expect(r.data).toMatchObject({ code: "limit_reached", feature: "api_keys", limit: MAX_API_KEYS, used: MAX_API_KEYS });
@@ -269,5 +281,50 @@ describe("PATCH / DELETE /api/account/api-keys/:id", () => {
     expect((await notifications(users.pro, "security.api_key_revoked"))[0]).toMatchObject({ title: 'API key "ACCT-l5 second" was revoked' });
     expect(sent).toHaveBeenCalledTimes(1);
     expect(sent.mock.calls[0][0].subject).toBe('ConstructHUB: API key "ACCT-l5 second" was revoked');
+  });
+});
+
+describe("createApiKey integration", () => {
+  it("normalizes either row spelling to the table's columns", () => {
+    const at = new Date("2026-09-30T12:00:00Z");
+    const camel = normalizeRow({ id: "key_a", userId: 7, name: "n", prefix: "p", suffix: "s", scopes: ["read"], monthlyUnitLimit: 50, expiresAt: at, lastUsedAt: null, revokedAt: null, createdAt: at });
+    expect(camel).toEqual({ id: "key_a", user_id: 7, name: "n", prefix: "p", suffix: "s", scopes: ["read"], monthly_unit_limit: 50, expires_at: at, last_used_at: null, revoked_at: null, created_at: at });
+    const snake = normalizeRow({ id: "key_b", user_id: 8, name: "n", prefix: "p", suffix: "s", scopes: ["write"], monthly_unit_limit: null, expires_at: null, last_used_at: at, revoked_at: null, created_at: at });
+    expect(snake).toMatchObject({ user_id: 8, monthly_unit_limit: null, expires_at: null, last_used_at: at, created_at: at });
+    expect(normalizeRow({ id: "key_c", name: "n", prefix: "p", suffix: "s", scopes: [] }, 9)).toMatchObject({ user_id: 9, monthly_unit_limit: null, expires_at: null });
+  });
+  it("accepts lane 1's camelCase row from createApiKey and still reports the limit and dates", async () => {
+    // server/account/api-keys.ts returns { userId, monthlyUnitLimit, expiresAt, createdAt, … }, not the table's columns.
+    activeDeps = {
+      async createApiKey(userId, input) {
+        const { secret, row: r } = await deps.createApiKey(userId, input);
+        return { secret, row: { id: r.id, userId: r.user_id!, name: r.name, prefix: r.prefix, suffix: r.suffix, scopes: r.scopes, monthlyUnitLimit: r.monthly_unit_limit!, expiresAt: r.expires_at!, lastUsedAt: r.last_used_at!, revokedAt: r.revoked_at!, createdAt: r.created_at! } };
+      },
+    };
+    try {
+      stepUp(users.other);
+      const r = await call(users.other, "/api/account/api-keys", "POST", { name: "ACCT-l5 camel", scopes: ["read"], monthlyUnitLimit: 777, expiresInDays: 10 });
+      expect(r.status).toBe(201);
+      expect(r.data.key).toMatch(/^chub_/);
+      expect(r.data.item).toMatchObject({ name: "ACCT-l5 camel", monthlyUnitLimit: 777, lastUsedAt: null });
+      expect(typeof r.data.item.createdAt).toBe("string");
+      expect(new Date(r.data.item.expiresAt).getTime()).toBeGreaterThan(Date.now() + 9 * 86400_000);
+      const listed = (await call(users.other, "/api/account/api-keys")).data.keys.find((k: any) => k.id === r.data.item.id);
+      expect(listed).toEqual(r.data.item);
+      const [created] = (await activity(users.other, "security.api_key_created")).slice(-1);
+      expect(created.detail).toMatchObject({ keyId: r.data.item.id, monthlyUnitLimit: 777 });
+      expect(created.detail.expiresAt).toBe(r.data.item.expiresAt);
+    } finally { activeDeps = deps; }
+  });
+  it("still returns the one-time secret when the security event cannot be recorded", async () => {
+    stepUp(users.other); sent.mockClear();
+    notify.mockRejectedValueOnce(new Error("ACCT-l5 notification outage"));
+    const r = await call(users.other, "/api/account/api-keys", "POST", { name: "ACCT-l5 outage", scopes: ["read"] });
+    expect(r.status).toBe(201);
+    expect(r.data.key).toMatch(/^chub_/);
+    expect((await pool.query("SELECT secret_hash FROM account_api_keys WHERE id=$1", [r.data.item.id])).rows[0].secret_hash).toBe(sha(r.data.key));
+    // The other steps still ran: the activity row and (the kind is not registered yet) the direct security email.
+    expect((await activity(users.other, "security.api_key_created")).some((a) => a.detail.keyId === r.data.item.id)).toBe(true);
+    expect(sent).toHaveBeenCalledTimes(1);
   });
 });

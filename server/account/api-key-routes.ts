@@ -71,16 +71,37 @@ export function cheapestApiPlan(): PlanKey {
   return PLAN_KEYS.find((k) => apiUnitsForPlan(k) !== 0) ?? PLAN_KEYS[PLAN_KEYS.length - 1];
 }
 
-/** account_api_keys as stored (the contract's columns). */
+/** account_api_keys as stored (the contract's columns): what this file works with. */
 export type ApiKeyRow = {
   id: string; user_id: number; name: string; prefix: string; suffix: string; scopes: string[];
   monthly_unit_limit: number | null; expires_at: Date | string | null; last_used_at: Date | string | null;
   revoked_at: Date | string | null; created_at: Date | string;
 };
+/**
+ * What createApiKey may hand back. The contract fixes the table's columns but
+ * not the helper's row, and lane 1's returns camelCase (userId, expiresAt, …):
+ * either spelling is accepted and normalizeRow() makes it an ApiKeyRow.
+ */
+export type ApiKeyRowLike = { id: string; name: string; prefix: string; suffix: string; scopes: readonly string[] } & Partial<{
+  user_id: number; monthly_unit_limit: number | null; expires_at: Date | string | null; last_used_at: Date | string | null; revoked_at: Date | string | null; created_at: Date | string;
+  userId: number; monthlyUnitLimit: number | null; expiresAt: Date | string | null; lastUsedAt: Date | string | null; revokedAt: Date | string | null; createdAt: Date | string;
+}>;
+export function normalizeRow(r: ApiKeyRowLike, fallbackUserId = 0): ApiKeyRow {
+  const pick = <T,>(snake: T | undefined, camel: T | undefined, fallback: T): T => (snake !== undefined ? snake : camel !== undefined ? camel : fallback);
+  return {
+    id: r.id, name: r.name, prefix: r.prefix, suffix: r.suffix, scopes: [...r.scopes],
+    user_id: pick(r.user_id, r.userId, fallbackUserId),
+    monthly_unit_limit: pick(r.monthly_unit_limit, r.monthlyUnitLimit, null),
+    expires_at: pick(r.expires_at, r.expiresAt, null),
+    last_used_at: pick(r.last_used_at, r.lastUsedAt, null),
+    revoked_at: pick(r.revoked_at, r.revokedAt, null),
+    created_at: pick(r.created_at, r.createdAt, new Date()),
+  };
+}
 export type CreateApiKeyInput = { name: string; scopes: ApiKeyScope[]; monthlyUnitLimit: number | null; expiresInDays: number | null };
 /** Lane 1's helper (server/account/api-keys.ts): mints the secret, stores its hash, returns both. */
 export type ApiKeyDeps = {
-  createApiKey(userId: number, input: CreateApiKeyInput): Promise<{ secret: string; row: ApiKeyRow }>;
+  createApiKey(userId: number, input: CreateApiKeyInput): Promise<{ secret: string; row: ApiKeyRowLike }>;
 };
 
 const iso = (v: Date | string | null | undefined) => (v == null ? null : new Date(v).toISOString());
@@ -159,19 +180,28 @@ const requestIp = (req: Request) => String(req.headers["cf-connecting-ip"] || re
  * Activity log + notification + email. Security kinds cannot be muted once
  * API_KEY_NOTIFICATION_KINDS is in the registry; until that spread lands,
  * notifyUser would fall back to in-app only, so the email is sent here.
+ *
+ * Never throws: it runs after the key was created or revoked, and the
+ * response (for a creation, the only copy of the secret) must still go out.
+ * Each step is attempted on its own and a failure is logged.
  */
 async function securityEvent(req: Request, userId: number, kind: ApiKeyNotificationKind, title: string, body: string, detail: Record<string, unknown>) {
-  await logActivity(req, userId, kind, detail);
-  await notifyUser(userId, kind as NotificationKind, { title, body, link: API_KEYS_PATH, severity: "warning", actionUrl: API_KEYS_PATH, actionLabel: "Review API keys" });
+  const attempt = async (what: string, fn: () => Promise<unknown>) => {
+    try { await fn(); } catch (e: any) { console.error(`[api-keys] ${kind}: ${what} failed:`, e?.message); }
+  };
+  await attempt("activity log", () => logActivity(req, userId, kind, detail));
+  await attempt("notification", () => notifyUser(userId, kind as NotificationKind, { title, body, link: API_KEYS_PATH, severity: "warning", actionUrl: API_KEYS_PATH, actionLabel: "Review API keys" }));
   if (Object.hasOwn(NOTIFICATION_KINDS, kind)) return;
-  const { rows: [u] } = await pool.query("SELECT email FROM users WHERE id=$1", [userId]);
-  if (!u?.email) return;
-  const base = process.env.APP_URL || "https://constructhub.us";
-  await sendWithFallback({
-    to: u.email, subject: `ConstructHUB: ${title}`,
-    text: `${title}\n\n${body}\n\nReview API keys: ${base}${API_KEYS_PATH}`,
-    html: `<div style="font-family:system-ui,sans-serif;max-width:560px"><h2 style="font-size:18px">${esc(title)}</h2><p>${esc(body)}</p><p><a href="${esc(base + API_KEYS_PATH)}" style="display:inline-block;background:#e0782f;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Review API keys</a></p></div>`,
-  }).catch((e: any) => console.error("[api-keys] security email failed:", e?.message));
+  await attempt("security email", async () => {
+    const { rows: [u] } = await pool.query("SELECT email FROM users WHERE id=$1", [userId]);
+    if (!u?.email) return;
+    const base = process.env.APP_URL || "https://constructhub.us";
+    await sendWithFallback({
+      to: u.email, subject: `ConstructHUB: ${title}`,
+      text: `${title}\n\n${body}\n\nReview API keys: ${base}${API_KEYS_PATH}`,
+      html: `<div style="font-family:system-ui,sans-serif;max-width:560px"><h2 style="font-size:18px">${esc(title)}</h2><p>${esc(body)}</p><p><a href="${esc(base + API_KEYS_PATH)}" style="display:inline-block;background:#e0782f;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Review API keys</a></p></div>`,
+    });
+  });
 }
 
 /** API keys are the account's own credentials: an agency member acting for the owner cannot mint or revoke them. */
@@ -233,8 +263,9 @@ export function registerApiKeyRoutes(app: Express, auth: (req: any, res: any) =>
     if (used >= MAX_API_KEYS) {
       return void sendLimitReached(res, { limit: MAX_API_KEYS, used, feature: "api_keys", message: `An account can hold up to ${MAX_API_KEYS} active API keys. Revoke one you no longer use.` });
     }
-    const { secret, row } = await deps.createApiKey(u.id, { name, scopes, monthlyUnitLimit, expiresInDays });
-    const key = bearerFor(secret, row.prefix);
+    const minted = await deps.createApiKey(u.id, { name, scopes, monthlyUnitLimit, expiresInDays });
+    const row = normalizeRow(minted.row, u.id);
+    const key = bearerFor(minted.secret, row.prefix);
     await securityEvent(req, u.id, "security.api_key_created", `API key "${name}" was created`,
       `A new API key (${row.prefix}…${row.suffix}, ${scopes.join(" + ")}) was created from ${requestIp(req)}${row.expires_at ? `; it expires ${new Date(row.expires_at).toUTCString()}` : ""}. If this was not you, revoke it now and change your password.`,
       { keyId: row.id, name, prefix: row.prefix, suffix: row.suffix, scopes, monthlyUnitLimit, expiresAt: iso(row.expires_at) });
