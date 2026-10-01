@@ -57,6 +57,23 @@ test.describe("signed out", () => {
     await expect(page.getByTestId("hub-launcher")).toBeFocused();
   });
 
+  test("keyboard: after a chip answer focus is still in the panel, and Escape still closes it", async ({ page }) => {
+    await page.goto(`${SIGNED_OUT}/`);
+    await page.getByTestId("hub-launcher").focus();
+    await page.keyboard.press("Enter");
+    const panel = page.getByRole("dialog", { name: "Hub — your ConstructHUB guide" });
+    await expect(panel).toBeVisible();
+    await panel.getByTestId("hub-chip-pricing").focus();
+    await page.keyboard.press("Enter");
+    // While the answer loads and after it arrives, focus never falls to <body>.
+    expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("$29/month or $290/year");
+    expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByTestId("hub-launcher")).toBeFocused();
+  });
+
   test("never on homeowner token pages or the sign-in page; shown on marketing pages", async ({ page }) => {
     for (const path of ["/e/not-a-real-token", "/portal/not-a-real-token", "/auth", "/terms"]) {
       await page.goto(`${SIGNED_OUT}${path}`);
@@ -148,6 +165,43 @@ test.describe("signed in", () => {
     await expect(err).toHaveAttribute("data-tone", "error");
     await expect(err).toContainText("My radio's crackling");
     await expect(panel.getByTestId("hub-input")).toBeEnabled();
+  });
+
+  test("keyboard: 'Start a new chat' moves focus to the text box, and Escape closes from anywhere", async ({ page }) => {
+    await mockChat(page, [{ body: { reply: "Open **Locations** first.", kind: "answer", conversationId: convo, index: 1, sig: sig("d") } }]);
+    await page.addInitScript(() => window.localStorage.setItem("hub.welcomeSeen", "1"));
+    await page.goto(`${SIGNED_IN}/`);
+    const panel = await openHub(page);
+    await panel.getByTestId("hub-input").fill("How do I connect Google?");
+    await panel.getByTestId("hub-send").click();
+    await expect(panel.getByTestId("hub-input")).toBeFocused(); // not left on the inactive Send button
+    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("Open Locations first.");
+    await panel.getByTestId("hub-new-chat").focus();
+    await page.keyboard.press("Enter");
+    await expect(panel.getByTestId("hub-new-chat")).toHaveCount(0);
+    await expect(panel.getByTestId("hub-input")).toBeFocused();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+  });
+
+  test("390px: a long unbroken message wraps inside its bubble", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockChat(page, [{ body: { reply: "Mock answer.", kind: "answer", conversationId: convo, index: 1, sig: sig("e") } }]);
+    await page.addInitScript(() => window.localStorage.setItem("hub.welcomeSeen", "1"));
+    await page.goto(`${SIGNED_IN}/`);
+    const panel = await openHub(page);
+    await panel.getByTestId("hub-input").fill(`Is this link ok https://constructhub.us/settings?tab=billing&${"a".repeat(90)} for Pro?`);
+    await panel.getByTestId("hub-send").click();
+    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("Mock answer.");
+    const fit = await page.evaluate(() => {
+      const list = document.querySelector('[data-testid="hub-messages"]')!;
+      const bubble = document.querySelector('[data-testid="hub-msg-user"]')!.getBoundingClientRect();
+      const panelBox = document.querySelector('[data-testid="hub-panel"]')!.getBoundingClientRect();
+      return { overflow: list.scrollWidth - list.clientWidth, bubbleRight: bubble.right, panelRight: panelBox.right };
+    });
+    expect(fit.overflow).toBeLessThanOrEqual(0);
+    expect(fit.bubbleRight).toBeLessThanOrEqual(fit.panelRight);
   });
 
   test("first visit after sign-up: a welcome bubble that opens Hub with setup questions", async ({ page }) => {

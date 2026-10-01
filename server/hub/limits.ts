@@ -5,8 +5,9 @@
  *
  * Gate order for POST /api/hub/chat (enforced in routes.ts):
  *   CSRF/Origin → schema → auth/tier → turn signatures → per-minute → refusal
- *   cooldown → pre-filter → breaker → daily user/IP/global budgets (only when a
- *   model call will happen) → semaphore → TruthCoder.
+ *   cooldown → pre-filter → breaker → semaphore → daily user/IP/global budgets
+ *   (only when a model call will happen; a request turned away as busy costs no
+ *   daily slot) → TruthCoder.
  */
 
 export const MINUTE = 60_000;

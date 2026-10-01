@@ -14,7 +14,7 @@ import {
   buildBook, dollarAmounts, knowledgeBook, knowledgeSlice, priceBookCents, renderPack, sectionsFor, CORE_SECTIONS, KNOWLEDGE_SLICE_MAX,
 } from "./knowledge";
 import { buildMessages, buildPresetMessages, buildRequest, CANARY, knowledgeHash, TRAILING_REMINDER } from "./prompt";
-import { filterOutput, COMPETITORS } from "./output-filter";
+import { filterOutput, mentionsCompetitor } from "./output-filter";
 
 const here = import.meta.dirname;
 const book = knowledgeBook();
@@ -100,7 +100,7 @@ describe("knowledge pack", () => {
   it("is public-safe: no emails, absolute URLs, competitor names, infra or 'Technical Details'", () => {
     expect(book.pack).not.toMatch(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
     expect(book.pack).not.toMatch(/https?:\/\/|www\./i);
-    for (const re of COMPETITORS) expect(book.pack).not.toMatch(re);
+    expect(mentionsCompetitor(book.pack)).toBe(false);
     expect(book.pack).not.toMatch(/Technical Details|PostgreSQL|\bExpress\b|Playwright|\bReact\b|\bDrizzle\b/);
     expect(book.pack).not.toMatch(/truthcode|openai|\bvb\d|127\.0\.0\.1|localhost|tunnel/i);
   });

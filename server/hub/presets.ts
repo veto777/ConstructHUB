@@ -69,6 +69,10 @@ export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
       return answer.includes(SALES_REP_LABEL) && answer.includes(SALES_HREF);
     case "agency":
       return /\bAgency\b/.test(answer) && new RegExp(`\\b${PLANS.agency.limits.locations}\\b`).test(answer) && /\b500\b/.test(answer) && /sales rep/i.test(answer);
+    case "click-fraud":
+      // The pack's honest limits, and the step people miss: the exclusions come from a script the user pastes into Google Ads.
+      return /\b(don'?t|do not|doesn'?t|does not|can'?t|cannot) prove fraud\b|\bno savings (are|is) guaranteed\b/i.test(answer)
+        && /\bscript\b/i.test(answer) && /\b(paste|add|install)\w*\b[^.]{0,80}\bGoogle Ads\b|\bGoogle Ads\b[^.]{0,80}\b(paste|add|install)\w*\b/i.test(answer);
     default:
       return true;
   }

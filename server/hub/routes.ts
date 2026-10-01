@@ -264,23 +264,24 @@ export function createHub(deps: HubDeps) {
 
       // 8. breaker
       if (breaker.isOpen()) { note(tier, "busy", "breaker", started); return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" }); }
-      // 9. daily budgets — taken only now that a model call will happen
-      if (!(await deps.budget.take(keys.userDaily(userId), HUB_LIMITS.userDaily.limit, HUB_LIMITS.userDaily.windowMs))) {
-        note(tier, "limit", "user_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
-      }
-      if (!(await deps.budget.take(keys.ipDaily(deps.ipKey(req)), HUB_LIMITS.ipDaily.limit, HUB_LIMITS.ipDaily.windowMs))) {
-        note(tier, "limit", "ip_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
-      }
-      if (!(await deps.budget.take(keys.globalDaily(), globalDailyCap(), HUB_LIMITS.userDaily.windowMs))) {
-        note(tier, "busy", "global_daily", started); return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" });
-      }
-      // 10. concurrency
+      // 9. concurrency — before the daily budgets, so a request turned away as busy costs no model-call slot
       const release = semaphore.tryAcquire(`user:${userId}`);
       if (!release) { note(tier, "busy", "concurrency", started); return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" }); }
 
-      // 11. TruthCoder
       let result: Upstream;
       try {
+        // 10. daily budgets — taken only now that a model call will happen (the finally below releases the slot)
+        if (!(await deps.budget.take(keys.userDaily(userId), HUB_LIMITS.userDaily.limit, HUB_LIMITS.userDaily.windowMs))) {
+          note(tier, "limit", "user_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
+        }
+        if (!(await deps.budget.take(keys.ipDaily(deps.ipKey(req)), HUB_LIMITS.ipDaily.limit, HUB_LIMITS.ipDaily.windowMs))) {
+          note(tier, "limit", "ip_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
+        }
+        if (!(await deps.budget.take(keys.globalDaily(), globalDailyCap(), HUB_LIMITS.userDaily.windowMs))) {
+          note(tier, "busy", "global_daily", started); return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" });
+        }
+
+        // 11. TruthCoder
         // Earlier questions that were refused (and their fixed replies) never reach the model.
         const turns: VisitorTurn[] = [];
         for (let i = 0; i < messages.length; i++) {
@@ -296,8 +297,12 @@ export function createHub(deps: HubDeps) {
         return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" });
       }
 
-      // 12. output filter
-      const filtered = filterOutput(result.completion, { publicOnly: false });
+      // 12. output filter (with this request's own turns, so visitor text echoed back is caught: O18)
+      const echo = {
+        user: messages.filter((m) => m.role === "user").map((m) => m.content),
+        assistant: messages.filter((m) => m.role === "assistant").map((m) => m.content),
+      };
+      const filtered = filterOutput(result.completion, { publicOnly: false, echo });
       if (!filtered.ok) { note(tier, "output_block", filtered.code, started); return void signed(REPLIES.R_FALLBACK, "fallback"); }
       note(tier, "chat_ok", latencyBucket(result.ms), started);
       signed(filtered.text, "answer");

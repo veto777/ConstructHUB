@@ -153,6 +153,22 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     window.setTimeout(() => launcherRef.current?.focus(), 0);
   }, []);
 
+  // Escape closes the panel wherever focus is (a button that just went away can leave focus on <body>).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented) close(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
+  /** Keep keyboard focus inside the dialog: the text box when chat is on, else the first quick question. */
+  const focusComposer = () => {
+    window.setTimeout(() => {
+      const target = (canChat ? inputRef.current : null) ?? panelRef.current?.querySelector<HTMLElement>("[data-hub-chip]") ?? panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+      target?.focus();
+    }, 0);
+  };
+
   const openPanel = (asWelcome: boolean) => {
     setOpen(true);
     setBubble(false);
@@ -210,6 +226,8 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     const userMsgId = push({ role: "user", content: text });
     setInput("");
     setBusy(true);
+    // The Send button goes inactive while Hub answers; never leave focus on it.
+    if (document.activeElement !== inputRef.current) inputRef.current?.focus();
     try {
       const res = await fetch("/api/hub/chat", {
         method: "POST", credentials: "include",
@@ -245,9 +263,8 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     }
   };
 
-  // Escape closes; Tab stays inside the panel (focus trap).
+  // Tab stays inside the panel (focus trap). Escape is handled at document level above.
   const onPanelKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") { e.stopPropagation(); close(); return; }
     if (e.key !== "Tab" || !panelRef.current) return;
     const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null || el === document.activeElement);
     if (!items.length) return;
@@ -350,7 +367,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
               </p>
             </div>
             {builder && messages.length > 0 && (
-              <button type="button" onClick={() => { setMessages([]); setConversationId(null); }}
+              <button type="button" onClick={() => { setMessages([]); setConversationId(null); focusComposer(); }}
                 className="rounded-md p-1.5 text-white/85 hover:bg-white/10 hover:text-white" aria-label="Start a new chat" data-testid="hub-new-chat">
                 <RotateCcw className="h-4 w-4" />
               </button>
@@ -367,7 +384,8 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
               <div key={m.id} data-msg-id={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
-                    "max-w-[92%] rounded-2xl px-3 py-2",
+                    // A long unbroken string (a pasted URL) wraps instead of running out of the panel.
+                    "min-w-0 max-w-[92%] break-words rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
                     m.role === "user"
                       ? "whitespace-pre-wrap rounded-tr-sm bg-orange-700 text-white"
                       : m.tone === "error"
@@ -399,8 +417,9 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Quick questions</p>
               <div className="flex flex-wrap gap-1.5">
                 {chips.map((p) => (
-                  <button key={p.id} type="button" data-hub-chip disabled={busy} onClick={() => askPreset(p.id, p.label)}
-                    className="rounded-full border bg-background px-3 py-1.5 text-left text-xs font-medium hover:border-orange-600 hover:bg-orange-50 disabled:opacity-50 dark:hover:bg-orange-950/40"
+                  // aria-disabled, not disabled: a disabled button drops keyboard focus to <body> (askPreset ignores taps while busy).
+                  <button key={p.id} type="button" data-hub-chip aria-disabled={busy || undefined} onClick={() => askPreset(p.id, p.label)}
+                    className="rounded-full border bg-background px-3 py-1.5 text-left text-xs font-medium hover:border-orange-600 hover:bg-orange-50 aria-disabled:cursor-wait aria-disabled:opacity-50 dark:hover:bg-orange-950/40"
                     data-testid={`hub-chip-${p.id}`}>
                     {p.label}
                   </button>

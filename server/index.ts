@@ -2,6 +2,7 @@ import { credentialBody } from "./cloudflare/credential-body";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { isSiteScanPath, responseBodyLoggable } from "./request-log";
 import { setupAuth } from "./auth";
 import { createServer } from "http";
 
@@ -53,23 +54,24 @@ export function log(message: string, source = "express") {
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const isSiteScan = req.path.startsWith("/api/agency") || req.path.startsWith("/api/sitescan") || req.path.startsWith("/api/admin/sitescan");
+  const isSiteScan = isSiteScanPath(req.path);
   const path = isSiteScan ? req.path.replace(/[a-f0-9]{64}/g, ":token") : req.path;
+  // Hub replies, auth/consent bodies (QR seeds, recovery codes) and social bodies (signed upload URLs)
+  // never reach logs, whatever the path's case (server/request-log.ts).
+  const loggable = responseBodyLoggable(req.path);
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
-    // Hub replies are never written to the log (guardrails §2/§8).
-    if (!isSiteScan && !req.path.startsWith("/api/domains") && !req.path.startsWith("/api/mail-alerts") && !req.path.startsWith("/api/hub")) capturedJsonResponse = bodyJson;
+    if (loggable) capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
+    if (path.toLowerCase().startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      // Auth/consent bodies (QR seeds, recovery codes) and social bodies (signed upload URLs) never reach logs.
-      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")) {
+      if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

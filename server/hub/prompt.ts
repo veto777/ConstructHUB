@@ -103,6 +103,7 @@ const PRESET_NOTES: Partial<Record<PresetId, string>> = {
   "trial": "Say there is no free plan, and give the trial exactly as KNOWLEDGE words it.",
   "agency": "Say the Agency plan includes 10 locations, give the per-location bands exactly as KNOWLEDGE words them, and say that above 500 locations it is quoted by a sales rep.",
   "done-for-you": `Say "${SALES_REP_LABEL}" and link [${SALES_REP_LABEL}](${SALES_HREF}).`,
+  "click-fraud": "Say that the IP exclusions come from a Google Ads script the user pastes into their own Google Ads account, that these signals don't prove fraud, and that no savings are guaranteed. Never promise savings.",
 };
 
 /** Messages for a preset answer: server-owned question, public links only, cached for everyone. */
