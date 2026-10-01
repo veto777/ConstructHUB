@@ -40,21 +40,24 @@ const BACKFILL_PAGES = 10;
 const BACKFILL_RECHECK_MS = 10 * 60_000;
 
 // ---------------------------------------------------------------------------
-// Schema — the two ledgers this file reads (CONTRACT shapes). Idempotent, so
-// it coexists with server/account/schema.ts ensureAccountSchema() creating the
-// same tables: whichever runs first creates them, the other is a no-op.
+// Schema — the two ledgers this file reads (CONTRACT shapes). Statement for
+// statement the same DDL as server/account/schema.ts ensureAccountSchema()
+// (lane 1 owns the tables): both are IF NOT EXISTS, so whichever runs first
+// creates them and the other is a no-op — and because the column constraints
+// and index names are identical, the result is the same table either way (no
+// second index, no NOT NULL that the webhook writer never agreed to).
 // ---------------------------------------------------------------------------
 export const BILLING_LEDGER_DDL: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS billing_invoices (
-    id text PRIMARY KEY, user_id integer NOT NULL, number text, status text,
+    id text PRIMARY KEY, user_id integer, number text, status text,
     amount_paid integer, amount_due integer, currency text,
     period_start timestamptz, period_end timestamptz, description text,
-    hosted_invoice_url text, invoice_pdf text, created timestamptz NOT NULL DEFAULT now())`,
-  `CREATE INDEX IF NOT EXISTS billing_invoices_user_created ON billing_invoices(user_id, created DESC, id DESC)`,
+    hosted_invoice_url text, invoice_pdf text, created timestamptz)`,
+  `CREATE INDEX IF NOT EXISTS billing_invoices_user_idx ON billing_invoices(user_id, created DESC)`,
   `CREATE TABLE IF NOT EXISTS billing_purchases (
-    id text PRIMARY KEY, user_id integer NOT NULL, kind text, description text,
-    amount integer, currency text, created timestamptz NOT NULL DEFAULT now(), receipt_url text)`,
-  `CREATE INDEX IF NOT EXISTS billing_purchases_user_created ON billing_purchases(user_id, created DESC, id DESC)`,
+    id text PRIMARY KEY, user_id integer, kind text, description text,
+    amount integer, currency text, created timestamptz, receipt_url text)`,
+  `CREATE INDEX IF NOT EXISTS billing_purchases_user_idx ON billing_purchases(user_id, created DESC)`,
 ];
 
 let ledgerReady: Promise<void> | null = null;
@@ -106,6 +109,11 @@ const idOf = (ref: unknown): string | null =>
 // ---------------------------------------------------------------------------
 // Keyset pagination over a ledger, newest first, inside one account.
 // ---------------------------------------------------------------------------
+// The sort key. `created` is nullable in the shared DDL (a writer that omits it
+// is a bug, but a NULL must not make a page vanish): a row without one sorts
+// last, and pages past it consistently.
+const SORT_CREATED = `COALESCE(created, 'epoch'::timestamptz)`;
+
 async function pageOf<T extends { id: string }>(
   table: "billing_invoices" | "billing_purchases", userId: number, page: { limit: number; startingAfter: string | null },
 ): Promise<{ rows: T[]; hasMore: boolean }> {
@@ -115,13 +123,17 @@ async function pageOf<T extends { id: string }>(
     // The cursor must be one of THIS account's rows: resolved under user_id,
     // so an id from another account (or a made-up one) is simply unknown.
     const { rows: [cursor] } = await pool.query(
-      `SELECT created, id FROM ${table} WHERE user_id = $1 AND id = $2`, [userId, page.startingAfter]);
+      `SELECT 1 FROM ${table} WHERE user_id = $1 AND id = $2`, [userId, page.startingAfter]);
     if (!cursor) throw new BillingReadError(400, "That page cursor isn't one of your records.", "bad_cursor");
-    values.push(cursor.created, cursor.id);
-    after = `AND (created, id) < ($3, $4)`;
+    values.push(page.startingAfter);
+    // The cursor row's sort key is read inside the query, at Postgres' own
+    // microsecond precision: a round trip through a JS Date keeps only
+    // milliseconds, and rows written in the same millisecond as the cursor
+    // (but a few microseconds earlier) would be skipped between pages.
+    after = `AND (${SORT_CREATED}, id) < (SELECT ${SORT_CREATED}, id FROM ${table} WHERE user_id = $1 AND id = $3)`;
   }
   const { rows } = await pool.query(
-    `SELECT * FROM ${table} WHERE user_id = $1 ${after} ORDER BY created DESC, id DESC LIMIT $2`, values);
+    `SELECT * FROM ${table} WHERE user_id = $1 ${after} ORDER BY ${SORT_CREATED} DESC, id DESC LIMIT $2`, values);
   return { rows: rows.slice(0, page.limit) as T[], hasMore: rows.length > page.limit };
 }
 
@@ -130,11 +142,26 @@ async function ledgerCount(table: "billing_invoices" | "billing_purchases", user
   return r?.n ?? 0;
 }
 
-async function customerIdFor(userId: number): Promise<string | null> {
+async function billingRefsFor(userId: number): Promise<{ customerId: string | null; subscriptionId: string | null }> {
   const { rows: [r] } = await pool.query(
-    `SELECT stripe_customer_id FROM subscriptions WHERE user_id = $1 ORDER BY id LIMIT 1`, [userId]);
-  return r?.stripe_customer_id ?? null;
+    `SELECT stripe_customer_id, stripe_subscription_id FROM subscriptions WHERE user_id = $1 ORDER BY id LIMIT 1`, [userId]);
+  return { customerId: r?.stripe_customer_id ?? null, subscriptionId: r?.stripe_subscription_id ?? null };
 }
+const customerIdFor = async (userId: number) => (await billingRefsFor(userId)).customerId;
+
+/** Stripe's "No such …" for the id we asked about (resource_missing). */
+const isMissingResource = (err: any) => typeof err?.type === "string" && err.type.startsWith("Stripe") && err?.code === "resource_missing";
+/**
+ * Stripe's "No such customer": the stored id is not in the connected Stripe
+ * account (a test-mode customer under the live key, or one deleted there).
+ * Nothing can have been billed to it through this key, so the honest answer
+ * is "no records" — logged, because it is a configuration smell — rather than
+ * a 502 on every load of the Billing page for as long as the row exists.
+ */
+const isMissingCustomer = (err: any) =>
+  isMissingResource(err) && (err?.param === "customer" || /no such customer/i.test(String(err?.message ?? "")));
+const warnMissingCustomer = (what: string, userId: number, customer: string) =>
+  console.warn(`[billing] Stripe has no customer ${customer} (user ${userId}); ${what} read as empty`);
 
 // ---------------------------------------------------------------------------
 // Invoices
@@ -195,14 +222,19 @@ export async function backfillInvoices(userId: number): Promise<number> {
     if (!customer) { backfillChecked.set(key, Date.now()); return 0; }
     let copied = 0;
     let starting_after: string | undefined;
-    for (let page = 0; page < BACKFILL_PAGES; page++) {
-      const list = await stripe.invoices.list({ customer, limit: 100, ...(starting_after ? { starting_after } : {}) });
-      for (const inv of list.data) {
-        const row = invoiceRow(userId, inv);
-        if (row) { await upsertInvoice(row); copied++; }
+    try {
+      for (let page = 0; page < BACKFILL_PAGES; page++) {
+        const list = await stripe.invoices.list({ customer, limit: 100, ...(starting_after ? { starting_after } : {}) });
+        for (const inv of list.data) {
+          const row = invoiceRow(userId, inv);
+          if (row) { await upsertInvoice(row); copied++; }
+        }
+        if (!list.has_more || !list.data.length) break;
+        starting_after = list.data[list.data.length - 1].id;
       }
-      if (!list.has_more || !list.data.length) break;
-      starting_after = list.data[list.data.length - 1].id;
+    } catch (err) {
+      if (!isMissingCustomer(err)) throw err;
+      warnMissingCustomer("invoices", userId, customer);
     }
     backfillChecked.set(key, Date.now());
     return copied;
@@ -279,18 +311,23 @@ export async function backfillPurchases(userId: number): Promise<number> {
     if (!customer) { backfillChecked.set(key, Date.now()); return 0; }
     let copied = 0;
     let starting_after: string | undefined;
-    for (let page = 0; page < BACKFILL_PAGES; page++) {
-      const list = await stripe.checkout.sessions.list({
-        customer, status: "complete", limit: 100,
-        expand: ["data.line_items", "data.payment_intent.latest_charge"],
-        ...(starting_after ? { starting_after } : {}),
-      });
-      for (const session of list.data) {
-        const row = purchaseRow(userId, session);
-        if (row) { await insertPurchase(row); copied++; }
+    try {
+      for (let page = 0; page < BACKFILL_PAGES; page++) {
+        const list = await stripe.checkout.sessions.list({
+          customer, status: "complete", limit: 100,
+          expand: ["data.line_items", "data.payment_intent.latest_charge"],
+          ...(starting_after ? { starting_after } : {}),
+        });
+        for (const session of list.data) {
+          const row = purchaseRow(userId, session);
+          if (row) { await insertPurchase(row); copied++; }
+        }
+        if (!list.has_more || !list.data.length) break;
+        starting_after = list.data[list.data.length - 1].id;
       }
-      if (!list.has_more || !list.data.length) break;
-      starting_after = list.data[list.data.length - 1].id;
+    } catch (err) {
+      if (!isMissingCustomer(err)) throw err;
+      warnMissingCustomer("purchases", userId, customer);
     }
     backfillChecked.set(key, Date.now());
     return copied;
@@ -320,17 +357,45 @@ export function paymentMethodItem(pm: Stripe.PaymentMethod, defaultId: string | 
   };
 }
 
+/**
+ * The method a current subscription charges: Stripe uses the subscription's
+ * own default_payment_method ahead of the customer's invoice_settings — and
+ * Checkout sets only the former, so for most subscribers the customer-level
+ * default is empty. A subscription Stripe no longer has, or one that ended, is
+ * no default (the customer-level one applies instead).
+ */
+async function subscriptionDefaultMethod(subscriptionId: string | null): Promise<string | null> {
+  if (!subscriptionId) return null;
+  try {
+    const sub = (await stripe.subscriptions.retrieve(subscriptionId)) as Stripe.Subscription | null | undefined;
+    if (!sub || sub.status === "canceled" || sub.status === "incomplete_expired") return null;
+    return idOf(sub.default_payment_method) ?? idOf(sub.default_source);
+  } catch (err) {
+    if (isMissingResource(err)) return null;
+    throw err;
+  }
+}
+
 export async function listPaymentMethods(userId: number): Promise<PaymentMethodItem[]> {
   if (!stripeConfigured()) return [];
-  const customerId = await customerIdFor(userId);
+  const { customerId, subscriptionId } = await billingRefsFor(userId);
   if (!customerId) return [];
-  const [customer, methods] = await Promise.all([
-    stripe.customers.retrieve(customerId),
-    stripe.customers.listPaymentMethods(customerId, { limit: 100 }),
-  ]);
+  let customer: Stripe.Customer | Stripe.DeletedCustomer, methods: { data: Stripe.PaymentMethod[] }, subscriptionDefault: string | null;
+  try {
+    [customer, methods, subscriptionDefault] = await Promise.all([
+      stripe.customers.retrieve(customerId),
+      stripe.customers.listPaymentMethods(customerId, { limit: 100 }),
+      subscriptionDefaultMethod(subscriptionId),
+    ]);
+  } catch (err) {
+    if (!isMissingCustomer(err)) throw err;
+    warnMissingCustomer("payment methods", userId, customerId);
+    return [];
+  }
   if (!customer || (customer as Stripe.DeletedCustomer).deleted) return [];
   const settings = (customer as Stripe.Customer).invoice_settings;
-  const defaultId = idOf(settings?.default_payment_method) ?? idOf((customer as Stripe.Customer).default_source);
+  const defaultId = subscriptionDefault
+    ?? idOf(settings?.default_payment_method) ?? idOf((customer as Stripe.Customer).default_source);
   return methods.data.map((pm) => paymentMethodItem(pm, defaultId));
 }
 

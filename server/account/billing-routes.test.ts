@@ -8,35 +8,43 @@ const mocks = vi.hoisted(() => ({
   sessionsList: vi.fn(),
   customersRetrieve: vi.fn(),
   listPaymentMethods: vi.fn(),
+  subscriptionsRetrieve: vi.fn(),
 }));
 vi.mock("stripe", () => ({ default: class {
   invoices = { list: mocks.invoicesList };
   checkout = { sessions: { list: mocks.sessionsList } };
   customers = { retrieve: mocks.customersRetrieve, listPaymentMethods: mocks.listPaymentMethods };
+  subscriptions = { retrieve: mocks.subscriptionsRetrieve };
 } }));
 
 import { pool } from "../db";
 import {
   registerBillingRoutes, ensureBillingLedgerSchema, resetBackfillMemory, parsePage, purchaseKind, invoiceRow, purchaseRow,
-  paymentMethodItem, PAGE_DEFAULT, PAGE_MAX,
+  paymentMethodItem, PAGE_DEFAULT, PAGE_MAX, BILLING_LEDGER_DDL,
 } from "./billing-routes";
 
 const CUSTOMER_A = "cus_ACCT_l4_a";
+const SUBSCRIPTION_A = "sub_ACCT_l4_a";
 const CUSTOMER_C = "cus_ACCT_l4_c";
-let a: number, b: number, c: number;
+let a: number, b: number, c: number, d: number;
 
 beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
   if (!["localhost", "127.0.0.1"].includes(url.hostname) || !/^\/constructhub_dev(?:_a\d+)?$/.test(url.pathname)) throw new Error("Requires a local development database");
   await ensureBillingLedgerSchema();
+  // The shared DDL (server/account/schema.ts) leaves `created` nullable; a dev database whose ledgers were
+  // created by an earlier, stricter copy is brought to that shape (a no-op once it is). Nothing else changes.
+  await pool.query("ALTER TABLE billing_invoices ALTER COLUMN created DROP NOT NULL");
   const { rows } = await pool.query(`INSERT INTO users(email) VALUES
-    ('ACCT-l4-'||gen_random_uuid()||'@example.invalid'), ('ACCT-l4-'||gen_random_uuid()||'@example.invalid'), ('ACCT-l4-'||gen_random_uuid()||'@example.invalid') RETURNING id`);
-  [a, b, c] = rows.map((r) => r.id);
-  // A and C are Stripe customers; B never reached checkout (no subscriptions row at all).
-  await pool.query(`INSERT INTO subscriptions(user_id, stripe_customer_id, plan, status) VALUES ($1,$2,'free','inactive'), ($3,$4,'free','inactive')`, [a, CUSTOMER_A, c, CUSTOMER_C]);
+    ('ACCT-l4-'||gen_random_uuid()||'@example.invalid'), ('ACCT-l4-'||gen_random_uuid()||'@example.invalid'),
+    ('ACCT-l4-'||gen_random_uuid()||'@example.invalid'), ('ACCT-l4-'||gen_random_uuid()||'@example.invalid') RETURNING id`);
+  [a, b, c, d] = rows.map((r) => r.id);
+  // A (a subscriber) and C are Stripe customers; B and D never reached checkout (no subscriptions row at all).
+  await pool.query(`INSERT INTO subscriptions(user_id, stripe_customer_id, stripe_subscription_id, plan, status)
+    VALUES ($1,$2,$3,'pro','active'), ($4,$5,NULL,'free','inactive')`, [a, CUSTOMER_A, SUBSCRIPTION_A, c, CUSTOMER_C]);
 });
 afterAll(async () => {
-  const ids = [a, b, c];
+  const ids = [a, b, c, d];
   await pool.query("DELETE FROM billing_invoices WHERE user_id = ANY($1)", [ids]);
   await pool.query("DELETE FROM billing_purchases WHERE user_id = ANY($1)", [ids]);
   await pool.query("DELETE FROM subscriptions WHERE user_id = ANY($1)", [ids]);
@@ -60,6 +68,9 @@ async function call(path: string, userId: number | null, query: Record<string, u
 }
 
 const stripeError = (message: string) => Object.assign(new Error(message), { type: "StripeAPIError", code: "api_error" });
+/** What the SDK raises for an id the connected Stripe account does not have (a list filter names the param; a path id is "id"). */
+const missingCustomer = (id: string, param = "customer") =>
+  Object.assign(new Error(`No such customer: '${id}'`), { type: "StripeInvalidRequestError", code: "resource_missing", param, statusCode: 404 });
 const invoice = (id: string, created: number, extra: Record<string, unknown> = {}) => ({
   id, number: `ACCT-${id}`, status: "paid", amount_paid: 4900, amount_due: 0, currency: "usd", created,
   period_start: created, period_end: created + 30 * 86400, description: null,
@@ -178,6 +189,39 @@ describe("GET /api/billing/invoices", () => {
     } finally { process.env.STRIPE_SECRET_KEY = key; }
     expect(mocks.invoicesList).not.toHaveBeenCalled();
   });
+  it("reads as empty — not 502 on every load — when Stripe has no such customer, and does not re-ask", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      mocks.invoicesList.mockRejectedValueOnce(missingCustomer(CUSTOMER_C));
+      const { status, body } = await call("/api/billing/invoices", c);
+      expect(status).toBe(200);
+      expect(body).toEqual({ invoices: [], hasMore: false });
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/no customer cus_ACCT_l4_c/));
+      expect((await call("/api/billing/invoices", c)).body).toEqual({ invoices: [], hasMore: false });
+      expect(mocks.invoicesList).toHaveBeenCalledTimes(1);
+      // Any other Stripe failure is still reported, never papered over.
+      resetBackfillMemory();
+      mocks.invoicesList.mockRejectedValueOnce(Object.assign(new Error("No such thing"), { type: "StripeInvalidRequestError", code: "resource_missing", param: "starting_after" }));
+      expect((await call("/api/billing/invoices", c)).status).toBe(502);
+    } finally { warn.mockRestore(); }
+  });
+  it("does not skip rows written in the same millisecond as the cursor, and pages past a row without a date", async () => {
+    // Postgres keeps microseconds; a cursor that round-trips through a JS Date keeps milliseconds.
+    // in_us1 (…40.000456) is the cursor; in_us0 (…40.000123) is older and must be on the next page.
+    await pool.query(`INSERT INTO billing_invoices (id, user_id, status, amount_paid, amount_due, currency, created) VALUES
+      ('in_us1', $1, 'paid', 100, 0, 'usd', to_timestamp(1690000000.000456)),
+      ('in_us0', $1, 'paid', 100, 0, 'usd', to_timestamp(1690000000.000123)),
+      ('in_undated', $1, 'paid', 100, 0, 'usd', NULL)`, [d]);
+    const page1 = await call("/api/billing/invoices", d, { limit: "1" });
+    expect(page1.body.invoices.map((i: any) => i.id)).toEqual(["in_us1"]);
+    const page2 = await call("/api/billing/invoices", d, { limit: "1", starting_after: "in_us1" });
+    expect(page2.body.invoices.map((i: any) => i.id)).toEqual(["in_us0"]);
+    expect(page2.body.hasMore).toBe(true);
+    const page3 = await call("/api/billing/invoices", d, { limit: "1", starting_after: "in_us0" });
+    expect(page3.body).toEqual({ invoices: [expect.objectContaining({ id: "in_undated", created: null })], hasMore: false });
+    expect((await call("/api/billing/invoices", d, { limit: "1", starting_after: "in_undated" })).body).toEqual({ invoices: [], hasMore: false });
+    expect(mocks.invoicesList).not.toHaveBeenCalled();
+  });
   it("pages newest-first inside one account and rejects another account's cursor", async () => {
     const base = 1_690_000_000;
     for (let i = 0; i < 5; i++) {
@@ -233,6 +277,38 @@ describe("GET /api/billing/payment-methods", () => {
     ] });
     expect(JSON.stringify(body)).not.toMatch(/4242\d{12}|cvc|fingerprint/);
   });
+  it("flags the current subscription's own default ahead of the customer-level one (what Checkout actually sets)", async () => {
+    const methods = [
+      { id: "pm_customer_default", type: "card", card: { brand: "visa", last4: "1111", exp_month: 1, exp_year: 2031 } },
+      { id: "pm_sub_default", type: "card", card: { brand: "amex", last4: "2222", exp_month: 2, exp_year: 2032 } },
+    ];
+    mocks.customersRetrieve.mockResolvedValue({ id: CUSTOMER_A, invoice_settings: { default_payment_method: "pm_customer_default" } });
+    mocks.listPaymentMethods.mockResolvedValue({ data: methods });
+    mocks.subscriptionsRetrieve.mockResolvedValueOnce({ id: SUBSCRIPTION_A, status: "active", default_payment_method: "pm_sub_default" });
+    expect((await call("/api/billing/payment-methods", a)).body.methods.map((m: any) => [m.id, m.isDefault]))
+      .toEqual([["pm_customer_default", false], ["pm_sub_default", true]]);
+    expect(mocks.subscriptionsRetrieve).toHaveBeenCalledWith(SUBSCRIPTION_A);
+    // An ended subscription, or one Stripe no longer has, leaves the customer-level default in charge.
+    mocks.subscriptionsRetrieve.mockResolvedValueOnce({ id: SUBSCRIPTION_A, status: "canceled", default_payment_method: "pm_sub_default" });
+    expect((await call("/api/billing/payment-methods", a)).body.methods.map((m: any) => [m.id, m.isDefault]))
+      .toEqual([["pm_customer_default", true], ["pm_sub_default", false]]);
+    mocks.subscriptionsRetrieve.mockRejectedValueOnce(Object.assign(new Error("No such subscription"), { type: "StripeInvalidRequestError", code: "resource_missing", param: "id" }));
+    expect((await call("/api/billing/payment-methods", a)).body.methods.map((m: any) => [m.id, m.isDefault]))
+      .toEqual([["pm_customer_default", true], ["pm_sub_default", false]]);
+    mocks.customersRetrieve.mockReset();
+    mocks.listPaymentMethods.mockReset();
+  });
+  it("lists nothing when Stripe has no such customer", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      mocks.customersRetrieve.mockRejectedValueOnce(missingCustomer(CUSTOMER_A, "id"));
+      mocks.listPaymentMethods.mockRejectedValueOnce(missingCustomer(CUSTOMER_A, "id"));
+      const { status, body } = await call("/api/billing/payment-methods", a);
+      expect(status).toBe(200);
+      expect(body).toEqual({ methods: [] });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally { warn.mockRestore(); }
+  });
   it("treats a deleted customer as having no methods and a Stripe failure as 502", async () => {
     mocks.customersRetrieve.mockResolvedValueOnce({ id: CUSTOMER_A, deleted: true });
     mocks.listPaymentMethods.mockResolvedValueOnce({ data: [{ id: "pm_x", type: "card", card: { brand: "visa", last4: "0000", exp_month: 1, exp_year: 2030 } }] });
@@ -287,6 +363,14 @@ describe("GET /api/billing/purchases", () => {
     const failed = await call("/api/billing/purchases", c);
     expect(failed.status).toBe(502);
     expect(failed.body).toMatchObject({ code: "provider_unavailable" });
+    // A customer id Stripe does not have: no purchases, not a broken tab.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      resetBackfillMemory();
+      mocks.sessionsList.mockRejectedValueOnce(missingCustomer(CUSTOMER_C));
+      expect((await call("/api/billing/purchases", c)).body).toEqual({ purchases: [], hasMore: false });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally { warn.mockRestore(); }
   });
   it("pages inside one account and rejects another account's cursor", async () => {
     for (let i = 0; i < 3; i++) {
@@ -307,6 +391,13 @@ describe("GET /api/billing/purchases", () => {
 });
 
 describe("ledger schema", () => {
+  it("is the foundation's DDL — same nullability, same index names — so either boot order yields one table", () => {
+    // Mirrors server/account/schema.ts (lane 1). A NOT NULL here that the webhook writer never agreed to, or
+    // a second index under another name, would make the result depend on which ensure*() ran first.
+    expect(BILLING_LEDGER_DDL.join("\n")).not.toMatch(/NOT NULL|DEFAULT now\(\)/);
+    expect(BILLING_LEDGER_DDL.filter((s) => s.startsWith("CREATE INDEX")).map((s) => s.match(/EXISTS (\w+)/)![1]))
+      .toEqual(["billing_invoices_user_idx", "billing_purchases_user_idx"]);
+  });
   it("is idempotent", async () => {
     await expect(ensureBillingLedgerSchema()).resolves.toBeUndefined();
     const { rows } = await pool.query(`SELECT table_name, column_name FROM information_schema.columns
