@@ -6,9 +6,11 @@ import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections";
 import type { SettingsSectionId } from "./types";
 
 /**
- * The settings navigation: a grouped left rail ("Me" / "Workspace") from md
+ * The settings navigation: a grouped left rail ("Me" / "Workspace") from lg
  * up, and below that a single menu button that opens the same groups in a
- * sheet, so a phone shows the section content instead of a wall of tabs.
+ * sheet, so a phone or a tablet shows the section content instead of a wall
+ * of tabs. The app's own sidebar (14.5rem) is open at md, which leaves a
+ * 768–1023px screen under 300px for the section if this rail is open too.
  */
 export function SettingsNav({ active, onSelect }: { active: SettingsSectionId; onSelect: (id: SettingsSectionId) => void }) {
   const current = SETTINGS_SECTIONS.find((s) => s.id === active) ?? SETTINGS_SECTIONS[0];
@@ -18,7 +20,7 @@ export function SettingsNav({ active, onSelect }: { active: SettingsSectionId; o
 
   return (
     <>
-      <nav aria-label="Settings sections" className="hidden md:block w-56 shrink-0" data-testid="nav-settings">
+      <nav aria-label="Settings sections" className="hidden lg:block w-56 shrink-0" data-testid="nav-settings">
         {groups.map((g) => (
           <div key={g.id} className="mb-5" data-testid={`nav-settings-group-${g.id}`}>
             <h3 className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</h3>
@@ -46,7 +48,7 @@ export function SettingsNav({ active, onSelect }: { active: SettingsSectionId; o
         ))}
       </nav>
 
-      <div className="md:hidden">
+      <div className="lg:hidden">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" className="w-full justify-between h-11" aria-label={`Settings section: ${current.label}. Open menu`} data-testid="button-settings-menu">

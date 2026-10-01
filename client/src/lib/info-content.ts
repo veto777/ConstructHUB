@@ -695,7 +695,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "account-integrations": {
     title: "Integrations",
     body: [
-      "Every outside service connected to this account in one list — Google Business Profile, Cloudflare, Search Console, Google Ads, Gmail for mail alerts, your domain registrar, HOVER and Stripe — with whether each is connected, needs reconnecting, or was never set up.",
+      "Every outside service connected to this account in one list — Google Business Profile, Google Ads, Cloudflare, Search Console, social-media publishing, your domain registrars and Gmail alert forwarding — with whether each is connected, needs reconnecting, or was never set up. CRM connections (HOVER, Stripe payments) are managed under the CRM's own Integrations and Payments pages.",
       "This page shows status and points you to where each connection is managed; it never holds the credentials itself.",
       "Example: ranking reports stop updating. Integrations shows Google Business Profile as \"Reconnect needed\" — Google expired the token — and one click takes you to the page that fixes it.",
     ],

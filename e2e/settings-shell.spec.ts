@@ -49,6 +49,8 @@ const PRO_WITH_API = { ...PRO_ENTITLEMENTS, allowances: { ...PLANS.pro.limits, a
 const ACTIVITY = [
   { id: 1, kind: "auth.login_success", detail: { method: "password" }, ip: "203.0.113.5", user_agent: "Mozilla/5.0 (Windows NT 10.0) Chrome/128.0", created_at: "2026-09-29T14:14:00Z" },
   { id: 2, kind: "security.device_revoked", detail: null, ip: "203.0.113.5", user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/605.1", created_at: "2026-09-28T09:00:00Z" },
+  // A failed attempt carries whatever the other side sent: a user agent that is a spreadsheet formula must export as text.
+  { id: 5, kind: "auth.login_failure", detail: { email: "=HYPERLINK(\"https://example.invalid\",\"open\")" }, ip: "198.51.100.77", user_agent: "=cmd|' /C calc'!A0", created_at: "2026-09-27T09:00:00Z" },
   { id: 3, kind: "google.connected", detail: { email: "fixture@example.invalid" }, ip: null, user_agent: null, created_at: "2026-09-20T09:00:00Z" },
   { id: 4, kind: "sitescan.started", detail: null, ip: "198.51.100.9", user_agent: "curl/8.0", created_at: "2026-09-10T09:00:00Z" },
 ];
@@ -239,8 +241,8 @@ test.describe("settings shell — desktop", () => {
     await expect(rows.first().getByTestId("text-audit-event")).toHaveText("Signed in with password");
     await expect(rows.first()).toContainText("203.0.113.5");
     await expect(rows.first()).toContainText("Chrome · Windows");
-    await expect(rows.nth(2)).toContainText("fixture@example.invalid");
-    await expect(rows.nth(2)).toContainText("Unavailable");
+    await expect(rows.nth(3)).toContainText("fixture@example.invalid");
+    await expect(rows.nth(3)).toContainText("Unavailable");
     await expect(page.getByTestId("text-audit-count")).toContainText(`${ACTIVITY.length} of ${ACTIVITY.length} events`);
 
     await page.getByTestId("select-audit-area").selectOption("security");
@@ -256,13 +258,17 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("button-audit-export")).toBeDisabled();
     await page.getByTestId("input-audit-search").fill("");
     await page.getByTestId("input-audit-since").fill("2026-09-25");
-    await expect(rows).toHaveCount(2);
+    await expect(rows).toHaveCount(3);
 
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByTestId("button-audit-export").click()]);
     expect(download.suggestedFilename()).toMatch(/^constructhub-audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
     const csv = fs.readFileSync(await download.path(), "utf8");
-    expect(csv.split("\n")).toHaveLength(3);
+    expect(csv.split("\n")).toHaveLength(4);
     expect(csv).toContain("Signed in with password,auth.login_success,Sign-in,203.0.113.5");
+    // Formula-shaped values are exported as text, never as something a spreadsheet would run.
+    expect(csv).toContain(`"'=cmd|' /C calc'!A0"`);
+    expect(csv).toContain(`"'=HYPERLINK(""https://example.invalid"",""open"")"`);
+    for (const line of csv.split("\n").slice(1)) for (const cell of line.split(",")) expect(cell, line).not.toMatch(/^[=+\-@]/);
   });
 
   test("Integrations: the status list with manage links, and an honest fallback when the service isn't there", async ({ page }) => {
@@ -300,6 +306,28 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("card-api-keys-unavailable")).toContainText("AI features");
     await page.getByTestId("button-settings-tab-api-usage").click();
     await expect(page.getByTestId("card-api-usage-unavailable")).toBeVisible();
+  });
+});
+
+test.describe("settings shell — tablet 820", () => {
+  // The app sidebar is open at this width, so the section has to fit beside it without the settings rail.
+  test.use({ viewport: { width: 820, height: 1180 } });
+
+  test("the rail gives way to the menu and no section scrolls sideways beside the app sidebar", async ({ page }) => {
+    await mockAccount(page);
+    await gotoCrm(page, "/settings?tab=audit-log");
+    await expect(page.getByTestId("nav-settings")).toBeHidden();
+    await expect(page.getByTestId("button-settings-menu")).toContainText("Audit log");
+    await expect(page.getByTestId("row-audit-event").first()).toBeVisible();
+    await expectNoSideScroll(page, "text-audit-count");
+    await shot(page, "820-audit-log");
+    for (const [id, anchor] of [["limits", "text-limits-plan"], ["billing", "card-current-plan"], ["account", "card-profile"]] as const) {
+      await page.getByTestId("button-settings-menu").click();
+      await page.getByTestId(`button-settings-menu-${id}`).click();
+      await expect(page.getByTestId(anchor)).toBeVisible();
+      await expectNoSideScroll(page, anchor);
+      await shot(page, `820-${id}`);
+    }
   });
 });
 

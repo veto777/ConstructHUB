@@ -13,8 +13,9 @@ import type { SettingsSectionId, SettingsUser } from "./settings/types";
  * security, Notifications) and Workspace (Billing, Limits & usage, API keys,
  * API usage, Audit log, Integrations) — with the open section in ?tab= so a
  * reload or a shared link reopens it. Old tab names keep working
- * (settings/sections.tsx resolveSettingsTab). Below md the nav collapses into
- * a menu button. Each section is a panel from the registry in sections.tsx.
+ * (settings/sections.tsx resolveSettingsTab). Below lg the nav collapses into
+ * a menu button (the app sidebar already takes a tablet's left edge). Each
+ * section is a panel from the registry in sections.tsx.
  */
 
 export type { SettingsSectionId, SettingsSectionProps, SettingsUser } from "./settings/types";
@@ -83,7 +84,7 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-5 md:gap-8">
+        <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
           <SettingsNav active={section} onSelect={(id) => go(id)} />
 
           <div className="flex-1 min-w-0" data-testid={`settings-section-${section}`}>

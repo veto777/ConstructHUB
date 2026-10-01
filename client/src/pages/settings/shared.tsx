@@ -48,13 +48,16 @@ export function LoadingCard({ label = "Loading…" }: { label?: string }) {
 
 /**
  * Reads a JSON endpoint that may not exist on this server yet. A 404, or the
- * SPA's HTML fallback for an unknown /api path, resolves to `null`
- * ("unavailable") instead of throwing, so a panel can say so honestly.
+ * SPA's HTML fallback (a 2xx page for an unknown /api path), resolves to
+ * `null` ("unavailable") instead of throwing, so a panel can say so honestly.
+ * Any other failure — a 401, a 5xx, the tunnel's HTML error page while the
+ * server restarts — is still an error, so an outage never reads as "this
+ * feature isn't installed".
  */
 export async function fetchOptional<T>(url: string): Promise<T | null> {
   const res = await fetch(url, { credentials: "include", cache: "no-store" });
   const type = res.headers.get("content-type") ?? "";
-  if (res.status === 404 || !type.includes("application/json")) return null;
+  if (res.status === 404 || (res.ok && !type.includes("application/json"))) return null;
   if (!res.ok) throw new Error(`${res.status}: ${(await res.text()) || res.statusText}`);
   return (await res.json()) as T;
 }

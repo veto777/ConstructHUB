@@ -43,9 +43,17 @@ function deviceSummary(ua: string | null | undefined): string {
   return parts.length ? parts.join(" · ") : ua.length > 48 ? `${ua.slice(0, 48)}…` : ua;
 }
 
+/**
+ * One CSV cell. Quotes what needs quoting, and neutralises a value that a
+ * spreadsheet would run as a formula (=, +, -, @, tab, CR): the user agent of
+ * a failed sign-in attempt and the e-mail in its detail are whatever the
+ * other side sent, so they are never trusted to open as code in Excel.
+ */
 const csvCell = (v: unknown) => {
-  const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  let s = v == null ? "" : String(v);
+  const escaped = /^[=+\-@\t\r]/.test(s);
+  if (escaped) s = `'${s}`;
+  return escaped || /[",\n\r\t]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
 export function AuditLogSection(_props: SettingsSectionProps) {
@@ -152,7 +160,8 @@ export function AuditLogSection(_props: SettingsSectionProps) {
 
       <Card>
         <CardContent className="p-0">
-          <div className="hidden md:grid grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] gap-3 px-4 py-2 border-b text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {/* The four-column table needs ~34rem; below xl (app sidebar + this page's padding) a row stacks its fields instead. */}
+          <div className="hidden xl:grid grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] gap-3 px-4 py-2 border-b text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             <span>Time</span><span>Event</span><span>IP</span><span>Device</span>
           </div>
           {rows.length > 0 && shown.length === 0 && (
@@ -165,14 +174,14 @@ export function AuditLogSection(_props: SettingsSectionProps) {
             {shown.map((r) => {
               const email = (r.detail as any)?.email as string | undefined;
               return (
-                <li key={r.id} className="grid gap-1 md:grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] md:gap-3 px-4 py-3 border-b last:border-b-0 text-sm break-words" data-testid="row-audit-event">
-                  <time className="text-muted-foreground tabular-nums md:text-foreground" dateTime={r.created_at}>{formatDateTime(r.created_at)}</time>
+                <li key={r.id} className="grid gap-1 xl:grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] xl:gap-3 px-4 py-3 border-b last:border-b-0 text-sm break-words" data-testid="row-audit-event">
+                  <time className="text-muted-foreground tabular-nums xl:text-foreground" dateTime={r.created_at}>{formatDateTime(r.created_at)}</time>
                   <div className="min-w-0">
                     <p className="font-medium" title={r.kind} data-testid="text-audit-event">{activityLabel(r.kind, r.detail)}</p>
                     <p className="text-xs text-muted-foreground">{areaLabel(areaOf(r.kind))}{email ? ` · ${email}` : ""}</p>
                   </div>
-                  <p className="text-xs md:text-sm text-muted-foreground font-mono"><span className="md:hidden">IP: </span>{r.ip || "Unavailable"}</p>
-                  <p className="text-xs md:text-sm text-muted-foreground" title={r.user_agent || undefined}><span className="md:hidden">Device: </span>{deviceSummary(r.user_agent)}</p>
+                  <p className="text-xs xl:text-sm text-muted-foreground font-mono"><span className="xl:hidden">IP: </span>{r.ip || "Unavailable"}</p>
+                  <p className="text-xs xl:text-sm text-muted-foreground" title={r.user_agent || undefined}><span className="xl:hidden">Device: </span>{deviceSummary(r.user_agent)}</p>
                 </li>
               );
             })}
