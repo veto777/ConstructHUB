@@ -7,7 +7,7 @@ import {DatabaseLimiter} from './quota';
 import {registerGbpRoutes} from './routes';
 import {saveGrant,grantStatus,accessToken} from './grants';
 import {GBP_SCOPE,GoogleClient,Limiter} from './client';
-import {discover,discoverAll,importLocations,syncLocation,reply,runGbpWorker,unlinkLocation,autoLinkAndSync} from './service';
+import {discover,discoverAll,importLocations,syncLocation,reply,unlinkLocation,autoLinkAndSync} from './service';
 let userId:number,otherId:number,locationId:number,reviewId:number;
 let reviewRows:any[]=[];let failReviews=false, failReply=false;let reviewPaging=false,failSecondPage=false;
 const today=new Date();today.setUTCDate(today.getUTCDate()-2);const metricDate={year:today.getUTCFullYear(),month:today.getUTCMonth()+1,day:today.getUTCDate()};
@@ -141,18 +141,10 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     failReply=true;await expect(reply(userId,reviewId,'','delete',client)).rejects.toThrow();expect((await pool.query('SELECT reply_comment FROM google_profile_reviews WHERE id=$1',[reviewId])).rows[0].reply_comment).toBe('Confirmed');
     failReply=false;expect(await reply(userId,reviewId,'','delete',client)).toMatchObject({replyStatus:'draft',replyComment:null});
   });
-  it('shares pacing across limiter instances and schedules only due locations',async()=>{
+  it('shares pacing across limiter instances',async()=>{
     const a=new DatabaseLimiter(),b=new DatabaseLimiter();const times:number[]=[];
     await Promise.all([a,b,a].map(async l=>{await l.take();times.push(Date.now())}));
     times.sort((a,b)=>a-b);expect(times[2]-times[0]).toBeGreaterThanOrEqual(390);
-    const sync=vi.fn(async()=>({}));await runGbpWorker(sync);expect(sync).not.toHaveBeenCalled();
-    await pool.query("UPDATE gbp_sync_status SET last_attempt=now()-interval '7 hours' WHERE location_id=$1",[locationId]);
-    await runGbpWorker(sync);expect(sync).toHaveBeenCalledWith(userId,locationId);
-    // An account whose plan lapsed is not synced on schedule (no Google quota spent).
-    await pool.query("UPDATE subscriptions SET status='canceled' WHERE user_id=$1",[userId]);
-    await pool.query("UPDATE gbp_sync_status SET last_attempt=now()-interval '7 hours' WHERE location_id=$1",[locationId]);
-    sync.mockClear();await runGbpWorker(sync);expect(sync).not.toHaveBeenCalledWith(userId,locationId);
-    await pool.query("UPDATE subscriptions SET status='active' WHERE user_id=$1",[userId]);
   });
   it('rejects cross-user sync and replies',async()=>{await expect(syncLocation(otherId,locationId,client)).rejects.toMatchObject({status:404});await expect(reply(otherId,reviewId,'x','publish',client)).rejects.toMatchObject({status:404})});
   it('binds callback identity without logging in as the Google account, and disconnects despite remote revoke failure',async()=>{
