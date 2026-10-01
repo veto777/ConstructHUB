@@ -40,7 +40,7 @@ const positiveInt = (raw: unknown): number | null => {
 };
 
 /** invoice.paid / invoice.payment_failed / invoice.finalized → upsert the row, emit the same-named event. */
-export async function syncInvoiceEvent(event: Stripe.Event): Promise<{ userId: number; invoice: BillingInvoiceRow } | null> {
+export async function syncInvoiceEvent(event: Stripe.Event): Promise<{ userId: number; invoice: BillingInvoiceRow; applied: boolean } | null> {
   if (!INVOICE_EVENT_TYPES.has(event.type) || isConnectEvent(event)) return null;
   const inv = event.data.object as Stripe.Invoice;
   const userId = await resolveInvoiceUserId(inv);
@@ -54,7 +54,7 @@ export async function syncInvoiceEvent(event: Stripe.Event): Promise<{ userId: n
     // void, so this open snapshot is history. Nobody is told the invoice is
     // "due" or "failed" after it was paid.
     console.warn(`[billing] ${event.type} for ${inv.id} arrived after the invoice settled — ledger kept, no notice emitted.`);
-    return { userId, invoice };
+    return { userId, invoice, applied: false };
   }
   if (event.type === "invoice.payment_failed") {
     void billingEvents.emit("invoice.payment_failed", {
@@ -65,7 +65,7 @@ export async function syncInvoiceEvent(event: Stripe.Event): Promise<{ userId: n
   } else {
     void billingEvents.emit(event.type as "invoice.paid" | "invoice.finalized", { userId, invoice, stripeInvoice: inv });
   }
-  return { userId, invoice };
+  return { userId, invoice, applied: true };
 }
 
 /** customer.subscription.trial_will_end → subscription.trial_will_end (3 days before the trial converts). */

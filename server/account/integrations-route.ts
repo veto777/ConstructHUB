@@ -58,7 +58,7 @@ const googleBusiness: Builder = async (userId) => {
 
 const googleAds: Builder = async (userId, modules) => {
   const [grant] = await rowsOf<{ manager_id: string; reconnect_required: boolean; verified: boolean }>("SELECT manager_id, reconnect_required, verified FROM ads_grants WHERE user_id=$1", [userId]);
-  const item = { id: "google_ads", service: "Google Ads manager", manageHref: "/google-ads" };
+  const item = { id: "google_ads", service: "Google Ads manager", manageHref: "/ads-manager" };
   if (!grant) return { ...item, status: "not_connected", detail: modules.adsManager ? "No Google Ads manager account connected." : includedWith("adsManager") };
   if (grant.reconnect_required) return { ...item, status: "reconnect", detail: `Manager account ${grant.manager_id} needs to be reconnected.` };
   const [{ c }] = await rowsOf<{ c: number }>("SELECT count(*)::int c FROM ads_accounts WHERE user_id=$1 AND NOT manager", [userId]).then((r) => (r.length ? r : [{ c: 0 }]));
