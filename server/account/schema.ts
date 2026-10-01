@@ -85,6 +85,14 @@ export const ACCOUNT_SCHEMA_DDL: readonly string[] = [
      PRIMARY KEY (key_id, day)
    )`,
   `CREATE INDEX IF NOT EXISTS account_api_usage_user_idx ON account_api_usage(user_id, day)`,
+  // A table created from the bare contract shape (no defaults) converges on
+  // the same defaults; SET DEFAULT is idempotent and touches no row.
+  `ALTER TABLE billing_events ALTER COLUMN received_at SET DEFAULT now()`,
+  `ALTER TABLE email_log ALTER COLUMN sent_at SET DEFAULT now()`,
+  `ALTER TABLE account_api_keys ALTER COLUMN created_at SET DEFAULT now()`,
+  `ALTER TABLE account_api_keys ALTER COLUMN scopes SET DEFAULT '{read}'`,
+  `ALTER TABLE account_api_usage ALTER COLUMN units SET DEFAULT 0`,
+  `ALTER TABLE account_api_usage ALTER COLUMN requests SET DEFAULT 0`,
 ];
 
 export const ACCOUNT_TABLES: readonly string[] = [
