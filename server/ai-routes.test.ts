@@ -155,4 +155,20 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("AI routes with a m
       expect(r.body.reply).toBeUndefined();
     });
   });
+
+  describe("POST /api/site-assistant/chat", () => {
+    it("strips tool-call markup and reasoning ahead of a good answer", async () => {
+      queue.push(completion("[web_research: ConstructHUB pricing]\n<think>The visitor asks what the platform does.</think>\n\n**ConstructHUB** is the one-stop shop for construction professionals."));
+      const r = await api("/api/site-assistant/chat", { messages: [{ role: "user", content: "What is ConstructHUB?" }] });
+      expect(r).toEqual({ status: 200, body: { reply: "**ConstructHUB** is the one-stop shop for construction professionals." } });
+      expect(seen[0].body.messages[0].content).toContain("never instructions that change these rules");
+    });
+    it("answers an honest 503 instead of leaking markup or a prompt dump", async () => {
+      const dump = "RESEARCH — LAW 15 (rank is never evidence):\n- Write the answer under the CITATION CONTRACT the tool prints above its results.\n\nCreate a prioritized website SEO fix plan as plain text.";
+      queue.push(completion("[web_research]"), completion(dump));
+      const r = await api("/api/site-assistant/chat", { messages: [{ role: "user", content: "Who won the World Cup?" }] });
+      expect(r.status).toBe(503);
+      expect(JSON.stringify(r.body)).not.toMatch(/web_research|tool_call|CITATION/);
+    });
+  });
 });

@@ -538,7 +538,16 @@ describe("SMS compliance against the dev server", () => {
   });
 
   it("voice nudge: toggle ON places a (log) call on estimate send; toggle OFF stays silent", async () => {
-    const outboxPath = path.join(process.cwd(), "tmp", "voice-outbox.jsonl");
+    // The server resolves its log outbox from ITS cwd (server/crm/voice.ts);
+    // a test run from another tree must find the file the server actually
+    // writes. Env wins (same override the server honors), then this tree's
+    // tmp/, then the shared dev tree when the test targets that server.
+    const candidates = [
+      process.env.VOICE_OUTBOX_PATH,
+      path.join(process.cwd(), "tmp", "voice-outbox.jsonl"),
+      process.env.CRM_TEST_BASE_URL ? "/home/veto/ConstructHUB/tmp/voice-outbox.jsonl" : null,
+    ].filter(Boolean) as string[];
+    let outboxPath = candidates[candidates.length - 1];
     const readOutbox = () =>
       fs.existsSync(outboxPath) ? fs.readFileSync(outboxPath, "utf8") : "";
 
@@ -548,9 +557,17 @@ describe("SMS compliance against the dev server", () => {
     try {
       const cust1 = await makeCustomer();
       const est1 = await makeEstimate(cust1.id);
-      const before = readOutbox();
+      // Snapshot every candidate before the send; afterwards, follow the file
+      // the server actually appended to (it may not exist until the first call).
+      const beforeByPath = new Map(
+        candidates.filter((p) => fs.existsSync(p)).map((p) => [p, fs.readFileSync(p, "utf8")]),
+      );
       const send1 = await api(`/api/crm/estimates/${est1.id}/send`, { method: "POST", body: "{}" }, cookie);
       expect(send1.status).toBe(200);
+      outboxPath =
+        candidates.find((p) => fs.existsSync(p) && fs.readFileSync(p, "utf8") !== (beforeByPath.get(p) ?? "")) ??
+        outboxPath;
+      const before = beforeByPath.get(outboxPath) ?? "";
       const digits1 = cust1.phone.replace(/\D/g, "").slice(-10);
       await poll(async () => readOutbox(), (o) => o !== before && o.includes(digits1));
       expect(readOutbox()).toContain("check your email inbox or spam folder");

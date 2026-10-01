@@ -130,6 +130,12 @@ describe('Queued Google syncs need an active plan', () => {
     const queued = async (user: number) => (await pool.query("SELECT count(*)::int n FROM agency_jobs WHERE user_id=$1 AND action='sync'", [user])).rows[0].n;
     expect(await queued(paid)).toBe(1);
     expect(await queued(lapsed)).toBe(0);
+    // A location attempted within the 6-hour cadence is not enqueued again.
+    const paidLoc = (await pool.query('SELECT id FROM business_locations WHERE user_id=$1', [paid])).rows[0].id;
+    await pool.query("INSERT INTO gbp_sync_status(location_id,kind,last_attempt) VALUES($1,'profile',now()) ON CONFLICT(location_id,kind) DO UPDATE SET last_attempt=now()", [paidLoc]);
+    await pool.query("DELETE FROM agency_jobs WHERE user_id=$1", [paid]);
+    await scheduleSyncs(paid);
+    expect(await queued(paid)).toBe(0);
     // A sync queued another way (onboarding, a re-link) is not run for the owner without a plan.
     const loc = (await pool.query('SELECT id FROM business_locations WHERE user_id=$1', [lapsed])).rows[0].id;
     const job = randomUUID();
@@ -139,7 +145,7 @@ describe('Queued Google syncs need an active plan', () => {
     expect(ran).not.toContain(job);
     expect((await pool.query('SELECT status,error FROM agency_jobs WHERE id=$1', [job])).rows[0]).toEqual({ status: 'failed', error: gbpSyncPaused });
     await runAgencyJobs(async (j: any) => { ran.push(j.id); return {}; }, 5, paid);
-    expect(ran).toHaveLength(1);
+    expect(ran).toHaveLength(0); // paid's only job was the due-cadence probe, never queued
   });
 });
 

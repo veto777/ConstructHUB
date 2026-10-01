@@ -594,6 +594,61 @@ it("rotates bearer shares and enforces share and email verification expiry", asy
   const value = mailObject.text.match(/verify=([a-f0-9]{64})/)[1];
   expect((await call("post", "/api/sitescan/public/verify", { body: { token: value }, user: null })).status).toBe(404);
 });
+it("gives back the monthly Site Scan when a scan start fails", async () => {
+  await pool.query("DELETE FROM growth_budgets WHERE key IN ('sitescan:scan:1','sitescan:bulk:1')");
+  const monthly = quotaKey(1, "siteScans");
+  const usedBefore = async () =>
+    Number(
+      (
+        await pool.query(
+          "SELECT used FROM growth_budgets WHERE key=$1 AND period='0'",
+          [monthly],
+        )
+      ).rows[0]?.used ?? 0,
+    );
+  // Guarantee room in the allowance; the dev account's real count goes back afterwards.
+  const setUsed = (n: number) =>
+    pool.query(
+      "INSERT INTO growth_budgets(key,period,used) VALUES($1,'0',$2) ON CONFLICT(key,period) DO UPDATE SET used=$2",
+      [monthly, n],
+    );
+  const before = await usedBefore();
+  try {
+    await setUsed(0);
+    // A queue-insert failure (provider/DB outage at start): the monthly unit just
+    // reserved must come back, and no job row may exist.
+    const worker = await import("./worker");
+    const spy = vi
+      .spyOn(worker, "enqueue")
+      .mockRejectedValueOnce(new Error("enqueue outage fixture"));
+    try {
+      await expect(
+        call("post", "/api/sitescan", {
+          body: { url: "https://sitescan-refund-start.test/" },
+        }),
+      ).rejects.toThrow("enqueue outage fixture");
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await usedBefore()).toBe(0);
+    expect(
+      (
+        await pool.query(
+          "SELECT 1 FROM sitescan_jobs WHERE url='https://sitescan-refund-start.test/'",
+        )
+      ).rowCount,
+    ).toBe(0);
+    // The bulk route refunds the same way when the selected locations are not
+    // all owned and synced (the reservation precedes that validation).
+    const bulk = await call("post", "/api/sitescan/bulk", {
+      body: { locationIds: [2147483647], pageCap: 10, psiPages: 0 },
+    });
+    expect(bulk.status).toBe(400);
+    expect(await usedBefore()).toBe(0);
+  } finally {
+    await setUsed(before);
+  }
+});
 it("enforces account scan and draft quotas before provider calls", async () => {
   await pool.query("DELETE FROM growth_budgets WHERE key IN ('sitescan:scan:1','sitescan:ai:1')");
   const { takeBudget } = await import("../growth-limits");

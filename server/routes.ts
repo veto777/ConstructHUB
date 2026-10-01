@@ -342,7 +342,6 @@ export async function registerRoutes(
   startSiteScanWorker();
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
-  const { startGbpWorker } = await import("./gbp/service");
   const { startAgencyWorker } = await import("./agency/jobs");
   const { startOnboardingWorker } = await import("./agency/onboarding");
   startAgencyWorker();

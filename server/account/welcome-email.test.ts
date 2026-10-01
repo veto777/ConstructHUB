@@ -2,7 +2,8 @@
  * Welcome email on the real sign-up path, against the running dev server:
  * POST /api/auth/signup → the verification link from the database →
  * GET /api/auth/verify-email → exactly one welcome email in the mail sink
- * (tmp/email-outbox.jsonl; EMAIL_FORCE_SINK=1 on the dev server) and one
+ * (the target server's tmp/email-outbox.jsonl; EMAIL_FORCE_SINK=1 on the dev
+ * server — point EMAIL_OUTBOX_FILE at it when it runs from another checkout) and one
  * email_log claim. A second welcome for the same account is refused.
  *
  *   DATABASE_URL=… EMAIL_FORCE_SINK=1 PORT=8333 npx tsx server/index.ts
@@ -18,7 +19,9 @@ import { pool as appPool } from "../db";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
 const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
-const OUTBOX = path.join(process.cwd(), "tmp", "email-outbox.jsonl");
+// The sink file the TARGET server writes (EMAIL_FORCE_SINK=1) — its own cwd's
+// tmp/, which need not be this checkout (a shared dev server runs elsewhere).
+const OUTBOX = process.env.EMAIL_OUTBOX_FILE ?? path.join(process.cwd(), "tmp", "email-outbox.jsonl");
 
 const pool = new pg.Pool({ connectionString: DATABASE_URL });
 const email = `welcome-${randomUUID()}@example.invalid`;
