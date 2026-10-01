@@ -35,7 +35,8 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   extra-location quantity syncs daily (production only; yearly subs invoice immediately).
 - **AI = TruthCoder** (owner's decision): live `.env` has `AI_INTEGRATIONS_OPENAI_BASE_URL=http://127.0.0.1:8250/api`
   (truthcoder-webui on the same host, bypasses Cloudflare's 100 s cap), `AI_MODEL=truthcode:38`,
-  `AI_VISION_MODEL=huihui_ai/qwen3-vl-abliterated:8b`, `AI_TIMEOUT_MS=180000`, and the owner's TruthCoder API key.
+  `AI_VISION_MODEL=huihui_ai/qwen3-vl-abliterated:8b`, `AI_TIMEOUT_MS=180000`, and the named TruthCoder key **"ConstructHUB"**
+  (scoped to truthcode:38 + the vision model; issued by the owner 2026-10-01; rotating his personal key no longer affects it).
   Keys are managed at https://truthcoder.com/api-keys (named, revocable; built by Kimi in the TruthCoder project).
   This is an owner-approved cross-project coupling — record it in `~/HUB/registry.json → known_tower_couplings`.
 
