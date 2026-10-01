@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { primaryKey, pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, numeric } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, numeric, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2426,3 +2426,77 @@ export const reviewReferralSettings = pgTable("review_referral_settings", {
   enabled: boolean("enabled").notNull().default(false),
   offer: text("offer").notNull().default(""),
 });
+
+// ── Account: billing records, transactional-email log, public API keys ──────
+// Created idempotently by server/account/schema.ts (boot + the migration
+// script); the drizzle definitions let other modules read and write them.
+export const billingEvents = pgTable("billing_events", {
+  stripeEventId: text("stripe_event_id").primaryKey(),
+  type: text("type"),
+  userId: integer("user_id"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const billingInvoices = pgTable("billing_invoices", {
+  /** Stripe invoice id (in_…). */
+  id: text("id").primaryKey(),
+  userId: integer("user_id"),
+  number: text("number"),
+  status: text("status"),
+  amountPaid: integer("amount_paid"),
+  amountDue: integer("amount_due"),
+  currency: text("currency"),
+  periodStart: timestamp("period_start", { withTimezone: true }),
+  periodEnd: timestamp("period_end", { withTimezone: true }),
+  description: text("description"),
+  hostedInvoiceUrl: text("hosted_invoice_url"),
+  invoicePdf: text("invoice_pdf"),
+  created: timestamp("created", { withTimezone: true }),
+});
+export const billingPurchases = pgTable("billing_purchases", {
+  /** Stripe payment intent (pi_…) or checkout session (cs_…) id. */
+  id: text("id").primaryKey(),
+  userId: integer("user_id"),
+  /** course | service | reinstatement | other */
+  kind: text("kind"),
+  description: text("description"),
+  amount: integer("amount"),
+  currency: text("currency"),
+  created: timestamp("created", { withTimezone: true }),
+  receiptUrl: text("receipt_url"),
+});
+export const emailLog = pgTable("email_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id"),
+  kind: text("kind"),
+  dedupeKey: text("dedupe_key").unique(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const accountApiKeys = pgTable("account_api_keys", {
+  /** key_<random> */
+  id: text("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  /** The visible part of the token (chub_<prefix>_…); the secret is never stored. */
+  prefix: text("prefix").notNull(),
+  /** Last characters of the secret, for "…wxyz" display only. */
+  suffix: text("suffix").notNull(),
+  secretHash: text("secret_hash").notNull(),
+  /** read | write */
+  scopes: text("scopes").array().notNull(),
+  /** Optional per-key cap below the plan's monthly units. */
+  monthlyUnitLimit: integer("monthly_unit_limit"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const accountApiUsage = pgTable("account_api_usage", {
+  keyId: text("key_id").notNull(),
+  userId: integer("user_id").notNull(),
+  day: date("day").notNull(),
+  units: integer("units").notNull().default(0),
+  requests: integer("requests").notNull().default(0),
+}, t => [primaryKey({ columns: [t.keyId, t.day] })]);
+export type BillingInvoice = typeof billingInvoices.$inferSelect;
+export type BillingPurchase = typeof billingPurchases.$inferSelect;
+export type AccountApiKey = typeof accountApiKeys.$inferSelect;
