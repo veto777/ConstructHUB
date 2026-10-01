@@ -16,7 +16,8 @@ import { escapeHtml, oneLine, firstZodMessage, visitorIp, edgeGeo, normalizeBloc
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { reviewDraftPrompt } from "./review-draft";
+import { photoDescription, reviewResponse, reviewFunnelDraft } from "./ai-features";
+import { AiAnswerError, aiErrorTag } from "./ai-output";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
 import { randomUUID } from "crypto";
 import { isIP } from "net";
@@ -24,7 +25,6 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import archiver from "archiver";
-import OpenAI from "openai";
 import { z } from "zod";
 import { processPhoto, generateFileName, analyzePhoto } from "./photo-processor";
 import { registerStripeRoutes } from "./stripe";
@@ -41,7 +41,6 @@ import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed } from "./crm/admin";
-import { aiModel } from "./ai-config";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -77,11 +76,6 @@ async function resolveReviewLink(input: unknown): Promise<string | null> {
   if (!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = `https://${v}`;
   return googleReviewLink(await resolveGoogleUrl(v));
 }
-
-const photoOpenai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
 
 const uploadDir = path.join(process.cwd(), "tmp", "photo-uploads");
 const processedDir = path.join(process.cwd(), "tmp", "photo-processed");
@@ -1255,24 +1249,14 @@ export async function registerRoutes(
       }
 
       if (useAI) {
-        const prompt = `Generate a short, SEO-optimized photo description (2-3 sentences) for a Google My Business photo. 
-Business: ${companyName}${website ? ` (${website})` : ""}
-Service: ${service}
-${keyword ? `Keyword: ${keyword}` : ""}
-${city ? `City: ${city}` : ""}
-${county ? `County/Region: ${county}` : ""}
-
-The description should naturally incorporate the service keyword and location. It should describe work being done by the contractor and be suitable for alt text and image metadata. Keep it professional and local-SEO focused. Do not use hashtags or emojis.`;
-
-        const completion = await photoOpenai.chat.completions.create({
-          model: aiModel(),
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 200,
-          temperature: 0.7,
-        });
-
-        const description = completion.choices[0]?.message?.content?.trim() || "";
-        res.json({ description });
+        // The route gets no image: the description comes from the supplied facts only,
+        // and an unusable answer (markup, reasoning, empty) is an error, never a blank 200.
+        try {
+          res.json({ description: await photoDescription({ companyName, service, keyword, city, county, website }) });
+        } catch (err) {
+          console.error("Photo description failed:", aiErrorTag(err));
+          res.status(err instanceof AiAnswerError ? 502 : 503).json({ message: "AI descriptions are unavailable right now. Try again, or turn off AI descriptions to use a template." });
+        }
       } else {
         const templates = [
           `Professional ${service.toLowerCase()} services by ${companyName}${city ? ` in ${city}` : ""}${county ? `, ${county}` : ""}. ${keyword || `Trusted ${service.toLowerCase()} contractor`} delivering quality workmanship and reliable results for residential and commercial clients.`,
@@ -2044,45 +2028,13 @@ The description should naturally incorporate the service keyword and location. I
   app.post("/api/gmb/review-response", async (req, res) => {
     try {
       const { reviewText, businessName, tone, reviewerName } = req.body;
-      if (!reviewText) return res.status(400).json({ message: "reviewText is required" });
+      if (typeof reviewText !== "string" || !reviewText.trim()) return res.status(400).json({ message: "reviewText is required" });
+      if (reviewText.length > 5000) return res.status(400).json({ message: "Reviews longer than 5,000 characters can't be answered here." });
 
-      const toneInstruction = tone === "empathetic"
-        ? "Be empathetic and apologetic while remaining professional."
-        : tone === "grateful"
-        ? "Be grateful and warm, thanking the customer enthusiastically."
-        : "Be professional, kind, and constructive.";
-
-      const response = await photoOpenai.chat.completions.create({
-        model: aiModel(),
-        messages: [
-          {
-            role: "system",
-            content: `You are a professional review response writer for a construction/contractor business called "${businessName || "our company"}". Write a response to a customer review. 
-
-Rules:
-- ${toneInstruction}
-- NEVER be rude, condescending, or aggressive — even if the review is unfair
-- Naturally include 1-2 relevant industry keywords (e.g., "quality craftsmanship", "professional service", "home improvement") for SEO
-- Keep it concise (2-4 sentences)
-- Address the reviewer by name if provided
-- If it's a negative review, acknowledge their concern, offer to resolve it offline, and invite them to contact you directly
-- If it's a positive review, thank them and mention the type of work done if apparent
-- Remember: other potential customers will read this response — always look professional`
-          },
-          {
-            role: "user",
-            content: `Customer${reviewerName ? ` "${reviewerName}"` : ""} left this review:\n\n"${reviewText}"\n\nWrite a professional response.`
-          }
-        ],
-        max_tokens: 300,
-      });
-
-      // An empty completion is a failure, not a reason to present canned text as the AI's draft.
-      const generatedResponse = response.choices[0]?.message?.content?.trim();
-      if (!generatedResponse) throw new Error("The AI returned an empty response");
-      res.json({ response: generatedResponse });
+      // Rules, delimiters and output checks live in reviewResponse (server/ai-features.ts).
+      res.json({ response: await reviewResponse({ reviewText, businessName, tone, reviewerName }) });
     } catch (err: any) {
-      console.error("Review response generation failed:", err);
+      console.error("Review response generation failed:", aiErrorTag(err));
       res.status(503).json({ message: "AI responses are unavailable right now — please try again later." });
     }
   });
@@ -5472,16 +5424,14 @@ function main() {
       if (!(await takeBudget(`review-draft:owner:${request.userId}`, 50)) || !(await takeBudget(`review-draft:request:${request.id}`, 5, 1, 86400_000))) {
         return res.status(429).json({ message: "Draft limit reached. You can still write your own review directly on Google." });
       }
-      const prompt = reviewDraftPrompt(request.companyName || "the company", request.feedbackRating, highlights.trim());
-
-      const response = await photoOpenai.chat.completions.create({
-        model: aiModel(),
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 300,
-        temperature: 0.8,
-      });
-
-      const review = response.choices[0]?.message?.content?.trim() || "";
+      let review: string;
+      try {
+        // Only the customer's own words; never the private score or work guessed from the company name.
+        review = await reviewFunnelDraft(request.companyName || "the company", request.feedbackRating, highlights.trim());
+      } catch (err) {
+        console.error("Review draft generation failed:", aiErrorTag(err));
+        return res.status(err instanceof AiAnswerError ? 502 : 503).json({ message: "AI help is unavailable right now. You can still use your own words." });
+      }
       await storage.updateReviewRequest(request.id, { reviewMethod: "ai" });
       res.json({ review });
     } catch (err: any) {

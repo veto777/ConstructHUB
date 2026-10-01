@@ -5,7 +5,7 @@
  */
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
-  TRIAL_DAYS, SALES_THRESHOLD_CENTS, MODULE_NAMES, planForModule, showsPrice,
+  TRIAL_DAYS, SALES_THRESHOLD_CENTS, MODULE_NAMES, ANNUAL_MONTHS, planForModule, showsPrice,
   type Plan, type PlanKey, type ModuleKey,
 } from "./plans";
 
@@ -80,6 +80,19 @@ export function agencyBandsLine(): string {
   return `${joinNames(parts)}; above ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations the Agency plan is quoted by a sales rep`;
 }
 
+/** The same bands billed yearly (ANNUAL_MONTHS × the monthly band price): "$150/year each for locations 11–50, …". */
+function agencyBandsAnnualLine(): string {
+  const parts: string[] = [];
+  let from = 1;
+  for (const band of AGENCY_LOCATION_BANDS) {
+    if (band.centsPerLocation > 0) {
+      parts.push(`${formatUsd(band.centsPerLocation * ANNUAL_MONTHS)}/year each for locations ${from}–${band.upTo}`);
+    }
+    from = band.upTo + 1;
+  }
+  return joinNames(parts);
+}
+
 /** "Extra location — $19/month or $190/year (Starter, Pro and Growth)". */
 export function addonLines(): string[] {
   return Object.values(ADDONS).map((addon) => {
@@ -104,11 +117,13 @@ export const TEXTING_PLANS = planNamesWhere((plan) => plan.limits.teamTextSegmen
 export function pricingKnowledge(): string {
   const plans = PLAN_KEYS.map((key) => {
     const plan = PLANS[key];
-    const agency = key === "agency" ? ` Locations above ${plan.limits.locations}: ${agencyBandsLine()}.` : "";
+    const agency = key === "agency"
+      ? ` Locations above ${plan.limits.locations}: ${agencyBandsLine()}. On yearly billing each extra location is ${ANNUAL_MONTHS} times its monthly band price: ${agencyBandsAnnualLine()}.`
+      : "";
     return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}${agency}\n  Includes: ${plan.features.join("; ")}.`;
   }).join("\n");
   return `## Plans and pricing (the ConstructHUB price book)
-There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at 10 times the monthly price.
+There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at ${ANNUAL_MONTHS} times the monthly price. The ${PLANS.agency.name} location bands and every add-on are billed the same way: monthly, or yearly at ${ANNUAL_MONTHS} times their monthly price.
 ${plans}
 
 Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}.
