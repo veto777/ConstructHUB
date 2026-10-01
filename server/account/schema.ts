@@ -9,7 +9,7 @@
  */
 export const ACCOUNT_SCHEMA_DDL: readonly string[] = [
   // Every Stripe event the platform webhook accepted, so a redelivered event
-  // is processed once (recordBillingEvent in ./email.ts).
+  // is processed once (recordBillingEvent in ./billing-events.ts).
   `CREATE TABLE IF NOT EXISTS billing_events (
      stripe_event_id text PRIMARY KEY,
      type text,

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { primaryKey, pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, numeric, date } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, bigserial, boolean, timestamp, jsonb, real, numeric, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2465,7 +2465,8 @@ export const billingPurchases = pgTable("billing_purchases", {
   receiptUrl: text("receipt_url"),
 });
 export const emailLog = pgTable("email_log", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  /** bigserial, as the contract and server/account/schema.ts create it. */
+  id: bigserial("id", { mode: "number" }).primaryKey(),
   userId: integer("user_id"),
   kind: text("kind"),
   dedupeKey: text("dedupe_key").unique(),

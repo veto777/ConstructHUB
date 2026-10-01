@@ -91,7 +91,12 @@ function installMetering(req: Request, res: Response, ctx: PublicApiContext) {
   // res.send(object) delegates to res.json, so this covers both.
   const json = res.json.bind(res);
   res.json = ((body?: unknown) => {
-    meter(body).finally(() => json(body));
+    // The real send runs after the meter row is written. A handler that sends
+    // twice would make the second send throw ("headers already sent") inside
+    // this callback: catch it here, where there is no router try/catch any more.
+    void meter(body).finally(() => {
+      try { json(body); } catch (e: any) { console.error("[public-api] send failed:", e?.message || e); }
+    });
     return res;
   }) as Response["json"];
   res.on("finish", () => { void meter(); });
