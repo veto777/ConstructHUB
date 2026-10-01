@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Receipt } from "lucide-react";
-import { formatDate, formatMoney } from "./format";
+import { formatDate, formatMoney, httpUrl } from "./format";
 import { PURCHASE_KIND_LABELS, type Purchase, type PurchasesResponse } from "./types";
 
 /**
@@ -82,10 +82,11 @@ export function PurchasesPanel() {
 
 /** `idSuffix` keeps the phone card's test id distinct from the table row's. */
 function ReceiptLink({ p, idSuffix = "" }: { p: Purchase; idSuffix?: string }) {
-  if (!p.receiptUrl) return <span className="text-xs text-muted-foreground">—</span>;
+  const url = httpUrl(p.receiptUrl);
+  if (!url) return <span className="text-xs text-muted-foreground">—</span>;
   return (
     <Button asChild variant="ghost" size="sm" className="h-8 px-2">
-      <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer" data-testid={`link-purchase-receipt${idSuffix}-${p.id}`}>
+      <a href={url} target="_blank" rel="noopener noreferrer" data-testid={`link-purchase-receipt${idSuffix}-${p.id}`}>
         <Receipt className="h-3.5 w-3.5 mr-1" aria-hidden="true" />Receipt
       </a>
     </Button>

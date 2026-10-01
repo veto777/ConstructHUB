@@ -57,11 +57,13 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling }: Subscripti
   const startedAt = subscription?.startedAt ?? subscription?.startDate ?? subscription?.currentPeriodStart ?? null;
   const periodEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
   const openEnded = !!periodEnd && periodEnd.getUTCFullYear() >= 2099;
+  // A subscription set to end at the period's close is never charged again,
+  // trial or not — so that case is read before the trial wording.
   const nextBilling = !periodEnd ? "—"
     : openEnded ? "No end date"
     : !view.viaStripe ? `Access through ${formatDate(subscription?.currentPeriodEnd)}`
-    : status === "trialing" ? `Trial ends ${formatDate(subscription?.currentPeriodEnd)} — first charge that day`
     : subscription?.cancelAtPeriodEnd === true ? `Ends ${formatDate(subscription?.currentPeriodEnd)} (won't renew)`
+    : status === "trialing" ? `Trial ends ${formatDate(subscription?.currentPeriodEnd)} — first charge that day`
     : subscription?.cancelAtPeriodEnd === false ? formatDate(subscription?.currentPeriodEnd)
     : `Current period ends ${formatDate(subscription?.currentPeriodEnd)}`;
 
@@ -90,8 +92,11 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling }: Subscripti
         .map((key) => ({ addon: ADDONS[key], qty: Math.max(0, Number(subscription?.addons?.[key] ?? 0) || 0) }))
         .filter((r) => r.qty > 0)
     : [];
+  // Add-on prices depend on the interval; when the server doesn't report one
+  // (older subscriptions) the quantities are shown without a guessed price.
+  const priced = view.interval !== null;
   const addonsTotal = addonRows.reduce((sum, r) => sum + r.qty * addonPriceCents(r.addon, interval), 0);
-  const total = planPrice !== null ? planPrice + addonsTotal : null;
+  const total = planPrice !== null && priced ? planPrice + addonsTotal : null;
 
   return (
     <Card data-testid="card-subscription">
@@ -162,9 +167,11 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling }: Subscripti
                   {addonRows.map(({ addon, qty }) => (
                     <li key={addon.key} className="flex flex-wrap justify-between gap-x-4" data-testid={`row-subscription-addon-${addon.key}`}>
                       <span>{addon.name} <span className="text-muted-foreground">× {qty}</span></span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {formatUsd(qty * addonPriceCents(addon, interval))}{intervalSuffix(interval)}
-                      </span>
+                      {priced && (
+                        <span className="tabular-nums text-muted-foreground">
+                          {formatUsd(qty * addonPriceCents(addon, interval))}{intervalSuffix(interval)}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>

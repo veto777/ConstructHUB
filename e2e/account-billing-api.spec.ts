@@ -43,7 +43,8 @@ const INVOICES_PAGE_1 = {
 };
 const INVOICES_PAGE_2 = {
   invoices: [
-    { id: "in_l9_0000", number: "CH-0000", status: "void", amountPaid: 0, amountDue: 0, currency: "usd", created: "2026-07-01T12:00:00Z", periodStart: null, periodEnd: null, description: "Voided", hostedInvoiceUrl: null, invoicePdf: null },
+    // A non-http(s) document URL must never become an href.
+    { id: "in_l9_0000", number: "CH-0000", status: "void", amountPaid: 0, amountDue: 0, currency: "usd", created: "2026-07-01T12:00:00Z", periodStart: null, periodEnd: null, description: "Voided", hostedInvoiceUrl: "javascript:alert(1)", invoicePdf: null },
   ],
   hasMore: false,
 };
@@ -183,6 +184,24 @@ test.describe("settings billing", () => {
     guards.assertClean("subscriptions");
   });
 
+  test("Subscriptions: a trial set to cancel never promises a first charge", async ({ page }) => {
+    await mockAccount(page, { sub: { ...PRO_SUB, status: "trialing", cancelAtPeriodEnd: true } });
+    await gotoCrm(page, BILLING_URL);
+    await expect(page.getByTestId("badge-subscription-status")).toHaveText("Trial");
+    await expect(page.getByTestId("text-subscription-next")).toHaveText(`Ends ${date(PRO_SUB.currentPeriodEnd)} (won't renew)`);
+    await expect(page.getByTestId("text-subscription-next")).not.toContainText("first charge");
+  });
+
+  test("Subscriptions without a reported interval: add-on quantities, but no guessed prices or total", async ({ page }) => {
+    await mockAccount(page, { sub: { ...PRO_SUB, billingInterval: null } });
+    await gotoCrm(page, BILLING_URL);
+    await expect(page.getByTestId("text-subscription-interval")).toHaveText("—");
+    await expect(page.getByTestId("text-subscription-price")).toHaveText("—");
+    await expect(page.getByTestId("row-subscription-addon-protected_site")).toContainText(`${ADDONS.protected_site.name} × 2`);
+    await expect(page.getByTestId("row-subscription-addon-protected_site")).not.toContainText("/mo");
+    await expect(page.locator('[data-testid="text-subscription-total"]')).toHaveCount(0);
+  });
+
   test("Subscriptions without a plan: no price, a way to choose one, no portal button", async ({ page }) => {
     await mockAccount(page, { sub: NO_SUB });
     await gotoCrm(page, BILLING_URL);
@@ -213,6 +232,8 @@ test.describe("settings billing", () => {
     await page.getByTestId("button-invoices-more").click();
     await expect(page.getByTestId("badge-invoice-status-in_l9_0000")).toHaveText("Void");
     await expect(page.getByTestId("text-invoice-period-in_l9_0000")).toHaveText("—");
+    await expect(page.locator('[data-testid="link-invoice-view-in_l9_0000"]')).toHaveCount(0);
+    expect(await page.locator('a[href^="javascript:"]').count()).toBe(0);
     await expect(page.locator('[data-testid="button-invoices-more"]')).toHaveCount(0);
     expect(calls.invoiceUrls).toEqual(["?limit=20", "?limit=20&starting_after=in_l9_0001"]);
     guards.assertClean("invoices");
@@ -314,6 +335,11 @@ test.describe("settings api keys", () => {
     // The list refreshed with the new key, masked.
     await expect(page.getByTestId("text-key-masked-key_new")).toHaveText("chub_n3wk3y…zz");
     expect(await page.locator("body").innerText()).not.toContain("SECRETSECRET");
+    // The next Generate starts from a blank form, not the previous key's.
+    await page.getByTestId("button-generate-key").click();
+    await expect(dialog.getByTestId("input-key-name")).toHaveValue("");
+    await expect(dialog.getByTestId("input-key-limit")).toHaveValue("");
+    await expect(dialog.getByTestId("checkbox-scope-write")).toHaveAttribute("data-state", "unchecked");
     guards.assertClean("generate key");
   });
 
@@ -340,13 +366,25 @@ test.describe("settings api keys", () => {
     await page.getByTestId("button-rename-submit").click();
     await expect.poll(() => calls.patch).toEqual([{ id: "key_a1", body: { name: "Zapier (prod)" } }]);
     await expect(page.getByTestId("text-key-name-key_a1")).toHaveText("Zapier (prod)");
+    // Another key's dialog opens with its own name, never the draft typed for the first.
+    await page.getByTestId("button-key-menu-key_b2").click();
+    await page.getByTestId("menu-key-rename").click();
+    await expect(page.getByTestId("input-rename-key")).toHaveValue("Reporting script");
+    await page.getByTestId("dialog-rename-key").getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByTestId("dialog-rename-key")).toBeHidden();
 
     await page.getByTestId("button-key-menu-key_a1").click();
     await page.getByTestId("menu-key-limit").click();
+    await expect(page.getByTestId("input-limit-key")).toHaveValue("");
     await page.getByTestId("input-limit-key").fill("750");
     await page.getByTestId("button-limit-submit").click();
     await expect.poll(() => calls.patch.at(-1)).toEqual({ id: "key_a1", body: { monthlyUnitLimit: 750 } });
     await expect(page.getByTestId("text-key-limit-key_a1")).toHaveText("750");
+    await page.getByTestId("button-key-menu-key_b2").click();
+    await page.getByTestId("menu-key-limit").click();
+    await expect(page.getByTestId("input-limit-key")).toHaveValue("2000");
+    await page.getByTestId("dialog-limit-key").getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByTestId("dialog-limit-key")).toBeHidden();
 
     await page.getByTestId("button-key-menu-key_b2").click();
     await page.getByTestId("menu-key-revoke").click();
@@ -442,6 +480,15 @@ test.describe("developers page", () => {
     await expect(page.getByTestId("text-developers-unpublished")).toContainText("isn't published on this server yet");
     await expect(page.getByTestId("card-developers-auth")).toBeVisible();
     await expect(page.getByTestId("banner-developers-no-ai")).toBeVisible();
+  });
+
+  test("a server that answers the SPA's HTML for openapi.json reads as unpublished, not as a parse error", async ({ page }) => {
+    const guards = watchPage(page);
+    await page.route("**/api/v1/openapi.json", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: "<!DOCTYPE html><html><body>app</body></html>" }));
+    await gotoCrm(page, "/developers");
+    await expect(page.getByTestId("text-developers-unpublished")).toContainText("isn't published on this server yet");
+    await expect(page.getByTestId("text-developers-unpublished")).not.toContainText("Unexpected token");
+    guards.assertClean("developers html fallback");
   });
 });
 

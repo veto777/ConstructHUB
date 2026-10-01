@@ -87,8 +87,21 @@ function planUnits(): { key: string; name: string; units: number }[] | null {
   return rows.every((r) => r !== null) ? (rows as { key: string; name: string; units: number }[]) : null;
 }
 
+/**
+ * A server without the public API answers /api/v1/openapi.json with the SPA's
+ * HTML (200) rather than JSON; that is "not published", not a parse error.
+ */
+async function fetchOpenApi(): Promise<OpenApiDoc> {
+  const res = await fetch("/api/v1/openapi.json", { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(`${res.status}: ${(await res.text()) || res.statusText}`);
+  if (!/\bjson\b/i.test(res.headers.get("content-type") ?? "")) throw new Error("404: no OpenAPI document at /api/v1/openapi.json");
+  const doc = (await res.json()) as OpenApiDoc;
+  if (!doc || typeof doc !== "object" || !doc.paths) throw new Error("404: no OpenAPI document at /api/v1/openapi.json");
+  return doc;
+}
+
 export default function DevelopersPage() {
-  const { data: doc, isLoading, error } = useQuery<OpenApiDoc>({ queryKey: ["/api/v1/openapi.json"] });
+  const { data: doc, isLoading, error } = useQuery<OpenApiDoc>({ queryKey: ["/api/v1/openapi.json"], queryFn: fetchOpenApi });
   const endpoints = useMemo(() => flatten(doc), [doc]);
   const tags = useMemo(() => {
     const order = (doc?.tags ?? []).map((t) => t.name);

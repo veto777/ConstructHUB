@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { ExternalLink, FileDown, Loader2 } from "lucide-react";
-import { formatDate, formatMoney, formatPeriod, getJson } from "./format";
+import { formatDate, formatMoney, formatPeriod, getJson, httpUrl } from "./format";
 import { INVOICE_STATUS_LABELS, type BillingInvoice, type InvoicesResponse } from "./types";
 
 export type InvoicesPanelProps = {
@@ -117,19 +117,20 @@ export function InvoicesPanel({ pageSize = 20 }: InvoicesPanelProps = {}) {
 
 /** `idSuffix` keeps the phone card's test ids distinct from the table row's. */
 function InvoiceLinks({ inv, idSuffix = "" }: { inv: BillingInvoice; idSuffix?: string }) {
-  if (!inv.hostedInvoiceUrl && !inv.invoicePdf) return <span className="text-xs text-muted-foreground">—</span>;
+  const view = httpUrl(inv.hostedInvoiceUrl), pdf = httpUrl(inv.invoicePdf);
+  if (!view && !pdf) return <span className="text-xs text-muted-foreground">—</span>;
   return (
     <div className="flex items-center justify-end gap-1">
-      {inv.hostedInvoiceUrl && (
+      {view && (
         <Button asChild variant="ghost" size="sm" className="h-8 px-2">
-          <a href={inv.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer" data-testid={`link-invoice-view${idSuffix}-${inv.id}`}>
+          <a href={view} target="_blank" rel="noopener noreferrer" data-testid={`link-invoice-view${idSuffix}-${inv.id}`}>
             <ExternalLink className="h-3.5 w-3.5 mr-1" aria-hidden="true" />View
           </a>
         </Button>
       )}
-      {inv.invoicePdf && (
+      {pdf && (
         <Button asChild variant="ghost" size="sm" className="h-8 px-2">
-          <a href={inv.invoicePdf} target="_blank" rel="noopener noreferrer" data-testid={`link-invoice-pdf${idSuffix}-${inv.id}`}>
+          <a href={pdf} target="_blank" rel="noopener noreferrer" data-testid={`link-invoice-pdf${idSuffix}-${inv.id}`}>
             <FileDown className="h-3.5 w-3.5 mr-1" aria-hidden="true" />PDF
           </a>
         </Button>

@@ -41,9 +41,11 @@ export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
     for (const d of rows) for (const id of Object.keys(d.byKey ?? {})) ids.add(id);
     return Array.from(ids);
   }, [rows]);
+  // "Revoked" is only claimed once the keys list has loaded and the id is absent from it.
   const keyName = (id: string) => {
     const k = keysQuery.data?.keys.find((x) => x.id === id);
-    return k ? `${k.name} (${maskedKey(k)})` : `Revoked key ${id.replace(/^key_/, "").slice(0, 6)}`;
+    const short = id.replace(/^key_/, "").slice(0, 6);
+    return k ? `${k.name} (${maskedKey(k)})` : keysQuery.data ? `Revoked key ${short}` : `Key ${short}`;
   };
   const config = useMemo<ChartConfig>(() => {
     const c: ChartConfig = {};

@@ -59,6 +59,21 @@ export function daysUntil(iso: string | null | undefined, now = new Date()): num
 }
 
 /**
+ * An external document link (Stripe's hosted invoice, PDF or receipt) is
+ * rendered only when it is an http(s) URL; anything else reads as absent, so
+ * no API value can ever become a `javascript:` or `data:` href.
+ */
+export function httpUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://constructhub.us");
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Clipboard writes can be refused (no permission, insecure context, some
  * browsers); report the outcome instead of assuming the copy worked.
  */

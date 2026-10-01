@@ -69,6 +69,9 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
   const upgrade = onUpgrade ?? (() => navigate("/pricing"));
 
   const [generateOpen, setGenerateOpen] = useState(false);
+  // Bumped after each successful create so the next Generate starts from a blank form
+  // (Radix doesn't call onOpenChange when the dialog is closed from code).
+  const [generateSession, setGenerateSession] = useState(0);
   const [newKey, setNewKey] = useState<CreateApiKeyResponse | null>(null);
   const [renaming, setRenaming] = useState<ApiKeyItem | null>(null);
   const [limiting, setLimiting] = useState<ApiKeyItem | null>(null);
@@ -81,9 +84,11 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
 
   const createMutation = useMutation({
     mutationFn: async (body: CreateApiKeyBody) => (await apiRequest("POST", "/api/account/api-keys", body)).json() as Promise<CreateApiKeyResponse>,
-    onSuccess: (res) => { setGenerateOpen(false); setNewKey(res); refreshKeys(); },
+    onSuccess: (res) => { setGenerateOpen(false); setGenerateSession((n) => n + 1); setNewKey(res); refreshKeys(); },
     onError: fail("Couldn't create the key"),
   });
+  // Once the reveal is dismissed the secret leaves React state and the mutation cache alike.
+  const dismissNewKey = () => { setNewKey(null); createMutation.reset(); };
   const patchMutation = useMutation({
     mutationFn: async (v: { id: string; name?: string; monthlyUnitLimit?: number | null }) => {
       const { id, ...body } = v;
@@ -221,13 +226,14 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
       )}
 
       <GenerateKeyDialog
+        key={generateSession}
         open={generateOpen}
         onOpenChange={setGenerateOpen}
         planUnits={plan?.unitsPerMonth ?? 0}
         pending={createMutation.isPending}
         onSubmit={(body) => createMutation.mutate(body)}
       />
-      <NewKeyDialog result={newKey} onClose={() => setNewKey(null)} />
+      <NewKeyDialog result={newKey} onClose={dismissNewKey} />
       <RenameDialog item={renaming} pending={patchMutation.isPending} onClose={() => setRenaming(null)} onSubmit={(name) => renaming && patchMutation.mutate({ id: renaming.id, name })} />
       <LimitDialog item={limiting} planUnits={plan?.unitsPerMonth ?? 0} pending={patchMutation.isPending} onClose={() => setLimiting(null)} onSubmit={(limit) => limiting && patchMutation.mutate({ id: limiting.id, monthlyUnitLimit: limit })} />
       <AlertDialog open={!!revoking} onOpenChange={(open) => { if (!open) setRevoking(null); }}>
@@ -427,20 +433,26 @@ function NewKeyDialog({ result, onClose }: { result: CreateApiKeyResponse | null
   );
 }
 
+/**
+ * The draft is remembered with the id of the key it was typed for: the dialog
+ * closes from code after a successful save (no onOpenChange), so an untied
+ * draft would pre-fill the next key's dialog with the previous key's text.
+ */
 function RenameDialog({ item, pending, onClose, onSubmit }: { item: ApiKeyItem | null; pending: boolean; onClose: () => void; onSubmit: (name: string) => void }) {
-  const [name, setName] = useState<string | null>(null);
-  const value = name ?? item?.name ?? "";
+  const [draft, setDraft] = useState<{ id: string; name: string } | null>(null);
+  const value = draft && draft.id === item?.id ? draft.name : item?.name ?? "";
+  const close = () => { setDraft(null); onClose(); };
   return (
-    <Dialog open={!!item} onOpenChange={(o) => { if (!o) { setName(null); onClose(); } }}>
+    <Dialog open={!!item} onOpenChange={(o) => { if (!o) close(); }}>
       <DialogContent data-testid="dialog-rename-key">
         <DialogHeader><DialogTitle>Rename key</DialogTitle><DialogDescription>{item ? maskedKey(item) : ""}</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (value.trim()) onSubmit(value.trim()); }}>
           <div className="space-y-1.5">
             <Label htmlFor="api-key-rename">Title</Label>
-            <Input id="api-key-rename" value={value} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus data-testid="input-rename-key" />
+            <Input id="api-key-rename" value={value} onChange={(e) => item && setDraft({ id: item.id, name: e.target.value })} maxLength={80} autoFocus data-testid="input-rename-key" />
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => { setName(null); onClose(); }}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={close}>Cancel</Button>
             <Button type="submit" disabled={!value.trim() || pending} data-testid="button-rename-submit">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}</Button>
           </DialogFooter>
         </form>
@@ -452,13 +464,16 @@ function RenameDialog({ item, pending, onClose, onSubmit }: { item: ApiKeyItem |
 function LimitDialog({ item, planUnits, pending, onClose, onSubmit }: {
   item: ApiKeyItem | null; planUnits: number; pending: boolean; onClose: () => void; onSubmit: (limit: number | null) => void;
 }) {
-  const [limit, setLimit] = useState<string | null>(null);
-  const value = limit ?? (item?.monthlyUnitLimit === null || item?.monthlyUnitLimit === undefined ? "" : String(item.monthlyUnitLimit));
+  // Same rule as RenameDialog: a draft belongs to the key it was typed for.
+  const [draft, setDraft] = useState<{ id: string; value: string } | null>(null);
+  const stored = item?.monthlyUnitLimit === null || item?.monthlyUnitLimit === undefined ? "" : String(item.monthlyUnitLimit);
+  const value = draft && draft.id === item?.id ? draft.value : stored;
+  const close = () => { setDraft(null); onClose(); };
   const parsed = parseLimit(value);
   const err = Number.isNaN(parsed) ? "Enter a whole number of units, or leave it blank for the plan's allowance."
     : parsed !== null && planUnits > 0 && parsed > planUnits ? `Your plan allows ${formatCount(planUnits)} units a month; a key can't have more.` : null;
   return (
-    <Dialog open={!!item} onOpenChange={(o) => { if (!o) { setLimit(null); onClose(); } }}>
+    <Dialog open={!!item} onOpenChange={(o) => { if (!o) close(); }}>
       <DialogContent data-testid="dialog-limit-key">
         <DialogHeader>
           <DialogTitle>Monthly unit limit</DialogTitle>
@@ -467,11 +482,11 @@ function LimitDialog({ item, planUnits, pending, onClose, onSubmit }: {
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!err) onSubmit(parsed === null ? null : parsed); }}>
           <div className="space-y-1.5">
             <Label htmlFor="api-key-limit-edit">Units per month</Label>
-            <Input id="api-key-limit-edit" type="number" inputMode="numeric" min={1} max={planUnits > 0 ? planUnits : undefined} value={value} onChange={(e) => setLimit(e.target.value)} placeholder="Plan allowance" aria-invalid={!!err} autoFocus data-testid="input-limit-key" />
+            <Input id="api-key-limit-edit" type="number" inputMode="numeric" min={1} max={planUnits > 0 ? planUnits : undefined} value={value} onChange={(e) => item && setDraft({ id: item.id, value: e.target.value })} placeholder="Plan allowance" aria-invalid={!!err} autoFocus data-testid="input-limit-key" />
             {err && <p className="text-xs text-destructive" role="alert">{err}</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => { setLimit(null); onClose(); }}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={close}>Cancel</Button>
             <Button type="submit" disabled={!!err || pending} data-testid="button-limit-submit">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}</Button>
           </DialogFooter>
         </form>
