@@ -382,6 +382,9 @@ function englishWord(w: string): boolean {
 // P3 override / jailbreak
 const P3: RegExp[] = [
   /\b(ignore|disregard|forget|override|bypass)\s+((all|any|previous|prior|above|earlier|your|the|of|my|these|those)\s+){0,4}(instructions|rules|prompt|guidelines|guardrails|restrictions)\b/,
+  // "Ignore the above and…", "Disregard everything prior." — only when nothing follows the word, so
+  // "can I ignore previous invoices?" is still a question about invoices.
+  /\b(ignore|disregard|forget)\s+(all\s+|everything\s+|anything\s+)?(of\s+)?(that\s+|the\s+|what'?s\s+|what\s+(is|was)\s+)?(above|prior|previous|earlier|before)(?=\s*([.,;:!?]|and\b|then\b|$))/,
   /\byou are now\b/, /\bfrom now on\b/, /\b(you|hub) (will |must |should |can )?act as\b/, /\bact as if\b/,
   /\bpretend/, /\brole-?play/, /\blet'?s play\b/, /\bhypothetical(ly)?\b/, /\bimagine you\b/,
   /\bdo anything now\b/, /\bdeveloper mode\b/, /\bjailbreak/, /\bno (rules|restrictions|limits|filter)\b/,
@@ -413,6 +416,8 @@ const P4: RegExp[] = [
   /\b(your|hub'?s) (instructions|rules|prompt|guidelines|knowledge (base|pack))\b/,
   /\bthe (system|hidden|initial|original) (prompt|instructions)\b/,
   /\brepeat (everything|the text|all) (above|before)\b/, /\bverbatim\b/, /\bwhat were you told\b/, /\bprint your\b/,
+  // "output the text that appears before my message", "what came before this question?"
+  /\b(text|words|everything|anything|what|whatever|content|lines?)\b.{0,30}\b(above|before) (my|this|the) (first )?(message|question|chat|conversation)\b/,
 ];
 
 // P5 other people's data. Group A always targets someone else; group B is a data noun
