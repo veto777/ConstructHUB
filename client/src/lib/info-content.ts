@@ -615,4 +615,89 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
       "Example: a well-meaning helper wants to \"clean up\" old declined estimates. They can't — the delete button doesn't exist for them. Your history survives spring cleaning.",
     ],
   },
+
+  /* ── Account settings (growth app: /settings) ────────────────────────── */
+
+  "account-profile": {
+    title: "My account",
+    body: [
+      "Who you are on ConstructHUB: your name and photo, the company name and logo that go on review-request emails, and the Google Business Profiles those requests point at.",
+      "Below that are the facts about the account itself — your account ID (handy when you write to support), when you joined, and how you sign in — plus trial codes and the way to ask for the account to be deleted.",
+      "Example: you rebrand from \"Smith Roofing\" to \"Smith Exteriors\". Change the company name and logo here once, and every review request from then on carries the new look.",
+    ],
+  },
+
+  "account-security": {
+    title: "Password & security",
+    body: [
+      "Everything that protects the sign-in: change your password, turn on two-factor authentication (a six-digit code from an authenticator app), and see the devices you asked us to remember.",
+      "Sensitive changes ask you to verify it's really you first — a password, a code, or an emailed code if you sign in with Google. Recent security activity is listed here too; the full history is in the Audit log.",
+      "Example: you lose a phone that was \"remembered\" for 30 days. Revoke that device here and it has to sign in from scratch — with your two-factor code it no longer has.",
+    ],
+  },
+
+  "account-notifications": {
+    title: "Notifications",
+    body: [
+      "Choose which alerts reach you in the app, by email, or both — a failed Google post, a finished Site Scan, a score that dropped, a new connection.",
+      "Security alerts (a new Google account connected, two-factor turned off) are always emailed; everything else is yours to switch. Changes save as you flip them.",
+      "Example: you only want email when something breaks. Turn off the in-app copies of routine alerts, keep \"post failed\" on email, and your inbox stays signal only.",
+    ],
+  },
+
+  "account-billing": {
+    title: "Billing",
+    body: [
+      "Your subscription, read from Stripe — never a plan name typed into the page: what you're on, what it costs, when it renews, and the add-ons riding on it.",
+      "Add-on + and − change your subscription right away: a change is prorated and invoiced, a reduction becomes account credit, and if the card can't be charged nothing changes. Cards, invoices and cancellation live in Stripe's secure portal under Manage billing.",
+      "Example: a second office opens. Add one Extra location here, pay the prorated difference for the rest of the month, and the new Google Business Profile links the same afternoon.",
+    ],
+  },
+
+  "account-limits": {
+    title: "Limits & usage",
+    body: [
+      "Every limit in your plan on one page — Google Business Profile locations, ranking-grid credits, Site Scans, permit searches, CRM seats, protected websites and the rest — with what's included next to what you've used.",
+      "The numbers are the same ones the server enforces, counted the same way, so a meter here at 100% is exactly when a tool says \"limit reached\". Monthly counts reset on the date shown; standing counts (seats, locations) just are what they are.",
+      "Where an add-on raises a limit, its + and − sit right under that limit. Where only a bigger plan does, the Change plan button goes to Pricing.",
+      "Example: Site Scans shows 5 of 5 used on the 20th. Instead of waiting until the 1st, you see the plan above it includes 15 and switch — no detour through a support ticket.",
+    ],
+  },
+
+  "account-api-keys": {
+    title: "API keys",
+    body: [
+      "A key lets your own tools — a spreadsheet, a script, your own AI assistant — read your data and, with write scope, schedule posts or create records the way you would by hand.",
+      "Each key shows its name, a prefix…suffix (the full key is shown once, when it's created), its scope, how many units it has used and when it expires. Creating one asks you to verify your identity first; revoking takes one click.",
+      "The API never reaches the AI features: it can't ask TruthCoder to draft posts or replies, change AI settings, or run analysis. Anything you send through it is stored exactly as you sent it. Every key is also rate-limited and counts against your plan's monthly units.",
+      "Example: you keep a Google Sheet of your posting calendar. A small script with a write key schedules each row as a post — written by you, published on your schedule.",
+    ],
+  },
+
+  "account-api-usage": {
+    title: "API usage",
+    body: [
+      "How much of your monthly API allowance your keys have used, day by day and per key. Reads cost one unit per call plus one per hundred rows returned; writes cost five.",
+      "When a key hits its own limit or the plan's monthly units, the API answers with a clear \"quota exceeded\" until the month resets — nothing is silently dropped.",
+      "Example: a nightly sync suddenly doubles its units. The per-key breakdown shows which script changed, before it eats the month's allowance.",
+    ],
+  },
+
+  "account-audit-log": {
+    title: "Audit log",
+    body: [
+      "A record of what happened on the account: sign-ins and failed attempts, password and two-factor changes, Google accounts connected or removed, and activity in the tools.",
+      "Each entry has the time, the IP address and the device the request came from. Filter by area, event or date, search for an address or email, and export the view as a CSV for your records.",
+      "Example: a crew member says they \"never changed anything\". The log shows a sign-in from their phone at 7:14 am and the setting change at 7:16 — settled in ten seconds, no argument.",
+    ],
+  },
+
+  "account-integrations": {
+    title: "Integrations",
+    body: [
+      "Every outside service connected to this account in one list — Google Business Profile, Google Ads, Cloudflare, Search Console, social-media publishing, your domain registrars and Gmail alert forwarding — with whether each is connected, needs reconnecting, or was never set up. CRM connections (HOVER, Stripe payments) are managed under the CRM's own Integrations and Payments pages.",
+      "This page shows status and points you to where each connection is managed; it never holds the credentials itself.",
+      "Example: ranking reports stop updating. Integrations shows Google Business Profile as \"Reconnect needed\" — Google expired the token — and one click takes you to the page that fixes it.",
+    ],
+  },
 };
