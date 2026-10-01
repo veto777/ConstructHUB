@@ -19,6 +19,24 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🧾 2026-10-01 — account settings, billing documents, customer API (deployed 03:45 UTC)
+- **Emails** (server/account/billing-emails.ts, one per Stripe event via email_log dedupe, $0 invoices skipped): welcome,
+  subscription started, receipt per paid invoice, payment failed, plan/add-on changed, cancellation, one-time purchase.
+  Webhook calls onStripeBillingEvent after recordBillingEvent (server/billing/ledger.ts); ledger tables billing_events /
+  billing_invoices / billing_purchases (DDL in server/account/schema.ts).
+- **Settings** (client/src/pages/settings/*): Ahrefs-style nav — Me (account, password & security, notifications) /
+  Workspace (Billing: Subscriptions | Invoices | Payment methods | Purchases; Limits & usage; API keys; API usage; Audit log;
+  Integrations). Old ?tab= names redirect.
+- **Customer API** `/api/v1/<resource>` with `chub_<prefix>_<secret>` keys (server/public-api/*): account, locations (+POST
+  posts), reviews (+POST reply), insights, photos, gbp-posts, social-posts (+POST), site-scans (+POST), citations, /me,
+  /openapi.json (docs at /developers). Limits: plan units/month (Starter 0, Pro 10k, Growth 50k, Agency 250k; reads 1 +
+  1/100 rows, writes 5), 60 req/min per key, 300/min per account, max 25 active keys, optional per-key cap + expiry.
+  **No AI through the API**: server/public-api/no-ai.test.ts walks transitive imports and fails on any AI module;
+  server/public-api/guard.ts (mounted first in server/index.ts) rejects chub_ keys on every non-/api/v1 route; API-created
+  posts/replies are stored as supplied (source=api). CRM `chk_` keys on /api/v1/customers etc. are unchanged.
+- Known leftovers: lane-1 server/account/email.ts and lane-2 server/billing/invoices.ts are unused duplicates (safe to
+  delete); course/service fulfilment on a retried checkout.session.completed is not idempotent (pre-existing).
+
 ## 💲 2026-09-30 — new price book + TruthCoder AI (deployed 23:45 UTC)
 - **Price book** (owner decisions): Starter $29 / Pro $79 / Growth $199 / Agency $349 incl. 10 locations then
   $15 / $10 / $7 per location (quote above 500); annual = 10x; no free plan; 1-day trial (one per Stripe customer);
