@@ -54,6 +54,9 @@ import PermitsLandingPage from "@/pages/permits-landing";
 import CompetitorsLandingPage from "@/pages/competitors-landing";
 import MasterClassLandingPage from "@/pages/master-class-landing";
 import SettingsPage from "@/pages/settings";
+import BillingSettingsPage from "@/pages/settings/billing";
+import ApiSettingsPage from "@/pages/settings/api";
+import DevelopersPage from "@/pages/developers";
 import CrmTeamPage from "@/pages/crm-team";
 import CrmJoinPage from "@/pages/crm-join";
 import CrmHomePage from "@/pages/crm-home";
@@ -158,6 +161,10 @@ function DashboardRouter() {
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/lsa-account-manager" component={LsaAccountManagerPage} />
+      {/* Account billing + API panels (settings/billing/*, settings/api/*) and the public API reference. */}
+      <Route path="/settings/billing" component={BillingSettingsPage} />
+      <Route path="/settings/api" component={ApiSettingsPage} />
+      <Route path="/developers" component={DevelopersPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
@@ -197,6 +204,7 @@ function PublicRouter() {
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
+      <Route path="/developers" component={DevelopersPage} />
       <Route path="/permits-landing" component={PermitsLandingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
       <Route path="/master-class-landing" component={MasterClassLandingPage} />
@@ -250,7 +258,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
   "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews",
-  "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in",
+  "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
 };
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
