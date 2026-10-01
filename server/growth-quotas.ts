@@ -16,7 +16,7 @@ import {
 } from "./entitlements";
 import { PLANS, gridCreditCost, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
 
-export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos";
+export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos" | "texts";
 
 type Meter = {
   /** Upgrade prompt subject: "<what> is included with the Starter plan". */
@@ -38,6 +38,11 @@ export const METERS: Record<MeteredFeature, Meter> = {
   // The photo optimizer is included on every paid plan (fair use: the growth
   // processing rate limit is the only cap), so it has no monthly count.
   photos: { what: "The Photo Optimizer", unit: ["photo"] },
+  // Every text an org sends (client texts, reminders, team alerts), by segment:
+  // server/crm/sms.ts reserves here before the carrier sees the text. The
+  // texting-number add-on is a carrier number, not segments (shared/plans.ts),
+  // so nothing raises this but the plan.
+  texts: { what: "Texting", unit: ["text segment"], limit: "teamTextSegments" },
 };
 
 /** Ranking-grid credits a grid costs (one per 25 grid points), from the price book so the client shows the same number. */
@@ -71,9 +76,12 @@ export function resetsAt(d = new Date()): string {
 
 /** A reservation still holding `remaining` units that can be given back. */
 export type QuotaReservation = { key: string; remaining: number };
+/** The 403 body for a spent month — sendLimitReached's shape, built once here so every meter reads the same. */
+export type LimitReachedBody = ReturnType<typeof limitBody>;
 export type QuotaResult =
   | { ok: true; reservation: QuotaReservation; ent: Entitlements; limit: number }
-  | { ok: false; status: 401 | 402 | 403; body: Record<string, unknown> };
+  | { ok: false; status: 401 | 402; body: Record<string, unknown> }
+  | { ok: false; status: 403; body: LimitReachedBody };
 
 async function allowanceFor(userId: number, feature: MeteredFeature) {
   const ent = await getEntitlements(userId);

@@ -152,6 +152,8 @@ describe("opt-out suppression seam (real test DB)", () => {
   });
   afterAll(async () => {
     await pool.query(`delete from crm_orgs where owner_user_id = any($1)`, [owners]);
+    // Each send above spent a segment of the fixture owner's monthly text allowance.
+    await pool.query(`delete from growth_budgets where key like any($1)`, [owners.map((u) => `quota:user:${u}:%`)]);
     await pool.query(`delete from subscriptions where user_id = any($1)`, [owners]);
     await pool.query(`delete from users where id = any($1)`, [owners]);
   });

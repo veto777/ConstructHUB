@@ -379,6 +379,7 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: st
 
   // Money landing is worth a buzz in the pocket — opt-in per org. The bell
   // never depends on there being an email inbox.
+  let texts: Awaited<ReturnType<typeof textOrgOwners>> | null = null;
   if (org) {
     await notifyMembers({
       org, pref: "invoicePaid",
@@ -386,10 +387,12 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: st
       link: cust ? `/crm/clients/${cust.id}` : null,
       smsHandled: true,
     });
-    await textOrgOwners(org, `${org.name}: ${amount} received from ${cust?.displayName ?? "a client"}${via}.`, "invoicePaid");
+    texts = await textOrgOwners(org, `${org.name}: ${amount} received from ${cust?.displayName ?? "a client"}${via}.`, "invoicePaid");
   }
 
-  if (to.size && crmNotificationChannel(org?.customFields, "invoicePaid", "email")) {
+  // Email when the channel is on — or when the owner text was skipped because
+  // the month's text allowance is spent.
+  if (to.size && (crmNotificationChannel(org?.customFields, "invoicePaid", "email") || texts?.limit)) {
     await sendWithFallback({
       to: [...to].join(","),
       subject: `💰 ${amount} received from ${cust?.displayName ?? "a client"}`,

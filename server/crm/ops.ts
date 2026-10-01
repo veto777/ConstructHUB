@@ -128,9 +128,11 @@ async function notifyPaymentRecorded(
     excludeMemberIds: actorMemberId ? [actorMemberId] : [],
     smsHandled: true,
   });
-  await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}.`, "paymentReceived");
+  const texts = await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}.`, "paymentReceived");
 
-  if (to.size && crmNotificationChannel(org.customFields, "paymentReceived", "email")) {
+  // Email when the channel is on — or when the owner text was skipped because
+  // the month's text allowance is spent.
+  if (to.size && (crmNotificationChannel(org.customFields, "paymentReceived", "email") || texts.limit)) {
     await sendWithFallback({
       to: [...to].join(","),
       subject: `Payment received — ${amount} via ${via} from ${who} for invoice ${inv.number ?? ""}`.trim(),

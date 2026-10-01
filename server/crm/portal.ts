@@ -1460,25 +1460,28 @@ async function notifyOwner(
          ${reason ? `<p>Reason: ${esc(reason)}</p>` : ""}`
       : `<p><strong>${esc(cust.displayName)}</strong> just opened estimate ${esc(est.number ?? "")} (${money(est.totalCents)}) for the first time.</p>`;
 
-  if (recipients.size && crmNotificationChannel(org.customFields, pref, "email")) {
-    await sendWithFallback({
-      to: [...recipients].join(","),
-      subject,
-      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
-    } as any).catch((e: any) => console.error("[crm] owner notify failed:", e?.message || e));
-  }
-
   // The signature is the moment that matters — text it too when the org
-  // turned SMS alerts on (opt-in; the email above is the default channel).
+  // turned SMS alerts on (opt-in; the email below is the default channel).
+  let texts: Awaited<ReturnType<typeof textOrgOwners>> | null = null;
   if (event === "approved") {
-    await textOrgOwners(
+    texts = await textOrgOwners(
       org,
       `${org.name}: ${cust.displayName} SIGNED estimate ${est.number ?? ""} for ` +
       `${money(est.approvedTotalCents ?? est.totalCents)}.`.replace(/\s+/g, " "),
       "estimateApproved",
     );
   } else if (event === "declined") {
-    await textOrgOwners(org, `${org.name}: ${cust.displayName} declined estimate ${est.number ?? ""}.`, "estimateDeclined");
+    texts = await textOrgOwners(org, `${org.name}: ${cust.displayName} declined estimate ${est.number ?? ""}.`, "estimateDeclined");
+  }
+
+  // Email when the channel is on — or when the text was skipped because the
+  // month's text allowance is spent, so the event still reaches the owner.
+  if (recipients.size && (crmNotificationChannel(org.customFields, pref, "email") || texts?.limit)) {
+    await sendWithFallback({
+      to: [...recipients].join(","),
+      subject,
+      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
+    } as any).catch((e: any) => console.error("[crm] owner notify failed:", e?.message || e));
   }
 }
 

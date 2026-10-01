@@ -11,6 +11,9 @@
  *     shows a clickable dead Text button, and the API never pretends either.
  *     (Unlike bid reminders, which RECORD via the log provider, a manual
  *     "send a text" must not silently become a log line.)
+ *   - A text spends segments from the plan's monthly allowance (sms.ts
+ *     sendSms). A spent month answers the standard 403 limit_reached, which
+ *     the composer shows with its "See <plan>" link.
  *
  * Recording: there is no crm_messages table by design — the outbound message
  * is appended to crm_customer_notes with the OUTBOUND_MESSAGE_PREFIX marker,
@@ -25,6 +28,8 @@ import { crmCustomerNotes, crmCustomers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { sendWithFallback } from "../email";
+import { sendLimitReached } from "../entitlements";
+import type { LimitReachedBody } from "../growth-quotas";
 import { normalizePhone, sendSms, smsMissingEnv, resolveSmsSender, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER, orgSmsEntitled, smsPlanRequired } from "./sms";
 
 type GetUser = (req: any, res: any) => any;
@@ -68,7 +73,7 @@ export async function deliverQuickMessage(args: {
   orgCustomFields?: unknown;
   /** Known org — enables the STOP opt-out suppression check. */
   orgId?: string;
-}): Promise<{ ok: boolean; provider: "email" | "signalwire" | "log"; error?: string }> {
+}): Promise<{ ok: boolean; provider: "email" | "signalwire" | "log"; error?: string; limit?: LimitReachedBody }> {
   const { channel, to, body, orgName, replyTo, orgCustomFields, orgId } = args;
   if (channel === "email") {
     await sendWithFallback({
@@ -83,7 +88,7 @@ export async function deliverQuickMessage(args: {
     return { ok: true, provider: "email" };
   }
   const r = await sendSms(to, `${orgName}: ${body}`, orgCustomFields, orgId);
-  return { ok: r.ok, provider: r.provider, error: r.error ?? undefined };
+  return { ok: r.ok, provider: r.provider, error: r.error ?? undefined, limit: r.limit };
 }
 
 // ── Route ───────────────────────────────────────────────────────────────────
@@ -150,6 +155,8 @@ export function registerCrmMessageRoutes(app: Express, getDevUser: GetUser): voi
       return res.status(502).json({ message: `The message could not be sent: ${String(e?.message || e).slice(0, 300)}` });
     }
     if (!result.ok) {
+      // The month's text allowance is spent: the one 403 every metered feature answers.
+      if (result.limit) return sendLimitReached(res, result.limit);
       return res.status(502).json({ message: `The message could not be sent: ${result.error ?? "provider error"}` });
     }
 
