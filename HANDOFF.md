@@ -19,6 +19,29 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🔎 2026-10-01 — audit 4: Codex + Kimi audit of everything since 09-30 (deployed 05:15 UTC)
+- Two independent audits of the price book, TruthCoder AI, account/billing/API work (briefs + full reports with
+  evidence in the session scratchpad `audit4/`; branches `audit4/codex`, `audit4/kimi`, merged with `--no-ff`).
+- **Codex fixed (7):** F01 API monthly quota race + under-metered reads (quota checks serialised through metering,
+  real read cost, honest 503 on metering errors — server/public-api/quota.ts, quota-concurrency.test.ts); F02 site
+  assistant now on the shared aiClient/aiComplete/timeout path; F03/F04 stale invoice-failure and stray-subscription
+  events no longer email; F05 Stripe Connect checkouts can't enter platform course fulfilment; F06 GBP imports are
+  atomic under the account location lock (`ImportLocationError`, server/gbp/import-limit.test.ts); F07 Ads
+  integration Connect/Manage link opens the MCC manager.
+- **Kimi fixed (9 commits):** site assistant hardening (same hole as F02, superset kept), dead `startGbpWorker`
+  removed (the lapsed-account sync fix had landed in dead code — the live path in server/agency/jobs.ts was
+  already right), test sinks honour `EMAIL_OUTBOX_FILE` / `VOICE_OUTBOX_PATH`, plan-gates test mkdir, Badge-in-<p>
+  DOM nesting on Limits & usage, knowledge base no longer says "powered by OpenAI", scan refund test resets state.
+- **Still open (owner/engineering):** F08 unpaid `checkout.session.completed` (payment_status=unpaid) still grants a
+  course; F09 cart fulfilment DB failure is ack'd to Stripe with no retry; F10 failed billing email has no retry path
+  → all three want one transactional one-time fulfilment with event idempotency + an email outbox (server/stripe.ts
+  ~599–639). F11 vision caption hit a 524 via the public TruthCoder URL (production uses loopback :8250 — re-test
+  there). Kimi A1-3: texting segment allowance (500/1,500 per month) is advertised but not metered server-side
+  (server/crm/sms.ts, messages.ts); A1-8: scripts/invite-team.ts + seed-crm-demo.ts still seed `platinum`.
+  Unverified: Profile Guard enable has no account-wide lock on downgraded accounts (server/routes.ts:208–226).
+- Suite on main after the merge: run with Node 20 (`~/.nvm/versions/node/v20.19.6/bin` — vitest.config needs
+  `util.parseEnv`; system Node 18 fails at startup) and `. ~/ConstructHUB-a5/.env` sourced.
+
 ## 🧾 2026-10-01 — account settings, billing documents, customer API (deployed 03:45 UTC)
 - **Emails** (server/account/billing-emails.ts, one per Stripe event via email_log dedupe, $0 invoices skipped): welcome,
   subscription started, receipt per paid invoice, payment failed, plan/add-on changed, cancellation, one-time purchase.
