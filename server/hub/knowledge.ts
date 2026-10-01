@@ -54,6 +54,8 @@ export function knowledgeTokens(): Record<string, string> {
     GRID_CREDIT_COSTS: [3, 5, 7, 9, 11, 13, 15].map((n) => `${n}x${n} = ${gridCreditCost(n)}`).join(", "),
     ADDON_MAX_QUANTITY: String(ADDON_MAX_QUANTITY),
     GBP_REINSTATEMENT_PRICE: formatUsd(GBP_REINSTATEMENT_CENTS),
+    ANNUAL_MONTHS: String(ANNUAL_MONTHS),
+    ANNUAL_FREE_MONTHS: String(12 - ANNUAL_MONTHS),
   };
 }
 

@@ -9,7 +9,7 @@
  * output filter AND the required-facts check. Cached answers are filtered
  * again every time they are served.
  */
-import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { AGENCY_SELF_SERVE_MAX_LOCATIONS, ANNUAL_MONTHS, PLANS, PLAN_KEYS } from "@shared/plans";
 import {
   planPriceLine, agencyBandsLine, joinNames, planNamesWhere, AGENCY_ONLY_MODULES, CRM_SEATS_LINE,
   PROTECTED_SITE_PLANS, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL,
@@ -27,7 +27,7 @@ const planLines = () => PLAN_KEYS.map((k) => `- **${PLANS[k].name}**: ${planPric
 export function templateAnswer(presetId: PresetId): string {
   switch (presetId) {
     case "pricing":
-      return `There is no free plan. A first-time subscriber starts with a ${TRIAL_LABEL}, and yearly billing costs 10 times the monthly price.\n${planLines()}\nAdd-ons raise single limits. Compare everything on [Pricing](/pricing).`;
+      return `There is no free plan. A first-time subscriber starts with a ${TRIAL_LABEL}, and yearly billing costs ${ANNUAL_MONTHS} times the monthly price.\n${planLines()}\nAdd-ons raise single limits. Compare everything on [Pricing](/pricing).`;
     case "which-plan":
       return `It depends on how many profiles, websites and people you have:\n${planLines()}\nSee them side by side on [Pricing](/pricing#comparison).`;
     case "trial":
@@ -68,7 +68,7 @@ export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
     case "done-for-you":
       return answer.includes(SALES_REP_LABEL) && answer.includes(SALES_HREF);
     case "agency":
-      return /\bAgency\b/.test(answer) && new RegExp(`\\b${PLANS.agency.limits.locations}\\b`).test(answer) && /\b500\b/.test(answer) && /sales rep/i.test(answer);
+      return /\bAgency\b/.test(answer) && new RegExp(`\\b${PLANS.agency.limits.locations}\\b`).test(answer) && new RegExp(`\\b${AGENCY_SELF_SERVE_MAX_LOCATIONS}\\b`).test(answer) && /sales rep/i.test(answer);
     case "click-fraud":
       // The pack's honest limits, and the step people miss: the exclusions come from a script the user pastes into Google Ads.
       return /\b(don'?t|do not|doesn'?t|does not|can'?t|cannot) prove fraud\b|\bno savings (are|is) guaranteed\b/i.test(answer)

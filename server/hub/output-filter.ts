@@ -100,9 +100,9 @@ const COMMERCIAL_UNLESS_NEGATED: RegExp[] = [
   // ranking promises ("Growth puts you at #1 on Google Maps within 30 days, promised")
   /\bpromise[sd]?\b/i, /(#\s?1|number one|first place|top spot|top (3|three))\b[^.]{0,40}\b(google|maps|rank\w*|results|search)\b/i,
 ];
-/** "2 months free" is how the pack describes yearly billing; any other free stretch is a promotion. */
+/** "N months free" is how the pack describes yearly billing; any other free stretch is a promotion. */
 const FREE_STRETCH = /\b(\w+) (free )?(months?|weeks?|days?) (free|on us|at no (cost|charge))\b/i;
-const YEARLY = /\b(year|years|yearly|annual|annually|10 times)\b/i;
+const YEARLY = new RegExp(String.raw`\b(year|years|yearly|annual|annually|${ANNUAL_MONTHS} times)\b`, "i");
 /** Discount talk about ConstructHUB's own plans. CRM estimate/invoice discounts are a real feature. */
 const DISCOUNT = /\bdiscount(s|ed)?\b/i;
 const DISCOUNT_PLAN_CONTEXT = /\b(Starter|Pro|Growth|Agency|plans?|subscription|ConstructHUB|checkout|code|approve|special|launch|signups?|sign-?ups?|first month)\b|\$/i;

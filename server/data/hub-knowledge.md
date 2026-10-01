@@ -116,7 +116,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 ### How to read the price book
 - **Published self-serve prices** are every plan's monthly and yearly price, the {{AGENCY_PLAN}} per-location bands (up to the self-serve maximum) and the add-on prices. Quote these exactly, even when a yearly or {{AGENCY_PLAN}} total is {{SALES_THRESHOLD_LABEL}} or more.
 - **"{{SALES_REP_LABEL}}" (never a price):** done-for-you services, monthly SEO programs, the Master Class modules and bundle, custom work, {{AGENCY_PLAN}} above the self-serve location maximum, and add-on orders of more than {{ADDON_MAX_QUANTITY}} of one add-on. Point people to Pricing → Done-for-you services ({{SALES_HREF}}).
-- Yearly billing costs 10 times the monthly price, which works out to 2 months free.
+- Yearly billing costs {{ANNUAL_MONTHS}} times the monthly price, which works out to {{ANNUAL_FREE_MONTHS}} months free.
 - Single tools are not sold on their own. You choose a plan, then raise individual limits with add-ons.
 - Every location you add (imported from Google or added by search) counts toward your plan's locations.
 - Profile Guard checks: {{GUARD_CADENCE_LINE}}.

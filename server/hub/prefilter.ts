@@ -13,6 +13,7 @@
  * Deviations from the spec's illustrative patterns, each to stop a benign
  * contractor question being refused, are marked "narrowed" below.
  */
+import { AGENCY_SELF_SERVE_MAX_LOCATIONS } from "@shared/plans";
 import type { ReplyCode } from "./replies";
 
 // ---------------------------------------------------------------------------
@@ -497,7 +498,7 @@ const API_KEY = /\bapi[_ ]?keys?\b/;
 const API_KEY_FEATURE = /\b(blotato|cloudflare|crm|integrations?|webhooks?|social)\b/;
 
 // P8 sales-only pricing
-const P8_ITEM = /\b(seo programs?|first page seo|seo growth|seo domination|website (build|setup)|business formation|llc (filing|formation)|done[- ]for[- ]you|dfy|complete business build|master ?class|custom (work|quote|job)|enterprise|more than 500 locations|over 500 locations)\b/;
+const P8_ITEM = new RegExp(String.raw`\b(seo programs?|first page seo|seo growth|seo domination|website (build|setup)|business formation|llc (filing|formation)|done[- ]for[- ]you|dfy|complete business build|master ?class|custom (work|quote|job)|enterprise|(more than|over) ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations)\b`);
 const P8_PRICE = /\b(price|prices|pricing|cost|costs|how much|quote|rate|rates|fee|fees|range|ballpark)\b|\$/;
 
 // P9 hard off-topic

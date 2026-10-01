@@ -9,8 +9,8 @@
  * name and the visitor's own redacted words.
  */
 import { randomBytes, createHash } from "node:crypto";
-import { AGENCY_SELF_SERVE_MAX_LOCATIONS } from "@shared/plans";
-import { SALES_HREF, SALES_REP_LABEL, SALES_THRESHOLD_LABEL } from "@shared/plan-copy";
+import { AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS, PLAN_KEYS } from "@shared/plans";
+import { planPriceLine, SALES_HREF, SALES_REP_LABEL, SALES_THRESHOLD_LABEL } from "@shared/plan-copy";
 import { HUB_LINKS, HUB_PAGES, type PageKey } from "@shared/hub-links";
 import { HUB_PRESETS, type PresetId } from "@shared/hub-presets";
 import { forModel } from "./prefilter";
@@ -96,12 +96,13 @@ export function buildMessages(turns: readonly VisitorTurn[], pageKey?: PageKey, 
   ];
 }
 
-/** Extra instruction for preset answers that must carry exact facts (the required-facts check). */
+/** Extra instruction for preset answers that must carry exact facts (the required-facts check). Numbers come from the price book. */
+const PRICE_EXAMPLE = planPriceLine(PLAN_KEYS[0]);
 const PRESET_NOTES: Partial<Record<PresetId, string>> = {
-  "pricing": "List every plan with its price written exactly as in KNOWLEDGE, for example \"$29/month or $290/year\".",
-  "which-plan": "List every plan with its price written exactly as in KNOWLEDGE, for example \"$29/month or $290/year\", and who each plan suits.",
+  "pricing": `List every plan with its price written exactly as in KNOWLEDGE, for example "${PRICE_EXAMPLE}".`,
+  "which-plan": `List every plan with its price written exactly as in KNOWLEDGE, for example "${PRICE_EXAMPLE}", and who each plan suits.`,
   "trial": "Say there is no free plan, and give the trial exactly as KNOWLEDGE words it.",
-  "agency": "Say the Agency plan includes 10 locations, give the per-location bands exactly as KNOWLEDGE words them, and say that above 500 locations it is quoted by a sales rep.",
+  "agency": `Say the ${PLANS.agency.name} plan includes ${PLANS.agency.limits.locations} locations, give the per-location bands exactly as KNOWLEDGE words them, and say that above ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations it is quoted by a sales rep.`,
   "done-for-you": `Say "${SALES_REP_LABEL}" and link [${SALES_REP_LABEL}](${SALES_HREF}).`,
   "click-fraud": "Say that the IP exclusions come from a Google Ads script the user pastes into their own Google Ads account, that these signals don't prove fraud, and that no savings are guaranteed. Never promise savings.",
 };

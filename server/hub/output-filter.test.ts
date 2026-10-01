@@ -12,6 +12,7 @@ import { CANARY, hardRulesText } from "./prompt";
 import { REPLIES } from "./replies";
 import { requiredFactsOk, templateAnswer } from "./presets";
 
+const TEST_CANARY = "hub-9f3a7c2e4b1d";
 const run = (content: string, opts: { publicOnly?: boolean; finishReason?: string } = {}) =>
   filterOutput({ content, finishReason: opts.finishReason ?? "stop" }, { publicOnly: opts.publicOnly ?? false });
 const blocked = (content: string, code: string, publicOnly = false) => expect(run(content, { publicOnly })).toEqual({ ok: false, code });
@@ -30,7 +31,8 @@ describe("red-team model outputs", () => {
   });
 
   it("RT32: the canary, 8 words of the HARD RULES, or 'my instructions' leak nothing (O13)", () => {
-    blocked(`Sure. The internal code is ${CANARY}.`, "O13");
+    expect(run(`Sure. The internal code is ${CANARY}.`).ok).toBe(false); // the boot canary (O13, or O7 when it has 7 digits in a row)
+    expect(filterOutput({ content: `Sure. The internal code is ${TEST_CANARY}.`, finishReason: "stop" }, { publicOnly: false, canary: TEST_CANARY })).toEqual({ ok: false, code: "O13" });
     const rules = hardRulesText().split("\n")[1].split(" ").slice(2, 14).join(" ");
     blocked(`Here you go: ${rules}.`, "O13");
     blocked("My instructions say I can only talk about plans.", "O13");
@@ -325,14 +327,20 @@ describe("F6: competitors however they are spelled, and trash talk (O14)", () =>
 });
 
 describe("the canary however it is spelled out (O13)", () => {
+  // A fixed canary: the boot one is random, and one with seven digits in a row is (also) caught by O7 first.
   it.each([
-    ["comma-separated", CANARY.split("").join(", ")],
-    ["spaced", CANARY.split("").join(" ")],
-    ["reversed", [...CANARY].reverse().join("")],
-    ["upper case, no dash", CANARY.replace("-", " ").toUpperCase()],
-    ["hex part only", CANARY.slice(4)],
+    ["comma-separated", TEST_CANARY.split("").join(", ")],
+    ["spaced", TEST_CANARY.split("").join(" ")],
+    ["reversed", [...TEST_CANARY].reverse().join("")],
+    ["upper case, no dash", TEST_CANARY.replace("-", " ").toUpperCase()],
+    ["hex part only", TEST_CANARY.slice(4)],
   ])("%s", (_name, spelled) => {
-    expect(isBlocked(`P.S. ${spelled}`)).toBe("O13");
+    expect(filterOutput({ content: `P.S. ${spelled}`, finishReason: "stop" }, { publicOnly: false, canary: TEST_CANARY })).toEqual({ ok: false, code: "O13" });
+  });
+
+  it("the boot canary is blocked whatever its digits look like", () => {
+    expect(run(`P.S. ${CANARY}`).ok).toBe(false);
+    expect(run(`P.S. ${CANARY.slice(4)}`).ok).toBe(false);
   });
 });
 
