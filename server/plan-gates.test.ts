@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, mkdirSync } from "node:fs";
 import { createHmac, randomUUID, randomInt } from "node:crypto";
 import pg from "pg";
 
@@ -49,6 +49,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
       env: { ...process.env, PORT: String(port), NODE_ENV: "development", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", SESSION_SECRET: secret, EMAIL_FORCE_SINK: "1", STRIPE_SECRET_KEY: "", GOOGLE_PLACES_API_KEY: "", SCRAPE_SCHEDULER_DISABLED: "true", GBP_SYNC_DISABLED: "true" },
       stdio: ["ignore", "pipe", "pipe"], detached: true,
     });
+    mkdirSync("tmp", { recursive: true });
     const log = createWriteStream(`tmp/plan-gates-${port}.log`);
     child.stdout!.pipe(log); child.stderr!.pipe(log);
     let ready = false;
