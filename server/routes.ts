@@ -263,6 +263,9 @@ export async function registerRoutes(
     });
   }
 
+  // Account: billing records, email log, public API keys + metering.
+  const { ensureAccountSchema } = await import("./account/schema");
+  await ensureAccountSchema();
   const { ensureAccountEventsSchema, registerAccountEventRoutes } = await import("./account-events");
   await ensureAccountEventsSchema();
   registerAccountEventRoutes(app, getDevUser);
@@ -341,6 +344,11 @@ export async function registerRoutes(
   registerSocialRoutes(app, getDevUser);
   const { startSocialWorker } = await import("./social/service");
   startSocialWorker();
+
+  // Public API (/api/v1, chub_ keys). Mounted before the CRM so requests
+  // without a chub_ token reach the CRM's chk_-key routes unchanged.
+  const { registerPublicApi } = await import("./public-api");
+  registerPublicApi(app);
 
   // CRM tenancy layer (orgs, crews, roles, invitations).
   try {

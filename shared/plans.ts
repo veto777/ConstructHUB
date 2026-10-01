@@ -40,6 +40,14 @@ export type PlanLimits = {
   /** AI review replies may publish without a human approving each one. */
   autoPublishAiReplies: boolean;
   reviewTemplates: number;
+  /**
+   * Public API (/api/v1, `chub_` keys) units per calendar month; 0 = the API
+   * is not included. A read costs 1 unit (+1 per 100 rows), a write 5. The
+   * API never reaches TruthCoder AI: it stores what the caller sends.
+   */
+  apiUnitsPerMonth: number;
+  /** Public API requests per minute, per key. */
+  apiRatePerMinute: number;
 };
 
 /** The numeric limits (the ones an add-on can raise). */
@@ -85,6 +93,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       locations: 1, guardCadenceMinutes: 15, gridCredits: 5, gridCreditsPerLocation: 0, competitorScans: 0,
       protectedSites: 0, siteScans: 2, siteScansPerLocation: 0, permitSearches: 100, crmSeats: 1,
       teamTextSegments: 0, clientTexting: "none", autoPublishAiReplies: false, reviewTemplates: 5,
+      apiUnitsPerMonth: 0, apiRatePerMinute: 60,
     },
     modules: NO_MODULES,
   },
@@ -107,6 +116,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       locations: 1, guardCadenceMinutes: 15, gridCredits: 15, gridCreditsPerLocation: 0, competitorScans: 2,
       protectedSites: 1, siteScans: 5, siteScansPerLocation: 0, permitSearches: 500, crmSeats: 3,
       teamTextSegments: 500, clientTexting: "byo_or_addon", autoPublishAiReplies: true, reviewTemplates: 20,
+      apiUnitsPerMonth: 10_000, apiRatePerMinute: 60,
     },
     modules: NO_MODULES,
   },
@@ -129,6 +139,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       locations: 3, guardCadenceMinutes: 15, gridCredits: 30, gridCreditsPerLocation: 0, competitorScans: 8,
       protectedSites: 3, siteScans: 15, siteScansPerLocation: 0, permitSearches: 5000, crmSeats: 10,
       teamTextSegments: 1500, clientTexting: "included", autoPublishAiReplies: true, reviewTemplates: 20,
+      apiUnitsPerMonth: 50_000, apiRatePerMinute: 60,
     },
     modules: NO_MODULES,
   },
@@ -151,6 +162,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       locations: 10, guardCadenceMinutes: 30, gridCredits: 0, gridCreditsPerLocation: 2, competitorScans: 20,
       protectedSites: 10, siteScans: 0, siteScansPerLocation: 1, permitSearches: 5000, crmSeats: 10,
       teamTextSegments: 1500, clientTexting: "byo_or_addon", autoPublishAiReplies: true, reviewTemplates: 50,
+      apiUnitsPerMonth: 250_000, apiRatePerMinute: 60,
     },
     modules: { agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true },
   },

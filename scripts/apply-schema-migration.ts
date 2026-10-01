@@ -15,6 +15,7 @@ import pg from "pg";
 import { STATE_GUIDES_LINK_STATUS_DDL } from "../server/state-guides-schema";
 import { ensureDocNumberUniqueIndexes } from "../server/crm/doc-number";
 import { BILLING_SUBSCRIPTION_DDL } from "../server/billing/schema";
+import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -31,6 +32,10 @@ const STATEMENTS = [
   // Plan billing: interval, add-on quantities and billed Agency locations on
   // each subscription (server/billing/schema.ts also runs these at boot).
   ...BILLING_SUBSCRIPTION_DDL,
+  // Account: billing_events / billing_invoices / billing_purchases / email_log /
+  // account_api_keys / account_api_usage (server/account/schema.ts also runs
+  // these at boot).
+  ...ACCOUNT_SCHEMA_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;
