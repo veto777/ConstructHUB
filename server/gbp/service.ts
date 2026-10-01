@@ -1,4 +1,5 @@
-import { getEntitlements } from '../entitlements';
+import { getEntitlements, locationCount, sendLocationLimit, sendPlanRequired } from '../entitlements';
+import type { Response } from 'express';
 import { pool } from '../db';
 import { logActivity, notifyUser } from '../account-events';
 import { GoogleClient, GoogleError, mapLocation, mapPerformance, mapProfile, performancePath, resource, PROFILE_READ_MASK } from './client';
@@ -45,31 +46,60 @@ export async function importLocations(userId: number, requested: any[], client?:
   });
   return {...await importVerifiedLocations(userId,selected),errors:discovered.errors};
 }
+/** Preserve the common plan/limit response when an import loses a capacity race. */
+export class ImportLocationError extends GoogleError {
+  constructor(status: number, public body: any) { super('permission', body.message || 'Location import refused', status); }
+}
+function importRefusal(send: (res: Response) => unknown): ImportLocationError {
+  let status = 403, body: any;
+  const res = { status(value: number) { status = value; return res; }, json(value: unknown) { body = value; } };
+  send(res as Response);
+  return new ImportLocationError(status, body);
+}
 /** Internal only. Caller supplies listings verified by Google discovery (live or a fresh owner-scoped cache). */
 export async function importVerifiedLocations(userId:number,selected:any[]) {
-  const imported = [];
-  for (const l of selected) {
-    // A location the contractor added by Places search (same place, not yet linked) is linked in place
-    // so its settings and citations carry over, instead of a duplicate row being created.
-    // The same listing can be reachable through two Google accounts: keep one row, managed by the latest import.
-    const {rows:[already]} = await pool.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name=$2 ORDER BY id LIMIT 1',[userId,l.gbpName]);
-    if (already) {
-      await pool.query('UPDATE business_locations SET gbp_account_name=$2,gbp_google_subject=$3,gbp_unlinked_by_user=false,updated_at=now() WHERE id=$1',[already.id,l.accountResource,l.grantSubject]);
-      imported.push(already); continue;
+  // Resolve the plan before taking a connection; otherwise a pool full of
+  // imports waiting on this account's lock can starve entitlement queries.
+  const ent = await getEntitlements(userId);
+  if (!ent.allowances) throw importRefusal(res => sendPlanRequired(res, 'starter', 'Importing locations'));
+  const limit = ent.allowances.locations;
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    // The same account lock used by Places saves and agency onboarding.
+    await c.query('SELECT pg_advisory_xact_lock(7170, $1)', [userId]);
+    const imported = [];
+    for (const l of selected) {
+      // A location the contractor added by Places search (same place, not yet linked) is linked in place
+      // so its settings and citations carry over, instead of a duplicate row being created.
+      // The same listing can be reachable through two Google accounts: keep one row, managed by the latest import.
+      const {rows:[already]} = await c.query('SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name=$2 ORDER BY id LIMIT 1',[userId,l.gbpName]);
+      if (already) {
+        await c.query('UPDATE business_locations SET gbp_account_name=$2,gbp_google_subject=$3,gbp_unlinked_by_user=false,updated_at=now() WHERE id=$1',[already.id,l.accountResource,l.grantSubject]);
+        imported.push(already); continue;
+      }
+      if (!already && l.placeId) {
+        const {rows:[linked]} = await c.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,gbp_google_subject=$6,gbp_unlinked_by_user=false,updated_at=now()
+          WHERE id=(SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id=$5 ORDER BY id LIMIT 1) RETURNING id`,
+          [userId,l.accountResource,l.gbpName,l.businessName,l.placeId,l.grantSubject]);
+        if (linked) { imported.push(linked); continue; }
+      }
+      const used = await locationCount(userId, c);
+      if (limit !== -1 && used >= limit) {
+        throw importRefusal(res => sendLocationLimit(res, ent, used));
+      }
+      const {rows:[row]} = await c.query(`INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,address,city,state,zip_code,country,phone,website,place_id,gbp_google_subject)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(user_id,gbp_account_name,gbp_location_name)
+        DO UPDATE SET business_name=$2,address=$5,city=$6,state=$7,zip_code=$8,country=$9,phone=$10,website=$11,place_id=$12,gbp_google_subject=$13,updated_at=now() RETURNING id`,
+        [userId,l.businessName,l.accountResource,l.gbpName,l.address,l.city,l.state,l.zipCode,l.country,l.phone,l.website,l.placeId,l.grantSubject]);
+      imported.push(row);
     }
-    if (!already && l.placeId) {
-      const {rows:[linked]} = await pool.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,gbp_google_subject=$6,gbp_unlinked_by_user=false,updated_at=now()
-        WHERE id=(SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id=$5 ORDER BY id LIMIT 1) RETURNING id`,
-        [userId,l.accountResource,l.gbpName,l.businessName,l.placeId,l.grantSubject]);
-      if (linked) { imported.push(linked); continue; }
-    }
-    const {rows:[row]} = await pool.query(`INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,address,city,state,zip_code,country,phone,website,place_id,gbp_google_subject)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(user_id,gbp_account_name,gbp_location_name)
-      DO UPDATE SET business_name=$2,address=$5,city=$6,state=$7,zip_code=$8,country=$9,phone=$10,website=$11,place_id=$12,gbp_google_subject=$13,updated_at=now() RETURNING id`,
-      [userId,l.businessName,l.accountResource,l.gbpName,l.address,l.city,l.state,l.zipCode,l.country,l.phone,l.website,l.placeId,l.grantSubject]);
-    imported.push(row);
-  }
-  return { imported:imported.length, locations:imported };
+    await c.query('COMMIT');
+    return { imported:imported.length, locations:imported };
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally { c.release(); }
 }
 export function mapReview(r: any, parent: string) {
   const name = r.name || `${parent}/reviews/${r.reviewId}`;

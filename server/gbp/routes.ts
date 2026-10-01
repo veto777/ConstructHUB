@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { filters, listLocations, accessFor, locationAccess }  from '../agency/access';
 import { queueSync } from '../agency/jobs';
-import { importVerifiedLocations } from './service';
+import { importVerifiedLocations, ImportLocationError } from './service';
 import { requireRecentAuth, RECENT_AUTH_MS } from '../account-security';
 import { notifyUser, logActivity } from '../account-events';
 import { decryptToken } from './token-crypto';
@@ -26,7 +26,7 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
   const recentlyVerified = (req: Request) => { const v=req.session?.recentAuth,u=req.user as any; return !!u && !!v && v.userId===u.id && v.at<=Date.now() && Date.now()-v.at<RECENT_AUTH_MS; };
   const route = (method: 'get'|'post'|'patch'|'delete',path: string,fn: (req: Request,res: Response,userId: number)=>Promise<any>) => {
     // Grants are invalidated per Google account where the failure happened (grants/service), never all at once here.
-    app[method](path,async(req,res)=>{const user=auth(req,res);if(!user)return;try {await fn(req,res,user.id);}catch(e){res.status(e instanceof GoogleError?e.status:500).json(publicError(e));}});
+    app[method](path,async(req,res)=>{const user=auth(req,res);if(!user)return;try {await fn(req,res,user.id);}catch(e){res.status(e instanceof GoogleError?e.status:500).json(e instanceof ImportLocationError ? e.body : publicError(e));}});
   };
   route('get','/api/gbp/connect',async(req,res,userId)=>{
     // A browser navigation (middle-click, new tab, typed URL, /api/auth/google?gbp=1) cannot answer the JSON
