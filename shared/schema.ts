@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { primaryKey, pgTable, text, varchar, integer, bigserial, boolean, timestamp, jsonb, real, numeric, date } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, bigserial, boolean, timestamp, jsonb, real, numeric, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -493,6 +493,12 @@ export const masterClassModules = pgTable("master_class_modules", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// One-time purchase rows are granted by the Stripe webhook
+// (server/billing/fulfilment.ts) once per Checkout Session and item, whichever
+// event carried the session: the partial unique indexes below are what its
+// ON CONFLICT DO NOTHING targets. They are created at boot by
+// server/billing/schema.ts FULFILMENT_DDL (idempotent; this project never runs
+// drizzle-kit push) — keep the two definitions identical.
 export const coursePurchases = pgTable("course_purchases", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull(),
@@ -500,7 +506,11 @@ export const coursePurchases = pgTable("course_purchases", {
   isBundle: boolean("is_bundle").default(false),
   stripeSessionId: text("stripe_session_id"),
   purchasedAt: timestamp("purchased_at").notNull().defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("course_purchases_session_item_idx")
+    .on(t.stripeSessionId, sql`(COALESCE(${t.moduleId}, 0))`, sql`(COALESCE(${t.isBundle}, false))`)
+    .where(sql`${t.stripeSessionId} IS NOT NULL`),
+]);
 
 export const servicePurchases = pgTable("service_purchases", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -510,7 +520,11 @@ export const servicePurchases = pgTable("service_purchases", {
   price: integer("price").notNull(),
   stripeSessionId: text("stripe_session_id"),
   purchasedAt: timestamp("purchased_at").notNull().defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("service_purchases_session_item_idx")
+    .on(t.stripeSessionId, t.serviceType)
+    .where(sql`${t.stripeSessionId} IS NOT NULL`),
+]);
 
 export const trackedDomains = pgTable("tracked_domains", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import type { Express, Request, Response } from "express";
 import { db } from "./db";
-import { subscriptions, masterClassModules, coursePurchases, servicePurchases } from "@shared/schema";
+import { subscriptions, masterClassModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
 import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sendTalkToSales } from "./catalog";
@@ -26,6 +26,7 @@ import { recordBillingEvent, releaseBillingEvent, attributeBillingEvent } from "
 import {
   syncInvoiceEvent, onTrialWillEnd, recordOneTimePurchase, emitSubscriptionStarted, emitCancellationChange, emitSubscriptionCanceled, isConnectEvent,
 } from "./billing/webhook-events";
+import { fulfilOneTimePurchase } from "./billing/fulfilment";
 import { stripeConfigured } from "./billing/client";
 import { onStripeBillingEvent } from "./account/billing-emails";
 
@@ -170,6 +171,23 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
 async function recentAuthOk(req: Request, res: Response): Promise<boolean> {
   const { requireRecentAuth } = await import("./account-security");
   return requireRecentAuth(req, res);
+}
+
+/**
+ * A one-time Checkout Session, on either event that can say it is paid
+ * (checkout.session.completed, checkout.session.async_payment_succeeded):
+ * grant what it bought — server/billing/fulfilment, only when payment_status
+ * is paid, once per session + item, all items in one transaction; a write
+ * failure throws so the event claim is released and Stripe retries — then the
+ * purchase ledger row and its receipt event (recordOneTimePurchase checks the
+ * payment status itself). An unpaid completion writes neither.
+ */
+async function applyOneTimeCheckout(session: Stripe.Checkout.Session, userId: number): Promise<void> {
+  const result = await fulfilOneTimePurchase(session, userId);
+  if (!result.fulfilled && result.reason === "unpaid") {
+    console.log(`[billing] checkout ${session.id} (user ${userId}) completed ${session.payment_status}: nothing granted until Stripe reports it paid.`);
+  }
+  await recordOneTimePurchase(session, userId);
 }
 
 export function registerStripeRoutes(app: Express) {
@@ -593,49 +611,15 @@ export function registerStripeRoutes(app: Express) {
         case "checkout.session.completed": {
           const session = event.data.object as Stripe.Checkout.Session;
           const userId = parseInt(session.metadata?.userId || "0");
-          const metaType = session.metadata?.type;
           if (userId) eventUserId = userId;
 
-          if (userId && metaType === "cart") {
-            try {
-              const cartItems = JSON.parse(session.metadata?.items || "[]");
-              for (const item of cartItems) {
-                if (item.type === "course_module" && item.moduleId) {
-                  await db.insert(coursePurchases).values({
-                    userId,
-                    moduleId: item.moduleId,
-                    isBundle: false,
-                    stripeSessionId: session.id,
-                  });
-                } else if (item.type === "course_bundle") {
-                  await db.insert(coursePurchases).values({
-                    userId,
-                    moduleId: null,
-                    isBundle: true,
-                    stripeSessionId: session.id,
-                  });
-                } else if (item.type === "dfy_service" || item.type === "dfy_bundle") {
-                  await db.insert(servicePurchases).values({
-                    userId,
-                    serviceType: item.id,
-                    serviceName: item.name,
-                    price: item.price,
-                    stripeSessionId: session.id,
-                  });
-                }
-              }
-            } catch (e) {
-              console.error("Failed to process cart items:", e);
-            }
-          } else if (userId && metaType === "master_class") {
-            const isBundle = session.metadata?.bundle === "true";
-            const moduleId = session.metadata?.moduleId ? parseInt(session.metadata.moduleId) : null;
-            await db.insert(coursePurchases).values({
-              userId,
-              moduleId,
-              isBundle: isBundle,
-              stripeSessionId: session.id,
-            });
+          if (userId && session.mode === "payment") {
+            // A one-time checkout (a course, a cart of courses / DFY services,
+            // an SEO contract…): granted and recorded only once Stripe says it
+            // is paid. A card is paid here; a bank debit completes unpaid and
+            // is granted by async_payment_succeeded below, through the same
+            // path — never from the metadata alone.
+            await applyOneTimeCheckout(session, userId);
           } else if (userId && session.subscription) {
             // Plan, interval, add-ons and Agency locations are read from the
             // subscription's items (prices we created), not from metadata.
@@ -650,24 +634,28 @@ export function registerStripeRoutes(app: Express) {
             const set = await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
             emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
           }
-
-          // A paid one-time checkout (course, DFY service, SEO contract) goes
-          // into the purchase ledger with its receipt, whatever its metadata
-          // type; a subscription checkout is not a purchase (its invoice is).
-          if (userId && session.mode === "payment") {
-            await recordOneTimePurchase(session, userId);
-          }
           break;
         }
         case "checkout.session.async_payment_succeeded": {
-          // A bank-debit checkout settled after the session completed: now it
-          // is a paid purchase (the session arrived unpaid at completion).
+          // A bank-debit checkout settled after the session completed (it
+          // arrived unpaid then): the same fulfilment and ledger as a card
+          // checkout, now that Stripe says it is paid.
           const session = event.data.object as Stripe.Checkout.Session;
           const userId = parseInt(session.metadata?.userId || "0");
           if (userId && session.mode === "payment") {
             eventUserId = userId;
-            await recordOneTimePurchase(session, userId);
+            await applyOneTimeCheckout(session, userId);
           }
+          break;
+        }
+        case "checkout.session.async_payment_failed": {
+          // The delayed payment did not settle: the session stays unfulfilled
+          // (nothing was granted at completion, nothing is granted now) and
+          // nothing is recorded as bought. The event is kept for the account.
+          const session = event.data.object as Stripe.Checkout.Session;
+          const userId = parseInt(session.metadata?.userId || "0");
+          if (userId) eventUserId = userId;
+          console.warn(`[billing] checkout ${session.id} (user ${userId || "unknown"}): delayed payment failed — nothing granted.`);
           break;
         }
         case "invoice.paid":

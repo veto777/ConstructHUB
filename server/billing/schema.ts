@@ -40,6 +40,49 @@ import { BILLING_LEDGER_DDL } from "../account/schema";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 
+/**
+ * One-time purchase fulfilment (./fulfilment.ts) writes course_purchases /
+ * service_purchases ON CONFLICT DO NOTHING against these: one row per Checkout
+ * Session and item, whichever Stripe event carried it (completed,
+ * async_payment_succeeded, a redelivery under a new event id). The tables are
+ * drizzle's (shared/schema.ts, which declares the same indexes — keep the two
+ * identical); the indexes are added here because this project applies schema
+ * changes with idempotent statements, never drizzle-kit push. Partial
+ * (stripe_session_id IS NOT NULL): a row granted by hand carries no session
+ * and is not deduplicated.
+ */
+export const FULFILMENT_DDL: readonly string[] = [
+  `CREATE UNIQUE INDEX IF NOT EXISTS course_purchases_session_item_idx
+     ON course_purchases (stripe_session_id, (COALESCE(module_id, 0)), (COALESCE(is_bundle, false)))
+     WHERE stripe_session_id IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS service_purchases_session_item_idx
+     ON service_purchases (stripe_session_id, service_type)
+     WHERE stripe_session_id IS NOT NULL`,
+];
+
+export const FULFILMENT_INDEXES: readonly string[] = ["course_purchases_session_item_idx", "service_purchases_session_item_idx"];
+
+/**
+ * The fulfilment indexes, idempotently: a catalog read when both exist, else
+ * the CREATE … IF NOT EXISTS statements. A table that already holds two rows
+ * for one (session, item) makes the CREATE fail — that is reported with the
+ * index name and the cause, never worked around by dropping the uniqueness.
+ */
+export async function ensureFulfilmentSchema(q: Queryable): Promise<void> {
+  const { rows } = await q.query(
+    `SELECT indexname FROM pg_indexes WHERE schemaname = current_schema() AND indexname = ANY($1)`,
+    [FULFILMENT_INDEXES]);
+  if (rows.length === FULFILMENT_INDEXES.length) return;
+  for (const statement of FULFILMENT_DDL) {
+    try {
+      await q.query(statement);
+    } catch (e: any) {
+      const name = FULFILMENT_INDEXES.find((n) => statement.includes(n)) ?? "fulfilment index";
+      throw new Error(`${name} could not be created (${e?.message || e}); purchase rows already duplicated for one checkout session must be resolved first`);
+    }
+  }
+}
+
 export const BILLING_LEDGER_TABLES: readonly string[] = ["billing_events", "billing_invoices", "billing_purchases"];
 
 /**
@@ -59,8 +102,8 @@ export async function ensureBillingLedgerSchema(q: Queryable): Promise<void> {
 /**
  * Adds any missing billing column. When all of them already exist it only
  * reads the catalog, so a routine boot takes no table lock on `subscriptions`.
- * The ledger tables are checked the same way (two catalog reads, no DDL,
- * once everything exists).
+ * The ledger tables and the fulfilment indexes are checked the same way
+ * (three catalog reads, no DDL, once everything exists).
  */
 export async function ensureBillingSchema(q: Queryable): Promise<void> {
   const { rows } = await q.query(
@@ -71,4 +114,5 @@ export async function ensureBillingSchema(q: Queryable): Promise<void> {
     for (const statement of BILLING_SUBSCRIPTION_DDL) await q.query(statement);
   }
   await ensureBillingLedgerSchema(q);
+  await ensureFulfilmentSchema(q);
 }
