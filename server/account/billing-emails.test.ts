@@ -74,7 +74,8 @@ vi.mock("../email", () => ({
 
 import {
   BILLING_EMAIL_EVENTS, EMAIL_KINDS, sendWelcomeEmail, handleBillingEmailEvent, billingEmailEventsFromStripe,
-  onStripeBillingEvent, sendTransactionalEmail, subscriptionFacts, describeChanges, type BillingEmailEvent, type StripeReader,
+  onStripeBillingEvent, sendTransactionalEmail, subscriptionFacts, describeChanges, previousItemsFrom, appBaseUrl,
+  type BillingEmailEvent, type StripeReader,
 } from "./billing-emails";
 import { emailLayout } from "./billing-email-templates";
 import { PLANS, ADDONS, agencyPriceCents } from "@shared/plans";
@@ -194,7 +195,23 @@ describe("welcome email", () => {
     }
     expect(mail.html).toContain("owner@example.invalid");
     expect(mail.text).toMatch(/1\. Choose a plan/);
+    // The trial is granted or refused by the server at checkout; the email must not promise it.
+    expect(mail.text).not.toMatch(/free trial/i);
     expect(mocks.log.get(`welcome:${USER}`)?.kind).toBe(EMAIL_KINDS.welcome);
+  });
+  it("links to the app origin: in production even when sign-up came through the CRM portal host, the dev server otherwise", () => {
+    const env = { NODE_ENV: process.env.NODE_ENV, PORTAL_URL: process.env.PORTAL_URL };
+    try {
+      process.env.NODE_ENV = "production";
+      process.env.PORTAL_URL = "https://portal.constructhub.us";
+      const viaPortal = { protocol: "https", headers: { host: "portal.constructhub.us", "x-forwarded-proto": "https" } };
+      expect(appBaseUrl(viaPortal)).toBe(BASE); // APP_URL — the portal host serves the CRM only, Pricing/Settings live here
+      process.env.NODE_ENV = "test";
+      expect(appBaseUrl({ protocol: "http", headers: { host: "127.0.0.1:8433" } })).toBe("http://127.0.0.1:8433");
+    } finally {
+      process.env.NODE_ENV = env.NODE_ENV;
+      if (env.PORTAL_URL === undefined) delete process.env.PORTAL_URL; else process.env.PORTAL_URL = env.PORTAL_URL;
+    }
   });
 });
 
@@ -289,6 +306,18 @@ describe("receipt for a paid invoice", () => {
     expect(mail.html).not.toContain("javascript:");
     expect(mail.html).toContain("Mastercard ending in 5555");
   });
+  it("shows the account credit Stripe applied so the totals add up to what was charged", async () => {
+    const inv = invoice([line(PRO_M, 7900)], { total: 7900, amount_due: 4900, amount_paid: 4900, starting_balance: -3000, ending_balance: 0 });
+    await handleBillingEmailEvent({ type: "billing.invoice_paid", userId: USER, invoice: inv }, { baseUrl: BASE });
+    expect(last().subject).toBe("Receipt CHUB-0001 — $49.00 paid to ConstructHUB");
+    expect(last().text).toContain("Subtotal: $79.00");
+    expect(last().text).toContain("Account credit applied: -$30.00");
+    expect(last().text).toContain("Total paid: $49.00");
+    // No balance involved: no such row.
+    await handleBillingEmailEvent({ type: "billing.invoice_paid", userId: USER, invoice: invoice([line(PRO_M, 7900)], { id: "in_plain", amount_due: 7900 }) }, { baseUrl: BASE });
+    expect(last().text).not.toContain("credit applied");
+    expect(last().text).not.toContain("Previous balance");
+  });
   it("still sends a receipt when Stripe is unavailable for the card lookup", async () => {
     const broken: StripeReader = { ...stripeStub(), charges: { retrieve: async () => { throw new Error("stripe down"); } } };
     const [ev] = await billingEmailEventsFromStripe(stripeEvent("invoice.paid", paidInvoice()), { userId: USER, stripe: broken });
@@ -362,6 +391,35 @@ describe("plan / add-on changed (from customer.subscription.updated)", () => {
     expect(await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub, { status: "trialing" }), { userId: USER })).toEqual([]);
     expect(await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub, { metadata: {} }), { userId: USER })).toEqual([]);
     expect(await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub), { userId: USER })).toEqual([]);
+    // A renewal on current API versions: previous_attributes.items.data holds only
+    // each item's old period fields. Not a plan change — and no invoice lookup.
+    const stripe = stripeStub();
+    const roll = { current_period_end: PERIOD_START, latest_invoice: "in_prev", items: { data: [{ current_period_end: PERIOD_START, current_period_start: PERIOD_START - 30 * 86400 }] } };
+    expect(await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", { ...sub, latest_invoice: "in_cycle" }, roll), { userId: USER, stripe })).toEqual([]);
+    expect(stripe.calls).toEqual([]);
+  });
+  it("reads previous_attributes.items as the diff Stripe sends: a partial entry per changed item, never a phantom change", async () => {
+    const after = [item("si_plan", GROWTH_M), item("si_seat", SEAT_M, 3)];
+    const sub = subscription(after, { latest_invoice: "in_2" });
+    // Plan swap: only the first item changed, and only its price/plan is in the diff.
+    const swap = { items: { data: [{ price: PRO_M, plan: { id: PRO_M.id } }, {}] } };
+    expect(previousItemsFrom(swap, after)).toMatchObject([{ id: "si_plan", price: { id: PRO_M.id }, quantity: 1 }, { id: "si_seat", price: { id: SEAT_M.id }, quantity: 3 }]);
+    const [swapped] = await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub, swap, "evt_swap"), { userId: USER, stripe: stripeStub() });
+    expect(swapped).toMatchObject({ type: "billing.subscription_changed", prorationCents: 12000 });
+    expect(describeChanges((swapped as any).previousItems, after)).toEqual(["Plan: Pro → Growth"]);
+    await handleBillingEmailEvent(swapped, { baseUrl: BASE });
+    expect(last().text).toContain("- Plan: Pro → Growth");
+    expect(last().text).not.toContain("Extra seat: added");
+    // Quantity change on the second item only.
+    const [requantified] = await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub, { items: { data: [{}, { quantity: 1 }] }, quantity: 1 }, "evt_qty"), { userId: USER });
+    expect(describeChanges((requantified as any).previousItems, after)).toEqual(["Extra seat: 1 → 3"]);
+    // An added item: Stripe gives the full previous list (shorter), used as is.
+    const added = { items: { data: [item("si_plan", GROWTH_M)], total_count: 1 } };
+    expect(previousItemsFrom(added, after)).toHaveLength(1);
+    const [withSeats] = await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub, added, "evt_add"), { userId: USER });
+    expect(describeChanges((withSeats as any).previousItems, after)).toEqual(["Extra seat: added × 3"]);
+    // A diff that cannot be rebuilt (shorter and partial) still emails, generically.
+    expect(previousItemsFrom({ items: { data: [{ quantity: 1 }] } }, after)).toBeNull();
   });
   it("describes interval and Agency location changes and a removed add-on", () => {
     const changes = describeChanges(
@@ -447,6 +505,12 @@ describe("one-time purchase receipt (checkout.session.completed)", () => {
     expect(last().text).toContain("Our team will reach out within one business day");
     const [reinstated] = await billingEmailEventsFromStripe(stripeEvent("checkout.session.completed", session({ userId: String(USER), type: "reinstatement" }, { id: "cs_re", amount_total: 4900 })), { userId: USER });
     expect(reinstated).toMatchObject({ kind: "reinstatement", items: [{ label: "Account reinstatement", amountCents: 4900 }] });
+  });
+  it("names an SEO agreement checkout (server/routes.ts) from its own metadata", async () => {
+    const [ev] = await billingEmailEventsFromStripe(stripeEvent("checkout.session.completed", session({ userId: String(USER), type: "seo_contract", contractId: "12", packageId: "seo_growth" }, { id: "cs_seo", amount_total: 900000 })), { userId: USER });
+    expect(ev).toMatchObject({ kind: "service", items: [{ label: "SEO package agreement — contract #12, paid in full", detail: "Package seo_growth", amountCents: 900000 }] });
+    await handleBillingEmailEvent(ev, { baseUrl: BASE });
+    expect(last().text).toContain("- SEO package agreement — contract #12, paid in full (Package seo_growth): $9,000.00");
   });
   it("ignores subscription checkouts and unpaid sessions", async () => {
     expect(await billingEmailEventsFromStripe(stripeEvent("checkout.session.completed", session({ type: "plan" }, { mode: "subscription" })), { userId: USER })).toEqual([]);

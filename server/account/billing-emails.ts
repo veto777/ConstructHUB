@@ -31,7 +31,7 @@
 import type Stripe from "stripe";
 import { pool } from "../db";
 import { sendWithFallback } from "../email";
-import { PRIMARY_DOMAIN } from "../site-context";
+import { PRIMARY_DOMAIN, siteBaseUrl } from "../site-context";
 import {
   PLANS, ADDONS, ADDON_KEYS, planPriceCents, addonPriceCents, type AddonKey, type BillingInterval,
 } from "@shared/plans";
@@ -117,18 +117,36 @@ export function accountBaseUrl(): string {
   return env || `https://${PRIMARY_DOMAIN}`;
 }
 
+/**
+ * Origin for the links in an email sent from a request (the welcome email).
+ * Pricing, the dashboard, Settings and the data tools live on the app origin
+ * (APP_URL / the primary domain); the CRM portal host serves the CRM routes
+ * only, and in production siteBaseUrl() deliberately prefers PORTAL_URL for
+ * its CRM callers — so it is used here only outside production, where it
+ * points at the dev server the request came from.
+ */
+export function appBaseUrl(req: unknown): string {
+  if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT) return siteBaseUrl(req);
+  return accountBaseUrl();
+}
+
 // ── sendTransactionalEmail (contract-identical fallback for lane 1's helper) ─
 
 let emailLogReady: Promise<void> | null = null;
-/** email_log as the shared contract defines it; CREATE IF NOT EXISTS, so lane 1's copy and this one agree. */
+/**
+ * email_log exactly as lane 1's ensureAccountSchema() defines it (same
+ * columns, NOT NULL DEFAULT now() on sent_at, same index), so whichever DDL
+ * runs first on a fresh database leaves a table the other's INSERT fits.
+ */
 export function ensureEmailLogSchema(): Promise<void> {
   emailLogReady ??= pool.query(`CREATE TABLE IF NOT EXISTS email_log (
       id bigserial PRIMARY KEY,
       user_id integer,
       kind text,
       dedupe_key text UNIQUE,
-      sent_at timestamptz
-    )`).then(() => undefined, (err: any) => { emailLogReady = null; throw err; });
+      sent_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS email_log_user_idx ON email_log(user_id, sent_at DESC)`).then(() => undefined, (err: any) => { emailLogReady = null; throw err; });
   return emailLogReady;
 }
 
@@ -272,6 +290,8 @@ export function invoiceFacts(invoice: Stripe.Invoice, card: CardSummary | null =
     ? anyInv.tax
     : (invoice.total_taxes ?? []).reduce((sum, tax: any) => sum + (Number(tax?.amount) || 0), 0);
   const discountCents = (invoice.total_discount_amounts ?? []).reduce((sum, d: any) => sum + (Number(d?.amount) || 0), 0);
+  const totalCents = Number(invoice.total) || 0;
+  const amountDueCents = Number(invoice.amount_due) || 0;
   return {
     id: invoice.id,
     number: invoice.number ?? null,
@@ -284,9 +304,13 @@ export function invoiceFacts(invoice: Stripe.Invoice, card: CardSummary | null =
     subtotalCents: Number(invoice.subtotal) || 0,
     taxCents,
     discountCents,
-    totalCents: Number(invoice.total) || 0,
+    totalCents,
     amountPaidCents: Number(invoice.amount_paid) || 0,
-    amountDueCents: Number(invoice.amount_due) || 0,
+    amountDueCents,
+    // Stripe charges amount_due, which is the total after the customer's
+    // balance: a credit applied (negative) or a previous balance owed (positive).
+    // Without this row the receipt's numbers would not add up to "Total paid".
+    balanceCents: amountDueCents - totalCents,
     card,
     hostedInvoiceUrl: safeUrl(invoice.hosted_invoice_url),
     invoicePdf: safeUrl(invoice.invoice_pdf),
@@ -330,6 +354,33 @@ export function describeChanges(before: Stripe.SubscriptionItem[] | null | undef
 
 const itemsFingerprint = (items: Stripe.SubscriptionItem[]) =>
   items.map((i) => `${i.price?.id ?? "?"}x${i.quantity ?? 1}`).sort().join(",");
+
+const isFullItem = (entry: any): boolean =>
+  !!entry && typeof entry === "object" && typeof entry.id === "string" && !!entry.price && typeof entry.price === "object";
+
+/**
+ * The subscription's items before a `customer.subscription.updated` event.
+ *
+ * Stripe's `previous_attributes.items.data` is a diff, not a snapshot: an item
+ * changed in place appears as a PARTIAL object at its index holding only the
+ * fields that changed (`price`/`plan` on a plan swap, `quantity` on a quantity
+ * change — and, on current API versions, `current_period_start/end` on every
+ * renewal), while an added or removed item yields the full previous list.
+ * Comparing a partial entry as if it were an item would invent changes ("a
+ * previous plan → Pro", a seat add-on "added") and email one every month, so
+ * the previous items are rebuilt over the current ones. Null when they cannot
+ * be rebuilt.
+ */
+export function previousItemsFrom(previous: Record<string, any> | null | undefined, after: Stripe.SubscriptionItem[]): Stripe.SubscriptionItem[] | null {
+  const data = previous?.items?.data;
+  if (!Array.isArray(data)) return null;
+  if (data.every(isFullItem)) return data as Stripe.SubscriptionItem[];
+  if (data.length !== after.length) return null;
+  return after.map((item, i) => {
+    const prev = data[i];
+    return prev && typeof prev === "object" ? ({ ...item, ...prev } as Stripe.SubscriptionItem) : item;
+  });
+}
 
 // ── Handler ─────────────────────────────────────────────────────────────────
 
@@ -485,6 +536,11 @@ export async function purchaseItemsForSession(session: Stripe.Checkout.Session):
     return { items: [{ label: "Master Class module", amountCents: total }], kind: "course" };
   }
   if (meta.type === "reinstatement") return { items: [{ label: meta.description || "Account reinstatement", amountCents: total }], kind: "reinstatement" };
+  if (meta.type === "seo_contract") {
+    // server/routes.ts SEO agreement checkout: one upfront charge for the whole term.
+    const label = `SEO package agreement${meta.contractId ? ` — contract #${meta.contractId}` : ""}, paid in full`;
+    return { items: [{ label, detail: meta.packageId ? `Package ${meta.packageId}` : null, amountCents: total }], kind: "service" };
+  }
   const lines = (session as any).line_items?.data as any[] | undefined;
   if (lines?.length) {
     return { items: lines.map((l) => ({ label: String(l.description || "Item"), amountCents: Number(l.amount_total) || 0, quantity: l.quantity ?? 1 })), kind: "other" };
@@ -530,7 +586,11 @@ export async function billingEmailEventsFromStripe(event: Stripe.Event, ctx: { u
         else if (!isCanceling && wasCanceling) out.push({ type: "billing.cancellation_reverted", userId, eventId, subscription: sub });
       }
       if (previous && "items" in previous) {
-        const previousItems: Stripe.SubscriptionItem[] | null = Array.isArray(previous.items?.data) ? previous.items.data : null;
+        const after = sub.items?.data ?? [];
+        const previousItems = previousItemsFrom(previous, after);
+        // Only a real change of prices or quantities is a plan/add-on change; a
+        // renewal that touched the items' period fields is not (the receipt covers it).
+        if (previousItems && itemsFingerprint(previousItems) === itemsFingerprint(after)) break;
         let prorationCents: number | null = null;
         let invoice: Stripe.Invoice | null = null;
         const latest = sub.latest_invoice;

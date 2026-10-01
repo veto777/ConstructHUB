@@ -16,7 +16,7 @@ import { pool } from "./db";
 import bcrypt from "bcryptjs";
 import { randomBytes, randomInt } from "crypto";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
-import { sendWelcomeEmail } from "./account/billing-emails";
+import { sendWelcomeEmail, appBaseUrl } from "./account/billing-emails";
 import { notifyMemberLogin, notifyMemberAccountChange } from "./crm/owner-notify";
 import { logMemberAuth } from "./crm/activity";
 import { resolveGoogleUrl } from "./google-url-resolver";
@@ -211,7 +211,9 @@ export async function setupAuth(app: Express) {
 
           // A Google account arrives verified, so this is its sign-up moment:
           // the welcome email goes now (once per user; never blocks the login).
-          void sendWelcomeEmail(newUser.id, getBaseUrl(req))
+          // Its links are app links (Pricing, Settings…), so they use the app
+          // origin, not getBaseUrl(): in production that is the CRM portal host.
+          void sendWelcomeEmail(newUser.id, appBaseUrl(req))
             .catch((err: any) => console.error("Failed to send welcome email:", err?.message || err));
 
           done(null, newUser);
@@ -541,7 +543,8 @@ export async function setupAuth(app: Express) {
 
       // The account is usable from here: welcome + first steps, once per user.
       // The verification redirect never waits on (or fails because of) mail.
-      void sendWelcomeEmail(user.id, getBaseUrl(req))
+      // App origin for the links (see the Google sign-up hook above).
+      void sendWelcomeEmail(user.id, appBaseUrl(req))
         .catch((err: any) => console.error("Failed to send welcome email:", err?.message || err));
 
       // A still-valid email link must never bypass a subsequently enabled second factor.

@@ -211,6 +211,8 @@ export type InvoiceFacts = {
   totalCents: number;
   amountPaidCents: number;
   amountDueCents: number;
+  /** amount_due − total: negative when account credit was applied, positive when a previous balance was owed. */
+  balanceCents: number;
   /** "Visa ending in 4242" when the charge is known, else null. */
   card: { brand: string; last4: string } | null;
   hostedInvoiceUrl: string | null;
@@ -265,7 +267,8 @@ export function welcomeEmail(input: { displayName: string | null; email: string;
       "Here's how to get going:",
     ],
     steps: [
-      { text: "Choose a plan — every plan starts with a free trial, and you can change it any time.", url: `${base}/pricing` },
+      // No trial promise here: the trial is granted (or refused) by the server at checkout.
+      { text: "Choose a plan — you can change or cancel it any time.", url: `${base}/pricing` },
       { text: "Connect your Google Business Profile for review alerts, posts and Profile Guard.", url: `${base}/google-business` },
       { text: "Set up the CRM: estimates, invoices and payments for your jobs.", url: `${base}/crm` },
       { text: "Search permits and appraiser records for your area.", url: `${base}/databases` },
@@ -319,6 +322,8 @@ export function receiptEmail(invoice: InvoiceFacts, baseUrl: string): EmailMessa
   const totals: LayoutRow[] = [["Subtotal", money(invoice.subtotalCents, invoice.currency)]];
   if (invoice.discountCents) totals.push(["Discount", `-${money(invoice.discountCents, invoice.currency)}`]);
   if (invoice.taxCents) totals.push(["Tax", money(invoice.taxCents, invoice.currency)]);
+  if (invoice.balanceCents < 0) totals.push(["Account credit applied", `-${money(-invoice.balanceCents, invoice.currency)}`]);
+  else if (invoice.balanceCents > 0) totals.push(["Previous balance", money(invoice.balanceCents, invoice.currency)]);
   totals.push(["Total paid", money(invoice.amountPaidCents, invoice.currency)]);
   const secondary: LayoutCta[] = [];
   if (invoice.hostedInvoiceUrl) secondary.push({ label: "View invoice online", url: invoice.hostedInvoiceUrl });
