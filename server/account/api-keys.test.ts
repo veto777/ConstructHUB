@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { ensureAccountSchema } from "./schema";
 import {
-  API_KEY_TOKEN_RE, ApiKeyInputError, apiMonthResetsAt, apiMonthStart, createApiKey, getApiKey, listApiKeys, looksLikeApiKey,
+  API_KEY_TOKEN_RE, ApiKeyInputError, ApiKeyLimitError, MAX_ACTIVE_API_KEYS, apiMonthResetsAt, apiMonthStart, countActiveApiKeys, createApiKey, getApiKey, listApiKeys, looksLikeApiKey,
   monthlyUsage, parseApiKeyToken, recordUnits, revokeApiKey, serializeApiKey, unitsThisMonth, updateApiKey, usageByDay, usageDay, verifyApiKey,
 } from "./api-keys";
 
@@ -66,6 +66,28 @@ describe("createApiKey", () => {
       expect(err.status).toBe(400);
     }
     expect(await listApiKeys(uid)).toEqual([]);
+  });
+
+  it("holds the per-account ceiling under the account lock: revoked keys free a slot, concurrent mints at the cap cannot overshoot", async () => {
+    const uid = await account();
+    const mint = () => createApiKey(uid, { name: "ACCT-cap", scopes: ["read"] }, { maxActive: 2 });
+    await mint(); const second = await mint();
+    const refused = await mint().catch((e) => e);
+    expect(refused).toBeInstanceOf(ApiKeyLimitError);
+    expect(refused).toMatchObject({ status: 403, code: "limit_reached", feature: "api_keys", limit: 2, used: 2 });
+    expect(await countActiveApiKeys(uid)).toBe(2);
+    // A revoked key no longer counts.
+    expect(await revokeApiKey(uid, second.row.id)).toBe(true);
+    await mint();
+    expect(await countActiveApiKeys(uid)).toBe(2);
+    // Three at once with one slot left: exactly one wins (pg_advisory_xact_lock serialises the count + insert).
+    expect(await revokeApiKey(uid, (await listApiKeys(uid))[0].id)).toBe(true);
+    const race = await Promise.allSettled([mint(), mint(), mint()]);
+    expect(race.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of race) if (r.status === "rejected") expect(r.reason).toBeInstanceOf(ApiKeyLimitError);
+    expect(await countActiveApiKeys(uid)).toBe(2);
+    // The default ceiling is the documented one.
+    expect(MAX_ACTIVE_API_KEYS).toBe(25);
   });
 });
 

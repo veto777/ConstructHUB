@@ -28,11 +28,12 @@ import { rateLimit } from "../growth-limits";
 import { getEntitlements, sendLimitReached, sendPlanRequired, type Entitlements } from "../entitlements";
 import { PLANS, PLAN_KEYS, type PlanKey, type PlanLimits } from "@shared/plans";
 import type { ApiKeyNotificationKind } from "./api-key-notification-kinds";
+import { MAX_ACTIVE_API_KEYS } from "./api-keys";
 
 export type ApiKeyScope = "read" | "write";
 export const API_KEY_SCOPES: readonly ApiKeyScope[] = ["read", "write"];
-/** Active (unrevoked) keys one account may hold. */
-export const MAX_API_KEYS = 25;
+/** Active (unrevoked) keys one account may hold — the one ceiling, enforced under the per-account lock in createApiKey. */
+export const MAX_API_KEYS = MAX_ACTIVE_API_KEYS;
 export const MAX_KEY_NAME = 80;
 export const MAX_EXPIRES_DAYS = 3650;
 /** The widest usage window the usage endpoint serves. */

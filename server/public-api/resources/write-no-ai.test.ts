@@ -140,17 +140,34 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("API keys never aut
   it("the session-protected AI routes answer 401 to an account API key, and the anonymous ones grant it nothing", async () => {
     for (const [method, route, body, kind] of AI_ROUTES(randomUUID())) {
       const r = await api(method, route, body);
-      if (kind === "session") {
-        expect(r.status, route).toBe(401);
-      } else {
-        // Public endpoints (rate-limited, CAPTCHA-gated): a key is not an identity there either —
-        // the request is treated like any anonymous caller (input refused before any AI call, 400),
-        // or refused outright once rejectApiKeysOutsidePublicApi is mounted app-wide (401).
-        expect([400, 401], route).toContain(r.status);
-      }
-      expect(r.status, route).toBeGreaterThanOrEqual(400);
+      // Session-protected or anonymous (rate-limited, CAPTCHA-gated), a key is refused outright:
+      // rejectApiKeysOutsidePublicApi is mounted app-wide in server/index.ts, before any parser or handler.
+      expect(r.status, `${kind} ${route}`).toBe(401);
+      expect(r.data, route).toMatchObject({ error: { code: "unauthorized" } });
       expect(r.data?.reached, route).toBeUndefined();
     }
+  });
+
+  it("a malformed JSON body on /api/v1 answers the API's error envelope (the app-level parser fails before the router)", async () => {
+    const raw = async (path: string, bearer: string | null) => {
+      const headers: Record<string, string> = { "content-type": "application/json", "x-forwarded-for": ip };
+      if (bearer) headers.authorization = `Bearer ${bearer}`;
+      const r = await fetch(base + path, { method: "POST", headers, body: "{not json" });
+      return { status: r.status, type: r.headers.get("content-type") ?? "", data: await r.json().catch(() => null) };
+    };
+    for (const bearer of [key, null]) {
+      const r = await raw("/api/v1/site-scans", bearer);
+      expect(r.status, bearer ? "with key" : "anonymous").toBe(400);
+      expect(r.type).toMatch(/json/);
+      expect(r.data).toMatchObject({ error: { code: "validation_error" } });
+      // Never the parser's own text (no internals, one vocabulary).
+      expect(JSON.stringify(r.data)).not.toMatch(/Unexpected token|SyntaxError/);
+    }
+    // Session routes keep their own { message } shape.
+    const s = await raw("/api/account/api-keys", null);
+    expect(s.status).toBe(400);
+    expect(s.data?.error).toBeUndefined();
+    expect(typeof s.data?.message).toBe("string");
   });
 
   it("the CRM's own /api/v1 key middleware refuses an account key (the two key types never cross)", async () => {
