@@ -266,6 +266,10 @@ export async function registerRoutes(
   // Account: billing records, email log, public API keys + metering.
   const { ensureAccountSchema } = await import("./account/schema");
   await ensureAccountSchema();
+  // Transactional emails the provider refused wait in email_log as pending;
+  // retry them (server/account/billing-emails.ts drainEmailOutbox) every minute.
+  const { startEmailOutboxDrainer } = await import("./account/billing-emails");
+  startEmailOutboxDrainer();
   const { ensureAccountEventsSchema, registerAccountEventRoutes } = await import("./account-events");
   await ensureAccountEventsSchema();
   registerAccountEventRoutes(app, getDevUser);

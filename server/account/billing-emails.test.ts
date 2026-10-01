@@ -18,7 +18,7 @@ process.env.APP_URL = "https://app.example.invalid";
 
 const mocks = vi.hoisted(() => ({
   users: new Map<number, { email: string; display_name: string | null }>(),
-  log: new Map<string, { id: number; user_id: number; kind: string }>(),
+  log: new Map<string, { id: number; user_id: number; kind: string; status: string; message: any }>(),
   nextId: 1,
   modules: new Map<number, { title: string; price: number }>(),
   customers: new Map<string, number>(),
@@ -43,9 +43,14 @@ vi.mock("../db", () => ({
       if (/INSERT INTO email_log/.test(text)) {
         const [user_id, kind, key] = values;
         if (mocks.log.has(key)) return { rows: [] };
-        const row = { id: mocks.nextId++, user_id, kind };
+        const row = { id: mocks.nextId++, user_id, kind, status: "sent", message: null as any };
         mocks.log.set(key, row);
         return { rows: [{ id: row.id }] };
+      }
+      if (/UPDATE email_log SET status = 'pending'/.test(text)) {
+        // The outbox: a failed send keeps its claim and stores the rendered message for drainEmailOutbox.
+        for (const row of mocks.log.values()) if (row.id === values[0]) { row.status = "pending"; row.message = JSON.parse(values[3]); }
+        return { rows: [] };
       }
       if (/DELETE FROM email_log/.test(text)) {
         for (const [key, row] of mocks.log) if (row.id === values[0]) mocks.log.delete(key);
@@ -74,7 +79,7 @@ vi.mock("../email", () => ({
 
 import {
   BILLING_EMAIL_EVENTS, EMAIL_KINDS, sendWelcomeEmail, handleBillingEmailEvent, billingEmailEventsFromStripe,
-  onStripeBillingEvent, sendTransactionalEmail, subscriptionFacts, describeChanges, previousItemsFrom, appBaseUrl,
+  onStripeBillingEvent, sendTransactionalEmail, deliverTransactionalEmail, subscriptionFacts, describeChanges, previousItemsFrom, appBaseUrl,
   type BillingEmailEvent, type StripeReader,
 } from "./billing-emails";
 import { emailLayout } from "./billing-email-templates";
@@ -168,13 +173,17 @@ describe("sendTransactionalEmail (dedupe contract)", () => {
     expect(last()).toMatchObject({ to: "owner@example.invalid", subject: "Hello", text: "Hi" });
     expect(last().headers["X-ConstructHUB-Email"]).toBe("test");
   });
-  it("releases the claim when the send fails so a retry can send", async () => {
+  it("a failed send keeps the claim and queues the email for the outbox — a retry by the caller never sends it twice", async () => {
     const msg = { subject: "Hello", html: "<p>Hi</p>", text: "Hi" };
     mocks.sendError = new Error("smtp down");
-    await expect(sendTransactionalEmail(USER, "test", "test:retry", msg)).rejects.toThrow("smtp down");
+    expect(await deliverTransactionalEmail(USER, "test", "test:retry", msg)).toBe("queued");
+    expect(mocks.log.get("test:retry")).toMatchObject({ status: "pending", message: { subject: "Hello", text: "Hi" } });
     mocks.sendError = null;
-    expect(await sendTransactionalEmail(USER, "test", "test:retry", msg)).toBe(true);
-    expect(sent()).toHaveLength(1);
+    // The key is still claimed: the caller's retry sends nothing — drainEmailOutbox sends the
+    // pending row once (email-outbox.test.ts, against the real database).
+    expect(await deliverTransactionalEmail(USER, "test", "test:retry", msg)).toBe("duplicate");
+    expect(await sendTransactionalEmail(USER, "test", "test:retry", msg)).toBe(false);
+    expect(sent()).toHaveLength(0);
   });
   it("sends nothing for an account without an address", async () => {
     expect(await sendTransactionalEmail(999, "test", "test:none", { subject: "x", html: "x", text: "x" })).toBe(false);
@@ -524,11 +533,15 @@ describe("onStripeBillingEvent (the webhook's one call)", () => {
     expect(results).toEqual([{ kind: EMAIL_KINDS.subscriptionStarted, dedupeKey: "subscription_started:sub_1", sent: true }]);
     expect(await onStripeBillingEvent(stripeEvent("customer.subscription.created", subscription([item("si_plan", PRO_M)], { id: "sub_x", customer: "cus_unknown", metadata: {} })), { baseUrl: BASE })).toEqual([]);
     mocks.sendError = new Error("smtp down");
-    expect(await onStripeBillingEvent(stripeEvent("invoice.paid", invoice([line(PRO_M, 7900)])), { baseUrl: BASE })).toEqual([]);
+    expect(await onStripeBillingEvent(stripeEvent("invoice.paid", invoice([line(PRO_M, 7900)])), { baseUrl: BASE }))
+      .toEqual([{ kind: EMAIL_KINDS.receipt, dedupeKey: "receipt:in_1", sent: false, queued: true }]);
     mocks.sendError = null;
-    // The failed send released its claim: the next delivery sends.
-    expect(await onStripeBillingEvent(stripeEvent("invoice.paid", invoice([line(PRO_M, 7900)])), { baseUrl: BASE })).toEqual([{ kind: EMAIL_KINDS.receipt, dedupeKey: "receipt:in_1", sent: true }]);
-    expect(sent()).toHaveLength(2);
+    // The failed send kept its claim as a pending outbox row: a redelivery of the event sends
+    // nothing more (drainEmailOutbox sends the row, once), and the webhook was never failed for it.
+    expect(await onStripeBillingEvent(stripeEvent("invoice.paid", invoice([line(PRO_M, 7900)])), { baseUrl: BASE }))
+      .toEqual([{ kind: EMAIL_KINDS.receipt, dedupeKey: "receipt:in_1", sent: false }]);
+    expect(mocks.log.get("receipt:in_1")).toMatchObject({ status: "pending" });
+    expect(sent()).toHaveLength(1);
   });
   it("covers every declared billing event with a template", async () => {
     const sub = subscription([item("si_plan", PRO_M)]);
