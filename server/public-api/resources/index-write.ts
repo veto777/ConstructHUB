@@ -1,50 +1,49 @@
 /**
- * Public API — entry point for the WRITE resources (lane l7-api-write).
+ * Public API — entry point for the WRITE routes. Each entry names the read
+ * resource it joins (./register.ts composes one router per name, write routes
+ * first) and carries an OpenAPI fragment whose paths are relative to
+ * /api/v1/<name>:
  *
- * Lane 1's server/public-api/index.ts calls `registerWriteResources(registerResource)`
- * once it has built its router stack (API-key auth → scope check → 60/min rate
- * limit → monthly units → metering). Each resource is a plain Express router
- * mounted at `${GROWTH_BASE}/<name>` and an OpenAPI fragment for
- * GET /api/v1/openapi.json.
+ *   locations      POST /{locationId}/posts    schedule a Google Business Profile update
+ *   reviews        POST /{reviewId}/reply      reply to a Google review
+ *   social-posts   POST /                      schedule a social post (businessId in the body)
+ *   site-scans     POST /                      start a Site Scan
  *
- *   gbp       POST /locations/{locationId}/posts, POST /reviews/{reviewId}/reply
- *   social    POST /businesses/{businessId}/posts
- *   sitescan  POST /scans
- *
- * Also exported for the app: `rejectApiKeysOutsidePublicApi` (mount app-wide so
- * a `chub_` bearer answers 401 on every non-/api/v1 route, the AI routes
- * included) and `ensurePublicApiWriteSchema` (idempotent; also run lazily).
+ * `ensurePublicApiWriteSchema` (idempotent; also run lazily) adds the
+ * gbp_content_jobs.source column API-created jobs carry.
  */
-import { gbpWriteRouter, gbpWriteOpenapi, gbpWriteDefaults, type GbpWriteDeps } from "./gbp-write";
+import { gbpPostsWriteRouter, gbpReplyWriteRouter, gbpPostsWriteOpenapi, gbpReplyWriteOpenapi, gbpWriteDefaults, type GbpWriteDeps } from "./gbp-write";
 import { socialWriteRouter, socialWriteOpenapi, socialWriteDefaults, type SocialWriteDeps } from "./social-write";
 import { sitescanWriteRouter, sitescanWriteOpenapi, sitescanWriteDefaults, type SitescanWriteDeps } from "./sitescan-write";
 import type { RegisterResource } from "./shared-write";
 
-export { GROWTH_BASE, WRITE_UNITS, API_KEY_BEARER, rejectApiKeysOutsidePublicApi, requireWriteScope, apiKeyContext, type ApiKeyContext, type RegisterResource } from "./shared-write";
+export { PUBLIC_API_BASE, WRITE_UNITS, API_KEY_BEARER, rejectApiKeysOutsidePublicApi, requireWriteScope, apiKeyContext, type ApiKeyContext, type RegisterResource } from "./shared-write";
 export { ensurePublicApiWriteSchema } from "./gbp-write";
 
 export type WriteResourceDeps = { gbp?: GbpWriteDeps; social?: SocialWriteDeps; sitescan?: SitescanWriteDeps };
 
-/** Every write resource with its router factory and OpenAPI fragment, in mount order. */
+/** Every write route with its router factory and OpenAPI fragment, keyed by the resource it joins, in mount order. */
 export function writeResources(deps: WriteResourceDeps = {}) {
+  const gbp = deps.gbp ?? gbpWriteDefaults;
   return [
-    { name: "gbp", router: gbpWriteRouter(deps.gbp ?? gbpWriteDefaults), openapi: gbpWriteOpenapi },
-    { name: "social", router: socialWriteRouter(deps.social ?? socialWriteDefaults), openapi: socialWriteOpenapi },
-    { name: "sitescan", router: sitescanWriteRouter(deps.sitescan ?? sitescanWriteDefaults), openapi: sitescanWriteOpenapi },
+    { name: "locations", router: gbpPostsWriteRouter(gbp), openapi: gbpPostsWriteOpenapi },
+    { name: "reviews", router: gbpReplyWriteRouter(gbp), openapi: gbpReplyWriteOpenapi },
+    { name: "social-posts", router: socialWriteRouter(deps.social ?? socialWriteDefaults), openapi: socialWriteOpenapi },
+    { name: "site-scans", router: sitescanWriteRouter(deps.sitescan ?? sitescanWriteDefaults), openapi: sitescanWriteOpenapi },
   ] as const;
 }
 
-/** Register the write resources with lane 1's registry (one call per resource; a name may be registered once). */
+/** Register the write routes on their own (tests); the app composes them with the reads through ./register.ts. */
 export function registerWriteResources(registerResource: RegisterResource, deps: WriteResourceDeps = {}) {
   for (const r of writeResources(deps)) registerResource(r.name, r.router, r.openapi);
 }
 
-/** The write operations' OpenAPI paths + schemas merged (what the fragments add to /api/v1/openapi.json). */
+/** The write operations' OpenAPI paths (absolute, /api/v1-relative) + schemas merged (what the fragments add to openapi.json). */
 export function writeOpenapiFragment() {
   const paths: Record<string, unknown> = {}, schemas: Record<string, unknown> = {};
-  for (const f of [gbpWriteOpenapi, socialWriteOpenapi, sitescanWriteOpenapi]) {
-    Object.assign(paths, f.paths);
-    Object.assign(schemas, f.components.schemas);
+  for (const r of writeResources()) {
+    for (const [p, ops] of Object.entries(r.openapi.paths)) paths[p === "/" ? `/${r.name}` : `/${r.name}${p}`] = ops;
+    Object.assign(schemas, r.openapi.components.schemas);
   }
   return { paths, components: { schemas } };
 }

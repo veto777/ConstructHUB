@@ -177,12 +177,14 @@ describe("pricing display: services at or above the sales threshold", () => {
 
 describe("pricing UI source", () => {
   it("hard-codes no prices and no retired plans", () => {
-    const billing = read("client/src/pages/settings.tsx").split("function BillingSection")[1];
+    // The Billing cards moved out of settings.tsx into the settings shell's plan-billing panel.
+    const billing = read("client/src/pages/settings/plan-billing.tsx").split("function PlanBillingSection")[1];
     for (const [name, src] of [
       ["pricing.tsx", read("client/src/pages/pricing.tsx")],
       ["cart-sheet.tsx", read("client/src/components/cart-sheet.tsx")],
       ["talk-to-sales.tsx", read("client/src/components/talk-to-sales.tsx")],
-      ["settings.tsx BillingSection", billing],
+      ["settings/plan-billing.tsx PlanBillingSection", billing],
+      ["settings/billing/subscriptions-panel.tsx", read("client/src/pages/settings/billing/subscriptions-panel.tsx")],
     ] as const) {
       expect(src, name).not.toMatch(/\$\s?\d/);
       expect(src, name).not.toMatch(/\b(Gold|Platinum|Premium|Professional)\b/);

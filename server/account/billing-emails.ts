@@ -31,6 +31,7 @@
 import type Stripe from "stripe";
 import { pool } from "../db";
 import { sendWithFallback } from "../email";
+import { EMAIL_LOG_DDL } from "./schema";
 import { PRIMARY_DOMAIN, siteBaseUrl } from "../site-context";
 import {
   PLANS, ADDONS, ADDON_KEYS, planPriceCents, addonPriceCents, type AddonKey, type BillingInterval,
@@ -139,14 +140,8 @@ let emailLogReady: Promise<void> | null = null;
  * runs first on a fresh database leaves a table the other's INSERT fits.
  */
 export function ensureEmailLogSchema(): Promise<void> {
-  emailLogReady ??= pool.query(`CREATE TABLE IF NOT EXISTS email_log (
-      id bigserial PRIMARY KEY,
-      user_id integer,
-      kind text,
-      dedupe_key text UNIQUE,
-      sent_at timestamptz NOT NULL DEFAULT now()
-    );
-    CREATE INDEX IF NOT EXISTS email_log_user_idx ON email_log(user_id, sent_at DESC)`).then(() => undefined, (err: any) => { emailLogReady = null; throw err; });
+  // One definition (server/account/schema.ts EMAIL_LOG_DDL), one statement here.
+  emailLogReady ??= pool.query(EMAIL_LOG_DDL.join(";\n")).then(() => undefined, (err: any) => { emailLogReady = null; throw err; });
   return emailLogReady;
 }
 

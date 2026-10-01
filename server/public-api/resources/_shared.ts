@@ -227,8 +227,15 @@ export function handler(fn: ScopedHandler): RequestHandler {
   };
 }
 
-/** Every route here is a read; a key without the `read` scope is refused even if it reaches us. */
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * Every route here is a read; a key without the `read` scope is refused even if it reaches us.
+ * A write method is not ours (the write router of the same name handles it, or the registry's
+ * JSON 404 does), so it passes through untouched.
+ */
 export const requireReadScope: RequestHandler = (req, res, next) => {
+  if (!READ_METHODS.has(req.method.toUpperCase())) return next();
   try {
     const key = keyContext(req);
     if (!key.scopes.includes("read")) return sendError(res, 403, "insufficient_scope", "This API key has no read scope.");

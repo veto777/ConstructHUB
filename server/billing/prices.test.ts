@@ -129,7 +129,9 @@ describe("ensureBillingSchema", () => {
     // Then the ledger: one catalog read, then its CREATE ... IF NOT EXISTS statements.
     expect(statements[1 + BILLING_SUBSCRIPTION_DDL.length]).toMatch(/information_schema\.tables/);
     expect(statements.slice(2 + BILLING_SUBSCRIPTION_DDL.length)).toEqual([...BILLING_LEDGER_DDL]);
-    for (const ddl of BILLING_LEDGER_DDL) expect(ddl).toMatch(/^CREATE (TABLE|INDEX) IF NOT EXISTS /);
+    // The ledger DDL is the account schema's (one definition): CREATE … IF NOT EXISTS, plus the removal of the
+    // duplicate indexes earlier builds created under other names (DROP INDEX IF EXISTS, idempotent).
+    for (const ddl of BILLING_LEDGER_DDL) expect(ddl).toMatch(/^(CREATE (TABLE|INDEX) IF NOT EXISTS |DROP INDEX IF EXISTS billing_)/);
     for (const ddl of BILLING_SUBSCRIPTION_DDL) expect(ddl).toMatch(/^ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS /);
     // One statement per checked column, so a routine boot never re-runs DDL.
     expect(BILLING_SUBSCRIPTION_DDL.map((ddl) => ddl.split(" ")[8])).toEqual([...BILLING_COLUMNS]);

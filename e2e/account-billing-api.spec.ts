@@ -13,8 +13,11 @@ import { test, expect, type Page } from "@playwright/test";
 import { ADDONS, PLANS } from "../shared/plans";
 import { gotoCrm, watchPage } from "./helpers";
 
+// Deep links: /settings/billing[?billing=…] and /settings/api[?api=usage] redirect into the settings shell
+// (Workspace → Billing with its tabs, API keys, API usage), which is what the assertions below see.
 const BILLING_URL = "/settings/billing";
 const API_URL = "/settings/api";
+const sectionTitle = (page: Page) => page.getByTestId("text-settings-section-title");
 
 const usd = (cents: number) => {
   const whole = cents % 100 === 0;
@@ -164,7 +167,8 @@ test.describe("settings billing", () => {
     const guards = watchPage(page);
     const calls = await mockAccount(page);
     await gotoCrm(page, BILLING_URL);
-    await expect(page.getByTestId("text-billing-title")).toHaveText("Billing");
+    await expect(sectionTitle(page)).toContainText("Billing");
+    await expect(page).toHaveURL(/[?&]tab=billing(&|$)/);
     await expect(page.getByTestId("tab-billing-subscriptions")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("text-subscription-plan")).toHaveText("Pro");
     await expect(page.getByTestId("badge-subscription-status")).toHaveText("Active");
@@ -178,7 +182,9 @@ test.describe("settings billing", () => {
     await expect(page.locator('[data-testid="row-subscription-addon-extra_seat"]')).toHaveCount(0);
     const total = PLANS.pro.monthlyCents + 2 * ADDONS.protected_site.monthlyCents + ADDONS.competitor_pack.monthlyCents;
     await expect(page.getByTestId("text-subscription-total")).toHaveText(`${usd(total)}/mo`);
-    await expect(page.getByTestId("button-change-plan")).toHaveText("Change plan");
+    // The plan cards under the statement carry the actions (one "Manage billing" on the page).
+    await expect(page.getByTestId("button-upgrade")).toHaveText("Change plan");
+    await expect(page.getByTestId("card-current-plan")).toContainText("Pro plan");
     await page.getByTestId("button-manage-billing").click();
     await expect.poll(() => calls.portal).toBe(1);
     guards.assertClean("subscriptions");
@@ -206,9 +212,9 @@ test.describe("settings billing", () => {
     await mockAccount(page, { sub: NO_SUB });
     await gotoCrm(page, BILLING_URL);
     await expect(page.getByTestId("text-no-subscription")).toContainText("No active plan");
-    await expect(page.getByTestId("button-change-plan")).toHaveText("Choose a plan");
+    await expect(page.getByTestId("button-upgrade")).toHaveText("Choose a plan");
     await expect(page.locator('[data-testid="button-manage-billing"]')).toHaveCount(0);
-    await page.getByTestId("button-change-plan").click();
+    await page.getByTestId("button-upgrade").click();
     await expect(page).toHaveURL(/\/pricing$/);
   });
 
@@ -269,7 +275,7 @@ test.describe("settings billing", () => {
     await mockAccount(page);
     await gotoCrm(page, BILLING_URL);
     await page.getByTestId("tab-billing-invoices").click();
-    await expect(page).toHaveURL(/billing=invoices/);
+    await expect(page).toHaveURL(/[?&]view=invoices(&|$)/);
     await page.reload();
     await expect(page.getByTestId("card-invoices")).toBeVisible();
   });
@@ -418,7 +424,8 @@ test.describe("settings api usage", () => {
     const guards = watchPage(page);
     await mockAccount(page);
     await gotoCrm(page, `${API_URL}?api=usage`);
-    await expect(page.getByTestId("tab-api-usage")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("button-settings-tab-api-usage")).toHaveAttribute("aria-current", "page");
+    await expect(page).toHaveURL(/[?&]tab=api-usage(&|$)/);
     await expect(page.getByTestId("text-usage-total-units")).toHaveText("165");
     await expect(page.getByTestId("text-usage-total-requests")).toHaveText("120");
     await expect(page.getByTestId("text-usage-active-keys")).toHaveText("2");
@@ -470,7 +477,7 @@ test.describe("developers page", () => {
     await expect(create).toContainText("Cost: 5 unit(s).");
     await expect(create).toContainText("201 — Created.");
     await page.getByTestId("link-developers-keys").click();
-    await expect(page).toHaveURL(/\/settings\/api$/);
+    await expect(page).toHaveURL(/[?&]tab=api-keys(&|$)/);
     guards.assertClean("developers");
   });
 

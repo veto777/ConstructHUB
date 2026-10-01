@@ -33,6 +33,8 @@ export type SubscriptionsPanelProps = {
   onChangePlan?: () => void;
   /** "Manage billing" (default: Stripe's billing portal via POST /api/stripe/create-portal). */
   onManageBilling?: () => void;
+  /** false hides the header buttons (the settings shell renders the plan cards with their own controls below). */
+  showActions?: boolean;
 };
 
 /**
@@ -41,7 +43,7 @@ export type SubscriptionsPanelProps = {
  * from the price book, never from this file. Changes happen in Pricing or in
  * Stripe's portal; this panel is a statement, not a form.
  */
-export function SubscriptionsPanel({ onChangePlan, onManageBilling }: SubscriptionsPanelProps = {}) {
+export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions = true }: SubscriptionsPanelProps = {}) {
   const [, navigate] = useLocation();
   const portal = useBillingPortal();
   const { data: subscription, isLoading, error } = useQuery<SubscriptionWithStart>({ queryKey: ["/api/stripe/subscription"] });
@@ -105,14 +107,16 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling }: Subscripti
           <CardTitle className="text-lg">Subscription</CardTitle>
           <CardDescription>What you're on, when it renews and what it costs.</CardDescription>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={changePlan} data-testid="button-change-plan">{plan ? "Change plan" : "Choose a plan"}</Button>
-          {view.viaStripe && (
-            <Button size="sm" variant="outline" onClick={manageBilling} disabled={portal.isPending} data-testid="button-manage-billing">
-              {portal.isPending ? "Opening…" : "Manage billing"}
-            </Button>
-          )}
-        </div>
+        {showActions && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={changePlan} data-testid="button-change-plan">{plan ? "Change plan" : "Choose a plan"}</Button>
+            {view.viaStripe && (
+              <Button size="sm" variant="outline" onClick={manageBilling} disabled={portal.isPending} data-testid="button-manage-billing">
+                {portal.isPending ? "Opening…" : "Manage billing"}
+              </Button>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {isLoading ? (

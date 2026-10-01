@@ -1,30 +1,32 @@
 /**
- * Public API — Social Media WRITE resource (`social`), mounted by lane 1 at
- * `${GROWTH_BASE}/social`:
+ * Public API — Social Media WRITE route, composed into the `social-posts`
+ * resource (./register.ts):
  *
- *   POST /businesses/{businessId}/posts   schedule the caller's text (and media
- *                                         URLs) to that business's connected,
- *                                         mapped destinations
+ *   POST /api/v1/social-posts   schedule the caller's text (and media URLs) to
+ *                               a business's connected, mapped destinations
  *
- * A 5-unit write. The body is the same contract the Social Media page uses
- * (shared/social.ts postSchema) and goes through server/social/service.ts
- * createPosts(): request-id idempotency, destination/mapping validation,
- * per-platform text and media rules, the user lock. Rows are stored exactly as
- * supplied with source='api', ai_generated=false and auto_generated=false, so
- * no AI worker ever touches them. No AI module is imported here.
+ * A 5-unit write. The body is the Social Media page's contract
+ * (shared/social.ts postSchema) plus `businessId`, and goes through
+ * server/social/schedule.ts createPosts(): request-id idempotency,
+ * destination/mapping validation, per-platform text and media rules, the user
+ * lock. Rows are stored exactly as supplied with source='api',
+ * ai_generated=false and auto_generated=false, so no AI worker ever touches
+ * them. No AI module is imported here or below (social/schedule.ts is the
+ * AI-free half of the social service).
  */
 import { Router, type Request } from "express";
 import { pool } from "../../db";
 import { SocialError } from "../../social/client";
-import { createPosts as createSocialPosts, ownedBusiness } from "../../social/service";
+import { createPosts as createSocialPosts, ownedBusiness } from "../../social/schedule";
 import { logActivity } from "../../account-events";
 import { postSchema } from "@shared/social";
-import { GROWTH_BASE, handle, idParam, openapiCommon, requireWriteScope, type ApiKeyContext } from "./shared-write";
+import { handle, idParam, openapiCommon, requireWriteScope, type ApiKeyContext } from "./shared-write";
 
 export type SocialWriteDeps = { createPosts: typeof createSocialPosts };
 export const socialWriteDefaults: SocialWriteDeps = { createPosts: createSocialPosts };
 
-export const socialPostInput = postSchema;
+/** The page's post contract plus the business the post belongs to. */
+export const socialPostInput = postSchema.extend({ businessId: idParam });
 
 export function socialPostView(row: any) {
   const content = row.payload?.post?.content ?? {};
@@ -38,8 +40,8 @@ export function socialPostView(row: any) {
 }
 
 /** Schedule the caller's post to a business's mapped destinations; idempotent on requestId (same content replays). */
-export async function scheduleSocialPost(userId: number, businessId: number, raw: unknown, meta: { keyId: string; req?: Request | null }, deps: SocialWriteDeps = socialWriteDefaults) {
-  const input = socialPostInput.parse(raw);
+export async function scheduleSocialPost(userId: number, raw: unknown, meta: { keyId: string; req?: Request | null }, deps: SocialWriteDeps = socialWriteDefaults) {
+  const { businessId, ...input } = socialPostInput.parse(raw);
   if (!(await ownedBusiness(userId, businessId))) throw new SocialError("Business not found", 404);
   const rows = await deps.createPosts(userId, input, businessId);
   const ids = rows.map((r: any) => r.id);
@@ -53,38 +55,36 @@ export async function scheduleSocialPost(userId: number, businessId: number, raw
   return { created, rows: rows.map((r: any) => ({ ...r, source: updated.some((u: any) => u.id === r.id) ? "api" : r.source })) };
 }
 
+/** `social-posts` resource: POST /. */
 export function socialWriteRouter(deps: SocialWriteDeps = socialWriteDefaults) {
   const router = Router();
-  router.post("/businesses/:businessId/posts", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
-    const businessId = idParam.parse(req.params.businessId);
-    const { created, rows } = await scheduleSocialPost(key.userId, businessId, req.body ?? {}, { keyId: key.id, req }, deps);
+  router.post("/", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
+    const { created, rows } = await scheduleSocialPost(key.userId, req.body ?? {}, { keyId: key.id, req }, deps);
     res.status(created ? 201 : 200).json({ posts: rows.map(socialPostView), created });
   }));
   return router;
 }
 
-const base = `${GROWTH_BASE}/social`;
+/** Fragment for the `social-posts` resource (paths relative to /api/v1/social-posts). */
 export const socialWriteOpenapi = {
   paths: {
-    [`${base}/businesses/{businessId}/posts`]: {
+    "/": {
       post: {
-        ...openapiCommon.writeOperation("Schedule a social post with your own text to a business's connected destinations", "social"),
+        ...openapiCommon.writeOperation("Schedule a social post with your own text to a business's connected destinations", "social-posts"),
         operationId: "scheduleSocialPost",
-        parameters: [{ name: "businessId", in: "path", required: true, schema: { type: "integer" } }],
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/SocialPostInput" } } } },
         responses: {
           "201": { description: "Queued (one row per destination)", content: { "application/json": { schema: { $ref: "#/components/schemas/SocialPostResult" } } } },
           "200": { description: "Already queued under this requestId (idempotent replay)", content: { "application/json": { schema: { $ref: "#/components/schemas/SocialPostResult" } } } },
-          "400": openapiCommon.errorResponse("Validation failed (platform text limits, media rules, past schedule time)"),
-          "403": openapiCommon.errorResponse("Key lacks the write scope"), "404": openapiCommon.errorResponse("Business not found"),
-          "409": openapiCommon.errorResponse("Social account not connected, destinations not mapped to this business, requestId reused, or the queue is busy"),
+          "400": openapiCommon.errorResponse("validation_error (platform text limits, media rules, past schedule time)"),
+          "403": openapiCommon.errorResponse("insufficient_scope — the key lacks the write scope"), "404": openapiCommon.errorResponse("not_found — no such business of yours"),
+          "409": openapiCommon.errorResponse("conflict — social account not connected, destinations not mapped to this business, requestId reused, or the queue is busy"),
         },
       },
     },
   },
   components: {
     schemas: {
-      ...openapiCommon.schemas,
       SocialDestination: {
         type: "object", required: ["accountId", "platform"],
         properties: {
@@ -95,8 +95,9 @@ export const socialWriteOpenapi = {
         },
       },
       SocialPostInput: {
-        type: "object", required: ["requestId", "text", "destinations"],
+        type: "object", required: ["businessId", "requestId", "text", "destinations"],
         properties: {
+          businessId: { type: "integer", description: "The location (business) whose connected social accounts publish the post" },
           requestId: { type: "string", format: "uuid", description: "Idempotency key" },
           text: { type: "string", maxLength: 63206 },
           destinations: { type: "array", minItems: 1, maxItems: 20, items: { $ref: "#/components/schemas/SocialDestination" }, description: "Must be mapped to the business in Social Media settings" },

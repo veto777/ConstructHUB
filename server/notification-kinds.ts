@@ -2,9 +2,11 @@ import { EDGE_NOTIFICATION_KINDS } from './cloudflare/notification-kinds';
 /** Single registry for every growth account notification emitted by the app. */
 export type NotificationDefaults = { label: string; inApp: boolean; email: boolean; security?: boolean };
 import { DOMAIN_MAIL_NOTIFICATION_KINDS } from "./domains/notification-kinds";
+import { API_KEY_NOTIFICATION_KINDS } from "./account/api-key-notification-kinds";
 export const NOTIFICATION_KINDS = {
   ...EDGE_NOTIFICATION_KINDS,
   ...DOMAIN_MAIL_NOTIFICATION_KINDS,
+  ...API_KEY_NOTIFICATION_KINDS,
   "google.connected": { label: "A Google account was connected", inApp: true, email: true, security: true },
   "google.disconnected": { label: "A Google account was disconnected", inApp: true, email: true, security: true },
   "security.2fa_changed": { label: "Two-factor sign-in was turned on or off", inApp: true, email: true, security: true },

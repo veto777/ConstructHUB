@@ -186,12 +186,14 @@ const requestIp = (req: Request) => String(req.headers["cf-connecting-ip"] || re
  * Each step is attempted on its own and a failure is logged.
  */
 async function securityEvent(req: Request, userId: number, kind: ApiKeyNotificationKind, title: string, body: string, detail: Record<string, unknown>) {
-  const attempt = async (what: string, fn: () => Promise<unknown>) => {
-    try { await fn(); } catch (e: any) { console.error(`[api-keys] ${kind}: ${what} failed:`, e?.message); }
+  const attempt = async (what: string, fn: () => Promise<unknown>): Promise<boolean> => {
+    try { await fn(); return true; } catch (e: any) { console.error(`[api-keys] ${kind}: ${what} failed:`, e?.message); return false; }
   };
   await attempt("activity log", () => logActivity(req, userId, kind, detail));
-  await attempt("notification", () => notifyUser(userId, kind as NotificationKind, { title, body, link: API_KEYS_PATH, severity: "warning", actionUrl: API_KEYS_PATH, actionLabel: "Review API keys" }));
-  if (Object.hasOwn(NOTIFICATION_KINDS, kind)) return;
+  const notified = await attempt("notification", () => notifyUser(userId, kind as NotificationKind, { title, body, link: API_KEYS_PATH, severity: "warning", actionUrl: API_KEYS_PATH, actionLabel: "Review API keys" }));
+  // A registered security kind is emailed by notifyUser; when that failed (or the kind is not
+  // registered) the email still goes out directly — a key event is never silently in-app-only.
+  if (notified && Object.hasOwn(NOTIFICATION_KINDS, kind)) return;
   await attempt("security email", async () => {
     const { rows: [u] } = await pool.query("SELECT email FROM users WHERE id=$1", [userId]);
     if (!u?.email) return;
@@ -263,7 +265,17 @@ export function registerApiKeyRoutes(app: Express, auth: (req: any, res: any) =>
     if (used >= MAX_API_KEYS) {
       return void sendLimitReached(res, { limit: MAX_API_KEYS, used, feature: "api_keys", message: `An account can hold up to ${MAX_API_KEYS} active API keys. Revoke one you no longer use.` });
     }
-    const minted = await deps.createApiKey(u.id, { name, scopes, monthlyUnitLimit, expiresInDays });
+    let minted: Awaited<ReturnType<ApiKeyDeps["createApiKey"]>>;
+    try {
+      // The helper re-checks the ceiling under the per-account lock (two requests at 24 keys cannot both succeed).
+      minted = await deps.createApiKey(u.id, { name, scopes, monthlyUnitLimit, expiresInDays });
+    } catch (e: any) {
+      if (e?.code === "limit_reached" && e?.feature === "api_keys") {
+        return void sendLimitReached(res, { limit: Number(e.limit) || MAX_API_KEYS, used: Number(e.used) || used, feature: "api_keys", message: String(e.message) });
+      }
+      if (Number(e?.status) === 400) return void res.status(400).json({ message: String(e.message || "Invalid API key request") });
+      throw e;
+    }
     const row = normalizeRow(minted.row, u.id);
     const key = bearerFor(minted.secret, row.prefix);
     await securityEvent(req, u.id, "security.api_key_created", `API key "${name}" was created`,

@@ -112,7 +112,13 @@ export const canceledRowUpdate = (): SubscriptionSet => ({
  * record a cancellation either as cancel_at_period_end or as a cancel_at date;
  * a cancel_at on or before the period end is "ends at period end" too.
  */
-export type Cancellation = { cancelAtPeriodEnd: boolean | null; cancelAt: Date | null };
+export type Cancellation = { cancelAtPeriodEnd: boolean | null; cancelAt: Date | null; /** When the Stripe subscription began (its start_date); null until synced. */ startDate?: Date | null };
+
+/** The subscription's start, as Stripe records it (`start_date`); null when the object carries none. */
+export function subscriptionStartOf(sub: Stripe.Subscription): Date | null {
+  const epoch = (sub as any).start_date ?? (sub as any).created;
+  return typeof epoch === "number" && Number.isFinite(epoch) ? new Date(epoch * 1000) : null;
+}
 
 export function cancellationOf(sub: Stripe.Subscription): Cancellation {
   const epoch = (sub as any).cancel_at;
@@ -132,18 +138,20 @@ export async function recordCancellation(where: { id: number } | { userId: numbe
   await billingSchemaReady();
   const c: Cancellation = sub ? cancellationOf(sub) : { cancelAtPeriodEnd: null, cancelAt: null };
   const [column, value] = "id" in where ? ["id", where.id] : ["user_id", where.userId];
+  // The start date is written from the live subscription and kept when the subscription ended (sub null).
   await pool.query(
-    `UPDATE subscriptions SET cancel_at_period_end = $2, cancel_at = $3 WHERE ${column} = $1`,
-    [value, c.cancelAtPeriodEnd, c.cancelAt]);
+    `UPDATE subscriptions SET cancel_at_period_end = $2, cancel_at = $3, start_date = COALESCE($4, start_date) WHERE ${column} = $1`,
+    [value, c.cancelAtPeriodEnd, c.cancelAt, sub ? subscriptionStartOf(sub) : null]);
 }
 
-/** The stored cancellation state of a row (null = never synced from Stripe). */
+/** The stored cancellation state (and start date) of a row (null = never synced from Stripe). */
 export async function cancellationFor(rowId: number): Promise<Cancellation> {
   await billingSchemaReady();
-  const { rows: [r] } = await pool.query("SELECT cancel_at_period_end, cancel_at FROM subscriptions WHERE id = $1", [rowId]);
+  const { rows: [r] } = await pool.query("SELECT cancel_at_period_end, cancel_at, start_date FROM subscriptions WHERE id = $1", [rowId]);
   return {
     cancelAtPeriodEnd: typeof r?.cancel_at_period_end === "boolean" ? r.cancel_at_period_end : null,
     cancelAt: r?.cancel_at ? new Date(r.cancel_at) : null,
+    startDate: r?.start_date ? new Date(r.start_date) : null,
   };
 }
 
@@ -160,7 +168,7 @@ export async function cancellationFor(rowId: number): Promise<Cancellation> {
  * or while a row has not been synced since the column was added).
  */
 export function subscriptionSummary(row: Partial<SubscriptionRow> | null | undefined, cancellation: Cancellation | null = null, now = new Date()) {
-  if (!row) return { plan: "free", effectivePlan: null, status: "inactive", billingInterval: null, interval: null, addons: {}, agencyLocations: null, locations: null, currentPeriodEnd: null, stripeSubscriptionId: null, cancelAtPeriodEnd: null, cancelAt: null };
+  if (!row) return { plan: "free", effectivePlan: null, status: "inactive", billingInterval: null, interval: null, addons: {}, agencyLocations: null, locations: null, currentPeriodEnd: null, stripeSubscriptionId: null, cancelAtPeriodEnd: null, cancelAt: null, startDate: null };
   const snake = { plan: row.plan, status: row.status, stripe_subscription_id: row.stripeSubscriptionId, current_period_end: row.currentPeriodEnd };
   const viaStripe = !!row.stripeSubscriptionId;
   // A grant still marked trialing/active past its end date has simply run out.
@@ -178,6 +186,8 @@ export function subscriptionSummary(row: Partial<SubscriptionRow> | null | undef
     stripeSubscriptionId: row.stripeSubscriptionId ?? null,
     cancelAtPeriodEnd: viaStripe ? cancellation?.cancelAtPeriodEnd ?? null : null,
     cancelAt: viaStripe ? cancellation?.cancelAt ?? null : null,
+    // When the Stripe subscription began (its start_date, stored by recordCancellation); null until synced or for a grant.
+    startDate: viaStripe ? cancellation?.startDate ?? null : null,
   };
 }
 

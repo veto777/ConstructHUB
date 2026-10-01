@@ -59,11 +59,15 @@ export type BillingPurchaseRow = {
  * `userId` is usually unknown at claim time — attributeBillingEvent fills it
  * in once the handler resolved the account.
  */
-export async function recordBillingEvent(event: { id: string; type: string }, userId: number | null = null): Promise<boolean> {
+export type BillingEventRef = { id: string; type?: string | null; userId?: number | null };
+
+export async function recordBillingEvent(event: BillingEventRef, userId: number | null = null): Promise<boolean> {
+  if (!event?.id || typeof event.id !== "string") throw new Error("recordBillingEvent: event.id is required");
+  const owner = Number.isInteger(userId) ? userId : Number.isInteger(event.userId) ? event.userId! : null;
   const { rows } = await pool.query(
     `INSERT INTO billing_events(stripe_event_id, type, user_id, received_at) VALUES($1, $2, $3, now())
        ON CONFLICT (stripe_event_id) DO NOTHING RETURNING stripe_event_id`,
-    [event.id, event.type, userId]);
+    [event.id, event.type ?? null, owner]);
   return rows.length > 0;
 }
 

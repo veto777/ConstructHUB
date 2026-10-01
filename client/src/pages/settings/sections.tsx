@@ -4,9 +4,8 @@ import type { SettingsGroupId, SettingsSectionDef, SettingsSectionId, SettingsSe
 import { MyAccountSection } from "./me-account";
 import { PasswordSecuritySection } from "./me-security";
 import { NotificationsSection } from "./me-notifications";
-import { PlanBillingSection } from "./plan-billing";
 import { LimitsUsageSection } from "./limits-usage";
-import { ApiKeysSection, ApiUsageSection } from "./api-placeholder";
+import { BillingSection, ApiKeysSection, ApiUsageSection } from "./account-panels";
 import { AuditLogSection } from "./audit-log";
 import { IntegrationsSection } from "./integrations";
 
@@ -41,7 +40,7 @@ const DEFAULT_COMPONENTS: Record<SettingsSectionId, ComponentType<SettingsSectio
   "account": MyAccountSection,
   "security": PasswordSecuritySection,
   "notifications": NotificationsSection,
-  "billing": PlanBillingSection,
+  "billing": BillingSection,
   "limits": LimitsUsageSection,
   "api-keys": ApiKeysSection,
   "api-usage": ApiUsageSection,

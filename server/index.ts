@@ -12,6 +12,10 @@ import { registerInboundMail } from "./mail-alerts/inbound";
 registerInboundMail(app);
 import { registerPrivateIntegrationParsers } from "./domains/private-http";
 registerPrivateIntegrationParsers(app);
+// An account API key (chub_…) authenticates ONLY /api/v1: anywhere else it is
+// refused before any parser or handler runs (the AI routes included).
+import { rejectApiKeysOutsidePublicApi } from "./public-api/guard";
+app.use(rejectApiKeysOutsidePublicApi);
 
 declare module "http" {
   interface IncomingMessage {
@@ -62,8 +66,11 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      // Auth/consent bodies (QR seeds, recovery codes) and social bodies (signed upload URLs) never reach logs.
-      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")) {
+      // Auth/consent bodies (QR seeds, recovery codes), social bodies (signed upload URLs), the public
+      // API's responses (account data handed to third-party tools) and the API-key endpoints (one-time
+      // secrets) never reach logs.
+      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")
+        && !path.startsWith("/api/v1") && !path.startsWith("/api/account/api-keys")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

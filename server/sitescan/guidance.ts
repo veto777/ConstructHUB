@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { CrawlState, Finding, Page } from "./audit";
-import { businessSchema } from "./providers";
+import { businessSchema } from "./business-schema";
 export type Platform =
   | "WordPress/Elementor"
   | "WordPress"

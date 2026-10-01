@@ -650,8 +650,8 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow()]);
     const res = await request("/api/stripe/change-plan", { plan: "pro", addons: { extra_seat: 1 } });
     expect(res.code).toBe(200);
-    // The mocked update returns a fresh subscription (not set to cancel).
-    expect(cancellationWrites()).toEqual([[5, false, null]]);
+    // The mocked update returns a fresh subscription (not set to cancel); the fixture carries no start_date.
+    expect(cancellationWrites()).toEqual([[5, false, null, null]]);
     expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: false });
   });
 
@@ -711,7 +711,7 @@ describe("webhook maps the subscription's items onto the row", () => {
     mocks.rows.push([liveRow()]);
     await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_live", customer: "cus_test" } } });
     expect(mocks.updates[0]).toEqual({ status: "canceled", plan: "free", addons: {}, agencyLocations: null, billingInterval: null });
-    expect(cancellationWrites()).toEqual([[5, null, null]]);
+    expect(cancellationWrites()).toEqual([[5, null, null, null]]);
   });
 
   it("records a cancellation set in Stripe's portal (cancel at period end) with the row", async () => {
@@ -719,12 +719,12 @@ describe("webhook maps the subscription's items onto the row", () => {
     const sub = agencyYearly("sub_new", "active") as any;
     sub.cancel_at_period_end = true;
     await webhook({ type: "customer.subscription.updated", data: { object: sub } });
-    expect(cancellationWrites()).toEqual([[5, true, new Date(1893456000 * 1000)]]);
+    expect(cancellationWrites()).toEqual([[5, true, new Date(1893456000 * 1000), null]]);
     // Resumed in the portal: the flag clears.
     mocks.sql.length = 0;
     mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
     await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_new", "active") } });
-    expect(cancellationWrites()).toEqual([[5, false, null]]);
+    expect(cancellationWrites()).toEqual([[5, false, null, null]]);
   });
 
   it("a late event for an ended subscription never ends a live trial-code grant; a live subscription replaces it", async () => {

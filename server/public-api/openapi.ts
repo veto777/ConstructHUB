@@ -3,23 +3,38 @@
  * fragments plus the built-in pieces (auth, errors, /me, limits).
  */
 import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { API_ERROR_CODES, API_EXTRA_ERROR_CODES } from "./errors";
 import { listResources } from "./registry";
 import { READ_UNITS, ROWS_PER_UNIT, WRITE_UNITS } from "./quota";
+import { ACCOUNT_RATE_PER_MINUTE } from "./rate-limit";
 
-const ERROR_SCHEMA = {
+/** The one error shape; every resource fragment's `Error` / `ApiError` schema is replaced by this. */
+export const ERROR_SCHEMA = {
   type: "object",
   required: ["error"],
   properties: {
     error: {
       type: "object", required: ["code", "message"],
       properties: {
-        code: { type: "string", enum: ["unauthorized", "invalid_api_key", "insufficient_scope", "rate_limited", "plan_required", "quota_exceeded", "not_found", "validation_error", "internal_error"] },
+        code: { type: "string", enum: [...API_ERROR_CODES, ...API_EXTRA_ERROR_CODES] },
         message: { type: "string" },
+        issues: { type: "array", description: "validation_error only", items: { type: "object", properties: { path: { type: "string" }, message: { type: "string" } } } },
       },
       additionalProperties: true,
     },
   },
 };
+
+/**
+ * A fragment path relative to the resource ("/" or "/{id}") is prefixed with
+ * /<name>; a path that already starts with /<name> (a resource documenting
+ * absolute paths) is used as is.
+ */
+export function resourcePath(name: string, fragmentPath: string): string {
+  const p = fragmentPath === "" ? "/" : fragmentPath.startsWith("/") ? fragmentPath : `/${fragmentPath}`;
+  if (p === `/${name}` || p.startsWith(`/${name}/`)) return p;
+  return p === "/" ? `/${name}` : `/${name}${p}`;
+}
 
 const ME_SCHEMA = {
   type: "object",
@@ -56,16 +71,20 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       },
     },
   };
-  const schemas: Record<string, unknown> = { Error: ERROR_SCHEMA, Me: ME_SCHEMA };
+  const schemas: Record<string, unknown> = { Me: ME_SCHEMA };
   const tags: { name: string; description?: string }[] = [{ name: "account", description: "Who am I, usage" }];
   for (const r of listResources()) {
     for (const [p, item] of Object.entries(r.openapi.paths ?? {})) {
-      const suffix = p === "/" || p === "" ? "" : p.startsWith("/") ? p : `/${p}`;
-      paths[`/${r.name}${suffix}`] = item;
+      const full = resourcePath(r.name, p);
+      // Two routers under one name (reads + writes) each document their own methods on a path.
+      paths[full] = { ...(paths[full] as Record<string, unknown> | undefined), ...(item as Record<string, unknown>) };
     }
     Object.assign(schemas, r.openapi.components?.schemas ?? {});
     for (const t of r.openapi.tags ?? []) if (!tags.some((x) => x.name === t.name)) tags.push(t);
   }
+  // One error vocabulary: whatever a fragment named its error schema, the document carries the shared one.
+  schemas.Error = ERROR_SCHEMA;
+  if ("ApiError" in schemas) schemas.ApiError = ERROR_SCHEMA;
   return {
     openapi: "3.0.3",
     info: {
@@ -89,9 +108,15 @@ export function buildOpenApiDocument(): Record<string, unknown> {
     },
     "x-limits": {
       ratePerMinute: PLANS.pro.limits.apiRatePerMinute,
+      accountRatePerMinute: ACCOUNT_RATE_PER_MINUTE,
       units: { read: `${READ_UNITS} + 1 per ${ROWS_PER_UNIT} rows`, write: WRITE_UNITS },
       unitsPerMonth: Object.fromEntries(PLAN_KEYS.map((k) => [k, PLANS[k].limits.apiUnitsPerMonth])),
-      errors: { rateLimited: "429 rate_limited (Retry-After)", quota: "429 quota_exceeded (Retry-After until the 1st)", noApiOnPlan: "402 plan_required" },
+      errors: { rateLimited: "429 rate_limited (Retry-After; scope key | account)", quota: "429 quota_exceeded (Retry-After until the 1st)", noApiOnPlan: "402 plan_required" },
+    },
+    "x-error-codes": {
+      base: [...API_ERROR_CODES],
+      extra: [...API_EXTRA_ERROR_CODES],
+      shape: "{ error: { code, message, ...details } }",
     },
     "x-crm-api": {
       note: "CRM resources (customers, projects, estimates, invoices, payments) are a separate API with chk_ keys from Portal → Integrations.",

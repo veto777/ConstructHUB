@@ -28,14 +28,11 @@ const namedImports = (code: string) => [...code.matchAll(/import\s*(?:type\s*)?\
 /** An AI module, as a bare specifier (`openai`) or a resolved file path. */
 const AI_MODULE = /^openai$|\/(ai-config|ai-output|review-automation|sitescan\/providers|site-assistant|ads-consultant)(\.tsx?)?$/;
 /**
- * The session-side modules the write resources reuse whose own import graph
- * reaches an AI module: gbp/service (lazy `import('./review-automation')` in
- * syncLocation), social/service (static openai + ai-config for generateDue) and
- * sitescan/audit (guidance → providers). None of them is invoked for AI from
- * here, but the reach is real; this list is the whole of it. A new entry fails;
- * an entry disappearing (the service split) is the intended edit.
+ * Session-side modules the write resources reuse whose own import graph
+ * reaches an AI module. Since the service split (gbp/reply.ts, social/schedule.ts,
+ * sitescan/business-schema.ts) there are none; a new entry fails.
  */
-const ALLOWED_AI_ENTRIES = ["server/gbp/service.ts", "server/sitescan/audit.ts", "server/social/service.ts"];
+const ALLOWED_AI_ENTRIES: string[] = [];
 const resolveSpec = (from: string, spec: string) => {
   const base = spec.startsWith("@shared/") ? path.join(root, "shared", spec.slice(8)) : spec.startsWith(".") ? path.resolve(path.dirname(from), spec) : spec;
   for (const c of [base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]) if (existsSync(c) && statSync(c).isFile()) return c;
@@ -67,7 +64,7 @@ describe("no AI reachable from the public API (static)", () => {
     }
   });
 
-  it("transitively, AI code is reached only through the documented session services (pinned)", () => {
+  it("transitively, no AI code is reachable from the write resources (pinned to none)", () => {
     const direct: string[] = [], entries = new Set<string>();
     for (const file of sources) {
       const from = path.join(here, file);
