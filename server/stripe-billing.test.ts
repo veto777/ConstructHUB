@@ -48,8 +48,12 @@ vi.mock("./db", () => {
     pool: {
       query: async (text: string, values: any[] = []) => {
         if (/information_schema\.columns/.test(text)) return { rows: [{}, {}, {}, {}, {}] };
+        if (/information_schema\.tables/.test(text)) return { rows: [{}, {}, {}] };
+        if (/^\s*CREATE (TABLE|INDEX)/.test(text)) return { rows: [] };
         mocks.sql.push({ text, values });
         if (/SELECT cancel_at_period_end/.test(text)) return { rows: [mocks.cancelRow] };
+        // Every event id is new to the ledger (the webhook's idempotency claim succeeds).
+        if (/INSERT INTO billing_events/.test(text)) return { rows: [{ stripe_event_id: values[0] }] };
         return { rows: [] };
       },
     },

@@ -6,7 +6,7 @@ import {
   agencyLocationTiers, tieredAmountCents, planPriceSpec, addonPriceSpec, addonSetupPriceSpec, agencyLocationsPriceSpec,
   resolvePriceId, resetPriceCache, describeSubscription, roleOfPrice,
 } from "./prices";
-import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS } from "./schema";
+import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS, BILLING_LEDGER_DDL, BILLING_LEDGER_TABLES } from "./schema";
 import { PLANS, ADDONS, ANNUAL_MONTHS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
 
 describe("Agency location bands in Stripe", () => {
@@ -116,13 +116,20 @@ describe("describeSubscription", () => {
 
 describe("ensureBillingSchema", () => {
   it("only reads the catalog when the columns exist, and adds them idempotently when not", async () => {
-    const present = { query: vi.fn(async () => ({ rows: BILLING_COLUMNS.map(() => ({})) })) };
+    // Columns and ledger tables all present: two catalog reads, no DDL.
+    const present = { query: vi.fn(async (sql: string) => ({ rows: /information_schema\.tables/.test(sql) ? BILLING_LEDGER_TABLES.map(() => ({})) : BILLING_COLUMNS.map(() => ({})) })) };
     await ensureBillingSchema(present);
-    expect(present.query).toHaveBeenCalledTimes(1);
+    expect(present.query).toHaveBeenCalledTimes(2);
+    expect(present.query.mock.calls.every((c) => /information_schema/.test(c[0]))).toBe(true);
 
     const missing = { query: vi.fn(async (_sql: string) => ({ rows: [{}] })) };
     await ensureBillingSchema(missing);
-    expect(missing.query.mock.calls.slice(1).map((c) => c[0])).toEqual([...BILLING_SUBSCRIPTION_DDL]);
+    const statements = missing.query.mock.calls.map((c) => c[0]);
+    expect(statements.slice(1, 1 + BILLING_SUBSCRIPTION_DDL.length)).toEqual([...BILLING_SUBSCRIPTION_DDL]);
+    // Then the ledger: one catalog read, then its CREATE ... IF NOT EXISTS statements.
+    expect(statements[1 + BILLING_SUBSCRIPTION_DDL.length]).toMatch(/information_schema\.tables/);
+    expect(statements.slice(2 + BILLING_SUBSCRIPTION_DDL.length)).toEqual([...BILLING_LEDGER_DDL]);
+    for (const ddl of BILLING_LEDGER_DDL) expect(ddl).toMatch(/^CREATE (TABLE|INDEX) IF NOT EXISTS /);
     for (const ddl of BILLING_SUBSCRIPTION_DDL) expect(ddl).toMatch(/^ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS /);
     // One statement per checked column, so a routine boot never re-runs DDL.
     expect(BILLING_SUBSCRIPTION_DDL.map((ddl) => ddl.split(" ")[8])).toEqual([...BILLING_COLUMNS]);

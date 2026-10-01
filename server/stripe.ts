@@ -22,6 +22,10 @@ import {
   withBillingLock,
 } from "./billing/sync";
 import { startAgencyLocationSync } from "./billing/agency-sync";
+import { recordBillingEvent, releaseBillingEvent, attributeBillingEvent } from "./billing/ledger";
+import {
+  syncInvoiceEvent, onTrialWillEnd, recordOneTimePurchase, emitSubscriptionStarted, emitCancellationChange, emitSubscriptionCanceled,
+} from "./billing/webhook-events";
 
 export { PaymentsNotConfiguredError };
 
@@ -566,11 +570,24 @@ export function registerStripeRoutes(app: Express) {
         return res.status(400).json({ message: `Webhook signature verification failed` });
       }
 
+      // One Stripe event is processed once: a retry or a double delivery of
+      // an id already in billing_events answers 200 and does nothing (a
+      // course row, a ledger row or a receipt email is never duplicated). A
+      // handler failure releases the claim so Stripe's retry is processed.
+      await billingSchemaReady();
+      if (event.id && !(await recordBillingEvent(event))) {
+        return res.json({ received: true, duplicate: true });
+      }
+      // The account the event turned out to be about (recorded with the event).
+      let eventUserId: number | null = null;
+
+      try { // wraps the switch: a throw below releases the event claim first
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object as Stripe.Checkout.Session;
           const userId = parseInt(session.metadata?.userId || "0");
           const metaType = session.metadata?.type;
+          if (userId) eventUserId = userId;
 
           if (userId && metaType === "cart") {
             try {
@@ -623,8 +640,42 @@ export function registerStripeRoutes(app: Express) {
               // this should not happen; if it does, both bill — say so loudly.
               console.error(`[billing] user ${userId} now has two live subscriptions (${tracked.stripeSubscriptionId} and ${stripeSubscription.id}); tracking the new one — cancel the other in Stripe.`);
             }
-            await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
+            const set = await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
+            emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
           }
+
+          // A paid one-time checkout (course, DFY service, SEO contract) goes
+          // into the purchase ledger with its receipt, whatever its metadata
+          // type; a subscription checkout is not a purchase (its invoice is).
+          if (userId && session.mode === "payment") {
+            await recordOneTimePurchase(session, userId);
+          }
+          break;
+        }
+        case "checkout.session.async_payment_succeeded": {
+          // A bank-debit checkout settled after the session completed: now it
+          // is a paid purchase (the session arrived unpaid at completion).
+          const session = event.data.object as Stripe.Checkout.Session;
+          const userId = parseInt(session.metadata?.userId || "0");
+          if (userId && session.mode === "payment") {
+            eventUserId = userId;
+            await recordOneTimePurchase(session, userId);
+          }
+          break;
+        }
+        case "invoice.paid":
+        case "invoice.payment_failed":
+        case "invoice.finalized": {
+          // The invoice ledger (Billing → Invoices) and the receipt / failed
+          // payment emails hang off these; the subscription row does not.
+          const synced = await syncInvoiceEvent(event);
+          eventUserId = synced?.userId ?? null;
+          break;
+        }
+        case "customer.subscription.trial_will_end": {
+          const sub = event.data.object as Stripe.Subscription;
+          const [tracked] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, sub.customer as string)).limit(1);
+          eventUserId = await onTrialWillEnd(event, tracked?.plan ?? null);
           break;
         }
         case "customer.subscription.created":
@@ -640,7 +691,15 @@ export function registerStripeRoutes(app: Express) {
             .limit(1);
 
           if (existingSub && eventAppliesToRow(existingSub, sub)) {
-            await writeSubscriptionRow({ id: existingSub.id }, sub);
+            eventUserId = existingSub.userId;
+            // What we had before this event, for "set to end" / "resumed"
+            // when Stripe's previous_attributes don't say.
+            const stored = existingSub.stripeSubscriptionId === sub.id ? await cancellationFor(existingSub.id) : null;
+            const set = await writeSubscriptionRow({ id: existingSub.id }, sub);
+            if (event.type === "customer.subscription.updated") {
+              emitCancellationChange(existingSub.userId, sub, event.data.previous_attributes as Record<string, unknown> | undefined,
+                stored, set.plan ?? existingSub.plan);
+            }
           } else if (existingSub) {
             console.warn(`[billing] ${event.type} for ${sub.id} (${sub.status}) ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "a live trial-code grant"}.`);
           }
@@ -659,18 +718,27 @@ export function registerStripeRoutes(app: Express) {
             .where(eq(subscriptions.stripeCustomerId, customerId))
             .limit(1);
           if (existingSub?.stripeSubscriptionId === sub.id) {
+            eventUserId = existingSub.userId;
             await db
               .update(subscriptions)
               .set(canceledRowUpdate())
               .where(eq(subscriptions.id, existingSub.id));
             await recordCancellation({ id: existingSub.id }, null);
+            emitSubscriptionCanceled(existingSub.userId, sub, existingSub.plan);
           } else if (existingSub) {
             console.warn(`[billing] deletion of ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "no subscription"}.`);
           }
           break;
         }
       }
+      } catch (handlerErr) {
+        if (event.id) await releaseBillingEvent(event.id).catch((e: any) => console.error("[billing] could not release event claim:", e?.message || e));
+        throw handlerErr;
+      }
 
+      if (event.id && eventUserId) {
+        await attributeBillingEvent(event.id, eventUserId).catch((e: any) => console.error("[billing] could not attribute event:", e?.message || e));
+      }
       res.json({ received: true });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
