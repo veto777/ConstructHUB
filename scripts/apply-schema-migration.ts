@@ -14,7 +14,7 @@
 import pg from "pg";
 import { STATE_GUIDES_LINK_STATUS_DDL } from "../server/state-guides-schema";
 import { ensureDocNumberUniqueIndexes } from "../server/crm/doc-number";
-import { BILLING_SUBSCRIPTION_DDL } from "../server/billing/schema";
+import { BILLING_SUBSCRIPTION_DDL, FULFILMENT_DDL } from "../server/billing/schema";
 import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
 
 const STATEMENTS = [
@@ -32,9 +32,12 @@ const STATEMENTS = [
   // Plan billing: interval, add-on quantities and billed Agency locations on
   // each subscription (server/billing/schema.ts also runs these at boot).
   ...BILLING_SUBSCRIPTION_DDL,
-  // Account: billing_events / billing_invoices / billing_purchases / email_log /
-  // account_api_keys / account_api_usage (server/account/schema.ts also runs
-  // these at boot).
+  // One-time purchase fulfilment: one course_purchases / service_purchases row
+  // per Checkout Session and item (server/billing/schema.ts also runs these at boot).
+  ...FULFILMENT_DDL,
+  // Account: billing_events / billing_invoices / billing_purchases / email_log
+  // (+ its outbox columns) / account_api_keys / account_api_usage
+  // (server/account/schema.ts also runs these at boot).
   ...ACCOUNT_SCHEMA_DDL,
 ];
 

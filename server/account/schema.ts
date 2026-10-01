@@ -62,16 +62,39 @@ export const BILLING_LEDGER_DDL: readonly string[] = [
   `DROP INDEX IF EXISTS billing_purchases_user_created_idx`,
 ];
 
-/** Every transactional email sent, keyed so a retried webhook or a double click never sends the same document twice. */
+/**
+ * Every transactional email, keyed so a retried webhook or a double click
+ * never sends the same document twice — and the outbox for the ones that
+ * could not be sent: a failed send keeps its row as `pending` with the
+ * rendered message, and server/account/billing-emails.ts drainEmailOutbox
+ * retries it with backoff until it is `sent` (sent_at set, message cleared)
+ * or, after the last attempt, `failed` (kept with its error and message for
+ * an operator to re-queue by setting status back to pending).
+ */
 export const EMAIL_LOG_DDL: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS email_log (
      id bigserial PRIMARY KEY,
      user_id integer,
      kind text,
      dedupe_key text UNIQUE,
-     sent_at timestamptz NOT NULL DEFAULT now()
+     sent_at timestamptz DEFAULT now(),
+     status text NOT NULL DEFAULT 'sent',
+     attempts integer NOT NULL DEFAULT 0,
+     next_attempt_at timestamptz,
+     last_error text,
+     message jsonb
    )`,
   `CREATE INDEX IF NOT EXISTS email_log_user_idx ON email_log(user_id, sent_at DESC)`,
+  // Tables from before the outbox get the same columns in place; no row is
+  // rewritten (existing rows read as sent, which they were). sent_at is NULL
+  // while a row is pending, so it stops being NOT NULL.
+  `ALTER TABLE email_log ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'sent'`,
+  `ALTER TABLE email_log ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE email_log ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz`,
+  `ALTER TABLE email_log ADD COLUMN IF NOT EXISTS last_error text`,
+  `ALTER TABLE email_log ADD COLUMN IF NOT EXISTS message jsonb`,
+  `ALTER TABLE email_log ALTER COLUMN sent_at DROP NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS email_log_pending_idx ON email_log(next_attempt_at) WHERE status = 'pending'`,
 ];
 
 /** Public API keys (only a hash of the secret is stored) and their metering, one row per key per UTC day. */

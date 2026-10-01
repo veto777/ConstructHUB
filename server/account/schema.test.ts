@@ -10,9 +10,9 @@ beforeAll(async () => {
 afterAll(async () => { await pool.end(); });
 
 describe("ensureAccountSchema", () => {
-  it("only ever creates what is missing, sets a column default or drops a duplicate index (never rewrites rows)", () => {
+  it("only ever creates what is missing, adds a column, sets a default / drops NOT NULL on one, or drops a duplicate index (never rewrites rows)", () => {
     for (const s of ACCOUNT_SCHEMA_DDL) {
-      expect(s).toMatch(/^\s*(CREATE (TABLE|INDEX|UNIQUE INDEX) IF NOT EXISTS|ALTER TABLE \w+ ALTER COLUMN \w+ SET DEFAULT|ALTER TABLE IF EXISTS \w+ ADD COLUMN IF NOT EXISTS|DROP INDEX IF EXISTS billing_\w+)/);
+      expect(s).toMatch(/^\s*(CREATE (TABLE|INDEX|UNIQUE INDEX) IF NOT EXISTS|ALTER TABLE \w+ ALTER COLUMN \w+ (SET DEFAULT|DROP NOT NULL)|ALTER TABLE (IF EXISTS )?\w+ ADD COLUMN IF NOT EXISTS|DROP INDEX IF EXISTS billing_\w+)/);
       expect(s).not.toMatch(/\b(UPDATE|DELETE|TRUNCATE|DROP TABLE|DROP COLUMN)\b/i);
     }
   });

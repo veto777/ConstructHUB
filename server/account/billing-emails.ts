@@ -19,8 +19,12 @@
  * Every send goes through sendTransactionalEmail(userId, kind, dedupeKey, msg):
  * the dedupe key is claimed in email_log BEFORE sending (unique index), so a
  * redelivered webhook, a retried job or two lanes handling the same event
- * produce exactly one email; a failed send releases the claim so it can be
- * retried. Nothing here reads a secret into a message: templates get facts
+ * produce exactly one email. A send that fails keeps that claim: the row
+ * becomes `pending` with the rendered message, and drainEmailOutbox (run every
+ * minute by startEmailOutboxDrainer from server/routes.ts) retries it with
+ * backoff — the webhook that caused it answers 200 as usual, so a mail outage
+ * neither fails nor replays a billing event, and the email still goes out,
+ * once. Nothing here reads a secret into a message: templates get facts
  * (names, amounts, dates, public Stripe links) and nothing else.
  *
  * Contract note: sendTransactionalEmail here is the contract-identical
@@ -110,7 +114,15 @@ export const EMAIL_KINDS = {
 } as const;
 export type EmailKind = (typeof EMAIL_KINDS)[keyof typeof EMAIL_KINDS];
 
-export type SendOutcome = { kind: EmailKind; dedupeKey: string; sent: boolean; skipped?: string };
+export type SendOutcome = {
+  kind: EmailKind;
+  dedupeKey: string;
+  /** Went out now. */
+  sent: boolean;
+  /** Could not be sent now; kept in email_log as pending for drainEmailOutbox (never set together with `sent`). */
+  queued?: boolean;
+  skipped?: string;
+};
 
 /** Public origin for links in emails sent without a request (webhooks, jobs). */
 export function accountBaseUrl(): string {
@@ -131,53 +143,193 @@ export function appBaseUrl(req: unknown): string {
   return accountBaseUrl();
 }
 
-// ── sendTransactionalEmail (contract-identical fallback for lane 1's helper) ─
+// ── sendTransactionalEmail + the outbox ─────────────────────────────────────
 
 let emailLogReady: Promise<void> | null = null;
 /**
- * email_log exactly as lane 1's ensureAccountSchema() defines it (same
- * columns, NOT NULL DEFAULT now() on sent_at, same index), so whichever DDL
- * runs first on a fresh database leaves a table the other's INSERT fits.
+ * email_log (with its outbox columns) exactly as ensureAccountSchema()
+ * defines it — one definition, server/account/schema.ts EMAIL_LOG_DDL — so
+ * whichever DDL runs first on a fresh database leaves a table the other's
+ * statements fit. Once per process.
  */
 export function ensureEmailLogSchema(): Promise<void> {
-  // One definition (server/account/schema.ts EMAIL_LOG_DDL), one statement here.
   emailLogReady ??= pool.query(EMAIL_LOG_DDL.join(";\n")).then(() => undefined, (err: any) => { emailLogReady = null; throw err; });
   return emailLogReady;
 }
 
+export type TransactionalSend =
+  /** Handed to the mail provider (or the dev sink) now. */
+  | "sent"
+  /** The provider failed: the message is kept in email_log as pending and drainEmailOutbox will retry it. */
+  | "queued"
+  /** The dedupe key was already claimed (sent, pending or failed earlier): nothing sent, nothing queued. */
+  | "duplicate"
+  /** The account has no email address. */
+  | "no_address";
+
+/** Retry schedule for a queued email: how long to wait after the n-th failed attempt (the last entry repeats). */
+export const EMAIL_RETRY_DELAYS_MS: readonly number[] = [60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000, 60 * 60_000, 2 * 3_600_000, 4 * 3_600_000];
+/** After this many failed attempts (about eight hours of retries) a row is marked failed and left for an operator. */
+export const EMAIL_MAX_ATTEMPTS = 8;
+/** A row the drainer picked up is leased this long: a second drainer (another process) skips it meanwhile. */
+const OUTBOX_LEASE_MS = 10 * 60_000;
+
+const retryDelayMs = (attempts: number) => EMAIL_RETRY_DELAYS_MS[Math.min(Math.max(attempts, 1), EMAIL_RETRY_DELAYS_MS.length) - 1];
+
+type RenderedMessage = { subject: string; html: string; text: string };
+
+const mailFor = (kind: string, to: string, msg: RenderedMessage) => ({
+  from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
+  to,
+  subject: msg.subject,
+  html: msg.html,
+  text: msg.text,
+  headers: { "X-Priority": "3", "Importance": "Normal", "X-ConstructHUB-Email": kind },
+});
+
+const errorText = (err: unknown): string => String((err as any)?.message || err).slice(0, 1000);
+
 /**
- * Send one email to the account's address, once per dedupe key. Returns false
- * when the key was already claimed (nothing sent) or the user has no address.
- * The claim is taken before the send and released if the send throws.
+ * Send one email to the account's address, once per dedupe key. The claim is
+ * taken before the send; when the send fails the claim STAYS and the message
+ * is queued on it (see drainEmailOutbox) — the key remains the email's
+ * identity, so a caller that retries finds it claimed and the drainer sends
+ * it exactly once. Throws only when the database refused the claim, or the
+ * send failed and the row could not be queued either (then the claim is
+ * released, as before the outbox, and the caller decides).
  */
-export async function sendTransactionalEmail(
-  userId: number, kind: string, dedupeKey: string, msg: { subject: string; html: string; text: string },
-): Promise<boolean> {
+export async function deliverTransactionalEmail(
+  userId: number, kind: string, dedupeKey: string, msg: RenderedMessage,
+): Promise<TransactionalSend> {
   await ensureEmailLogSchema();
   const { rows: [user] } = await pool.query("SELECT email FROM users WHERE id = $1", [userId]);
   if (!user?.email) {
     console.warn(`[email] ${kind} for user ${userId} not sent: no address on file`);
-    return false;
+    return "no_address";
   }
   const { rows: [claim] } = await pool.query(
-    `INSERT INTO email_log (user_id, kind, dedupe_key, sent_at) VALUES ($1, $2, $3, now())
+    `INSERT INTO email_log (user_id, kind, dedupe_key, status, attempts, sent_at) VALUES ($1, $2, $3, 'sent', 1, now())
        ON CONFLICT (dedupe_key) DO NOTHING RETURNING id`,
     [userId, kind, dedupeKey]);
-  if (!claim) return false;
+  if (!claim) return "duplicate";
   try {
-    await sendWithFallback({
-      from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
-      to: user.email,
-      subject: msg.subject,
-      html: msg.html,
-      text: msg.text,
-      headers: { "X-Priority": "3", "Importance": "Normal", "X-ConstructHUB-Email": kind },
-    });
+    await sendWithFallback(mailFor(kind, user.email, msg));
   } catch (err) {
-    await pool.query("DELETE FROM email_log WHERE id = $1", [claim.id]).catch(() => undefined);
-    throw err;
+    const delay = retryDelayMs(1);
+    try {
+      await pool.query(
+        `UPDATE email_log SET status = 'pending', sent_at = NULL, next_attempt_at = now() + ($2::int * interval '1 millisecond'),
+                last_error = $3, message = $4::jsonb
+          WHERE id = $1`,
+        [claim.id, delay, errorText(err), JSON.stringify({ subject: msg.subject, html: msg.html, text: msg.text })]);
+    } catch (dbErr) {
+      await pool.query("DELETE FROM email_log WHERE id = $1", [claim.id]).catch(() => undefined);
+      console.error(`[email] ${kind} ${dedupeKey} not sent (${errorText(err)}) and could not be queued (${errorText(dbErr)}); claim released`);
+      throw err;
+    }
+    console.warn(`[email] ${kind} ${dedupeKey} not sent (${errorText(err)}) — queued, next attempt in ${Math.round(delay / 1000)}s`);
+    return "queued";
   }
-  return true;
+  return "sent";
+}
+
+/**
+ * deliverTransactionalEmail as the boolean the older callers expect: true
+ * when the email went out now. A queued email reads false (it is on its way),
+ * as does a repeat of a claimed key or an account without an address.
+ */
+export async function sendTransactionalEmail(
+  userId: number, kind: string, dedupeKey: string, msg: RenderedMessage,
+): Promise<boolean> {
+  return (await deliverTransactionalEmail(userId, kind, dedupeKey, msg)) === "sent";
+}
+
+export type OutboxDrain = { sent: number; deferred: number; failed: number };
+
+/**
+ * Retry the pending emails that are due. Each is leased first (attempts
+ * counted up, next_attempt_at pushed out — a second process running this
+ * skips it meanwhile), sent through the same sendWithFallback as a first
+ * send (the dev sink and EMAIL_FORCE_SINK apply) and marked sent; or deferred
+ * to the next backoff step; or, at EMAIL_MAX_ATTEMPTS, marked failed with its
+ * error and message kept (set status back to pending to try again). One
+ * email's failure never stops the others; a database error surfaces to the
+ * caller. The dedupe key stays the identity throughout: a row is sent at most
+ * once per attempt and never re-queued after it was sent.
+ */
+export async function drainEmailOutbox(limit = 25): Promise<OutboxDrain> {
+  await ensureEmailLogSchema();
+  const out: OutboxDrain = { sent: 0, deferred: 0, failed: 0 };
+  const { rows } = await pool.query(
+    `UPDATE email_log SET attempts = attempts + 1, next_attempt_at = now() + ($2::int * interval '1 millisecond')
+      WHERE id IN (SELECT id FROM email_log WHERE status = 'pending' AND next_attempt_at <= now()
+                    ORDER BY next_attempt_at LIMIT $1 FOR UPDATE SKIP LOCKED)
+      RETURNING id, user_id, kind, dedupe_key, attempts, message`,
+    [Math.min(Math.max(Number(limit) || 25, 1), 200), OUTBOX_LEASE_MS]);
+  for (const row of rows) {
+    const label = `${row.kind} ${row.dedupe_key} (attempt ${row.attempts})`;
+    const msg = row.message as RenderedMessage | null;
+    const { rows: [user] } = await pool.query("SELECT email FROM users WHERE id = $1", [row.user_id]);
+    const unsendable = !msg?.subject ? "no message stored" : !user?.email ? "no address on file" : null;
+    if (unsendable) {
+      await pool.query(`UPDATE email_log SET status = 'failed', next_attempt_at = NULL, last_error = $2 WHERE id = $1`, [row.id, unsendable]);
+      console.error(`[email] outbox: ${label} cannot be sent — ${unsendable}; marked failed`);
+      out.failed++;
+      continue;
+    }
+    try {
+      await sendWithFallback(mailFor(row.kind, user.email, msg!));
+      await pool.query(`UPDATE email_log SET status = 'sent', sent_at = now(), next_attempt_at = NULL, last_error = NULL, message = NULL WHERE id = $1`, [row.id]);
+      console.log(`[email] outbox: ${label} sent`);
+      out.sent++;
+    } catch (err) {
+      const error = errorText(err);
+      if (row.attempts >= EMAIL_MAX_ATTEMPTS) {
+        await pool.query(`UPDATE email_log SET status = 'failed', next_attempt_at = NULL, last_error = $2 WHERE id = $1`, [row.id, error]);
+        console.error(`[email] outbox: ${label} failed again (${error}) — giving up after ${row.attempts} attempts; the row keeps the message for an operator`);
+        out.failed++;
+      } else {
+        const delay = retryDelayMs(row.attempts);
+        await pool.query(`UPDATE email_log SET next_attempt_at = now() + ($2::int * interval '1 millisecond'), last_error = $3 WHERE id = $1`, [row.id, delay, error]);
+        console.warn(`[email] outbox: ${label} failed again (${error}) — next attempt in ${Math.round(delay / 1000)}s`);
+        out.deferred++;
+      }
+    }
+  }
+  return out;
+}
+
+let drainer: { stop: () => void } | null = null;
+
+/**
+ * Run drainEmailOutbox every `intervalMs` (a minute by default) for the life
+ * of the process; the timers are unref'd, so they never keep a process alive.
+ * Started once by server/routes.ts after the account schema is ensured; a
+ * second call returns the running one. A run that throws (database down) is
+ * logged and the next tick tries again; runs never overlap.
+ */
+export function startEmailOutboxDrainer(opts: { intervalMs?: number; firstRunMs?: number } = {}): { stop: () => void } {
+  if (drainer) return drainer;
+  const intervalMs = Math.max(opts.intervalMs ?? 60_000, 10);
+  let running = false;
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const n = await drainEmailOutbox();
+      if (n.sent || n.deferred || n.failed) console.log(`[email] outbox drain: ${n.sent} sent, ${n.deferred} deferred, ${n.failed} failed`);
+    } catch (err) {
+      console.error(`[email] outbox drain failed: ${errorText(err)}`);
+    } finally {
+      running = false;
+    }
+  };
+  const first = setTimeout(run, Math.max(opts.firstRunMs ?? Math.min(intervalMs, 15_000), 0));
+  const every = setInterval(run, intervalMs);
+  first.unref();
+  every.unref();
+  drainer = { stop() { clearTimeout(first); clearInterval(every); drainer = null; } };
+  return drainer;
 }
 
 // ── Welcome ─────────────────────────────────────────────────────────────────
@@ -447,13 +599,17 @@ export function billingEmailFor(event: BillingEmailEvent, baseUrl = accountBaseU
   }
 }
 
-/** Send the email for one billing event (deduped). Throws on a send failure so the caller can log/retry. */
+/**
+ * Send the email for one billing event (deduped). A send the provider failed
+ * is queued for the outbox and reported as `queued`; only a database failure
+ * throws.
+ */
 export async function handleBillingEmailEvent(event: BillingEmailEvent, opts: { baseUrl?: string } = {}): Promise<SendOutcome> {
   if (!Number.isInteger(event.userId) || event.userId <= 0) throw new Error(`[billing-emails] ${event.type} needs a userId`);
   const { kind, dedupeKey, message, skipped } = billingEmailFor(event, opts.baseUrl ?? accountBaseUrl());
   if (!message) return { kind, dedupeKey, sent: false, skipped };
-  const sent = await sendTransactionalEmail(event.userId, kind, dedupeKey, message);
-  return { kind, dedupeKey, sent };
+  const outcome = await deliverTransactionalEmail(event.userId, kind, dedupeKey, message);
+  return { kind, dedupeKey, sent: outcome === "sent", ...(outcome === "queued" ? { queued: true } : {}) };
 }
 
 // ── Stripe adapter ──────────────────────────────────────────────────────────
@@ -629,7 +785,9 @@ export async function billingEmailEventsFromStripe(event: Stripe.Event, ctx: { u
  * The webhook's one call, after signature verification and its own
  * processing: resolve the account, map the event, send each email. Never
  * throws — an email problem must not fail the webhook (Stripe would redeliver
- * an event the app already applied); it is logged and reported in the result.
+ * an event the app already applied). A send the provider failed is queued in
+ * email_log and retried by drainEmailOutbox (reported as `queued`); a problem
+ * before that point is logged and the event's emails are reported as absent.
  */
 export async function onStripeBillingEvent(
   event: Stripe.Event,

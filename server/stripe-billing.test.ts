@@ -54,14 +54,20 @@ vi.mock("./db", () => {
       query: async (text: string, values: any[] = []) => {
         if (/information_schema\.columns/.test(text)) return { rows: [{}, {}, {}, {}, {}] };
         if (/information_schema\.tables/.test(text)) return { rows: [{}, {}, {}] };
-        if (/^\s*CREATE (TABLE|INDEX)/.test(text)) return { rows: [] };
+        if (/FROM pg_indexes/.test(text)) return { rows: [{}, {}] };
+        if (/^\s*CREATE (TABLE|UNIQUE INDEX|INDEX)/.test(text)) return { rows: [] };
         mocks.sql.push({ text, values });
         if (/SELECT cancel_at_period_end/.test(text)) return { rows: [mocks.cancelRow] };
         // An event id is new to the ledger (the webhook's idempotency claim succeeds) unless a test marked it seen.
         if (/INSERT INTO billing_events/.test(text)) return { rows: mocks.seenEvents.has(values[0]) ? [] : [{ stripe_event_id: values[0] }] };
         if (/INSERT INTO billing_invoices/.test(text)) return { rows: mocks.invoiceApplied ? [{ id: values[0] }] : [] };
+        // Purchase fulfilment rows (server/billing/fulfilment.ts), captured in the shape the old drizzle inserts had.
+        if (/INSERT INTO course_purchases/.test(text)) { mocks.inserts.push({ userId: values[0], moduleId: values[1], isBundle: values[2], stripeSessionId: values[3] }); return { rows: [{ id: mocks.inserts.length }] }; }
+        if (/INSERT INTO service_purchases/.test(text)) { mocks.inserts.push({ userId: values[0], serviceType: values[1], serviceName: values[2], price: values[3], stripeSessionId: values[4] }); return { rows: [{ id: mocks.inserts.length }] }; }
         return { rows: [] };
       },
+      // Fulfilment writes a session's rows in one transaction on a dedicated client: the same mock answers it.
+      async connect() { return { query: this.query, release() {} }; },
     },
   };
 });

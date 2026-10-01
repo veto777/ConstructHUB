@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   /** Invoice ids the ledger already holds as paid/void (an open snapshot of them is stale: the upsert writes nothing). */
   settledInvoices: new Set<string>(),
   cancelRow: {} as Record<string, unknown>,
+  /** (session, item) keys already in course_purchases / service_purchases — the unique fulfilment indexes, emulated. */
+  granted: new Set<string>(),
+  /** Make the next purchase-row INSERT fail (a database error mid-fulfilment). */
+  failPurchaseInsert: false,
   verify: vi.fn(),
   retrieve: vi.fn(),
   paymentIntent: vi.fn(),
@@ -46,8 +50,22 @@ vi.mock("../db", () => {
       query: async (text: string, values: any[] = []) => {
         if (/information_schema\.columns/.test(text)) return { rows: [{}, {}, {}, {}, {}] };
         if (/information_schema\.tables/.test(text)) return { rows: [{}, {}, {}] };
+        if (/FROM pg_indexes/.test(text)) return { rows: [{}, {}] };
         mocks.sql.push({ text, values });
         if (/SELECT cancel_at_period_end/.test(text)) return { rows: [mocks.cancelRow] };
+        // Purchase fulfilment rows (server/billing/fulfilment.ts): ON CONFLICT DO NOTHING on (session, item) emulated with a Set,
+        // captured in the shape the old drizzle inserts had; a test can make the INSERT fail like a database would.
+        if (/INSERT INTO (course|service)_purchases/.test(text)) {
+          if (mocks.failPurchaseInsert) { mocks.failPurchaseInsert = false; throw new Error("injected: purchase row could not be written"); }
+          const course = /course_purchases/.test(text);
+          const key = course ? `course:${values[3]}:${values[1] ?? 0}:${values[2]}` : `service:${values[4]}:${values[1]}`;
+          if (mocks.granted.has(key)) return { rows: [] };
+          mocks.granted.add(key);
+          mocks.inserts.push(course
+            ? { userId: values[0], moduleId: values[1], isBundle: values[2], stripeSessionId: values[3] }
+            : { userId: values[0], serviceType: values[1], serviceName: values[2], price: values[3], stripeSessionId: values[4] });
+          return { rows: [{ id: mocks.inserts.length }] };
+        }
         if (/INSERT INTO billing_events/.test(text)) {
           if (mocks.seen.has(values[0])) return { rows: [] };
           mocks.seen.add(values[0]);
@@ -69,6 +87,8 @@ vi.mock("../db", () => {
         if (/count\(\*\)::int AS n FROM billing_invoices/.test(text)) return { rows: [{ n: 0 }] };
         return { rows: [] };
       },
+      // Fulfilment writes a session's rows in one transaction on a dedicated client: the same mock answers it.
+      async connect() { return { query: this.query, release() {} }; },
     },
   };
 });
@@ -144,6 +164,8 @@ beforeEach(() => {
   mocks.updates.length = 0;
   mocks.inserts.length = 0;
   mocks.sql.length = 0;
+  mocks.granted.clear();
+  mocks.failPurchaseInsert = false;
   mocks.customers.clear();
   mocks.customers.set("cus_42", 42);
   mocks.seen.clear();
@@ -363,12 +385,52 @@ describe("one-time purchases → billing_purchases + purchase.completed", () => 
     expect(purchaseUpserts()[0].slice(0, 5)).toEqual(["pi_seo", 42, "service", "ConstructHUB Local SEO — 12-Month Agreement, paid in full", 480000]);
   });
 
-  it("a bank-debit checkout completes unpaid: no purchase until async_payment_succeeded", async () => {
+  it("F08: a bank-debit checkout completes unpaid — nothing granted, no purchase — until async_payment_succeeded grants and records it, once", async () => {
     const completed = capture("purchase.completed");
     await webhook({ type: "checkout.session.completed", data: { object: cartSession({ payment_status: "unpaid" }) } });
+    expect(mocks.inserts).toEqual([]); // no course row from the metadata alone
     expect(purchaseUpserts()).toEqual([]);
     expect(completed).not.toHaveBeenCalled();
     await webhook({ type: "checkout.session.async_payment_succeeded", data: { object: cartSession({ payment_status: "paid" }) } });
+    expect(mocks.inserts).toEqual([
+      { userId: 42, moduleId: 3, isBundle: false, stripeSessionId: "cs_cart" },
+      { userId: 42, moduleId: null, isBundle: true, stripeSessionId: "cs_cart" },
+    ]);
+    expect(purchaseUpserts()).toHaveLength(1);
+    expect(completed).toHaveBeenCalledTimes(1);
+    // The same session again under new event ids (a redelivery; the completed event, late and now
+    // paid): the (session, item) identity — not the event id — keeps it to one row per item.
+    await webhook({ type: "checkout.session.async_payment_succeeded", data: { object: cartSession({ payment_status: "paid" }) } });
+    await webhook({ type: "checkout.session.completed", data: { object: cartSession({ payment_status: "paid" }) } });
+    expect(mocks.inserts).toHaveLength(2);
+  });
+
+  it("F08: async_payment_failed grants nothing and records nothing; the event is attributed to the account", async () => {
+    const completed = capture("purchase.completed");
+    const res = await webhook({ type: "checkout.session.async_payment_failed", data: { object: cartSession({ payment_status: "unpaid" }) } });
+    expect(res.body).toEqual({ received: true });
+    expect(mocks.inserts).toEqual([]);
+    expect(purchaseUpserts()).toEqual([]);
+    expect(completed).not.toHaveBeenCalled();
+    expect(attributions()).toEqual([[expect.any(String), 42]]);
+  });
+
+  it("F09: a purchase row that can't be written fails the webhook — rolled back, claim released, nothing recorded — and the retry grants once", async () => {
+    const completed = capture("purchase.completed");
+    mocks.failPurchaseInsert = true;
+    const first = await webhook({ id: "evt_cart_fail", type: "checkout.session.completed", data: { object: cartSession() } });
+    expect(first.code).toBe(400);
+    expect(first.body.message).toMatch(/injected/);
+    expect(sqlOf(/^ROLLBACK$/)).toHaveLength(1);
+    expect(mocks.inserts).toEqual([]);
+    expect(purchaseUpserts()).toEqual([]);
+    expect(completed).not.toHaveBeenCalled();
+    expect(mocks.seen.has("evt_cart_fail")).toBe(false);
+    // Stripe retries the same event id: processed (not a duplicate), every item granted once, then the ledger and the receipt event.
+    const second = await webhook({ id: "evt_cart_fail", type: "checkout.session.completed", data: { object: cartSession() } });
+    expect(second.body).toEqual({ received: true });
+    expect(sqlOf(/^COMMIT$/)).toHaveLength(1);
+    expect(mocks.inserts).toHaveLength(2);
     expect(purchaseUpserts()).toHaveLength(1);
     expect(completed).toHaveBeenCalledTimes(1);
   });

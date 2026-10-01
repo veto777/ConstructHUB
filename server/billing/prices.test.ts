@@ -6,7 +6,7 @@ import {
   agencyLocationTiers, tieredAmountCents, planPriceSpec, addonPriceSpec, addonSetupPriceSpec, agencyLocationsPriceSpec,
   resolvePriceId, resetPriceCache, describeSubscription, roleOfPrice,
 } from "./prices";
-import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS, BILLING_LEDGER_DDL, BILLING_LEDGER_TABLES } from "./schema";
+import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS, BILLING_LEDGER_DDL, BILLING_LEDGER_TABLES, FULFILMENT_DDL, FULFILMENT_INDEXES } from "./schema";
 import { PLANS, ADDONS, ANNUAL_MONTHS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
 
 describe("Agency location bands in Stripe", () => {
@@ -116,19 +116,29 @@ describe("describeSubscription", () => {
 
 describe("ensureBillingSchema", () => {
   it("only reads the catalog when the columns exist, and adds them idempotently when not", async () => {
-    // Columns and ledger tables all present: two catalog reads, no DDL.
-    const present = { query: vi.fn(async (sql: string) => ({ rows: /information_schema\.tables/.test(sql) ? BILLING_LEDGER_TABLES.map(() => ({})) : BILLING_COLUMNS.map(() => ({})) })) };
+    // Columns, ledger tables and fulfilment indexes all present: three catalog reads, no DDL.
+    const present = { query: vi.fn(async (sql: string) => ({
+      rows: /information_schema\.tables/.test(sql) ? BILLING_LEDGER_TABLES.map(() => ({}))
+        : /pg_indexes/.test(sql) ? FULFILMENT_INDEXES.map(() => ({}))
+        : BILLING_COLUMNS.map(() => ({})),
+    })) };
     await ensureBillingSchema(present);
-    expect(present.query).toHaveBeenCalledTimes(2);
-    expect(present.query.mock.calls.every((c) => /information_schema/.test(c[0]))).toBe(true);
+    expect(present.query).toHaveBeenCalledTimes(3);
+    expect(present.query.mock.calls.every((c) => /information_schema|pg_indexes/.test(c[0]))).toBe(true);
 
     const missing = { query: vi.fn(async (_sql: string) => ({ rows: [{}] })) };
     await ensureBillingSchema(missing);
     const statements = missing.query.mock.calls.map((c) => c[0]);
     expect(statements.slice(1, 1 + BILLING_SUBSCRIPTION_DDL.length)).toEqual([...BILLING_SUBSCRIPTION_DDL]);
     // Then the ledger: one catalog read, then its CREATE ... IF NOT EXISTS statements.
-    expect(statements[1 + BILLING_SUBSCRIPTION_DDL.length]).toMatch(/information_schema\.tables/);
-    expect(statements.slice(2 + BILLING_SUBSCRIPTION_DDL.length)).toEqual([...BILLING_LEDGER_DDL]);
+    const ledgerAt = 1 + BILLING_SUBSCRIPTION_DDL.length;
+    expect(statements[ledgerAt]).toMatch(/information_schema\.tables/);
+    expect(statements.slice(ledgerAt + 1, ledgerAt + 1 + BILLING_LEDGER_DDL.length)).toEqual([...BILLING_LEDGER_DDL]);
+    // Then the purchase-fulfilment indexes: one catalog read, then CREATE UNIQUE INDEX ... IF NOT EXISTS (one per session + item).
+    const fulfilmentAt = ledgerAt + 1 + BILLING_LEDGER_DDL.length;
+    expect(statements[fulfilmentAt]).toMatch(/pg_indexes/);
+    expect(statements.slice(fulfilmentAt + 1)).toEqual([...FULFILMENT_DDL]);
+    for (const ddl of FULFILMENT_DDL) expect(ddl).toMatch(/^CREATE UNIQUE INDEX IF NOT EXISTS \w+_session_item_idx\s+ON (course|service)_purchases/);
     // The ledger DDL is the account schema's (one definition): CREATE … IF NOT EXISTS, plus the removal of the
     // duplicate indexes earlier builds created under other names (DROP INDEX IF EXISTS, idempotent).
     for (const ddl of BILLING_LEDGER_DDL) expect(ddl).toMatch(/^(CREATE (TABLE|INDEX) IF NOT EXISTS |DROP INDEX IF EXISTS billing_)/);
