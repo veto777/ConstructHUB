@@ -253,12 +253,12 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-1">
-              <p className="font-semibold flex flex-wrap items-center gap-2" data-testid="text-limits-plan">
+              <div className="font-semibold flex flex-wrap items-center gap-2" data-testid="text-limits-plan">
                 {entitlements.planName ?? PLANS[plan].name} plan limits
                 {entitlements.isPlatformAdmin && entitlements.accessPlan !== entitlements.plan && (
                   <Badge variant="outline" className="text-[10px]" data-testid="badge-limits-admin">Platform admin</Badge>
                 )}
-              </p>
+              </div>
               <p className="text-xs text-muted-foreground" data-testid="text-limits-resets">
                 {resets ? `Monthly counts reset ${resets.toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone: "UTC" })}.` : ""}
                 {isAgency ? " Agency allowances grow with the locations you're billed for." : ""}
