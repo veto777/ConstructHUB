@@ -22,7 +22,12 @@ declare module "http" {
 app.use(["/api/cloudflare", "/api/gsc"], credentialBody);
 
 // Bound public AI/photo JSON before the general parser; Stripe raw-body stays intact.
-app.use(["/api/site-assistant", "/api/ads-consultant", "/api/review", "/api/photos", "/api/gmb/review-response"], express.json({ limit: "32kb" }));
+// The Hub assistant gets the smallest body of all, and a body it can't parse is
+// answered here (never by the global error handler, which logs the error).
+app.use("/api/hub", express.json({ limit: "8kb" }), (err: any, _req: Request, res: Response, _next: NextFunction) => {
+  res.status(err?.type === "entity.too.large" ? 413 : 400).json({ message: "Request too large or not valid JSON." });
+});
+app.use(["/api/ads-consultant", "/api/review", "/api/photos", "/api/gmb/review-response"], express.json({ limit: "32kb" }));
 app.use("/api/ads", express.json({ limit: "512kb" }));
 app.use(
   express.json({
@@ -54,7 +59,8 @@ app.use((req, res, next) => {
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
-    if (!isSiteScan && !req.path.startsWith("/api/domains") && !req.path.startsWith("/api/mail-alerts")) capturedJsonResponse = bodyJson;
+    // Hub replies are never written to the log (guardrails §2/§8).
+    if (!isSiteScan && !req.path.startsWith("/api/domains") && !req.path.startsWith("/api/mail-alerts") && !req.path.startsWith("/api/hub")) capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 

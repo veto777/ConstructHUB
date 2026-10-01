@@ -29,6 +29,8 @@ Self-contained. Never pull in another tower project's infra, domains, or account
 - `server/` — Express 5 + Drizzle. `shared/schema.ts` is the DB schema (source of truth).
 - `client/` — React + Vite + shadcn/ui (New York style) + Tailwind.
 - `server/data/*.json` — reference data, bundled to `dist/data/` at build (`script/build.ts`).
+- `server/hub/` — Hub, the corner assistant (TruthCoder). Its guardrails are deterministic code there, not the
+  prompt; its knowledge pack is `server/data/hub-knowledge.md` (prices are tokens filled from `shared/plans.ts`).
 - Auth: session (connect-pg-simple) + Google OAuth. Payments: Stripe. Storage: Cloudflare R2. AI: OpenAI.
 
 ## Data pipelines (`scripts/`, re-runnable)

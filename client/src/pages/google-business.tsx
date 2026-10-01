@@ -11,6 +11,8 @@ import {
   Target, Sparkles, BadgeCheck,
 } from "lucide-react";
 import googleBusinessLogo from "@assets/google-business-logo.png";
+import { GBP_REINSTATEMENT_CENTS } from "@shared/plans";
+import { formatUsd } from "@shared/plan-copy";
 
 // No unsourced statistics on this page: every point is a plain description of
 // how Google Business Profile works, not a number we can't back up.
@@ -75,7 +77,7 @@ const tools = [
     link: "/reinstatement",
     badge: "Recovery",
     badgeColor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
-    features: ["Soft & hard suspension", "$599 flat rate", "Expert handling"],
+    features: ["Soft & hard suspension", `${formatUsd(GBP_REINSTATEMENT_CENTS)} flat rate`, "Expert handling"],
   },
 ];
 

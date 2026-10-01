@@ -30,7 +30,7 @@ import { processPhoto, generateFileName, analyzePhoto } from "./photo-processor"
 import { registerStripeRoutes } from "./stripe";
 import { registerTrackingRoutes } from "./tracking-script";
 import { registerAdsConsultantRoutes } from "./ads-consultant";
-import { registerSiteAssistantRoutes } from "./site-assistant";
+import { registerHubRoutes } from "./hub";
 import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
@@ -159,7 +159,7 @@ export async function registerRoutes(
   registerStripeRoutes(app);
   registerTrackingRoutes(app);
   registerAdsConsultantRoutes(app);
-  registerSiteAssistantRoutes(app);
+  registerHubRoutes(app);
 
   function getDevUser(req: any, res: any): any {
     const user = req.user;
