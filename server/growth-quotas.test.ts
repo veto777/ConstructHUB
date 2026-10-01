@@ -15,6 +15,7 @@ vi.mock("./db", () => ({
 vi.mock("./growth-limits", () => ({ takeBudget: mocks.take }));
 import { gridCreditCost, monthlyLimit, reserveMonthlyQuota, reserveQuotaFor, refundQuota, quotaKey, monthKey } from "./growth-quotas";
 import { getEntitlements } from "./entitlements";
+import { PLANS, PLAN_KEYS } from "@shared/plans";
 
 const plan = (key: string | null, extra: Record<string, unknown> = {}) =>
   ({ email: "owner@example.invalid", plan: key, status: key ? "active" : null, stripe_subscription_id: key ? "sub_fixture" : null, ...extra });
@@ -52,6 +53,32 @@ describe("monthly allowances come from shared/plans.ts", () => {
 
     mocks.row = undefined;
     expect(monthlyLimit(await getEntitlements(1), "searches")).toBe(0);
+  });
+
+  it("meters texts by the plan's teamTextSegments; the texting number add-on raises nothing", async () => {
+    for (const key of PLAN_KEYS) {
+      mocks.row = plan(key, { addons: { texting_number: 1 } });
+      expect(monthlyLimit(await getEntitlements(1), "texts")).toBe(PLANS[key].limits.teamTextSegments);
+    }
+    mocks.row = plan("premium"); // legacy -> Pro
+    expect(monthlyLimit(await getEntitlements(1), "texts")).toBe(PLANS.pro.limits.teamTextSegments);
+
+    mocks.row = plan("starter");
+    const none = await reserveQuotaFor(42, "texts", 1);
+    expect(none.ok).toBe(false);
+    expect(!none.ok && none.body).toMatchObject({ code: "plan_required", requiredPlan: "pro" });
+    expect(mocks.take).not.toHaveBeenCalled();
+
+    mocks.row = plan("pro");
+    mocks.take.mockResolvedValue(false);
+    mocks.used = 500;
+    const spent = await reserveQuotaFor(42, "texts", 2);
+    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([`quota:user:42:texts:${monthKey()}`, 500, 2]);
+    expect(!spent.ok && spent.status).toBe(403);
+    expect(!spent.ok && spent.body).toMatchObject({
+      code: "limit_reached", feature: "texts", limit: 500, used: 500, upgradePlan: "growth", addon: null,
+      message: "You've used all 500 text segments your Pro plan includes this month. The count resets on the 1st (UTC). To raise it, move to Growth (1,500 text segments).",
+    });
   });
 });
 

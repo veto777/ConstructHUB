@@ -197,15 +197,9 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           hint: isAgency ? "One pool for the CRM and the agency team." : undefined,
           addon: "extra_seat",
         },
-        {
-          key: "teamTextSegments",
-          label: "Team text alerts",
-          included: perMonth(allowances.teamTextSegments),
-          excluded: allowances.teamTextSegments === 0,
-          used: allowances.teamTextSegments === 0 ? null : undefined,
-          monthly: true,
-          hint: allowances.teamTextSegments === 0 ? undefined : "Counted per text segment; a running total isn't reported here yet.",
-        },
+        meterRow("teamTextSegments", "Team text alerts", usage.texts, allowances.teamTextSegments, {
+          hint: allowances.teamTextSegments === 0 ? undefined : "Every text the workspace sends counts, by segment: 160 characters, or 70 with emoji or special characters.",
+        }),
         {
           key: "clientTexting",
           label: "Two-way client texting",

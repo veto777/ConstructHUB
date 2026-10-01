@@ -41,6 +41,7 @@ const PRO_ENTITLEMENTS = {
     rankings: { used: PLANS.pro.limits.gridCredits, limit: PLANS.pro.limits.gridCredits },
     siteScans: { used: 2, limit: PLANS.pro.limits.siteScans },
     competitorScans: { used: 0, limit: PLANS.pro.limits.competitorScans },
+    texts: { used: 37, limit: PLANS.pro.limits.teamTextSegments },
   },
   resetsAt: "2026-11-01T00:00:00Z",
 };
@@ -194,7 +195,7 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("limit-reviewTemplates-used")).toContainText(`1 of ${n(L.reviewTemplates)}`);
     await expect(page.getByTestId("limit-autoPublishAiReplies-included")).toContainText(L.autoPublishAiReplies ? "Included" : "Not included");
     await expect(page.getByTestId("limit-teamTextSegments-included")).toContainText(L.teamTextSegments === 0 ? "Not included" : `${n(L.teamTextSegments)} / mo`);
-    if (L.teamTextSegments !== 0) await expect(page.getByTestId("limit-teamTextSegments-used")).toContainText("Not reported");
+    if (L.teamTextSegments !== 0) await expect(page.getByTestId("limit-teamTextSegments-used")).toContainText(`37 of ${n(L.teamTextSegments)} this month`);
     await expect(page.getByTestId("limit-clientTexting-included")).toContainText(
       L.clientTexting === "none" ? "Not included" : L.clientTexting === "included" ? "1 number included" : "SignalWire",
     );

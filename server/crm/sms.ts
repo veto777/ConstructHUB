@@ -12,6 +12,10 @@
  * sending — dev and e2e exercise the exact production code path without a
  * carrier account, and the result names the provider so the UI never pretends
  * a text went out.
+ *
+ * Every text an org sends is metered by segment against the org owner's
+ * monthly allowance (shared/plans.ts teamTextSegments) — see sendSms and
+ * reserveSmsSegments below.
  */
 import type { Express } from "express";
 import { z } from "zod";
@@ -33,9 +37,11 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl } from "../site-context";
-import { getEntitlements } from "../entitlements";
+import { getEntitlements, sendLimitReached } from "../entitlements";
+import { reserveQuotaFor, refundReservation, monthKey, type LimitReachedBody, type QuotaReservation } from "../growth-quotas";
 import { PLANS, PLAN_KEYS, type PlanKey, type PlanLimits } from "@shared/plans";
 import { logEvent, presentEstimate } from "./entities";
+import { smsSegments } from "./sms-segments";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -126,6 +132,56 @@ export async function orgSmsStatus(org: { id: string; customFields: unknown }) {
   const status = smsStatus(org.customFields);
   if (await orgSmsEntitled(org.id)) return { ...status, planAllowsSms: true };
   return { ...status, configured: false, canTextClients: false, fromNumber: null, planAllowsSms: false, planMessage: SMS_NEEDS_PLAN };
+}
+
+// ── Monthly allowance (shared/plans.ts teamTextSegments) ────────────────────
+
+/** Orgs already told this month that their allowance is spent: one log line per org per month. */
+const limitWarned = new Set<string>();
+
+type SmsMetered =
+  | { ok: true; reservation: QuotaReservation | null; segments: number }
+  /** `limit` is the 403 limit_reached body when the month's segments are spent (absent for a plan/lookup refusal). */
+  | { ok: false; error: string; limit?: LimitReachedBody };
+
+/**
+ * Reserve the text's segments from the org owner's monthly allowance through
+ * the same growth_budgets meter as every other monthly count (atomic, so
+ * parallel sends can't overshoot; refundable when the send fails). The plan
+ * resolves exactly as in orgSmsEntitled: the owner's effective plan (legacy
+ * keys through LEGACY_PLAN_MAP), the top plan for platform admins. A lookup
+ * failure denies — texts cost money. The first refusal of a month is logged;
+ * later ones stay quiet, but every caller still gets the reason in its result.
+ */
+async function reserveSmsSegments(orgId: string, body: string): Promise<SmsMetered> {
+  const segments = smsSegments(body);
+  let result: Awaited<ReturnType<typeof reserveQuotaFor>>;
+  try {
+    const [org] = await db
+      .select({ ownerUserId: crmOrgs.ownerUserId })
+      .from(crmOrgs)
+      .where(eq(crmOrgs.id, orgId))
+      .limit(1);
+    if (!org) return { ok: false, error: SMS_NEEDS_PLAN };
+    result = await reserveQuotaFor(org.ownerUserId, "texts", segments);
+  } catch (e: any) {
+    console.error("[sms] allowance check failed (not sending):", e?.message || e);
+    return { ok: false, error: "This month's text allowance could not be checked — not sent." };
+  }
+  if (result.ok) return { ok: true, reservation: result.reservation, segments };
+  if (result.status !== 403) return { ok: false, error: SMS_NEEDS_PLAN };
+  const month = monthKey();
+  if (!limitWarned.has(`${orgId}:${month}`)) {
+    for (const k of limitWarned) if (!k.endsWith(`:${month}`)) limitWarned.delete(k);
+    limitWarned.add(`${orgId}:${month}`);
+    console.warn(`[sms] monthly text allowance spent for org ${orgId} — texts are skipped until the 1st (UTC). ${result.body.message}`);
+  }
+  return { ok: false, error: result.body.message, limit: result.body };
+}
+
+/** Tests: forget which orgs were already warned this month. */
+export function clearSmsLimitWarnings(): void {
+  limitWarned.clear();
 }
 
 // ── Per-org sender: shared platform number, own number, or own account ─────
@@ -277,6 +333,10 @@ export type SmsResult = {
   provider: "signalwire" | "log";
   sid?: string | null;
   error?: string | null;
+  /** Segments charged to the org's monthly allowance (a refused or failed send charges none). */
+  segments?: number;
+  /** Set when the month's allowance refused the text: the 403 limit_reached body a manual route answers with. */
+  limit?: LimitReachedBody;
 };
 
 const LOG_PATH = () => process.env.SMS_OUTBOX_PATH ?? path.join(process.cwd(), "tmp", "sms-outbox.jsonl");
@@ -335,6 +395,12 @@ async function signalwireSend(to: string, body: string, sender: SmsSender): Prom
  * is SKIPPED and reported (`ok:false`, error names the opt-out) — never
  * thrown, never sent. A DB hiccup during the check fails OPEN (logged) so a
  * wobbly database can't take down notifications.
+ *
+ * With an org the text's segments are reserved from the owner's monthly
+ * allowance first (reserveSmsSegments); a spent month is SKIPPED and reported
+ * (`ok:false`, `limit` carries the 403 body for manual routes), and a send
+ * the carrier refuses gives its segments back. Platform-level sends (no org)
+ * belong to no allowance.
  */
 export async function sendSms(
   to: string,
@@ -361,8 +427,23 @@ export async function sendSms(
       console.error("[sms] opt-out check failed (sending anyway):", e?.message || e);
     }
   }
-  if (!sender) return logProviderSend(to, body);
-  return signalwireSend(to, body, sender);
+  // Charge the allowance after the opt-out check (a suppressed text costs
+  // nothing) and before the carrier sees the text.
+  let metered: SmsMetered | null = null;
+  if (orgId && orgId !== "*") {
+    metered = await reserveSmsSegments(orgId, body);
+    if (!metered.ok) {
+      return { ok: false, provider: sender ? "signalwire" : "log", sid: null, error: metered.error, limit: metered.limit };
+    }
+  }
+  const result = sender ? await signalwireSend(to, body, sender) : logProviderSend(to, body);
+  if (!result.ok) {
+    // The text never went out: give its segments back.
+    if (metered?.ok) await refundReservation(metered.reservation ?? undefined, metered.segments)
+      .catch((e: any) => console.error("[sms] allowance refund failed:", e?.message || e));
+    return result;
+  }
+  return metered?.ok ? { ...result, segments: metered.segments } : result;
 }
 
 /** Loose E.164 sanity: optional +, 7–15 digits. Returns null when unusable. */
@@ -430,23 +511,9 @@ export async function maybeAlertReengagement(args: {
   }
   if (!targets.length) targets = members.filter((m) => m.role === "owner");
 
-  const emails = crmNotificationChannel(org.customFields, "clientReengaged", "email")
-    ? ([...new Set(targets.map((m) => m.email).filter(Boolean))] as string[])
-    : [];
-
   const clientLink = `${portalBaseUrl(req)}/crm/clients/${cust.id}`;
   const estLabel = est.number ? `estimate ${est.number}` : "their estimate";
   const total = money(est.totalCents);
-
-  if (emails.length) await sendWithFallback({
-    to: emails.join(","),
-    subject: `👀 ${cust.displayName} is reviewing ${estLabel} again — good time to call`,
-    html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-      <p><strong>${esc(cust.displayName)}</strong> opened ${esc(estLabel)}${total ? ` (${total})` : ""} again.</p>
-      <p>A second look usually means they're close to deciding — a quick call now wins the job.</p>
-      <p><a href="${esc(clientLink)}">Open ${esc(cust.displayName)} in the CRM</a></p>
-    </div>`,
-  } as any).catch((e: any) => console.error("[crm] reengagement email failed:", e?.message || e));
 
   // Text the person who should make the call. The owner's fallback is the
   // org's main phone; anyone else without a mobile simply doesn't get a text.
@@ -469,6 +536,22 @@ export async function maybeAlertReengagement(args: {
     );
   }
 
+  // Email when the channel is on — or when the text was skipped because the
+  // month's text allowance is spent, so the alert still reaches someone.
+  const emails = crmNotificationChannel(org.customFields, "clientReengaged", "email") || smsResult?.limit
+    ? ([...new Set(targets.map((m) => m.email).filter(Boolean))] as string[])
+    : [];
+
+  if (emails.length) await sendWithFallback({
+    to: emails.join(","),
+    subject: `👀 ${cust.displayName} is reviewing ${estLabel} again — good time to call`,
+    html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+      <p><strong>${esc(cust.displayName)}</strong> opened ${esc(estLabel)}${total ? ` (${total})` : ""} again.</p>
+      <p>A second look usually means they're close to deciding — a quick call now wins the job.</p>
+      <p><a href="${esc(clientLink)}">Open ${esc(cust.displayName)} in the CRM</a></p>
+    </div>`,
+  } as any).catch((e: any) => console.error("[crm] reengagement email failed:", e?.message || e));
+
   if (crmNotificationChannel(org.customFields, "clientReengaged", "inApp")) {
     await db.insert(crmNotifications).values(targets.map((m) => ({
       orgId: org.id, memberId: m.id, type: "clientReengaged",
@@ -486,6 +569,7 @@ export async function maybeAlertReengagement(args: {
     emailedTo: emails,
     textedTo: smsResult?.ok ? smsTo : null,
     smsProvider: smsResult?.provider ?? null,
+    smsError: smsResult?.error ?? null,
   };
   await db.update(crmEstimates).set({ customFields: cf, updatedAt: new Date() })
     .where(eq(crmEstimates.id, est.id));
@@ -703,6 +787,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     if (!to) return res.status(400).json({ message: "That doesn't look like a phone number." });
 
     const result = await sendSms(to, parsed.data.body?.trim() || `Test text from ${ctx.org.name} — SMS is working.`, ctx.org.customFields, ctx.org.id);
+    if (result.limit) return sendLimitReached(res, result.limit);
     if (!result.ok) return res.status(502).json({ message: `SignalWire rejected the text: ${result.error}` });
     res.json({ ok: true, provider: result.provider, sid: result.sid, to });
   });
@@ -855,15 +940,19 @@ export function smsAlertsEnabled(customFields: unknown): boolean {
   return v === true;
 }
 
+/** What came of the owner texts: how many went out, and the allowance refusal when the month is spent (callers fall back to email). */
+export type OwnerTextOutcome = { sent: number; limit: LimitReachedBody | null };
+
 export async function textOrgOwners(
   org: typeof crmOrgs.$inferSelect,
   body: string,
   pref?: CrmNotificationPref,
-): Promise<void> {
+): Promise<OwnerTextOutcome> {
+  const outcome: OwnerTextOutcome = { sent: 0, limit: null };
   // The legacy master toggle OR the per-event text channel from Settings.
   const perPref = pref ? crmNotificationChannel(org.customFields, pref, "sms") : false;
-  if (!smsAlertsEnabled(org.customFields) && !perPref) return;
-  if (!resolveSmsSender(org.customFields)) return; // no sender → say nothing
+  if (!smsAlertsEnabled(org.customFields) && !perPref) return outcome;
+  if (!resolveSmsSender(org.customFields)) return outcome; // no sender → say nothing
 
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
@@ -878,7 +967,12 @@ export async function textOrgOwners(
     if (fallback) numbers.add(fallback);
   }
   for (const to of numbers) {
-    await sendSms(to, body, org.customFields, org.id).catch((e: any) =>
-      console.error("[crm] owner text alert failed:", e?.message || e));
+    const r = await sendSms(to, body, org.customFields, org.id).catch((e: any) => {
+      console.error("[crm] owner text alert failed:", e?.message || e);
+      return null;
+    });
+    if (r?.ok) outcome.sent++;
+    if (r?.limit) outcome.limit = r.limit;
   }
+  return outcome;
 }
