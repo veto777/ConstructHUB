@@ -30,9 +30,10 @@ import { reply as realReply } from "../../gbp/service";
 import { BlotatoClient } from "../../social/client";
 import { connect as connectSocial } from "../../social/service";
 import { saveMapping } from "../../social/agency";
-import { quotaKey } from "../../growth-quotas";
+import { quotaKey, reserveQuotaFor } from "../../growth-quotas";
 import { PUBLIC_API_BASE, WRITE_UNITS, registerWriteResources, rejectApiKeysOutsidePublicApi, writeOpenapiFragment, writeResources } from "./index-write";
 import { gbpPostPayload, gbpPostInput } from "./gbp-write";
+import { startSiteScan } from "./sitescan-write";
 
 let owner = 0, other = 0, noPlan = 0, location = 0, unlinked = 0, otherLocation = 0, review = 0, otherReview = 0;
 let base = "", server: ReturnType<express.Express["listen"]>;
@@ -341,6 +342,26 @@ describe("POST site-scans — start a Site Scan", () => {
     // Another account's location is never a scan target.
     expect((await call(scans, { user: owner }, { locationId: otherLocation })).status).toBe(400);
     expect(await used(quotaKey(owner, "siteScans"))).toBe(1);
+  });
+
+  it("gives the monthly Site Scan back when the queue insert fails (the scan never starts)", async () => {
+    const before = await used(quotaKey(owner, "siteScans"));
+    const jobsBefore = (await pool.query("SELECT count(*)::int n FROM sitescan_jobs WHERE user_id=$1", [owner])).rows[0].n;
+    await expect(
+      startSiteScan(
+        owner,
+        { url: "https://example.com/", pageCap: 20, psiPages: 0 },
+        { keyId: "key_scan" },
+        {
+          reserveQuotaFor,
+          enqueue: async () => {
+            throw new Error("queue insert fixture");
+          },
+        },
+      ),
+    ).rejects.toThrow("queue insert fixture");
+    expect(await used(quotaKey(owner, "siteScans"))).toBe(before);
+    expect((await pool.query("SELECT count(*)::int n FROM sitescan_jobs WHERE user_id=$1", [owner])).rows[0].n).toBe(jobsBefore);
   });
 });
 

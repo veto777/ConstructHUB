@@ -1,4 +1,3 @@
-import { getEntitlements } from '../entitlements';
 import { pool } from '../db';
 import { logActivity, notifyUser } from '../account-events';
 import { GoogleClient, GoogleError, mapLocation, mapPerformance, mapProfile, performancePath, resource, PROFILE_READ_MASK } from './client';
@@ -226,27 +225,11 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
     return result;
   });
 }
-let workerBusy = false;
-export async function runGbpWorker(sync = syncLocation) {
-  if(workerBusy) return; workerBusy=true;
-  try {
-    const {rows} = await pool.query(`SELECT DISTINCT l.id,l.user_id FROM business_locations l JOIN gbp_grants g ON g.user_id=l.user_id
-      AND (g.google_subject=l.gbp_google_subject OR (l.gbp_google_subject IS NULL AND (SELECT count(*) FROM gbp_grants x WHERE x.user_id=l.user_id)=1))
-      WHERE l.gbp_location_name IS NOT NULL AND NOT g.reconnect_required AND $1=ANY(g.scopes)
-      AND NOT EXISTS(SELECT 1 FROM gbp_sync_status s WHERE s.location_id=l.id AND s.last_attempt>now()-interval '6 hours') ORDER BY l.id LIMIT 100`,['https://www.googleapis.com/auth/business.manage']);
-    // Only accounts with an active plan (or a platform admin) spend Google quota on scheduled syncs.
-    const planned=new Map<number,boolean>();
-    for(const l of rows) {
-      if(!planned.has(l.user_id)) planned.set(l.user_id,(await getEntitlements(l.user_id).catch(()=>null))?.accessPlan!=null);
-      if(!planned.get(l.user_id)) continue;
-      try {await sync(l.user_id,l.id);} catch {/* next tick retries; no token/provider payload logging */}
-    }
-  } catch {console.error('GBP scheduled sync failed');} finally {workerBusy=false;}
-}
-export function startGbpWorker() {
-  if (process.env.GBP_SYNC_DISABLED === "true") return;
-  const timer=setInterval(()=>void runGbpWorker(),60_000);timer.unref();return timer;
-}
+// Scheduled GBP syncs are NOT here: they run through the agency queue
+// (server/agency/jobs.ts scheduleSyncs + runAgencyJobs), which gates on the
+// owner's active plan both when enqueueing and when running. The old direct
+// 60-second loop was removed with the agency worker; keep plan-gating changes
+// there.
 
 /** After a Google account connects: link the contractor's matching Places-added rows and fully sync
  *  every listing that account manages, so the Locations pages fill in without further clicks. */
