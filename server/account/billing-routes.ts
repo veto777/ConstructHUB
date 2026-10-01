@@ -40,25 +40,13 @@ const BACKFILL_PAGES = 10;
 const BACKFILL_RECHECK_MS = 10 * 60_000;
 
 // ---------------------------------------------------------------------------
-// Schema — the two ledgers this file reads (CONTRACT shapes). Statement for
-// statement the same DDL as server/account/schema.ts ensureAccountSchema()
-// (lane 1 owns the tables): both are IF NOT EXISTS, so whichever runs first
-// creates them and the other is a no-op — and because the column constraints
-// and index names are identical, the result is the same table either way (no
-// second index, no NOT NULL that the webhook writer never agreed to).
+// Schema — the ledgers this file reads are defined ONCE in
+// server/account/schema.ts (BILLING_LEDGER_DDL); it is re-run here lazily so
+// the routes work even before the boot-time ensureAccountSchema() (IF NOT
+// EXISTS throughout: a second run is a no-op).
 // ---------------------------------------------------------------------------
-export const BILLING_LEDGER_DDL: readonly string[] = [
-  `CREATE TABLE IF NOT EXISTS billing_invoices (
-    id text PRIMARY KEY, user_id integer, number text, status text,
-    amount_paid integer, amount_due integer, currency text,
-    period_start timestamptz, period_end timestamptz, description text,
-    hosted_invoice_url text, invoice_pdf text, created timestamptz)`,
-  `CREATE INDEX IF NOT EXISTS billing_invoices_user_idx ON billing_invoices(user_id, created DESC)`,
-  `CREATE TABLE IF NOT EXISTS billing_purchases (
-    id text PRIMARY KEY, user_id integer, kind text, description text,
-    amount integer, currency text, created timestamptz, receipt_url text)`,
-  `CREATE INDEX IF NOT EXISTS billing_purchases_user_idx ON billing_purchases(user_id, created DESC)`,
-];
+export { BILLING_LEDGER_DDL } from "./schema";
+import { BILLING_LEDGER_DDL } from "./schema";
 
 let ledgerReady: Promise<void> | null = null;
 /** Creates the ledgers once per process; a failure is retried on the next call. */

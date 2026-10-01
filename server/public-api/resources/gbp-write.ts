@@ -1,27 +1,28 @@
 /**
- * Public API — Google Business Profile WRITE resource (`gbp`), mounted by lane 1
- * at `${GROWTH_BASE}/gbp`:
+ * Public API — Google Business Profile WRITE routes, composed into the read
+ * resources of the same names (./register.ts):
  *
- *   POST /locations/{locationId}/posts   schedule a Google update (post) with
- *                                        the caller's text, media URLs and time
- *   POST /reviews/{reviewId}/reply       reply to a Google review with the
- *                                        caller's text (publish or draft)
+ *   POST /api/v1/locations/{locationId}/posts   schedule a Google update (post) with
+ *                                               the caller's text, media URLs and time
+ *   POST /api/v1/reviews/{reviewId}/reply       reply to a Google review with the
+ *                                               caller's text (publish or draft)
  *
  * Both are 5-unit writes. The post is queued in gbp_content_jobs exactly as
  * supplied (source=api) and published by the existing content worker; the
- * reply goes through server/gbp/service.ts reply() and all of its checks
+ * reply goes through server/gbp/reply.ts reply() and all of its checks
  * (ownership, Google linkage, usable grant, location lock, Google confirmation).
- * No AI module is imported here.
+ * No AI module is imported here or below (gbp/reply.ts is the AI-free half of
+ * the GBP service).
  */
 import { randomUUID } from "node:crypto";
 import { Router, type Request } from "express";
 import { z } from "zod";
 import { pool } from "../../db";
 import { GoogleError } from "../../gbp/client";
-import { ownedLocation, reply as replyToReview } from "../../gbp/service";
+import { ownedLocation, reply as replyToReview } from "../../gbp/reply";
 import { logActivity } from "../../account-events";
 import { publicMediaUrl } from "@shared/social";
-import { GROWTH_BASE, handle, idParam, jsonError, openapiCommon, requireWriteScope, type ApiKeyContext } from "./shared-write";
+import { handle, idParam, jsonError, openapiCommon, requireWriteScope, type ApiKeyContext } from "./shared-write";
 
 export type GbpWriteDeps = { reply: typeof replyToReview };
 export const gbpWriteDefaults: GbpWriteDeps = { reply: replyToReview };
@@ -140,20 +141,24 @@ export const gbpReplyInput = z.object({
   publish: z.boolean().default(true),
 }).strict();
 
-export function gbpWriteRouter(deps: GbpWriteDeps = gbpWriteDefaults) {
-  // Scope is checked per route (not router.use) so a read resource registered under the same name is never affected.
+/** `locations` resource: POST /{locationId}/posts. Scope is checked per route so the read routes of the resource are untouched. */
+export function gbpPostsWriteRouter(_deps: GbpWriteDeps = gbpWriteDefaults) {
   const router = Router();
-
-  router.post("/locations/:locationId/posts", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
+  router.post("/:locationId/posts", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
     const locationId = idParam.parse(req.params.locationId);
     const { created, row } = await scheduleGbpPost(key.userId, locationId, req.body ?? {}, { keyId: key.id, req });
     res.status(created ? 201 : 200).json({ post: gbpPostView(row), created });
   }));
+  return router;
+}
 
-  router.post("/reviews/:reviewId/reply", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
+/** `reviews` resource: POST /{reviewId}/reply. */
+export function gbpReplyWriteRouter(deps: GbpWriteDeps = gbpWriteDefaults) {
+  const router = Router();
+  router.post("/:reviewId/reply", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
     const reviewId = idParam.parse(req.params.reviewId);
     const { text, publish } = gbpReplyInput.parse(req.body ?? {});
-    if (publish && !text.trim()) return jsonError(res, 400, "invalid_request", "Reply text required");
+    if (publish && !text.trim()) return jsonError(res, 400, "validation_error", "Reply text required", { issues: [{ path: "text", message: "Reply text required" }] });
     // The existing reply path: ownership (404), Google linkage, grant checks, the location lock, Google's confirmation.
     const result: any = await deps.reply(key.userId, reviewId, text, publish ? "publish" : "draft", undefined, { req });
     await logActivity(req, key.userId, "api.gbp.review_replied", { reviewId, keyId: key.id, published: publish }).catch(() => {});
@@ -164,43 +169,27 @@ export function gbpWriteRouter(deps: GbpWriteDeps = gbpWriteDefaults) {
   return router;
 }
 
-const base = `${GROWTH_BASE}/gbp`;
-export const gbpWriteOpenapi = {
+/** Fragment for the `locations` resource (paths relative to /api/v1/locations). */
+export const gbpPostsWriteOpenapi = {
   paths: {
-    [`${base}/locations/{locationId}/posts`]: {
+    // The same templated path as the read lane's GET /locations/{id}/posts (one path, two methods in openapi.json).
+    "/{id}/posts": {
       post: {
-        ...openapiCommon.writeOperation("Schedule a Google Business Profile update (post) with your own text, media URLs and time", "gbp"),
+        ...openapiCommon.writeOperation("Schedule a Google Business Profile update (post) with your own text, media URLs and time", "locations"),
         operationId: "scheduleGbpPost",
-        parameters: [{ name: "locationId", in: "path", required: true, schema: { type: "integer" } }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }, description: "Location id" }],
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/GbpPostInput" } } } },
         responses: {
           "201": { description: "Queued", content: { "application/json": { schema: { $ref: "#/components/schemas/GbpPostResult" } } } },
           "200": { description: "Already queued under this requestKey (idempotent replay)", content: { "application/json": { schema: { $ref: "#/components/schemas/GbpPostResult" } } } },
-          "400": openapiCommon.errorResponse("Validation failed"), "403": openapiCommon.errorResponse("Key lacks the write scope"),
-          "404": openapiCommon.errorResponse("Location not found"), "409": openapiCommon.errorResponse("Location not linked to Google, or requestKey reused with different content"),
-        },
-      },
-    },
-    [`${base}/reviews/{reviewId}/reply`]: {
-      post: {
-        ...openapiCommon.writeOperation("Reply to a Google review with your own text (publish to Google, or save a draft)", "gbp"),
-        operationId: "replyToGbpReview",
-        parameters: [{ name: "reviewId", in: "path", required: true, schema: { type: "integer" } }],
-        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/GbpReplyInput" } } } },
-        responses: {
-          "200": { description: "Published to Google", content: { "application/json": { schema: { $ref: "#/components/schemas/GbpReplyResult" } } } },
-          "201": { description: "Draft saved", content: { "application/json": { schema: { $ref: "#/components/schemas/GbpReplyResult" } } } },
-          "400": openapiCommon.errorResponse("Validation failed, or the review is not an active Google review"),
-          "403": openapiCommon.errorResponse("Key lacks the write scope, or Google denied permission"),
-          "404": openapiCommon.errorResponse("Review not found"), "409": openapiCommon.errorResponse("Google account needs reconnecting (google_reconnect_required), or the location is busy"),
-          "503": openapiCommon.errorResponse("Google did not confirm the reply"),
+          "400": openapiCommon.errorResponse("validation_error"), "403": openapiCommon.errorResponse("insufficient_scope — the key lacks the write scope"),
+          "404": openapiCommon.errorResponse("not_found — no such location of yours"), "409": openapiCommon.errorResponse("conflict — location not linked to Google, or requestKey reused with different content"),
         },
       },
     },
   },
   components: {
     schemas: {
-      ...openapiCommon.schemas,
       GbpPostInput: {
         type: "object", required: ["text"],
         properties: {
@@ -225,6 +214,32 @@ export const gbpWriteOpenapi = {
           } },
         },
       },
+    },
+  },
+};
+
+/** Fragment for the `reviews` resource (paths relative to /api/v1/reviews). */
+export const gbpReplyWriteOpenapi = {
+  paths: {
+    "/{id}/reply": {
+      post: {
+        ...openapiCommon.writeOperation("Reply to a Google review with your own text (publish to Google, or save a draft)", "reviews"),
+        operationId: "replyToGbpReview",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }, description: "Review id" }],
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/GbpReplyInput" } } } },
+        responses: {
+          "200": { description: "Published to Google", content: { "application/json": { schema: { $ref: "#/components/schemas/GbpReplyResult" } } } },
+          "201": { description: "Draft saved", content: { "application/json": { schema: { $ref: "#/components/schemas/GbpReplyResult" } } } },
+          "400": openapiCommon.errorResponse("validation_error, or the review is not an active Google review"),
+          "403": openapiCommon.errorResponse("insufficient_scope, or google_permission / google_api_disabled"),
+          "404": openapiCommon.errorResponse("not_found — no such review of yours"), "409": openapiCommon.errorResponse("google_reconnect_required, or conflict — the location is busy"),
+          "503": openapiCommon.errorResponse("google_unavailable — Google did not confirm the reply"),
+        },
+      },
+    },
+  },
+  components: {
+    schemas: {
       GbpReplyInput: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4096 }, publish: { type: "boolean", default: true, description: "false saves a draft for the owner instead of publishing" } } },
       GbpReplyResult: {
         type: "object",

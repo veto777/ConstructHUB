@@ -31,7 +31,7 @@ import { BlotatoClient } from "../../social/client";
 import { connect as connectSocial } from "../../social/service";
 import { saveMapping } from "../../social/agency";
 import { quotaKey } from "../../growth-quotas";
-import { GROWTH_BASE, WRITE_UNITS, registerWriteResources, rejectApiKeysOutsidePublicApi, writeOpenapiFragment, writeResources } from "./index-write";
+import { PUBLIC_API_BASE, WRITE_UNITS, registerWriteResources, rejectApiKeysOutsidePublicApi, writeOpenapiFragment, writeResources } from "./index-write";
 import { gbpPostPayload, gbpPostInput } from "./gbp-write";
 
 let owner = 0, other = 0, noPlan = 0, location = 0, unlinked = 0, otherLocation = 0, review = 0, otherReview = 0;
@@ -95,7 +95,7 @@ beforeAll(async () => {
     res.json = (body: any) => { if (res.locals.apiUnits !== undefined) res.setHeader("x-test-units", String(res.locals.apiUnits)); return json(body); };
     next();
   });
-  registerWriteResources((name, router) => app.use(`${GROWTH_BASE}/${name}`, router), { gbp: { reply: replyMock } });
+  registerWriteResources((name, router) => app.use(`${PUBLIC_API_BASE}/${name}`, router), { gbp: { reply: replyMock } });
   for (const path of AI_ROUTES) app.post(path, (_req, res) => res.json({ reached: true }));
   await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", () => resolve()); });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -118,18 +118,18 @@ afterAll(async () => {
   await pool.end();
 });
 
-const gbpPost = (loc = location) => `${GROWTH_BASE}/gbp/locations/${loc}/posts`;
-const gbpReply = (id = review) => `${GROWTH_BASE}/gbp/reviews/${id}/reply`;
-const socialPost = (biz = location) => `${GROWTH_BASE}/social/businesses/${biz}/posts`;
-const scans = `${GROWTH_BASE}/sitescan/scans`;
-const socialBody = (extra: Record<string, unknown> = {}) => ({ requestId: randomUUID(), text: "Fixture update from the API", destinations: [{ accountId: "l7-twitter", platform: "twitter" }], ...extra });
+const gbpPost = (loc = location) => `${PUBLIC_API_BASE}/locations/${loc}/posts`;
+const gbpReply = (id = review) => `${PUBLIC_API_BASE}/reviews/${id}/reply`;
+const socialPost = () => `${PUBLIC_API_BASE}/social-posts`;
+const scans = `${PUBLIC_API_BASE}/site-scans`;
+const socialBody = (extra: Record<string, unknown> = {}) => ({ businessId: location, requestId: randomUUID(), text: "Fixture update from the API", destinations: [{ accountId: "l7-twitter", platform: "twitter" }], ...extra });
 
 describe("scope and metering", () => {
-  it("every write needs the write scope (403 scope_required) and a key at all (401)", async () => {
+  it("every write needs the write scope (403 insufficient_scope) and a key at all (401)", async () => {
     for (const [path, body] of [[gbpPost(), { text: "x" }], [gbpReply(), { text: "x" }], [socialPost(), socialBody()], [scans, { url: "https://example.com" }]] as const) {
       const readOnly = await call(path, { user: owner, scopes: ["read"] }, body);
       expect(readOnly.status, path).toBe(403);
-      expect(readOnly.data).toMatchObject({ error: { code: "scope_required", scope: "write" } });
+      expect(readOnly.data).toMatchObject({ error: { code: "insufficient_scope", required: "write" } });
       expect((await call(path, null, body)).status, path).toBe(401);
     }
     // Nothing was written by the refused calls.
@@ -145,15 +145,12 @@ describe("scope and metering", () => {
     const ops = Object.values(fragment.paths).flatMap((p: any) => Object.values(p)) as any[];
     expect(ops.length).toBe(4);
     for (const op of ops) expect(op).toMatchObject({ "x-scope": "write", "x-units": 5, security: [{ apiKey: ["write"] }] });
-    expect(Object.keys(fragment.paths).sort()).toEqual([
-      `${GROWTH_BASE}/gbp/locations/{locationId}/posts`, `${GROWTH_BASE}/gbp/reviews/{reviewId}/reply`,
-      `${GROWTH_BASE}/sitescan/scans`, `${GROWTH_BASE}/social/businesses/{businessId}/posts`,
-    ]);
-    expect(writeResources().map((r) => r.name)).toEqual(["gbp", "social", "sitescan"]);
+    expect(Object.keys(fragment.paths).sort()).toEqual(["/locations/{id}/posts", "/reviews/{id}/reply", "/site-scans", "/social-posts"]);
+    expect(writeResources().map((r) => r.name)).toEqual(["locations", "reviews", "social-posts", "site-scans"]);
   });
 });
 
-describe("POST gbp/locations/:id/posts — schedule a Google update", () => {
+describe("POST locations/:id/posts — schedule a Google update", () => {
   it("stores the caller's text, media and time exactly as supplied with source=api", async () => {
     const requestKey = randomUUID(), scheduledAt = "2030-06-01T14:30:00.000Z";
     const body = { requestKey, text: "  Our crew finished the Hyde Park roof today — call for a free estimate!  ", mediaUrls: ["https://cdn.example.com/roof.jpg"], scheduledAt, callToAction: { actionType: "CALL" } };
@@ -192,7 +189,7 @@ describe("POST gbp/locations/:id/posts — schedule a Google update", () => {
       { text: "ok", topicType: "EVENT" }, { text: "ok", callToAction: { actionType: "BOOK" } }, { text: "ok", scheduledAt: "tomorrow" }, { text: "ok", unknown: 1 }]) {
       const r = await call(gbpPost(), { user: owner }, body);
       expect(r.status, JSON.stringify(body)).toBe(400);
-      expect(r.data.error.code).toBe("invalid_request");
+      expect(r.data.error.code).toBe("validation_error");
       expect(Array.isArray(r.data.error.issues)).toBe(true);
     }
   });
@@ -207,7 +204,7 @@ describe("POST gbp/locations/:id/posts — schedule a Google update", () => {
   });
 });
 
-describe("POST gbp/reviews/:id/reply — reply with the caller's text", () => {
+describe("POST reviews/:id/reply — reply with the caller's text", () => {
   it("saves a draft through the existing reply path (the AI reply worker then leaves the review alone)", async () => {
     const r = await call(gbpReply(), { user: owner }, { text: "Thank you for trusting us with your roof!", publish: false });
     expect(r.status).toBe(201);
@@ -250,7 +247,7 @@ describe("POST gbp/reviews/:id/reply — reply with the caller's text", () => {
   });
 });
 
-describe("POST social/businesses/:id/posts — schedule a social post", () => {
+describe("POST social-posts — schedule a social post (businessId in the body)", () => {
   it("queues the caller's text to the mapped destinations, stored as supplied with source=api and no AI flags", async () => {
     const body = socialBody({ text: "Fixture update from the API — see our latest install", mediaUrls: ["https://cdn.example.com/install.jpg"], scheduledTime: "2030-01-02T15:00:00.000Z" });
     const r = await call(socialPost(), { user: owner, id: "key_social" }, body);
@@ -286,15 +283,15 @@ describe("POST social/businesses/:id/posts — schedule a social post", () => {
     expect((await call(socialPost(), { user: owner }, socialBody({ text: "x".repeat(281) }))).status).toBe(400);
     expect((await call(socialPost(), { user: owner }, socialBody({ mediaUrls: ["http://cdn.example.com/a.jpg"] }))).status).toBe(400);
     expect((await call(socialPost(), { user: owner }, { text: "no request id" })).status).toBe(400);
-    const foreign = await call(socialPost(otherLocation), { user: owner }, socialBody());
+    const foreign = await call(socialPost(), { user: owner }, socialBody({ businessId: otherLocation }));
     expect(foreign.status).toBe(404);
     // The other account has no social connection: 409, and nothing of the owner's is visible to it.
-    expect((await call(socialPost(location), { user: other }, socialBody())).status).toBe(404);
+    expect((await call(socialPost(), { user: other }, socialBody())).status).toBe(404);
     expect((await pool.query("SELECT count(*)::int n FROM social_posts WHERE user_id=$1", [other])).rows[0].n).toBe(0);
   });
 });
 
-describe("POST sitescan/scans — start a Site Scan", () => {
+describe("POST site-scans — start a Site Scan", () => {
   it("queues the crawl for the worker and spends one monthly Site Scan", async () => {
     const before = await used(quotaKey(owner, "siteScans"));
     const r = await call(scans, { user: owner, id: "key_scan" }, { url: "https://example.com/", pageCap: 20, psiPages: 0 });
@@ -309,7 +306,7 @@ describe("POST sitescan/scans — start a Site Scan", () => {
     expect(activity.detail).toMatchObject({ id: r.data.scan.id, url: "https://example.com/", keyId: "key_scan" });
   });
 
-  it("refuses without a plan (402 plan_required), when the month is used up (403 limit_reached) and over the daily cap (429), refunding what never ran", async () => {
+  it("refuses without a plan (402 plan_required), when the month is used up (429 quota_exceeded) and over the daily cap (429 rate_limited), refunding what never ran", async () => {
     const none = await call(scans, { user: noPlan }, { url: "https://example.com" });
     expect(none.status).toBe(402);
     expect(none.data.error).toMatchObject({ code: "plan_required", requiredPlan: "starter" });
@@ -318,14 +315,15 @@ describe("POST sitescan/scans — start a Site Scan", () => {
     // Pro includes 5 a month.
     await pool.query("INSERT INTO growth_budgets(key,period,used) VALUES($1,'0',5) ON CONFLICT(key,period) DO UPDATE SET used=5", [quotaKey(owner, "siteScans")]);
     const full = await call(scans, { user: owner }, { url: "https://example.com" });
-    expect(full.status).toBe(403);
-    expect(full.data.error).toMatchObject({ code: "limit_reached", feature: "siteScans", limit: 5, used: 5 });
+    expect(full.status).toBe(429);
+    expect(full.data.error).toMatchObject({ code: "quota_exceeded", scope: "feature", feature: "siteScans", limit: 5, used: 5 });
+    expect(Number(full.retryAfter)).toBeGreaterThan(0);
     await pool.query("UPDATE growth_budgets SET used=1 WHERE key=$1 AND period='0'", [quotaKey(owner, "siteScans")]);
 
     await pool.query("INSERT INTO growth_budgets(key,period,used) VALUES($1,$2,5) ON CONFLICT(key,period) DO UPDATE SET used=5", [`sitescan:scan:${owner}`, String(Math.floor(Date.now() / 86400_000))]);
     const daily = await call(scans, { user: owner }, { url: "https://example.com" });
     expect(daily.status).toBe(429);
-    expect(daily.data.error.code).toBe("daily_limit");
+    expect(daily.data.error).toMatchObject({ code: "rate_limited", scope: "daily", limit: 5 });
     expect(daily.retryAfter).toBe("86400");
     // The monthly reservation taken before the daily refusal was given back.
     expect(await used(quotaKey(owner, "siteScans"))).toBe(1);
@@ -339,7 +337,7 @@ describe("POST sitescan/scans — start a Site Scan", () => {
     }
     const unsynced = await call(scans, { user: owner }, { locationId: location });
     expect(unsynced.status).toBe(400);
-    expect(unsynced.data.error.code).toBe("location_not_synced");
+    expect(unsynced.data.error).toMatchObject({ code: "validation_error", issues: [{ path: "locationId" }] });
     // Another account's location is never a scan target.
     expect((await call(scans, { user: owner }, { locationId: otherLocation })).status).toBe(400);
     expect(await used(quotaKey(owner, "siteScans"))).toBe(1);
@@ -360,7 +358,7 @@ describe("no AI through the API", () => {
     for (const path of AI_ROUTES) {
       const r = await fetch(base + path, { method: "POST", headers: { authorization: "Bearer chub_fixture_secret", "content-type": "application/json" }, body: "{}" });
       expect(r.status, path).toBe(401);
-      expect(await r.json()).toMatchObject({ error: { code: "api_key_not_accepted" } });
+      expect(await r.json()).toMatchObject({ error: { code: "unauthorized" } });
     }
     // Without a key the (stubbed) session routes are untouched by the guard, and keys still reach the public API.
     expect((await fetch(base + AI_ROUTES[0], { method: "POST" })).status).toBe(200);

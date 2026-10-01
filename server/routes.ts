@@ -311,6 +311,15 @@ export async function registerRoutes(
   const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");
   await ensureAccountSecuritySchema();
   registerAccountSecurityRoutes(app, getDevUser);
+  // Account settings: billing documents (ledger + Stripe backfill), public-API
+  // keys + usage (session side; the keys themselves authenticate only /api/v1)
+  // and the integrations status. ensureAccountSchema() ran above.
+  const { registerBillingRoutes } = await import("./account/billing-routes");
+  registerBillingRoutes(app, getDevUser);
+  const { registerApiKeyRoutes } = await import("./account/api-key-routes");
+  registerApiKeyRoutes(app, getDevUser, await import("./account/api-keys"));
+  const { registerIntegrationsRoute } = await import("./account/integrations-route");
+  registerIntegrationsRoute(app, getDevUser);
   const { ensureGbpContentSchema, registerContentRoutes, startContentWorker } = await import("./gbp/content");
   await ensureGbpContentSchema();
   registerContentRoutes(app, getDevUser);

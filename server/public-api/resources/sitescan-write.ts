@@ -1,17 +1,19 @@
 /**
- * Public API — Site Scan WRITE resource (`sitescan`), mounted by lane 1 at
- * `${GROWTH_BASE}/sitescan`:
+ * Public API — Site Scan WRITE route, composed into the `site-scans` resource
+ * (./register.ts):
  *
- *   POST /scans   start a Site Scan of a public website (or of a synced GBP
- *                 location's website); counts against the plan's monthly Site
- *                 Scan allowance exactly like the Site Scan page
+ *   POST /api/v1/site-scans   start a Site Scan of a public website (or of a
+ *                             synced GBP location's website); counts against
+ *                             the plan's monthly Site Scan allowance exactly
+ *                             like the Site Scan page
  *
  * A 5-unit write. The scan is queued for the existing worker; the report is
- * read back through the read resources. Only the crawl is started here — the
- * AI action plan (POST /api/sitescan/jobs/:id/plan) is a session-only feature
- * and is not reachable through the API. The queue insert mirrors
- * server/sitescan/worker.ts enqueue()/profileFor() on purpose: importing the
- * worker would pull sitescan/providers.ts (the AI provider) into this module.
+ * read back through GET /site-scans/{id}/report. Only the crawl is started
+ * here — the AI action plan (POST /api/sitescan/jobs/:id/plan) is a
+ * session-only feature and is not reachable through the API. The queue insert
+ * mirrors server/sitescan/worker.ts enqueue()/profileFor() on purpose:
+ * importing the worker would pull sitescan/providers.ts (the AI provider)
+ * into this module.
  */
 import { randomUUID } from "node:crypto";
 import { Router, type Request } from "express";
@@ -22,7 +24,8 @@ import { reserveQuotaFor as reserveQuota, refundReservation } from "../../growth
 import { logActivity } from "../../account-events";
 import { siteUrl } from "../../sitescan/http";
 import { emptyState } from "../../sitescan/audit";
-import { GROWTH_BASE, handle, jsonError, openapiCommon, requireWriteScope, type ApiKeyContext } from "./shared-write";
+import type { ApiErrorCode } from "../errors";
+import { handle, jsonError, openapiCommon, requireWriteScope, type ApiKeyContext } from "./shared-write";
 
 export type SitescanWriteDeps = { reserveQuotaFor: typeof reserveQuota; enqueue: typeof enqueueScan };
 const DAY = 86400_000;
@@ -60,21 +63,35 @@ export const sitescanWriteDefaults: SitescanWriteDeps = { reserveQuotaFor: reser
 
 export type StartScanResult =
   | { ok: true; scan: { id: string; url: string; status: "queued"; pageCap: number; psiPages: number; locationId: number | null } }
-  | { ok: false; status: 400 | 402 | 403 | 429; code: string; message: string; body?: Record<string, unknown> };
+  | { ok: false; status: 400 | 402 | 429; code: ApiErrorCode; message: string; detail?: Record<string, unknown>; retryAfterSeconds?: number };
 
-/** Reserve one Site Scan from the plan, then queue the crawl; the reservation is refunded when nothing was queued. */
+/**
+ * Reserve one Site Scan from the plan, then queue the crawl; the reservation is
+ * refunded when nothing was queued. Refusals use the API's codes: the plan's
+ * monthly Site Scans used up → 429 quota_exceeded (scope "feature"), the daily
+ * cap → 429 rate_limited (scope "daily"), no Site Scans on the plan → 402.
+ */
 export async function startSiteScan(userId: number, raw: unknown, meta: { keyId: string; req?: Request | null }, deps: SitescanWriteDeps = sitescanWriteDefaults): Promise<StartScanResult> {
   const body = siteScanInput.parse(raw);
   const profile = body.locationId || !body.url ? await profileFor(userId, body.locationId) : null;
-  if (body.locationId && !profile) return { ok: false, status: 400, code: "location_not_synced", message: "Sync the selected GBP profile before scanning." };
+  if (body.locationId && !profile) {
+    return { ok: false, status: 400, code: "validation_error", message: "Sync the selected GBP profile before scanning.", detail: { issues: [{ path: "locationId", message: "This location has no synced Google profile yet" }] } };
+  }
   let url: string;
   try { url = siteUrl(body.url || profile?.website || ""); }
-  catch { return { ok: false, status: 400, code: "invalid_url", message: "Enter a public HTTP or HTTPS website URL." }; }
+  catch { return { ok: false, status: 400, code: "validation_error", message: "Enter a public HTTP or HTTPS website URL.", detail: { issues: [{ path: "url", message: "Public http(s) URL required" }] } }; }
   const quota = await deps.reserveQuotaFor(userId, "siteScans", 1);
-  if (!quota.ok) return { ok: false, status: quota.status === 401 ? 402 : quota.status, code: String(quota.body.code ?? "quota"), message: String(quota.body.message ?? "Site Scan is not available on this plan."), body: quota.body };
+  if (!quota.ok) {
+    const { code: _code, message, ...detail } = quota.body as Record<string, unknown> & { code?: string; message?: string };
+    const text = String(message ?? "Site Scan is not available on this plan.");
+    if (quota.status === 402 || quota.status === 401) return { ok: false, status: 402, code: "plan_required", message: text, detail };
+    const resetsAt = typeof detail.resetsAt === "string" ? Date.parse(detail.resetsAt) : NaN;
+    const retryAfterSeconds = Number.isFinite(resetsAt) ? Math.max(1, Math.ceil((resetsAt - Date.now()) / 1000)) : undefined;
+    return { ok: false, status: 429, code: "quota_exceeded", message: text, detail: { scope: "feature", feature: "siteScans", ...detail }, retryAfterSeconds };
+  }
   if (!(await takeBudget("sitescan:scan:" + userId, DAILY_SCAN_CAP, 1, DAY))) {
     await refundReservation(quota.reservation, 1);
-    return { ok: false, status: 429, code: "daily_limit", message: `Daily scan budget reached (${DAILY_SCAN_CAP}).` };
+    return { ok: false, status: 429, code: "rate_limited", message: `Daily scan budget reached (${DAILY_SCAN_CAP} per day).`, detail: { scope: "daily", limit: DAILY_SCAN_CAP }, retryAfterSeconds: DAY / 1000 };
   }
   let id: string;
   try { id = await deps.enqueue(userId, url, body.pageCap, body.psiPages, profile); }
@@ -83,42 +100,40 @@ export async function startSiteScan(userId: number, raw: unknown, meta: { keyId:
   return { ok: true, scan: { id, url, status: "queued", pageCap: body.pageCap, psiPages: body.psiPages, locationId: profile?.id ?? null } };
 }
 
+/** `site-scans` resource: POST /. */
 export function sitescanWriteRouter(deps: SitescanWriteDeps = sitescanWriteDefaults) {
   const router = Router();
-  router.post("/scans", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
+  router.post("/", requireWriteScope, handle(async (req, res, key: ApiKeyContext) => {
     const result = await startSiteScan(key.userId, req.body ?? {}, { keyId: key.id, req }, deps);
     if (!result.ok) {
-      if (result.status === 429) res.setHeader("Retry-After", String(DAY / 1000));
-      // The quota body's own fields (requiredPlan, limit, used, resetsAt, upgradePlan, addon) ride along under the API's code/message.
-      const { code: _code, message: _message, ...detail } = result.body ?? {};
-      return jsonError(res, result.status, result.code, result.message, detail);
+      if (result.retryAfterSeconds) res.setHeader("Retry-After", String(result.retryAfterSeconds));
+      return jsonError(res, result.status, result.code, result.message, result.detail ?? {});
     }
     res.status(202).json({ scan: result.scan });
   }));
   return router;
 }
 
-const base = `${GROWTH_BASE}/sitescan`;
+/** Fragment for the `site-scans` resource (paths relative to /api/v1/site-scans). */
 export const sitescanWriteOpenapi = {
   paths: {
-    [`${base}/scans`]: {
+    "/": {
       post: {
-        ...openapiCommon.writeOperation("Start a Site Scan (uses one of the plan's monthly Site Scans)", "sitescan"),
+        ...openapiCommon.writeOperation("Start a Site Scan (uses one of the plan's monthly Site Scans)", "site-scans"),
         operationId: "startSiteScan",
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/SiteScanInput" } } } },
         responses: {
           "202": { description: "Queued", content: { "application/json": { schema: { $ref: "#/components/schemas/SiteScanResult" } } } },
-          "400": openapiCommon.errorResponse("Invalid or private URL, or the location has no synced profile"),
+          "400": openapiCommon.errorResponse("validation_error — invalid or private URL, or the location has no synced profile"),
           "402": openapiCommon.errorResponse("plan_required — the plan has no Site Scans"),
-          "403": openapiCommon.errorResponse("Key lacks the write scope, or limit_reached — this month's Site Scans are used"),
-          "429": openapiCommon.errorResponse("daily_limit — 5 scans per day per account"),
+          "403": openapiCommon.errorResponse("insufficient_scope — the key lacks the write scope"),
+          "429": openapiCommon.errorResponse("quota_exceeded (scope feature — this month's Site Scans are used) or rate_limited (scope daily — 5 scans per day per account)"),
         },
       },
     },
   },
   components: {
     schemas: {
-      ...openapiCommon.schemas,
       SiteScanInput: {
         type: "object",
         properties: {

@@ -24,7 +24,7 @@ const shot = async (page: Page, name: string, fullPage = true) => {
 /** Something each section shows once its data is in, so a screenshot isn't of a spinner. */
 const SECTION_ANCHOR: Record<string, string> = {
   account: "card-profile", security: "card-two-factor", notifications: "section-notifications", billing: "card-current-plan",
-  limits: "text-limits-plan", "api-keys": "card-api-plan", "api-usage": "card-api-usage-totals", "audit-log": "text-audit-count",
+  limits: "text-limits-plan", "api-keys": "card-api-keys", "api-usage": "card-api-usage", "audit-log": "text-audit-count",
   integrations: "text-integration-service-gbp",
 };
 
@@ -155,12 +155,18 @@ test.describe("settings shell — desktop", () => {
     await gotoCrm(page, "/settings?tab=security");
     await expect(page.getByTestId("card-two-factor")).toBeVisible();
     await expect(page.getByLabel("Activity type")).toBeVisible();
-    // Billing keeps the plan card, this month's usage and the add-on controls the pricing suite drives.
-    await gotoCrm(page, "/settings?tab=billing&view=invoices");
+    // Billing's Subscriptions tab keeps the subscription statement, the plan card, this month's usage and
+    // the add-on controls the pricing suite drives; ?view= opens one of its other tabs.
+    await gotoCrm(page, "/settings?tab=billing");
     await expect(sectionTitle(page)).toContainText("Billing");
+    await expect(page.getByTestId("tab-billing-subscriptions")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("card-subscription")).toBeVisible();
     await expect(page.getByTestId("card-current-plan")).toContainText("Pro plan");
     await expect(page.getByTestId("card-usage")).toBeVisible();
     await expect(page.getByTestId("button-addon-inc-protected_site")).toBeVisible();
+    await gotoCrm(page, "/settings?tab=billing&view=invoices");
+    await expect(page.getByTestId("tab-billing-invoices")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("card-invoices")).toBeVisible();
     await expect(page).toHaveURL(/tab=billing&view=invoices/);
   });
 
@@ -192,8 +198,8 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("limit-clientTexting-included")).toContainText(
       L.clientTexting === "none" ? "Not included" : L.clientTexting === "included" ? "1 number included" : "SignalWire",
     );
-    // No API allowances on this server → no API rows.
-    await expect(page.getByTestId("limit-apiUnitsPerMonth")).toHaveCount(0);
+    // The price book carries the API allowance, so the API rows are always there (Pro: its monthly units).
+    await expect(page.getByTestId("limit-apiUnitsPerMonth-included")).toContainText(`${n((PLANS.pro.limits as any).apiUnitsPerMonth)} / mo`);
 
     // Add-ons the Pro plan sells sit under the limit they raise, with the quantity Stripe reports.
     for (const addon of Object.values(ADDONS).filter((a) => a.availableOn.includes("pro"))) {
@@ -221,8 +227,8 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("limit-apiRatePerMinute-included")).toContainText("60 / min per key");
     await page.getByTestId("button-limits-api-keys").click();
     await expect(sectionTitle(page)).toContainText("API keys");
-    await expect(page.getByTestId("badge-api-enabled")).toHaveText("Enabled");
-    await expect(page.getByTestId("text-api-plan-units")).toContainText("120 of 10,000 units");
+    await expect(page.getByTestId("card-api-quota")).toBeVisible();
+    await expect(page.getByTestId("text-api-quota")).toHaveText("120 of 10,000 used");
   });
 
   test("Limits & usage without a plan offers the way to one", async ({ page }) => {
@@ -295,17 +301,19 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("link-integration-page-locations")).toHaveAttribute("href", "/locations");
   });
 
-  test("API keys and API usage say so when the account API isn't installed", async ({ page }) => {
+  test("API keys and API usage are the key console and the usage panel, and say so when the endpoints fail", async ({ page }) => {
     await mockAccount(page);
-    await page.unroute("**/api/account/api-keys");
-    await page.unroute("**/api/account/api-usage**");
-    const html = (r: any) => r.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>app</title>" });
-    await page.route("**/api/account/api-keys", html);
-    await page.route("**/api/account/api-usage**", html);
     await gotoCrm(page, "/settings?tab=api-keys");
-    await expect(page.getByTestId("card-api-keys-unavailable")).toContainText("AI features");
+    await expect(page.getByTestId("card-api-keys")).toBeVisible();
+    await expect(page.getByTestId("text-api-no-ai")).toContainText("AI features are not available through the API.");
+    await expect(page.getByTestId("text-api-keys-empty")).toBeVisible();
     await page.getByTestId("button-settings-tab-api-usage").click();
-    await expect(page.getByTestId("card-api-usage-unavailable")).toBeVisible();
+    await expect(page.getByTestId("text-api-usage-empty")).toBeVisible();
+    // A failing endpoint is an error state, never a silent empty list.
+    await page.unroute("**/api/account/api-keys");
+    await page.route("**/api/account/api-keys", (r) => r.fulfill({ status: 500, json: { message: "fixture outage" } }));
+    await gotoCrm(page, "/settings?tab=api-keys");
+    await expect(page.getByTestId("text-api-keys-error")).toContainText("fixture outage");
   });
 });
 

@@ -28,6 +28,10 @@ const mocks = vi.hoisted(() => ({
   sql: [] as { text: string; values: any[] }[],
   /** What the cancellation columns hold for the row GET /subscription reads. */
   cancelRow: {} as Record<string, unknown>,
+  /** The billing-email adapter (server/account/billing-emails onStripeBillingEvent), spied. */
+  billingEmail: vi.fn(async (..._args: any[]) => [] as any[]),
+  /** Stripe event ids the ledger already holds (the idempotency claim fails for them). */
+  seenEvents: new Set<string>(),
 }));
 vi.mock("stripe", () => ({ default: class {
   prices = { list: mocks.pricesList, create: mocks.pricesCreate };
@@ -52,8 +56,8 @@ vi.mock("./db", () => {
         if (/^\s*CREATE (TABLE|INDEX)/.test(text)) return { rows: [] };
         mocks.sql.push({ text, values });
         if (/SELECT cancel_at_period_end/.test(text)) return { rows: [mocks.cancelRow] };
-        // Every event id is new to the ledger (the webhook's idempotency claim succeeds).
-        if (/INSERT INTO billing_events/.test(text)) return { rows: [{ stripe_event_id: values[0] }] };
+        // An event id is new to the ledger (the webhook's idempotency claim succeeds) unless a test marked it seen.
+        if (/INSERT INTO billing_events/.test(text)) return { rows: mocks.seenEvents.has(values[0]) ? [] : [{ stripe_event_id: values[0] }] };
         return { rows: [] };
       },
     },
@@ -68,6 +72,8 @@ vi.mock("./account-security", () => ({
     return false;
   },
 }));
+// The one email path: the webhook hands each verified platform event to this adapter (spied, never sends).
+vi.mock("./account/billing-emails", () => ({ onStripeBillingEvent: mocks.billingEmail }));
 
 import * as stripeModule from "./stripe";
 import { registerStripeRoutes } from "./stripe";
@@ -111,6 +117,8 @@ beforeEach(() => {
   mocks.inserts.length = 0;
   mocks.prices.clear();
   mocks.recentAuth = true;
+  mocks.billingEmail.mockClear();
+  mocks.seenEvents.clear();
   resetPriceCache();
   mocks.pricesList.mockReset().mockImplementation(async ({ lookup_keys }: any) => ({
     data: [...mocks.prices.values()].filter((p) => lookup_keys.includes(p.lookup_key)).map((p) => ({ ...p, recurring: p.recurring ?? null })),
@@ -650,8 +658,8 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow()]);
     const res = await request("/api/stripe/change-plan", { plan: "pro", addons: { extra_seat: 1 } });
     expect(res.code).toBe(200);
-    // The mocked update returns a fresh subscription (not set to cancel).
-    expect(cancellationWrites()).toEqual([[5, false, null]]);
+    // The mocked update returns a fresh subscription (not set to cancel); the fixture carries no start_date.
+    expect(cancellationWrites()).toEqual([[5, false, null, null]]);
     expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: false });
   });
 
@@ -711,7 +719,7 @@ describe("webhook maps the subscription's items onto the row", () => {
     mocks.rows.push([liveRow()]);
     await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_live", customer: "cus_test" } } });
     expect(mocks.updates[0]).toEqual({ status: "canceled", plan: "free", addons: {}, agencyLocations: null, billingInterval: null });
-    expect(cancellationWrites()).toEqual([[5, null, null]]);
+    expect(cancellationWrites()).toEqual([[5, null, null, null]]);
   });
 
   it("records a cancellation set in Stripe's portal (cancel at period end) with the row", async () => {
@@ -719,12 +727,12 @@ describe("webhook maps the subscription's items onto the row", () => {
     const sub = agencyYearly("sub_new", "active") as any;
     sub.cancel_at_period_end = true;
     await webhook({ type: "customer.subscription.updated", data: { object: sub } });
-    expect(cancellationWrites()).toEqual([[5, true, new Date(1893456000 * 1000)]]);
+    expect(cancellationWrites()).toEqual([[5, true, new Date(1893456000 * 1000), null]]);
     // Resumed in the portal: the flag clears.
     mocks.sql.length = 0;
     mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
     await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_new", "active") } });
-    expect(cancellationWrites()).toEqual([[5, false, null]]);
+    expect(cancellationWrites()).toEqual([[5, false, null, null]]);
   });
 
   it("a late event for an ended subscription never ends a live trial-code grant; a live subscription replaces it", async () => {
@@ -807,5 +815,56 @@ describe("cancellationOf", () => {
   });
   it("a cancel date after this period still renews once: not 'at period end', but the date is kept", () => {
     expect(cancellationOf(sub({ cancel_at: periodEnd + 30 * 86400 }))).toEqual({ cancelAtPeriodEnd: false, cancelAt: new Date((periodEnd + 30 * 86400) * 1000) });
+  });
+});
+
+describe("webhook → billing emails: one call per verified platform event, after the ledger and the row", () => {
+  async function webhook(event: any) {
+    const prior = process.env.STRIPE_WEBHOOK_SECRET;
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_local_mock";
+    try {
+      mocks.verify.mockReturnValue(event);
+      return await request("/api/stripe/webhook", {}, { headers: { "stripe-signature": "t=1,v1=mock" }, rawBody: Buffer.from("{}") });
+    } finally {
+      if (prior === undefined) delete process.env.STRIPE_WEBHOOK_SECRET; else process.env.STRIPE_WEBHOOK_SECRET = prior;
+    }
+  }
+  const proSub = (id = "sub_new", status = "active") => subscription([item("si_plan", "price_pro_m", 1, { kind: "plan", key: "pro" })], { id, status });
+
+  it("hands the event to onStripeBillingEvent exactly once, with the resolved account, once the row was applied", async () => {
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
+    const res = await webhook({ id: "evt_email_1", type: "customer.subscription.updated", data: { object: proSub() } });
+    expect(res.code).toBe(200);
+    expect(res.body).toEqual({ received: true });
+    expect(mocks.updates).toHaveLength(1); // the row change came first
+    expect(mocks.billingEmail).toHaveBeenCalledTimes(1);
+    const [event, ctx] = mocks.billingEmail.mock.calls[0];
+    expect(event).toMatchObject({ id: "evt_email_1", type: "customer.subscription.updated" });
+    expect(ctx).toMatchObject({ userId: 42 });
+    expect(ctx.stripe).toBeTruthy(); // the adapter may read the card / receipt from Stripe
+  });
+
+  it("a redelivered event (id already in billing_events) answers 200 duplicate and sends nothing", async () => {
+    mocks.seenEvents.add("evt_dup");
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
+    const res = await webhook({ id: "evt_dup", type: "customer.subscription.updated", data: { object: proSub() } });
+    expect(res.body).toEqual({ received: true, duplicate: true });
+    expect(mocks.updates).toHaveLength(0);
+    expect(mocks.billingEmail).not.toHaveBeenCalled();
+  });
+
+  it("a Connect (CRM client payment) event is never a platform email", async () => {
+    const res = await webhook({ id: "evt_connect", account: "acct_client", type: "checkout.session.completed", data: { object: { id: "cs_client", mode: "payment", payment_status: "paid", metadata: {} } } });
+    expect(res.code).toBe(200);
+    expect(mocks.billingEmail).not.toHaveBeenCalled();
+  });
+
+  it("a handler failure releases the claim (Stripe retries) and sends no email for the failed attempt", async () => {
+    mocks.sql.length = 0;
+    mocks.retrieve.mockRejectedValueOnce(new Error("stripe unavailable"));
+    const res = await webhook({ id: "evt_fail", type: "checkout.session.completed", data: { object: { id: "cs_plan", mode: "subscription", subscription: "sub_new", metadata: { userId: "42", type: "plan", plan: "pro" } } } });
+    expect(res.code).toBe(400);
+    expect(mocks.sql.some((s) => /DELETE FROM billing_events/.test(s.text) && s.values[0] === "evt_fail")).toBe(true);
+    expect(mocks.billingEmail).not.toHaveBeenCalled();
   });
 });

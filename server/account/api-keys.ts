@@ -88,6 +88,19 @@ export class ApiKeyInputError extends Error {
   status = 400;
 }
 
+/** Active (unrevoked, unexpired or not) keys one account may hold at once. */
+export const MAX_ACTIVE_API_KEYS = 25;
+
+/** The account already holds MAX_ACTIVE_API_KEYS live keys (403, like the other feature limits). */
+export class ApiKeyLimitError extends Error {
+  status = 403;
+  code = "limit_reached";
+  feature = "api_keys";
+  constructor(public limit: number, public used: number) {
+    super(`An account can hold up to ${limit} active API keys. Revoke one you no longer use.`);
+  }
+}
+
 function validateName(name: unknown): string {
   const n = String(name ?? "").trim();
   if (!n) throw new ApiKeyInputError("Give the key a name.");
@@ -113,34 +126,63 @@ function validateExpiresInDays(days: unknown): number | null {
   return n;
 }
 
+/** Live (unrevoked) keys of the account. */
+export async function countActiveApiKeys(userId: number, q: { query: typeof pool.query } = pool): Promise<number> {
+  const { rows: [r] } = await q.query("SELECT count(*)::int AS n FROM account_api_keys WHERE user_id=$1 AND revoked_at IS NULL", [userId]);
+  return r?.n ?? 0;
+}
+
 /**
  * Mint a key. The returned `secret` is the full token (chub_…) and is the only
  * time it exists in plaintext: show it once, never log it.
+ *
+ * The per-account ceiling (MAX_ACTIVE_API_KEYS, or `maxActive`) is checked and
+ * the row inserted in one transaction under a per-account advisory lock, so two
+ * concurrent requests at the limit cannot both succeed.
  */
-export async function createApiKey(userId: number, input: CreateApiKeyInput): Promise<{ secret: string; row: ApiKeyRow }> {
+export async function createApiKey(userId: number, input: CreateApiKeyInput, opts: { maxActive?: number } = {}): Promise<{ secret: string; row: ApiKeyRow }> {
   if (!Number.isInteger(userId) || userId <= 0) throw new ApiKeyInputError("An account is required.");
   const name = validateName(input.name);
   const scopes = validateScopes(input.scopes);
   const monthlyUnitLimit = validateUnitLimit(input.monthlyUnitLimit);
   const expiresInDays = validateExpiresInDays(input.expiresInDays);
   const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 86_400_000) : null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const prefix = randomPrefix();
-    const secret = randomBytes(SECRET_BYTES).toString("hex");
-    const token = `${API_KEY_TOKEN_PREFIX}${prefix}_${secret}`;
-    const id = `key_${randomBytes(12).toString("hex")}`;
-    try {
-      const { rows: [r] } = await pool.query(
-        `INSERT INTO account_api_keys(id, user_id, name, prefix, suffix, secret_hash, scopes, monthly_unit_limit, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${COLUMNS}`,
-        [id, userId, name, prefix, secret.slice(-4), sha256(token), scopes, monthlyUnitLimit, expiresAt]);
-      return { secret: token, row: publicRow(toRow(r)) };
-    } catch (e: any) {
-      if (e?.code === "23505" && attempt < 4) continue; // prefix collision: draw again
-      throw e;
+  const maxActive = Math.max(1, Math.floor(opts.maxActive ?? MAX_ACTIVE_API_KEYS));
+  const c = await pool.connect();
+  try {
+    await c.query("BEGIN");
+    // One account's key creations run one at a time (any process): the count below is exact.
+    await c.query("SELECT pg_advisory_xact_lock(8160, $1)", [userId]);
+    const used = await countActiveApiKeys(userId, c as any);
+    if (used >= maxActive) {
+      await c.query("ROLLBACK");
+      throw new ApiKeyLimitError(maxActive, used);
     }
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const prefix = randomPrefix();
+      const secret = randomBytes(SECRET_BYTES).toString("hex");
+      const token = `${API_KEY_TOKEN_PREFIX}${prefix}_${secret}`;
+      const id = `key_${randomBytes(12).toString("hex")}`;
+      await c.query("SAVEPOINT mint");
+      try {
+        const { rows: [r] } = await c.query(
+          `INSERT INTO account_api_keys(id, user_id, name, prefix, suffix, secret_hash, scopes, monthly_unit_limit, expires_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${COLUMNS}`,
+          [id, userId, name, prefix, secret.slice(-4), sha256(token), scopes, monthlyUnitLimit, expiresAt]);
+        await c.query("COMMIT");
+        return { secret: token, row: publicRow(toRow(r)) };
+      } catch (e: any) {
+        if (e?.code === "23505" && attempt < 4) { await c.query("ROLLBACK TO SAVEPOINT mint"); continue; } // prefix collision: draw again
+        throw e;
+      }
+    }
+    throw new Error("createApiKey: could not allocate a unique key prefix");
+  } catch (e) {
+    await c.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    c.release();
   }
-  throw new Error("createApiKey: could not allocate a unique key prefix");
 }
 
 /**

@@ -391,12 +391,15 @@ describe("GET /api/billing/purchases", () => {
 });
 
 describe("ledger schema", () => {
-  it("is the foundation's DDL — same nullability, same index names — so either boot order yields one table", () => {
-    // Mirrors server/account/schema.ts (lane 1). A NOT NULL here that the webhook writer never agreed to, or
-    // a second index under another name, would make the result depend on which ensure*() ran first.
-    expect(BILLING_LEDGER_DDL.join("\n")).not.toMatch(/NOT NULL|DEFAULT now\(\)/);
+  it("is the foundation's DDL — the same statements, same index names — so either boot order yields one table", async () => {
+    // ONE definition: server/account/schema.ts. The invoice/purchase tables carry no NOT NULL the webhook
+    // writer never agreed to, and each table has exactly one user index under the foundation's name.
+    const { BILLING_LEDGER_DDL: foundation } = await import("./schema");
+    expect(BILLING_LEDGER_DDL).toBe(foundation);
+    const invoicesAndPurchases = BILLING_LEDGER_DDL.filter((s) => /billing_(invoices|purchases)/.test(s) && s.startsWith("CREATE TABLE"));
+    expect(invoicesAndPurchases.join("\n")).not.toMatch(/NOT NULL|DEFAULT now\(\)/);
     expect(BILLING_LEDGER_DDL.filter((s) => s.startsWith("CREATE INDEX")).map((s) => s.match(/EXISTS (\w+)/)![1]))
-      .toEqual(["billing_invoices_user_idx", "billing_purchases_user_idx"]);
+      .toEqual(["billing_events_user_idx", "billing_invoices_user_idx", "billing_purchases_user_idx"]);
   });
   it("is idempotent", async () => {
     await expect(ensureBillingLedgerSchema()).resolves.toBeUndefined();

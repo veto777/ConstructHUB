@@ -24,8 +24,10 @@ import {
 import { startAgencyLocationSync } from "./billing/agency-sync";
 import { recordBillingEvent, releaseBillingEvent, attributeBillingEvent } from "./billing/ledger";
 import {
-  syncInvoiceEvent, onTrialWillEnd, recordOneTimePurchase, emitSubscriptionStarted, emitCancellationChange, emitSubscriptionCanceled,
+  syncInvoiceEvent, onTrialWillEnd, recordOneTimePurchase, emitSubscriptionStarted, emitCancellationChange, emitSubscriptionCanceled, isConnectEvent,
 } from "./billing/webhook-events";
+import { stripeConfigured } from "./billing/client";
+import { onStripeBillingEvent } from "./account/billing-emails";
 
 export { PaymentsNotConfiguredError };
 
@@ -738,6 +740,15 @@ export function registerStripeRoutes(app: Express) {
 
       if (event.id && eventUserId) {
         await attributeBillingEvent(event.id, eventUserId).catch((e: any) => console.error("[billing] could not attribute event:", e?.message || e));
+      }
+      // Billing emails — ONE path: the Stripe event, after the ledger and the
+      // row were applied. Each email dedupes on its own key in email_log, so a
+      // retry never sends twice; $0 invoices (trial starts) send no receipt; a
+      // Connect (CRM client payment) event is never a platform email. The
+      // in-process billingEvents bus (server/billing/events.ts) carries no
+      // email listener — nothing else sends these.
+      if (!isConnectEvent(event)) {
+        await onStripeBillingEvent(event, { userId: eventUserId ?? undefined, stripe: stripeConfigured() ? stripe : null });
       }
       res.json({ received: true });
     } catch (err: any) {

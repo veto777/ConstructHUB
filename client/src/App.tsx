@@ -54,8 +54,6 @@ import PermitsLandingPage from "@/pages/permits-landing";
 import CompetitorsLandingPage from "@/pages/competitors-landing";
 import MasterClassLandingPage from "@/pages/master-class-landing";
 import SettingsPage from "@/pages/settings";
-import BillingSettingsPage from "@/pages/settings/billing";
-import ApiSettingsPage from "@/pages/settings/api";
 import DevelopersPage from "@/pages/developers";
 import CrmTeamPage from "@/pages/crm-team";
 import CrmJoinPage from "@/pages/crm-join";
@@ -110,6 +108,27 @@ function IndividualPricingRedirect() {
   return null;
 }
 
+/** /settings/billing[?billing=invoices] → the shell's Billing section (its inner tab = ?tab=invoices…). */
+function SettingsBillingRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const view = new URLSearchParams(window.location.search).get("billing");
+    const tab = view && ["invoices", "payment-methods", "purchases", "subscriptions"].includes(view) ? view : "billing";
+    setLocation(`/settings?tab=${tab}`, { replace: true });
+  }, [setLocation]);
+  return null;
+}
+
+/** /settings/api[?api=usage] → the shell's API keys / API usage section. */
+function SettingsApiRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const view = new URLSearchParams(window.location.search).get("api");
+    setLocation(`/settings?tab=${view === "usage" ? "api-usage" : "api-keys"}`, { replace: true });
+  }, [setLocation]);
+  return null;
+}
+
 function DashboardRouter() {
   return (
     <Switch>
@@ -161,9 +180,9 @@ function DashboardRouter() {
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/lsa-account-manager" component={LsaAccountManagerPage} />
-      {/* Account billing + API panels (settings/billing/*, settings/api/*) and the public API reference. */}
-      <Route path="/settings/billing" component={BillingSettingsPage} />
-      <Route path="/settings/api" component={ApiSettingsPage} />
+      {/* Deep links into Account settings (the shell's Billing / API keys / API usage sections) and the public API reference. */}
+      <Route path="/settings/billing" component={SettingsBillingRedirect} />
+      <Route path="/settings/api" component={SettingsApiRedirect} />
       <Route path="/developers" component={DevelopersPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/auth" component={AuthPage} />

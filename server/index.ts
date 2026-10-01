@@ -12,6 +12,11 @@ import { registerInboundMail } from "./mail-alerts/inbound";
 registerInboundMail(app);
 import { registerPrivateIntegrationParsers } from "./domains/private-http";
 registerPrivateIntegrationParsers(app);
+// An account API key (chub_…) authenticates ONLY /api/v1: anywhere else it is
+// refused before any parser or handler runs (the AI routes included).
+import { isPublicApiPath, rejectApiKeysOutsidePublicApi } from "./public-api/guard";
+import { apiError, codeForStatus } from "./public-api/errors";
+app.use(rejectApiKeysOutsidePublicApi);
 
 declare module "http" {
   interface IncomingMessage {
@@ -62,8 +67,11 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      // Auth/consent bodies (QR seeds, recovery codes) and social bodies (signed upload URLs) never reach logs.
-      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")) {
+      // Auth/consent bodies (QR seeds, recovery codes), social bodies (signed upload URLs), the public
+      // API's responses (account data handed to third-party tools) and the API-key endpoints (one-time
+      // secrets) never reach logs.
+      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")
+        && !path.startsWith("/api/v1") && !path.startsWith("/api/account/api-keys")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
@@ -97,7 +105,7 @@ process.on("unhandledRejection", (reason) => {
     await setupAuth(app);
     await registerRoutes(httpServer, app);
 
-    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    app.use((err: any, req: Request, res: Response, next: NextFunction) => {
       const status = typeof err.code === "string" && err.code.startsWith("LIMIT_") ? 413 : (err.status || err.statusCode || 500);
       const message = err.message || "Internal Server Error";
 
@@ -105,6 +113,14 @@ process.on("unhandledRejection", (reason) => {
 
       if (res.headersSent) {
         return next(err);
+      }
+
+      // The public API answers its one error envelope even for failures raised
+      // before its router (the app-level JSON parser: malformed or oversized body).
+      if (isPublicApiPath(req.path)) {
+        const isBodyError = typeof err?.type === "string" && err.type.startsWith("entity.");
+        if (status >= 500) return apiError(res, 500, "internal_error", "Something went wrong on our side. Try again shortly.");
+        return apiError(res, status, codeForStatus(status), isBodyError ? "The request body could not be read as JSON." : message);
       }
 
       return res.status(status).json({ message });

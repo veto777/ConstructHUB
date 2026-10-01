@@ -22,54 +22,21 @@ export const BILLING_SUBSCRIPTION_DDL: readonly string[] = [
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS agency_locations integer`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end boolean`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancel_at timestamp`,
+  // When the Stripe subscription began (Stripe `start_date`); plain-SQL like
+  // the cancel columns, written by ./sync recordCancellation.
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS start_date timestamp`,
 ];
 
-export const BILLING_COLUMNS: readonly string[] = ["billing_interval", "addons", "agency_locations", "cancel_at_period_end", "cancel_at"];
+export const BILLING_COLUMNS: readonly string[] = ["billing_interval", "addons", "agency_locations", "cancel_at_period_end", "cancel_at", "start_date"];
 
 /**
  * The account billing ledger (server/billing/ledger.ts): processed Stripe
- * event ids, invoices and one-time purchases. Exactly the shapes the account
- * foundation's ensureAccountSchema() creates (server/account/schema.ts: same
- * columns, same index names) — CREATE ... IF NOT EXISTS, so whichever runs
- * first the other is a no-op and no index is created twice under two names.
- * Every INSERT names its columns.
+ * event ids, invoices and one-time purchases. ONE definition — the account
+ * schema's (server/account/schema.ts) — re-exported here for the webhook's
+ * boot path; whichever ensure* runs first, the other is a no-op.
  */
-export const BILLING_LEDGER_DDL: readonly string[] = [
-  `CREATE TABLE IF NOT EXISTS billing_events (
-     stripe_event_id text PRIMARY KEY,
-     type text,
-     user_id integer,
-     received_at timestamptz NOT NULL DEFAULT now()
-   )`,
-  `CREATE INDEX IF NOT EXISTS billing_events_user_idx ON billing_events(user_id, received_at DESC)`,
-  `CREATE TABLE IF NOT EXISTS billing_invoices (
-     id text PRIMARY KEY,
-     user_id integer,
-     number text,
-     status text,
-     amount_paid integer,
-     amount_due integer,
-     currency text,
-     period_start timestamptz,
-     period_end timestamptz,
-     description text,
-     hosted_invoice_url text,
-     invoice_pdf text,
-     created timestamptz
-   )`,
-  `CREATE INDEX IF NOT EXISTS billing_invoices_user_idx ON billing_invoices(user_id, created DESC)`,
-  `CREATE TABLE IF NOT EXISTS billing_purchases (
-     id text PRIMARY KEY,
-     user_id integer,
-     kind text,
-     description text,
-     amount integer,
-     currency text,
-     created timestamptz,
-     receipt_url text
-   )`,
-  `CREATE INDEX IF NOT EXISTS billing_purchases_user_idx ON billing_purchases(user_id, created DESC)`,
-];
+export { BILLING_LEDGER_DDL } from "../account/schema";
+import { BILLING_LEDGER_DDL } from "../account/schema";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 

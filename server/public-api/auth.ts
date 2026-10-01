@@ -37,6 +37,8 @@ declare global {
     interface Request {
       /** Set by the public API's authenticate middleware; absent on session routes. */
       publicApi?: PublicApiContext;
+      /** The verified key row ({ id, userId, scopes, … }); what the resource handlers read. Same request lifetime as publicApi. */
+      apiKey?: ApiKeyRow;
     }
   }
 }
@@ -61,6 +63,7 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     const key = await verifyApiKey(header);
     if (!key) return apiError(res, 401, "invalid_api_key", "This API key is invalid, revoked or expired.");
     const ent = await getEntitlements(key.userId);
+    req.apiKey = key;
     req.publicApi = {
       userId: key.userId,
       key,

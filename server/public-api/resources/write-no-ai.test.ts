@@ -28,14 +28,11 @@ const namedImports = (code: string) => [...code.matchAll(/import\s*(?:type\s*)?\
 /** An AI module, as a bare specifier (`openai`) or a resolved file path. */
 const AI_MODULE = /^openai$|\/(ai-config|ai-output|review-automation|sitescan\/providers|site-assistant|ads-consultant)(\.tsx?)?$/;
 /**
- * The session-side modules the write resources reuse whose own import graph
- * reaches an AI module: gbp/service (lazy `import('./review-automation')` in
- * syncLocation), social/service (static openai + ai-config for generateDue) and
- * sitescan/audit (guidance → providers). None of them is invoked for AI from
- * here, but the reach is real; this list is the whole of it. A new entry fails;
- * an entry disappearing (the service split) is the intended edit.
+ * Session-side modules the write resources reuse whose own import graph
+ * reaches an AI module. Since the service split (gbp/reply.ts, social/schedule.ts,
+ * sitescan/business-schema.ts) there are none; a new entry fails.
  */
-const ALLOWED_AI_ENTRIES = ["server/gbp/service.ts", "server/sitescan/audit.ts", "server/social/service.ts"];
+const ALLOWED_AI_ENTRIES: string[] = [];
 const resolveSpec = (from: string, spec: string) => {
   const base = spec.startsWith("@shared/") ? path.join(root, "shared", spec.slice(8)) : spec.startsWith(".") ? path.resolve(path.dirname(from), spec) : spec;
   for (const c of [base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]) if (existsSync(c) && statSync(c).isFile()) return c;
@@ -67,7 +64,7 @@ describe("no AI reachable from the public API (static)", () => {
     }
   });
 
-  it("transitively, AI code is reached only through the documented session services (pinned)", () => {
+  it("transitively, no AI code is reachable from the write resources (pinned to none)", () => {
     const direct: string[] = [], entries = new Set<string>();
     for (const file of sources) {
       const from = path.join(here, file);
@@ -143,17 +140,34 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("API keys never aut
   it("the session-protected AI routes answer 401 to an account API key, and the anonymous ones grant it nothing", async () => {
     for (const [method, route, body, kind] of AI_ROUTES(randomUUID())) {
       const r = await api(method, route, body);
-      if (kind === "session") {
-        expect(r.status, route).toBe(401);
-      } else {
-        // Public endpoints (rate-limited, CAPTCHA-gated): a key is not an identity there either —
-        // the request is treated like any anonymous caller (input refused before any AI call, 400),
-        // or refused outright once rejectApiKeysOutsidePublicApi is mounted app-wide (401).
-        expect([400, 401], route).toContain(r.status);
-      }
-      expect(r.status, route).toBeGreaterThanOrEqual(400);
+      // Session-protected or anonymous (rate-limited, CAPTCHA-gated), a key is refused outright:
+      // rejectApiKeysOutsidePublicApi is mounted app-wide in server/index.ts, before any parser or handler.
+      expect(r.status, `${kind} ${route}`).toBe(401);
+      expect(r.data, route).toMatchObject({ error: { code: "unauthorized" } });
       expect(r.data?.reached, route).toBeUndefined();
     }
+  });
+
+  it("a malformed JSON body on /api/v1 answers the API's error envelope (the app-level parser fails before the router)", async () => {
+    const raw = async (path: string, bearer: string | null) => {
+      const headers: Record<string, string> = { "content-type": "application/json", "x-forwarded-for": ip };
+      if (bearer) headers.authorization = `Bearer ${bearer}`;
+      const r = await fetch(base + path, { method: "POST", headers, body: "{not json" });
+      return { status: r.status, type: r.headers.get("content-type") ?? "", data: await r.json().catch(() => null) };
+    };
+    for (const bearer of [key, null]) {
+      const r = await raw("/api/v1/site-scans", bearer);
+      expect(r.status, bearer ? "with key" : "anonymous").toBe(400);
+      expect(r.type).toMatch(/json/);
+      expect(r.data).toMatchObject({ error: { code: "validation_error" } });
+      // Never the parser's own text (no internals, one vocabulary).
+      expect(JSON.stringify(r.data)).not.toMatch(/Unexpected token|SyntaxError/);
+    }
+    // Session routes keep their own { message } shape.
+    const s = await raw("/api/account/api-keys", null);
+    expect(s.status).toBe(400);
+    expect(s.data?.error).toBeUndefined();
+    expect(typeof s.data?.message).toBe("string");
   });
 
   it("the CRM's own /api/v1 key middleware refuses an account key (the two key types never cross)", async () => {

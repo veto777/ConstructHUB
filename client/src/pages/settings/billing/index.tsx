@@ -5,6 +5,7 @@
  * `BillingSettingsPage` wraps that in a page for the /settings/billing route.
  * The settings shell can import any of them.
  */
+import type { ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { SubscriptionsPanel, type SubscriptionsPanelProps } from "./subscriptions-panel";
@@ -31,11 +32,13 @@ export type BillingPanelProps = {
   tab?: BillingTab;
   onTabChange?: (tab: BillingTab) => void;
   subscriptions?: SubscriptionsPanelProps;
+  /** Rendered under the subscription statement on the Subscriptions tab (the settings shell puts the plan cards there). */
+  subscriptionsExtra?: ReactNode;
   invoices?: InvoicesPanelProps;
   paymentMethods?: PaymentMethodsPanelProps;
 };
 
-export function BillingPanel({ tab, onTabChange, subscriptions, invoices, paymentMethods }: BillingPanelProps = {}) {
+export function BillingPanel({ tab, onTabChange, subscriptions, subscriptionsExtra, invoices, paymentMethods }: BillingPanelProps = {}) {
   const [param, setParam] = useUrlParam("billing");
   const active: BillingTab = tab ?? (isBillingTab(param) ? param : "subscriptions");
   const change = (next: string) => {
@@ -57,7 +60,10 @@ export function BillingPanel({ tab, onTabChange, subscriptions, invoices, paymen
           </TabsTrigger>
         ))}
       </TabsList>
-      <TabsContent value="subscriptions" className="mt-0"><SubscriptionsPanel {...subscriptions} /></TabsContent>
+      <TabsContent value="subscriptions" className="mt-0 space-y-6">
+        <SubscriptionsPanel {...subscriptions} />
+        {subscriptionsExtra}
+      </TabsContent>
       <TabsContent value="invoices" className="mt-0"><InvoicesPanel {...invoices} /></TabsContent>
       <TabsContent value="payment-methods" className="mt-0"><PaymentMethodsPanel {...paymentMethods} /></TabsContent>
       <TabsContent value="purchases" className="mt-0"><PurchasesPanel /></TabsContent>
