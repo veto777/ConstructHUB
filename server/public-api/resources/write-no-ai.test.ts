@@ -1,29 +1,63 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { createWriteStream, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-// The NO AI RULE for the public API write lane, checked two ways:
+// The NO AI RULE for the public API write lane, checked three ways:
 //   1. statically — the write resources never import an AI module or an AI
 //      generator (direct import specifiers and named imports);
-//   2. over HTTP against a real server with the dev bypass OFF — an account API
+//   2. statically, transitively — the import graph below the write resources
+//      reaches AI code only through the documented session services (pinned);
+//   3. over HTTP against a real server with the dev bypass OFF — an account API
 //      key (`chub_…`) never authenticates the AI routes (401), and the CRM's
 //      own key middleware does not accept it either.
 // The behavioural half (AI clients mocked to throw while every write runs) is
 // in write.test.ts.
 
 const here = path.dirname(new URL(import.meta.url).pathname);
+const root = path.resolve(here, "../../..");
 const sources = readdirSync(here).filter((f) => /-write\.ts$/.test(f) && !f.endsWith(".test.ts")).sort();
 const FORBIDDEN_MODULES = [/^openai$/, /ai-config/, /ai-output/, /review-automation/, /sitescan\/providers/, /site-assistant/, /ads-consultant/, /sitescan\/worker/, /social\/agency/, /gbp\/content$/];
 const FORBIDDEN_NAMES = ["createDraftGenerator", "generateDraft", "generateReply", "processReplies", "generateText", "generateDue", "openAIProvider", "planBatches", "OpenAI", "aiModel", "aiVisionModel"];
 const specifiers = (code: string) => [...code.matchAll(/(?:from\s+|import\s*\()\s*["']([^"']+)["']/g)].map((m) => m[1]);
 const namedImports = (code: string) => [...code.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from/g)].flatMap((m) => m[1].split(",").map((s) => s.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]).filter(Boolean));
 
+/** An AI module, as a bare specifier (`openai`) or a resolved file path. */
+const AI_MODULE = /^openai$|\/(ai-config|ai-output|review-automation|sitescan\/providers|site-assistant|ads-consultant)(\.tsx?)?$/;
+/**
+ * The session-side modules the write resources reuse whose own import graph
+ * reaches an AI module: gbp/service (lazy `import('./review-automation')` in
+ * syncLocation), social/service (static openai + ai-config for generateDue) and
+ * sitescan/audit (guidance → providers). None of them is invoked for AI from
+ * here, but the reach is real; this list is the whole of it. A new entry fails;
+ * an entry disappearing (the service split) is the intended edit.
+ */
+const ALLOWED_AI_ENTRIES = ["server/gbp/service.ts", "server/sitescan/audit.ts", "server/social/service.ts"];
+const resolveSpec = (from: string, spec: string) => {
+  const base = spec.startsWith("@shared/") ? path.join(root, "shared", spec.slice(8)) : spec.startsWith(".") ? path.resolve(path.dirname(from), spec) : spec;
+  for (const c of [base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]) if (existsSync(c) && statSync(c).isFile()) return c;
+  return spec; // bare module (openai, express, …)
+};
+const reachCache = new Map<string, boolean>();
+function reachesAi(file: string, stack = new Set<string>()): boolean {
+  if (reachCache.has(file)) return reachCache.get(file)!;
+  if (stack.has(file)) return false;
+  stack.add(file);
+  let hit = false;
+  for (const spec of specifiers(readFileSync(file, "utf8"))) {
+    const r = resolveSpec(file, spec);
+    if (AI_MODULE.test(r) || (existsSync(r) && reachesAi(r, stack))) { hit = true; break; }
+  }
+  stack.delete(file);
+  reachCache.set(file, hit);
+  return hit;
+}
+
 describe("no AI reachable from the public API (static)", () => {
-  it("the write resources exist and import no AI module", () => {
+  it("the write resources exist and import no AI module directly", () => {
     expect(sources).toEqual(["gbp-write.ts", "index-write.ts", "shared-write.ts", "sitescan-write.ts", "social-write.ts"]);
     for (const file of sources) {
       const code = readFileSync(path.join(here, file), "utf8");
@@ -31,6 +65,21 @@ describe("no AI reachable from the public API (static)", () => {
       for (const name of namedImports(code)) expect(FORBIDDEN_NAMES, `${file} imports ${name}`).not.toContain(name);
       expect(code, `${file} must not construct an AI client`).not.toMatch(/new\s+OpenAI|chat\.completions|AI_INTEGRATIONS_OPENAI/);
     }
+  });
+
+  it("transitively, AI code is reached only through the documented session services (pinned)", () => {
+    const direct: string[] = [], entries = new Set<string>();
+    for (const file of sources) {
+      const from = path.join(here, file);
+      for (const spec of specifiers(readFileSync(from, "utf8"))) {
+        const r = resolveSpec(from, spec);
+        if (AI_MODULE.test(r)) direct.push(`${file} -> ${spec}`);
+        else if (r.startsWith(here)) continue; // sibling write files are walked on their own turn
+        else if (existsSync(r) && reachesAi(r)) entries.add(path.relative(root, r));
+      }
+    }
+    expect(direct).toEqual([]);
+    expect([...entries].sort()).toEqual(ALLOWED_AI_ENTRIES);
   });
 
   it("every stored write is marked as API-authored so no AI worker rewrites it", () => {
@@ -98,9 +147,11 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("API keys never aut
         expect(r.status, route).toBe(401);
       } else {
         // Public endpoints (rate-limited, CAPTCHA-gated): a key is not an identity there either —
-        // the request is treated like any anonymous caller (input refused before any AI call).
-        expect(r.status, route).toBe(400);
+        // the request is treated like any anonymous caller (input refused before any AI call, 400),
+        // or refused outright once rejectApiKeysOutsidePublicApi is mounted app-wide (401).
+        expect([400, 401], route).toContain(r.status);
       }
+      expect(r.status, route).toBeGreaterThanOrEqual(400);
       expect(r.data?.reached, route).toBeUndefined();
     }
   });

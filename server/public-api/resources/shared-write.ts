@@ -19,8 +19,12 @@
  *
  * NO AI RULE: nothing in server/public-api/resources/*-write.ts imports openai,
  * ai-config, ai-output, review-automation, sitescan/providers, site-assistant,
- * ads-consultant or any AI generator. API-created content is stored exactly as
- * supplied with source=api.
+ * ads-consultant or any AI generator, and no route here calls one. The session
+ * services these files reuse (gbp/service, social/service, sitescan/audit) do
+ * still import the AI generators themselves, so the import graph reaches
+ * openai/ai-config transitively; write-no-ai.test.ts pins that reach to exactly
+ * those three modules until they are split. API-created content is stored
+ * exactly as supplied with source=api.
  */
 import type { NextFunction, Request, RequestHandler, Response, Router } from "express";
 import { z } from "zod";
@@ -96,7 +100,8 @@ export function handle(fn: (req: Request, res: Response, key: ApiKeyContext) => 
         if (e.status === 429) res.setHeader("Retry-After", "5");
         return jsonError(res, e.status, codeForStatus(e.status), e.message);
       }
-      if (e instanceof TypeError) return jsonError(res, 400, "invalid_request", "Invalid request.");
+      // Anything else is a server-side failure: logged and reported as 500. (Input problems surface as
+      // ZodError/GoogleError/SocialError above; a TypeError here is a bug, never a client mistake.)
       console.error("[public-api] write failed:", e instanceof Error ? e.message : e);
       jsonError(res, 500, "internal", "The request could not be completed. Try again.");
     }
