@@ -29,8 +29,8 @@ async function main() {
   //    no Stripe objects — stripeSubscriptionId stays null).
   const [sub] = await db.select().from(s.subscriptions).where(eq(s.subscriptions.userId, OWNER_USER_ID)).limit(1);
   if (!sub) {
-    await db.insert(s.subscriptions).values({ userId: OWNER_USER_ID, plan: "platinum", status: "active" });
-    console.log("✓ comped owner plan: platinum/active (5 seats)");
+    await db.insert(s.subscriptions).values({ userId: OWNER_USER_ID, plan: "agency", status: "active" });
+    console.log("✓ comped owner plan: agency/active (10 seats)");
   } else {
     console.log(`· subscription already present: ${sub.plan}/${sub.status} — left alone`);
   }

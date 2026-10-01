@@ -59,9 +59,9 @@ async function main() {
     .where(eq(s.subscriptions.userId, org.ownerUserId)).limit(1);
   if (!sub) {
     await db.insert(s.subscriptions)
-      .values({ userId: org.ownerUserId, plan: "platinum", status: "active" });
-  } else if (sub.plan !== "platinum" || sub.status !== "active") {
-    await db.update(s.subscriptions).set({ plan: "platinum", status: "active" })
+      .values({ userId: org.ownerUserId, plan: "agency", status: "active" });
+  } else if (sub.plan !== "agency" || sub.status !== "active") {
+    await db.update(s.subscriptions).set({ plan: "agency", status: "active" })
       .where(eq(s.subscriptions.id, sub.id));
   }
 
