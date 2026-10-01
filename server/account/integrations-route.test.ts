@@ -85,7 +85,7 @@ describe("GET /api/account/integrations", () => {
   it("reports connected / reconnect from the modules' own flags", async () => {
     const items = byId((await get(users.agency)).data.items);
     expect(items.google_business).toMatchObject({ status: "reconnect", service: "Google Business Profile", manageHref: "/google-business", detail: "stale@example.invalid needs to be reconnected." });
-    expect(items.google_ads).toMatchObject({ status: "connected", manageHref: "/google-ads", detail: "Manager account 123-456-7890 · 2 client accounts." });
+    expect(items.google_ads).toMatchObject({ status: "connected", manageHref: "/ads-manager", detail: "Manager account 123-456-7890 · 2 client accounts." });
     expect(items.cloudflare).toMatchObject({ status: "connected", manageHref: "/cloudflare", detail: "1 connection (cf@example.invalid) · 2 zones." });
     expect(items.search_console).toMatchObject({ status: "reconnect", manageHref: "/search-console", detail: "gsc@example.invalid needs to be reconnected." });
     expect(items.blotato).toMatchObject({ status: "connected", manageHref: "/social-media", detail: "3 social accounts linked · agency-wide key." });
