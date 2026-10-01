@@ -62,7 +62,7 @@ async function listSocialPosts(scope: Scope, f: z.infer<typeof filterSchema>) {
   return { items: rows.map(socialPostItem), total };
 }
 
-const common = { 401: OPENAPI.errors[401], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
+const common = { 401: OPENAPI.errors[401], 402: OPENAPI.errors[402], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
 
 export const socialPostsResource = resource("social-posts", {
   tags: [{ name: "Social posts", description: "Scheduled and published social media posts." }],

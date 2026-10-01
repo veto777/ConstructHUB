@@ -83,7 +83,12 @@ export function keyContext(req: Request): ApiKeyContext {
 
 export const positiveId = z.coerce.number().int().positive().max(2147483647);
 export const uuid = z.string().uuid();
-export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+/** A real calendar day: "2026-02-30" is refused here (400), not by Postgres's `::date` cast (500). */
+export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").refine((s) => {
+  const [y, m, d] = s.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}, "Not a calendar date");
 const workspaceParam = z.object({ workspace: positiveId.optional() });
 
 /**

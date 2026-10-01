@@ -41,7 +41,7 @@ export const LOCATION_SCHEMA = { type: "object", properties: {
   agencyClientId: nullableInt, clientName: nullableString, createdAt: dateTime, updatedAt: dateTime,
 } };
 
-const common = { 401: OPENAPI.errors[401], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
+const common = { 401: OPENAPI.errors[401], 402: OPENAPI.errors[402], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
 
 export const locationsResource = resource("locations", {
   tags: [{ name: "Locations", description: "Google Business Profile locations and their reviews, insights, media and posts." }],

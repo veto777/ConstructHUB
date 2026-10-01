@@ -78,7 +78,7 @@ async function listFolders(scope: Scope, q: z.infer<typeof folderQuery>) {
   return { items, total };
 }
 
-const common = { 400: OPENAPI.errors[400], 401: OPENAPI.errors[401], 403: OPENAPI.errors[403], 429: OPENAPI.errors[429] };
+const common = { 400: OPENAPI.errors[400], 401: OPENAPI.errors[401], 402: OPENAPI.errors[402], 403: OPENAPI.errors[403], 429: OPENAPI.errors[429] };
 
 export const photosResource = resource("photos", {
   tags: [{ name: "Photos", description: "Your media library (uploaded photos, by folder)." }],

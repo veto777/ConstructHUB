@@ -55,7 +55,7 @@ export async function listGbpPosts(scope: Scope, f: GbpPostFilter) {
   return { items: rows.map(gbpPostItem), total };
 }
 
-const common = { 401: OPENAPI.errors[401], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
+const common = { 401: OPENAPI.errors[401], 402: OPENAPI.errors[402], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
 
 export const gbpPostsResource = resource("gbp-posts", {
   tags: [{ name: "GBP posts", description: "The Business Profile post and photo publishing queue." }],

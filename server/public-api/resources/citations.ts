@@ -81,7 +81,7 @@ async function listCitations(scope: Scope, f: z.infer<typeof citationQuery>) {
   return { items: rows.map(citationItem), total };
 }
 
-const common = { 401: OPENAPI.errors[401], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
+const common = { 401: OPENAPI.errors[401], 402: OPENAPI.errors[402], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] };
 
 export const citationsResource = resource("citations", {
   tags: [{ name: "Citations", description: "Citation campaigns and the directory listings found." }],

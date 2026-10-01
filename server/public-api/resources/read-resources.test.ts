@@ -28,6 +28,8 @@ let postA1: number, postB: number;
 let socialA1: string, socialA0: string, socialB: string;
 let scanA1: string, scanA0: string, scanB: string;
 const keyOf = (user: number) => `key_${TAG}_${user}`;
+/** Unique per key (lane 1 indexes account_api_keys.prefix UNIQUE); the run tag keeps parallel runs apart. */
+const prefixOf = (user: number) => `${TAG.slice(-8)}${user}`;
 const meterWrites: Promise<unknown>[] = [];
 
 type Call = { status: number; body: any; headers: Headers };
@@ -50,10 +52,12 @@ beforeAll(async () => {
   await ensureAgencySchema();
   const { rows: [{ jobs }] } = await pool.query("SELECT to_regclass('public.gbp_content_jobs') AS jobs");
   if (!jobs) throw new Error("gbp_content_jobs is missing: boot the dev server once against this database");
-  // Lane 1's tables, in the contract's shape (idempotent).
+  // Lane 1's tables, in the contract's shape (idempotent). The prefix is unique per key, as in
+  // lane 1's DDL (server/account/schema.ts account_api_keys_prefix_idx), so every fixture key gets its own.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS account_api_keys(id text PRIMARY KEY, user_id int, name text, prefix text, suffix text, secret_hash text,
       scopes text[], monthly_unit_limit int, expires_at timestamptz, last_used_at timestamptz, revoked_at timestamptz, created_at timestamptz);
+    CREATE UNIQUE INDEX IF NOT EXISTS account_api_keys_prefix_idx ON account_api_keys(prefix);
     CREATE TABLE IF NOT EXISTS account_api_usage(key_id text, user_id int, day date, units int, requests int, PRIMARY KEY(key_id, day));`);
 
   const { rows: users } = await pool.query("INSERT INTO users(email, display_name, company_name) VALUES($1,'A','ACCT A Co'),($2,'B','ACCT B Co'),($3,'M',NULL) RETURNING id",
@@ -62,8 +66,8 @@ beforeAll(async () => {
   await pool.query("INSERT INTO subscriptions(user_id,plan,status,stripe_subscription_id) VALUES($1,'agency','active',$2),($3,'pro','active',$4)",
     [A, `sub_${TAG}_A`, B, `sub_${TAG}_B`]);
   for (const u of [A, B, M]) {
-    await pool.query("INSERT INTO account_api_keys(id,user_id,name,prefix,suffix,secret_hash,scopes,monthly_unit_limit,created_at) VALUES($1,$2,'ACCT test','abcd','wxyz','x','{read}',$3,now())",
-      [keyOf(u), u, u === A ? 500 : null]);
+    await pool.query("INSERT INTO account_api_keys(id,user_id,name,prefix,suffix,secret_hash,scopes,monthly_unit_limit,created_at) VALUES($1,$2,'ACCT test',$3,'wxyz','x','{read}',$4,now())",
+      [keyOf(u), u, prefixOf(u), u === A ? 500 : null]);
   }
 
   // A's agency workspace: client C1, member M limited to C1.
@@ -214,6 +218,16 @@ describe("auth and scope", () => {
     expect((await api("/api/v1/locations?limit=1000", A)).status).toBe(400);
     expect((await api("/api/v1/locations/abc", A)).status).toBe(400);
   });
+  it("refuses impossible calendar dates as 400s, never as a database 500", async () => {
+    // Postgres rejects '2026-02-30'::date and JS Date throws on 2026-13-45: both must be validation errors.
+    for (const path of ["/api/v1/reviews?since=2026-02-30", "/api/v1/reviews?until=2026-13-45", "/api/v1/locations?updatedSince=2026-02-30",
+      `/api/v1/insights?locationId=${locA1}&to=2026-13-45`, `/api/v1/insights?locationId=${locA1}&from=2026-02-30`,
+      `/api/v1/locations/${locA1}/insights?to=2026-02-30`]) {
+      const r = await api(path, A);
+      expect(r.status, path).toBe(400);
+      expect(r.body.error.code, path).toBe("validation_error");
+    }
+  });
 });
 
 describe("account", () => {
@@ -226,7 +240,8 @@ describe("account", () => {
     expect(d.limits.locations).toBeGreaterThan(0);
     expect(d.modules.agencyWorkspace).toBe(true);
     expect(d.api).toMatchObject({ enabled: true, unitsPerMonth: 250_000, ratePerMinute: 60 });
-    expect(d.api.key).toMatchObject({ id: keyOf(A), name: "ACCT test", prefix: "abcd", suffix: "wxyz", scopes: ["read"], monthlyUnitLimit: 500 });
+    expect(d.api.key).toMatchObject({ id: keyOf(A), name: "ACCT test", prefix: prefixOf(A), suffix: "wxyz", scopes: ["read"], monthlyUnitLimit: 500 });
+    expect(JSON.stringify(d)).not.toContain("secret_hash");
     expect(d.api.remaining).toBeLessThanOrEqual(500);
     expect(new Date(d.api.resetsAt).getUTCDate()).toBe(1);
     expect(d.usage.locations).toEqual({ used: 2, included: d.limits.locations });

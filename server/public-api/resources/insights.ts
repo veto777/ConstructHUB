@@ -24,7 +24,9 @@ export const insightsQuerySchema = z.object({
   metric: z.string().max(60).optional(),
 }).transform((q) => {
   const to = q.to ?? ymd(new Date());
-  const from = q.from ?? ymd(new Date(new Date(`${to}T00:00:00Z`).getTime() - 29 * 86_400_000));
+  // isoDate already refuses impossible days; the guard keeps a bad `to` a 400 in superRefine, never a RangeError (500).
+  const toMs = new Date(`${to}T00:00:00Z`).getTime();
+  const from = q.from ?? (Number.isFinite(toMs) ? ymd(new Date(toMs - 29 * 86_400_000)) : to);
   return { ...q, from, to };
 }).superRefine((q, ctx) => {
   const a = new Date(`${q.from}T00:00:00Z`).getTime(), b = new Date(`${q.to}T00:00:00Z`).getTime();
@@ -78,7 +80,7 @@ export const insightsResource = resource("insights", {
       responses: { ...OPENAPI.list("#/components/schemas/InsightDay", {
         totals: { type: "object", additionalProperties: { type: "integer" } },
         range: { type: "object", properties: { from: { type: "string", format: "date" }, to: { type: "string", format: "date" } } },
-      }), 400: OPENAPI.errors[400], 401: OPENAPI.errors[401], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] },
+      }), 400: OPENAPI.errors[400], 401: OPENAPI.errors[401], 402: OPENAPI.errors[402], 403: OPENAPI.errors[403], 404: OPENAPI.errors[404], 429: OPENAPI.errors[429] },
     } },
   },
   components: { schemas: { ...OPENAPI.baseSchemas, InsightDay: INSIGHTS_SCHEMA } },
