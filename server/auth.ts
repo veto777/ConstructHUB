@@ -16,6 +16,7 @@ import { pool } from "./db";
 import bcrypt from "bcryptjs";
 import { randomBytes, randomInt } from "crypto";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
+import { sendWelcomeEmail } from "./account/billing-emails";
 import { notifyMemberLogin, notifyMemberAccountChange } from "./crm/owner-notify";
 import { logMemberAuth } from "./crm/activity";
 import { resolveGoogleUrl } from "./google-url-resolver";
@@ -207,6 +208,11 @@ export async function setupAuth(app: Express) {
             .insert(users)
             .values({ googleId, email, displayName, avatarUrl, accountId: generateAccountId(), betaAt, ...tokenData })
             .returning();
+
+          // A Google account arrives verified, so this is its sign-up moment:
+          // the welcome email goes now (once per user; never blocks the login).
+          void sendWelcomeEmail(newUser.id, getBaseUrl(req))
+            .catch((err: any) => console.error("Failed to send welcome email:", err?.message || err));
 
           done(null, newUser);
         } catch (err) {
@@ -532,6 +538,11 @@ export async function setupAuth(app: Express) {
       const verified = await pool.query(`UPDATE users SET email_verified=true,verification_token=NULL,verification_expiry=NULL
         WHERE id=$1 AND verification_token=$2 AND verification_expiry>timezone('UTC',now()) RETURNING id`, [user.id, token]);
       if (!verified.rowCount) return res.redirect("/auth?error=invalid-token");
+
+      // The account is usable from here: welcome + first steps, once per user.
+      // The verification redirect never waits on (or fails because of) mail.
+      void sendWelcomeEmail(user.id, getBaseUrl(req))
+        .catch((err: any) => console.error("Failed to send welcome email:", err?.message || err));
 
       // A still-valid email link must never bypass a subsequently enabled second factor.
       if (user.totpEnabled) {
