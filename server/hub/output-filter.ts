@@ -17,7 +17,7 @@ import {
 import { hardRulesText, NOT_SURE_LINE, REDIRECT_LINE, CANARY } from "./prompt";
 import { knowledgeBook, dollarAmounts, type KnowledgeBook } from "./knowledge";
 
-export type OCode = "O1" | "O2" | "O4" | "O6" | "O7" | "O8" | "O9" | "O10" | "O11" | "O12" | "O13" | "O14" | "O15" | "O16" | "O18";
+export type OCode = "O1" | "O2" | "O4" | "O6" | "O7" | "O8" | "O9" | "O10" | "O11" | "O12" | "O13" | "O14" | "O15" | "O16" | "O17" | "O18";
 export type ModelOutput = { content?: string | null; finishReason?: string | null; toolCalls?: unknown; functionCall?: unknown };
 /**
  * `echo`: the request's own turns. A reply may not repeat a run of the visitor's words (O18);
@@ -358,35 +358,16 @@ function checkHref(href: string, publicOnly: boolean): { path: string; keepLink:
   return { path, keepLink: !publicOnly || link!.public };
 }
 
-function run(out: ModelOutput, opts: FilterOptions): string {
-  const book = opts.book ?? knowledgeBook();
-  const canary = opts.canary ?? CANARY;
-
-  // O1 — finish reason, tool calls, empty
-  if (!["stop", "length"].includes(String(out.finishReason ?? ""))) block("O1");
-  const hasTools = Array.isArray(out.toolCalls) ? out.toolCalls.length > 0 : !!out.toolCalls;
-  if (hasTools || out.functionCall) block("O1");
-  let t = typeof out.content === "string" ? out.content : "";
-  if (!t.trim()) block("O1");
-
-  // O2 — reasoning blocks (strip; an unclosed one blocks)
-  t = t.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  const closer = t.toLowerCase().lastIndexOf("</think>");
-  if (closer !== -1) t = t.slice(closer + "</think>".length);
-  if (/<think>/i.test(t)) block("O2");
-
-  // O3 — normalise (strip)
-  t = cleanText(t).replace(/\n{3,}/g, "\n\n").trim();
-  if (!t) block("O1");
-
-  // O4 — active content
-  if (ACTIVE.test(t)) block("O4");
-  if (/<\/?visitor>/i.test(t)) block("O13");
-
+/**
+ * O5 + O17 + style: the formatting the browser would otherwise hide or join. Runs BEFORE the
+ * content checks, so what is checked is what is delivered ("$_5_", "$`5`", "Truth😀Coder" or
+ * "evil .com" can't pass as one thing and render as another). Must settle in one pass.
+ */
+function tidy(input: string): string {
   // O5 — other tags, headings, quotes, tables, entities (strip)
   // A bare structural tag named in prose ("paste it in your <head> section") keeps its name as a
   // plain word; every other tag is removed. No angle bracket survives either way.
-  t = t.replace(/<\/?(head|body|html|header|footer|title)>/gi, "$1")
+  let t = input.replace(/<\/?(head|body|html|header|footer|title)>/gi, "$1")
     .replace(/<\/?[a-z][^>]*>/gi, "")
     .replace(/^[ \t]*#+[ \t]+/gm, "")
     .replace(/^[ \t]*>[ \t]?/gm, "")
@@ -396,32 +377,28 @@ function run(out: ModelOutput, opts: FilterOptions): string {
     .replace(/&(amp|nbsp);/gi, (m) => (m.toLowerCase() === "&amp;" ? "&" : " "))
     .replace(/&[a-z]{2,8};/gi, "");
 
-  // O6 — links and domains (rewrite / block)
-  // Links are parked as placeholders; the checks below read their text, never their (checked) path.
-  const kept: string[] = [];
-  const keptText: string[] = [];
-  const park = (markdown: string, text: string) => { kept.push(markdown); keptText.push(text); return `\u0001${kept.length - 1}\u0002`; };
-  t = t.replace(MD_LINK, (_, text: string, href: string) => {
-    const { path, keepLink } = checkHref(href, opts.publicOnly);
-    return park(keepLink ? `[${text}](${path})` : text, text);
-  });
-  if (OTHER_SCHEME.test(t) || PROTOCOL_RELATIVE.test(t)) block("O6");
-  t = t.replace(BARE_URL, (raw) => {
-    const url = raw.replace(/[.,;:!?]+$/, "");
-    const trail = raw.slice(url.length);
-    const { path, keepLink } = checkHref(url.startsWith("www.") ? `https://${url}` : url, opts.publicOnly);
-    const link = hubLinkFor(path)!;
-    return park(keepLink ? `[${link.label}](${path})` : link.label, link.label) + trail;
-  });
-  t = t.replace(BARE_DOMAIN, (raw, host: string, pathPart: string | undefined) => {
-    if (!PLAIN_OWN_HOST.test(host)) return block("O6");
-    if (!pathPart || pathPart === "/") return raw;
-    const { path, keepLink } = checkHref(`https://${host.replace(/^portal\./i, "")}${pathPart.replace(/[.,;:!?]+$/, "")}`, opts.publicOnly);
-    const link = hubLinkFor(path)!;
-    return park(keepLink ? `[${link.label}](${path})` : link.label, link.label);
-  });
-  const linkless = t.replace(/\u0001(\d+)\u0002/g, (_, i: string) => keptText[Number(i)]);
-  const restore = (s: string) => s.replace(/\u0001(\d+)\u0002/g, (_, i: string) => kept[Number(i)]);
+  // O17 — markdown whitelist (strip): **bold**, "- " / "1. " lists, allowlisted links
+  t = t.split("\n").map((line) => {
+    let l = line.replace(/^(\s*)[*+•]\s+/, "$1- ").replace(/^(\s*)(\d+)\)\s+/, "$1$2. ");
+    if (/^\s*([-*_]\s*){3,}$/.test(l)) return "";
+    l = l.replace(/`([^`]*)`/g, "$1").replace(/~~([^~]+)~~/g, "$1").replace(/__([^_]+)__/g, "$1")
+      .replace(/(^|[^\w])_([^_\n]+)_(?=[^\w]|$)/g, "$1$2");
+    const bold = (l.match(/\*\*/g) ?? []).length;
+    l = bold % 2 === 0
+      ? l.replace(/\*\*/g, "\u0003").replace(/(^|[^\w*])\*([^*\n]+)\*(?=[^\w*]|$)/g, "$1$2").replace(/\u0003/g, "**")
+      : l.replace(/\*\*/g, "");
+    return l.replace(/[ \t]+$/g, "");
+  }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // Style: no emoji (strip). Runs of spaces read as one space in the browser, so they are one here too.
+  return t.replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/ +([.,;:!?])/g, "$1").trim();
+}
+
+/**
+ * O7–O15 and O18 on one rendering of the reply (links already reduced to their text). Called on
+ * the text as written and again as the browser shows it, with **bold** markers removed, so
+ * "$**5**", "Open**AI**" and "bob@**acme**.com" are read the way a visitor reads them.
+ */
+function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook, canary: string): void {
   const sentences = sentencesOf(linkless);
 
   // O7 — contact details and identifiers, and a named business said to be a ConstructHUB customer
@@ -513,8 +490,8 @@ function run(out: ModelOutput, opts: FilterOptions): string {
   }
   if (LEAKS.some((re) => re.test(linkless))) block("O13");
   const words = normWords(linkless);
-  const grams = rulesNgrams();
-  for (let i = 0; i + 8 <= words.length; i++) if (grams.has(words.slice(i, i + 8).join(" "))) block("O13");
+  const ruleGrams = rulesNgrams();
+  for (let i = 0; i + 8 <= words.length; i++) if (ruleGrams.has(words.slice(i, i + 8).join(" "))) block("O13");
 
   // O14 — off-script content
   if (CODE.some((re) => re.test(linkless))) block("O14");
@@ -532,8 +509,74 @@ function run(out: ModelOutput, opts: FilterOptions): string {
 
   // O18 — the visitor's own words coming back (the "finish with this exact sign-off line" piggyback)
   if (opts.echo && echoesVisitor(linkless, opts.echo, book)) block("O18");
+}
 
-  // O16 — length (truncate / block)
+function run(out: ModelOutput, opts: FilterOptions): string {
+  const book = opts.book ?? knowledgeBook();
+  const canary = opts.canary ?? CANARY;
+
+  // O1 — finish reason, tool calls, empty
+  if (!["stop", "length"].includes(String(out.finishReason ?? ""))) block("O1");
+  const hasTools = Array.isArray(out.toolCalls) ? out.toolCalls.length > 0 : !!out.toolCalls;
+  if (hasTools || out.functionCall) block("O1");
+  let t = typeof out.content === "string" ? out.content : "";
+  if (!t.trim()) block("O1");
+
+  // O2 — reasoning blocks (strip; an unclosed one blocks)
+  t = t.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  const closer = t.toLowerCase().lastIndexOf("</think>");
+  if (closer !== -1) t = t.slice(closer + "</think>".length);
+  if (/<think>/i.test(t)) block("O2");
+
+  // O3 — normalise (strip). Combining marks NFKC could not compose ("$̲" + "5") only hide characters
+  // from the checks in an English answer, so they go too.
+  t = cleanText(t).replace(/\p{M}/gu, "").replace(/\n{3,}/g, "\n\n").trim();
+  if (!t) block("O1");
+
+  // O4 — active content (before and after the tidy, so "<`script`>" can't become "<script>")
+  if (ACTIVE.test(t)) block("O4");
+  if (/<\/?visitor>/i.test(t)) block("O13");
+
+  // O5 + O17 + style (strip), before any content check. Formatting that only settles over several
+  // passes ("$<i>_</i>5_") is not something Hub writes: block it rather than guess what it shows.
+  t = tidy(t);
+  if (tidy(t) !== t) block("O17");
+  if (ACTIVE.test(t)) block("O4");
+  if (!t) block("O1");
+
+  // O6 — links and domains (rewrite / block)
+  // Links are parked as placeholders; the checks below read their text, never their (checked) path.
+  const kept: string[] = [];
+  const keptText: string[] = [];
+  const park = (markdown: string, text: string) => { kept.push(markdown); keptText.push(text); return `\u0001${kept.length - 1}\u0002`; };
+  t = t.replace(MD_LINK, (_, text: string, href: string) => {
+    const { path, keepLink } = checkHref(href, opts.publicOnly);
+    return park(keepLink ? `[${text}](${path})` : text, text);
+  });
+  if (OTHER_SCHEME.test(t) || PROTOCOL_RELATIVE.test(t)) block("O6");
+  t = t.replace(BARE_URL, (raw) => {
+    const url = raw.replace(/[.,;:!?]+$/, "");
+    const trail = raw.slice(url.length);
+    const { path, keepLink } = checkHref(url.startsWith("www.") ? `https://${url}` : url, opts.publicOnly);
+    const link = hubLinkFor(path)!;
+    return park(keepLink ? `[${link.label}](${path})` : link.label, link.label) + trail;
+  });
+  t = t.replace(BARE_DOMAIN, (raw, host: string, pathPart: string | undefined) => {
+    if (!PLAIN_OWN_HOST.test(host)) return block("O6");
+    if (!pathPart || pathPart === "/") return raw;
+    const { path, keepLink } = checkHref(`https://${host.replace(/^portal\./i, "")}${pathPart.replace(/[.,;:!?]+$/, "")}`, opts.publicOnly);
+    const link = hubLinkFor(path)!;
+    return park(keepLink ? `[${link.label}](${path})` : link.label, link.label);
+  });
+  const linkless = t.replace(/\u0001(\d+)\u0002/g, (_, i: string) => keptText[Number(i)]);
+  const restore = (s: string) => s.replace(/\u0001(\d+)\u0002/g, (_, i: string) => kept[Number(i)]);
+
+  // O7–O15, O18 — on the text as written, and as the browser shows it (**bold** is formatting, not text).
+  checkContent(linkless, opts, book, canary);
+  const shown = linkless.replace(/\*\*/g, "");
+  if (shown !== linkless) checkContent(shown, opts, book, canary);
+
+  // O16 — length (truncate / block). Truncation only removes text, so every check above still holds.
   t = restore(t);
   if (out.finishReason === "length") {
     const end = lastSentenceEnd(t, t.length);
@@ -547,21 +590,6 @@ function run(out: ModelOutput, opts: FilterOptions): string {
   }
   const lines = t.split("\n").filter((l) => l.trim());
   if (lines.length > 14 || lines.filter((l) => /^\s*([-*+•]|\d+[.)])\s/.test(l)).length > 8) block("O16");
-
-  // O17 — markdown whitelist (strip): **bold**, "- " / "1. " lists, allowlisted links
-  t = t.split("\n").map((line) => {
-    let l = line.replace(/^(\s*)[*+•]\s+/, "$1- ").replace(/^(\s*)(\d+)\)\s+/, "$1$2. ");
-    if (/^\s*([-*_]\s*){3,}$/.test(l)) return "";
-    l = l.replace(/`([^`]*)`/g, "$1").replace(/~~([^~]+)~~/g, "$1").replace(/__([^_]+)__/g, "$1")
-      .replace(/(^|[^\w])_([^_\n]+)_(?=[^\w]|$)/g, "$1$2");
-    const bold = (l.match(/\*\*/g) ?? []).length;
-    l = bold % 2 === 0
-      ? l.replace(/\*\*/g, "\u0003").replace(/(^|[^\w*])\*([^*\n]+)\*(?=[^\w*]|$)/g, "$1$2").replace(/\u0003/g, "**")
-      : l.replace(/\*\*/g, "");
-    return l.replace(/[ \t]+$/g, "");
-  }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
-  // Style: no emoji (strip).
-  t = t.replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/ +([.,;:!?])/g, "$1").trim();
   if (!t) block("O1");
   return t;
 }

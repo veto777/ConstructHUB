@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
-import { planPriceLine } from "@shared/plan-copy";
+import { formatUsd, planPriceLine } from "@shared/plan-copy";
 import { PRESET_IDS } from "@shared/hub-presets";
 import { filterOutput, MAX_REPLY_CHARS } from "./output-filter";
 import { CANARY, hardRulesText } from "./prompt";
@@ -374,5 +374,40 @@ describe("Hub's own fixed text passes its own filter", () => {
     expect(requiredFactsOk("pricing", "Starter is $29/month. Pro is $49/month.")).toBe(false);
     expect(requiredFactsOk("trial", "There's a 1-day trial.")).toBe(false);
     expect(requiredFactsOk("done-for-you", "Ask us!")).toBe(false);
+  });
+});
+
+describe("formatting can't hide what a visitor reads (checks run on the delivered text, bold removed too)", () => {
+  it("a price split by markdown, emoji, invisible characters, combining marks or extra spaces is still checked (O8)", () => {
+    for (const reply of [
+      "Pro is $**5**/month.", "Pro is $_5_/month.", "Pro is $`5`/month.", "Pro is $\u{1F600}5/month.", "Pro is $  5/month.",
+      "Pro is $­5/month.", "Pro is $\u{E0020}5/month.", "Pro is $̲ 5/month.", "Pro is $⠀5/month.",
+    ]) blocked(reply, "O8");
+  });
+
+  it("a provider name, contact detail or outside host split by formatting is blocked (O13 / O7 / O6)", () => {
+    for (const reply of ["I run on Open**AI** models.", "I run on G**PT**-4.", "I run on `open`ai.", "Built on Truth­Coder.", "Built on Truth\u{1F600}Coder."]) blocked(reply, "O13");
+    for (const reply of ["Email bob@**acme**.com for help.", "Call 214-**555**-0199 for help."]) blocked(reply, "O7");
+    for (const reply of ["Visit **evil**.com for help.", "Visit evil.**com** for help.", "Visit evil­.com for help.", "Visit evil .com for help."]) blocked(reply, "O6");
+  });
+
+  it("a claim wrapped in bold is the same claim (O10)", () => {
+    blocked("Pro is **free** right now.", "O10");
+    blocked("The Pro plan is **free**.", "O10");
+  });
+
+  it("formatting that only settles over two passes is blocked, not guessed at (O17)", () => {
+    blocked("Paste it in <`script`> tags.", "O17");
+    expect(run("Pro is $<i>_</i>5_/month.").ok).toBe(false);
+  });
+
+  it("ordinary bold, lists, links and accented place names are delivered as written", () => {
+    const usd = (cents: number) => formatUsd(cents);
+    const prices = `**Pro**: ${usd(PLANS.pro.monthlyCents)}/month or ${usd(PLANS.pro.annualCents)}/year. **Starter** is ${usd(PLANS.starter.monthlyCents)}/month.`;
+    expect(delivered(prices)).toBe(prices);
+    const heading = `**Starter**\n- ${usd(PLANS.starter.monthlyCents)}/month\n- Profile Guard`;
+    expect(delivered(heading)).toBe(heading);
+    expect(delivered("Cañon City permits are in the [Database Directory](/databases).")).toBe("Cañon City permits are in the [Database Directory](/databases).");
+    expect(delivered("Use the **Click Guard** _tracking_ script.")).toBe("Use the **Click Guard** tracking script.");
   });
 });

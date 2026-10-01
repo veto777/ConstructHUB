@@ -22,6 +22,11 @@ const ZERO_WIDTH = /[\u200B-\u200F\u2060-\u2064\uFEFF]/g;
 const BIDI = /[\u202A-\u202E\u2066-\u2069]/g;
 // C0/C1 controls except \n (tabs become spaces first so words never merge).
 const CONTROLS = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g;
+// Every other character a browser draws as nothing (soft hyphen, tag characters, variation selectors,
+// combining grapheme joiner, Hangul fillers\u2026): "Truth\u00ADCoder" and "$\u{E0020}5" read as "TruthCoder" and "$5".
+const INVISIBLE = /\p{Default_Ignorable_Code_Point}/gu;
+// Blank-looking characters NFKC leaves alone; they read as a space.
+const BLANKS = /[\u2800]/g;
 
 export function cleanText(input: string): string {
   return String(input ?? "")
@@ -34,6 +39,8 @@ export function cleanText(input: string): string {
     .replace(/\t/g, " ")
     .replace(ZERO_WIDTH, "")
     .replace(BIDI, "")
+    .replace(INVISIBLE, "")
+    .replace(BLANKS, " ")
     .replace(CONTROLS, "");
 }
 
