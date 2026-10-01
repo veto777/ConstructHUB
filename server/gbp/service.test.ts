@@ -39,7 +39,8 @@ beforeAll(async()=>{
   const {rows}=await pool.query("INSERT INTO users(email) VALUES('gbp-fixture-'||gen_random_uuid()::text||'@example.invalid'),('gbp-fixture-'||gen_random_uuid()::text||'@example.invalid') RETURNING id");
   [userId,otherId]=rows.map(r=>r.id);
   // Scheduled syncs only run for accounts with a plan.
-  await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active')",[userId]);
+  // Imports and scheduled syncs need a plan: both fixture accounts get one.
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active'),($2,'starter','active')",[userId,otherId]);
 });
 afterAll(async()=>{await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM google_profile_reviews WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[userId,otherId]]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[userId,otherId]]);await pool.end()});
 describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',()=>{
