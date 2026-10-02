@@ -115,9 +115,11 @@ test.describe("signed out: routing", () => {
     expect(res.status()).toBe(401);
   });
 
-  test("the public header and footer link the catalogue", async ({ page }) => {
+  test("the public header's Features dropdown and the footer link the catalogue", async ({ page }) => {
     await open(page, `${SIGNED_OUT}/pricing`);
-    await expect(page.getByTestId("link-public-features")).toHaveAttribute("href", "/features");
+    await page.getByTestId("nav-dropdown-features").hover();
+    await expect(page.getByTestId("nav-features-all")).toHaveAttribute("href", "/features");
+    await expect(page.getByTestId("nav-item-site-scan")).toHaveAttribute("href", "/features/site-scan");
     await expect(page.getByTestId("link-public-footer-features")).toHaveAttribute("href", "/features");
   });
 });

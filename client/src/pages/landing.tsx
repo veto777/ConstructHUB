@@ -14,35 +14,24 @@
 import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { CHLogo } from "@/components/ch-logo";
-import { CartSheet } from "@/components/cart-sheet";
-import { Settings } from "lucide-react";
 import {
   ArrowRight, Search, Camera, Users,
   MapPin, CheckCircle2,
-  Eye, Globe, LayoutDashboard, GraduationCap,
+  Eye, Globe, GraduationCap,
   Grid3X3, ShieldAlert, Crosshair, Briefcase,
   Megaphone, Package, Phone,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
 import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
-import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+import { SiteNavBar } from "@/components/site-nav";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
 import { callAssistantPricing } from "@shared/plan-copy";
 import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
 
-const SECTION_LINKS = [
-  { href: "#services", label: "Services" },
-  { href: "#plans", label: "Plans" },
-  { href: "#stats", label: "Results" },
-  { href: "#coverage", label: "Coverage" },
-] as const;
-/** Other pages in the nav (the section links above jump within this one). */
-const ROUTE_LINKS = [{ href: FEATURES_PATH, label: "Features" }];
 
 /** Button recipes — anchors styled as buttons (no <button> nested in <a>). */
 const BTN = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange focus-visible:ring-offset-2 focus-visible:ring-offset-mkt-paper";
@@ -268,43 +257,7 @@ export default function LandingPage() {
 
       {/* Nav — a navy masthead with an orange rule under it. */}
       <nav className={`sticky top-0 z-50 transition-transform duration-300 bg-mkt-navy border-b-[3px] border-mkt-orange ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <CHLogo height={40} />
-          <div className="hidden md:flex items-center gap-5 lg:gap-7 text-[14px] lg:text-[15px] font-medium text-white/75">
-            {SECTION_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
-            ))}
-            {ROUTE_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</Link>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 lg:gap-3">
-            {user && (
-              <Link href="/settings">
-                <button className="hidden sm:inline-flex items-center justify-center rounded-md h-9 w-9 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
-                  <Settings className="h-4 w-4" />
-                </button>
-              </Link>
-            )}
-            <div className="text-white"><CartSheet /></div>
-            <div className="text-white hidden sm:block"><ThemeToggle /></div>
-            {user ? (
-              <Link href="/" data-testid="link-nav-dashboard" className={`${BTN_PRIMARY} h-9 px-4 text-sm`}>
-                <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link href="/auth" className="hidden sm:inline-flex items-center whitespace-nowrap h-9 px-3 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-nav-signin">
-                  Sign In
-                </Link>
-                <Link href="/auth?mode=signup" data-testid="link-nav-getstarted" className={`${BTN_PRIMARY} h-9 px-4 text-sm`}>
-                  Get Started <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </>
-            )}
-            <LandingMobileMenu signInHref={user ? undefined : "/auth"} links={[...SECTION_LINKS]} routeLinks={ROUTE_LINKS} />
-          </div>
-        </div>
+        <SiteNavBar signedIn={!!user} next="/" />
       </nav>
 
       {/* Hero — the gator is the cover star, standing on a tape-measure rule.
