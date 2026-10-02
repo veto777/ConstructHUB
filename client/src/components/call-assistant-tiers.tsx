@@ -57,7 +57,7 @@ export function CallAssistantTierCards({ interval, className }: { interval: Bill
       <div className="rounded-lg border border-[#F97316]/30 bg-[#F97316]/5 px-4 py-3 text-sm flex flex-wrap items-start gap-2" data-testid="text-call-assistant-tiers-every">
         <ShieldBan className="h-4 w-4 mt-0.5 text-[#F97316] shrink-0" aria-hidden="true" />
         <span>
-          <span className="font-semibold">Every tier:</span> {p.freeSpamCalls} spam calls a month free (they never count toward your minutes); spam is screened and repeat spammers are blocked before they ring.
+          <span className="font-semibold">Every tier:</span> the first {p.freeSpamCalls} spam calls each month are free (they never count toward your minutes); spam is screened and repeat spammers are blocked before they're answered.
           Above the included minutes, {p.overagePerMinute}/minute. Extra local numbers {p.extraNumber}/mo each. Add-on for the {p.plans} plans.
         </span>
       </div>

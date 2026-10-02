@@ -9,6 +9,7 @@ import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { ADDONS, PLANS, CALL_ASSISTANT_FREE_SPAM_CALLS, type AddonKey, type BillingInterval, type PlanKey, type PlanLimits } from "@shared/plans";
 import { CallAssistantTierPicker } from "@/components/call-assistant-tiers";
+import { callAssistantTierNumbersLine } from "@shared/plan-copy";
 import {
   AGENCY_INCLUDED_LOCATIONS, addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
 } from "@/lib/pricing-display";
@@ -260,8 +261,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           action: (
             <div className="w-full space-y-2" data-testid="row-limit-call-assistant-tier">
               <p className="text-xs text-muted-foreground">
-                {vs?.tier ? `Your tier: ${vs.tier.name}.` : "Pick a tier."} Every tier: {formatCount(vs?.pricing.freeSpamCalls ?? CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls a month never count toward your minutes.
-                {vs?.usage?.spamCallsThisMonth ? ` ${formatCount(vs.usage.spamCallsThisMonth)} spam calls blocked this month.` : ""}
+                {vs?.tier ? `Your tier: ${vs.tier.name}.` : "Pick a tier."} Every tier: the first {formatCount(vs?.pricing.freeSpamCalls ?? CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls each month never count toward your minutes.
+                {vs?.usage?.spamCallsThisMonth ? ` ${formatCount(vs.usage.spamCallsThisMonth)} spam calls stopped this month.` : ""}
               </p>
               <CallAssistantTierPicker
                 compact
@@ -281,7 +282,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           excluded: !on,
           used: !on ? null : vs!.numberAllowance ? vs!.numberAllowance.used : undefined,
           ceiling: on && numbers > 0 ? numbers : undefined,
-          hint: "Solo includes 1 local number, Crew 3 and Fleet 5; buy and release them in CRM → Call Assistant → Numbers.",
+          hint: `${callAssistantTierNumbersLine()}; buy and release them in CRM → Call Assistant → Numbers.`,
           addon: on ? "call_number" : undefined,
         },
       ],

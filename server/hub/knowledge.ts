@@ -20,7 +20,7 @@ import {
   pricingKnowledge, joinNames, planNamesWhere, formatUsd, TRIAL_LABEL, SALES_REP_LABEL, SALES_THRESHOLD_LABEL,
   SALES_HREF, PROTECTED_SITE_PLANS, COMPETITOR_INTEL_PLANS, TEXTING_PLANS, CRM_SEATS_LINE,
   CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantPricing, callAssistantIncludesLine, callAssistantIntroLine,
-  CALL_ASSISTANT_SPAM, callAssistantMinuteRule, callAssistantSpamAllowanceLine, callAssistantTierAdvice, callAssistantTiersLine,
+  CALL_ASSISTANT_SPAM, callAssistantMinuteRule, callAssistantSpamAllowanceLine, callAssistantTierAdvice, callAssistantTierNumbersLine, callAssistantTiersLine,
 } from "@shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { HUB_PAGES, type PageKey } from "@shared/hub-links";
@@ -70,6 +70,8 @@ export function knowledgeTokens(): Record<string, string> {
     CALL_ASSISTANT_SPAM_SCREEN: CALL_ASSISTANT_SPAM.screen,
     CALL_ASSISTANT_SPAM_BLOCK: CALL_ASSISTANT_SPAM.block,
     CALL_ASSISTANT_SPAM_REPORT: CALL_ASSISTANT_SPAM.report,
+    CALL_ASSISTANT_SPAM_FORWARDING: CALL_ASSISTANT_SPAM.forwarding,
+    CALL_ASSISTANT_TIER_NUMBERS: callAssistantTierNumbersLine(),
     CALL_ASSISTANT_SPAM_FREE: callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase()),
     CALL_ASSISTANT_PLANS,
     CALL_ASSISTANT_AVAILABILITY: callAssistantAvailabilityLine(),

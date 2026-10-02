@@ -29,6 +29,7 @@ import type { Express, Response } from "express";
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { voiceNumbers, type VoiceNumberRow } from "@shared/schema";
+import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { ADDONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIERS, CALL_NUMBER_MIN_DAYS, PLANS, callAssistantTierOf } from "@shared/plans";
 import { sendLimitReached, sendModulePaymentNeeded } from "../entitlements";
 import { releaseReasonText, releaseIsFinal, FINAL_RELEASE_REASONS } from "./number-release";
@@ -60,7 +61,7 @@ export const FORWARDING_CARRIERS: readonly { id: string; name: string; kind: "mo
 ];
 
 export const FORWARDING_ADVICE = [
-  "Start with no-answer / after-hours forwarding so the assistant only takes what you miss; switch to 'always' once you've listened to a few calls.",
+  `Start with no-answer / after-hours forwarding so the assistant only takes what you miss; switch to 'always' once you've listened to a few calls. ${CALL_ASSISTANT_SPAM.forwarding}`,
   "Call your own line after setting it up: the assistant should answer with your greeting. Caller-ID keeps showing the caller's number, so the CRM matches existing customers.",
   "Keep your old number on your website, trucks and ads — only where it rings changes.",
 ];

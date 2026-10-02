@@ -289,7 +289,7 @@ function callAssistantTierAddon(key: CallAssistantTierKey): Addon {
   return {
     key: t.addon,
     name: `${CALL_ASSISTANT_NAME} — ${t.name}`,
-    description: `An AI receptionist that answers your phone 24/7, screens out spam, fills in the lead for your CRM and texts the right person. ${t.name}: ${numbers} and ${t.includedMinutes.toLocaleString("en-US")} call minutes / month, then $${(CALL_MINUTE_OVERAGE_CENTS / 100).toFixed(2)} / minute; ${CALL_ASSISTANT_FREE_SPAM_CALLS} spam calls a month never count.`,
+    description: `An AI receptionist that answers your phone 24/7, screens out spam, fills in the lead for your CRM and texts the right person. ${t.name}: ${numbers} and ${t.includedMinutes.toLocaleString("en-US")} call minutes / month, then $${(CALL_MINUTE_OVERAGE_CENTS / 100).toFixed(2)} / minute; the first ${CALL_ASSISTANT_FREE_SPAM_CALLS} spam calls each month never count.`,
     monthlyCents: t.monthlyCents,
     annualCents: t.annualCents,
     availableOn: CALL_ASSISTANT_SOLD_ON,

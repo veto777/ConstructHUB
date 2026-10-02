@@ -52,8 +52,8 @@ describe("weekly spam report", () => {
     // On Monday itself the week just ended is reported.
     expect(report.spamReportWeek(new Date("2001-01-08T00:30:00Z")).key).toBe(WEEK_KEY);
     expect(report.spamReportWeek(new Date("2001-01-07T23:59:00Z")).key).toBe("2000-12-25");
-    expect(report.spamReportTitle(1)).toBe("We blocked 1 spam call for you this week");
-    expect(report.spamReportTitle(1200)).toBe("We blocked 1,200 spam calls for you this week");
+    expect(report.spamReportTitle(1)).toBe("We stopped 1 spam call for you this week");
+    expect(report.spamReportTitle(1200)).toBe("We stopped 1,200 spam calls for you this week");
   });
 
   it("emails the org owner once per week: every spam call with its number, time, reason and whether it is blocked now; and rings the bell", async () => {
@@ -77,7 +77,7 @@ describe("weekly spam report", () => {
     expect(deliver).toHaveBeenCalledTimes(1);
     const [userId, kind, key, msg] = deliver.mock.calls[0];
     expect([userId, kind, key]).toEqual([a.userId, "voice.spam_report", `voice-spam-report:${a.orgId}:${WEEK_KEY}`]);
-    expect(msg.subject).toBe("We blocked 4 spam calls for you this week");
+    expect(msg.subject).toBe("We stopped 4 spam calls for you this week");
     expect(msg.text).toContain("Spam Report Siding");
     expect(msg.text).toContain("Mon, Jan 1 and Sun, Jan 7");
     expect(msg.text).toContain("Sales pitch about Google listings");
@@ -92,11 +92,11 @@ describe("weekly spam report", () => {
     expect(msg.text).toContain("1 of these numbers is now blocked: their calls are rejected before they're answered.");
     expect(msg.text).toContain("https://constructhub.example.invalid/crm/call-assistant?tab=calls&view=spam");
     expect(msg.text).toContain('turn off "Weekly spam report" in CRM → Settings → Notifications');
-    expect(msg.html).toContain("We blocked 4 spam calls for you this week");
+    expect(msg.html).toContain("We stopped 4 spam calls for you this week");
     expect(msg.html).not.toContain("<script");
 
     expect(bell).toHaveBeenCalledTimes(1);
-    expect(bell.mock.calls[0][0]).toMatchObject({ pref: "spamReport", type: "call.spam_report", title: "We blocked 4 spam calls for you this week", link: "/crm/call-assistant?tab=calls&view=spam" });
+    expect(bell.mock.calls[0][0]).toMatchObject({ pref: "spamReport", type: "call.spam_report", title: "We stopped 4 spam calls for you this week", link: "/crm/call-assistant?tab=calls&view=spam" });
     expect(bell.mock.calls[0][0].body).toBe("2 numbers, 3 screened by the assistant and 1 rejected before answering. Nobody had to pick up.");
 
     // Idempotent: a second run (or a second process) sends nothing.
@@ -155,7 +155,7 @@ describe("weekly spam report", () => {
     const out = await report.sendWeeklySpamReport(a.orgId, report.spamReportWeek(NOW), { q: pool, deliver, hasCallAssistant: async () => true, baseUrl: "https://x.example.invalid" });
     expect(out).toMatchObject({ sent: true, bell: true });
     const { rows } = await pool.query("select member_id, type, title, link from crm_notifications where org_id = $1", [a.orgId]);
-    expect(rows).toEqual([{ member_id: a.memberId, type: "call.spam_report", title: "We blocked 1 spam call for you this week", link: "/crm/call-assistant?tab=calls&view=spam" }]);
+    expect(rows).toEqual([{ member_id: a.memberId, type: "call.spam_report", title: "We stopped 1 spam call for you this week", link: "/crm/call-assistant?tab=calls&view=spam" }]);
   });
 
   it("the weekly run reports every org with spam that week, once; the job is off outside production unless switched on", async () => {
@@ -185,7 +185,7 @@ describe("weekly spam report", () => {
       callId: String(i), phoneNumber: `+1555010${String(1000 + i).slice(-4)}`, at: new Date("2001-01-03T12:00:00Z"), outcome: "spam" as const, reason: "Sales pitch", nowBlocked: false,
     }));
     const msg = report.spamReportEmail({ orgName: "Acme <b>Siding</b>", week, calls, baseUrl: "https://x.example.invalid" });
-    expect(msg.subject).toBe("We blocked 53 spam calls for you this week");
+    expect(msg.subject).toBe("We stopped 53 spam calls for you this week");
     expect(msg.text.match(/Not blocked/g)).toHaveLength(50);
     expect(msg.text).toContain("3 more spam calls are in your spam report.");
     // The org name is escaped in the HTML.

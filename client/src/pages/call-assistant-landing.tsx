@@ -28,7 +28,7 @@ import {
 } from "@/components/call-assistant-marketing";
 import { PLANS } from "@shared/plans";
 import {
-  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, SALES_REP_LABEL, callAssistantMinuteRule, callAssistantPricing, callAssistantSpamAllowanceLine,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantMinuteRule, callAssistantPricing, callAssistantSpamAllowanceLine,
   callAssistantTierAdvice, callAssistantYearlyNote, formatUsd,
 } from "@shared/plan-copy";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST } from "@shared/voice-personas";
@@ -85,7 +85,7 @@ const AFTER_CALL: string[] = [
   "A real lead becomes a client in your CRM, plus a pipeline project if you want one, with \"Call Assistant\" as the lead source.",
   "Your team hears about it the way it hears about every new lead: in the app, by email or by text, as each person has set it up.",
   "Emergencies, existing customers and \"I want a person\" go by text or email to the teammate you choose, with reminders until someone replies.",
-  "Spam calls ping nobody. They show under Calls → Spam blocked, where you can block or unblock a number, and in a weekly spam report email.",
+  "Spam calls forwarded to your assistant ping nobody. They show under Calls → Spam blocked, where you can block or unblock a number, and in a weekly spam report email.",
 ];
 
 function faqs(): { q: string; a: string }[] {
@@ -133,7 +133,7 @@ function faqs(): { q: string; a: string }[] {
     },
     {
       q: "Do spam calls use my minutes?",
-      a: `Not for the first ${p.freeSpamCalls} each month: ${callAssistantSpamAllowanceLine()}. Calls from a blocked number are rejected before they're answered and never cost a minute. ${CALL_ASSISTANT_SPAM.report}`,
+      a: `${callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase())}. After that, a spam call's minutes count like any call. Calls from a blocked number are rejected before they're answered and never cost a minute. ${CALL_ASSISTANT_SPAM.report}`,
     },
     {
       q: "Which tier do I need?",
@@ -240,15 +240,16 @@ export default function CallAssistantLandingPage() {
                   {CALL_ASSISTANT_SPAM.headline}
                 </h2>
                 <p className="mt-5 text-[16px] leading-relaxed opacity-85">{CALL_ASSISTANT_SPAM.lead}</p>
+                <p className="mt-3 text-[14px] leading-relaxed opacity-75" data-testid="text-ca-spam-forwarding">{CALL_ASSISTANT_SPAM.forwarding}</p>
                 <p className="mt-6 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl border border-[color:color-mix(in_srgb,var(--mkt-panel-ink)_42%,transparent)] px-4 py-3" data-testid="text-ca-spam-free">
                   <span className="font-display font-semibold text-[1.9rem] leading-none">{price.freeSpamCalls}</span>{" "}
-                  <span className="text-[14px] opacity-90">spam calls a month never count toward your minutes, on every tier</span>
+                  <span className="text-[14px] opacity-90">free spam calls every month, on every tier: they never count toward your minutes</span>
                 </p>
               </div>
               <ol className="lg:col-span-7 grid gap-px bg-[color:color-mix(in_srgb,var(--mkt-panel-ink)_16%,transparent)] rounded-2xl overflow-hidden self-start">
                 {([
                   { icon: ShieldBan, title: "Screened on every call", body: CALL_ASSISTANT_SPAM.screen },
-                  { icon: Ban, title: "Caught twice, blocked before it rings", body: CALL_ASSISTANT_SPAM.block },
+                  { icon: Ban, title: CALL_ASSISTANT_SPAM_BLOCK_TITLE, body: CALL_ASSISTANT_SPAM.block },
                   { icon: FileBarChart, title: "Every one in your spam report", body: CALL_ASSISTANT_SPAM.report },
                 ] as const).map((step, i) => (
                   <li key={step.title} className="bg-mkt-panel p-6 sm:p-7 flex gap-4" data-testid={`item-ca-spam-${i + 1}`}>
@@ -427,7 +428,7 @@ export default function CallAssistantLandingPage() {
               <div className="md:col-span-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">On every tier</p>
                 <ul className="mt-4 space-y-3 text-[15px] text-mkt-ink">
-                  <li className="flex gap-3"><ShieldBan className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> <span><strong className="font-semibold">{price.freeSpamCalls} spam calls a month free</strong>: they never count toward your minutes</span></li>
+                  <li className="flex gap-3"><ShieldBan className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> <span><strong className="font-semibold">The first {price.freeSpamCalls} spam calls each month free</strong>: they never count toward your minutes</span></li>
                   <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Then {price.overagePerMinute} a minute above your included minutes</li>
                   <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Extra local numbers {price.extraNumber}/mo each</li>
                 </ul>

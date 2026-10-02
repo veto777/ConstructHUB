@@ -73,7 +73,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
         <MetricCard icon={Timer} label="Minutes this month" value={used.toLocaleString("en-US")} testid="metric-overview-minutes"
           context={`of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over at ${formatUsd(status.pricing.overageCentsPerMinute ?? CALL_MINUTE_OVERAGE_CENTS)}/min` : ""}`} />
         <MetricCard icon={PhoneCall} label="Calls this month" value={status.usage?.calls ?? 0} testid="metric-overview-calls" href="/crm/call-assistant?tab=calls" />
-        <MetricCard icon={ShieldBan} label="Spam blocked this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
+        <MetricCard icon={ShieldBan} label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
           context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/crm/call-assistant?tab=calls&view=spam" />
       </div>
 

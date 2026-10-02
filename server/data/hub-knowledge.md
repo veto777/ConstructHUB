@@ -622,7 +622,7 @@ An AI receptionist for the contractor's own phone line. It answers every call, d
 
 **Getting a phone number:**
 1. CRM → **Call Assistant** → **Numbers** → pick a state, and optionally an area code or a city.
-2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. Solo includes 1 number, Crew 3 and Fleet 5; each extra number is its own add-on (a second location or a tracking line).
+2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. {{CALL_ASSISTANT_TIER_NUMBERS}}; each extra number is its own add-on (a second location or a tracking line).
 3. Keep your existing numbers: forward them to the new number from your phone carrier (for example only when you don't answer, after hours, or always). Nothing is ported, so your numbers stay yours. The Numbers tab shows how to set up forwarding with common carriers.
 
 **If you cancel or a payment fails:** {{CALL_ASSISTANT_RULE_OWN_NUMBERS}} {{CALL_ASSISTANT_RULE_CANCEL}} {{CALL_ASSISTANT_RULE_PAYMENT}}
@@ -631,7 +631,7 @@ An AI receptionist for the contractor's own phone line. It answers every call, d
 
 **After the call:** a real lead becomes a client in the CRM (and a pipeline project if the contractor chooses), tagged with the source "Call Assistant", and the office is notified the same way as other new leads. Emergencies, existing customers and "I want to talk to a person" are texted or emailed to the teammate the contractor picked, with reminders until someone replies. The assistant never gives out a teammate's number.
 
-**Spam — you never answer a spam call again:** {{CALL_ASSISTANT_SPAM_SCREEN}} {{CALL_ASSISTANT_SPAM_BLOCK}} {{CALL_ASSISTANT_SPAM_REPORT}} The weekly email can be turned off under CRM → Settings → Notifications ("Weekly spam report"). {{CALL_ASSISTANT_SPAM_FREE}}.
+**Spam — you never answer a spam call again:** {{CALL_ASSISTANT_SPAM_SCREEN}} {{CALL_ASSISTANT_SPAM_FORWARDING}} {{CALL_ASSISTANT_SPAM_BLOCK}} {{CALL_ASSISTANT_SPAM_REPORT}} The weekly email can be turned off under CRM → Settings → Notifications ("Weekly spam report"). {{CALL_ASSISTANT_SPAM_FREE}}.
 
 **Call log:** every call is listed under **Calls** with its outcome, a summary, the full transcript and the recording.
 

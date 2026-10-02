@@ -324,12 +324,12 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
           <ShieldBan className="h-6 w-6 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <h2 id="spam-summary-title" className="text-lg font-semibold">{CALL_ASSISTANT_SPAM.headline}</h2>
-            <p className="text-sm text-muted-foreground">{CALL_ASSISTANT_SPAM.lead} {CALL_ASSISTANT_SPAM.screen}</p>
+            <p className="text-sm text-muted-foreground">{CALL_ASSISTANT_SPAM.lead} {CALL_ASSISTANT_SPAM.screen} {CALL_ASSISTANT_SPAM.forwarding}</p>
           </div>
         </div>
         <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div className="rounded-lg bg-background/70 border p-3">
-            <dt className="text-xs text-muted-foreground">Spam blocked this month</dt>
+            <dt className="text-xs text-muted-foreground">Spam stopped this month</dt>
             <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-this-month">{(month?.spamCalls ?? 0).toLocaleString("en-US")}</dd>
           </div>
           <div className="rounded-lg bg-background/70 border p-3">

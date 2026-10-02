@@ -20,7 +20,9 @@
  *     new subscriber);
  *   - ONCE PER CUSTOMER, and only when the add-on is first added: an account
  *     that already holds the add-on gets nothing, and `billing_addon_intros`
- *     records every grant. A grant on a Checkout Session only counts once that
+ *     records every grant. An account that has held Crew or Fleet on a live
+ *     subscription has the Solo intro recorded as used too, with no coupon
+ *     (markIntrosUsedByHeldAddons). A grant on a Checkout Session only counts once that
  *     session completed — an abandoned checkout does not use the intro up.
  *
  * Coupons are found by a deterministic id that spells every figure
@@ -30,7 +32,7 @@
  */
 import type Stripe from "stripe";
 import { pool } from "../db";
-import { ADDONS, ADDON_KEYS, type AddonKey, type BillingInterval } from "@shared/plans";
+import { ACCESS_STATUSES, ADDONS, ADDON_KEYS, type AddonKey, type BillingInterval } from "@shared/plans";
 import { addonPriceSpec, resolvePriceId } from "./prices";
 import type { AddonQuantities } from "./order";
 
@@ -131,6 +133,41 @@ export async function recordIntro(userId: number, addon: AddonKey, couponId: str
     `INSERT INTO billing_addon_intros (user_id, addon, coupon_id, ref) VALUES ($1, $2, $3, $4)
      ON CONFLICT (user_id, addon) DO UPDATE SET coupon_id = EXCLUDED.coupon_id, ref = EXCLUDED.ref, created_at = now()`,
     [userId, addon, couponId, ref]);
+}
+
+/** The coupon_id of a "used up, never granted" row (markIntrosUsedByHeldAddons). */
+export const INTRO_USED_BY_SIBLING = "none:held_sibling";
+
+/**
+ * The intro is for a new customer of the service: an account that holds a
+ * sibling of an intro-bearing add-on (Crew or Fleet, same exclusiveGroup as
+ * Solo) on a live subscription has used the Solo intro up, even though it
+ * never received a coupon. Recorded as a billing_addon_intros row with no
+ * coupon and the subscription as `ref`, so removing the tier and adding Solo
+ * in a later request, or a new subscription after cancelling Crew, gets no
+ * intro. Called after every subscription write (server/stripe.ts). A real
+ * grant is never overwritten; a pending checkout grant (cs_…) is replaced,
+ * since the subscription now proves the account is a customer. Returns the
+ * add-ons marked.
+ */
+export async function markIntrosUsedByHeldAddons(
+  userId: number, addons: AddonQuantities | null | undefined, status: string | null | undefined, subscriptionId: string | null | undefined, q: Queryable = pool,
+): Promise<AddonKey[]> {
+  if (!userId || !subscriptionId || !ACCESS_STATUSES.includes(status ?? "")) return [];
+  const held = addons ?? {};
+  const marked: AddonKey[] = [];
+  for (const addon of ADDON_KEYS) {
+    const group = ADDONS[addon].exclusiveGroup;
+    if (!group || !addonIntro(addon) || (held[addon] ?? 0) > 0) continue;
+    if (!ADDON_KEYS.some((k) => k !== addon && ADDONS[k].exclusiveGroup === group && (held[k] ?? 0) > 0)) continue;
+    await q.query(
+      `INSERT INTO billing_addon_intros (user_id, addon, coupon_id, ref) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, addon) DO UPDATE SET coupon_id = EXCLUDED.coupon_id, ref = EXCLUDED.ref, created_at = now()
+       WHERE left(billing_addon_intros.ref, 3) = 'cs_'`,
+      [userId, addon, INTRO_USED_BY_SIBLING, subscriptionId]);
+    marked.push(addon);
+  }
+  return marked;
 }
 
 /** Add-ons this order adds for the first time that carry an intro, with their coupon (eligible accounts only). */

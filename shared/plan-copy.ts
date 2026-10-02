@@ -249,26 +249,40 @@ export const CALL_ASSISTANT_NUMBER_RULES = {
  * don't ever have to answer spam … our system blocks spam calls and reports
  * them"). Only what the code does: the assistant screens each call it answers
  * (server/voice/internal-calls.ts), a spam call notifies nobody and files no
- * lead, a number with two near-certain spam strikes is rejected before the
- * call is answered (server/voice/spam.ts SPAM_STRIKES_TO_BLOCK, the engine's
- * <Reject/>), every one is listed in the Calls tab's spam view and the weekly
- * spam report (server/voice/spam-report.ts), and up to
- * CALL_ASSISTANT_FREE_SPAM_CALLS a month never count toward minutes.
+ * lead, a number with two near-certain spam strikes (server/voice/spam.ts:
+ * confidence ≥ strikeAt, SPAM_STRIKES_TO_BLOCK) is rejected before the call
+ * is answered (the engine's <Reject/>), every one is listed in the Calls tab's
+ * spam view and the weekly spam report to the customer
+ * (server/voice/spam-report.ts — nothing is reported to carriers or
+ * registries), and the first CALL_ASSISTANT_FREE_SPAM_CALLS a month never
+ * count toward minutes. The promise holds on calls forwarded to the
+ * assistant: with no-answer forwarding a spam call still rings the
+ * contractor first (`forwarding` says so, and how to fix it).
  */
 export const CALL_ASSISTANT_SPAM = {
   headline: "You never answer a spam call again",
-  lead: "Your assistant answers every call you forward to it and asks what the call is about, so the spam stops with it, not with you.",
-  screen: "Telemarketers, robocalls and cold sales pitches are flagged as spam: they never ring through to you, never create a lead and never send anyone a notification.",
-  block: "A number caught twice is blocked: its next calls are rejected before they're answered, so they never reach you or your assistant.",
-  report: "Every spam call and blocked number lands in your spam report under Calls → Spam blocked, with one click to unblock a number we got wrong, and a weekly email tells you how many we blocked.",
+  lead: "Forward your line to your assistant and it answers every call first, so spam stops with it, not with you.",
+  screen: "Telemarketers, robocalls and cold sales pitches are flagged as spam: on calls forwarded to your assistant they never reach you, never create a lead and never notify anyone.",
+  block: "A number caught twice as near-certain spam is blocked: its next calls to your assistant are rejected before they're answered and never cost a minute.",
+  forwarding: "With no-answer or after-hours forwarding, spam still rings you first. Switch to 'always' forwarding to stop answering spam.",
+  report: "Every spam call and blocked number lands in your spam report under Calls → Spam blocked, with one click to unblock a number we got wrong, and a weekly email tells you how many spam calls were stopped.",
 } as const;
 
-/** "500 spam calls a month never count toward your minutes, on every tier." */
+/** The step title for the block rule (two near-certain strikes, server/voice/spam.ts). */
+export const CALL_ASSISTANT_SPAM_BLOCK_TITLE = "Two strikes, blocked before it's answered";
+
+/** "the first 500 spam calls each month never count toward your minutes, on every tier" — after that, spam minutes count like any call. */
 export function callAssistantSpamAllowanceLine(): string {
-  return `${count(CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls a month never count toward your minutes, on every tier`;
+  return `the first ${count(CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls each month never count toward your minutes, on every tier`;
 }
 
-/** "Every tier: then $0.10 a minute; extra numbers $5/month each; 500 spam calls a month never count toward your minutes". */
+/** "Solo includes 1 local number, Crew 3 and Fleet 5" — local numbers per tier, from the price book. */
+export function callAssistantTierNumbersLine(): string {
+  const [first, ...rest] = callAssistantTiers();
+  return joinNames([`${first.name} includes ${first.numbersLabel}`, ...rest.map((t) => `${t.name} ${t.numbers}`)]);
+}
+
+/** "Every tier: then $0.10 a minute; extra numbers $5/month each; the first 500 spam calls each month never count toward your minutes". */
 export function callAssistantIncludesLine(): string {
   const p = callAssistantPricing();
   return `minutes above a tier's included ones are ${p.overagePerMinute} a minute; extra numbers are ${p.extraNumber}/month each; and ${callAssistantSpamAllowanceLine()}`;

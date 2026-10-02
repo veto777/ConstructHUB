@@ -72,7 +72,7 @@ export const CA_HIGHLIGHTS: { icon: LucideIcon; title: string; body: string }[] 
   {
     icon: ShieldBan,
     title: "You never answer spam again",
-    body: `Telemarketers and robocalls are screened and never ping your phone. A number caught twice is blocked before it rings, and every one lands in your spam report. ${callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase())}.`,
+    body: `Telemarketers and robocalls forwarded to your assistant are screened and never ping your phone. A number caught twice as near-certain spam is blocked before it's answered, and every one lands in your spam report. ${callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase())}.`,
   },
   {
     icon: Clock3,
@@ -318,7 +318,7 @@ export function CallAssistantSection() {
               {price.tiers.map((t, i) => (
                 <span key={t.tier}>{i > 0 ? (i === price.tiers.length - 1 ? " and " : ", ") : "Three tiers: "}<strong className="font-semibold text-mkt-ink">{t.name}</strong> ({t.minutes} min, {t.numbersLabel})</span>
               ))}
-              . {price.freeSpamCalls} spam calls a month free on every tier. An add-on for the {price.plans} plans.
+              . The first {price.freeSpamCalls} spam calls each month are free on every tier. An add-on for the {price.plans} plans.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">

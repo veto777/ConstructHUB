@@ -96,7 +96,7 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
           <li>Answers every call, 24/7, in a voice and name you choose, and says it is a virtual assistant when asked.</li>
           <li>Asks what the caller needs, the address, a name, a good email and the best time to call — then files the lead in your CRM.</li>
           <li>Texts or emails the right person for emergencies, existing customers and "I want a person".</li>
-          <li>Screens out spam: you never answer a telemarketer or robocall again, and a number caught twice is blocked before it rings.</li>
+          <li>Screens out spam on every call forwarded to it, so you stop answering telemarketers and robocalls; a number caught twice as near-certain spam is blocked before it's answered.</li>
           <li>Every call logged with a summary, transcript and recording.</li>
         </ul>
         <ul className="grid gap-2 sm:grid-cols-3 text-sm" data-testid="list-plan-required-tiers">

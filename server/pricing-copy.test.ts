@@ -8,10 +8,11 @@ import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
   CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote,
-  callAssistantTiers, callAssistantTiersLine, callAssistantTierAdvice, callAssistantSpamAllowanceLine, callAssistantIncludesLine, callAssistantMinuteRule,
+  callAssistantTiers, callAssistantTiersLine, callAssistantTierAdvice, callAssistantSpamAllowanceLine, callAssistantIncludesLine, callAssistantMinuteRule, callAssistantTierNumbersLine, CALL_ASSISTANT_SPAM_BLOCK_TITLE,
 } from "@shared/plan-copy";
 import { CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
 import { SPAM_STRIKES_TO_BLOCK } from "./voice/spam";
+import { FORWARDING_ADVICE } from "./voice/numbers";
 import { knowledgeBook, priceBookCents } from "./hub/knowledge";
 import { filterOutput } from "./hub/output-filter";
 
@@ -116,14 +117,19 @@ describe("AI Call Assistant launch price", () => {
     expect(callAssistantTierAdvice()).toMatch(/^At about 2 minutes a call, Solo covers about 1,000 calls a month, Crew covers about 2,500 calls a month and Fleet covers about 6,000 calls a month\. These are estimates/);
     const p = callAssistantPricing();
     expect([p.overagePerMinute, p.extraNumber, p.freeSpamCalls]).toEqual(["$0.10", "$5", "500"]);
-    expect(callAssistantSpamAllowanceLine()).toBe("500 spam calls a month never count toward your minutes, on every tier");
-    expect(callAssistantIncludesLine()).toBe("minutes above a tier's included ones are $0.10 a minute; extra numbers are $5/month each; and 500 spam calls a month never count toward your minutes, on every tier");
+    expect(callAssistantSpamAllowanceLine()).toBe("the first 500 spam calls each month never count toward your minutes, on every tier");
+    // Tier numbers come from the price book, on Limits & usage and in Gabe's knowledge alike.
+    expect(callAssistantTierNumbersLine()).toBe("Solo includes 1 local number, Crew 3 and Fleet 5");
+    expect(callAssistantIncludesLine()).toBe("minutes above a tier's included ones are $0.10 a minute; extra numbers are $5/month each; and the first 500 spam calls each month never count toward your minutes, on every tier");
     expect(callAssistantMinuteRule()).toMatch(/every started minute/i);
     // Every tier is in the Hub's knowledge and in the add-on lines it quotes.
     const pack = knowledgeBook().pack;
     expect(pack).toContain(callAssistantTiersLine());
     expect(pack).toContain(callAssistantTierAdvice());
     expect(pack).toContain(CALL_ASSISTANT_SPAM.block);
+    expect(pack).toContain(CALL_ASSISTANT_SPAM.forwarding);
+    expect(pack).toContain(callAssistantTierNumbersLine());
+    expect(pack).not.toContain("{{");
     for (const t of CALL_ASSISTANT_TIERS) {
       expect(addonLines().some((l) => l.startsWith(`${ADDONS[t.addon].name} — ${formatUsd(t.monthlyCents)}/month or ${formatUsd(t.annualCents)}/year`))).toBe(true);
       expect(priceBookCents().has(t.monthlyCents) && priceBookCents().has(t.annualCents)).toBe(true);
@@ -136,16 +142,29 @@ describe("AI Call Assistant launch price", () => {
   });
 
   it("the spam promise only says what the code does", () => {
-    // "A number caught twice is blocked" is server/voice/spam.ts's rule.
+    // "Caught twice as near-certain spam" is server/voice/spam.ts's rule: two strikes, each at strike confidence (not merely flagged).
     expect(SPAM_STRIKES_TO_BLOCK).toBe(2);
-    expect(CALL_ASSISTANT_SPAM.block).toMatch(/caught twice is blocked/);
+    expect(CALL_ASSISTANT_SPAM.block).toMatch(/caught twice as near-certain spam is blocked/);
+    expect(CALL_ASSISTANT_SPAM_BLOCK_TITLE).toBe("Two strikes, blocked before it's answered");
+    // The "never answer spam" promise is tied to forwarding: no-answer forwarding still rings the contractor first.
+    expect(CALL_ASSISTANT_SPAM.lead).toMatch(/^Forward your line to your assistant/);
+    expect(CALL_ASSISTANT_SPAM.screen).toMatch(/on calls forwarded to your assistant/);
+    expect(CALL_ASSISTANT_SPAM.forwarding).toMatch(/no-answer.*rings you first.*'always'/);
+    expect(FORWARDING_ADVICE[0]).toContain(CALL_ASSISTANT_SPAM.forwarding);
+    // "Blocked" means rejected before answering; the month's screened + rejected total is "stopped".
+    for (const f of ["client/src/pages/crm-call-assistant/calls.tsx", "client/src/pages/crm-call-assistant/overview.tsx"]) {
+      const src = fs.readFileSync(path.join(root, f), "utf8");
+      expect(src).toContain("Spam stopped this month");
+      expect(src).not.toContain("Spam blocked this month");
+    }
     expect(CALL_ASSISTANT_SPAM.headline).toBe("You never answer a spam call again");
     expect(CALL_ASSISTANT_SPAM.report).toMatch(/weekly email/);
     expect(CALL_ASSISTANT_FREE_SPAM_CALLS).toBe(500);
     // Never a claim the product doesn't make (reporting to carriers or regulators, "guaranteed").
     for (const line of Object.values(CALL_ASSISTANT_SPAM)) expect(line).not.toMatch(/FTC|FCC|carrier report|guarantee|100%/i);
     const page = fs.readFileSync(path.join(root, "client/src/pages/call-assistant-landing.tsx"), "utf8");
-    for (const key of ["headline", "lead", "screen", "block", "report"] as const) expect(page).toContain(`CALL_ASSISTANT_SPAM.${key}`);
+    for (const key of ["headline", "lead", "screen", "block", "forwarding", "report"] as const) expect(page).toContain(`CALL_ASSISTANT_SPAM.${key}`);
+    expect(page).toContain("CALL_ASSISTANT_SPAM_BLOCK_TITLE");
     for (const q of ["What counts as a minute?", "Do spam calls use my minutes?", "Which tier do I need?"]) expect(page).toContain(q);
   });
 

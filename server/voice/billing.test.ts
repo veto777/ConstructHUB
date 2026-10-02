@@ -44,7 +44,7 @@ describe("Call Assistant price book: three tiers (owner, 2026-10-02)", () => {
       // The description quotes the tier's own numbers and the shared rules.
       expect(a.description).toContain(`${t.includedMinutes.toLocaleString("en-US")} call minutes`);
       expect(a.description).toContain(`$${(CALL_MINUTE_OVERAGE_CENTS / 100).toFixed(2)} / minute`);
-      expect(a.description).toContain(`${CALL_ASSISTANT_FREE_SPAM_CALLS} spam calls a month never count`);
+      expect(a.description).toContain(`the first ${CALL_ASSISTANT_FREE_SPAM_CALLS} spam calls each month never count`);
     }
     // The intro is Solo only (monthly billing; server/billing/intro.ts).
     expect(ADDONS.call_assistant).toMatchObject({ introMonthlyCents: 9_900, introMonths: 3 });
@@ -112,9 +112,15 @@ describe("Call Assistant price book: three tiers (owner, 2026-10-02)", () => {
     expect(u.summarizeVoiceUsage(null, "2026-10", 500)).toMatchObject({ calls: 0, minutes: 0, includedMinutes: 500, remainingMinutes: 500, overageMinutes: 0, overageCents: 0, resetsAt: "2026-11-01T00:00:00.000Z" });
     expect(u.summarizeVoiceUsage({ minutes: 530, calls: 9, includedMinutes: 500, overageReportedMinutes: 10 }, "2026-10", 500))
       .toMatchObject({ remainingMinutes: 0, overageMinutes: 30, overageCents: 30 * CALL_MINUTE_OVERAGE_CENTS, overageReportedMinutes: 10 });
-    // A second unit bought mid-month raises what's included; a cancelled one never lowers what the month already granted.
-    expect(u.summarizeVoiceUsage({ minutes: 530, includedMinutes: 500 }, "2026-10", 1000).overageMinutes).toBe(0);
-    expect(u.summarizeVoiceUsage({ minutes: 530, includedMinutes: 500 }, "2026-10", 0).overageMinutes).toBe(30);
+    // The row's accrued overage is what shows (and bills): an upgrade after the fact never erases it.
+    const now = u.voiceMonthKey();
+    expect(u.summarizeVoiceUsage({ minutes: 4500, includedMinutes: 2000, overageMinutes: 2500 }, now, 5000))
+      .toMatchObject({ includedMinutes: 5000, remainingMinutes: 500, overageMinutes: 2500, overageCents: 2500 * CALL_MINUTE_OVERAGE_CENTS });
+    // No allowance right now (cancelled): the month's snapshot stays; a past month always shows its own snapshot.
+    expect(u.summarizeVoiceUsage({ minutes: 530, includedMinutes: 500, overageMinutes: 30 }, now, 0)).toMatchObject({ includedMinutes: 500, overageMinutes: 30 });
+    expect(u.summarizeVoiceUsage({ minutes: 530, includedMinutes: 500, overageMinutes: 30 }, "2001-01", 5000)).toMatchObject({ includedMinutes: 500, overageMinutes: 30 });
+    // Unlimited (-1): never overage.
+    expect(u.summarizeVoiceUsage(null, now, -1)).toMatchObject({ includedMinutes: -1, remainingMinutes: -1, overageMinutes: 0 });
     expect(u.voiceOverageLookupKey()).toBe(`chub_v1_meter_call_minutes_${CALL_MINUTE_OVERAGE_CENTS}`);
   });
 
@@ -241,6 +247,40 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     const fleet = await user({ call_assistant_fleet: 1, call_number: 1 });
     expect(await usage.recordVoiceCallUsage({ orgId: org(), accountUserId: crew, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: 5000 });
     expect(await usage.recordVoiceCallUsage({ orgId: org(), accountUserId: fleet, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: 12_000 });
+  });
+
+  it("overage accrues per call against the tier in force: a later upgrade never wipes it, a downgrade lowers the allowance from then on", async () => {
+    const setAddons = (uid: number, addons: Record<string, number>) => db.query("update subscriptions set addons = $2 where user_id = $1", [uid, JSON.stringify(addons)]);
+    // (1) Solo, one 4,500-minute call → 2,500 over. A one-day upgrade to Crew afterwards keeps those 2,500.
+    const solo = await user({ call_assistant: 1 });
+    const o = org();
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 4500, at: AT })).toMatchObject({ includedMinutes: 2000, overageMinutes: 2500 });
+    await setAddons(solo, { call_assistant_crew: 1 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ minutes: 4501, includedMinutes: 5000, overageMinutes: 2500 });
+    // Crew's 5,000 cover the month's minutes up to 5,000; the call that crosses it is over only by the part above.
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 600, at: AT })).toMatchObject({ minutes: 5101, overageMinutes: 2601 });
+    // Back to Solo: every billable minute from here is over (the month is already past 2,000).
+    await setAddons(solo, { call_assistant: 1 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 3, at: AT })).toMatchObject({ includedMinutes: 2000, overageMinutes: 2604 });
+
+    // (2) Fleet, one 1-minute call, then a downgrade to Solo, then 11,000 minutes → 9,001 over (Solo's 2,000 included).
+    const fleet = await user({ call_assistant_fleet: 1 });
+    const o2 = org();
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: fleet, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: 12_000, overageMinutes: 0 });
+    await setAddons(fleet, { call_assistant: 1 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: fleet, outcome: "info", billedMinutes: 11_000, at: AT })).toMatchObject({ minutes: 11_001, includedMinutes: 2000, overageMinutes: 9001 });
+
+    // (3) A call that ends after the add-on is gone keeps the month's allowance (it was answered while paid for).
+    const gone = await user({ call_assistant: 1 });
+    const o3 = org();
+    await usage.recordVoiceCallUsage({ orgId: o3, accountUserId: gone, outcome: "info", billedMinutes: 100, at: AT });
+    await setAddons(gone, {});
+    expect(await usage.recordVoiceCallUsage({ orgId: o3, accountUserId: gone, outcome: "info", billedMinutes: 5, at: AT })).toMatchObject({ minutes: 105, includedMinutes: 2000, overageMinutes: 0 });
+
+    // Free spam minutes never accrue overage, even past the allowance.
+    const o4 = org();
+    await usage.recordVoiceCallUsage({ orgId: o4, accountUserId: payer, outcome: "info", billedMinutes: 2000, at: AT });
+    expect(await usage.recordVoiceCallUsage({ orgId: o4, accountUserId: payer, outcome: "spam", billedMinutes: 9, at: AT })).toMatchObject({ minutes: 2000, overageMinutes: 0, spamFreeMinutes: 9 });
   });
 
   it("overage: monthly subscription → one invoice item on the subscription, only the new minutes, idempotent", async () => {

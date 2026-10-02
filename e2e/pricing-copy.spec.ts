@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PLANS, PLAN_KEYS } from "../shared/plans";
 import {
-  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, callAssistantTierAdvice,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, callAssistantTierAdvice,
   callAssistantYearlyNote, joinNames, planPriceLine,
 } from "../shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
@@ -87,15 +87,17 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   }
   await expect(page.getByTestId("text-ca-tier-terms-solo")).toHaveText(`for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`);
   const every = page.getByTestId("card-ca-every-tier");
-  await expect(every).toContainText(`${p.freeSpamCalls} spam calls a month free`);
+  await expect(every).toContainText(`The first ${p.freeSpamCalls} spam calls each month free`);
   await expect(every).toContainText(`Then ${p.overagePerMinute} a minute`);
   await expect(every).toContainText(`Extra local numbers ${p.extraNumber}/mo each`);
   // The spam section, near the top: only what the code does.
   const spam = page.getByTestId("section-ca-spam");
   await expect(spam).toContainText(CALL_ASSISTANT_SPAM.headline);
   await expect(spam).toContainText(CALL_ASSISTANT_SPAM.block);
+  await expect(spam).toContainText(CALL_ASSISTANT_SPAM.forwarding);
+  await expect(spam).toContainText(CALL_ASSISTANT_SPAM_BLOCK_TITLE);
   await expect(spam).toContainText(CALL_ASSISTANT_SPAM.report);
-  await expect(page.getByTestId("text-ca-spam-free")).toContainText(`${p.freeSpamCalls} spam calls a month never count toward your minutes`);
+  await expect(page.getByTestId("text-ca-spam-free")).toContainText(`${p.freeSpamCalls} free spam calls every month, on every tier: they never count toward your minutes`);
   const order = await page.evaluate(() => ["section-ca-spam", "section-ca-how", "section-ca-pricing"].map((id) => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top));
   expect(order[0]).toBeLessThan(order[1]);
   // The FAQ says the owner's number rules plainly.
@@ -124,7 +126,7 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`${p.intro}/mo`);
   await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`then ${p.regular}/mo — or ${p.annual}/yr`);
   for (const t of p.tiers) await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`${t.name} (${t.minutes} min, ${t.numbersLabel})`);
-  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`${p.freeSpamCalls} spam calls a month free on every tier`);
+  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`The first ${p.freeSpamCalls} spam calls each month are free on every tier`);
   await expect(page.getByTestId("link-call-assistant-learn-more")).toHaveAttribute("href", "/call-assistant");
   await expect(page.getByTestId("link-footer-call-assistant")).toHaveAttribute("href", "/call-assistant");
 
@@ -139,7 +141,7 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
     await expect(page.getByTestId(`row-addon-${t.addon}`)).toHaveCount(0);
   }
   await expect(page.getByTestId("text-call-assistant-tier-intro-solo")).toHaveText(`Launch price: ${p.intro}/mo for your first ${p.introMonths} months`);
-  await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(`${p.freeSpamCalls} spam calls a month free (they never count toward your minutes)`);
+  await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(`the first ${p.freeSpamCalls} spam calls each month are free (they never count toward your minutes)`);
   await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(`${p.overagePerMinute}/minute`);
   await expect(page.getByTestId("row-addon-call_number")).toBeVisible();
   // The tiers' annual prices show on yearly billing even though they are over $1,000 (add-on annuals are exempt).

@@ -651,6 +651,9 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
       expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant_crew: 1 });
       // The release decision runs after the change (a downgrade's extra numbers go there).
       expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
+      // Holding Crew uses the Solo intro up (no coupon), so dropping Crew and adding Solo later can't claim it.
+      expect(mocks.sql.filter((q) => /INSERT INTO billing_addon_intros/.test(q.text)).map((q) => q.values.slice(0, 3)))
+        .toEqual([[42, "call_assistant", "none:held_sibling"]]);
 
       // Downgrade: Crew → Solo — the Solo intro is NOT granted again on a switch.
       mocks.current = await mocks.update.mock.results[0].value;

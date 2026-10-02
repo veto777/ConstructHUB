@@ -49,7 +49,7 @@ const NOTIFICATIONS = [
   { key: "memberLogin", label: "Team member signs in", description: "Someone on your team signed in (at most one email per person per hour)." },
   { key: "memberAccountChange", label: "Team member changes their account", description: "A team member changed their own profile details or password." },
   { key: "leadReceived", label: "Website lead received", description: "A lead came in through your website lead form." },
-  { key: "spamReport", label: "Weekly spam report", description: "AI Call Assistant: once a week, the spam calls it blocked for you (only weeks with spam)." },
+  { key: "spamReport", label: "Weekly spam report", description: "AI Call Assistant: once a week, the spam calls it stopped for you (only weeks with spam)." },
   { key: "jobApproved", label: "Job approved (PM email)", description: "The project-manager handoff email when a client signs." },
   { key: "clientComments", label: "Client comments", description: "A client sent a message or photo from their portal." },
   { key: "financeClick", label: "Financing interest", description: "A client clicked the financing option on an estimate." },

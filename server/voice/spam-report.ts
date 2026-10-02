@@ -34,6 +34,7 @@ import { getEntitlements } from "../entitlements";
 import { notifyMembers } from "../crm/notify";
 import { crmNotificationChannel } from "@shared/schema";
 import { CALL_ASSISTANT_NAME } from "@shared/plans";
+import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { emailLayout, type EmailMessage } from "../account/billing-email-templates";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
@@ -104,8 +105,8 @@ function timeText(at: Date, timeZone: string | null | undefined): string {
 
 const dayText = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
-/** "We blocked 3 spam calls for you this week". */
-export const spamReportTitle = (n: number) => `We blocked ${n.toLocaleString("en-US")} spam call${n === 1 ? "" : "s"} for you this week`;
+/** "We stopped 3 spam calls for you this week" — screened by the assistant or rejected as a blocked number; only the latter are "blocked". */
+export const spamReportTitle = (n: number) => `We stopped ${n.toLocaleString("en-US")} spam call${n === 1 ? "" : "s"} for you this week`;
 
 /** The email (pure: facts in, message out). */
 export function spamReportEmail(input: { orgName: string; week: SpamReportWeek; calls: SpamReportCall[]; timeZone?: string | null; baseUrl: string }): EmailMessage {
@@ -122,7 +123,7 @@ export function spamReportEmail(input: { orgName: string; week: SpamReportWeek; 
       `Your ${CALL_ASSISTANT_NAME} screened these calls for ${input.orgName} between ${dayText(week.start)} and ${dayText(lastDay)}, so nobody on your team had to answer them. None of them created a lead or sent a notification.`,
       blockedNow > 0
         ? `${blockedNow} of these numbers ${blockedNow === 1 ? "is" : "are"} now blocked: their calls are rejected before they're answered.`
-        : "A number caught twice is blocked: its next calls are rejected before they're answered.",
+        : CALL_ASSISTANT_SPAM.block,
     ],
     sections: [{
       heading: "Spam calls this week",
