@@ -197,19 +197,16 @@ describe("routes (in-process, lane DB)", () => {
     expect(await subOf(member.id)).toEqual([]);
   });
 
-  it("enforces the admin second factor where it is configured: 403 reauth (the client verifies identity and retries)", async () => {
+  it("giving access never asks the admin for a verification code, even where the admin gate is configured", async () => {
+    // Owner, 2026-10-02: "you dont send a verfication code to us but to the user we are adding".
     process.env.ADMIN_GATE_USER = "gate"; process.env.ADMIN_GATE_PASS = "pass";
     try {
       const target = await account();
-      for (const r of [
-        await call("/api/admin/access-grants"),
-        await grant({ userId: target.id, plan: "pro", days: 30 }),
-        await revoke(1),
-      ]) {
-        expect(r.status).toBe(403);
-        expect(r.body).toMatchObject({ reauth: true, gateRequired: true, message: "Please verify your identity to continue." });
-      }
-      expect(await subOf(target.id)).toEqual([]);
+      expect((await call("/api/admin/access-grants")).status).toBe(200);
+      const made = await grant({ userId: target.id, plan: "pro", days: 30 });
+      expect(made.status).toBe(201);
+      expect(made.body.reauth).toBeUndefined();
+      expect((await revoke(made.body.grant.id)).status).toBe(200);
     } finally {
       delete process.env.ADMIN_GATE_USER; delete process.env.ADMIN_GATE_PASS;
     }

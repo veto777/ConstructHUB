@@ -94,7 +94,7 @@ export function gateClear(key: string): void {
   gateAttempts.delete(key);
 }
 
-export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUser) {
+export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUser, opts: { skipGate?: boolean } = {}) {
   const user = getDevUser(req, res);
   if (!user) return null;
   const [account] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
@@ -104,7 +104,9 @@ export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUs
   }
   // Second factor for the cross-org console: the admin passphrase, once per
   // session. Only enforced where the credentials are configured (prod).
-  if (!platformGatePassed(req)) {
+  // Giving someone access (trial invites, access grants) skips it: owner, 2026-10-02 — "you dont send a
+  // verfication code to us but to the user we are adding".
+  if (!opts.skipGate && !platformGatePassed(req)) {
     res.status(403).json(ADMIN_REAUTH_BODY);
     return null;
   }

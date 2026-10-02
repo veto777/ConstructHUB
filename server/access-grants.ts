@@ -399,7 +399,7 @@ const failed = (res: Response, what: string) => (err: unknown) => {
 
 export function registerAccessGrantRoutes(app: Express, getUser: GetUser): void {
   app.get("/api/admin/access-grants", async (req: Request, res: Response) => {
-    const admin = await requirePlatformAdmin(req, res, getUser);
+    const admin = await requirePlatformAdmin(req, res, getUser, { skipGate: true });
     if (!admin) return;
     res.setHeader("Cache-Control", "private, no-store");
     try {
@@ -412,7 +412,7 @@ export function registerAccessGrantRoutes(app: Express, getUser: GetUser): void 
   });
 
   app.post("/api/admin/access-grants", async (req: Request, res: Response) => {
-    const admin = await requirePlatformAdmin(req, res, getUser);
+    const admin = await requirePlatformAdmin(req, res, getUser, { skipGate: true });
     if (!admin) return;
     if (!originOk(req)) return void res.status(403).json({ message: "Forbidden" });
     if (!req.is("application/json")) return void res.status(415).json({ message: "Send JSON." });
@@ -457,7 +457,7 @@ export function registerAccessGrantRoutes(app: Express, getUser: GetUser): void 
   });
 
   app.post("/api/admin/access-grants/:id/revoke", async (req: Request, res: Response) => {
-    const admin = await requirePlatformAdmin(req, res, getUser);
+    const admin = await requirePlatformAdmin(req, res, getUser, { skipGate: true });
     if (!admin) return;
     if (!originOk(req)) return void res.status(403).json({ message: "Forbidden" });
     const id = Number(req.params.id);

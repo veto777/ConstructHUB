@@ -5549,10 +5549,8 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
-      // Same second-factor wall as requirePlatformAdmin (see adminGuard).
-      if (!platformGatePassed(req)) {
-        return res.status(403).json(ADMIN_REAUTH_BODY);
-      }
+      // No second-factor prompt: trial invites only give someone access (owner, 2026-10-02 — the code goes to
+      // the person being added, never a verification code to the admin).
 
       const { trialDays, recipientEmail, recipientName } = req.body || {};
       // 1–1000 days (owner, 2026-10-02 — it was capped at 14), or 0 for "until revoked".
@@ -5600,10 +5598,8 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
-      // Same second-factor wall as requirePlatformAdmin (see adminGuard).
-      if (!platformGatePassed(req)) {
-        return res.status(403).json(ADMIN_REAUTH_BODY);
-      }
+      // No second-factor prompt: trial invites only give someone access (owner, 2026-10-02 — the code goes to
+      // the person being added, never a verification code to the admin).
 
       const codes = await storage.getAllBetaAccessCodes();
       const enriched = await Promise.all(codes.map(async (c) => {
@@ -5630,10 +5626,8 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
-      // Same second-factor wall as requirePlatformAdmin (see adminGuard).
-      if (!platformGatePassed(req)) {
-        return res.status(403).json(ADMIN_REAUTH_BODY);
-      }
+      // No second-factor prompt: trial invites only give someone access (owner, 2026-10-02 — the code goes to
+      // the person being added, never a verification code to the admin).
 
       const id = parseInt(req.params.id);
       const code = await storage.revokeBetaAccessCode(id);

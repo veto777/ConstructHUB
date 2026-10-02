@@ -410,10 +410,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("configured admin g
       expect(testEmail.status).toBe(403);
       expect((await testEmail.json()).gateRequired).toBe(true);
 
-      // The beta-codes routes (inline isAdmin checks) sit behind the same wall.
+      // Trial invites are NOT behind the wall: giving someone access never asks the admin for a code
+      // (owner, 2026-10-02 — "you dont send a verfication code to us but to the user we are adding").
       const beta = await fetch(`${GBASE}/api/beta-codes`, { headers: { cookie } });
-      expect(beta.status).toBe(403);
-      expect((await beta.json()).gateRequired).toBe(true);
+      expect(beta.status).toBe(200);
 
       // Pass the gate on this session and the LSA route opens.
       const gate = await postGate({ username: GATE_USER, password: GATE_PASS }, cookie);
