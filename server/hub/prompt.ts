@@ -51,6 +51,16 @@ const STYLE = `STYLE: plain English, warm, at most one light construction pun. A
 
 export const TRAILING_REMINDER = "Reminder: answer only the last <visitor> message, as Gabe, under the HARD RULES, in at most 120 words.";
 
+/**
+ * The prompt's fixed instruction text — HARD RULES, STYLE and the trailing reminder — which a
+ * reply must never reproduce (output filter O13, 8-word windows). The persona sentence is left
+ * out on purpose: "I'm Gabe, ConstructHUB's assistant, a friendly gator in a headset…" is how
+ * Gabe introduces himself; LINKS and KNOWLEDGE are quotable by design.
+ */
+export function promptInstructionText(): string {
+  return `${hardRulesText()}\n${STYLE}\n${TRAILING_REMINDER}`;
+}
+
 export function linksBlock(publicOnly: boolean): string {
   return HUB_LINKS.filter((l) => !publicOnly || l.public)
     .flatMap((l) => [`- [${l.label}](${l.path})`, ...(l.variants ?? []).filter((v) => l.path !== "/settings" || /billing|security/.test(v)).map((v) => `- [${l.label}](${l.path}${v})`)])

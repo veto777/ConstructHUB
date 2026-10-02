@@ -74,11 +74,13 @@ const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), in
 export default function HubWidget({ surface, signedIn }: { surface: HubSurface; signedIn: boolean }) {
   const [location] = useLocation();
   const visible = hubVisible(location, surface);
-  const { data: meta, refetch } = useQuery<HubMeta>({
+  const { data: meta, isError: metaFailed, refetch } = useQuery<HubMeta>({
     queryKey: ["/api/hub/presets", signedIn ? "in" : "out"],
     queryFn: async () => {
       const res = await fetch("/api/hub/presets", { credentials: "include" });
       if (!res.ok) throw new Error(String(res.status));
+      // A server without the Hub routes answers with the SPA's index.html (the catch-all): not meta.
+      if (!/\bapplication\/json\b/i.test(res.headers.get("content-type") ?? "")) throw new Error("not json");
       return res.json();
     },
     staleTime: 5 * 60_000,
@@ -284,14 +286,19 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     return showMore ? [...first, ...rest] : first;
   }, [meta, welcome, showMore]);
 
-  if (!visible || !meta) return null;
+  // Nothing until the server has answered; when it can't (a server without /api/hub, or down), the
+  // launcher still shows and the panel says so, rather than Gabe silently not existing.
+  if (!visible || (!meta && !metaFailed)) return null;
+  const offline = !meta;
 
   const portalMobile = surface === "portal";
-  const greeting = welcome
-    ? "Welcome aboard! I'm Gabe. I can walk you through setting up ConstructHUB, one step at a time. Where do you want to start?"
-    : builder
-      ? "Hi, I'm Gabe! Ask me how any ConstructHUB feature works or how to set it up. I can't see your account or anyone's data, so I'll point you to the right page."
-      : "Hi, I'm Gabe! I know ConstructHUB inside out: plans, features and how to set things up. Tap a question below.";
+  const greeting = offline
+    ? "Hi, I'm Gabe! My radio's down right now, so I can't take questions. Please try again in a minute."
+    : welcome
+      ? "Welcome aboard! I'm Gabe. I can walk you through setting up ConstructHUB, one step at a time. Where do you want to start?"
+      : builder
+        ? "Hi, I'm Gabe! Ask me how any ConstructHUB feature works or how to set it up. I can't see your account or anyone's data, so I'll point you to the right page."
+        : "Hi, I'm Gabe! I know ConstructHUB inside out: plans, features and how to set things up. Tap a question below.";
 
   return (
     <>
@@ -414,6 +421,15 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
               </div>
             )}
 
+            {offline ? (
+              <div className="pt-1" data-testid="hub-offline">
+                <button type="button" onClick={() => void refetch()}
+                  className="rounded-full border bg-background px-3 py-1.5 text-xs font-medium hover:border-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                  data-testid="hub-retry">
+                  Try again
+                </button>
+              </div>
+            ) : (
             <div className="pt-1" data-testid="hub-chips">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Quick questions</p>
               <div className="flex flex-wrap gap-1.5">
@@ -432,8 +448,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                 </button>
               </div>
             </div>
+            )}
           </div>
 
+          {!offline && (
           <div className="border-t bg-background/60 p-3">
             {canChat ? (
               <form onSubmit={(e) => { e.preventDefault(); void sendChat(); }} className="flex items-end gap-2">
@@ -443,7 +461,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                   ref={inputRef}
                   rows={1}
                   value={input}
-                  maxLength={meta.maxChars}
+                  maxLength={meta?.maxChars}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendChat(); } }}
                   placeholder="Ask how something works…"
@@ -468,10 +486,11 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                 </Link>
               </div>
             )}
-            {canChat && input.length > (meta.maxChars - 100) && (
+            {canChat && meta && input.length > (meta.maxChars - 100) && (
               <p className="mt-1 text-right text-[11px] text-muted-foreground" aria-live="polite">{input.length}/{meta.maxChars}</p>
             )}
           </div>
+          )}
         </div>
       )}
     </>

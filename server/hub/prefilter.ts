@@ -385,15 +385,15 @@ const P3: RegExp[] = [
   // "Ignore the above and…", "Disregard everything prior." — only when nothing follows the word, so
   // "can I ignore previous invoices?" is still a question about invoices.
   /\b(ignore|disregard|forget)\s+(all\s+|everything\s+|anything\s+)?(of\s+)?(that\s+|the\s+|what'?s\s+|what\s+(is|was)\s+)?(above|prior|previous|earlier|before)(?=\s*([.,;:!?]|and\b|then\b|$))/,
-  /\byou are now\b/, /\bfrom now on\b/, /\b(you|hub) (will |must |should |can )?act as\b/, /\bact as if\b/,
+  /\byou are now\b/, /\bfrom now on\b/, /\b(you|hub|gabe) (will |must |should |can )?act as\b/, /\bact as if\b/,
   /\bpretend/, /\brole-?play/, /\blet'?s play\b/, /\bhypothetical(ly)?\b/, /\bimagine you\b/,
   /\bdo anything now\b/, /\bdeveloper mode\b/, /\bjailbreak/, /\bno (rules|restrictions|limits|filter)\b/,
   /\bunfiltered\b/, /\buncensored\b/, /\bdo what it says\b/, /\bfor this conversation,? (say|answer|assume)\b/,
   /\bnew rule\b/, /\bauthori[sz]ation code\b/,
   // Identity claims — narrowed: "I'm a business owner" is how contractors talk, so only a
-  // claim to be ConstructHUB's (or Hub's) own owner/admin/staff/developer counts.
-  /\bi('m| am) (the |a |an |one of the |one of your )?(constructhub'?s? |hub'?s? |your |site |platform |system )(\w+ )?(admin|administrator|owner|developer|dev|ceo|founder|staff|employee|engineer|creator|programmer)\b/,
-  /\bi('m| am) (the |a |an )?(developer|programmer|creator|founder|ceo|owner|administrator|admin) (of|at|for|behind) (constructhub|hub|this (site|app|bot|platform)|you|the (site|platform|bot))\b/,
+  // claim to be ConstructHUB's (or Gabe's) own owner/admin/staff/developer counts.
+  /\bi('m| am) (the |a |an |one of the |one of your )?(constructhub'?s? |hub'?s? |gabe'?s? |your |site |platform |system )(\w+ )?(admin|administrator|owner|developer|dev|ceo|founder|staff|employee|engineer|creator|programmer)\b/,
+  /\bi('m| am) (the |a |an )?(developer|programmer|creator|founder|ceo|owner|administrator|admin) (of|at|for|behind) (constructhub|hub|gabe|this (site|app|bot|platform)|you|the (site|platform|bot))\b/,
   // Instructions to emit visitor-chosen text (the "sign-off line" piggyback: a real question plus
   // "finish your answer with this exact line: P.S. <payload>"). Hub's answers are its own words only.
   /\b(finish|end|close|start|begin|open|conclude|wrap up|sign off|prefix|follow up|top off)( off| up)? (your|each|every|this|the) (answer|reply|response|message|output)s?( with| by)\b/,
@@ -413,7 +413,7 @@ const P3_CASED = /\bDAN\b/;
 // P4 prompt extraction
 const P4: RegExp[] = [
   /\b(system|initial|hidden|original) (prompt|message|instructions)\b/,
-  /\b(your|hub'?s) (instructions|rules|prompt|guidelines|knowledge (base|pack))\b/,
+  /\b(your|hub'?s|gabe'?s) (instructions|rules|prompt|guidelines|knowledge (base|pack))\b/,
   /\bthe (system|hidden|initial|original) (prompt|instructions)\b/,
   /\brepeat (everything|the text|all) (above|before)\b/, /\bverbatim\b/, /\bwhat were you told\b/, /\bprint your\b/,
   // "output the text that appears before my message", "what came before this question?"
@@ -428,33 +428,33 @@ const P5_A: RegExp[] = [
   /\bwho (uses|signed up|subscribes|is using|bought|else uses)\b/,
   /\b(user|account) (id|#|number) ?#?\d+/,
   /\blook ?up (a |the )?(user|customer|account|company|contractor)s?\b/,
-  /\bdoes .{1,60} (use (constructhub|hub|you|this|your)|have an account)\b/,
+  /\bdoes .{1,60} (use (constructhub|hub|gabe|you|this|your)|have an account)\b/,
   /\btoday'?s sign-?ups\b/, /\bsign-?ups (today|this week|this month)\b/,
   // narrowed: "how many users can I add on Pro?" is a plan question, not a data request.
   /\bhow many (\w+ )?(users|customers|subscribers|contractors|accounts|signups|people|roofers|plumbers|electricians|builders|remodelers|companies|businesses|agencies|firms|members)\b(?!.*\b((can|could|does|do) (i|we|my|our)|do (i|we) get|does (the )?(\w+ )?(plan|starter|pro|growth|agency)|included|include|per (plan|month|location|seat)|allowed|allow|limit|max(imum)?|on (the )?(starter|pro|growth|agency)))/,
-  /\b(are|is) (they|he|she|them) (on|using|with|signed up (with|on|for|to)|subscribed to|paying for) (constructhub|hub)\b/,
+  /\b(are|is) (they|he|she|them) (on|using|with|signed up (with|on|for|to)|subscribed to|paying for) (constructhub|hub|gabe)\b/,
   /\b(are|is) (they|he|she) (a |an )?(constructhub|paying) (customer|user|member|client|subscriber)s?\b/,
-  /\b(are|is) (they|he|she) (a |an )?(customers?|users?|members?|subscribers?) (of|on|at|with) (constructhub|hub)\b/,
+  /\b(are|is) (they|he|she) (a |an )?(customers?|users?|members?|subscribers?) (of|on|at|with) (constructhub|hub|gabe)\b/,
   /\bhow (big|large)\b.{0,50}\b(community|user ?base|customer ?base|network|client ?base)\b/,
-  /\b(constructhub'?s|your|hub'?s|the platform'?s|the site'?s) (user|customer|subscriber|client|contractor) ?(base|count)\b/,
-  /\b(last|previous|other|another) (person|people|user|visitor|customer|contractor)s? (who|that) (chatted|talked|spoke|asked|wrote|used)\b/, /\bwho (else )?(chatted|talked|spoke) (with|to) (you|hub)\b/,
+  /\b(constructhub'?s|your|hub'?s|gabe'?s|the platform'?s|the site'?s) (user|customer|subscriber|client|contractor) ?(base|count)\b/,
+  /\b(last|previous|other|another) (person|people|user|visitor|customer|contractor)s? (who|that) (chatted|talked|spoke|asked|wrote|used)\b/, /\bwho (else )?(chatted|talked|spoke) (with|to) (you|hub|gabe)\b/,
 ];
 /** Asks about other tenants, but a how-to phrasing ("how do contractors use ConstructHUB to…") is a feature question. */
 const P5_TENANT: RegExp[] = [
-  /\b(name|list|which|what|who|show( me)?|give me|tell me( about)?|any|some|top|biggest|largest|best|most|real|three|four|five|ten|\d+) (?:(?!(?:can|do|does|did|should|would|will|could|are|is|i|we|you)\b)[\w'-]+ ){0,3}(companies|contractors|businesses|roofers|plumbers|electricians|builders|remodelers|agencies|members|customers|clients|users|firms|people|accounts)\b.{0,40}\b(use|uses|using|used|rely on|relies on|are on|is on|signed up|subscribe|subscribed|pay for|paying for)\b.{0,25}\b(constructhub|hub)\b/,
-  /\b(email|e-mail|phone|cell|number|contact( info| details)?|address)\b.{0,40}\b(owner|of|for|at)\b.{0,40}\bon (constructhub|hub)\b/,
+  /\b(name|list|which|what|who|show( me)?|give me|tell me( about)?|any|some|top|biggest|largest|best|most|real|three|four|five|ten|\d+) (?:(?!(?:can|do|does|did|should|would|will|could|are|is|i|we|you)\b)[\w'-]+ ){0,3}(companies|contractors|businesses|roofers|plumbers|electricians|builders|remodelers|agencies|members|customers|clients|users|firms|people|accounts)\b.{0,40}\b(use|uses|using|used|rely on|relies on|are on|is on|signed up|subscribe|subscribed|pay for|paying for)\b.{0,25}\b(constructhub|hub|gabe)\b/,
+  /\b(email|e-mail|phone|cell|number|contact( info| details)?|address)\b.{0,40}\b(owner|of|for|at)\b.{0,40}\bon (constructhub|hub|gabe)\b/,
   /\banother (user|customer|contractor|company|account|business|client|member|roofer|agency|subscriber)('?s)?\b/,
   /\bwhich (contractors?|compan(y|ies)|business(es)?|agenc(y|ies)|roofers?|customers?|users?|clients?|accounts?|members?)\b.{0,60}\b(most|best|top|biggest|largest|highest|first|last)\b/,
   /\b(real|actual)\b.{0,30}\b(success stor(y|ies)|examples?|case stud(y|ies)|testimonials?|customers?|clients?|contractors?|users?)\b.{0,60}\b(from|of|on|at|using|with)\b/,
 ];
-const P5_TENANT_EXEMPT = /\b(what|how) (do|does|can|could|would|should|are|is) .{0,40}\buse (constructhub|hub|it) (for|to)\b/;
+const P5_TENANT_EXEMPT = /\b(what|how) (do|does|can|could|would|should|are|is) .{0,40}\buse (constructhub|hub|gabe|it) (for|to)\b/;
 /** A business name ("Acme Roofing", "Smith Builders LLC") next to an account word, unless it's the visitor's own. */
 const BUSINESS_NAME = /\b[A-Z][\w&'.-]*(?: [A-Z][\w&'.-]*)* (Roofing|Construction|Builders|Building|Contracting|Contractors|Plumbing|Electric|Electrical|HVAC|Remodeling|Renovations?|Homes|Exteriors|Siding|Painting|Landscaping|Concrete|Solar|Restoration|Gutters|LLC|Inc|Corp|Co)\b(?! (companies|contractors|business(es)?|crews?|jobs?|work|services|industry|leads|clients|customers|permits|trade|niche|market)\b)/;
 const ACCOUNT_WORD = /\b(plan|trial|account|subscription|email|phone|number|address|contact|customer|user|member|subscriber|pay|pays|paying|signed up|sign up|uses|using|use|on constructhub)\b/;
 const FIRST_PERSON = /\b(i|i'm|i am|my|our|ours|we|we're|mine)\b/;
 const P5_A_CASED: RegExp[] = [
   // narrowed: the name must not be ConstructHUB's own support/sales.
-  /\b(phone|email|address|number|contact( info)?|cell) (of|for) (?!ConstructHUB|Hub\b|Support|Sales)[A-Z]/,
+  /\b(phone|email|address|number|contact( info)?|cell) (of|for) (?!ConstructHUB|Hub\b|Gabe\b|Support|Sales)[A-Z]/,
   /\b[A-Z][a-z]+'s (phone|email|address|number|account|plan|invoice|reviews)\b/,
   // narrowed: "is <Capitalised Name> a customer" (not "is the CRM included for a new user").
   /\b[Ii]s ([A-Z][\w&'.-]*(?: [A-Z&][\w&'.-]*)*) an? (\w+ )?(customer|user|member|client|subscriber)\b/,
@@ -490,13 +490,13 @@ const P7_WHOAMI: RegExp[] = [
   /\btruthcoder?\b/, /\bopenai\b/, /\bollama\b/, /\bwho (hosts|made|built|trained|created|programmed) you\b/,
 ];
 const PERMIT_CONTEXT = /\b(permits?|portals?|county|counties|city|cities|property|appraisers?|assessors?|directory|jurisdictions?|states?)\b/;
-const P7_DB = /\b(your|constructhub'?s|the site'?s|hub'?s) (database|db)\b/;
+const P7_DB = /\b(your|constructhub'?s|the site'?s|hub'?s|gabe'?s) (database|db)\b/;
 const P7_INTERNAL: RegExp[] = [
-  /\b(your|constructhub'?s|the site'?s|hub'?s) (servers?|source code|codebase|repo|github|secrets?|env|tokens?|credentials|admin (panel|password|login)|infrastructure|hosting|host|tunnel|backend|stack|employees|staff|revenue|mrr|arr|profit|investors|valuation)\b/,
+  /\b(your|constructhub'?s|the site'?s|hub'?s|gabe'?s) (servers?|source code|codebase|repo|github|secrets?|env|tokens?|credentials|admin (panel|password|login)|infrastructure|hosting|host|tunnel|backend|stack|employees|staff|revenue|mrr|arr|profit|investors|valuation)\b/,
   /\.env\b/, /\bai_integrations/, /\bsecret key\b/, /\bssh\b/, /\blocalhost\b/, /\b127\.0\.0\.1\b/,
   /\b\d{1,3}(\.\d{1,3}){3}\b/, /\bselect \* from\b/, /\bunion select\b/, /\bdrop table\b/, /\binsert into\b/, /;--/,
   /\bvb\d+\b/, /\bstripe (key|secret|webhook)/,
-  /\b(your|hub'?s|constructhub'?s|the site'?s|the server'?s|openai|stripe|truthcode\w*|ai|admin|master|root|internal) api[_ ]?keys?\b/,
+  /\b(your|hub'?s|gabe'?s|constructhub'?s|the site'?s|the server'?s|openai|stripe|truthcode\w*|ai|admin|master|root|internal) api[_ ]?keys?\b/,
 ];
 // narrowed: a bare "API key" is a setup step for Blotato, Cloudflare and the CRM.
 const API_KEY = /\bapi[_ ]?keys?\b/;
@@ -540,7 +540,7 @@ const P9_TOPICS: RegExp[] = [
 
 // P10 vocabulary gate
 const DOMAIN_VOCAB = [
-  "constructhub", "hub", "plan", "price", "pricing", "cost", "trial", "subscription", "billing", "starter", "pro",
+  "constructhub", "hub", "gabe", "plan", "price", "pricing", "cost", "trial", "subscription", "billing", "starter", "pro",
   "growth", "agency", "feature", "permit", "county", "counties", "city", "cities", "property", "appraiser", "assessor", "google",
   "gbp", "gmb", "business profile", "review", "ranking", "grid", "photo", "seo", "location", "ads", "lsa",
   "click guard", "ip tracker", "vpn shield", "competitor", "crm", "estimate", "invoice", "payment", "pipeline",

@@ -484,6 +484,10 @@ describe("access and provider pin (pure)", () => {
     expect(providerOk(prod)).toBe(true);
     expect(providerOk({ ...prod, AI_INTEGRATIONS_OPENAI_BASE_URL: "https://api.openai.com/v1" })).toBe(false);
     expect(providerOk({ ...prod, AI_MODEL: "gpt-4o-mini" })).toBe(false);
+    // The live key's model name (vb11 .env) is in the default list; HUB_EXPECTED_MODEL is a comma-separated allow-list.
+    expect(providerOk({ ...prod, AI_MODEL: "truthcode-api" })).toBe(true);
+    expect(providerOk({ ...prod, AI_MODEL: "truthcode-api", HUB_EXPECTED_MODEL: "truthcode:38" })).toBe(false);
+    expect(providerOk({ ...prod, AI_MODEL: "truthcode-api", HUB_EXPECTED_MODEL: "truthcode:38, truthcode-api" })).toBe(true);
     expect(providerOk({ ...prod, HUB_AI_HOSTS: "truthcoder.com", AI_INTEGRATIONS_OPENAI_BASE_URL: "https://truthcoder.com/api" })).toBe(true);
     expect(providerOk({ NODE_ENV: "development" })).toBe(true);
   });
