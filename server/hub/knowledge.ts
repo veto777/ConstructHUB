@@ -19,7 +19,7 @@ import {
 import {
   pricingKnowledge, joinNames, planNamesWhere, formatUsd, TRIAL_LABEL, SALES_REP_LABEL, SALES_THRESHOLD_LABEL,
   SALES_HREF, PROTECTED_SITE_PLANS, COMPETITOR_INTEL_PLANS, TEXTING_PLANS, CRM_SEATS_LINE,
-  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantPricing, callAssistantIncludesLine, callAssistantIntroLine,
+  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantPricing, callAssistantIncludesLine, callAssistantIntroLine,
 } from "@shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { HUB_PAGES, type PageKey } from "@shared/hub-links";
@@ -59,6 +59,9 @@ export function knowledgeTokens(): Record<string, string> {
     ANNUAL_MONTHS: String(ANNUAL_MONTHS),
     ANNUAL_FREE_MONTHS: String(12 - ANNUAL_MONTHS),
     CALL_ASSISTANT_INTRO_LINE: callAssistantIntroLine(),
+    CALL_ASSISTANT_RULE_OWN_NUMBERS: CALL_ASSISTANT_NUMBER_RULES.ownNumbers,
+    CALL_ASSISTANT_RULE_CANCEL: CALL_ASSISTANT_NUMBER_RULES.cancel,
+    CALL_ASSISTANT_RULE_PAYMENT: CALL_ASSISTANT_NUMBER_RULES.payment,
     CALL_ASSISTANT_INCLUDES_LINE: callAssistantIncludesLine(),
     CALL_ASSISTANT_PLANS,
     CALL_ASSISTANT_AVAILABILITY: callAssistantAvailabilityLine(),

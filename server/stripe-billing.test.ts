@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => ({
   /** Stripe event ids the ledger already holds (the idempotency claim fails for them). */
   seenEvents: new Set<string>(),
   invoiceApplied: true,
+  /** The Call Assistant number-release hook (server/voice/number-release.ts), spied. */
+  afterSubscriptionChange: vi.fn(async (_userId: number) => null),
 }));
 vi.mock("stripe", () => ({ default: class {
   prices = { list: mocks.pricesList, create: mocks.pricesCreate };
@@ -82,6 +84,8 @@ vi.mock("./account-security", () => ({
 }));
 // The one email path: the webhook hands each verified platform event to this adapter (spied, never sends).
 vi.mock("./account/billing-emails", () => ({ onStripeBillingEvent: mocks.billingEmail }));
+// The number-release decision runs after every subscription write (its own tests: server/voice/number-release.test.ts).
+vi.mock("./voice/number-release", () => ({ afterSubscriptionChange: mocks.afterSubscriptionChange }));
 
 import * as stripeModule from "./stripe";
 import { registerStripeRoutes } from "./stripe";
@@ -128,6 +132,7 @@ beforeEach(() => {
   mocks.billingEmail.mockClear();
   mocks.seenEvents.clear();
   mocks.invoiceApplied = true;
+  mocks.afterSubscriptionChange.mockClear();
   resetPriceCache();
   mocks.pricesList.mockReset().mockImplementation(async ({ lookup_keys }: any) => ({
     data: [...mocks.prices.values()].filter((p) => lookup_keys.includes(p.lookup_key)).map((p) => ({ ...p, recurring: p.recurring ?? null })),
@@ -584,6 +589,8 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow()]);
     expect((await request("/api/stripe/addons", { addons: { texting_number: 0 } })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1].items).toEqual([{ id: "si_text", deleted: true }]);
+    // An add-on change re-decides the account's Call Assistant numbers (fewer paid for → extras released).
+    expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
 
     mocks.current = subscription([item("si_plan", "price_x", 1, { kind: "plan", key: "starter" })]);
     mocks.rows.push([liveRow({ plan: "starter" })]);
@@ -729,6 +736,23 @@ describe("webhook maps the subscription's items onto the row", () => {
     await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_live", customer: "cus_test" } } });
     expect(mocks.updates[0]).toEqual({ status: "canceled", plan: "free", addons: {}, agencyLocations: null, billingInterval: null });
     expect(cancellationWrites()).toEqual([[5, null, null, null]]);
+    // The Call Assistant number is part of the service: the release decision runs for the account, after the row is written.
+    expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
+  });
+
+  it("every subscription write re-decides the account's Call Assistant numbers; an ignored event does not", async () => {
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_new", "past_due") } });
+    expect(mocks.updates[0]).toMatchObject({ status: "past_due" });
+    // Called for past_due too — the decision itself never releases on past_due (number-release.test.ts).
+    expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
+    mocks.afterSubscriptionChange.mockClear();
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_live" })]);
+    await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_stray", customer: "cus_test" } } });
+    expect(mocks.afterSubscriptionChange).not.toHaveBeenCalled();
+    mocks.current = agencyYearly();
+    await webhook({ type: "checkout.session.completed", data: { object: { id: "cs_2", subscription: "sub_new", metadata: { userId: "42", type: "plan", plan: "agency" } } } });
+    expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
   });
 
   it("records a cancellation set in Stripe's portal (cancel at period end) with the row", async () => {

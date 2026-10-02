@@ -180,6 +180,13 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS voice_usage_account_idx ON voice_usage(account_user_id, month)`,
 
   // ── lane: numbers+billing — append ALTER TABLE … ADD COLUMN IF NOT EXISTS here ──
+  // The number is part of the service (owner, 2026-10-02): when the subscription
+  // ends or no longer pays for a number, it is scheduled for release
+  // (status 'releasing' + why + when decided) and released on SignalWire once
+  // release_eligible_at has passed (server/voice/number-release.ts).
+  `ALTER TABLE voice_numbers ADD COLUMN IF NOT EXISTS release_reason text`,
+  `ALTER TABLE voice_numbers ADD COLUMN IF NOT EXISTS release_scheduled_at timestamp`,
+  `CREATE INDEX IF NOT EXISTS voice_numbers_release_due_idx ON voice_numbers(release_eligible_at) WHERE status = 'releasing' AND release_reason IS NOT NULL`,
   // ── end lane: numbers+billing ──
 
   // ── lane: studio-backend — append here ──

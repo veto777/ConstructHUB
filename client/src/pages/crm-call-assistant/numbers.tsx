@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { ADDONS } from "@shared/plans";
-import { formatUsd } from "@shared/plan-copy";
+import { CALL_ASSISTANT_NUMBER_RULES, formatUsd } from "@shared/plan-copy";
 import { BuyNumberWizard } from "./numbers-buy";
 import { ForwardingInstructions } from "./numbers-forwarding";
 import { NUMBERS_KEY, NumberStatusPill, formatDate, formatPhone, type NumbersResponse, type VoiceNumber } from "./numbers-shared";
@@ -57,7 +57,8 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
   }
 
   const d = q.data;
-  const manage = canManage && d.canManage;
+  // Paused for a payment: read-only until the card is updated (the server refuses changes too).
+  const manage = canManage && d.canManage && !d.paused;
   const shown = d.numbers.filter((n) => n.status !== "released");
   const released = d.numbers.filter((n) => n.status === "released");
   const full = d.allowance.remaining <= 0;
@@ -81,6 +82,17 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
           )}
         </div>
       </div>
+
+      <Card data-testid="card-voice-numbers-rules">
+        <CardContent className="p-4 text-sm space-y-1.5">
+          <p className="font-medium">How numbers work</p>
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+            <li data-testid="text-voice-numbers-rule-own">{CALL_ASSISTANT_NUMBER_RULES.ownNumbers}</li>
+            <li data-testid="text-voice-numbers-rule-cancel">{CALL_ASSISTANT_NUMBER_RULES.cancel}</li>
+            <li data-testid="text-voice-numbers-rule-payment">{CALL_ASSISTANT_NUMBER_RULES.payment}</li>
+          </ul>
+        </CardContent>
+      </Card>
 
       {!d.configured && (
         <Card className="border-amber-500/40" data-testid="card-voice-numbers-unconfigured">
@@ -142,6 +154,13 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
                       : ""}
                     {` · ${n.monthlyCents > 0 ? `${formatUsd(n.monthlyCents)}/mo extra number` : "included"}`}
                   </p>
+                  {n.status === "releasing" && n.releaseReason && (
+                    <p className="text-xs text-amber-700 dark:text-amber-400" data-testid={`text-voice-number-releasing-${n.id}`}>
+                      Not answering calls: being released because {n.releaseReasonText ?? "the subscription ended"}
+                      {n.releaseEligibleAt && new Date(n.releaseEligibleAt).getTime() > Date.now() ? ` — it goes back to the carrier on ${formatDate(n.releaseEligibleAt)}` : ""}.
+                      Turn off forwarding to it.
+                    </p>
+                  )}
                   {n.lastError && <p className="text-xs text-destructive" data-testid={`text-voice-number-error-${n.id}`}>{n.lastError}</p>}
                 </div>
                 {manage && (

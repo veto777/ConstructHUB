@@ -216,7 +216,9 @@ export type NumberLookup = {
 
 /** The active number row + org + profile row for an inbound E.164 number, or null when nobody owns it. */
 export async function lookupNumber(to: string): Promise<NumberLookup | null> {
-  const [number] = await db.select().from(voiceNumbers).where(and(eq(voiceNumbers.phoneNumber, to), eq(voiceNumbers.status, "active"))).limit(1);
+  // `releasing` too: the number still rings until the carrier takes it back, and the
+  // profile route answers it 423 paused (internal-profile.ts) instead of "unknown number".
+  const [number] = await db.select().from(voiceNumbers).where(and(eq(voiceNumbers.phoneNumber, to), inArray(voiceNumbers.status, ["active", "releasing"]))).limit(1);
   if (!number) return null;
   const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, number.orgId)).limit(1);
   if (!org) return null;

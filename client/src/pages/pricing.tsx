@@ -579,10 +579,11 @@ export default function PricingPage() {
                   return (
                     <tr key={k} className="border-b border-border/50 last:border-0" data-testid={`row-addon-${k}`}>
                       <td className="p-3 align-top">
-                        <p className="font-medium flex items-center gap-2 flex-wrap">
+                        {/* a div, not a <p>: the Badge renders a <div>, which a <p> may not contain */}
+                        <div className="font-medium flex items-center gap-2 flex-wrap">
                           {addon.name}
                           {addon.preview && <Badge variant="outline" className="text-[10px]" data-testid={`badge-addon-preview-${k}`}>Coming soon</Badge>}
-                        </p>
+                        </div>
                         <p className="text-xs text-muted-foreground">{addon.description}</p>
                         {k === "call_assistant" && (
                           <p className="text-xs mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">

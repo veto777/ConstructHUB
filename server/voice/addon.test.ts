@@ -15,7 +15,7 @@ vi.mock("../db", () => ({
   db: {},
 }));
 import {
-  getEntitlements, addonModulesFor, moduleEnabled, callAssistantAllowance, sendModuleRequired, requireModule, allowancesFor,
+  getEntitlements, addonModulesFor, moduleEnabled, modulePaused, callAssistantAllowance, sendModuleRequired, requireModule, allowancesFor,
 } from "../entitlements";
 import {
   ADDONS, ADDON_MODULES, PLANS, PLAN_KEYS, MODULE_NAMES, planForModule, moduleName, isAddonModule,
@@ -40,9 +40,11 @@ describe("price book: the Call Assistant add-ons", () => {
       expect(ADDONS[key].availableOn).toEqual(["pro", "growth", "agency"]);
       expect(ADDONS[key].grants).toEqual({});
       expect(ADDONS[key].preview).toBe(true);
-      expect(ADDONS[key].annualCents).toBe(ADDONS[key].monthlyCents * 10);
       expect(ADDONS[key].setupCents).toBeUndefined();
     }
+    // Owner, 2026-10-02: "annually price can be $1999 for this service" — its own number, not 10 × monthly.
+    expect(ADDONS.call_assistant.annualCents).toBe(199_900);
+    expect(ADDONS.call_number.annualCents).toBe(ADDONS.call_number.monthlyCents * 10);
     expect(ADDONS.call_number.requires).toBe("call_assistant");
     expect(ADDONS.call_assistant.description).toContain(`${CALL_ASSISTANT_INCLUDED_MINUTES} call minutes`);
     expect(CALL_ASSISTANT_INCLUDED_NUMBERS).toBe(1);
@@ -71,12 +73,16 @@ describe("price book: the Call Assistant add-ons", () => {
 });
 
 describe("entitlements: the callAssistant add-on module", () => {
-  it("is on only when the add-on is on the subscription and the plan sells it", () => {
-    expect(addonModulesFor("pro", { call_assistant: 1 })).toEqual({ callAssistant: true });
-    expect(addonModulesFor("pro", {})).toEqual({ callAssistant: false });
-    expect(addonModulesFor("starter", { call_assistant: 1 })).toEqual({ callAssistant: false });
-    expect(addonModulesFor(null, { call_assistant: 1 })).toEqual({ callAssistant: false });
-    expect(addonModulesFor(null, {}, true)).toEqual({ callAssistant: true });
+  it("is on only when the add-on is on the subscription, the plan sells it and the subscription is paid up", () => {
+    expect(addonModulesFor("pro", { call_assistant: 1 }, "active")).toEqual({ callAssistant: true });
+    expect(addonModulesFor("pro", { call_assistant: 1 }, "trialing")).toEqual({ callAssistant: true });
+    expect(addonModulesFor("pro", { call_assistant: 1 }, "past_due")).toEqual({ callAssistant: false });
+    expect(addonModulesFor("pro", { call_assistant: 1 }, null)).toEqual({ callAssistant: false });
+    expect(addonModulesFor("pro", {}, "active")).toEqual({ callAssistant: false });
+    expect(addonModulesFor("starter", { call_assistant: 1 }, "active")).toEqual({ callAssistant: false });
+    expect(addonModulesFor(null, { call_assistant: 1 }, "active")).toEqual({ callAssistant: false });
+    expect(addonModulesFor(null, {}, null, true)).toEqual({ callAssistant: true });
+    expect(addonModulesFor(null, {}, "past_due", true)).toEqual({ callAssistant: true });
     // The add-on raises no count limit.
     expect(allowancesFor("pro", { call_assistant: 2, call_number: 3 })).toEqual(PLANS.pro.limits);
   });
@@ -98,6 +104,45 @@ describe("entitlements: the callAssistant add-on module", () => {
     const platinum = await getEntitlements(7);
     expect(platinum.modules).toEqual({ agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true });
     expect(platinum.addonModules).toEqual({ callAssistant: false });
+  });
+
+  // Owner, 2026-10-02: "As soon as they stop paying the agent stops working." The plan keeps
+  // past_due access (Stripe retries); the add-on module does not.
+  it.each([
+    ["active", true, false], ["trialing", true, false],
+    ["past_due", false, true], ["unpaid", false, true], ["incomplete", false, true], ["paused", false, true],
+    ["canceled", false, false], ["incomplete_expired", false, false],
+  ] as const)("status %s: module on = %s, paused for payment = %s", async (status, on, paused) => {
+    mocks.row = customer("pro", { status, addons: { call_assistant: 1, call_number: 2 } });
+    const ent = await getEntitlements(7);
+    expect(ent.addonModules).toEqual({ callAssistant: on });
+    expect(ent.addonModulesPaused).toEqual({ callAssistant: paused });
+    expect(moduleEnabled(ent, "callAssistant")).toBe(on);
+    expect(modulePaused(ent, "callAssistant")).toBe(paused);
+    expect(ent.subscriptionStatus).toBe(status);
+    // A paused add-on still shows what it bought (its numbers are held); an ended one shows nothing.
+    expect(callAssistantAllowance(ent)).toEqual(on || paused ? { numbers: 3, minutes: CALL_ASSISTANT_INCLUDED_MINUTES } : { numbers: 0, minutes: 0 });
+    // past_due keeps the PLAN's own access (only the add-on stops).
+    if (status === "past_due") expect(ent.plan).toBe("pro");
+  });
+
+  it("platform admins keep the module whatever their own subscription says", async () => {
+    const { ADMIN_EMAILS } = await import("../admin");
+    mocks.row = customer("pro", { email: ADMIN_EMAILS[1], status: "past_due", addons: { call_assistant: 1 } });
+    const ent = await getEntitlements(7);
+    expect(ent.addonModules).toEqual({ callAssistant: true });
+    expect(ent.addonModulesPaused).toEqual({ callAssistant: false });
+  });
+
+  it("requireModule answers 402 payment_required (not plan_required) for a paused add-on", async () => {
+    const mw = requireModule("callAssistant");
+    const next = vi.fn();
+    mocks.row = customer("pro", { status: "past_due", addons: { call_assistant: 1 } });
+    const r = res(); await mw({ user: { id: 7 } } as any, r, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(r.status).toHaveBeenCalledWith(402);
+    expect(r.json).toHaveBeenCalledWith(expect.objectContaining({ code: "payment_required", addon: "call_assistant", billingHref: "/settings?tab=billing" }));
+    expect(r.json.mock.calls[0][0].message).toMatch(/Update your payment method/);
   });
 
   it("answers the standard plan_required body with the add-on named", async () => {

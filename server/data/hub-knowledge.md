@@ -614,7 +614,7 @@ For contractors who'd rather have the work done for them. Every one of these is 
 
 An AI receptionist for the contractor's own phone line. It answers every call, day or night, collects the lead the way the contractor wants, files it in the CRM and gets urgent calls to the right person. Page: [AI Call Assistant](/call-assistant). In the CRM it lives under **Call Assistant** (tabs: Overview, Numbers, Agent Studio, Simulator, Calls).
 
-**Price and availability:** {{CALL_ASSISTANT_INTRO_LINE}}. It includes {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own. {{CALL_ASSISTANT_AVAILABILITY}}
+**Price and availability:** {{CALL_ASSISTANT_INTRO_LINE}}. The intro price is for monthly billing; yearly billing is the yearly price from the start. It includes {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own. {{CALL_ASSISTANT_AVAILABILITY}}
 
 **Voices:** the contractor picks a name and voice for the assistant: {{CALL_ASSISTANT_PERSONAS}}, and can change the greeting. (The phone voice named Gabe is one of those choices; it is not this website helper.) It speaks English today.
 
@@ -622,6 +622,8 @@ An AI receptionist for the contractor's own phone line. It answers every call, d
 1. CRM → **Call Assistant** → **Numbers** → pick a state, and optionally an area code or a city.
 2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. One number is included with the add-on; each extra number is its own add-on (a second location or a tracking line).
 3. Keep your existing numbers: forward them to the new number from your phone carrier (for example only when you don't answer, after hours, or always). Nothing is ported, so your numbers stay yours. The Numbers tab shows how to set up forwarding with common carriers.
+
+**If you cancel or a payment fails:** {{CALL_ASSISTANT_RULE_OWN_NUMBERS}} {{CALL_ASSISTANT_RULE_CANCEL}} {{CALL_ASSISTANT_RULE_PAYMENT}}
 
 **On a call:** it greets the caller with the company's name, asks what the call is about before collecting anything, then asks the questions the contractor set (by default: what they need, the property address, a first name, a confirmation of the callback number it sees, a good email and the best time to call). It says it is a virtual assistant if asked, and it can play a notice that calls may be recorded (on by default; some states require consent from everyone on the call, so check your state before turning it off).
 

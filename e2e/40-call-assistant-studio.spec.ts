@@ -2,6 +2,8 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { gotoCrm } from "./helpers";
 import { defaultVoiceProfile, type VoiceProfile } from "../shared/voice-profile";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
+import { ADDONS } from "../shared/plans";
+import { CALL_ASSISTANT_NUMBER_RULES, callAssistantIntroShort } from "../shared/plan-copy";
 
 /**
  * Call Assistant — Agent Studio, Overview and Simulator (studio-frontend lane).
@@ -450,5 +452,59 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await gotoCrm(page, "/crm/call-assistant?tab=studio");
     await expect(page.getByTestId("plan-required-callAssistant")).toBeVisible();
     await expect(page.getByTestId("tabs-call-assistant")).toHaveCount(0);
+  });
+});
+
+// Owner, 2026-10-02: "As soon as they stop paying the agent stops working" — the CRM says so and links Billing.
+test.describe("Call Assistant — paused for a payment", () => {
+  test("a payment-needed subscription shows Paused with a way to Billing; the Numbers tab states the number rules", async ({ page }) => {
+    // The CRM's voice API answered as server/voice/billing.ts does for a past_due owner (mocked: no subscription is touched).
+    const status = {
+      enabled: false, paused: true, pausedReason: "payment_needed", billingHref: "/settings?tab=billing", subscriptionStatus: "past_due",
+      addon: { key: "call_assistant", name: ADDONS.call_assistant.name, preview: true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents },
+      plan: "pro", allowance: { numbers: 1, minutes: 500 }, units: { callAssistant: 1, callNumber: 0 },
+      pricing: { includedMinutes: 500, overageCentsPerMinute: 15, numberMinDays: 14 },
+      engine: { configured: true, reachable: true, models: true, checkedAt: new Date().toISOString() },
+      numbersProvider: { configured: true, mock: true }, canManage: true,
+      numbers: [{ id: "n1", phoneNumber: "+13605550100", label: "Main line", location: "Bellingham", status: "active", isTest: false }],
+      profile: { status: "live", publishedVersion: 2 }, usage: { month: "2026-10", minutes: 12, calls: 3, overageMinutes: 0 },
+    };
+    const number = {
+      id: "n1", phoneNumber: "+13605550100", label: "Main line", location: "Bellingham", state: "WA", areaCode: "360", locality: "Bellingham",
+      provider: "mock", providerSid: "PNmock", friendlyName: "Main", voiceUrl: null, statusCallbackUrl: null, status: "active", isTest: false,
+      forwardingFrom: null, monthlyCents: 0, purchasedAt: "2026-09-01T00:00:00.000Z", releaseEligibleAt: "2026-09-15T00:00:00.000Z", releasable: true,
+      releasedAt: null, lastError: null, createdAt: "2026-09-01T00:00:00.000Z", releaseReason: null, releaseReasonText: null, releaseScheduledAt: null,
+    };
+    const numbers = {
+      numbers: [number], allowance: { numbers: 1, used: 1, remaining: 0, includedNumbers: 1, extraNumberMonthlyCents: 500 }, nextNumberMonthlyCents: 500,
+      minDays: 14, forwarding: { carriers: [], advice: [] }, webhooks: { voiceUrl: "", statusCallbackUrl: "", mediaUrl: "" },
+      configured: true, mock: true, canManage: true, paused: true,
+    };
+    await page.route("**/api/crm/voice/**", (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const json = (body: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+      if (path === "/api/crm/voice/status") return json(status);
+      if (path === "/api/crm/voice/numbers") return json(numbers);
+      if (path.startsWith("/api/crm/voice/calls")) return json({ calls: [] });
+      return route.fulfill({ status: 402, contentType: "application/json", body: JSON.stringify({ code: "payment_required", message: "paused" }) });
+    });
+
+    await gotoCrm(page, "/crm/call-assistant?tab=overview");
+    const banner = page.getByTestId("banner-call-assistant-paused");
+    await expect(banner).toBeVisible();
+    await expect(page.getByTestId("text-call-assistant-paused")).toHaveText("Paused — update your payment method");
+    await expect(page.getByTestId("link-call-assistant-paused-billing")).toHaveAttribute("href", "/settings?tab=billing");
+    await expect(page.getByTestId("plan-required-callAssistant")).toHaveCount(0);
+    await expect(page.getByTestId("text-overview-price")).toContainText(callAssistantIntroShort());
+
+    await page.getByTestId("tab-call-assistant-numbers").click();
+    await expect(page.getByTestId("banner-call-assistant-paused")).toBeVisible();
+    await expect(page.getByTestId("text-voice-numbers-rule-own")).toHaveText(CALL_ASSISTANT_NUMBER_RULES.ownNumbers);
+    await expect(page.getByTestId("text-voice-numbers-rule-cancel")).toHaveText(CALL_ASSISTANT_NUMBER_RULES.cancel);
+    await expect(page.getByTestId("text-voice-numbers-rule-payment")).toHaveText(CALL_ASSISTANT_NUMBER_RULES.payment);
+    // Read-only while paused: no buying, no releasing.
+    await expect(page.getByTestId("card-voice-number-n1")).toBeVisible();
+    await expect(page.getByTestId("button-voice-number-release-n1")).toHaveCount(0);
+    await expect(page.getByTestId("button-voice-number-add")).toHaveCount(0);
   });
 });

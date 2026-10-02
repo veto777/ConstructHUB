@@ -11,6 +11,7 @@ import { planRequiredFrom } from "@/components/plan-required";
 import { ADDONS, PLANS, CALL_ASSISTANT_INCLUDED_MINUTES } from "@shared/plans";
 import { callAssistantIntroShort, joinNames } from "@shared/plan-copy";
 import { OverviewPanel } from "./overview";
+import { CallAssistantPausedBanner } from "./paused-banner";
 import { NumbersPanel } from "./numbers";
 import { StudioPanel } from "./studio";
 import { SimulatorPanel } from "./simulator";
@@ -27,6 +28,12 @@ import { CallsPanel } from "./calls";
  * is false when the org owner's subscription lacks the add-on, and every
  * other /api/crm/voice/* route answers the standard 402 plan_required body
  * (with `addon: "call_assistant"`). The gate card below is the one prompt.
+ *
+ * Paused: the add-on is bought but the subscription needs a payment
+ * (`paused: true`). The tabs stay readable, a banner says "Paused — update
+ * your payment method" with a link to Billing, and edits answer 402
+ * payment_required (owner, 2026-10-02: "As soon as they stop paying the agent
+ * stops working").
  */
 export const CALL_ASSISTANT_TABS = ["overview", "numbers", "studio", "simulator", "calls"] as const;
 export type CallAssistantTab = (typeof CALL_ASSISTANT_TABS)[number];
@@ -36,6 +43,11 @@ const TAB_LABELS: Record<CallAssistantTab, string> = {
 
 export type VoiceStatus = {
   enabled: boolean;
+  /** Bought but paused until a payment goes through. */
+  paused?: boolean;
+  pausedReason?: "payment_needed" | null;
+  billingHref?: string;
+  subscriptionStatus?: string | null;
   addon: { key: string; name: string; preview: boolean; availableOn: string[] };
   plan: string | null;
   allowance: { numbers: number; minutes: number };
@@ -111,6 +123,7 @@ export default function CrmCallAssistantPage() {
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const status = useQuery<VoiceStatus>({ queryKey: ["/api/crm/voice/status"] });
   const enabled = status.data?.enabled === true;
+  const paused = !enabled && status.data?.paused === true;
   const canManage = me?.permissions?.manageSettings === true;
 
   return (
@@ -128,10 +141,12 @@ export default function CrmCallAssistantPage() {
 
       {status.isError && planRequiredFrom(status.error) ? (
         <CallAssistantPlanRequired error={status.error} />
-      ) : status.data && !enabled ? (
+      ) : status.data && !enabled && !paused ? (
         <CallAssistantPlanRequired status={status.data} />
       ) : (
         <Tabs value={tab} onValueChange={goToTab} data-testid="tabs-call-assistant">
+          {/* The Overview shows the banner itself; every other tab gets it above the tab strip. */}
+          {paused && status.data && tab !== "overview" && <div className="mb-3"><CallAssistantPausedBanner status={status.data} /></div>}
           <TabsList className="flex flex-wrap h-auto">
             {CALL_ASSISTANT_TABS.map((t) => (
               <TabsTrigger key={t} value={t} data-testid={`tab-call-assistant-${t}`}>{TAB_LABELS[t]}</TabsTrigger>

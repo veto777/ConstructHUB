@@ -99,7 +99,7 @@ export function addonLines(): string[] {
   return Object.values(ADDONS).map((addon) => {
     const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
     const on = joinNames(addon.availableOn.map((key) => PLANS[key].name));
-    const intro = addon.key === "call_assistant" ? ` Launch price: ${callAssistantIntroLine()}.` : "";
+    const intro = addon.key === "call_assistant" ? ` Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).` : "";
     // A `preview` add-on is listed but refused at checkout (shared/plans.ts), so say so.
     const preview = addon.preview ? " Coming soon: listed, not for sale yet." : "";
     return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}${intro}${preview}`;
@@ -110,7 +110,12 @@ export function addonLines(): string[] {
 
 /**
  * AI Call Assistant launch pricing (owner, 2026-10-02): "$99 a month for the
- * first 3 months", then the add-on's regular monthly price.
+ * first 3 months", then the add-on's regular monthly price — or the annual
+ * price ("annually price can be $1999"), which has no intro. Every surface
+ * says all three: "$99/mo for your first 3 months, then $249/mo — or
+ * $1,999/yr". The annual price is an add-on's own annual price, so it shows
+ * even though it is above the sales threshold (add-on and plan annual prices
+ * are exempt, like the plans' own annual prices).
  *
  * The figures live in the price book (shared/plans.ts ADDONS.call_assistant
  * introMonthlyCents / introMonths) — the same fields the Stripe intro coupon is
@@ -135,6 +140,8 @@ export function callAssistantPricing() {
     intro: formatUsd(CALL_ASSISTANT_INTRO.monthlyCents),
     introMonths: CALL_ASSISTANT_INTRO.months,
     regular: formatUsd(addon.monthlyCents),
+    /** The annual price (no intro on annual billing). */
+    annual: formatUsd(addon.annualCents),
     includedNumbers: CALL_ASSISTANT_INCLUDED_NUMBERS,
     includedMinutes: CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US"),
     overagePerMinute: formatUsd(CALL_MINUTE_OVERAGE_CENTS),
@@ -146,17 +153,30 @@ export function callAssistantPricing() {
   };
 }
 
-/** "$99/month for your first 3 months, then $249/month". */
+/** "$99/month for your first 3 months, then $249/month — or $1,999/year". */
 export function callAssistantIntroLine(): string {
   const p = callAssistantPricing();
-  return `${p.intro}/month for your first ${p.introMonths} months, then ${p.regular}/month`;
+  return `${p.intro}/month for your first ${p.introMonths} months, then ${p.regular}/month — or ${p.annual}/year`;
 }
 
-/** "$99/mo for your first 3 months, then $249/mo" — the short form next to a price (pricing table, CRM Overview). */
+/** "$99/mo for your first 3 months, then $249/mo — or $1,999/yr" — the short form next to a price (pricing table, CRM Overview). */
 export function callAssistantIntroShort(): string {
   const p = callAssistantPricing();
-  return `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo`;
+  return `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`;
 }
+
+/**
+ * What happens to the number and the assistant when billing stops — the
+ * owner's rules (2026-10-02), in one place for the FAQ, the Studio Numbers
+ * tab and Gabe: your own numbers are never moved; the assistant's number is
+ * part of the service and is released if you cancel; a failed payment pauses
+ * the assistant until the card is updated.
+ */
+export const CALL_ASSISTANT_NUMBER_RULES = {
+  ownNumbers: "Your existing business numbers are never moved: you keep them with your phone company and forward them to the assistant.",
+  cancel: "The Call Assistant number is part of the service. If you cancel, it is released and stops working, so turn off forwarding to it first.",
+  payment: "If a payment fails, the assistant pauses until the card is updated in Settings → Billing; the number is held while the payment is retried.",
+} as const;
 
 /** "1 local number and 500 call minutes a month, then $0.15 a minute; extra numbers $5/month each". */
 export function callAssistantIncludesLine(): string {
@@ -173,6 +193,13 @@ export function callAssistantAvailabilityLine(): string {
   return callAssistantPricing().comingSoon
     ? "It is coming soon: it is listed on Pricing but is not for sale yet, and there is no launch date to give. Create an account now and add it from Settings → Billing once it is live."
     : `Add it from Settings → Billing on the ${CALL_ASSISTANT_PLANS} plans.`;
+}
+
+/** Add-ons whose yearly price is their own, not ANNUAL_MONTHS × monthly: ", except the AI Call Assistant, which is $1,999/year". */
+function annualExceptionsLine(): string {
+  const odd = Object.values(ADDONS).filter((a) => a.annualCents !== a.monthlyCents * ANNUAL_MONTHS);
+  if (!odd.length) return "";
+  return `, except ${joinNames(odd.map((a) => `the ${a.name}, which is ${formatUsd(a.annualCents)}/year`))}`;
 }
 
 /** Competitor Intel is on every plan with a monthly scan allowance. */
@@ -196,7 +223,7 @@ export function pricingKnowledge(): string {
     return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}${agency}\n  Includes: ${plan.features.join("; ")}.`;
   }).join("\n");
   return `## Plans and pricing (the ConstructHUB price book)
-There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at ${ANNUAL_MONTHS} times the monthly price. The ${PLANS.agency.name} location bands and every add-on are billed the same way: monthly, or yearly at ${ANNUAL_MONTHS} times their monthly price.
+There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at ${ANNUAL_MONTHS} times the monthly price. The ${PLANS.agency.name} location bands and every add-on are billed the same way: monthly, or yearly at ${ANNUAL_MONTHS} times their monthly price${annualExceptionsLine()}.
 ${plans}
 
 Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}.

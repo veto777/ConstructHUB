@@ -255,7 +255,7 @@ export async function registerRoutes(
           plan: ent.plan, storedPlan: ent.storedPlan, accessPlan: ent.accessPlan,
           planName: ent.accessPlan ? PLANS[ent.accessPlan].name : null,
           isPlatformAdmin: ent.isPlatformAdmin, grantEndsAt: ent.grantEndsAt,
-          limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, addons: ent.addons,
+          limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, addonModulesPaused: ent.addonModulesPaused, addons: ent.addons,
           locations: { used: locations, limit: ent.allowances?.locations ?? 0 },
           usage, resetsAt: resetsAt(),
         });

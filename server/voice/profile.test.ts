@@ -435,6 +435,49 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
       await pool.query("update subscriptions set addons = $2::jsonb where user_id = $1", [owner.id, JSON.stringify(sub.addons)]);
     }
     expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
+
+    // Owner, 2026-10-02: "As soon as they stop paying the agent stops working." A failed renewal
+    // (past_due — the plan itself keeps access while Stripe retries) pauses the assistant on the
+    // very next call: no cache between the subscription row and the engine's per-call fetch.
+    await pool.query("update subscriptions set status = 'past_due' where user_id = $1", [owner.id]);
+    try {
+      const unpaid = await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`);
+      expect(unpaid.status).toBe(423);
+      expect(unpaid.body).toMatchObject({ code: "paused", reason: "payment_needed" });
+      expect(unpaid.body.say).toMatch(/taking a short break/);
+      // The CRM: reads stay open, changes answer 402 payment_required, the Overview says paused.
+      expect((await api("/api/crm/voice/profile", owner)).status).toBe(200);
+      expect((await api("/api/crm/voice/profile", field)).status).toBe(200);
+      const edit = await api("/api/crm/voice/profile/pause", owner, "POST");
+      expect(edit.status).toBe(402);
+      expect(edit.body).toMatchObject({ code: "payment_required", addon: "call_assistant", billingHref: "/settings?tab=billing" });
+      expect(edit.body.message).toMatch(/Update your payment method/);
+      expect((await api("/api/crm/voice/simulator/session", owner, "POST", { useDraft: true })).status).toBe(402);
+      const st = await api("/api/crm/voice/status", owner);
+      expect(st.body).toMatchObject({ enabled: false, paused: true, pausedReason: "payment_needed", subscriptionStatus: "past_due", billingHref: "/settings?tab=billing" });
+      expect(st.body.numbers.map((n: any) => n.phoneNumber)).toContain(inbound);
+      const nums = await api("/api/crm/voice/numbers", owner);
+      expect(nums.status).toBe(200);
+      expect(nums.body.paused).toBe(true);
+      expect((await api("/api/crm/voice/numbers/search?state=WA", owner)).body.code).toBe("payment_required");
+      // The plan's own features are untouched by past_due (only the add-on stops).
+      expect((await api("/api/entitlements", owner)).body).toMatchObject({ plan: "pro", addonModules: { callAssistant: false }, addonModulesPaused: { callAssistant: true } });
+    } finally {
+      await pool.query("update subscriptions set status = 'active' where user_id = $1", [owner.id]);
+    }
+    expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
+    expect((await api("/api/crm/voice/status", owner)).body).toMatchObject({ enabled: true, paused: false });
+
+    // A number being released (subscription ended / no longer paid for) stops answering at once.
+    await pool.query("update voice_numbers set status = 'releasing', release_reason = 'over_allowance' where phone_number = $1", [inbound]);
+    try {
+      const releasing = await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`);
+      expect(releasing.status).toBe(423);
+      expect(releasing.body).toMatchObject({ code: "paused", reason: "number_releasing" });
+    } finally {
+      await pool.query("update voice_numbers set status = 'active', release_reason = null where phone_number = $1", [inbound]);
+    }
+    expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
   });
 
   it("the setup wizard merges, marks setup complete and publishes; versions list, read and restore", async () => {

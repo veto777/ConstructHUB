@@ -10,7 +10,7 @@
 import type { Express } from "express";
 import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "./internal-auth";
 import { lookupNumber, callerStatus, publishedState, normalizeE164 } from "./profile-store";
-import { getEntitlements, moduleEnabled } from "../entitlements";
+import { getEntitlements, moduleEnabled, modulePaused } from "../entitlements";
 
 /** What the engine speaks (then hangs up) when a number rings but nothing can answer. */
 export const UNPUBLISHED_LINE = "Thank you for calling. Our phone assistant isn't set up yet, so please try again later or reach us through our website. Goodbye.";
@@ -30,8 +30,15 @@ export function registerVoiceInternalProfileRoutes(app: Express): void {
    *  400 { code: "bad_request" }         `to` is not E.164
    *  404 { code: "unknown_number" }      the app does not own `to`
    *  423 { code: "paused" | "unpublished", say }   the engine speaks `say` and hangs up
-   *      (also "paused" when the org owner's subscription no longer carries the Call Assistant add-on:
-   *      a lapsed or cancelled org gets no receptionist — the platform pays for GPU, AI and minutes)
+   *      (also "paused", with `reason`, when the org may not run the assistant right now:
+   *        "addon_inactive"   the owner's subscription no longer carries the add-on (lapsed, cancelled);
+   *        "payment_needed"   it carries it but is past_due / unpaid / incomplete — owner, 2026-10-02:
+   *                           "As soon as they stop paying the agent stops working" (past_due holds the
+   *                           number; unpaid has ended for it and releases it — number-release.ts);
+   *        "number_releasing" this number is being released (the subscription ended or no longer pays
+   *                           for it) — server/voice/number-release.ts.
+   *      Nothing here is cached: the entitlement is read from the subscriptions row on every call, and
+   *      the engine fetches this once per call, so a status change applies to the very next call.)
    */
   app.get(`${VOICE_INTERNAL_PATH}/profile`, requireVoiceInternal, async (req, res) => {
     const to = normalizeE164(typeof req.query.to === "string" ? req.query.to : null);
@@ -40,9 +47,14 @@ export function registerVoiceInternalProfileRoutes(app: Express): void {
     const found = await lookupNumber(to);
     if (!found) return res.status(404).json({ code: "unknown_number" });
     const { number, org, profile } = found;
+    res.setHeader("Cache-Control", "no-store");
     const ent = await getEntitlements(org.ownerUserId);
     if (!moduleEnabled(ent, "callAssistant")) {
-      return res.status(423).json({ code: "paused", reason: "addon_inactive", say: PAUSED_LINE, org: { id: org.id, name: org.name } });
+      const reason = modulePaused(ent, "callAssistant") ? "payment_needed" : "addon_inactive";
+      return res.status(423).json({ code: "paused", reason, say: PAUSED_LINE, org: { id: org.id, name: org.name } });
+    }
+    if (number.status !== "active") {
+      return res.status(423).json({ code: "paused", reason: "number_releasing", say: PAUSED_LINE, org: { id: org.id, name: org.name } });
     }
     const st = publishedState(profile);
     if (st.state !== "live") return res.status(423).json({ code: st.state, say: st.state === "paused" ? PAUSED_LINE : UNPUBLISHED_LINE, org: { id: org.id, name: org.name } });

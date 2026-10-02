@@ -27,7 +27,7 @@ import {
   PersonaCard, introPriceShort, personaNames,
 } from "@/components/call-assistant-marketing";
 import { PLANS } from "@shared/plans";
-import { SALES_REP_LABEL, callAssistantPricing, formatUsd } from "@shared/plan-copy";
+import { CALL_ASSISTANT_NUMBER_RULES, SALES_REP_LABEL, callAssistantPricing, formatUsd } from "@shared/plan-copy";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { ROUTE_META } from "@shared/route-meta";
 
@@ -102,7 +102,7 @@ function faqs(): { q: string; a: string }[] {
     },
     {
       q: "Can I keep my existing numbers?",
-      a: `Yes. Nothing is ported. Forward as many of your numbers as you like to the assistant. If you want a second local number of your own, for another location or a tracking line, extra numbers are ${p.extraNumber}/mo each.`,
+      a: `Yes. ${CALL_ASSISTANT_NUMBER_RULES.ownNumbers} Nothing is ported. Forward as many of your numbers as you like to the assistant. If you want a second local number of your own, for another location or a tracking line, extra numbers are ${p.extraNumber}/mo each.`,
     },
     {
       q: "Where can I get a number?",
@@ -114,7 +114,15 @@ function faqs(): { q: string; a: string }[] {
     },
     {
       q: "What if I cancel?",
-      a: "The Call Assistant is an add-on, so you remove it in Settings → Billing like any other add-on. Your own numbers were never moved: turn off forwarding with your carrier and calls ring through to you as before.",
+      a: `You remove the add-on in Settings → Billing like any other add-on. ${CALL_ASSISTANT_NUMBER_RULES.cancel} Your own numbers were never moved: turn off forwarding with your carrier and calls ring through to you as before.`,
+    },
+    {
+      q: "What if a payment fails?",
+      a: `${CALL_ASSISTANT_NUMBER_RULES.payment} Callers hear a short message that the assistant is taking a break instead of reaching it.`,
+    },
+    {
+      q: "Is there a yearly price?",
+      a: `Yes: ${p.annual}/yr. The ${p.intro}/mo price for your first ${p.introMonths} months is for monthly billing.`,
     },
     {
       q: "What won't the assistant do?",
@@ -183,7 +191,7 @@ export default function CallAssistantLandingPage() {
                 {salesCta(BTN_OUTLINE, "button-ca-sales-hero")}
               </div>
               <p className="mt-5 text-[15px] text-mkt-ink-soft" data-testid="text-ca-hero-price">
-                <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo.
+                <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr.
                 {" "}<a href="#pricing" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">See what's included</a>
               </p>
             </div>
@@ -341,7 +349,7 @@ export default function CallAssistantLandingPage() {
                   {price.intro}<span className="font-sans text-base font-medium text-mkt-muted ml-1">/mo</span>
                 </div>
                 <p className="mt-4 text-[15px] text-mkt-ink-soft leading-relaxed" data-testid="text-call-assistant-price">
-                  {introPriceShort()} — includes {price.includedNumbers} number and {price.includedMinutes} minutes; extra numbers {price.extraNumber}/mo.
+                  {introPriceShort()}. Includes {price.includedNumbers} number and {price.includedMinutes} minutes; extra numbers {price.extraNumber}/mo.
                 </p>
               </div>
               <div className="md:col-span-7 p-7 lg:p-9">

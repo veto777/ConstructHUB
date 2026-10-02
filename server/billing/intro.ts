@@ -9,8 +9,10 @@
  *   - monthly billing: `amount_off = monthly − intro`, `duration: repeating`,
  *     `duration_in_months = introMonths` → the add-on line costs the intro
  *     price for that many invoices;
- *   - annual billing: the same total once (`(monthly − intro) × introMonths`
- *     off the first annual invoice), so an annual buyer is never worse off;
+ *   - annual billing: NO intro. The intro is a monthly offer; the annual price
+ *     (owner, 2026-10-02: "$1999" a year) is already the yearly deal, so an
+ *     annual order gets no coupon and records no grant (the intro stays
+ *     unused for a later monthly purchase);
  *   - the coupon `applies_to` the add-on's own Stripe product, so it can never
  *     discount the plan or another add-on, and it is attached to the add-on's
  *     subscription item (an existing subscriber) or to the Checkout Session (a
@@ -52,13 +54,17 @@ export function addonIntro(addon: AddonKey): IntroOffer | null {
   return { addon, monthlyCents: a.introMonthlyCents, months: a.introMonths };
 }
 
-/** The coupon an interval needs: a monthly discount repeated, or the same total once on an annual invoice. */
+/** The intro an order on this billing interval gets: monthly only (annual billing has its own price, no intro). */
+export function introFor(addon: AddonKey, interval: BillingInterval): IntroOffer | null {
+  return interval === "month" ? addonIntro(addon) : null;
+}
+
+/** The coupon a MONTHLY order needs (the discount, repeated for the intro months); null for annual billing. */
 export function introCouponSpec(addon: AddonKey, interval: BillingInterval): { id: string; amountOff: number; params: Omit<Stripe.CouponCreateParams, "applies_to"> } | null {
-  const intro = addonIntro(addon);
+  const intro = introFor(addon, interval);
   if (!intro) return null;
   const a = ADDONS[addon];
-  const perMonth = a.monthlyCents - intro.monthlyCents;
-  const amountOff = interval === "month" ? perMonth : perMonth * intro.months;
+  const amountOff = a.monthlyCents - intro.monthlyCents;
   const id = `chub_v1_intro_${addon}_${interval}_${a.monthlyCents}_${intro.monthlyCents}x${intro.months}`;
   const usd = (c: number) => `$${(c / 100).toFixed(c % 100 ? 2 : 0)}`;
   return {
@@ -68,7 +74,8 @@ export function introCouponSpec(addon: AddonKey, interval: BillingInterval): { i
       id,
       amount_off: amountOff,
       currency: "usd",
-      ...(interval === "month" ? { duration: "repeating" as const, duration_in_months: intro.months } : { duration: "once" as const }),
+      duration: "repeating",
+      duration_in_months: intro.months,
       name: `${a.name}: ${usd(intro.monthlyCents)}/mo for ${intro.months} months`.slice(0, 40),
       metadata: { chub_kind: "intro", addon, interval },
     },
@@ -131,7 +138,7 @@ export async function introsForOrder(
 ): Promise<{ addon: AddonKey; couponId: string }[]> {
   const out: { addon: AddonKey; couponId: string }[] = [];
   for (const addon of ADDON_KEYS) {
-    if (!addonIntro(addon) || (before[addon] ?? 0) > 0 || (after[addon] ?? 0) <= 0) continue;
+    if (!introFor(addon, interval) || (before[addon] ?? 0) > 0 || (after[addon] ?? 0) <= 0) continue;
     if (!(await introEligible(stripe, userId, addon, q))) continue;
     const couponId = await resolveIntroCoupon(stripe, addon, interval);
     if (couponId) out.push({ addon, couponId });

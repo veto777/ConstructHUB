@@ -31,6 +31,7 @@ import { stripeConfigured } from "./billing/client";
 import { onStripeBillingEvent } from "./account/billing-emails";
 import { forgetDashboard } from "./dashboard/cache";
 import { introsForOrder, attachIntrosToItems, recordIntro, type StripeForIntro } from "./billing/intro";
+import { afterSubscriptionChange } from "./voice/number-release";
 
 export { PaymentsNotConfiguredError };
 
@@ -134,6 +135,7 @@ async function liveSubscription(userId: number) {
     // create-checkout stops answering has_subscription and the customer can
     // start a new plan instead of being refused by both routes.
     await writeSubscriptionRow({ id: row.id }, sub);
+    await afterSubscriptionChange(row.userId);
     throw NO_SUBSCRIPTION();
   }
   return { row, sub, current: describeSubscription(sub.items.data) };
@@ -170,6 +172,8 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
   });
   for (const intro of intros) await recordIntro(userId, intro.addon, intro.couponId, updated.id);
   const set = await writeSubscriptionRow({ id: row.id }, updated);
+  // Fewer Call Assistant numbers paid for (or the add-on removed): the extras are released.
+  await afterSubscriptionChange(userId);
   return { changed: true, subscription: subscriptionSummary({ ...row, ...set } as SubscriptionRow, cancellationOf(updated)) };
 }
 
@@ -650,6 +654,8 @@ export function registerStripeRoutes(app: Express) {
             }
             const set = await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
             emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
+            // A returning customer's scheduled number release is cancelled when the add-on is back.
+            await afterSubscriptionChange(userId);
           }
           break;
         }
@@ -713,6 +719,10 @@ export function registerStripeRoutes(app: Express) {
               emitCancellationChange(existingSub.userId, sub, event.data.previous_attributes as Record<string, unknown> | undefined,
                 stored, set.plan ?? existingSub.plan);
             }
+            // The Call Assistant number is part of the service (owner, 2026-10-02): an ended
+            // subscription (canceled / unpaid / incomplete_expired) or a removed add-on releases
+            // the org's numbers; past_due only pauses the assistant (entitlements) and keeps them.
+            await afterSubscriptionChange(existingSub.userId);
           } else if (existingSub) {
             sendBillingEmail = false;
             console.warn(`[billing] ${event.type} for ${sub.id} (${sub.status}) ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "a live trial-code grant"}.`);
@@ -739,6 +749,8 @@ export function registerStripeRoutes(app: Express) {
               .where(eq(subscriptions.id, existingSub.id));
             await recordCancellation({ id: existingSub.id }, null);
             emitSubscriptionCanceled(existingSub.userId, sub, existingSub.plan);
+            // Cancelled: the Call Assistant numbers are released (now, or once SignalWire's minimum days pass).
+            await afterSubscriptionChange(existingSub.userId);
           } else if (existingSub) {
             sendBillingEmail = false;
             console.warn(`[billing] deletion of ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "no subscription"}.`);

@@ -13,6 +13,12 @@
  *   - at most ONE real number in the whole build, label "constructhub-test",
  *     is_test = true; everything else is mocked in tests.
  *
+ * The number is part of the service (owner, 2026-10-02): an ended subscription
+ * or a removed add-on releases it automatically — number-release.ts schedules
+ * it ('releasing' + release_reason) and releases it once eligible. A payment
+ * that needs fixing only pauses the assistant (reads stay open here, buying
+ * and releasing answer 402 payment_required — context.ts).
+ *
  * Without SignalWire credentials every buy/release answers 503
  * signalwire_unconfigured and nothing is bought. VOICE_NUMBERS_MOCK=true (dev
  * boxes and the e2e lanes only) swaps in an in-memory carrier so the wizard
@@ -24,7 +30,8 @@ import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { voiceNumbers, type VoiceNumberRow } from "@shared/schema";
 import { ADDONS, CALL_NUMBER_MIN_DAYS, PLANS } from "@shared/plans";
-import { sendLimitReached } from "../entitlements";
+import { sendLimitReached, sendModulePaymentNeeded } from "../entitlements";
+import { releaseReasonText } from "./number-release";
 import { voiceContext, type GetUser, type VoiceContext } from "./context";
 import { voiceWebhookUrls } from "./proxy";
 import {
@@ -165,6 +172,10 @@ export function numberView(row: VoiceNumberRow) {
     purchasedAt: row.purchasedAt?.toISOString() ?? null, releaseEligibleAt: row.releaseEligibleAt?.toISOString() ?? null,
     releasable: row.status === "active" && !!row.releaseEligibleAt && row.releaseEligibleAt.getTime() <= Date.now(),
     releasedAt: row.releasedAt?.toISOString() ?? null, lastError: row.lastError, createdAt: row.createdAt?.toISOString() ?? null,
+    /** Set when the number is being released automatically (number-release.ts): why, when decided; it goes on releaseEligibleAt. */
+    releaseReason: row.releaseReason ?? null,
+    releaseReasonText: row.releaseReason ? releaseReasonText(row.releaseReason) : null,
+    releaseScheduledAt: row.releaseScheduledAt?.toISOString() ?? null,
   };
 }
 export type VoiceNumberView = ReturnType<typeof numberView>;
@@ -199,6 +210,8 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
     if (areaCode && !/^\d{3}$/.test(areaCode)) return res.status(400).json({ message: "An area code is three digits." });
     const limit = Math.max(1, Math.min(20, Number(req.query.limit) || 10));
     res.setHeader("Cache-Control", "no-store");
+    // Paused for a payment: nothing can be bought, so don't offer numbers either.
+    if (v.paused) return sendModulePaymentNeeded(res, "callAssistant");
     try {
       const { client, mock } = carrier();
       const numbers = await client.search({ state, areaCode: areaCode || undefined, city: str(req.query.city, 60) ?? undefined, contains: str(req.query.contains, 12) ?? undefined, limit });
@@ -227,6 +240,8 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
       configured: numbersMockEnabled() || signalwireConfig() !== null,
       mock: numbersMockEnabled(),
       canManage: v.ctx.permissions.manageSettings === true,
+      /** The add-on is bought but paused until a payment goes through: the list is read-only. */
+      paused: v.paused,
     });
   });
 
@@ -342,6 +357,13 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
     if (row.status === "failed" || stalePending) {
       await db.delete(voiceNumbers).where(eq(voiceNumbers.id, row.id));
       return res.json({ released: false, dismissed: true, message: "Removed the unfinished purchase. If SignalWire shows the number on the account, release it there." });
+    }
+    if (row.status === "releasing" && row.releaseReason) {
+      const at = row.releaseEligibleAt ? row.releaseEligibleAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
+      return res.status(409).json({
+        code: "release_scheduled", releaseEligibleAt: row.releaseEligibleAt?.toISOString() ?? null,
+        message: `${row.phoneNumber} is already being released because ${releaseReasonText(row.releaseReason)}${at ? `; it goes back to the carrier on ${at}` : ""}.`,
+      });
     }
     if (row.status === "pending" || row.status === "releasing") return res.status(409).json({ code: "busy", message: "That number is still being set up or released. Try again in a minute." });
     const eligible = row.releaseEligibleAt ?? releaseEligibleAt(row.purchasedAt ?? new Date());

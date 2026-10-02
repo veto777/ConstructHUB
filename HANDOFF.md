@@ -19,6 +19,20 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## ☎️ 2026-10-02 — Call Assistant billing rules (owner's words) — branch `ca/billing-rules`, NOT deployed
+- Owner: "When a person cancels they lose their number … As soon as they stop paying the agent stops working. And
+  annually price can be $1999". Answers the two open questions below (intro on annual: no; number on cancel: released).
+- **Price:** `call_assistant` annual $1,999 (199900, not 10×). The $99 × 3 intro coupon is MONTHLY only
+  (server/billing/intro.ts). Every surface: "$99/mo for your first 3 months, then $249/mo — or $1,999/yr".
+- **Stop paying → paused:** add-on modules run only on active/trialing (`ADDON_MODULE_RUN_STATUSES`); past_due /
+  unpaid / incomplete / paused → `ent.addonModulesPaused`: engine `/profile` 423 `payment_needed` on the next call,
+  CRM reads open / edits 402 `payment_required`, Overview "Paused — update your payment method" → Billing.
+- **Cancel → number released:** server/voice/number-release.ts, called from the Stripe webhook + add-on routes;
+  scheduled ('releasing') until `release_eligible_at`, then released by a 15-min sweep (ON in production by default;
+  `VOICE_NUMBER_RELEASE_WORKER_ENABLED=false` turns it off). past_due never releases. New columns
+  `voice_numbers.release_reason`, `release_scheduled_at` (boot DDL + apply-schema-migration).
+- Still `preview: true` (nobody can buy it). Launch remains a separate step.
+
 ## ☎️ 2026-10-02 — AI Call Assistant built and deployed in admin preview (10:10 UTC)
 - **Shape:** SignalWire → `https://constructhub.us/voice/*` (vb11 app, server/voice/proxy.ts, HTTP + WS) → tailnet →
   **tower** engine `constructhub-voice.service` (user unit, `/home/veto/ConstructHUB/voice`, venv `voice/.venv`,

@@ -24,7 +24,9 @@ process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATA
 describe("Call Assistant price book (PLACEHOLDER pricing, owner to confirm)", () => {
   it("call_assistant and call_number are the add-ons the SPEC names, still in preview, never a sales-only price", () => {
     expect(ADDONS.call_assistant).toMatchObject({ key: "call_assistant", monthlyCents: 24_900, availableOn: ["pro", "growth", "agency"], preview: true });
-    expect(ADDONS.call_assistant.annualCents).toBe(ADDONS.call_assistant.monthlyCents * ANNUAL_MONTHS);
+    // Owner, 2026-10-02: "annually price can be $1999" — the add-on's own annual price; it shows
+    // (add-on annual prices are exempt from the sales threshold, like plan annual prices).
+    expect(ADDONS.call_assistant.annualCents).toBe(199_900);
     expect(ADDONS.call_number).toMatchObject({ key: "call_number", monthlyCents: 500, requires: "call_assistant", preview: true });
     expect(ADDONS.call_number.annualCents).toBe(ADDONS.call_number.monthlyCents * ANNUAL_MONTHS);
     for (const a of [ADDONS.call_assistant, ADDONS.call_number]) {

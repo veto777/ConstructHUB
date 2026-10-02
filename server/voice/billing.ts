@@ -21,7 +21,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { voiceProfiles } from "@shared/schema";
 import { voiceContext, type GetUser } from "./context";
-import { moduleEnabled } from "../entitlements";
+import { moduleEnabled, modulePaused, BILLING_HREF } from "../entitlements";
 import { ADDONS, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
@@ -59,15 +59,23 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
    * Overview status. Answers for every org member; `enabled` is false (with
    * the add-on to buy) when the owner's subscription lacks the add-on. With
    * it, the numbers, the profile's state and this month's minutes come too.
+   * `paused` (enabled false) = the add-on is bought but the subscription needs
+   * a payment: the assistant doesn't answer, the numbers are held, and the
+   * Overview says "Paused — update your payment method" (billingHref).
    */
   app.get("/api/crm/voice/status", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser, { skipModule: true });
     if (!v) return;
     const enabled = moduleEnabled(v.ent, "callAssistant");
+    const paused = modulePaused(v.ent, "callAssistant");
     res.setHeader("Cache-Control", "no-store");
     const base = {
       enabled,
-      addon: { key: ADDONS.call_assistant.key, name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
+      paused,
+      pausedReason: paused ? ("payment_needed" as const) : null,
+      billingHref: BILLING_HREF,
+      subscriptionStatus: v.ent.subscriptionStatus,
+      addon: { key: ADDONS.call_assistant.key, name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
       plan: v.ent.accessPlan,
       allowance: v.allowance,
       units: { callAssistant: v.ent.addons.call_assistant ?? 0, callNumber: v.ent.addons.call_number ?? 0 },
@@ -77,7 +85,7 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       numbersProvider: { configured: numbersMockEnabled() || signalwireConfig() !== null, mock: numbersMockEnabled() },
       canManage: v.ctx.permissions.manageSettings === true,
     };
-    if (!enabled) return res.json({ ...base, numbers: [], profile: null, usage: null });
+    if (!enabled && !paused) return res.json({ ...base, numbers: [], profile: null, usage: null });
     const orgId = v.ctx.org.id;
     const month = voiceMonthKey();
     const [rows, profile, usageRow] = await Promise.all([

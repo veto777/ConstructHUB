@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PLANS, PLAN_KEYS } from "../shared/plans";
-import { SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, planPriceLine } from "../shared/plan-copy";
+import { CALL_ASSISTANT_NUMBER_RULES, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, planPriceLine } from "../shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 
 /**
@@ -68,9 +68,19 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   const short = callAssistantIntroShort();
 
   await page.goto("/call-assistant");
+  // Owner, 2026-10-02: "$99 a month for the first 3 months" … "annually price can be $1999".
+  expect(short).toBe(`${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`);
+  expect(p.annual).toBe("$1,999");
   await expect(page.getByTestId("text-call-assistant-price")).toHaveText(
-    `${short} — includes ${p.includedNumbers} number and ${p.includedMinutes} minutes; extra numbers ${p.extraNumber}/mo.`,
+    `${short}. Includes ${p.includedNumbers} number and ${p.includedMinutes} minutes; extra numbers ${p.extraNumber}/mo.`,
   );
+  await expect(page.getByTestId("text-ca-hero-price")).toContainText(`${p.regular}/mo — or ${p.annual}/yr`);
+  // The FAQ says the owner's number rules plainly.
+  const faq = page.getByTestId("section-ca-faq");
+  await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.ownNumbers);
+  await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.cancel);
+  await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.payment);
+  await expect(faq).toContainText(`Yes: ${p.annual}/yr.`);
   for (const persona of VOICE_PERSONA_LIST) await expect(page.getByTestId(`card-persona-${persona.id}`)).toContainText(persona.name);
   await expect(page.locator('[data-testid^="step-ca-"]')).toHaveCount(4);
   for (const key of p.planKeys) await expect(page.getByTestId("text-ca-plans")).toContainText(PLANS[key].name);
@@ -84,12 +94,18 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await page.goto("/landing");
   await expect(page.getByTestId("section-call-assistant")).toBeVisible();
   await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`${p.intro}/mo`);
+  await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`then ${p.regular}/mo — or ${p.annual}/yr`);
   await expect(page.getByTestId("link-call-assistant-learn-more")).toHaveAttribute("href", "/call-assistant");
   await expect(page.getByTestId("link-footer-call-assistant")).toHaveAttribute("href", "/call-assistant");
 
   await page.goto("/pricing");
   await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(callAssistantIntroShort());
   await expect(page.getByTestId("link-addon-call-assistant")).toHaveAttribute("href", "/call-assistant");
+  // The add-on's annual price shows on yearly billing even though it is over $1,000 (add-on annuals are exempt).
+  await expect(page.getByTestId("text-addon-price-call_assistant")).toContainText(`${p.regular}/mo`);
+  await page.getByTestId("button-interval-year").click();
+  await expect(page.getByTestId("text-addon-price-call_assistant")).toContainText(`${p.annual}/yr`);
+  await expect(page.getByTestId("text-addon-price-call_assistant")).not.toContainText(SALES_REP_LABEL);
 
   // Signed in (dev bypass): the main sidebar has the entry, with the NEW badge.
   await page.goto("/");
