@@ -27,7 +27,7 @@ import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "./internal-auth";
 import { loadOrgVoiceContext, findVoiceNumber } from "./org-profile";
 import { deliverLead, notifyCallSummary } from "./leads";
 import { raiseEscalation } from "./escalations";
-import { recordSpamVerdict, recordBlockedCall, callerSpamStatus } from "./spam";
+import { recordSpamVerdict, recordBlockedCall, callerSpamStatus, spamConfidenceWithFloor } from "./spam";
 import { meterCallUsage, billedMinutesFor } from "./usage";
 import { putRecording, recordingsConfigured } from "./recordings";
 import { recordActivity } from "../crm/activity";
@@ -232,7 +232,8 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
     result.blocked = true;
   } else if (isSpam) {
     // No confidence from the engine = flagged, not "near-certain": a strike needs the number.
-    const confidence = spam?.confidence ?? ctx.spam.flagAt;
+    const callerSaid = (report.transcript as VoiceTranscriptTurn[]).filter((t) => t.role === "caller").map((t) => t.text).join(" ");
+    const confidence = spamConfidenceWithFloor(spam?.confidence ?? ctx.spam.flagAt, ctx.spam.strikeAt, spam?.reason, callerSaid);
     const verdict = await recordSpamVerdict({ orgId: ctx.org.id, from: row.fromNumber, confidence, reason: spam?.reason || "flagged by the assistant", callId: row.id, strikeAt: ctx.spam.strikeAt });
     result.blocked = verdict?.blocked ?? false;
     patch.spam = verdict;

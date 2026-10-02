@@ -293,3 +293,23 @@ describe("WebSocket tunnel", () => {
     expect(engine.seen).toHaveLength(0);
   });
 });
+
+describe("Overview engine probe", () => {
+  it("asks the engine's /health, caches the answer ~30 s, and reports an unreachable engine as down", async () => {
+    const { probeEngine, resetEngineProbe } = await import("./billing");
+    resetEngineProbe();
+    engine.seen.length = 0;
+    const t0 = Date.now();
+    expect(await probeEngine(t0)).toMatchObject({ reachable: true, models: false });   // the fake engine reports no models flag
+    expect(await probeEngine(t0 + 10_000)).toMatchObject({ reachable: true });
+    expect(engine.seen.filter((s) => s.url === "/health")).toHaveLength(1);
+    const saved = process.env.VOICE_ENGINE_URL;
+    process.env.VOICE_ENGINE_URL = "http://127.0.0.1:9";
+    try {
+      expect(await probeEngine(t0 + 31_000)).toMatchObject({ reachable: false, models: false });
+    } finally {
+      process.env.VOICE_ENGINE_URL = saved;
+      resetEngineProbe();
+    }
+  });
+});

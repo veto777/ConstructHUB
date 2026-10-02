@@ -422,6 +422,19 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
     expect(paused.body.code).toBe("paused");
     expect((await api("/api/crm/voice/profile/resume", owner, "POST")).body).toEqual({ status: "live" });
     expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
+
+    // The add-on lapses: the published, live profile no longer answers calls.
+    const { rows: [sub] } = await pool.query("select addons from subscriptions where user_id = $1", [owner.id]);
+    await pool.query("update subscriptions set addons = '{}'::jsonb where user_id = $1", [owner.id]);
+    try {
+      const lapsed = await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`);
+      expect(lapsed.status).toBe(423);
+      expect(lapsed.body).toMatchObject({ code: "paused", reason: "addon_inactive" });
+      expect(lapsed.body.say).toMatch(/taking a short break/);
+    } finally {
+      await pool.query("update subscriptions set addons = $2::jsonb where user_id = $1", [owner.id, JSON.stringify(sub.addons)]);
+    }
+    expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
   });
 
   it("the setup wizard merges, marks setup complete and publishes; versions list, read and restore", async () => {

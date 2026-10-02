@@ -124,6 +124,29 @@ describe("raising and reminding (real DB)", () => {
     expect(((await callRow(c.id))!.flags as any).alertedKinds).toEqual(["urgent"]);
   });
 
+  it("an alert raised on the first sentence gets the name and address later: the body is rebuilt and one 'details added' goes out", async () => {
+    const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
+    const c = await makeCall(pool, a.orgId);
+    const before = smsTo(lead).length;
+    const r = await esc.raiseEscalation({ ctx, call: (await callRow(c.id))!, kind: "urgent", summary: "water pouring in", slots: {} });
+    expect((await escRow(r.escalationId!)).body).toContain("Caller: unknown");
+    expect(smsTo(lead)).toHaveLength(before + 1);
+    const slots = { first_name: "Dana", address: "12 Bay St, Everett" };
+    const again = await esc.raiseEscalation({ ctx, call: (await callRow(c.id))!, kind: "urgent", summary: "water pouring in", slots });
+    expect(again).toMatchObject({ escalationId: r.escalationId, duplicate: true });
+    const row = await escRow(r.escalationId!);
+    expect(row.body).toContain("Caller: Dana");
+    expect(row.body).toContain("12 Bay St, Everett");
+    const texts = smsTo(lead);
+    expect(texts).toHaveLength(before + 2);
+    expect(texts.at(-1).body).toMatch(/^Details added:\n\n/);
+    const { rows: bell } = await pool.query("select title from crm_notifications where org_id = $1 and type = 'call.alert.urgent' and link like $2 order by created_at", [a.orgId, `%call=${c.id}`]);
+    expect(bell.map((b: any) => b.title)).toEqual([expect.not.stringMatching(/^Details added/), expect.stringMatching(/^Details added — Emergency — call from Dana/)]);
+    // The same facts a third time (the end report): nothing new, nothing sent.
+    await esc.raiseEscalation({ ctx, call: (await callRow(c.id))!, kind: "urgent", summary: "water pouring in", slots });
+    expect(smsTo(lead)).toHaveLength(before + 2);
+  });
+
   it("a kind with no rule goes to the owners' channels once; a custom template is rendered", async () => {
     const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
     const c = await makeCall(pool, a.orgId);
@@ -186,7 +209,8 @@ describe("raising and reminding (real DB)", () => {
     expect((await escRow(id!)).followup_sent_at).not.toBeNull();
     expect(smsTo(lead).at(-1).body).toMatch(/^Next-day follow-up: was this taken care of\? Reply DONE/);
 
-    expect(await esc.confirmEscalationByReply(lead, "DONE", null, at("2026-10-03T10:00:00"))).toBeGreaterThanOrEqual(1);
+    expect(await esc.confirmEscalationByReply(lead, "DONE", null, at("2026-10-03T10:00:00"))).toBe(0);   // no `To`: no cross-org match
+    expect(await esc.confirmEscalationByReply(lead, "DONE", "+15550100000", at("2026-10-03T10:00:00"))).toBeGreaterThanOrEqual(1);
     expect(await escRow(id!)).toMatchObject({ close_reason: "done: DONE" });
   });
 

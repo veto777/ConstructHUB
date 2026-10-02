@@ -615,16 +615,16 @@ export function smsLamlReply(message?: string): string {
  *  - no signing key and no signature header → accepted for the legacy setup.
  */
 let warnedNoSigningKey = false;
-export function signalwireSignatureOk(req: any): boolean {
+
+/** The request carries a signature that matches the signing key (or the API token). */
+function signatureMatches(req: any): boolean {
   const sig = req.headers?.["x-signalwire-signature"] ?? req.headers?.["x-twilio-signature"];
-  const signingKey = process.env.SIGNALWIRE_SIGNING_KEY;
-  if (!sig) return !signingKey;
-  const keys = [signingKey, process.env.SIGNALWIRE_API_TOKEN].filter((k): k is string => !!k);
-  if (!keys.length) return true;
+  const keys = [process.env.SIGNALWIRE_SIGNING_KEY, process.env.SIGNALWIRE_API_TOKEN].filter((k): k is string => !!k);
+  if (!sig || !keys.length) return false;
   const body = (req.body ?? {}) as Record<string, string>;
   const data = Object.keys(body).sort().map((k) => `${k}${body[k]}`).join("");
   const signed = `${getBaseUrl(req)}${req.originalUrl}${data}`;
-  const matches = keys.some((k) => {
+  return keys.some((k) => {
     const expected = createHmac("sha1", k).update(signed).digest("base64");
     try {
       return timingSafeEqual(Buffer.from(String(sig)), Buffer.from(expected));
@@ -632,7 +632,25 @@ export function signalwireSignatureOk(req: any): boolean {
       return false;
     }
   });
-  if (matches) return true;
+}
+
+/**
+ * Strict: true only when the request is cryptographically verified. Anything
+ * that changes state beyond the carrier-mandated STOP/START/HELP (Call
+ * Assistant escalation confirmations) must use this, never the fail-open
+ * signalwireSignatureOk.
+ */
+export function signalwireSignatureVerified(req: any): boolean {
+  return signatureMatches(req);
+}
+
+export function signalwireSignatureOk(req: any): boolean {
+  const sig = req.headers?.["x-signalwire-signature"] ?? req.headers?.["x-twilio-signature"];
+  const signingKey = process.env.SIGNALWIRE_SIGNING_KEY;
+  if (!sig) return !signingKey;
+  const keys = [signingKey, process.env.SIGNALWIRE_API_TOKEN].filter((k): k is string => !!k);
+  if (!keys.length) return true;
+  if (signatureMatches(req)) return true;
   if (!signingKey) {
     if (!warnedNoSigningKey) {
       warnedNoSigningKey = true;
@@ -696,10 +714,16 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     // that sends from the `To` number) confirms it ("OK") or, after the
     // next-day follow-up, closes it ("DONE"); the sender gets a one-line ack.
     // A failure here is logged and the carrier still gets its normal reply.
+    // Only a VERIFIED webhook with a `To` may change escalation state: the route itself fails open (an
+    // unverifiable STOP must still be honoured), and an anonymous "OK" from an owner's number must not
+    // silence urgent-escalation reminders.
     try {
-      const { confirmEscalationByReply } = await import("../voice/escalations");
-      const touched = await confirmEscalationByReply(from, String(req.body?.Body ?? ""), req.body?.To ?? null);
-      if (touched > 0) return res.send(smsLamlReply("Got it, thanks."));
+      const to = normalizePhone(req.body?.To);
+      if (to && signalwireSignatureVerified(req)) {
+        const { confirmEscalationByReply } = await import("../voice/escalations");
+        const touched = await confirmEscalationByReply(from, String(req.body?.Body ?? ""), to);
+        if (touched > 0) return res.send(smsLamlReply("Got it, thanks."));
+      }
     } catch (e: any) {
       console.error("[sms] escalation reply hook failed:", e?.message || e);
     }

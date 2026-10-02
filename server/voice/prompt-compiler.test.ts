@@ -175,6 +175,15 @@ describe("compileVoiceProfile", () => {
     expect(c.systemPrompt).toContain("unless they contradict the output format");
   });
 
+  it("uses the tagline, lists the decline lines for the engine, and puts a specific referral before the generic one", () => {
+    const c = compileVoiceProfile(richProfile({ company: { ...richProfile().company, tagline: "Siding done right since 1998" } }), 1, NOW);
+    expect(c.systemPrompt).toContain('COMPANY TAGLINE (use it only when the caller asks what the company is about): "Siding done right since 1998"');
+    expect(c.declineLines?.declined).toContain("a local handyman company would be the best fit for that.");
+    expect(c.systemPrompt.indexOf("WE DO NOT DO")).toBeLessThan(c.systemPrompt.indexOf("MINIMUM JOB"));
+    expect(c.systemPrompt).not.toContain("usually within one business day");
+    expect(c.systemPrompt).toContain("PRIVACY: never share, confirm or deny anything about other customers");
+  });
+
   it("persona, greeting, spam thresholds, timings and escalation kinds come straight from the profile", () => {
     const c = compileVoiceProfile(richProfile(), 7, NOW);
     expect(c.version).toBe(7);
@@ -184,13 +193,21 @@ describe("compileVoiceProfile", () => {
     expect(c.spam).toEqual(SPAM_THRESHOLDS.high);
     expect(c.vocabulary).toEqual(["Hardie", "Bellingham"]);
     expect(c.escalationKinds).toEqual(["urgent", "human", "payment", "scheduling", "existing_customer"]);
-    expect(c.systemPrompt).toContain('a complaint about work or service → kind "complaint" (goes to the owner)');
-    expect(c.systemPrompt).toMatch(/making a payment or a question about one → kind "payment"\n/);
+    expect(c.systemPrompt).toContain('a complaint about work or service (e.g. "I\'m not happy with how the trim was finished") → kind "complaint" (goes to the owner)');
+    expect(c.systemPrompt).toMatch(/making a payment or a question about one \(e\.g\. "I.d like to make a payment on my invoice"\) → kind "payment"\n/);
     const named = compileVoiceProfile(richProfile({ persona: { presetId: "maya", assistantName: "Rosa", greeting: "Cascade, this is Rosa.", recordingNotice: false } as any }), 1, NOW);
     expect(named.persona).toEqual({ id: "maya", voice: "af_sarah", name: "Rosa" });
-    expect(named.greeting).toBe("Cascade, this is Rosa.");
-    const noNotice = compileVoiceProfile(richProfile({ persona: { presetId: "janice", recordingNotice: false } as any }), 1, NOW);
+    // Washington is an all-party-consent state: the notice is forced on and appended to a custom greeting.
+    expect(named.greeting).toBe("Cascade, this is Rosa. Calls may be recorded.");
+    const waOff = compileVoiceProfile(richProfile({ persona: { presetId: "janice", recordingNotice: false } as any }), 1, NOW);
+    expect(waOff.greeting).toBe("Thank you for calling Cascade Exteriors, this is Janice — calls may be recorded. What can we help you with today?");
+    const tx = { counties: [{ id: 9001, name: "Travis", stateCode: "TX" }], spokenAreas: ["Austin"], defaultStateCode: "TX" } as any;
+    const noNotice = compileVoiceProfile(richProfile({ serviceArea: tx, persona: { presetId: "janice", recordingNotice: false } as any }), 1, NOW);
     expect(noNotice.greeting).toBe("Thank you for calling Cascade Exteriors, this is Janice. What can we help you with today?");
+    const txCustom = compileVoiceProfile(richProfile({ serviceArea: tx, persona: { presetId: "janice", greeting: "Hi, Acme Siding, how can I help?" } as any }), 1, NOW);
+    expect(txCustom.greeting).toBe("Hi, Acme Siding, how can I help? Calls may be recorded.");
+    const mentions = compileVoiceProfile(richProfile({ persona: { presetId: "janice", greeting: "Acme Siding, this call is recorded. How can I help?" } as any }), 1, NOW);
+    expect(mentions.greeting).toBe("Acme Siding, this call is recorded. How can I help?");
     for (const s of ["low", "normal", "high"] as const) {
       const p = richProfile({ advanced: { spamSensitivity: s } as any });
       expect(compileVoiceProfile(p, 1, NOW).spam).toEqual(SPAM_THRESHOLDS[s]);

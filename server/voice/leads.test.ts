@@ -86,7 +86,67 @@ describe("streetOnly (integration: the engine's address slot often carries the c
   });
 });
 
+describe("one-slot addresses and the lead state", () => {
+  it("cityFromAddress takes the city out of the address slot, never a unit or a ZIP", () => {
+    expect(leads.cityFromAddress("55 Oak Lane, Bellingham")).toBe("Bellingham");
+    expect(leads.cityFromAddress("55 Oak Lane, Bellingham, WA 98225")).toBe("Bellingham");
+    expect(leads.cityFromAddress("55 Oak Lane, Bellingham WA")).toBe("Bellingham");
+    expect(leads.cityFromAddress("55 Oak Lane, Apt 4")).toBeNull();
+    expect(leads.cityFromAddress("55 Oak Lane")).toBeNull();
+    const call = { fromNumber: "+13605550101", callerName: null, callerEmail: null, callerAddress: null, callerCity: null, serviceNeeded: null };
+    expect(leads.leadFactsFrom(call, { address: "55 Oak Lane, Bellingham" })).toMatchObject({ address: "55 Oak Lane", city: "Bellingham" });
+  });
+
+  it("leadState falls back to the one state every service-area county is in", () => {
+    const area = (counties: { stateCode: string }[], defaultStateCode = "") => ({ serviceArea: { counties: counties.map((c, i) => ({ id: i + 1, name: `C${i}`, ...c })), defaultStateCode } }) as any;
+    expect(leads.leadState(area([{ stateCode: "WA" }, { stateCode: "WA" }]), { state: null })).toBe("WA");
+    expect(leads.leadState(area([{ stateCode: "WA" }, { stateCode: "OR" }]), { state: "ID" })).toBe("ID");
+    expect(leads.leadState(area([{ stateCode: "WA" }], "FL"), { state: null })).toBe("FL");
+    expect(leads.leadState(area([]), { state: null })).toBeNull();
+  });
+});
+
 describe("lead delivery (real DB)", () => {
+  it("a mid-call lead with a one-slot address files street and city apart; the end report fills the project and audit row", async () => {
+    const r = await makeAccount(pool, bag, { orgName: "Region Siding" });
+    await setProfile(pool, r.orgId, {
+      company: { name: "Region Siding" },
+      serviceArea: { defaultStateCode: "", counties: [{ id: 1, name: "Whatcom", stateCode: "WA" }, { id: 2, name: "Skagit", stateCode: "WA" }] },
+      leadDelivery: { email: { enabled: false } },
+    });
+    const ctx = (await orgProfile.loadOrgVoiceContext(r.orgId))!;
+    const c = await makeCall(pool, r.orgId);
+    const slots = { need: "full house siding replacement", address: "55 Oak Lane, Bellingham", first_name: "Pat" };
+    // mid-call: no summary, no duration, no caller city yet
+    const d = await leads.deliverLead({ ctx, call: (await callRow(c.id))!, slots });
+    const { rows: [cust] } = await pool.query("select * from crm_customers where id = $1", [d.customerId]);
+    expect(cust).toMatchObject({ address_line1: "55 Oak Lane", city: "Bellingham", state: "WA" });
+    const { rows: [p1] } = await pool.query("select * from crm_projects where id = $1", [d.projectId]);
+    expect(p1).toMatchObject({ name: "full house siding replacement — Bellingham", address_line1: "55 Oak Lane", city: "Bellingham", state: "WA", description: null });
+    await waitForActivity(pool, r.orgId, "call.lead");
+
+    // end report: summary, outcome and duration exist now
+    await pool.query("update voice_calls set customer_id = $2, project_id = $3, lead_delivered_at = now(), summary = 'Pat wants the whole house re-sided.', outcome = 'lead_submitted', duration_seconds = 95 where id = $1", [c.id, d.customerId, d.projectId]);
+    await leads.deliverLead({ ctx, call: (await callRow(c.id))!, slots });
+    const { rows: [p2] } = await pool.query("select * from crm_projects where id = $1", [d.projectId]);
+    expect(p2.description).toBe("Pat wants the whole house re-sided.");
+    const act = await waitForActivity(pool, r.orgId, "call.lead");
+    expect(act).toHaveLength(1);
+    expect(act[0].meta).toMatchObject({ summary: "Pat wants the whole house re-sided.", outcome: "lead_submitted", durationSeconds: 95 });
+  });
+
+  it("the end report fixes a raw one-slot address an earlier delivery stored, and names the project with the city", async () => {
+    const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
+    const c = await makeCall(pool, a.orgId);
+    const raw = "9 Pine Rd, Ferndale";
+    const { rows: [cust] } = await pool.query("insert into crm_customers(org_id, display_name, phone, address_line1, portal_token) values ($1, 'Lee', $2, $3, gen_random_uuid()) returning id", [a.orgId, c.from, raw]);
+    const { rows: [proj] } = await pool.query("insert into crm_projects(org_id, customer_id, name, status, address_line1) values ($1, $2, 'windows', 'lead', $3) returning id", [a.orgId, cust.id, raw]);
+    await pool.query("update voice_calls set customer_id = $2, project_id = $3, lead_delivered_at = now() where id = $1", [c.id, cust.id, proj.id]);
+    await leads.deliverLead({ ctx, call: (await callRow(c.id))!, slots: { need: "windows", address: raw } });
+    expect((await pool.query("select address_line1, city from crm_customers where id = $1", [cust.id])).rows[0]).toEqual({ address_line1: "9 Pine Rd", city: "Ferndale" });
+    expect((await pool.query("select name, address_line1, city, state from crm_projects where id = $1", [proj.id])).rows[0]).toEqual({ name: "windows — Ferndale", address_line1: "9 Pine Rd", city: "Ferndale", state: "WA" });
+  });
+
   it("findCustomerByPhone matches formatted phone and alt phone inside the org only, never archived clients", async () => {
     const phone = fakePhone(), alt = fakePhone(), archived = fakePhone();
     const ten = phone.slice(2);

@@ -124,7 +124,10 @@ export function registerVoiceSimulatorRoutes(app: Express, getDevUser: GetUser):
     const body = turnBody.safeParse(req.body ?? {});
     if (!body.success) return bad(res, body.error.issues);
 
+    const limited = () => res.status(429).json({ code: "rate_limited", message: `The simulator allows ${SIM_TURNS_PER_HOUR} turns an hour per company. Try again in a little while.` });
     if (simulatorBackend() === "engine") {
+      // Same per-org limit as the app backend; the engine checks the session's org.
+      if (!takeSimTurn(v.ctx.org.id)) return limited();
       const r = await engineFetch("/sim/turn", { method: "POST", body: JSON.stringify({ sessionId: body.data.sessionId, text: body.data.text, orgId: v.ctx.org.id }) });
       if (!r) return engineDown(res);
       const j = await r.json().catch(() => ({}));
@@ -134,7 +137,7 @@ export function registerVoiceSimulatorRoutes(app: Express, getDevUser: GetUser):
     const s = sessions.get(body.data.sessionId);
     if (!s || s.orgId !== v.ctx.org.id) return res.status(404).json({ code: "unknown_session", message: "That simulator session has ended. Start a new one." });
     if (s.brain.ended) return res.status(409).json({ code: "session_ended", outcome: s.brain.outcome, message: "The simulated call has ended." });
-    if (!takeSimTurn(v.ctx.org.id)) return res.status(429).json({ code: "rate_limited", message: `The simulator allows ${SIM_TURNS_PER_HOUR} turns an hour per company. Try again in a little while.` });
+    if (!takeSimTurn(v.ctx.org.id)) return limited();
     s.touchedAt = Date.now();
     let turn: TurnResult;
     try {
@@ -161,7 +164,7 @@ export function registerVoiceSimulatorRoutes(app: Express, getDevUser: GetUser):
     if (!v) return;
     const id = String(req.params.id);
     if (simulatorBackend() === "engine") {
-      const r = await engineFetch(`/sim/session/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const r = await engineFetch(`/sim/session/${encodeURIComponent(id)}?orgId=${encodeURIComponent(v.ctx.org.id)}`, { method: "DELETE" });
       if (!r) return engineDown(res);
       return res.status(r.ok ? 200 : r.status >= 500 ? 503 : r.status).json(await r.json().catch(() => ({ ended: true })));
     }

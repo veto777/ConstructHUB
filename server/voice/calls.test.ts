@@ -30,6 +30,16 @@ const bag = made();
 
 const SESSION_SECRET = "voice-calls-session-secret";
 const VOICE_SECRET = "voice-calls-internal-secret-0123456789";
+const SIGNING_KEY = "voice-calls-signing-key";
+
+/** A carrier webhook signed the SignalWire/Twilio way (url + sorted params, HMAC-SHA1, base64). */
+async function carrierPost(url: string, form: Record<string, string>, opts: { sign?: boolean } = {}) {
+  const data = Object.keys(form).sort().map((k) => `${k}${form[k]}`).join("");
+  const headers: Record<string, string> = { "content-type": "application/x-www-form-urlencoded" };
+  if (opts.sign !== false) headers["x-signalwire-signature"] = createHmac("sha1", SIGNING_KEY).update(`${base}${url}${data}`).digest("base64");
+  const r = await fetch(base + url, { method: "POST", headers, body: new URLSearchParams(form).toString() });
+  return { status: r.status, text: await r.text() };
+}
 let port = 0;
 let base = "";
 let child: ChildProcess;
@@ -102,6 +112,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
     // No carrier, no bucket: nothing in this suite can leave the box.
     for (const k of ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER", "SIGNALWIRE_SIGNING_KEY",
       "R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]) delete env[k];
+    // A signing key (no carrier): inbound texts must be signed, so an escalation reply is verified.
+    env.SIGNALWIRE_SIGNING_KEY = SIGNING_KEY;
     child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], { env, stdio: ["ignore", "pipe", "pipe"], detached: true });
     mkdirSync("tmp", { recursive: true });
     const log = createWriteStream(`tmp/voice-calls-${port}.log`);
@@ -194,6 +206,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       const retry = await internal("PUT", `/calls/${sid}`, report);
       expect(retry.body).toEqual(end.body);
       expect(textsTo(leadTech)).toHaveLength(1);
+      // the city the end report added is in the body the reminders resend (no second text for it)
+      expect((await pool.query("select body from voice_escalations where id = $1", [shared.escalationId])).rows[0].body).toContain("12 Elm St, Tacoma");
       const { rows: [cust] } = await pool.query("select * from crm_customers where id = $1", [end.body.customerId]);
       expect(cust).toMatchObject({ org_id: A.orgId, phone: caller, first_name: "Dana", city: "Tacoma", state: "WA" });
       expect(cust.notes).toMatch(/^VIRTUAL FORM — filled out by Janice, Acme Siding's virtual assistant, on a phone call to the Main line line\./);
@@ -342,10 +356,15 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
     });
 
     it("an escalation reply by text confirms it (HELP still gets HELP); any member can close it", async () => {
-      const help = await http("POST", "/api/crm/sms/inbound", { form: { From: leadTech, To: "+15550100000", Body: "HELP" }, bearer: null });
+      const help = await carrierPost("/api/crm/sms/inbound", { From: leadTech, To: "+15550100000", Body: "HELP" });
       expect(help.text).toContain("ConstructHub account alerts");
-      expect((await pool.query("select confirmed_at from voice_escalations where id = $1", [shared.escalationId])).rows[0].confirmed_at).toBeNull();
-      const ok = await http("POST", "/api/crm/sms/inbound", { form: { From: leadTech, Body: "OK on my way" }, bearer: null });
+      const confirmedAt = async () => (await pool.query("select confirmed_at from voice_escalations where id = $1", [shared.escalationId])).rows[0].confirmed_at;
+      expect(await confirmedAt()).toBeNull();
+      // An unsigned (forged) reply never confirms; a signed one without `To` matches no org.
+      expect((await carrierPost("/api/crm/sms/inbound", { From: leadTech, To: "+15550100000", Body: "OK" }, { sign: false })).status).toBe(403);
+      expect((await carrierPost("/api/crm/sms/inbound", { From: leadTech, Body: "OK" })).text).not.toContain("Got it");
+      expect(await confirmedAt()).toBeNull();
+      const ok = await carrierPost("/api/crm/sms/inbound", { From: leadTech, To: "+15550100000", Body: "OK on my way" });
       expect(ok.text).toContain("<Message>Got it, thanks.</Message>");
       const open = await crm(a, "GET", "/escalations?open=1");
       expect(open.body.escalations.find((e: any) => e.id === shared.escalationId)).toMatchObject({ state: "confirmed", replyText: "OK on my way" });

@@ -13,7 +13,7 @@
 import { randomBytes } from "crypto";
 import { db } from "../db";
 import {
-  crmCustomers, crmLeadSources, crmMembers, crmOrgs, crmProjects, crmNotificationChannel,
+  crmActivityLog, crmCustomers, crmLeadSources, crmMembers, crmOrgs, crmProjects, crmNotificationChannel,
   type VoiceCallRow,
 } from "@shared/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -22,6 +22,16 @@ import { notifyMembers } from "../crm/notify";
 import { recordActivity } from "../crm/activity";
 import { sendWithFallback } from "../email";
 import type { OrgVoiceContext } from "./org-profile";
+import type { VoiceProfile } from "@shared/voice-profile";
+
+/**
+ * The state for a call's client/project: the profile's default state, else the one state every service-area
+ * county is in (a region shortcut like "Border to Tacoma" leaves defaultStateCode empty), else the CRM org's.
+ */
+export function leadState(profile: Pick<VoiceProfile, "serviceArea">, org: { state?: string | null }): string | null {
+  const countyStates = [...new Set(profile.serviceArea.counties.map((c) => c.stateCode).filter(Boolean))];
+  return profile.serviceArea.defaultStateCode || (countyStates.length === 1 ? countyStates[0] : null) || org.state || null;
+}
 
 export const CALL_ASSISTANT_LEAD_SOURCE = "Call Assistant";
 
@@ -57,6 +67,22 @@ export function streetOnly(address: string | null, city: string | null): string 
   return parts.join(", ");
 }
 
+const STATE_ZIP = /^(?:[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?|\d{5}(?:-\d{4})?|[A-Za-z]+\s+\d{5}(?:-\d{4})?)$/;
+const NOT_A_CITY = /\d|^(?:apt|apartment|unit|suite|ste|bldg|building|lot|space|po box|#)\b/i;
+
+/**
+ * The city inside a one-slot address ("55 Oak Lane, Bellingham" or "55 Oak Lane, Bellingham, WA 98225" →
+ * "Bellingham"): the last comma-separated part once a trailing state/ZIP is dropped. The default intake
+ * collects street and city in one `address` slot, and a mid-call lead has no caller city yet.
+ */
+export function cityFromAddress(address: string | null | undefined): string | null {
+  const parts = String(address ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  while (parts.length > 2 && STATE_ZIP.test(parts[parts.length - 1])) parts.pop();
+  if (parts.length < 2) return null;
+  const last = parts[parts.length - 1].replace(/\s+[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/, "").trim();
+  return last && !NOT_A_CITY.test(last) && last.length <= 60 ? last : null;
+}
+
 export function leadFactsFrom(call: Pick<VoiceCallRow, "fromNumber" | "callerName" | "callerEmail" | "callerAddress" | "callerCity" | "serviceNeeded">, slots: Record<string, string> = {}): LeadFacts {
   const pick = (...keys: string[]) => {
     for (const k of keys) { const v = slots[k]; if (typeof v === "string" && v.trim()) return v.trim(); }
@@ -65,12 +91,13 @@ export function leadFactsFrom(call: Pick<VoiceCallRow, "fromNumber" | "callerNam
   const slotPhone = pick("phone", "callback", "callback_number");
   const phone = normalizePhone(slotPhone) ?? normalizePhone(call.fromNumber);
   const email = pick("email");
-  const city = pick("city") ?? (call.callerCity?.trim() || null);
+  const rawAddress = pick("address", "street_address") ?? (call.callerAddress?.trim() || null);
+  const city = pick("city") ?? (call.callerCity?.trim() || null) ?? cityFromAddress(rawAddress);
   return {
     phone,
     name: pick("first_name", "name", "full_name") ?? (call.callerName?.trim() || null),
     email: email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.toLowerCase() : (call.callerEmail?.trim() || null),
-    address: streetOnly(pick("address", "street_address") ?? (call.callerAddress?.trim() || null), city),
+    address: streetOnly(rawAddress, city),
     city,
     need: pick("need", "service", "project") ?? (call.serviceNeeded?.trim() || null),
     bestTime: pick("best_time", "callback_time"),
@@ -142,7 +169,8 @@ export async function deliverLead(args: {
   const { org, profile } = ctx;
   const slots = args.slots ?? call.slots ?? {};
   const facts = leadFactsFrom(call, slots);
-  const state = profile.serviceArea.defaultStateCode || org.state || null;
+  const state = leadState(profile, org);
+  const rawAddress = (["address", "street_address"].map((k) => slots[k]).find((v) => typeof v === "string" && v.trim()) ?? "").trim();
   const note = virtualFormNote(ctx, args.numberLabel ?? null, facts, call.summary);
   const tags = profile.leadDelivery.crm.tags.length ? profile.leadDelivery.crm.tags : ["call-assistant"];
 
@@ -156,6 +184,8 @@ export async function deliverLead(args: {
     const patch: Partial<typeof crmCustomers.$inferInsert> = { updatedAt: new Date() };
     if (!customer.email && facts.email) patch.email = facts.email;
     if (!customer.addressLine1 && facts.address) patch.addressLine1 = facts.address;
+    // a mid-call delivery stored the raw one-slot address ("55 Oak Lane, Bellingham"): the street alone now
+    else if (facts.address && rawAddress && customer.addressLine1 === rawAddress && rawAddress !== facts.address) patch.addressLine1 = facts.address;
     if (!customer.city && facts.city) patch.city = facts.city;
     if (!customer.state && state) patch.state = state;
     if (!customer.firstName && facts.name) patch.firstName = facts.name;
@@ -191,10 +221,10 @@ export async function deliverLead(args: {
 
   // 2. Project (pipeline stage "lead") — once per call.
   let projectId: string | null = call.projectId ?? null;
+  const projectName = [facts.need || "Phone lead", facts.city].filter(Boolean).join(" — ").slice(0, 200);
   if (!projectId && profile.leadDelivery.crm.createProject) {
-    const name = [facts.need || "Phone lead", facts.city].filter(Boolean).join(" — ").slice(0, 200);
     const [project] = await db.insert(crmProjects).values({
-      orgId: org.id, customerId: customer.id, name, status: "lead",
+      orgId: org.id, customerId: customer.id, name: projectName, status: "lead",
       addressLine1: facts.address, city: facts.city, state,
       description: call.summary ?? null,
     }).returning({ id: crmProjects.id });
@@ -202,6 +232,28 @@ export async function deliverLead(args: {
   }
 
   const alreadyDelivered = !!call.leadDeliveredAt;
+
+  // The end report for a lead delivered mid-call (before the city, summary and duration existed): fill in this
+  // call's own project and the audit row. Only empty fields, the raw slot address and the generated name change.
+  if (alreadyDelivered && projectId) {
+    const [project] = await db.select().from(crmProjects).where(and(eq(crmProjects.orgId, org.id), eq(crmProjects.id, projectId))).limit(1);
+    if (project) {
+      const pp: Partial<typeof crmProjects.$inferInsert> = {};
+      if (!project.city && facts.city) pp.city = facts.city;
+      if (!project.state && state) pp.state = state;
+      if (facts.address && (!project.addressLine1 || (rawAddress && project.addressLine1 === rawAddress && rawAddress !== facts.address))) pp.addressLine1 = facts.address;
+      if (!project.description && call.summary) pp.description = call.summary;
+      const generated = (facts.need || "Phone lead").slice(0, 200);
+      if (project.name === generated && projectName !== generated) pp.name = projectName;
+      if (Object.keys(pp).length) await db.update(crmProjects).set({ ...pp, updatedAt: new Date() }).where(eq(crmProjects.id, project.id));
+    }
+  }
+  if (alreadyDelivered && (call.summary || call.durationSeconds != null || call.outcome)) {
+    await db.update(crmActivityLog)
+      .set({ meta: sql`coalesce(${crmActivityLog.meta}, '{}'::jsonb) || ${JSON.stringify({ outcome: call.outcome, durationSeconds: call.durationSeconds, summary: call.summary, recording: !!call.recordingKey })}::jsonb` })
+      .where(and(eq(crmActivityLog.orgId, org.id), eq(crmActivityLog.action, "call.lead"), eq(crmActivityLog.entityType, "voice_call"), eq(crmActivityLog.entityId, call.id)))
+      .catch((e: any) => console.error("[voice] lead activity update failed:", e?.message || e));
+  }
 
   // 3. Audit row — once per call.
   if (!alreadyDelivered) recordActivity({

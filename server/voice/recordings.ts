@@ -53,6 +53,12 @@ export async function putRecording(orgId: string, callSid: string, wav: Buffer):
 }
 
 /** The R2 object for streaming; the caller pipes `body` to the response. */
-export async function openRecording(key: string): Promise<{ body: ReadableStream | null; contentType: string }> {
-  return getFromR2(key);
+export async function openRecording(key: string, range?: string): Promise<{ body: ReadableStream | null; contentType: string; contentLength?: number; contentRange?: string }> {
+  return getFromR2(key, { range });
+}
+
+/** A single byte range we pass to R2 ("bytes=0-99", "bytes=100-", "bytes=-500"); anything else is ignored. */
+export function parseRange(header: unknown): string | undefined {
+  const h = typeof header === "string" ? header.trim() : "";
+  return /^bytes=(?:\d+-\d*|-\d+)$/.test(h) ? h : undefined;
 }

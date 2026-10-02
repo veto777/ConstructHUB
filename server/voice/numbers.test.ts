@@ -260,6 +260,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
         // The stub carrier, under the texting integration's env names; the texting side never sends in these tests.
         SIGNALWIRE_SPACE_URL: stub.base, SIGNALWIRE_PROJECT_ID: CFG.SIGNALWIRE_PROJECT_ID, SIGNALWIRE_API_TOKEN: CFG.SIGNALWIRE_API_TOKEN, SIGNALWIRE_FROM_NUMBER: "+15550100000",
         VOICE_NUMBERS_MOCK: "", VOICE_PUBLIC_BASE: "https://constructhub.us/voice", VOICE_ESCALATION_WORKER_ENABLED: "false",
+        VOICE_ENGINE_URL: "http://127.0.0.1:9",   // no engine: the Overview must say so
       },
       stdio: ["ignore", "pipe", "pipe"], detached: true,
     });
@@ -382,6 +383,12 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     expect(r.status).toBe(200);
     expect(r.body.number).toMatchObject({ id, label: "Tracking line", location: "Mount Vernon", forwardingFrom: null });
     expect((await api(`/api/crm/voice/numbers/${id}`, pro, "PATCH", { label: "constructhub-test" })).status).toBe(400);
+    // …and a customer can't buy under it either (platform staff only), before any carrier call.
+    const hits = stub.hits.length;
+    const reserved = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: num("0177"), label: "constructhub-test", state: "WA" });
+    expect(reserved.status).toBe(400);
+    expect(reserved.body.message).toMatch(/reserved/);
+    expect(stub.hits).toHaveLength(hits);
     expect((await api(`/api/crm/voice/numbers/${randomUUID()}`, pro, "PATCH", { label: "x" })).status).toBe(404);
     // Another org can't touch it.
     await setAddons(noAddon, { call_assistant: 1 });
@@ -438,6 +445,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     const status = await api("/api/crm/voice/status", pro);
     expect(status.status).toBe(200);
     expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 500 }, units: { callAssistant: 1, callNumber: 1 }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
+    // The engine is probed, not assumed; its internal address never reaches the browser.
+    expect(status.body.engine).toMatchObject({ reachable: false, models: false });
+    expect(status.body.engine).not.toHaveProperty("url");
+    expect(status.body.engine).not.toHaveProperty("publicBase");
     expect(status.body.numbers.map((n: any) => n.status)).toEqual(["active"]);
     const month = new Date().toISOString().slice(0, 7);
     expect(status.body.usage).toMatchObject({ month, calls: 0, minutes: 0, includedMinutes: 500, remainingMinutes: 500, overageMinutes: 0, overageCentsPerMinute: 15 });

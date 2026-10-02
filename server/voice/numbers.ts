@@ -241,6 +241,9 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
     const forwardingFrom = req.body?.forwardingFrom ? toE164(String(req.body.forwardingFrom)) : null;
     if (req.body?.forwardingFrom && !forwardingFrom) return res.status(400).json({ message: "The line you forward from must be a US phone number." });
     const isTest = label === TEST_NUMBER_LABEL;
+    // The reserved label is the build's one test number: platform staff only (a customer org would block it
+    // for everyone, and learn that it exists).
+    if (isTest && !v.ent.isPlatformAdmin) return res.status(400).json({ message: `"${TEST_NUMBER_LABEL}" is reserved for the build's test number.` });
     const stateRaw = req.body?.state ? String(req.body.state).toUpperCase() : null;
     if (stateRaw && !isUsStateCode(stateRaw)) return res.status(400).json({ message: "State must be a two-letter US state code." });
     res.setHeader("Cache-Control", "no-store");

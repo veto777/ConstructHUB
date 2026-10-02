@@ -39,6 +39,17 @@ describe("spam thresholds", () => {
   });
 });
 
+describe("unmistakable pitches", () => {
+  it("raise a flagged call's confidence to the strike line; ordinary calls are untouched", async () => {
+    const { spamConfidenceWithFloor } = await import("./spam");
+    expect(spamConfidenceWithFloor(0.9, 0.95, "Google listing verification scam")).toBe(0.95);
+    expect(spamConfidenceWithFloor(0.85, 0.95, null, "Hi, I'm calling about your Google Business listing, it's unverified")).toBe(0.95);
+    expect(spamConfidenceWithFloor(0.85, 0.95, "vague caller", "press 1 to speak to an agent")).toBe(0.95);
+    expect(spamConfidenceWithFloor(0.98, 0.95, "SEO pitch")).toBe(0.98);
+    expect(spamConfidenceWithFloor(0.85, 0.95, "would not give an address", "I need my roof looked at")).toBe(0.85);
+  });
+});
+
 describe("spam ledger (real DB)", () => {
   it("a flagged-but-not-certain verdict counts the call without a strike", async () => {
     const from = fakePhone();

@@ -20,7 +20,7 @@ import { voiceCalls, voiceEscalations, crmCustomers, crmProjects, voiceNumbers }
 import { and, desc, eq, gte, inArray, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { CALL_OUTCOMES } from "@shared/voice-profile";
 import { voiceContext, type GetUser } from "./context";
-import { openRecording } from "./recordings";
+import { openRecording, parseRange } from "./recordings";
 import { listSpamLedger, presentSpamRow, unblockNumber, blockNumber, spamNumber } from "./spam";
 import { closeEscalation, listEscalations, confirmEscalationByToken, startVoiceEscalationWorker, kindLabel } from "./escalations";
 import { logActivity } from "../crm/activity";
@@ -136,8 +136,14 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(voiceCalls.orgId, v.ctx.org.id), eq(voiceCalls.id, String(req.params.id)))).limit(1);
     if (!call?.recordingKey) return res.status(404).json({ message: "No recording for this call" });
     try {
-      const { body, contentType } = await openRecording(call.recordingKey);
+      // Range + Content-Length so the browser's player knows the length and can seek (a chunked stream
+      // with no length reads as an endless recording).
+      const range = parseRange(req.headers.range);
+      const { body, contentType, contentLength, contentRange } = await openRecording(call.recordingKey, range);
       if (!body) return res.status(404).json({ message: "Recording not found" });
+      if (range && contentRange) { res.status(206); res.setHeader("Content-Range", contentRange); }
+      if (contentLength != null) res.setHeader("Content-Length", String(contentLength));
+      res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Content-Type", contentType || "audio/wav");
       res.setHeader("Cache-Control", "private, no-store");
       res.setHeader("Content-Disposition", `inline; filename="${call.callSid}.wav"`);
@@ -146,6 +152,9 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
       else if (typeof stream[Symbol.asyncIterator] === "function") { for await (const chunk of stream) res.write(chunk); res.end(); }
       else res.end(Buffer.from(await new Response(stream).arrayBuffer()));
     } catch (e: any) {
+      if (e?.name === "InvalidRange" || e?.$metadata?.httpStatusCode === 416) {
+        if (!res.headersSent) return res.status(416).json({ message: "Requested range not satisfiable" });
+      }
       console.error("[voice] recording stream failed:", e?.message || e);
       if (!res.headersSent) res.status(502).json({ message: "Could not fetch the recording" });
       else res.end();

@@ -24,6 +24,18 @@ export const SPAM_THRESHOLDS_BY_SENSITIVITY: Record<"low" | "normal" | "high", {
   high: { flagAt: 0.7, strikeAt: 0.9 },
 };
 
+/** Pitches that are spam every time; the model tends to rate them 0.9 when strikeAt is 0.95 (QA spam_google_listing). */
+export const UNMISTAKABLE_SPAM = /google (?:business )?(?:listing|profile|verification)|\bpress (?:1|one|2|two)\b|\bseo\b|rank(?:ing)? (?:on|in) google|merchant services|this is a recorded message/i;
+
+/**
+ * The confidence the ledger records for a call that is already flagged spam: at least `strikeAt` when the
+ * model's reason or what the caller said is one of the unmistakable pitches, so the two-strike block is
+ * deterministic. Never raises a call that wasn't flagged (that decision stays with flagAt).
+ */
+export function spamConfidenceWithFloor(confidence: number, strikeAt: number, ...texts: Array<string | null | undefined>): number {
+  return texts.some((t) => !!t && UNMISTAKABLE_SPAM.test(t)) ? Math.max(confidence, strikeAt) : confidence;
+}
+
 export type SpamVerdictResult = { strikes: number; calls: number; blocked: boolean; strike: boolean };
 
 /** E.164 or null; the ledger never stores a number it could not normalize. */

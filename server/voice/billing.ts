@@ -24,12 +24,35 @@ import { voiceContext, type GetUser } from "./context";
 import { moduleEnabled } from "../entitlements";
 import { ADDONS, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
-import { voiceEngineUrl, voicePublicBase } from "./proxy";
+import { voiceEngineUrl } from "./proxy";
 import { listOrgNumbers, numberView, numberAllowance, HELD_STATUSES, numbersMockEnabled } from "./numbers";
 import { signalwireConfig } from "./numbers-signalwire";
 import { getVoiceUsageRow, listVoiceUsage, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export type EngineStatus = { configured: boolean; reachable: boolean; models: boolean; checkedAt: string };
+const ENGINE_PROBE_TTL_MS = 30_000;
+let engineProbe: { at: number; value: Promise<Omit<EngineStatus, "configured">> } | null = null;
+
+/** Is the engine actually up? GET `${VOICE_ENGINE_URL}/health` with a short timeout, cached ~30 s. */
+export function probeEngine(now = Date.now()): Promise<Omit<EngineStatus, "configured">> {
+  if (engineProbe && now - engineProbe.at < ENGINE_PROBE_TTL_MS) return engineProbe.value;
+  const value = (async () => {
+    const checkedAt = new Date(now).toISOString();
+    try {
+      const r = await fetch(`${voiceEngineUrl()}/health`, { signal: AbortSignal.timeout(2500) });
+      if (!r.ok) return { reachable: false, models: false, checkedAt };
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; models?: boolean } | null;
+      return { reachable: j?.ok === true, models: j?.models === true, checkedAt };
+    } catch {
+      return { reachable: false, models: false, checkedAt };
+    }
+  })();
+  engineProbe = { at: now, value };
+  return value;
+}
+export function resetEngineProbe(): void { engineProbe = null; }
 
 export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): void {
   /**
@@ -49,7 +72,8 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       allowance: v.allowance,
       units: { callAssistant: v.ent.addons.call_assistant ?? 0, callNumber: v.ent.addons.call_number ?? 0 },
       pricing: { includedMinutes: CALL_ASSISTANT_INCLUDED_MINUTES, overageCentsPerMinute: CALL_MINUTE_OVERAGE_CENTS, numberMinDays: CALL_NUMBER_MIN_DAYS },
-      engine: { configured: voiceInternalConfigured(), url: voiceEngineUrl(), publicBase: voicePublicBase() },
+      // The engine's internal address never goes to the browser; only whether it answers.
+      engine: { configured: voiceInternalConfigured(), ...(await probeEngine()) } satisfies EngineStatus,
       numbersProvider: { configured: numbersMockEnabled() || signalwireConfig() !== null, mock: numbersMockEnabled() },
       canManage: v.ctx.permissions.manageSettings === true,
     };

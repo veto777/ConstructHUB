@@ -166,9 +166,10 @@ async function sendEscalation(org: typeof crmOrgs.$inferSelect, row: Pick<VoiceE
 }
 
 /** Owners through the CRM's channels (bell/email/sms per the leadReceived matrix). */
-async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: string, facts: EscalationFacts): Promise<void> {
+async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: string, facts: EscalationFacts, opts: { update?: boolean } = {}): Promise<void> {
   const who = facts.callerName === "unknown" ? facts.callback : facts.callerName;
-  const title = kind === "human" ? `${who} asked for a person` : `${facts.kind} — call from ${who}`;
+  const base = kind === "human" ? `${who} asked for a person` : `${facts.kind} — call from ${who}`;
+  const title = opts.update ? `Details added — ${base}` : base;
   await notifyMembers({
     org: ctx.org, pref: "leadReceived", type: `call.alert.${kind}`, title,
     body: facts.summary || null, link: `/crm/call-assistant?tab=calls&call=${call.id}`,
@@ -197,14 +198,22 @@ export async function raiseEscalation(args: {
 }): Promise<RaiseResult> {
   const { ctx, call } = args;
   const kind = isEscalationKind(args.kind) ? args.kind : "other";
-  const [existing] = await db.select({ id: voiceEscalations.id, recipientName: voiceEscalations.recipientName }).from(voiceEscalations)
-    .where(and(eq(voiceEscalations.orgId, ctx.org.id), eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind))).limit(1);
-  if (existing) return { escalationId: existing.id, sent: true, fallback: false, recipientName: existing.recipientName, duplicate: true };
-  const alreadyFallback = ((call.flags ?? {}) as Record<string, unknown>).alertedKinds;
-  if (Array.isArray(alreadyFallback) && alreadyFallback.includes(kind)) return { escalationId: null, sent: true, fallback: true, recipientName: null, duplicate: true };
-
   const facts = escalationFacts(ctx, call, kind, args.summary, args.slots);
   const rule = matchRule(ctx.profile.escalations.rules, kind);
+  const [existing] = await db.select().from(voiceEscalations)
+    .where(and(eq(voiceEscalations.orgId, ctx.org.id), eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind))).limit(1);
+  const callFlags = (call.flags ?? {}) as Record<string, unknown>;
+  const alreadyFallback = Array.isArray(callFlags.alertedKinds) && (callFlags.alertedKinds as string[]).includes(kind);
+  if (existing || alreadyFallback) {
+    // The same kind again (a mid-call update, or the end report repeating it): no second page — but when the
+    // call has since given a name or an address the first message lacked, the stored body (what reminders
+    // resend) is rebuilt and one "details added" message goes out.
+    await addEscalationDetails(ctx, call, kind, facts, rule, existing ?? null)
+      .catch((e: any) => console.error("[voice] escalation details update failed:", e?.message || e));
+    return existing
+      ? { escalationId: existing.id, sent: true, fallback: false, recipientName: existing.recipientName, duplicate: true }
+      : { escalationId: null, sent: true, fallback: true, recipientName: null, duplicate: true };
+  }
   recordActivity({
     orgId: ctx.org.id, actorLabel: `${ctx.assistantName} (Call Assistant)`, action: "call.alert",
     entityType: "voice_call", entityId: call.id, customerId: call.customerId ?? null,
@@ -231,11 +240,14 @@ export async function raiseEscalation(args: {
     }
   }
   // No rule (or an unusable recipient) → the owners; urgent/human always also reach the owners.
+  let ownersNotified = false;
   if ((!result.escalationId && ctx.profile.escalations.fallbackToOwner) || kind === "urgent" || kind === "human") {
     await notifyOwners(ctx, call, kind, facts).catch((e: any) => console.error("[voice] owner alert failed:", e?.message || e));
     result.fallback = true;
     result.sent = true;
+    ownersNotified = true;
   }
+  if (ownersNotified) await rememberOwnerFacts(call, kind, facts);
   // Remember the kind on the call (merged in SQL, so a concurrent end report keeps its own keys).
   await db.execute(sql`
     update voice_calls
@@ -249,6 +261,51 @@ export async function raiseEscalation(args: {
   return result;
 }
 
+/** What the owners' alert carried, per kind (voice_calls.flags.alertFacts), so a later update can tell what's new. */
+type SentFacts = { callerName: string; address: string };
+
+async function rememberOwnerFacts(call: VoiceCallRow, kind: string, facts: EscalationFacts): Promise<void> {
+  const entry: SentFacts = { callerName: facts.callerName, address: facts.address };
+  await db.execute(sql`
+    update voice_calls
+       set flags = coalesce(flags, '{}'::jsonb) || jsonb_build_object('alertFacts',
+         coalesce(flags->'alertFacts', '{}'::jsonb) || jsonb_build_object(${kind}::text, ${JSON.stringify(entry)}::jsonb))
+     where id = ${call.id}`);
+  const flags = { ...((call.flags ?? {}) as Record<string, unknown>) };
+  flags.alertFacts = { ...((flags.alertFacts ?? {}) as Record<string, SentFacts>), [kind]: entry };
+  call.flags = flags;
+}
+
+/**
+ * True when `facts` has a caller name or a street address that `had` (a body, or the facts sent before)
+ * lacks — worth a "details added" message. A city added to a street that was already there is not.
+ */
+export function factsAddDetail(facts: Pick<EscalationFacts, "callerName" | "address">, had: string | SentFacts): boolean {
+  const text = typeof had === "string" ? had.toLowerCase() : `${had.callerName === "unknown" ? "" : had.callerName}\n${had.address}`.toLowerCase();
+  const name = facts.callerName !== "unknown" && !!facts.callerName && !text.includes(facts.callerName.toLowerCase());
+  const street = facts.address.split(",")[0].trim().toLowerCase();
+  return name || (!!street && !text.includes(street));
+}
+
+async function addEscalationDetails(ctx: OrgVoiceContext, call: VoiceCallRow, kind: string, facts: EscalationFacts, rule: EscalationRule | null, row: VoiceEscalationRow | null): Promise<void> {
+  const fuller = !!row && !!facts.address && !row.body.toLowerCase().includes(facts.address.toLowerCase());
+  if (row && !row.closedAt && (factsAddDetail(facts, row.body) || fuller)) {
+    // the reminders resend the stored body, so it always gets the fuller facts; a message goes out only
+    // when a name or a street is new
+    const body = escalationBody(rule, facts);
+    await db.update(voiceEscalations).set({ body }).where(eq(voiceEscalations.id, row.id));
+    if (row.sentCount > 0 && factsAddDetail(facts, row.body)) {
+      const sent = await sendEscalation(ctx.org, row, `Details added:\n\n${body}`, `${facts.company}: ${facts.kind} — details added for ${facts.callerName}`);
+      await db.update(voiceEscalations).set({ lastProviderSid: sent.sid, lastError: sent.error }).where(eq(voiceEscalations.id, row.id));
+    }
+  }
+  const sentToOwners = ((call.flags ?? {}) as { alertFacts?: Record<string, SentFacts> }).alertFacts?.[kind];
+  if (sentToOwners && factsAddDetail(facts, sentToOwners)) {
+    await notifyOwners(ctx, call, kind, facts, { update: true });
+    await rememberOwnerFacts(call, kind, facts);
+  }
+}
+
 // ── Confirmation ─────────────────────────────────────────────────────────────
 
 /**
@@ -257,20 +314,20 @@ export async function raiseEscalation(args: {
  * Called from the inbound SMS webhook (server/crm/sms.ts, after STOP/START/
  * HELP). `to` is the number the text was sent to: only escalations whose org
  * sends from that number are touched, so one person on two orgs' escalation
- * lists confirms only the org they answered. Without `to` (carrier omitted
- * it) every open sms escalation to that phone is matched. Returns how many
- * rows the reply touched.
+ * lists confirms only the org they answered. Without `to` nothing is touched
+ * (no cross-org match). The SMS hook calls this only for a verified webhook.
+ * Returns how many rows the reply touched.
  */
 export async function confirmEscalationByReply(from: string | null | undefined, text: string, to?: string | null, now = new Date()): Promise<number> {
   const phone = normalizePhone(from);
-  if (!phone) return 0;
+  if (!phone || !normalizePhone(to)) return 0;
   const rows = await db.select().from(voiceEscalations)
     .where(and(eq(voiceEscalations.channel, "sms"), eq(voiceEscalations.recipient, phone), isNull(voiceEscalations.closedAt)))
     .orderBy(asc(voiceEscalations.id));
   if (!rows.length) return 0;
-  const inbound = normalizePhone(to);
+  const inbound = normalizePhone(to)!;
   const senderOf = new Map<string, string | null>();
-  if (inbound) {
+  {
     const orgIds = [...new Set(rows.map((r) => r.orgId))];
     const orgRows = await db.select({ id: crmOrgs.id, customFields: crmOrgs.customFields }).from(crmOrgs).where(inArray(crmOrgs.id, orgIds));
     for (const o of orgRows) senderOf.set(o.id, normalizePhone(resolveSmsSender(o.customFields)?.from ?? null));
@@ -280,7 +337,7 @@ export async function confirmEscalationByReply(from: string | null | undefined, 
   for (const row of rows) {
     // Skip only an org whose sender is known and is not the number that received the reply.
     const sender = senderOf.get(row.orgId);
-    if (inbound && sender && sender !== inbound) continue;
+    if (sender && sender !== inbound) continue;
     if (!row.confirmedAt) {
       await db.update(voiceEscalations).set({ confirmedAt: now, replyText: reply }).where(eq(voiceEscalations.id, row.id));
       touched++;

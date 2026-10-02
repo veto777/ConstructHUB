@@ -10,6 +10,7 @@
 import type { Express } from "express";
 import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "./internal-auth";
 import { lookupNumber, callerStatus, publishedState, normalizeE164 } from "./profile-store";
+import { getEntitlements, moduleEnabled } from "../entitlements";
 
 /** What the engine speaks (then hangs up) when a number rings but nothing can answer. */
 export const UNPUBLISHED_LINE = "Thank you for calling. Our phone assistant isn't set up yet, so please try again later or reach us through our website. Goodbye.";
@@ -29,6 +30,8 @@ export function registerVoiceInternalProfileRoutes(app: Express): void {
    *  400 { code: "bad_request" }         `to` is not E.164
    *  404 { code: "unknown_number" }      the app does not own `to`
    *  423 { code: "paused" | "unpublished", say }   the engine speaks `say` and hangs up
+   *      (also "paused" when the org owner's subscription no longer carries the Call Assistant add-on:
+   *      a lapsed or cancelled org gets no receptionist — the platform pays for GPU, AI and minutes)
    */
   app.get(`${VOICE_INTERNAL_PATH}/profile`, requireVoiceInternal, async (req, res) => {
     const to = normalizeE164(typeof req.query.to === "string" ? req.query.to : null);
@@ -37,6 +40,10 @@ export function registerVoiceInternalProfileRoutes(app: Express): void {
     const found = await lookupNumber(to);
     if (!found) return res.status(404).json({ code: "unknown_number" });
     const { number, org, profile } = found;
+    const ent = await getEntitlements(org.ownerUserId);
+    if (!moduleEnabled(ent, "callAssistant")) {
+      return res.status(423).json({ code: "paused", reason: "addon_inactive", say: PAUSED_LINE, org: { id: org.id, name: org.name } });
+    }
     const st = publishedState(profile);
     if (st.state !== "live") return res.status(423).json({ code: st.state, say: st.state === "paused" ? PAUSED_LINE : UNPUBLISHED_LINE, org: { id: org.id, name: org.name } });
     const caller = await callerStatus(org.id, from);
