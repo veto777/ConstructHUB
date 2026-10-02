@@ -1,4 +1,5 @@
 import { AgencyWorkspace, Pager, fullAddress, useAgencyFilter } from "@/components/agency-workspace";
+import { STARTING_MONTHLY_CENTS, formatUsd } from "@shared/plan-copy";
 import { LocationSearchSummary } from "./site-connections";
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection } from "@/components/gbp-connection";
@@ -104,6 +105,9 @@ function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated:
   const [tab, setTab] = useState<string>(initialTab ?? "search");
   // The connected account's profiles are being looked up (a new connection): retry until they arrive.
   const [gbpLookup, setGbpLookup] = useState(0);
+  // Importing needs a plan: say so before they pick profiles, not after the import fails (owner, 2026-10-02).
+  const { data: ent } = useQuery<{ accessPlan: string | null }>({ queryKey: ["/api/entitlements"] });
+  const needsPlan = !!ent && !ent.accessPlan;
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -329,10 +333,21 @@ function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated:
                 </div>
               ))}
             </div>
-            <Button onClick={importGbpLocations} disabled={selectedGbp.size === 0} className="w-full gap-2" data-testid="button-import-gbp">
-              <Plus className="w-4 h-4" />
-              Import {selectedGbp.size > 0 ? `${selectedGbp.size} Location${selectedGbp.size !== 1 ? "s" : ""}` : "Selected"}
-            </Button>
+            {needsPlan ? (
+              <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2" data-testid="gbp-import-needs-plan">
+                <p className="text-sm">
+                  <strong>Your Google profile{gbpLocations.length !== 1 ? "s were" : " was"} found.</strong> Importing {gbpLocations.length !== 1 ? "them" : "it"} into
+                  ConstructHUB — and opening {gbpLocations.length !== 1 ? "their" : "its"} profile page with insights, reviews, posts and Profile Guard — needs a plan,
+                  from {formatUsd(STARTING_MONTHLY_CENTS)}/month.
+                </p>
+                <Button asChild className="w-full gap-2" data-testid="button-gbp-see-plans"><a href="/pricing">See plans to import</a></Button>
+              </div>
+            ) : (
+              <Button onClick={importGbpLocations} disabled={selectedGbp.size === 0} className="w-full gap-2" data-testid="button-import-gbp">
+                <Plus className="w-4 h-4" />
+                Import {selectedGbp.size > 0 ? `${selectedGbp.size} Location${selectedGbp.size !== 1 ? "s" : ""}` : "Selected"}
+              </Button>
+            )}
           </div>
         )}
         {!gbpLoading && !gbpError && gbpLocations.length === 0 && gbpLookup === 0 && !hasGbpAccess && (

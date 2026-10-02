@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { STARTING_MONTHLY_CENTS, formatUsd } from '@shared/plan-copy';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, apiErrorMessage, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,8 @@ export function AgencyWorkspace(props:{onOpen?:(id:number)=>void;compact?:boolea
 function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
   const f=useAgencyFilter();
   const open=(id:number)=>onOpen?onOpen(id):window.location.assign(`/locations?location=${id}`);
+  const {data:ent}=useQuery<{accessPlan:string|null}>({queryKey:['/api/entitlements']});
+  const noPlan=!!ent&&!ent.accessPlan;
   const params=new URLSearchParams({paged:'true',q:f.q,status:f.status,offset:String(f.offset)});
   const {data,error}=useQuery<any>({queryKey:['/api/locations','paged',params.toString()],queryFn:()=>apiRequest('GET','/api/locations?'+params).then(r=>r.json())});
   const agencyPlan=PLANS[planForModule('agencyWorkspace')].name;
@@ -54,8 +57,13 @@ function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
     {data&&!data.items.length&&(f.q||f.status!=='all'
       ? <p className="text-sm text-muted-foreground">No locations match these filters.</p>
       : <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4" data-testid="own-locations-empty">
-          <p className="text-sm text-muted-foreground">No locations yet. Bring in the Business Profile from your connected Google account, or add one by searching Google.</p>
-          <Button asChild><a href="/locations?import=gbp" data-testid="button-import-own-profile">Import your Business Profile</a></Button>
+          <p className="text-sm text-muted-foreground">{noPlan
+            ? `No locations yet. Connect Google and we'll find your Business Profile; importing it and opening its profile page needs a plan, from ${formatUsd(STARTING_MONTHLY_CENTS)}/month.`
+            : 'No locations yet. Bring in the Business Profile from your connected Google account, or add one by searching Google.'}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant={noPlan ? 'outline' : 'default'}><a href="/locations?import=gbp" data-testid="button-import-own-profile">{noPlan ? 'See your Google profiles' : 'Import your Business Profile'}</a></Button>
+            {noPlan && <Button asChild><a href="/pricing" data-testid="button-own-locations-see-plans">See plans</a></Button>}
+          </div>
         </div>)}
     <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
     <p className="text-sm text-muted-foreground">Client workspaces, bulk actions across locations and CSV export are part of the {MODULE_NAMES.agencyWorkspace} on the <Link href="/pricing" className="text-primary underline">{agencyPlan} plan</Link>.</p>
