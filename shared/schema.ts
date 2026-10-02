@@ -2515,3 +2515,193 @@ export const accountApiUsage = pgTable("account_api_usage", {
 export type BillingInvoice = typeof billingInvoices.$inferSelect;
 export type BillingPurchase = typeof billingPurchases.$inferSelect;
 export type AccountApiKey = typeof accountApiKeys.$inferSelect;
+
+// ── Call Assistant (docs/call-assistant/SPEC.md) ─────────────────────────────
+// Mirror of server/voice/schema.ts (THE DDL). The architect owns this block;
+// a lane that adds a column appends it to its marked block in the DDL file
+// and here, never elsewhere. Every table is org-scoped (crm_orgs.id).
+import type { VoiceProfile, CompiledProfile, Decision } from "./voice-profile";
+
+/** One per org: the Studio draft, the published copy the engine runs, the compiled prompt. */
+export const voiceProfiles = pgTable("voice_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().unique(),
+  profile: jsonb("profile").$type<VoiceProfile>().notNull(),
+  publishedVersion: integer("published_version"),
+  publishedProfile: jsonb("published_profile").$type<VoiceProfile>(),
+  compiled: jsonb("compiled").$type<CompiledProfile>(),
+  /** draft | live | paused */
+  status: text("status").notNull().default("draft"),
+  setupCompletedAt: timestamp("setup_completed_at"),
+  updatedByMemberId: varchar("updated_by_member_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const voiceProfileVersions = pgTable("voice_profile_versions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  profileId: varchar("profile_id").notNull(),
+  version: integer("version").notNull(),
+  profile: jsonb("profile").$type<VoiceProfile>().notNull(),
+  compiled: jsonb("compiled").$type<CompiledProfile>(),
+  note: text("note"),
+  createdByMemberId: varchar("created_by_member_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [uniqueIndex("voice_profile_versions_org_version_key").on(t.orgId, t.version)]);
+
+export const VOICE_NUMBER_STATUSES = ["pending", "active", "releasing", "released", "failed"] as const;
+export type VoiceNumberStatus = (typeof VOICE_NUMBER_STATUSES)[number];
+
+export const voiceNumbers = pgTable("voice_numbers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  /** E.164. */
+  phoneNumber: text("phone_number").notNull().unique(),
+  label: text("label"),
+  location: text("location"),
+  state: text("state"),
+  areaCode: text("area_code"),
+  locality: text("locality"),
+  provider: text("provider").notNull().default("signalwire"),
+  /** SignalWire IncomingPhoneNumber SID. */
+  providerSid: text("provider_sid"),
+  friendlyName: text("friendly_name"),
+  voiceUrl: text("voice_url"),
+  statusCallbackUrl: text("status_callback_url"),
+  status: text("status").$type<VoiceNumberStatus>().notNull().default("active"),
+  /** The ONE real test number of the build (label "constructhub-test"). */
+  isTest: boolean("is_test").notNull().default(false),
+  /** The contractor's existing line that forwards here (informational). */
+  forwardingFrom: text("forwarding_from"),
+  /** 0 for the number the add-on includes, the call_number price for extras. */
+  monthlyCents: integer("monthly_cents").notNull().default(0),
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+  /** purchased_at + CALL_NUMBER_MIN_DAYS (SignalWire's 14-day minimum). */
+  releaseEligibleAt: timestamp("release_eligible_at"),
+  releasedAt: timestamp("released_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** One transcript line. */
+export type VoiceTranscriptTurn = { role: "caller" | "assistant" | "system"; text: string; t: string };
+/** One decision/tool event during the call. */
+export type VoiceCallEvent = { t: string; type: string; decision?: Partial<Decision>; detail?: Record<string, unknown> };
+
+export const voiceCalls = pgTable("voice_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  numberId: varchar("number_id"),
+  callSid: text("call_sid").notNull().unique(),
+  direction: text("direction").notNull().default("inbound"),
+  fromNumber: text("from_number"),
+  toNumber: text("to_number"),
+  /** "own" (voice/server.py) — kept so a second engine can be compared, as Alpine did. */
+  engine: text("engine"),
+  model: text("model"),
+  persona: text("persona"),
+  profileVersion: integer("profile_version"),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  answeredAt: timestamp("answered_at"),
+  endedAt: timestamp("ended_at"),
+  durationSeconds: integer("duration_seconds"),
+  /** ceil(duration / 60); what voice_usage counts. */
+  billedMinutes: integer("billed_minutes"),
+  /** shared/voice-profile.ts CALL_OUTCOMES. */
+  outcome: text("outcome"),
+  callerName: text("caller_name"),
+  callerEmail: text("caller_email"),
+  callerAddress: text("caller_address"),
+  callerCity: text("caller_city"),
+  serviceNeeded: text("service_needed"),
+  summary: text("summary"),
+  transcript: jsonb("transcript").$type<VoiceTranscriptTurn[]>().notNull().default([]),
+  slots: jsonb("slots").$type<Record<string, string>>(),
+  events: jsonb("events").$type<VoiceCallEvent[]>(),
+  /** R2 key (voice/<orgId>/<callSid>.wav); served through /api/crm/voice/calls/:id/recording. */
+  recordingKey: text("recording_key"),
+  recordingSeconds: integer("recording_seconds"),
+  customerId: varchar("customer_id"),
+  projectId: varchar("project_id"),
+  leadDeliveredAt: timestamp("lead_delivered_at"),
+  spamConfidence: numeric("spam_confidence", { precision: 3, scale: 2 }),
+  spamReason: text("spam_reason"),
+  flags: jsonb("flags").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const voiceEscalations = pgTable("voice_escalations", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  callId: varchar("call_id"),
+  /** shared/voice-profile.ts ESCALATION_KINDS. */
+  kind: text("kind").notNull(),
+  ruleId: text("rule_id"),
+  /** sms | email */
+  channel: text("channel").notNull(),
+  recipient: text("recipient").notNull(),
+  recipientName: text("recipient_name"),
+  body: text("body").notNull(),
+  sentCount: integer("sent_count").notNull().default(0),
+  lastSentAt: timestamp("last_sent_at"),
+  lastProviderSid: text("last_provider_sid"),
+  remindEveryMinutes: integer("remind_every_minutes").notNull().default(120),
+  remindFromHour: integer("remind_from_hour").notNull().default(8),
+  remindToHour: integer("remind_to_hour").notNull().default(20),
+  maxDays: integer("max_days").notNull().default(14),
+  followUpNextDay: boolean("follow_up_next_day").notNull().default(true),
+  confirmedAt: timestamp("confirmed_at"),
+  replyText: text("reply_text"),
+  followupSentAt: timestamp("followup_sent_at"),
+  closedAt: timestamp("closed_at"),
+  closeReason: text("close_reason"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const voiceSpam = pgTable("voice_spam", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  /** Near-certain spam calls (confidence ≥ the strike threshold); 2 → blocked. */
+  strikes: integer("strikes").notNull().default(0),
+  calls: integer("calls").notNull().default(0),
+  lastConfidence: numeric("last_confidence", { precision: 3, scale: 2 }),
+  lastReason: text("last_reason"),
+  lastCallId: varchar("last_call_id"),
+  blockedAt: timestamp("blocked_at"),
+  unblockedAt: timestamp("unblocked_at"),
+  /** "auto" or the member id who blocked by hand. */
+  blockedBy: text("blocked_by"),
+  firstSeenAt: timestamp("first_seen_at").defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+}, (t) => [uniqueIndex("voice_spam_org_number_key").on(t.orgId, t.phoneNumber)]);
+
+export const voiceUsage = pgTable("voice_usage", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  /** The paying account (crm_orgs.owner_user_id). */
+  accountUserId: integer("account_user_id").notNull(),
+  /** "YYYY-MM" (UTC, like growth-quotas monthKey). */
+  month: text("month").notNull(),
+  calls: integer("calls").notNull().default(0),
+  minutes: integer("minutes").notNull().default(0),
+  spamCalls: integer("spam_calls").notNull().default(0),
+  blockedCalls: integer("blocked_calls").notNull().default(0),
+  includedMinutes: integer("included_minutes"),
+  overageMinutes: integer("overage_minutes").notNull().default(0),
+  overageReportedMinutes: integer("overage_reported_minutes").notNull().default(0),
+  overageReportedAt: timestamp("overage_reported_at"),
+  stripeUsageRecordId: text("stripe_usage_record_id"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [uniqueIndex("voice_usage_org_month_key").on(t.orgId, t.month)]);
+
+export type VoiceProfileRow = typeof voiceProfiles.$inferSelect;
+export type VoiceProfileVersionRow = typeof voiceProfileVersions.$inferSelect;
+export type VoiceNumberRow = typeof voiceNumbers.$inferSelect;
+export type VoiceCallRow = typeof voiceCalls.$inferSelect;
+export type VoiceEscalationRow = typeof voiceEscalations.$inferSelect;
+export type VoiceSpamRow = typeof voiceSpam.$inferSelect;
+export type VoiceUsageRow = typeof voiceUsage.$inferSelect;

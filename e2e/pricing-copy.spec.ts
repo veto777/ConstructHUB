@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PLANS, PLAN_KEYS } from "../shared/plans";
-import { SALES_REP_LABEL, planPriceLine } from "../shared/plan-copy";
+import { SALES_REP_LABEL, callAssistantIntroLine, callAssistantPricing, planPriceLine } from "../shared/plan-copy";
+import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 
 /**
  * Pricing p5 (copy): pages outside /pricing describe the 2026-09-30 price book.
@@ -12,7 +13,7 @@ const LEGACY = /\bPlatinum\b|\bGold (and|&) Platinum\b|\$995|\$499\/mo|Unlimited
 
 const PAGES = [
   "/", "/landing", "/terms", "/crm-app", "/crm-terms", "/master-class-landing", "/master-class", "/master-class?tab=pricing",
-  "/competitors-landing", "/permits-landing", "/google-ads-landing", "/reinstatement", "/privacy",
+  "/competitors-landing", "/permits-landing", "/google-ads-landing", "/reinstatement", "/privacy", "/call-assistant",
 ];
 
 async function bodyText(page: Page) {
@@ -60,6 +61,41 @@ test("landing: plans from the price book, services go to a sales rep", async ({ 
   await expect(page.getByTestId("text-dfy-sales")).toHaveCount(3);
   await expect(page.getByTestId("link-dfy-pricing")).toHaveAttribute("href", "/pricing#services");
   await expect(page.getByText("Create a Free Account")).toHaveCount(0);
+});
+
+test("AI Call Assistant: the launch price from the price book on every surface, and the ways in", async ({ page }) => {
+  const p = callAssistantPricing();
+  const short = `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo`;
+
+  await page.goto("/call-assistant");
+  await expect(page.getByTestId("text-call-assistant-price")).toHaveText(
+    `${short} — includes ${p.includedNumbers} number and ${p.includedMinutes} minutes; extra numbers ${p.extraNumber}/mo.`,
+  );
+  for (const persona of VOICE_PERSONA_LIST) await expect(page.getByTestId(`card-persona-${persona.id}`)).toContainText(persona.name);
+  await expect(page.locator('[data-testid^="step-ca-"]')).toHaveCount(4);
+  for (const key of p.planKeys) await expect(page.getByTestId("text-ca-plans")).toContainText(PLANS[key].name);
+  await expect(page.getByTestId("link-ca-pricing")).toHaveAttribute("href", "/pricing#add-ons");
+  // "Coming soon" for as long as the price book keeps the add-on in preview.
+  if (p.comingSoon) await expect(page.getByTestId("badge-call-assistant-coming-soon").first()).toBeVisible();
+  else await expect(page.getByTestId("badge-call-assistant-coming-soon")).toHaveCount(0);
+  await page.getByTestId("button-ca-sales-hero").click();
+  await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText("AI Call Assistant");
+
+  await page.goto("/landing");
+  await expect(page.getByTestId("section-call-assistant")).toBeVisible();
+  await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`${p.intro}/mo`);
+  await expect(page.getByTestId("link-call-assistant-learn-more")).toHaveAttribute("href", "/call-assistant");
+  await expect(page.getByTestId("link-footer-call-assistant")).toHaveAttribute("href", "/call-assistant");
+
+  await page.goto("/pricing");
+  await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(callAssistantIntroLine());
+  await expect(page.getByTestId("link-addon-call-assistant")).toHaveAttribute("href", "/call-assistant");
+
+  // Signed in (dev bypass): the main sidebar has the entry, with the NEW badge.
+  await page.goto("/");
+  const entry = page.getByTestId("link-nav-call-assistant");
+  await expect(entry).toHaveAttribute("href", "/call-assistant");
+  await expect(page.getByTestId("badge-new-call-assistant")).toHaveText("NEW");
 });
 
 test("Master Class: modules and bundle at $1,000+ are sold through a sales rep", async ({ page }) => {

@@ -1,6 +1,7 @@
 /**
  * Minimal header + footer for marketing-site pages a signed-out visitor can
- * land on directly (/reinstatement, /crm-app, /pricing, /master-class). Signed
+ * land on directly (/reinstatement, /crm-app, /pricing, /master-class,
+ * /call-assistant). Signed
  * in, those pages render inside the dashboard frame, which already has
  * navigation and the cart — so this renders nothing unless the visitor is
  * signed out.
@@ -67,6 +68,8 @@ export function PublicPageFooter() {
     <footer className="mkt-editorial bg-mkt-navy text-mkt-navy-muted border-t border-mkt-navy-rule py-8 px-4 text-center text-[13px]" data-testid="footer-public-page">
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         <Link href="/" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors">Home</Link>
+        <span aria-hidden className="opacity-40">·</span>
+        <Link href="/call-assistant" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-call-assistant">AI Call Assistant</Link>
         <span aria-hidden className="opacity-40">·</span>
         <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors">support@constructhub.us</a>
         <span aria-hidden className="opacity-40">·</span>

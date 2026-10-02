@@ -23,7 +23,7 @@ import {
   MapPin, CheckCircle2,
   Eye, Globe, LayoutDashboard, GraduationCap,
   Grid3X3, ShieldAlert, Crosshair, Briefcase,
-  Megaphone, Package,
+  Megaphone, Package, Phone,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
@@ -31,6 +31,8 @@ import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } fr
 import { LandingMobileMenu } from "@/components/landing-mobile-menu";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
+import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
+import { callAssistantPricing } from "@shared/plan-copy";
 
 const SECTION_LINKS = [
   { href: "#services", label: "Services" },
@@ -183,6 +185,12 @@ const services = [
     icon: Users,
     title: "Contractor CRM",
     description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — included with every plan.",
+  },
+  {
+    icon: Phone,
+    title: `AI Call Assistant${callAssistantPricing().comingSoon ? " (coming soon)" : ""}`,
+    description: "An AI receptionist on your own local number answers 24/7, asks the right questions, files the lead in your CRM and pages the right person for emergencies. Every call logged with transcript and recording. Sold as an add-on.",
+    href: CALL_ASSISTANT_PATH,
   },
 ];
 
@@ -396,6 +404,11 @@ export default function LandingPage() {
                 </div>
                 <h3 className="font-display font-semibold text-[1.35rem] leading-tight text-mkt-ink mb-2.5">{svc.title}</h3>
                 <p className="text-[15px] text-mkt-ink-soft leading-relaxed">{svc.description}</p>
+                {svc.href && (
+                  <Link href={svc.href} className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-mkt-orange-ink hover:underline underline-offset-4" data-testid={`link-service-${i}`}>
+                    How it works <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
               </article>
             ))}
             {Array.from({ length: fillerCells }, (_, i) => (
@@ -411,6 +424,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* AI Call Assistant — the voices, a local number, forwarding, Agent Studio, the CRM (components/call-assistant-marketing.tsx). */}
+      <CallAssistantSection />
 
       {/* Done-For-You */}
       <section id="done-for-you" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-y border-mkt-rule">
@@ -570,6 +586,8 @@ export default function LandingPage() {
             <CHLogo height={30} className="opacity-70" />
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-mkt-navy-muted">
               <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-email">support@constructhub.us</a>
+              <span aria-hidden className="opacity-40">·</span>
+              <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">AI Call Assistant</Link>
               <span aria-hidden className="opacity-40">·</span>
               <a href="/terms" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-terms">Terms of Use</a>
               <span aria-hidden className="opacity-40">·</span>

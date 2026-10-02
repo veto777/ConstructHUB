@@ -19,7 +19,9 @@ import {
 import {
   pricingKnowledge, joinNames, planNamesWhere, formatUsd, TRIAL_LABEL, SALES_REP_LABEL, SALES_THRESHOLD_LABEL,
   SALES_HREF, PROTECTED_SITE_PLANS, COMPETITOR_INTEL_PLANS, TEXTING_PLANS, CRM_SEATS_LINE,
+  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantPricing, callAssistantIncludesLine, callAssistantIntroLine,
 } from "@shared/plan-copy";
+import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { HUB_PAGES, type PageKey } from "@shared/hub-links";
 
 export const KNOWLEDGE_FILE = "hub-knowledge.md";
@@ -56,6 +58,13 @@ export function knowledgeTokens(): Record<string, string> {
     GBP_REINSTATEMENT_PRICE: formatUsd(GBP_REINSTATEMENT_CENTS),
     ANNUAL_MONTHS: String(ANNUAL_MONTHS),
     ANNUAL_FREE_MONTHS: String(12 - ANNUAL_MONTHS),
+    CALL_ASSISTANT_INTRO_LINE: callAssistantIntroLine(),
+    CALL_ASSISTANT_INCLUDES_LINE: callAssistantIncludesLine(),
+    CALL_ASSISTANT_PLANS,
+    CALL_ASSISTANT_AVAILABILITY: callAssistantAvailabilityLine(),
+    CALL_ASSISTANT_STATUS: callAssistantPricing().comingSoon ? "coming soon, not for sale yet" : `sold on the ${CALL_ASSISTANT_PLANS} plans`,
+    // "Janice, Sofia and Maya (women's voices) and Gabe, Marcus and Ethan (men's voices)".
+    CALL_ASSISTANT_PERSONAS: `${joinNames(VOICE_PERSONA_LIST.filter((p) => p.gender === "female").map((p) => p.name))} (women's voices) and ${joinNames(VOICE_PERSONA_LIST.filter((p) => p.gender === "male").map((p) => p.name))} (men's voices)`,
   };
 }
 
@@ -107,6 +116,7 @@ const SECTION_KEYWORDS: Record<number, RegExp> = {
   25: /\b(notifications?|2fa|two[- ]factor|security|password|sign[- ]?in|log ?in|account activity|delete (my )?account|recovery codes?)\b/,
   26: /\b(master ?class|course|modules?|llc|licens\w*|bond\w*|insurance|state[- ]by[- ]state)\b/,
   27: /\b(done[- ]for[- ]you|dfy|sales rep|talk to (a )?sales|seo (program|package)s?|website build|business formation|complete business build|custom work|quote)\b/,
+  30: /\b(call assistant|receptionist|answer(?:s|ing)? (?:the|my|our) (?:phone|calls?)|phone (?:calls?|numbers?|lines?)|local numbers?|missed calls?|voicemail|call forwarding|forward(?:ing)? (?:my |our )?(?:calls?|lines?|numbers?)|agent studio|janice|sofia|maya|marcus|ethan|personas?|call log|recordings?|transcripts?|spam calls?|robocalls?|telemarketers?)\b/,
 };
 
 export type KnowledgeBook = {
@@ -183,10 +193,11 @@ export function dollarAmounts(text: string): number[] {
 /**
  * Every amount the price book can state, in cents: plan monthly/annual, add-on
  * monthly/annual/setup and the per-unit prices in their descriptions, Agency
- * band rates (monthly and annual), the sales threshold and the reinstatement price.
+ * band rates (monthly and annual), the sales threshold, the reinstatement price
+ * and the AI Call Assistant's launch price (shared/plan-copy.ts CALL_ASSISTANT_INTRO).
  */
 export function priceBookCents(): Set<number> {
-  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS]);
+  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS, CALL_ASSISTANT_INTRO.monthlyCents]);
   for (const key of PLAN_KEYS) { cents.add(PLANS[key].monthlyCents); cents.add(PLANS[key].annualCents); }
   for (const addon of Object.values(ADDONS)) {
     cents.add(addon.monthlyCents); cents.add(addon.annualCents);

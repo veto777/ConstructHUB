@@ -1,0 +1,12 @@
+{
+  "_comment": "Call Assistant personas — the engine lane verifies each Kokoro-82M voice id at startup, swaps a missing one for the closest match and rewrites this file; shared/voice-personas.ts mirrors it. `verified` flips to true once the engine has checked the pack.",
+  "verified": false,
+  "personas": [
+    { "id": "janice", "name": "Janice", "voice": "af_heart", "gender": "female", "sampleLine": "Thank you for calling your company, this is Janice. Calls may be recorded. What can we help you with today?" },
+    { "id": "gabe", "name": "Gabe", "voice": "am_michael", "gender": "male", "sampleLine": "Thank you for calling your company, this is Gabe. Calls may be recorded. What can we help you with today?" },
+    { "id": "sofia", "name": "Sofia", "voice": "af_bella", "gender": "female", "sampleLine": "Thank you for calling your company, this is Sofia. Calls may be recorded. What can we help you with today?" },
+    { "id": "maya", "name": "Maya", "voice": "af_sarah", "gender": "female", "sampleLine": "Thank you for calling your company, this is Maya. Calls may be recorded. What can we help you with today?" },
+    { "id": "marcus", "name": "Marcus", "voice": "am_adam", "gender": "male", "sampleLine": "Thank you for calling your company, this is Marcus. Calls may be recorded. What can we help you with today?" },
+    { "id": "ethan", "name": "Ethan", "voice": "am_eric", "gender": "male", "sampleLine": "Thank you for calling your company, this is Ethan. Calls may be recorded. What can we help you with today?" }
+  ]
+}

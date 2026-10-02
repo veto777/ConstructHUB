@@ -8,6 +8,7 @@ import {
   isClientHost,
   requestHost,
 } from "./site-context";
+import { ROUTE_META } from "@shared/route-meta";
 
 const CANONICAL_HOST = PRIMARY_DOMAIN;
 const BASE = `https://${CANONICAL_HOST}`;
@@ -17,6 +18,7 @@ const BASE = `https://${CANONICAL_HOST}`;
 export const PUBLIC_ROUTES = [
   "/",
   "/pricing",
+  "/call-assistant",
   "/google-ads-landing",
   "/google-ads-guide",
   "/google-ad-fraud",
@@ -45,6 +47,27 @@ function canonicalPath(reqPath: string): string {
 export const RETIRED_ROUTES: Record<string, string> = {
   "/individual-pricing": "/pricing#add-ons",
 };
+
+const escapeAttr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * The page's own <title>, meta description and Open Graph title/description
+ * (shared/route-meta.ts) written into the HTML served for that path, so a
+ * crawler that runs no JavaScript still sees them. Paths without an entry
+ * keep index.html's defaults.
+ */
+export function withRouteMeta(html: string, path: string): string {
+  const meta = ROUTE_META[path];
+  if (!meta) return html;
+  const title = escapeAttr(meta.title);
+  const description = escapeAttr(meta.description);
+  // Function replacers: a "$" in the copy is text, never a replacement pattern.
+  return html
+    .replace(/<title>[^<]*<\/title>/i, () => `<title>${title}</title>`)
+    .replace(/(<meta name="description" content=")[^"]*(")/i, (_, open, close) => `${open}${description}${close}`)
+    .replace(/(<meta property="og:title" content=")[^"]*(")/i, (_, open, close) => `${open}${title}${close}`)
+    .replace(/(<meta property="og:description" content=")[^"]*(")/i, (_, open, close) => `${open}${description}${close}`);
+}
 
 export function buildSitemap(): string {
   const urls = PUBLIC_ROUTES.map(
@@ -118,8 +141,9 @@ export function serveStatic(app: Express) {
       res.setHeader("X-Robots-Tag", "noindex, nofollow");
       return res.type("html").send(html);
     }
-    const canonical = `${BASE}${canonicalPath(req.originalUrl)}`;
-    const html = indexHtml.replace(
+    const pagePath = canonicalPath(req.originalUrl);
+    const canonical = `${BASE}${pagePath}`;
+    const html = withRouteMeta(indexHtml, pagePath).replace(
       /<\/title>/i,
       `</title>\n    <link rel="canonical" href="${canonical}" />`,
     );

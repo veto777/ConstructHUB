@@ -25,6 +25,7 @@ export const HUB_LINKS: readonly HubLink[] = [
   { path: "/lsa-guide", label: "LSA Guide", public: true },
   { path: "/google-ad-fraud", label: "Ad Fraud", public: true },
   { path: "/crm-app", label: "ConstructHub CRM", public: true },
+  { path: "/call-assistant", label: "AI Call Assistant", public: true },
   { path: "/privacy", label: "Privacy Policy", public: true },
   { path: "/terms", label: "Terms of Use", public: true },
   { path: "/settings", label: "Settings", public: false, variants: ["?tab=profile", "?tab=account", "?tab=notifications", "?tab=security", "?tab=billing"] },
@@ -87,7 +88,7 @@ export function hubLinkFor(href: string): HubLink | null {
 export const PAGE_KEYS = [
   "home", "pricing", "permits", "locations", "profile-guard", "gmb-monitor", "reviews", "posts", "photos",
   "ranking-grid", "site-scan", "social", "click-guard", "ip-tracker", "vpn-shield", "competitors", "google-ads",
-  "cloudflare", "domains", "agency", "reinstatement", "crm", "settings", "master-class",
+  "cloudflare", "domains", "agency", "reinstatement", "crm", "settings", "master-class", "call-assistant",
 ] as const;
 export type PageKey = (typeof PAGE_KEYS)[number];
 
@@ -117,6 +118,8 @@ export const HUB_PAGES: Record<PageKey, { name: string; sections: number[] }> = 
   "crm": { name: "ConstructHub CRM", sections: [24] },
   "settings": { name: "Settings", sections: [25] },
   "master-class": { name: "Master Class", sections: [26] },
+  // §30 of the knowledge pack (it lives in the CRM, but §24 would not fit in the same slice).
+  "call-assistant": { name: "AI Call Assistant", sections: [30] },
 };
 
 const PAGE_ROUTES: [string, PageKey][] = [
@@ -131,7 +134,7 @@ const PAGE_ROUTES: [string, PageKey][] = [
   ["/cloudflare", "cloudflare"], ["/search-console", "cloudflare"], ["/domains", "domains"],
   ["/mail-alerts", "domains"], ["/agency", "agency"], ["/reinstatement", "reinstatement"],
   ["/crm-app", "crm"], ["/crm", "crm"], ["/settings", "settings"], ["/master-class", "master-class"],
-  ["/google-business", "locations"], ["/permits-landing", "permits"],
+  ["/google-business", "locations"], ["/permits-landing", "permits"], ["/call-assistant", "call-assistant"],
 ];
 // Longest prefix first, so "/search-console" never falls into "/search".
 PAGE_ROUTES.sort((a, b) => b[0].length - a[0].length);

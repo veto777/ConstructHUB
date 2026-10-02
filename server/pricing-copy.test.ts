@@ -7,6 +7,7 @@ import {
 import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
+  CALL_ASSISTANT_INTRO, callAssistantIntroLine, callAssistantPricing,
 } from "@shared/plan-copy";
 import { knowledgeBook } from "./hub/knowledge";
 import { hardRulesText } from "./hub/prompt";
@@ -74,6 +75,31 @@ describe("plan copy helpers", () => {
   });
 });
 
+describe("AI Call Assistant launch price", () => {
+  const root = path.resolve(import.meta.dirname, "..");
+
+  it("is one constant, then the price book's regular price", () => {
+    expect(callAssistantIntroLine()).toBe(
+      `${formatUsd(CALL_ASSISTANT_INTRO.monthlyCents)}/month for your first ${CALL_ASSISTANT_INTRO.months} months, then ${formatUsd(ADDONS.call_assistant.monthlyCents)}/month`,
+    );
+    const p = callAssistantPricing();
+    expect(p.extraNumber).toBe(formatUsd(ADDONS.call_number.monthlyCents));
+    expect(p.comingSoon).toBe(ADDONS.call_assistant.preview === true);
+    expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`Launch price: ${callAssistantIntroLine()}.`);
+    expect(knowledgeBook().pack).toContain(callAssistantIntroLine());
+  });
+
+  it.each([
+    "client/src/pages/landing.tsx", "client/src/pages/call-assistant-landing.tsx",
+    "client/src/components/call-assistant-marketing.tsx", "client/src/pages/pricing.tsx",
+  ])("%s types no Call Assistant price (it renders them from the price book)", (file) => {
+    const src = fs.readFileSync(path.join(root, file), "utf8");
+    for (const cents of [CALL_ASSISTANT_INTRO.monthlyCents, ADDONS.call_assistant.monthlyCents, ADDONS.call_number.monthlyCents]) {
+      expect(src).not.toMatch(new RegExp(`\\${formatUsd(cents).replace(".", "\\.")}(?![\\d,])`));
+    }
+  });
+});
+
 describe("AI assistant prompts use the price book", () => {
   const knowledge = pricingKnowledge();
   // The Hub (corner assistant, server/hub) replaced the old site assistant.
@@ -104,9 +130,14 @@ describe("AI assistant prompts use the price book", () => {
   }
 
   it("hub assistant quotes no service at or above the sales threshold", () => {
-    // The only amounts of $1,000 or more it may state are annual plan prices
-    // and the threshold itself ("priced at $1,000 or more").
-    const planAnnual = new Set([...PLAN_KEYS.map((k) => PLANS[k].annualCents), SALES_THRESHOLD_CENTS]);
+    // The only amounts of $1,000 or more it may state are annual plan and
+    // add-on prices (10 × a listed monthly price) and the threshold itself
+    // ("priced at $1,000 or more").
+    const planAnnual = new Set([
+      ...PLAN_KEYS.map((k) => PLANS[k].annualCents),
+      ...Object.values(ADDONS).map((a) => a.annualCents),
+      SALES_THRESHOLD_CENTS,
+    ]);
     const text = HUB_TEXT;
     const overThreshold = dollarAmounts(text).filter((c) => c >= SALES_THRESHOLD_CENTS && !planAnnual.has(c));
     expect(overThreshold.map(formatUsd)).toEqual([]);
@@ -137,7 +168,7 @@ describe("page copy outside /pricing", () => {
   const PAGES = [
     "home", "landing", "permits-landing", "competitors-landing", "google-ads-landing", "master-class",
     "master-class-landing", "reinstatement", "terms-of-use", "privacy-policy", "crm-gateway", "crm-legal",
-    "competitors", "google-ads-guide",
+    "competitors", "google-ads-guide", "call-assistant-landing",
   ].map((p) => `client/src/pages/${p}.tsx`);
   const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
@@ -150,7 +181,7 @@ describe("page copy outside /pricing", () => {
     expect(src).not.toMatch(/["'](gold|platinum)["']/);
   });
 
-  it.each(["landing", "master-class-landing", "terms-of-use"])(
+  it.each(["landing", "master-class-landing", "terms-of-use", "call-assistant-landing"])(
     "%s prints no literal price at or above the sales threshold",
     (page) => {
       const src = read(`client/src/pages/${page}.tsx`);

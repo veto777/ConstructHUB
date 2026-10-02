@@ -69,6 +69,7 @@ ConstructHUB (constructhub.us) is an online platform for construction contractor
 - **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, and {{AGENCY_PLAN}}-plan agency tools.
 - **The ConstructHub CRM** (opens at portal.constructhub.us): clients, estimates with e-signature, invoices, online payments into your own Stripe account, price book, pipeline, projects, schedule, team roles, messaging and texting.
 - **A client portal**: every client you add to the CRM gets a private page where they read estimates, sign, pay, message you and see their documents.
+- **The AI Call Assistant** (an add-on, {{CALL_ASSISTANT_STATUS}}): an AI receptionist that answers your business calls on a local number and files every real caller as a lead in the CRM (section 30).
 - **Education**: free guides (LSA Guide, Ad Fraud page, setup Guides) and the paid Master Class.
 - **Services**: done-for-you work (business formation, websites, SEO and ads) quoted by a sales rep, and a Google Business Profile reinstatement service.
 
@@ -498,6 +499,8 @@ The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstat
 
 **Invoices:** convert an approved estimate into an invoice, send it with a secure payment link, record payments and give receipts (marked PAID IN FULL when settled). Filter by status to chase overdue invoices.
 
+**AI Call Assistant:** an add-on that answers the company's phone and files each caller as a lead in Clients. Its page in the CRM sidebar is **Call Assistant** (section 30).
+
 **Payments:**
 1. CRM → **Payments** → connect your own Stripe account (Stripe Connect). Money goes straight to your Stripe account; ConstructHUB never holds it.
 2. In Settings choose card, bank transfer (ACH) or both, optionally make large payments ACH-only above an amount you set, and optionally pass the card fee to the client as a clearly labeled line. The page shows Stripe's standard processing rates.
@@ -592,6 +595,7 @@ For contractors who'd rather have the work done for them. Every one of these is 
 - **Is Blotato included?** No. It's a separate subscription you buy from Blotato.
 - **Which plan should I pick?** One profile and the basics: the cheapest plan. Click-fraud protection, Competitor Intel, texting and auto-published AI replies: the plans listed for those features in section 3. Several locations and a bigger team: the plan with more locations and seats. An agency managing many clients: {{AGENCY_PLAN}}. Compare them on Pricing → Compare plans.
 - **Who else uses ConstructHUB?** That isn't something you can share. Talk about features instead.
+- **Can ConstructHUB answer my phone?** That is what the AI Call Assistant add-on does ({{CALL_ASSISTANT_STATUS}}): it answers calls on a local number, files the lead in the CRM and texts the right person for emergencies. See section 30.
 
 ## 29. Glossary
 
@@ -605,3 +609,28 @@ For contractors who'd rather have the work done for them. Every one of these is 
 - **IP exclusion:** a Google Ads setting that stops your ads showing to a specific IP address.
 - **ACH:** a bank transfer payment.
 - **10DLC:** the US carrier registration a business needs to text customers from its own number.
+
+## 30. AI Call Assistant (add-on)
+
+An AI receptionist for the contractor's own phone line. It answers every call, day or night, collects the lead the way the contractor wants, files it in the CRM and gets urgent calls to the right person. Page: [AI Call Assistant](/call-assistant). In the CRM it lives under **Call Assistant** (tabs: Overview, Numbers, Agent Studio, Simulator, Calls).
+
+**Price and availability:** {{CALL_ASSISTANT_INTRO_LINE}}. It includes {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own. {{CALL_ASSISTANT_AVAILABILITY}}
+
+**Voices:** the contractor picks a name and voice for the assistant: {{CALL_ASSISTANT_PERSONAS}}, and can change the greeting. (The phone voice named Gabe is one of those choices; it is not this website helper.) It speaks English today.
+
+**Getting a phone number:**
+1. CRM → **Call Assistant** → **Numbers** → pick a state, and optionally an area code or a city.
+2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. One number is included with the add-on; each extra number is its own add-on (a second location or a tracking line).
+3. Keep your existing numbers: forward them to the new number from your phone carrier (for example only when you don't answer, after hours, or always). Nothing is ported, so your numbers stay yours. The Numbers tab shows how to set up forwarding with common carriers.
+
+**On a call:** it greets the caller with the company's name, asks what the call is about before collecting anything, then asks the questions the contractor set (by default: what they need, the property address, a first name, a confirmation of the callback number it sees, a good email and the best time to call). It says it is a virtual assistant if asked, and it can play a notice that calls may be recorded (on by default; some states require consent from everyone on the call, so check your state before turning it off).
+
+**After the call:** a real lead becomes a client in the CRM (and a pipeline project if the contractor chooses), tagged with the source "Call Assistant", and the office is notified the same way as other new leads. Emergencies, existing customers and "I want to talk to a person" are texted or emailed to the teammate the contractor picked, with reminders until someone replies. The assistant never gives out a teammate's number.
+
+**Spam:** telemarketers and robocalls are screened and send no notifications. A number flagged as spam twice is blocked before the call is answered; the contractor can unblock it under Calls → Spam.
+
+**Call log:** every call is listed under **Calls** with its outcome, a summary, the full transcript and the recording.
+
+**Agent Studio** (where the contractor tunes the assistant, no code needed): company and services, the jobs it should turn down and where to refer them, service area by county, credibility (years in business, licenses, insurance, warranties), offers (financing, promotions, free estimates), policies (whether to talk about price ranges, repairs, what counts as an emergency), the voice and greeting, the questions to ask and in what order, answers to common questions, who gets which urgent calls, where leads are delivered, and advanced settings (extra instructions, call length, silence handling, spam sensitivity). The **Simulator** lets you test it by typing before it answers real calls. Publishing creates a version you can restore later, and **Pause** stops it answering.
+
+**What it won't do:** quote prices unless the contractor allows price ranges, book appointments (not available yet), give out a teammate's phone number, or pretend to be a person.

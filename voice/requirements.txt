@@ -1,0 +1,17 @@
+# ConstructHUB Call Assistant engine — pinned to the versions proven on the
+# tower GPU (Python 3.12, CUDA). Install torch first from the CUDA index if pip
+# resolves a CPU wheel: pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cu128
+aiohttp==3.14.1
+numpy==2.5.1
+torch==2.12.1
+faster-whisper==1.2.1
+kokoro==0.9.4
+misaki==0.9.4
+silero-vad==5.1.2
+soundfile==0.14.0
+python-dotenv==1.2.4
+httpx==0.28.1
+# Optional Anthropic adapter (VOICE_AI_PROVIDER=anthropic) — installed, unused without a ConstructHUB-owned key.
+anthropic==1.11.0
+# OpenAI-compatible provider (the default brain: TruthCoder via AI_INTEGRATIONS_OPENAI_*)
+openai==2.9.0

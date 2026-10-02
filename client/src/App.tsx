@@ -53,6 +53,7 @@ import GoogleAdsLandingPage from "@/pages/google-ads-landing";
 import PermitsLandingPage from "@/pages/permits-landing";
 import CompetitorsLandingPage from "@/pages/competitors-landing";
 import MasterClassLandingPage from "@/pages/master-class-landing";
+import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
 import CrmTeamPage from "@/pages/crm-team";
@@ -60,6 +61,7 @@ import CrmJoinPage from "@/pages/crm-join";
 import CrmHomePage from "@/pages/crm-home";
 import CrmSchedulePage from "@/pages/crm-schedule";
 import CrmInboxPage from "@/pages/crm-inbox";
+import CrmCallAssistantPage from "@/pages/crm-call-assistant";
 import CrmClientsPage from "@/pages/crm-clients";
 import CrmClientPage from "@/pages/crm-client";
 import CrmPaymentsPage from "@/pages/crm-payments";
@@ -167,6 +169,8 @@ function DashboardRouter() {
       <Route path="/lsa-leads" component={LsaLeadsPage} />
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
+      {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
+      <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
@@ -221,6 +225,7 @@ function PublicRouter() {
       <Route path="/lsa-guide" component={LsaGuidePage} />
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
+      <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/developers" component={DevelopersPage} />
@@ -278,6 +283,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
   "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews",
   "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
+  "/call-assistant": "AI Call Assistant",
 };
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
@@ -301,6 +307,7 @@ function PortalRouter() {
       <Route path="/crm/clients/:id" component={CrmClientPage} />
       <Route path="/crm/schedule" component={CrmSchedulePage} />
       <Route path="/crm/inbox" component={CrmInboxPage} />
+      <Route path="/crm/call-assistant" component={CrmCallAssistantPage} />
       <Route path="/crm/pipeline" component={CrmPipelinePage} />
       <Route path="/crm/estimates/new" component={CrmEstimateNewPage} />
       <Route path="/crm/estimates/:id" component={CrmEstimateDetailPage} />
@@ -497,6 +504,7 @@ function AppContent() {
       location.startsWith("/crm/clients") ? "Clients" :
       location.startsWith("/crm/schedule") ? "Schedule" :
       location.startsWith("/crm/inbox") ? "Messages" :
+      location.startsWith("/crm/call-assistant") ? "Call Assistant" :
       location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
       location.startsWith("/crm/pricebook") ? "Price book" :
       location.startsWith("/crm/estimates") ? "Estimates" :

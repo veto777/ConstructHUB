@@ -16,6 +16,7 @@ import { STATE_GUIDES_LINK_STATUS_DDL } from "../server/state-guides-schema";
 import { ensureDocNumberUniqueIndexes } from "../server/crm/doc-number";
 import { BILLING_SUBSCRIPTION_DDL, FULFILMENT_DDL } from "../server/billing/schema";
 import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
+import { VOICE_SCHEMA_DDL } from "../server/voice/schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -39,6 +40,10 @@ const STATEMENTS = [
   // (+ its outbox columns) / account_api_keys / account_api_usage
   // (server/account/schema.ts also runs these at boot).
   ...ACCOUNT_SCHEMA_DDL,
+  // AI Call Assistant: voice_profiles / voice_profile_versions / voice_numbers /
+  // voice_calls / voice_escalations / voice_spam / voice_usage
+  // (server/voice/schema.ts also runs these at boot).
+  ...VOICE_SCHEMA_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;
