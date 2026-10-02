@@ -90,13 +90,13 @@ describe("weekly spam report", () => {
     expect(msg.text.match(/Now blocked/g)).toHaveLength(3);
     expect(msg.text.match(/Not blocked/g)).toHaveLength(1);
     expect(msg.text).toContain("1 of these numbers is now blocked: their calls are rejected before they're answered.");
-    expect(msg.text).toContain("https://constructhub.example.invalid/crm/call-assistant?tab=calls&view=spam");
+    expect(msg.text).toContain("https://constructhub.example.invalid/call-assistant?tab=calls&view=spam");
     expect(msg.text).toContain('turn off "Weekly spam report" in CRM → Settings → Notifications');
     expect(msg.html).toContain("We stopped 4 spam calls for you this week");
     expect(msg.html).not.toContain("<script");
 
     expect(bell).toHaveBeenCalledTimes(1);
-    expect(bell.mock.calls[0][0]).toMatchObject({ pref: "spamReport", type: "call.spam_report", title: "We stopped 4 spam calls for you this week", link: "/crm/call-assistant?tab=calls&view=spam" });
+    expect(bell.mock.calls[0][0]).toMatchObject({ pref: "spamReport", type: "call.spam_report", title: "We stopped 4 spam calls for you this week", link: "/call-assistant?tab=calls&view=spam" });
     expect(bell.mock.calls[0][0].body).toBe("2 numbers, 3 screened by the assistant and 1 rejected before answering. Nobody had to pick up.");
 
     // Idempotent: a second run (or a second process) sends nothing.
@@ -155,7 +155,7 @@ describe("weekly spam report", () => {
     const out = await report.sendWeeklySpamReport(a.orgId, report.spamReportWeek(NOW), { q: pool, deliver, hasCallAssistant: async () => true, baseUrl: "https://x.example.invalid" });
     expect(out).toMatchObject({ sent: true, bell: true });
     const { rows } = await pool.query("select member_id, type, title, link from crm_notifications where org_id = $1", [a.orgId]);
-    expect(rows).toEqual([{ member_id: a.memberId, type: "call.spam_report", title: "We stopped 1 spam call for you this week", link: "/crm/call-assistant?tab=calls&view=spam" }]);
+    expect(rows).toEqual([{ member_id: a.memberId, type: "call.spam_report", title: "We stopped 1 spam call for you this week", link: "/call-assistant?tab=calls&view=spam" }]);
   });
 
   it("the weekly run reports every org with spam that week, once; the job is off outside production unless switched on", async () => {

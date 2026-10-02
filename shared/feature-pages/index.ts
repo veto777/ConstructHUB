@@ -88,7 +88,7 @@ export const EXTERNAL_FEATURE_PAGES: readonly ExternalFeaturePage[] = [
     title: "AI Call Assistant",
     lede: callAssistantTile?.description ?? "An assistant that answers your calls 24/7 and files the lead in your CRM.",
     path: "/call-assistant",
-    app: { href: "/crm/call-assistant", surface: "portal" },
+    app: { href: "/call-assistant", surface: "app" },
     pricing: { kind: "addon", addon: "call_assistant" },
   },
 ];

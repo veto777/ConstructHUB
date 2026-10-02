@@ -85,7 +85,7 @@ describe("dashboard for a platform admin", () => {
     // Every feature is on: the AI Call Assistant tile opens the CRM's Call Assistant, never "coming soon".
     const ca = p.tiles.find((t) => t.key === "callAssistant")!;
     expect(ca.status).not.toBe("coming_soon");
-    expect(ca).toMatchObject({ entitled: true, status: "ok", cta: { href: "/crm/call-assistant", surface: "portal" } });
+    expect(ca).toMatchObject({ entitled: true, status: "ok", cta: { href: "/call-assistant", surface: "app" } });
   });
 
   it("control: a customer with the same rows on the same plan IS flagged (unchanged)", async () => {

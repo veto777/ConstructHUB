@@ -18,7 +18,7 @@ import { SimulatorPanel } from "./simulator";
 import { CallsPanel } from "./calls";
 
 /**
- * /crm/call-assistant — the AI Call Assistant's home in the CRM
+ * /call-assistant — the AI Call Assistant's home in the CRM
  * (docs/call-assistant/SPEC.md § Side ribbon). ARCHITECT-OWNED shell: the
  * tab strip, the plan gate and the deep link (?tab=). Each panel file is a
  * lane's (LANES.md): numbers.tsx and calls.tsx → their server lanes,
@@ -132,7 +132,7 @@ export default function CrmCallAssistantPage() {
   const goToTab = (t: string) => {
     const next = (CALL_ASSISTANT_TABS as readonly string[]).includes(t) ? (t as CallAssistantTab) : "overview";
     setTab(next);
-    navigate(`/crm/call-assistant?tab=${next}`, { replace: true });
+    navigate(`/call-assistant?tab=${next}`, { replace: true });
   };
   // Back/forward keeps the tab in step with the URL.
   useEffect(() => {
@@ -176,7 +176,7 @@ export default function CrmCallAssistantPage() {
           <TabsContent value="overview"><OverviewPanel status={status.data ?? null} loading={status.isLoading} onPickResult={(p) => {
             // Open the Calls tab already filtered: the Calls panel reads ?outcome= / ?view= when it mounts.
             setTab("calls");
-            navigate(p === "spam" ? "/crm/call-assistant?tab=calls&view=spam" : `/crm/call-assistant?tab=calls&outcome=${p}`, { replace: true });
+            navigate(p === "spam" ? "/call-assistant?tab=calls&view=spam" : `/call-assistant?tab=calls&outcome=${p}`, { replace: true });
           }} /></TabsContent>
           <TabsContent value="numbers"><NumbersPanel canManage={canManage} /></TabsContent>
           <TabsContent value="studio"><StudioPanel canManage={canManage} /></TabsContent>

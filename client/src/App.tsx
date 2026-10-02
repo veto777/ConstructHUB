@@ -53,13 +53,12 @@ import GoogleAdFraudPage from "@/pages/google-ad-fraud";
 import LsaGuidePage from "@/pages/lsa-guide";
 import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
-import CallAssistantEntry from "@/pages/call-assistant-entry";
 import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
 import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
 import { CrmLogo } from "@/components/crm-logo";
-import { isPortal, isClientPortal, CRM_NAME } from "@/lib/site";
+import { isPortal, isClientPortal, CRM_NAME, marketingUrl } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
 import CrmGatewayPage from "@/pages/crm-gateway";
 import VpnShieldPage from "@/pages/vpn-shield";
@@ -151,6 +150,14 @@ function SettingsApiRedirect() {
   return null;
 }
 
+/** On the CRM host: the Call Assistant moved to the platform; keep the query (tab, call, view). */
+function CallAssistantMovedRedirect() {
+  useEffect(() => {
+    window.location.replace(marketingUrl(`/call-assistant${window.location.search}`));
+  }, []);
+  return null;
+}
+
 function DashboardRouter() {
   return (
     <Suspense fallback={null}>
@@ -195,7 +202,7 @@ function DashboardRouter() {
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
-      <Route path="/call-assistant" component={CallAssistantEntry} />
+      <Route path="/call-assistant" component={CrmCallAssistantPage} />
       {/* Every feature's intro page (shared/feature-pages), inside the app frame when signed in. */}
       <Route path="/features" component={FeaturesCataloguePage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
@@ -388,7 +395,10 @@ function PortalRouter() {
       <Route path="/crm/clients/:id" component={CrmClientPage} />
       <Route path="/crm/schedule" component={CrmSchedulePage} />
       <Route path="/crm/inbox" component={CrmInboxPage} />
-      <Route path="/crm/call-assistant" component={CrmCallAssistantPage} />
+      {/* The Call Assistant lives on the platform, not in the CRM (owner, 2026-10-02): old CRM links and
+          notifications land on constructhub.us/call-assistant with their ?tab=/&call= intact. */}
+      <Route path="/crm/call-assistant" component={CallAssistantMovedRedirect} />
+      <Route path="/call-assistant" component={CallAssistantMovedRedirect} />
       <Route path="/crm/pipeline" component={CrmPipelinePage} />
       <Route path="/crm/estimates/new" component={CrmEstimateNewPage} />
       <Route path="/crm/estimates/:id" component={CrmEstimateDetailPage} />

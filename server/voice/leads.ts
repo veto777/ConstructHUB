@@ -319,6 +319,6 @@ export async function notifyCallSummary(ctx: OrgVoiceContext, call: VoiceCallRow
   const title = `Call ${String(call.outcome ?? "ended").replace(/_/g, " ")} — ${call.callerName || prettyPhone(call.fromNumber)}`;
   await notifyMembers({
     org: ctx.org, pref: "leadReceived", type: "call.summary", title,
-    body: call.summary ?? null, link: `/crm/call-assistant?tab=calls&call=${call.id}`,
+    body: call.summary ?? null, link: `/call-assistant?tab=calls&call=${call.id}`,
   });
 }

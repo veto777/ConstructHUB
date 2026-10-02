@@ -114,6 +114,24 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS voice_calls_org_started_idx ON voice_calls(org_id, started_at DESC)`,
   `CREATE INDEX IF NOT EXISTS voice_calls_org_outcome_idx ON voice_calls(org_id, outcome)`,
   `CREATE INDEX IF NOT EXISTS voice_calls_customer_idx ON voice_calls(customer_id)`,
+  // Every call gets a per-account number, "Call #57" (owner, 2026-10-02: "the calls being recorded should all have
+  // an ID to them"). A BEFORE INSERT trigger assigns max+1 for the org under a per-org advisory lock, so engine
+  // calls, simulator-free inserts and pushed-in calls (ingest.ts) all get one; existing rows are numbered by date
+  // in VOICE_SCHEMA_BACKFILL, then (org_id, call_no) is made unique.
+  `ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS call_no integer`,
+  `CREATE OR REPLACE FUNCTION voice_calls_assign_no() RETURNS trigger LANGUAGE plpgsql AS $fn$
+   BEGIN
+     IF NEW.call_no IS NULL THEN
+       PERFORM pg_advisory_xact_lock(7181, hashtext(NEW.org_id));
+       SELECT coalesce(max(call_no), 0) + 1 INTO NEW.call_no FROM voice_calls WHERE org_id = NEW.org_id;
+     END IF;
+     RETURN NEW;
+   END $fn$`,
+  `DO $do$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'voice_calls_assign_no' AND tgrelid = 'voice_calls'::regclass) THEN
+       CREATE TRIGGER voice_calls_assign_no BEFORE INSERT ON voice_calls FOR EACH ROW EXECUTE FUNCTION voice_calls_assign_no();
+     END IF;
+   END $do$`,
   // Text/email escalations with reminders until the recipient confirms.
   `CREATE TABLE IF NOT EXISTS voice_escalations (
      id bigserial PRIMARY KEY,
@@ -233,6 +251,12 @@ export const VOICE_SCHEMA_BACKFILL: readonly string[] = [
      overage_reported_rate_minutes = jsonb_build_object('10', overage_reported_minutes),
      overage_cents_per_minute = COALESCE(overage_cents_per_minute, 10)
    WHERE overage_minutes > 0 AND overage_rate_minutes = '{}'::jsonb`,
+  // Calls from before call numbers existed: numbered after the org's highest, oldest first. Then unique per org.
+  `WITH m AS (SELECT org_id, coalesce(max(call_no), 0) AS base FROM voice_calls GROUP BY org_id),
+        s AS (SELECT c.id, m.base + row_number() OVER (PARTITION BY c.org_id ORDER BY c.started_at, c.created_at, c.id) AS n
+                FROM voice_calls c JOIN m ON m.org_id = c.org_id WHERE c.call_no IS NULL)
+   UPDATE voice_calls v SET call_no = s.n FROM s WHERE v.id = s.id`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS voice_calls_org_call_no_idx ON voice_calls(org_id, call_no)`,
 ];
 
 export const VOICE_TABLES: readonly string[] = [

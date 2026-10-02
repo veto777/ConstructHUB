@@ -53,9 +53,9 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
     : !status.engine.models ? { tone: "warning", text: "Engine starting", hint: "The engine is up but its speech models are still loading." }
     : { tone: "success", text: "Engine up", hint: "The voice engine is answering." };
   const nextStep =
-    !status.profile || status.profile.publishedVersion == null ? { text: "Set up and publish your assistant", href: "/crm/call-assistant?tab=studio", testid: "link-overview-next-studio" }
-    : numbers.length === 0 ? { text: "Get a local number", href: "/crm/call-assistant?tab=numbers", testid: "link-overview-next-numbers" }
-    : { text: "Try a test conversation", href: "/crm/call-assistant?tab=simulator", testid: "link-overview-next-simulator" };
+    !status.profile || status.profile.publishedVersion == null ? { text: "Set up and publish your assistant", href: "/call-assistant?tab=studio", testid: "link-overview-next-studio" }
+    : numbers.length === 0 ? { text: "Get a local number", href: "/call-assistant?tab=numbers", testid: "link-overview-next-numbers" }
+    : { text: "Try a test conversation", href: "/call-assistant?tab=simulator", testid: "link-overview-next-simulator" };
 
   const paymentPaused = !status.enabled && status.paused === true;
   const tiers = callAssistantTiers();
@@ -72,19 +72,19 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
           value={paymentPaused
             ? <StatusPill tone="warning" className="text-sm">paused</StatusPill>
             : <StatusPill tone={profileStatus === "live" ? "success" : profileStatus === "paused" ? "warning" : "neutral"} className="text-sm">{profileStatus}</StatusPill>}
-          context={paymentPaused ? "Waiting for a payment" : status.profile?.publishedVersion != null ? `Published version ${status.profile.publishedVersion}` : "Nothing published yet"} href="/crm/call-assistant?tab=studio" />
+          context={paymentPaused ? "Waiting for a payment" : status.profile?.publishedVersion != null ? `Published version ${status.profile.publishedVersion}` : "Nothing published yet"} href="/call-assistant?tab=studio" />
         <MetricCard icon={Hash} label="Numbers" value={numbers.length} testid="metric-overview-numbers"
-          context={`${status.allowance.numbers} included with your add-on`} href="/crm/call-assistant?tab=numbers" />
+          context={`${status.allowance.numbers} included with your add-on`} href="/call-assistant?tab=numbers" />
         <MetricCard icon={Timer} label="Minutes this month" value={used.toLocaleString("en-US")} testid="metric-overview-minutes"
           context={unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
-        <MetricCard icon={PhoneCall} label="Calls this month" value={status.usage?.calls ?? 0} testid="metric-overview-calls" href="/crm/call-assistant?tab=calls" />
+        <MetricCard icon={PhoneCall} label="Calls this month" value={status.usage?.calls ?? 0} testid="metric-overview-calls" href="/call-assistant?tab=calls" />
         <MetricCard icon={ShieldBan} label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
-          context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/crm/call-assistant?tab=calls&view=spam" />
+          context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/call-assistant?tab=calls&view=spam" />
       </div>
 
       <CallResults onPick={(p) => {
         if (onPickResult) onPickResult(p);
-        else window.location.assign(p === "spam" ? "/crm/call-assistant?tab=calls&view=spam" : `/crm/call-assistant?tab=calls&outcome=${p}`);
+        else window.location.assign(p === "spam" ? "/call-assistant?tab=calls&view=spam" : `/call-assistant?tab=calls&outcome=${p}`);
       }} />
 
       <Card data-testid="card-overview-tier">
@@ -149,7 +149,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Numbers ringing the assistant</h3>
-              <Button asChild variant="ghost" size="sm"><Link href="/crm/call-assistant?tab=numbers" data-testid="link-overview-numbers">Manage <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
+              <Button asChild variant="ghost" size="sm"><Link href="/call-assistant?tab=numbers" data-testid="link-overview-numbers">Manage <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
             </div>
             {numbers.length === 0 ? (
               <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">No number yet. Buy a local number in the Numbers tab, then forward your existing line to it.</p>
@@ -174,7 +174,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
         <CardContent className="p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Recent calls</h3>
-            <Button asChild variant="ghost" size="sm"><Link href="/crm/call-assistant?tab=calls" data-testid="link-overview-calls">All calls <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
+            <Button asChild variant="ghost" size="sm"><Link href="/call-assistant?tab=calls" data-testid="link-overview-calls">All calls <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
           </div>
           {calls.isError || recent.length === 0 ? (
             <p className="text-sm text-muted-foreground" data-testid="text-overview-no-calls">
@@ -184,7 +184,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             <ul className="divide-y rounded-md border text-sm" data-testid="list-overview-calls">
               {recent.map((c, i) => (
                 <li key={String(c.id)} data-testid={`row-overview-call-${i}`}>
-                  <Link href={`/crm/call-assistant?tab=calls&call=${encodeURIComponent(String(c.id))}`} className="flex flex-wrap items-center gap-2 px-3 py-2 hover:bg-muted/40" data-testid={`link-overview-call-${i}`}>
+                  <Link href={`/call-assistant?tab=calls&call=${encodeURIComponent(String(c.id))}`} className="flex flex-wrap items-center gap-2 px-3 py-2 hover:bg-muted/40" data-testid={`link-overview-call-${i}`}>
                     <Activity className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>
                     {c.outcome && <StatusPill tone={outcomeTone(c.outcome)}>{outcomeLabel(c.outcome)}</StatusPill>}

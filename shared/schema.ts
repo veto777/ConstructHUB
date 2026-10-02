@@ -2698,6 +2698,8 @@ export const voiceCalls = pgTable("voice_calls", {
   orgId: varchar("org_id").notNull(),
   numberId: varchar("number_id"),
   callSid: text("call_sid").notNull().unique(),
+  /** Per-org call number ("Call #57"), assigned by the voice_calls_assign_no trigger (server/voice/schema.ts). */
+  callNo: integer("call_no"),
   direction: text("direction").notNull().default("inbound"),
   fromNumber: text("from_number"),
   toNumber: text("to_number"),

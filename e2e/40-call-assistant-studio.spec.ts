@@ -217,7 +217,7 @@ test.describe("Call Assistant — Agent Studio", () => {
   test("first run: the setup wizard collects every step and publishes version 1", async ({ page }) => {
     const errors = trackErrors(page);
     const mock = await mockVoice(page);
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("studio-wizard")).toBeVisible();
 
     // Company: prefilled from the CRM; Next is blocked while the name is blank.
@@ -308,7 +308,7 @@ test.describe("Call Assistant — Agent Studio", () => {
   test("editor: edit, save, publish with a diff, preview, restore a version", async ({ page }) => {
     const errors = trackErrors(page);
     const mock = await mockVoice(page, { published: true });
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("studio-editor")).toBeVisible();
     await expect(page.getByTestId("badge-studio-version")).toHaveText("v1");
     await expect(page.getByTestId("text-studio-dirty")).toHaveText("All changes saved");
@@ -364,7 +364,7 @@ test.describe("Call Assistant — Agent Studio", () => {
 
   test("wizard: a failed draft save keeps the step (red chip) instead of moving on with a checkmark", async ({ page }) => {
     const mock = await mockVoice(page, { failPuts: 1 });
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("studio-wizard")).toBeVisible();
     await page.getByTestId("button-wizard-next").click();
     await expect(page.getByTestId("wizard-step-company")).toHaveAttribute("aria-current", "step");
@@ -379,7 +379,7 @@ test.describe("Call Assistant — Agent Studio", () => {
 
   test("editor: a value the server would refuse (max turns 999) blocks Publish; the field clamps on blur", async ({ page }) => {
     await mockVoice(page, { published: true });
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("studio-editor")).toBeVisible();
     await page.getByTestId("studio-nav-advanced").click();
     await page.getByTestId("input-max-turns").fill("999");
@@ -392,7 +392,7 @@ test.describe("Call Assistant — Agent Studio", () => {
 
   test("intake: an open options panel moves with its question", async ({ page }) => {
     await mockVoice(page, { published: true });
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await page.getByTestId("studio-nav-intake").click();
     await page.getByTestId("button-intake-options-1").click();
     await expect(page.getByTestId("input-intake-key-1")).toHaveValue("address");
@@ -403,7 +403,7 @@ test.describe("Call Assistant — Agent Studio", () => {
 
   test("members without manageSettings see the Studio read-only", async ({ page }) => {
     await mockVoice(page, { published: true }, { manageSettings: false });
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("text-studio-readonly")).toBeVisible();
     await expect(page.getByTestId("button-studio-save")).toHaveCount(0);
     await expect(page.getByTestId("input-company-name")).toBeDisabled();
@@ -412,7 +412,7 @@ test.describe("Call Assistant — Agent Studio", () => {
   test("mobile: sections switch through a select, no horizontal scroll", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockVoice(page, { published: true });
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("select-studio-section")).toBeVisible();
     await expect(page.getByTestId("studio-nav")).toBeHidden();
     await page.getByTestId("select-studio-section").click();
@@ -426,13 +426,13 @@ test.describe("Call Assistant — Agent Studio", () => {
 test.describe("Call Assistant — Overview and Simulator", () => {
   test("overview shows status, minutes, numbers and recent calls", async ({ page }) => {
     await mockVoice(page, { published: true });
-    await gotoCrm(page, "/crm/call-assistant?tab=overview");
+    await gotoCrm(page, "/call-assistant?tab=overview");
     await expect(page.getByTestId("metric-overview-minutes")).toContainText("120");
     await expect(page.getByTestId("text-overview-minutes-pct")).toHaveText("24%");
     await expect(page.getByTestId("row-overview-number-0")).toContainText("(360) 555-0100");
     // Same labels as the Calls tab, and each row opens that call.
     await expect(page.getByTestId("row-overview-call-0")).toContainText("Lead");
-    await expect(page.getByTestId("link-overview-call-0")).toHaveAttribute("href", /\/crm\/call-assistant\?tab=calls&call=/);
+    await expect(page.getByTestId("link-overview-call-0")).toHaveAttribute("href", /^\/call-assistant\?tab=calls&call=/);
     // The engine is probed: configured but not answering reads "Engine down", never "configured".
     await expect(page.getByTestId("pill-overview-engine")).toHaveText("Engine down");
     // Launched: no "Coming soon" badge while the price book sells the add-on.
@@ -456,7 +456,7 @@ test.describe("Call Assistant — Overview and Simulator", () => {
   test("calls: the Spam blocked view shows this month's count and the ledger; a false positive is unblocked in one click", async ({ page }) => {
     const errors = trackErrors(page);
     const mock = await mockVoice(page, { published: true }, { manageSettings: true });
-    await gotoCrm(page, "/crm/call-assistant?tab=calls");
+    await gotoCrm(page, "/call-assistant?tab=calls");
     await expect(page.getByTestId("badge-spam-this-month")).toHaveText("37");
     await page.getByTestId("button-calls-view-spam").click();
     await expect(page.getByTestId("card-spam-summary")).toContainText(CALL_ASSISTANT_SPAM.headline);
@@ -474,7 +474,7 @@ test.describe("Call Assistant — Overview and Simulator", () => {
   test("simulator: a turn shows the decision and slots; engine down is said, never faked", async ({ page }) => {
     const errors = trackErrors(page);
     const mock = await mockVoice(page, { published: true, engineDownOnTurn: 3 });
-    await gotoCrm(page, "/crm/call-assistant?tab=simulator");
+    await gotoCrm(page, "/call-assistant?tab=simulator");
     await page.getByTestId("input-simulator-caller").fill("360 555 1111");
     await page.getByTestId("button-simulator-start").click();
     expect(mock.simSessionBodies[0]).toEqual({ useDraft: false, callerNumber: "+13605551111" });
@@ -506,7 +506,7 @@ test.describe("Call Assistant — Overview and Simulator", () => {
 
   test("without the add-on, the plan prompt replaces the tabs", async ({ page }) => {
     await mockVoice(page, { enabled: false });
-    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("plan-required-callAssistant")).toBeVisible();
     await expect(page.getByTestId("tabs-call-assistant")).toHaveCount(0);
     // On sale (launched): the prompt links Billing to buy it — no "Coming soon", no disabled "Not available yet".
@@ -551,7 +551,7 @@ test.describe("Call Assistant — paused for a payment", () => {
       return route.fulfill({ status: 402, contentType: "application/json", body: JSON.stringify({ code: "payment_required", message: "paused" }) });
     });
 
-    await gotoCrm(page, "/crm/call-assistant?tab=overview");
+    await gotoCrm(page, "/call-assistant?tab=overview");
     const banner = page.getByTestId("banner-call-assistant-paused");
     await expect(banner).toBeVisible();
     await expect(page.getByTestId("text-call-assistant-paused")).toHaveText("Paused — update your payment method");

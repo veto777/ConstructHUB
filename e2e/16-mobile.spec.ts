@@ -41,7 +41,8 @@ test.describe("mobile ribbon", () => {
     const sheet = page.getByTestId("ribbon-more-sheet");
     await expect(sheet).toBeVisible();
     await expect(page.getByTestId("ribbon-more-pipeline")).toBeVisible();
-    await expect(page.getByTestId("ribbon-more-call-assistant")).toBeVisible();
+    // The Call Assistant lives on the platform, not in the CRM (owner, 2026-10-02).
+    await expect(page.getByTestId("ribbon-more-call-assistant")).toHaveCount(0);
     await expect(page.getByTestId("ribbon-more-pricebook")).toBeVisible();
     await expect(page.getByTestId("ribbon-more-payments")).toBeVisible();
     await expect(page.getByTestId("ribbon-more-team")).toBeVisible();

@@ -126,7 +126,7 @@ export function toRow(orgId: string, c: IngestCall) {
 }
 
 /** Upsert one call; null when the call_sid belongs to a call this org didn't push (another org, or our own engine's). */
-export async function upsertIngestedCall(orgId: string, c: IngestCall): Promise<{ id: string; created: boolean } | null> {
+export async function upsertIngestedCall(orgId: string, c: IngestCall): Promise<{ id: string; callNo: number | null; created: boolean } | null> {
   const r = toRow(orgId, c);
   const res = await db.execute(sql`
     INSERT INTO voice_calls (org_id, call_sid, direction, from_number, to_number, engine, persona, started_at, answered_at,
@@ -143,9 +143,9 @@ export async function upsertIngestedCall(orgId: string, c: IngestCall): Promise<
       summary = EXCLUDED.summary, transcript = EXCLUDED.transcript,
       flags = coalesce(voice_calls.flags, '{}'::jsonb) || EXCLUDED.flags
     WHERE voice_calls.org_id = EXCLUDED.org_id AND voice_calls.engine = ${INGEST_ENGINE}
-    RETURNING id, (xmax = 0) AS created`);
+    RETURNING id, call_no, (xmax = 0) AS created`);
   const row = (res as any).rows?.[0];
-  return row ? { id: String(row.id), created: !!row.created } : null;
+  return row ? { id: String(row.id), callNo: row.call_no == null ? null : Number(row.call_no), created: !!row.created } : null;
 }
 
 export function registerVoiceIngestRoutes(app: Express): void {
@@ -156,7 +156,7 @@ export function registerVoiceIngestRoutes(app: Express): void {
     if (!items.length || items.length > INGEST_BATCH_MAX) {
       return res.status(400).json({ code: "invalid", message: `Send one call, or { calls: [...] } with 1–${INGEST_BATCH_MAX} calls.` });
     }
-    const results: { callSid: string | null; id?: string; created?: boolean; error?: string }[] = [];
+    const results: { callSid: string | null; id?: string; callNo?: number | null; created?: boolean; error?: string }[] = [];
     for (const item of items) {
       const parsed = ingestCallSchema.safeParse(item);
       if (!parsed.success) {
@@ -176,7 +176,7 @@ export function registerVoiceIngestRoutes(app: Express): void {
     // a single call answers with its own status; a batch is 200 with per-call results
     if (!Array.isArray(body?.calls)) {
       const r = results[0];
-      if (r.id) return res.status(r.created ? 201 : 200).json({ id: r.id, created: r.created });
+      if (r.id) return res.status(r.created ? 201 : 200).json({ id: r.id, callNo: r.callNo, created: r.created });
       return res.status(r.error === "call_sid belongs to a call this sender did not push" ? 409 : r.error === "could not store the call" ? 500 : 400)
         .json({ code: "rejected", message: r.error });
     }

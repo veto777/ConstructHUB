@@ -8,6 +8,8 @@ import type { PillTone } from "@/components/crm-ui";
 
 export type VoiceCallListRow = {
   id: string;
+  /** Per-account call number, "Call #57" (server/voice/schema.ts trigger). */
+  callNo: number | null;
   numberId: string | null;
   callSid: string;
   direction: string;

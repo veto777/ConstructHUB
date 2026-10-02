@@ -41,7 +41,7 @@ const listQuery = z.object({
 
 /** The list shape: everything but the heavy JSON columns. */
 const listColumns = {
-  id: voiceCalls.id, numberId: voiceCalls.numberId, callSid: voiceCalls.callSid, direction: voiceCalls.direction,
+  id: voiceCalls.id, callNo: voiceCalls.callNo, numberId: voiceCalls.numberId, callSid: voiceCalls.callSid, direction: voiceCalls.direction,
   fromNumber: voiceCalls.fromNumber, toNumber: voiceCalls.toNumber, persona: voiceCalls.persona,
   startedAt: voiceCalls.startedAt, endedAt: voiceCalls.endedAt, durationSeconds: voiceCalls.durationSeconds, billedMinutes: voiceCalls.billedMinutes,
   outcome: voiceCalls.outcome, callerName: voiceCalls.callerName, callerCity: voiceCalls.callerCity, serviceNeeded: voiceCalls.serviceNeeded,
@@ -131,7 +131,12 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     if (q.numberId) where.push(eq(voiceCalls.numberId, q.numberId));
     if (q.from) where.push(gte(voiceCalls.startedAt, new Date(q.from)));
     if (q.to) where.push(lte(voiceCalls.startedAt, new Date(`${q.to.slice(0, 10)}T23:59:59.999Z`)));
-    if (q.q) {
+    if (q.q && /^#?\d{1,9}$/.test(q.q)) {
+      // "#57" / "57": the call number (a bare number also still matches phone digits)
+      const n = Number(q.q.replace("#", ""));
+      const like = `%${q.q.replace("#", "")}%`;
+      where.push(or(eq(voiceCalls.callNo, n), sql`${voiceCalls.fromNumber} ilike ${like}`)!);
+    } else if (q.q) {
       const like = `%${q.q.replace(/[%_]/g, "")}%`;
       where.push(or(
         sql`${voiceCalls.callerName} ilike ${like}`, sql`${voiceCalls.fromNumber} ilike ${like}`,

@@ -33,10 +33,7 @@ const MORE_LINKS: {
   platformAdmin?: boolean;
   active: (l: string) => boolean;
 }[] = [
-  // The AI receptionist, as in the sidebar: every member sees it; the page shows the add-on prompt itself.
-  { title: "Call Assistant", url: "/crm/call-assistant", icon: Phone, testid: "ribbon-more-call-assistant",
-    infoKey: "call-assistant",
-    active: (l) => l.startsWith("/crm/call-assistant") },
+  // No Call Assistant: it lives on the platform, not in the CRM (owner, 2026-10-02).
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
     infoKey: "pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },

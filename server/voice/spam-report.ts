@@ -43,7 +43,7 @@ type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: 
 export const SPAM_REPORT_EMAIL_KIND = "voice.spam_report";
 /** Rows listed in the email; the rest are counted and linked. */
 export const SPAM_REPORT_MAX_ROWS = 50;
-export const SPAM_REPORT_LINK = "/crm/call-assistant?tab=calls&view=spam";
+export const SPAM_REPORT_LINK = "/call-assistant?tab=calls&view=spam";
 
 export type SpamReportWeek = { start: Date; end: Date; key: string };
 

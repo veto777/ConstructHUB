@@ -33,6 +33,7 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto" data-testid="sheet-call-detail">
         <SheetHeader>
           <SheetTitle className="flex flex-wrap items-center gap-2" data-testid="text-call-detail-title">
+            {call?.callNo != null && <span className="font-mono text-base text-muted-foreground" data-testid="text-call-detail-no">Call #{call.callNo}</span>}
             {call ? (call.callerName || fmtPhone(call.fromNumber)) : "Call"}
             {call?.outcome && <StatusPill tone={outcomeTone(call.outcome)} data-testid="pill-call-detail-outcome">{outcomeLabel(call.outcome)}</StatusPill>}
           </SheetTitle>
@@ -143,7 +144,7 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
               )}
             </section>
 
-            <p className="text-xs text-muted-foreground">Call {call.callSid}{call.model ? ` · ${call.model}` : ""}{call.profileVersion ? ` · profile v${call.profileVersion}` : ""}</p>
+            <p className="text-xs text-muted-foreground" data-testid="text-call-reference">{call.callNo != null ? `Call #${call.callNo} · ` : ""}Reference {call.callSid}{call.model ? ` · ${call.model}` : ""}{call.profileVersion ? ` · profile v${call.profileVersion}` : ""}</p>
           </div>
         )}
       </SheetContent>

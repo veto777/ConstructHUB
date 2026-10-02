@@ -499,7 +499,7 @@ The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstat
 
 **Invoices:** convert an approved estimate into an invoice, send it with a secure payment link, record payments and give receipts (marked PAID IN FULL when settled). Filter by status to chase overdue invoices.
 
-**AI Call Assistant:** an add-on that answers the company's phone and files each caller as a lead in Clients. Its page in the CRM sidebar is **Call Assistant** (section 30).
+**AI Call Assistant:** an add-on that answers the company's phone and files each caller as a lead in Clients. Its page is **Call Assistant** in the main ConstructHUB sidebar, not in the CRM (section 30).
 
 **Payments:**
 1. CRM → **Payments** → connect your own Stripe account (Stripe Connect). Money goes straight to your Stripe account; ConstructHUB never holds it.
@@ -612,7 +612,7 @@ For contractors who'd rather have the work done for them. Every one of these is 
 
 ## 30. AI Call Assistant (add-on)
 
-An AI receptionist for the contractor's own phone line. It answers every call, day or night, collects the lead the way the contractor wants, files it in the CRM and gets urgent calls to the right person. Page: [AI Call Assistant](/call-assistant). In the CRM it lives under **Call Assistant** (tabs: Overview, Numbers, Agent Studio, Simulator, Calls).
+An AI receptionist for the contractor's own phone line. It answers every call, day or night, collects the lead the way the contractor wants, files it in the CRM and gets urgent calls to the right person. Page: [AI Call Assistant](/call-assistant). Signed in, it lives under **Call Assistant** in the main ConstructHUB sidebar (tabs: Overview, Numbers, Agent Studio, Simulator, Calls); the CRM is a separate product and only receives the leads.
 
 **Price and availability:** {{CALL_ASSISTANT_TIER_COUNT}} tiers, one per account: {{CALL_ASSISTANT_TIERS_LINE}}. Solo's launch price is {{CALL_ASSISTANT_INTRO_LINE}}. The intro price is Solo on monthly billing; yearly billing is the yearly price from the start, and {{CALL_ASSISTANT_NO_INTRO_TIERS}} have no intro. On every tier, {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own; the contractor can move between tiers any time in Settings → Billing (the difference is prorated, and a smaller tier keeps fewer numbers). {{CALL_ASSISTANT_AVAILABILITY}}
 
@@ -621,7 +621,7 @@ An AI receptionist for the contractor's own phone line. It answers every call, d
 **Voices:** the contractor picks a name and voice for the assistant: {{CALL_ASSISTANT_PERSONAS}}, and can change the greeting. (The phone voice named Gabe is one of those choices; it is not this website helper.) It speaks English today.
 
 **Getting a phone number:**
-1. CRM → **Call Assistant** → **Numbers** → pick a state, and optionally an area code or a city.
+1. **Call Assistant** (main sidebar) → **Numbers** → pick a state, and optionally an area code or a city.
 2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. {{CALL_ASSISTANT_TIER_NUMBERS}}; each extra number is its own add-on (a second location or a tracking line).
 3. Keep your existing numbers: forward them to the new number from your phone carrier (for example only when you don't answer, after hours, or always). Nothing is ported, so your numbers stay yours. The Numbers tab shows how to set up forwarding with common carriers.
 

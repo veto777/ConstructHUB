@@ -270,8 +270,8 @@ const googleGroups: NavGroup[] = [
 const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", icon: Star, logoComponent: GoogleGIcon, badge: "best" as BadgeType };
 
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
-  // The AI Call Assistant lives in the CRM (portal /crm/call-assistant). /call-assistant signed in
-  // (pages/call-assistant-entry.tsx) sends a CRM member straight there; anyone else sees the feature page.
+  // The AI Call Assistant's dashboard is a platform page (/call-assistant signed in); the CRM is a standalone
+  // service and never hosts it (owner, 2026-10-02). Signed out, /call-assistant is the feature page.
   { title: "Call Assistant", url: "/call-assistant", icon: Phone, logoComponent: CallAssistantIcon, badge: "new" },
   { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },
   { title: "Site Scan", url: "/site-scan", icon: Search, logoComponent: SiteScanIcon },

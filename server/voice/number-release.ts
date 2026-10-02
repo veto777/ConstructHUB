@@ -158,7 +158,7 @@ async function orgsHoldingNumbers(userId: number, q: Queryable = pool): Promise<
 async function notifyOwners(orgId: string, title: string, body: string): Promise<void> {
   await pool.query(
     `INSERT INTO crm_notifications (org_id, member_id, type, title, body, link)
-     SELECT $1::varchar, m.id, 'call.number_released', $2::text, $3::text, '/crm/call-assistant?tab=numbers'
+     SELECT $1::varchar, m.id, 'call.number_released', $2::text, $3::text, '/call-assistant?tab=numbers'
        FROM crm_members m WHERE m.org_id = $1::varchar AND m.role = 'owner' AND m.status = 'active'`,
     [orgId, title.slice(0, 300), body.slice(0, 1000)],
   ).catch((e: any) => {

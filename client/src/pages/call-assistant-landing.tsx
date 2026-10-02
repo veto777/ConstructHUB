@@ -103,7 +103,7 @@ const AFTER_CALL: string[] = [
  * No prices here (they come from the price book, above).
  */
 const IN_DEPTH: string[] = [
-  "The AI Call Assistant is an AI answering service for contractors, built into the ConstructHUB CRM. You forward " +
+  "The AI Call Assistant is an AI answering service for contractors, part of the ConstructHUB platform. You forward " +
     "your existing lines to its local number, when you don't answer, after hours or always, and it picks up under " +
     "the name and voice you chose. Its job is the call you would otherwise miss: find out what the caller needs, " +
     "take down a real job the way you set it up, and get it to the right person.",
@@ -211,9 +211,9 @@ export default function CallAssistantLandingPage() {
   const lowerOverageTiers = joinNames(price.tiers.filter((t) => t.lowerOverage).map((t) => t.name));
   useMetaDescription(ROUTE_META[CALL_ASSISTANT_PATH].description);
 
-  // Signed out: create an account. Signed in: the CRM, where the Call Assistant lives.
+  // Signed out: create an account. Signed in: the Call Assistant dashboard on this platform (never the CRM).
   const primaryCta = (where: string) => user
-    ? <Link href="/crm-app" data-testid={`link-ca-open-crm-${where}`} className={`${BTN_PRIMARY} ${BTN_LG}`}>Open your CRM <ArrowRight className="h-4 w-4" /></Link>
+    ? <Link href={CALL_ASSISTANT_PATH} data-testid={`link-ca-open-dashboard-${where}`} className={`${BTN_PRIMARY} ${BTN_LG}`}>Open your Call Assistant <ArrowRight className="h-4 w-4" /></Link>
     : <Link href={`/auth?mode=signup&next=${encodeURIComponent(CALL_ASSISTANT_PATH)}`} data-testid={`link-ca-signup-${where}`} className={`${BTN_PRIMARY} ${BTN_LG}`}>Create Your Account <ArrowRight className="h-4 w-4" /></Link>;
   const salesCta = (className: string, testId: string) => (
     <button type="button" onClick={() => setSalesOpen(true)} className={`${className} ${BTN_LG}`} data-testid={testId}>

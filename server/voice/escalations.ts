@@ -173,7 +173,7 @@ async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: stri
   const title = opts.update ? `Details added — ${base}` : base;
   await notifyMembers({
     org: ctx.org, pref: "leadReceived", type: `call.alert.${kind}`, title,
-    body: facts.summary || null, link: `/crm/call-assistant?tab=calls&call=${call.id}`,
+    body: facts.summary || null, link: `/call-assistant?tab=calls&call=${call.id}`,
   });
   if (!crmNotificationChannel(ctx.org.customFields, "leadReceived", "email")) return;
   const members = await db.select().from(crmMembers).where(and(eq(crmMembers.orgId, ctx.org.id), eq(crmMembers.status, "active")));

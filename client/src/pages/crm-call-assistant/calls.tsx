@@ -28,7 +28,7 @@ import {
  * calls+crm lane (LANES.md). API: /api/crm/voice/calls*, /spam*,
  * /escalations* (server/voice/calls.ts).
  *
- * Deep link: /crm/call-assistant?tab=calls&call=<id> opens that call's
+ * Deep link: /call-assistant?tab=calls&call=<id> opens that call's
  * drawer (the link every call notification carries); &view=spam|escalations
  * opens a sub-view.
  */
@@ -168,7 +168,7 @@ function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) => void
             id="calls-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, number, city or what they needed"
+            placeholder="Search call #, name, number, city or what they needed"
             className="pl-8"
             data-testid="input-calls-search"
           />
@@ -215,6 +215,7 @@ function CallsTable({ calls, onOpen, testId }: { calls: VoiceCallListRow[]; onOp
       <table className={crmTable.table} data-testid={testId}>
         <thead className={cn(crmTable.thead, crmTableCards.thead)}>
           <tr>
+            <th className={crmTable.th}>Call</th>
             <th className={crmTable.th}>When</th>
             <th className={crmTable.th}>Caller</th>
             <th className={crmTable.th}>Outcome</th>
@@ -230,6 +231,7 @@ function CallsTable({ calls, onOpen, testId }: { calls: VoiceCallListRow[]; onOp
               onClick={() => onOpen(c.id)}
               data-testid={`row-call-${c.id}`}
             >
+              <td className={cn(crmTable.td, crmTableCards.td, "whitespace-nowrap font-mono text-xs text-muted-foreground")} data-testid={`text-call-no-${c.id}`}>{c.callNo != null ? `#${c.callNo}` : "—"}</td>
               <td className={cn(crmTable.td, crmTableCards.td, "whitespace-nowrap text-muted-foreground")}>{fmtWhen(c.startedAt)}</td>
               <td className={cn(crmTable.td, crmTableCards.td)}>
                 {/* The row is clickable; this button is the keyboard/screen-reader way in. */}

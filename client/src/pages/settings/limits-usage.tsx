@@ -294,8 +294,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           used: !on ? null : vs!.numberAllowance ? vs!.numberAllowance.used : undefined,
           ceiling: on && numbers > 0 ? numbers : undefined,
           hint: admin
-            ? `Platform admins can hold up to ${formatCount(numbers)} numbers: each one is a real carrier number. Buy and release them in CRM → Call Assistant → Numbers.`
-            : `${callAssistantTierNumbersLine()}; buy and release them in CRM → Call Assistant → Numbers.`,
+            ? `Platform admins can hold up to ${formatCount(numbers)} numbers: each one is a real carrier number. Buy and release them in Call Assistant → Numbers.`
+            : `${callAssistantTierNumbersLine()}; buy and release them in Call Assistant → Numbers.`,
           addon: on ? "call_number" : undefined,
         },
       ],

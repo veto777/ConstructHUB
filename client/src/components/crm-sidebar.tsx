@@ -45,10 +45,8 @@ const NAV: {
     active: (l: string) => l.startsWith("/crm/clients") },
   { title: "Messages", url: "/crm/inbox", icon: Inbox, testid: "link-portal-nav-messages",
     active: (l: string) => l.startsWith("/crm/inbox") },
-  // The AI receptionist (docs/call-assistant/SPEC.md). Visible to every member;
-  // the page itself shows the add-on prompt when the plan lacks it.
-  { title: "Call Assistant", url: "/crm/call-assistant", icon: Phone, testid: "link-portal-nav-call-assistant",
-    active: (l: string) => l.startsWith("/crm/call-assistant") },
+  // No Call Assistant here: it lives on the platform (constructhub.us/call-assistant), and the CRM is a
+  // standalone service (owner, 2026-10-02).
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "link-portal-nav-pipeline",
     active: (l: string) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "link-portal-nav-estimates",

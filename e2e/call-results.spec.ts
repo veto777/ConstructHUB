@@ -39,12 +39,15 @@ async function mockVoice(page: Page, seen: string[]) {
   });
 }
 
-test("Overview shows the results, and a tile opens the matching calls", async ({ page }) => {
+test("the dashboard is a platform page with the main sidebar; Results open the matching calls", async ({ page }) => {
   const seen: string[] = [];
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await mockVoice(page, seen);
-  await page.goto(`${PORTAL}/crm/call-assistant`);
+  await page.context().addCookies([{ name: "ch_consent", value: "denied", url: SITE }]);
+  await page.goto(`${SITE}/call-assistant`);
+  await expect(page.getByTestId("tabs-call-assistant")).toBeVisible({ timeout: 60_000 });
+  expect(new URL(page.url()).host).toBe(new URL(SITE).host);   // never the CRM host
   const card = page.getByTestId("card-call-results");
   await expect(card).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("text-results-total")).toHaveText("63");
@@ -74,11 +77,17 @@ test("Overview shows the results, and a tile opens the matching calls", async ({
   expect(errors).toEqual([]);
 });
 
-test("signed in, the main site's Call Assistant opens the dashboard on the portal", async ({ page }) => {
-  await page.context().addCookies([{ name: "ch_consent", value: "denied", url: SITE }]);
-  const portalHost = `portal.${new URL(SITE).host}`;
-  let landed = "";
-  await page.route(`http://${portalHost}/**`, (route) => { landed = route.request().url(); return route.fulfill({ status: 200, contentType: "text/html", body: "<p>portal</p>" }); });
-  await page.goto(`${SITE}/call-assistant`);
-  await expect.poll(() => landed, { timeout: 30_000 }).toBe(`http://${portalHost}/crm/call-assistant`);
+test("old CRM links (bell notifications, bookmarks) land on the platform page with their query", async ({ page }) => {
+  await page.context().addCookies([{ name: "ch_consent", value: "denied", url: PORTAL }]);
+  await page.goto(`${PORTAL}/crm/call-assistant?tab=calls&call=abc123`);
+  // A forced-portal dev server's platform face is the same host with ?portal=0 (lib/site.ts marketingUrl).
+  await expect(page).toHaveURL(/\/call-assistant\?tab=calls&call=abc123(&portal=0)?$/, { timeout: 30_000 });
+  await expect(page).not.toHaveURL(/\/crm\//);
+});
+
+test("the CRM no longer lists the Call Assistant", async ({ page }) => {
+  await page.context().addCookies([{ name: "ch_consent", value: "denied", url: PORTAL }]);
+  await page.goto(`${PORTAL}/crm`);
+  await expect(page.getByTestId("link-portal-nav-clients")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("link-portal-nav-call-assistant")).toHaveCount(0);
 });

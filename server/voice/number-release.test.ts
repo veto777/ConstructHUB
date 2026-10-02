@@ -173,7 +173,7 @@ describe("cancel → the number is released", () => {
       `Your Call Assistant number ${n.phone} stopped answering because the subscription ended`,
       `Your Call Assistant number ${n.phone} was released because the subscription ended`,
     ]);
-    expect(bell.every((b) => b.member_id === a.memberId && b.link === "/crm/call-assistant?tab=numbers")).toBe(true);
+    expect(bell.every((b) => b.member_id === a.memberId && b.link === "/call-assistant?tab=numbers")).toBe(true);
     expect(bell[1].body).toMatch(/never moved/);
     expect(await activity(a.orgId, "call.number_released")).toEqual([{ meta: { phone: n.phone, reason: "subscription_ended" } }]);
 

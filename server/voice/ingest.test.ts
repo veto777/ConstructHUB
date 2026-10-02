@@ -9,6 +9,7 @@ import type { AddressInfo } from "net";
 import { randomUUID } from "crypto";
 import { pool } from "../db";
 import { registerVoiceIngestRoutes, normalizeTurn, toRow, ingestCallSchema } from "./ingest";
+import { ensureVoiceSchema } from "./schema";
 
 const SECRET = "ingest-test-secret-0123456789abcdef";
 const ORG = `test-ingest-${randomUUID().slice(0, 8)}`;
@@ -49,6 +50,7 @@ const rowFor = async (callSid: string) => (await pool.query(`SELECT * FROM voice
 
 beforeAll(async () => {
   if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
+  await ensureVoiceSchema();   // call numbers (call_no + trigger) on a dev DB that predates them
   process.env.VOICE_INGEST_SECRET = SECRET;
   process.env.VOICE_INGEST_ORG_ID = ORG;
   const app = express();
@@ -117,6 +119,23 @@ describe("storing a call", () => {
     expect((await rowFor(sid("b2"))).outcome).toBe("spam");
     expect((await http("POST", "/api/voice-ingest/calls", { body: { calls: [] } })).status).toBe(400);
     expect((await http("POST", "/api/voice-ingest/calls", { body: { call_sid: sid("bad"), started_at: "2026-10-02T19:58:00Z" } })).status).toBe(400);
+  });
+});
+
+describe("call numbers (owner 2026-10-02: every call has an ID)", () => {
+  it("numbers each org's calls 1, 2, 3…, keeps a call's number when it is pushed again, and counts orgs separately", async () => {
+    const first = await rowFor(sid("one"));
+    expect(first.call_no).toBe(1);   // the first call this test org ever stored
+    const again = await http("POST", "/api/voice-ingest/calls", { body: call("one", { summary: "updated" }) });
+    expect(again.body).toMatchObject({ callNo: 1, created: false });
+    const next = await http("POST", "/api/voice-ingest/calls", { body: call("numbered") });
+    expect(next).toMatchObject({ status: 201 });
+    expect(next.body.callNo).toBeGreaterThan(1);
+    const nums = (await pool.query(`SELECT call_no FROM voice_calls WHERE org_id = $1 ORDER BY call_no`, [ORG])).rows.map((r) => r.call_no);
+    expect(new Set(nums).size).toBe(nums.length);   // unique within the org
+    expect(nums).toEqual(Array.from({ length: nums.length }, (_, i) => i + 1));
+    // another org's numbering is its own (the engine row inserted above is that org's call #1)
+    expect((await rowFor(sid("theirs"))).call_no).toBe(1);
   });
 });
 
