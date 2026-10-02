@@ -19,6 +19,36 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🧰 2026-10-02 evening — what is live now (all deployed to vb11; dump-first each time)
+- **Call Assistant is LAUNCHED (purchasable).** Four tiers in `shared/plans.ts` CALL_ASSISTANT_TIERS: Lite $149
+  (1,000 min, 1 number), Solo $249 ($99 × 3 monthly intro; 2,000 min, 1 number), Crew $449 (5,000 min, 5 numbers),
+  Fleet $799 (12,000 min, 20 numbers). Overage 10¢ Lite/Solo, 5¢ Crew/Fleet. 500 spam calls/month free on every tier.
+  The two "NOT deployed" entries below are merged, live and superseded by these numbers. Owner still to confirm:
+  Lite yearly $1,199; the Stripe failed-payments setting (see the launch gate below).
+- **Owner call rules (engine + compiler, `9931a36`):** a caller who asked for work is never hung up on: the spam flag
+  is refused unless it sounds like a pitch or robocall, and only their own goodbye ends the call. Unusual or foreign names are
+  spelled and read back. "Is <name> available?" (lawyers, firms, collections) gets "I'm not sure. This line is only
+  for estimate requests." Personal or non-estimate matters get the estimates-only line, with no message taken. A lone
+  early "bye" is treated as a misheard "hi", and queued caller speech is answered before any hang-up. Unanswered
+  caller words are kept in the transcript as notes, and the summary gets labelled speakers. These mirror Alpine's
+  Janice fixes from the same day. Published profiles keep their compiled prompt until republished; production had none.
+- **Feature pages + SEO:** `/features` plus one page per feature and Done-For-You pages, a Features ▾ dropdown in the
+  shared ribbon (`client/src/components/site-nav.tsx`) on every public page, and 47 prerendered pages with JSON-LD.
+- **Google Profile access (Dennis):** discovery runs for every connected account. There is now a "Google Profile"
+  sidebar entry, plus View profiles / Open in Google buttons. Accounts without a plan see "needs a plan" instead of a
+  dead Import button.
+- **Admin second factor:** a recent identity check (12 h) satisfies the admin gate; a refusal returns `{reauth:true}`
+  and the client shows the verify dialog and retries. No more "Admin sign-in required" dead end.
+- **Access grants** (`/admin/access`, sidebar "Access grants · ADMIN"): give any account a plan for 1–1000 days,
+  extend, revoke. Trial codes go up to 1000 days.
+- **Issue desk** (`/admin/issues`, docs/ops/ISSUE-DESK.md): the app records its own 5xx errors, job failures, Call
+  Assistant problems and browser errors in `ops_issues`. The tower timer `constructhub-issue-desk.timer` (user unit,
+  every 15 min) hands new issues to a headless Claude in `~/ConstructHUB-issue-desk`. Claude has read-only production
+  tools and may put a fix on branch `issue/<id>`. It never pushes, deploys or restarts. Admins get a digest and a bell.
+  `ISSUE_DESK_SECRET` is in vb11's `.env` and `ops/issue-desk/.env` (600, gitignored). There is a cap of $10 per run
+  and 6 runs per day. **Browser reports start as "Needs review"**: they are anonymous input, so Claude only sees one
+  after an admin presses Send to Claude. Review every `issue/<id>` branch before merging.
+
 ## ☎️ 2026-10-02 — Call Assistant tiers, 10¢ overage, 500 free spam calls — branch `ca/tiers`, NOT deployed
 - Owner: "offer 3 different tiers … 3-5k min used a month … all plans cover 500 spam calls that aren't charged … we
   can charge 10 cents". Solo $249 (2,000 min, 1 number, the $99 × 3 intro), Crew $449 (5,000 min, 3 numbers), Fleet
