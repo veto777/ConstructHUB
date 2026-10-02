@@ -17,6 +17,7 @@ import {
   type DashboardTile, type DashboardTileKey, type DashboardUsage,
 } from "@shared/dashboard";
 import { tileAccess } from "./access";
+import { CTA_START, COMING_SOON_MESSAGE, lockedMessage } from "./copy";
 
 export type DashboardFixtureScenario = "full" | "new" | "noplan";
 export const DASHBOARD_FIXTURE_SCENARIOS: readonly DashboardFixtureScenario[] = ["full", "new", "noplan"];
@@ -64,15 +65,6 @@ function fullMetrics(key: DashboardTileKey, now: Date, limits: PlanLimits): Dash
 /** Tiles that are just links (no per-account numbers) still render as "ok". */
 const LINK_ONLY: ReadonlySet<DashboardTileKey> = new Set(["guides", "reinstatement"]);
 
-const CTA_START: Partial<Record<DashboardTileKey, string>> = {
-  gbp: "Connect Google", reviews: "Send a review request", profileGuard: "Turn on Profile Guard", rankingGrid: "Run a grid",
-  gbpContent: "Schedule a post", social: "Connect social accounts", siteScan: "Run a Site Scan", media: "Upload photos",
-  clickGuard: "Protect a website", ipTracker: "Add the tracking script", vpnShield: "Turn on VPN Shield", cloudflare: "Connect Cloudflare",
-  searchConsole: "Connect Search Console", domains: "Connect a registrar", mailAlerts: "Get your forwarding address",
-  permits: "Search permits", competitors: "Run a scan", adsManager: "Connect Google Ads", lsaLeads: "Connect LSA",
-  crm: "Open the CRM", crmSchedule: "Book a visit", crmLeads: "Add a lead", texting: "Set up texting", agency: "Add a client",
-  masterClass: "Start learning",
-};
 
 function tileFor(scenario: DashboardFixtureScenario, def: (typeof DASHBOARD_TILES)[number], now: Date, plan: PlanKey | null, modules: PlanModules, hasCrmOrg: boolean): DashboardTile {
   const limits = plan ? PLANS[plan].limits : null;
@@ -86,11 +78,10 @@ function tileFor(scenario: DashboardFixtureScenario, def: (typeof DASHBOARD_TILE
     ...(access.addon ? { addon: access.addon } : {}),
   };
   if (access.comingSoon) {
-    return { ...base, status: "coming_soon", message: "Coming soon as an add-on for the Pro, Growth and Agency plans.", cta: { label: "See add-ons", href: "/pricing#add-ons", surface: "app" } };
+    return { ...base, status: "coming_soon", message: COMING_SOON_MESSAGE, cta: { label: "See add-ons", href: "/pricing#add-ons", surface: "app" } };
   }
   if (!access.entitled) {
-    const name = access.requiredPlan ? PLANS[access.requiredPlan].name : "a paid";
-    return { ...base, status: "locked", message: `Included with the ${name} plan.`, cta: { label: "See plans", href: "/pricing", surface: "app" } };
+    return { ...base, status: "locked", message: lockedMessage(access.requiredPlan), cta: { label: "See plans", href: "/pricing", surface: "app" } };
   }
   if (LINK_ONLY.has(def.key)) return base;
   const start = { label: CTA_START[def.key] ?? "Open", href: def.href, surface: def.surface };
@@ -119,7 +110,7 @@ function usageFor(plan: PlanKey | null, scenario: DashboardFixtureScenario): Das
     { key: "texts", label: "Text segments", used: full ? 214 : 0, limit: l.teamTextSegments, period: "monthly", href: "/settings?tab=billing" },
     { key: "locations", label: "Locations", used: full ? 2 : 0, limit: l.locations, period: "count", href: "/locations" },
     { key: "protectedSites", label: "Protected websites", used: full ? 1 : 0, limit: l.protectedSites, period: "count", href: "/google-ads" },
-    { key: "crmSeats", label: "CRM seats", used: full ? 4 : 1, limit: l.crmSeats, period: "count", href: "/crm/team" },
+    { key: "crmSeats", label: "CRM seats", used: full ? 4 : 1, limit: l.crmSeats, period: "count", href: "/crm/team?tab=team", surface: "portal" },
   ];
   return rows.filter((r) => r.limit !== 0);
 }
