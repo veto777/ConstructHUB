@@ -15,10 +15,13 @@ export function CallAssistantPausedBanner({ status }: { status: VoiceStatus }) {
           <p className="text-sm text-muted-foreground">
             The subscription's last payment didn't go through, so the assistant isn't answering calls. Callers hear a short
             "taking a break" message.{" "}
-            {status.subscriptionStatus === "unpaid"
+            {status.subscriptionStatus !== "unpaid" ? CALL_ASSISTANT_NUMBER_RULES.payment
               // Stripe stopped retrying: the subscription has ended for the number (server/voice/number-release.ts).
-              ? "The payment is no longer being retried, so your Call Assistant number is being released (the Numbers tab shows the date). Update your payment method before then to keep it."
-              : CALL_ASSISTANT_NUMBER_RULES.payment}
+              : status.numberRelease === "releasing"
+                ? "The payment is no longer being retried, so your Call Assistant number is being released (the Numbers tab shows the date). Update your payment method before then to keep it."
+                : status.numberRelease === "released"
+                  ? "The payment is no longer being retried, so your Call Assistant number was released because the payment was not recovered. Updating your payment method restarts the assistant; you then pick a new number."
+                  : "The payment is no longer being retried. Update your payment method to restart the assistant."}
             {" "}You can still read your settings and call log.
           </p>
         </div>

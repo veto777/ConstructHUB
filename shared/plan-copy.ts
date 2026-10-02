@@ -166,6 +166,17 @@ export function callAssistantIntroShort(): string {
 }
 
 /**
+ * "$1,999/yr when your plan is billed yearly (add-ons follow your plan's
+ * billing); the $99/mo intro for your first 3 months is on monthly billing" —
+ * add-ons always ride on the plan's interval (server/billing/order.ts), so the
+ * yearly price is never a choice for the add-on alone.
+ */
+export function callAssistantYearlyNote(): string {
+  const p = callAssistantPricing();
+  return `${p.annual}/yr when your plan is billed yearly (add-ons follow your plan's billing); the ${p.intro}/mo intro for your first ${p.introMonths} months is on monthly billing`;
+}
+
+/**
  * What happens to the number and the assistant when billing stops — the
  * owner's rules (2026-10-02), in one place for the FAQ, the Studio Numbers
  * tab and Gabe: your own numbers are never moved; the assistant's number is

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PLANS, PLAN_KEYS } from "../shared/plans";
-import { CALL_ASSISTANT_NUMBER_RULES, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, planPriceLine } from "../shared/plan-copy";
+import { CALL_ASSISTANT_NUMBER_RULES, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote, planPriceLine } from "../shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 
 /**
@@ -80,7 +80,9 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.ownNumbers);
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.cancel);
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.payment);
-  await expect(faq).toContainText(`Yes: ${p.annual}/yr.`);
+  // Add-ons follow the plan's billing: $1,999/yr is not a choice for the add-on alone.
+  await expect(faq).toContainText(`Yes: ${callAssistantYearlyNote()}.`);
+  expect(callAssistantYearlyNote()).toBe(`${p.annual}/yr when your plan is billed yearly (add-ons follow your plan's billing); the ${p.intro}/mo intro for your first ${p.introMonths} months is on monthly billing`);
   for (const persona of VOICE_PERSONA_LIST) await expect(page.getByTestId(`card-persona-${persona.id}`)).toContainText(persona.name);
   await expect(page.locator('[data-testid^="step-ca-"]')).toHaveCount(4);
   for (const key of p.planKeys) await expect(page.getByTestId("text-ca-plans")).toContainText(PLANS[key].name);
@@ -105,6 +107,8 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await expect(page.getByTestId("text-addon-price-call_assistant")).toContainText(`${p.regular}/mo`);
   await page.getByTestId("button-interval-year").click();
   await expect(page.getByTestId("text-addon-price-call_assistant")).toContainText(`${p.annual}/yr`);
+  // … and the note under it no longer offers the monthly intro as if it applied to yearly billing.
+  await expect(page.getByTestId("text-addon-intro-call_assistant")).toHaveText(callAssistantYearlyNote());
   await expect(page.getByTestId("text-addon-price-call_assistant")).not.toContainText(SALES_REP_LABEL);
 
   // Signed in (dev bypass): the main sidebar has the entry, with the NEW badge.

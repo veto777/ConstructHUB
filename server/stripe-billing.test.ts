@@ -85,7 +85,7 @@ vi.mock("./account-security", () => ({
 // The one email path: the webhook hands each verified platform event to this adapter (spied, never sends).
 vi.mock("./account/billing-emails", () => ({ onStripeBillingEvent: mocks.billingEmail }));
 // The number-release decision runs after every subscription write (its own tests: server/voice/number-release.test.ts).
-vi.mock("./voice/number-release", () => ({ afterSubscriptionChange: mocks.afterSubscriptionChange }));
+vi.mock("./voice/number-release", () => ({ afterSubscriptionChange: mocks.afterSubscriptionChange, previewCallNumberReleases: async () => [] }));
 
 import * as stripeModule from "./stripe";
 import { registerStripeRoutes } from "./stripe";
@@ -691,10 +691,12 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
 });
 
 describe("webhook maps the subscription's items onto the row", () => {
-  async function webhook(event: any) {
+  /** `stripeHas`: what subscriptions.retrieve answers for a subscription event (default: the event's own snapshot). */
+  async function webhook(event: any, stripeHas: any = event.data?.object) {
     const prior = process.env.STRIPE_WEBHOOK_SECRET;
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_local_mock";
     try {
+      if (/^customer\.subscription\.(created|updated)$/.test(event.type)) mocks.current = stripeHas;
       mocks.verify.mockReturnValue(event);
       return await request("/api/stripe/webhook", {}, { headers: { "stripe-signature": "t=1,v1=mock" }, rawBody: Buffer.from("{}") });
     } finally {
@@ -753,6 +755,21 @@ describe("webhook maps the subscription's items onto the row", () => {
     mocks.current = agencyYearly();
     await webhook({ type: "checkout.session.completed", data: { object: { id: "cs_2", subscription: "sub_new", metadata: { userId: "42", type: "plan", plan: "agency" } } } });
     expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
+  });
+
+  it("an out-of-order event writes the subscription as Stripe has it now, never the event's stale snapshot", async () => {
+    // Stripe does not order events: a late past_due (or unpaid) snapshot arrives after the subscription is active again.
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_new", "unpaid") } }, agencyYearly("sub_new", "active"));
+    expect(mocks.retrieve).toHaveBeenCalledWith("sub_new");
+    expect(mocks.updates[0]).toMatchObject({ status: "active", plan: "agency" });
+    // The number decision then reads the fresh row (nothing is released for a stale `unpaid`).
+    expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
+    // An event for a subscription the account isn't on is never even looked up.
+    mocks.retrieve.mockClear();
+    mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_live" })]);
+    await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_stray", "active") } });
+    expect(mocks.retrieve).not.toHaveBeenCalled();
   });
 
   it("records a cancellation set in Stripe's portal (cancel at period end) with the row", async () => {
@@ -852,10 +869,12 @@ describe("cancellationOf", () => {
 });
 
 describe("webhook → billing emails: one call per verified platform event, after the ledger and the row", () => {
-  async function webhook(event: any) {
+  /** `stripeHas`: what subscriptions.retrieve answers for a subscription event (default: the event's own snapshot). */
+  async function webhook(event: any, stripeHas: any = event.data?.object) {
     const prior = process.env.STRIPE_WEBHOOK_SECRET;
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_local_mock";
     try {
+      if (/^customer\.subscription\.(created|updated)$/.test(event.type)) mocks.current = stripeHas;
       mocks.verify.mockReturnValue(event);
       return await request("/api/stripe/webhook", {}, { headers: { "stripe-signature": "t=1,v1=mock" }, rawBody: Buffer.from("{}") });
     } finally {

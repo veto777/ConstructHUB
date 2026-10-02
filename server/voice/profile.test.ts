@@ -430,7 +430,9 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
       const lapsed = await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`);
       expect(lapsed.status).toBe(423);
       expect(lapsed.body).toMatchObject({ code: "paused", reason: "addon_inactive" });
-      expect(lapsed.body.say).toMatch(/taking a short break/);
+      // The service ended for this line: no "try again later" (that is only for a payment problem).
+      expect(lapsed.body.say).toMatch(/no longer answered by our assistant/);
+      expect(lapsed.body.say).not.toMatch(/try again later/);
     } finally {
       await pool.query("update subscriptions set addons = $2::jsonb where user_id = $1", [owner.id, JSON.stringify(sub.addons)]);
     }
@@ -474,8 +476,16 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
       const releasing = await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`);
       expect(releasing.status).toBe(423);
       expect(releasing.body).toMatchObject({ code: "paused", reason: "number_releasing" });
+      expect(releasing.body.say).toMatch(/no longer answered by our assistant/);
+      // The Overview banner can tell a number a fixed card still keeps from one whose release is final
+      // (the build's test number never counts, so this line poses as a bought one for the check).
+      expect((await api("/api/crm/voice/status", owner)).body.numberRelease).toBeNull();
+      await pool.query("update voice_numbers set is_test = false where phone_number = $1", [inbound]);
+      expect((await api("/api/crm/voice/status", owner)).body.numberRelease).toBe("releasing");
+      await pool.query("update voice_numbers set last_error = 'Release failed, will retry: fixture' where phone_number = $1", [inbound]);
+      expect((await api("/api/crm/voice/status", owner)).body.numberRelease).toBe("released");
     } finally {
-      await pool.query("update voice_numbers set status = 'active', release_reason = null where phone_number = $1", [inbound]);
+      await pool.query("update voice_numbers set status = 'active', release_reason = null, last_error = null, is_test = true where phone_number = $1", [inbound]);
     }
     expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
   });

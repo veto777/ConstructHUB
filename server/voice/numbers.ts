@@ -31,7 +31,7 @@ import { db } from "../db";
 import { voiceNumbers, type VoiceNumberRow } from "@shared/schema";
 import { ADDONS, CALL_NUMBER_MIN_DAYS, PLANS } from "@shared/plans";
 import { sendLimitReached, sendModulePaymentNeeded } from "../entitlements";
-import { releaseReasonText } from "./number-release";
+import { releaseReasonText, releaseIsFinal, FINAL_RELEASE_REASONS } from "./number-release";
 import { voiceContext, type GetUser, type VoiceContext } from "./context";
 import { voiceWebhookUrls } from "./proxy";
 import {
@@ -124,9 +124,22 @@ export async function listOrgNumbers(orgId: string): Promise<VoiceNumberRow[]> {
   return db.select().from(voiceNumbers).where(eq(voiceNumbers.orgId, orgId)).orderBy(asc(voiceNumbers.purchasedAt), asc(voiceNumbers.createdAt));
 }
 
+/**
+ * Whether a row counts against the allowance: it holds a carrier number and is
+ * not on a final release (a cancelled customer's old number, or one whose
+ * release was already attempted — number-release.ts releaseIsFinal), so a
+ * returning customer can buy a new number at once.
+ */
+export function countsAgainstAllowance(row: Pick<VoiceNumberRow, "status" | "releaseReason" | "lastError">): boolean {
+  return (HELD_STATUSES as readonly string[]).includes(row.status)
+    && !releaseIsFinal({ status: row.status, release_reason: row.releaseReason, last_error: row.lastError });
+}
+
 export async function heldNumberCount(orgId: string, tx: { select: typeof db.select } = db): Promise<number> {
   const [row] = await tx.select({ n: sql<number>`count(*)::int` }).from(voiceNumbers)
-    .where(and(eq(voiceNumbers.orgId, orgId), inArray(voiceNumbers.status, [...HELD_STATUSES])));
+    .where(and(eq(voiceNumbers.orgId, orgId), inArray(voiceNumbers.status, [...HELD_STATUSES]),
+      sql`NOT (${voiceNumbers.status} = 'releasing' AND ${voiceNumbers.releaseReason} IS NOT NULL
+               AND (${inArray(voiceNumbers.releaseReason, [...FINAL_RELEASE_REASONS])} OR ${voiceNumbers.lastError} IS NOT NULL))`));
   return Number(row?.n ?? 0);
 }
 
@@ -228,7 +241,7 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
     const rows = await listOrgNumbers(v.ctx.org.id);
-    const held = rows.filter((r) => (HELD_STATUSES as readonly string[]).includes(r.status)).length;
+    const held = rows.filter(countsAgainstAllowance).length;
     res.setHeader("Cache-Control", "no-store");
     res.json({
       numbers: rows.map(numberView),

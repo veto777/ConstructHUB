@@ -48,6 +48,8 @@ export type VoiceStatus = {
   pausedReason?: "payment_needed" | null;
   billingHref?: string;
   subscriptionStatus?: string | null;
+  /** An automatic number release: "releasing" = a fixed card still keeps it; "released" = gone (or final). */
+  numberRelease?: "releasing" | "released" | null;
   addon: { key: string; name: string; preview: boolean; availableOn: string[] };
   plan: string | null;
   allowance: { numbers: number; minutes: number };

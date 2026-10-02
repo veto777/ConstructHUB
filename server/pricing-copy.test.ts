@@ -7,7 +7,7 @@ import {
 import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
-  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing,
+  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote,
 } from "@shared/plan-copy";
 import { knowledgeBook, priceBookCents } from "./hub/knowledge";
 import { filterOutput } from "./hub/output-filter";
@@ -92,6 +92,8 @@ describe("AI Call Assistant launch price", () => {
     expect(callAssistantIntroShort()).toBe("$99/mo for your first 3 months, then $249/mo — or $1,999/yr");
     const p = callAssistantPricing();
     expect(p.annual).toBe("$1,999");
+    // Add-ons follow the plan's billing interval (server/billing/order.ts): yearly is not a choice for the add-on alone.
+    expect(callAssistantYearlyNote()).toBe("$1,999/yr when your plan is billed yearly (add-ons follow your plan's billing); the $99/mo intro for your first 3 months is on monthly billing");
     expect(p.extraNumber).toBe(formatUsd(ADDONS.call_number.monthlyCents));
     expect(p.comingSoon).toBe(ADDONS.call_assistant.preview === true);
     expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).`);

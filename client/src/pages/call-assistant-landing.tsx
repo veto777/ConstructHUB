@@ -27,7 +27,7 @@ import {
   PersonaCard, introPriceShort, personaNames,
 } from "@/components/call-assistant-marketing";
 import { PLANS } from "@shared/plans";
-import { CALL_ASSISTANT_NUMBER_RULES, SALES_REP_LABEL, callAssistantPricing, formatUsd } from "@shared/plan-copy";
+import { CALL_ASSISTANT_NUMBER_RULES, SALES_REP_LABEL, callAssistantPricing, callAssistantYearlyNote, formatUsd } from "@shared/plan-copy";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { ROUTE_META } from "@shared/route-meta";
 
@@ -122,7 +122,7 @@ function faqs(): { q: string; a: string }[] {
     },
     {
       q: "Is there a yearly price?",
-      a: `Yes: ${p.annual}/yr. The ${p.intro}/mo price for your first ${p.introMonths} months is for monthly billing.`,
+      a: `Yes: ${callAssistantYearlyNote()}.`,
     },
     {
       q: "What won't the assistant do?",

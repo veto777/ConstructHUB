@@ -25,8 +25,9 @@ import { moduleEnabled, modulePaused, BILLING_HREF } from "../entitlements";
 import { ADDONS, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
-import { listOrgNumbers, numberView, numberAllowance, HELD_STATUSES, numbersMockEnabled } from "./numbers";
+import { listOrgNumbers, numberView, numberAllowance, countsAgainstAllowance, numbersMockEnabled } from "./numbers";
 import { signalwireConfig } from "./numbers-signalwire";
+import { releaseIsFinal } from "./number-release";
 import { getVoiceUsageRow, listVoiceUsage, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -94,9 +95,15 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
         .from(voiceProfiles).where(eq(voiceProfiles.orgId, orgId)).limit(1).then((r) => r[0] ?? null),
       getVoiceUsageRow(orgId, month),
     ]);
-    const held = rows.filter((r) => (HELD_STATUSES as readonly string[]).includes(r.status)).length;
+    const held = rows.filter(countsAgainstAllowance).length;
+    // For the "paused" banner: can a fixed card still keep the number ("releasing"),
+    // or has it gone / is its release final ("released")? null = no automatic release.
+    const auto = rows.filter((r) => !r.isTest && r.releaseReason && (r.status === "releasing" || r.status === "released"));
+    const numberRelease = auto.some((r) => r.status === "releasing" && !releaseIsFinal({ status: r.status, release_reason: r.releaseReason, last_error: r.lastError }))
+      ? "releasing" as const : auto.length ? "released" as const : null;
     res.json({
       ...base,
+      numberRelease,
       numbers: rows.filter((r) => r.status !== "released").map(numberView),
       numberAllowance: numberAllowance(v, held),
       profile: profile ? { status: profile.status, publishedVersion: profile.publishedVersion, setupCompletedAt: profile.setupCompletedAt?.toISOString() ?? null, updatedAt: profile.updatedAt?.toISOString() ?? null } : null,

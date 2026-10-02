@@ -12,7 +12,7 @@ import {
   AGENCY_INCLUDED_LOCATIONS, addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
 } from "@/lib/pricing-display";
 import { LoadingCard, formatCount, useOptionalQuery } from "./shared";
-import { useBillingActions, useEntitlements, useSubscription } from "./use-billing";
+import { useAddonChange, useBillingActions, useEntitlements, useSubscription } from "./use-billing";
 import type { SettingsSectionProps } from "./types";
 
 /**
@@ -82,6 +82,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const ent = useEntitlements();
   const { data: subscription, view } = useSubscription();
   const { addon: addonMutation, salesTopic, setSalesTopic } = useBillingActions();
+  // Fewer Call Assistant add-ons than numbers held asks first (the numbers are released, not kept).
+  const addonChange = useAddonChange(addonMutation);
 
   const entitlements = ent.data;
   const plan: PlanKey | null = entitlements?.accessPlan ?? null;
@@ -387,8 +389,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                               variant="outline"
                               className="h-8 w-8"
                               aria-label={`Remove one ${addon.name}`}
-                              disabled={!editable || addonMutation.isPending || qty === 0 || addon.preview === true}
-                              onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty - 1 })}
+                              disabled={!editable || addonMutation.isPending || addonChange.checking || qty === 0 || addon.preview === true}
+                              onClick={() => void addonChange.request({ addon: addon.key, quantity: qty - 1 }, qty)}
                               data-testid={`button-limit-addon-dec-${addon.key}`}
                             >
                               <Minus className="h-4 w-4" />
@@ -419,6 +421,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         </Card>
       ))}
 
+      {addonChange.dialog}
       <TalkToSalesDialog
         open={salesTopic !== null}
         onOpenChange={(open) => { if (!open) setSalesTopic(null); }}

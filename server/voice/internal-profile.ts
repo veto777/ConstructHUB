@@ -14,7 +14,10 @@ import { getEntitlements, moduleEnabled, modulePaused } from "../entitlements";
 
 /** What the engine speaks (then hangs up) when a number rings but nothing can answer. */
 export const UNPUBLISHED_LINE = "Thank you for calling. Our phone assistant isn't set up yet, so please try again later or reach us through our website. Goodbye.";
+/** A payment problem, or the owner paused the profile: it comes back. */
 export const PAUSED_LINE = "Thank you for calling. Our phone assistant is taking a short break, so please try again later or reach us through our website. Goodbye.";
+/** The service ended for this line (add-on gone, number being released): "try again later" would not be true. */
+export const ENDED_LINE = "Thank you for calling. This line is no longer answered by our assistant. Please reach the business through its website. Goodbye.";
 
 export function registerVoiceInternalProfileRoutes(app: Express): void {
   /** Lets the engine verify its secret at boot: { ok: true, app: "constructhub" }. */
@@ -51,10 +54,10 @@ export function registerVoiceInternalProfileRoutes(app: Express): void {
     const ent = await getEntitlements(org.ownerUserId);
     if (!moduleEnabled(ent, "callAssistant")) {
       const reason = modulePaused(ent, "callAssistant") ? "payment_needed" : "addon_inactive";
-      return res.status(423).json({ code: "paused", reason, say: PAUSED_LINE, org: { id: org.id, name: org.name } });
+      return res.status(423).json({ code: "paused", reason, say: reason === "payment_needed" ? PAUSED_LINE : ENDED_LINE, org: { id: org.id, name: org.name } });
     }
     if (number.status !== "active") {
-      return res.status(423).json({ code: "paused", reason: "number_releasing", say: PAUSED_LINE, org: { id: org.id, name: org.name } });
+      return res.status(423).json({ code: "paused", reason: "number_releasing", say: ENDED_LINE, org: { id: org.id, name: org.name } });
     }
     const st = publishedState(profile);
     if (st.state !== "live") return res.status(423).json({ code: st.state, say: st.state === "paused" ? PAUSED_LINE : UNPUBLISHED_LINE, org: { id: org.id, name: org.name } });

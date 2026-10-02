@@ -73,7 +73,7 @@ file and the drizzle block.
 |---|---|---|
 | `voice_profiles` | one per org: Studio draft, published copy, compiled prompt | `org_id UNIQUE`, `profile jsonb` (draft), `published_version int`, `published_profile jsonb`, `compiled jsonb`, `status` draft/live/paused, `setup_completed_at`, `updated_by_member_id` |
 | `voice_profile_versions` | every publish | `org_id`, `profile_id`, `version int` (UNIQUE per org), `profile jsonb`, `compiled jsonb`, `note`, `created_by_member_id` |
-| `voice_numbers` | SignalWire numbers an org owns | `phone_number UNIQUE` (E.164), `label`, `location`, `state`, `area_code`, `locality`, `provider` ='signalwire', `provider_sid`, `friendly_name`, `voice_url`, `status_callback_url`, `status` pending/active/releasing/released/failed, `is_test`, `forwarding_from`, `monthly_cents`, `purchased_at`, `release_eligible_at` (= purchased + 14 d), `released_at`, `last_error`, `release_reason` (subscription_ended/addon_removed/over_allowance — set while an automatic release is scheduled), `release_scheduled_at` |
+| `voice_numbers` | SignalWire numbers an org owns | `phone_number UNIQUE` (E.164), `label`, `location`, `state`, `area_code`, `locality`, `provider` ='signalwire', `provider_sid`, `friendly_name`, `voice_url`, `status_callback_url`, `status` pending/active/releasing/released/failed, `is_test`, `forwarding_from`, `monthly_cents`, `purchased_at`, `release_eligible_at` (= purchased + 14 d), `released_at`, `last_error`, `release_reason` (subscription_ended/addon_removed — final; payment_failed/over_allowance — restorable; set while an automatic release is scheduled), `release_scheduled_at` |
 | `voice_calls` | one row per call, transcript on the row | `call_sid UNIQUE`, `number_id`, `from_number`, `to_number`, `engine`, `model`, `persona`, `profile_version`, `started_at`, `answered_at`, `ended_at`, `duration_seconds`, `billed_minutes` (ceil/60), `outcome`, `caller_name/email/address/city`, `service_needed`, `summary`, `transcript jsonb []`, `slots jsonb`, `events jsonb`, `recording_key` (R2), `recording_seconds`, `customer_id`, `project_id`, `lead_delivered_at`, `spam_confidence numeric(3,2)`, `spam_reason`, `flags jsonb` |
 | `voice_escalations` | text/email hand-offs with reminders | `call_id`, `kind`, `rule_id`, `channel` sms/email, `recipient`, `recipient_name`, `body`, `sent_count`, `last_sent_at`, `last_provider_sid`, `remind_every_minutes` 120, `remind_from_hour` 8, `remind_to_hour` 20, `max_days` 14, `follow_up_next_day`, `confirmed_at`, `reply_text`, `followup_sent_at`, `closed_at`, `close_reason`, `last_error` |
 | `voice_spam` | ledger per caller number | `(org_id, phone_number) UNIQUE`, `strikes`, `calls`, `last_confidence`, `last_reason`, `last_call_id`, `blocked_at`, `unblocked_at`, `blocked_by` ('auto' or member id), `first_seen_at`, `last_seen_at` |
@@ -306,12 +306,25 @@ number - that is the entire purpose of the service you don't keep the number." `
 - `call_number` quantity drops below what the org holds → the NEWEST extras are released, the oldest kept;
 - `past_due` NEVER releases (the assistant pauses, the number is held so fixing the card restores the agent);
 - past `release_eligible_at` → released on SignalWire at once; earlier → `status='releasing'` + `release_reason`
-  (stops answering immediately: 423 `number_releasing`), released by the sweep (every 15 min, boot-started, on in
-  production unless `VOICE_NUMBER_RELEASE_WORKER_ENABLED=false`) as soon as it is eligible; restored to `active`
-  if the subscription pays for it again first;
+  (stops answering immediately: 423 `number_releasing`, callers hear "This line is no longer answered by our
+  assistant"), released by the sweep (every 15 min, boot-started) as soon as it is eligible;
+- a cancellation is FINAL whatever the number's age: a number scheduled because the subscription ended or the
+  Call Assistant add-on was removed (`release_reason` subscription_ended / addon_removed) is never restored, even
+  if the customer subscribes again within the 14 days — they buy a new number (a final release does not count
+  against the allowance). Only `unpaid` (reason payment_failed: the card is fixed before day 14) and a smaller
+  `call_number` count (over_allowance: the extra is re-added) restore a scheduled number. A number whose release
+  was already attempted (`last_error`) is never restored either (the carrier may have taken it);
+- `VOICE_NUMBER_RELEASE_WORKER_ENABLED=false` (and any non-production server without `=true`) stops every carrier
+  release — the sweep AND the background release after a webhook/add-on change; decisions (DB only) still run;
 - called from the Stripe webhook (subscription created/updated/deleted, checkout completed) and the add-on routes;
-  idempotent (row-locked carrier call, `released` rows never touched again); only `voice_numbers` rows of orgs the
-  account OWNS, by their own SID; never a platform admin's org or the `is_test` number;
+  subscription created/updated re-read the subscription from Stripe (`subscriptions.retrieve`) instead of trusting
+  the event snapshot, since Stripe does not order events; idempotent (row-locked carrier call; a decision locks
+  the org's rows too, so it never "keeps" a number an in-flight release just took; `released` rows never touched
+  again); only `voice_numbers` rows of orgs the account OWNS, by their own SID; never a platform admin's org or the
+  `is_test` number;
+- Settings → Billing / Limits: lowering `call_assistant` or `call_number` below the numbers held opens a confirm
+  dialog listing the numbers that stop now and are released (`GET /api/stripe/addons/release-preview`); the
+  "cancellation … billing portal" line names them too;
 - the org's owners get an activity row and a bell notification ("Your Call Assistant number +1… was released
   because the subscription ended").
 
@@ -369,7 +382,9 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
   calls are capped (`VOICE_MAX_ACTIVE_CALLS`).
 - Engine profile: `GET /profile` answers 423 `paused` — reason `addon_inactive` when the org owner's subscription
   no longer carries the Call Assistant add-on, `payment_needed` when it does but is not active/trialing,
-  `number_releasing` for a number being released.
+  `number_releasing` for a number being released. `say` is the "taking a short break" line only for
+  `payment_needed` (and a profile the owner paused); `addon_inactive` / `number_releasing` say "This line is no
+  longer answered by our assistant. Please reach the business through its website."
 - Escalation confirmations by text: only a verified (signed) inbound webhook with a `To` changes escalation
   state; the route stays fail-open only for STOP/START/HELP.
 - The engine reads only `voice/.env`; the operator copies ConstructHUB's own AI and SignalWire values in.

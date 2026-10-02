@@ -19,9 +19,17 @@
  * once; an earlier one is SCHEDULED — status 'releasing', release_reason,
  * release_scheduled_at — and stops answering immediately (internal-profile.ts
  * answers 423 number_releasing), then the sweep below releases it as soon as
- * it is eligible. If the subscription comes back before then (the card is
- * fixed after `unpaid`, the add-on is re-added), the scheduled number is
- * restored to active.
+ * it is eligible. Only a payment problem or a smaller extra-number count can be
+ * undone before then: a number scheduled because the payment was not recovered
+ * (`unpaid`, reason payment_failed) is restored when the card is fixed, and an
+ * extra one (over_allowance) when the call_number add-on comes back. A
+ * CANCELLATION is final, whatever the number's age (owner: "you don't keep the
+ * number"): a number scheduled because the subscription ended or the Call
+ * Assistant add-on was removed is never restored, even when the customer
+ * subscribes again within the 14 days; a returning customer buys a new number
+ * (FINAL_RELEASE_REASONS rows do not count against the allowance). Nor is a
+ * number whose release was already attempted (last_error set: the carrier may
+ * have taken it), which the sweep then finishes.
  *
  * Safety:
  *   - only rows of voice_numbers for an org the account OWNS are ever looked
@@ -32,8 +40,13 @@
  *   - idempotent: a webhook redelivery or a second sweep finds the row already
  *     'releasing' or 'released' and does nothing; the carrier call happens
  *     under a row lock (FOR UPDATE SKIP LOCKED), so two runs never release the
- *     same number twice; a carrier failure keeps the row 'releasing' with
+ *     same number twice, and a decision locks the org's rows too (FOR UPDATE),
+ *     so it waits for an in-flight release and never "keeps" a number that was
+ *     just released; a carrier failure keeps the row 'releasing' with
  *     last_error and the next sweep retries it;
+ *   - VOICE_NUMBER_RELEASE_WORKER_ENABLED=false (or a non-production server
+ *     without =true) stops every carrier release: the sweep and the background
+ *     release after a webhook both honour it; decisions (DB only) still run;
  *   - every decision is logged, and the org's owners get an activity row and a
  *     bell notification ("Your Call Assistant number +1… was released because
  *     the subscription ended").
@@ -55,14 +68,27 @@ import type { NumbersMock } from "./numbers";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
 
-export type ReleaseReason = "subscription_ended" | "addon_removed" | "over_allowance";
-export const RELEASE_REASONS: readonly ReleaseReason[] = ["subscription_ended", "addon_removed", "over_allowance"];
+export type ReleaseReason = "subscription_ended" | "addon_removed" | "payment_failed" | "over_allowance";
+export const RELEASE_REASONS: readonly ReleaseReason[] = ["subscription_ended", "addon_removed", "payment_failed", "over_allowance"];
+/** A cancellation: a number scheduled for one of these is never restored (owner: "you don't keep the number"). */
+export const FINAL_RELEASE_REASONS: readonly ReleaseReason[] = ["subscription_ended", "addon_removed"];
+
+/**
+ * A 'releasing' row that will be released whatever happens next: scheduled by a
+ * cancellation, or a release was already attempted (last_error: the carrier may
+ * have taken it). It is never restored and does not count against the allowance.
+ */
+export function releaseIsFinal(row: { status?: string | null; release_reason?: string | null; last_error?: string | null }): boolean {
+  if (row.status !== "releasing" || !row.release_reason) return false;
+  return (FINAL_RELEASE_REASONS as readonly string[]).includes(row.release_reason) || !!row.last_error;
+}
 
 /** "…because the subscription ended" — the owner-facing why. */
 export function releaseReasonText(reason: string | null | undefined): string {
   switch (reason) {
     case "addon_removed": return `the ${ADDONS.call_assistant.name} add-on was removed`;
     case "over_allowance": return `the subscription no longer pays for it (fewer ${ADDONS.call_number.name} add-ons)`;
+    case "payment_failed": return "the subscription's payment was not recovered";
     default: return "the subscription ended";
   }
 }
@@ -83,7 +109,9 @@ type SubscriptionLike = {
  * getEntitlements reads):
  *   - platform admin → null (never touched);
  *   - no subscription, an ended one (NUMBER_RELEASE_STATUSES) or an expired
- *     grant → keep 0, "subscription_ended";
+ *     grant → keep 0, "subscription_ended" — except `unpaid` (Stripe stopped
+ *     retrying a failed payment) → keep 0, "payment_failed", which a fixed
+ *     card can still undo;
  *   - active / trialing / past_due → keep what the add-ons pay for (one per
  *     call_assistant unit + every call_number unit); none → "addon_removed";
  *   - anything else (incomplete, paused, a row we can't read) → null: hold,
@@ -92,7 +120,9 @@ type SubscriptionLike = {
 export function numbersKeptFor(row: SubscriptionLike | null | undefined, admin: boolean, now = new Date()): NumberKeep | null {
   if (admin) return null;
   if (!row || !row.status) return { keep: 0, reason: "subscription_ended" };
-  if (grantExpired(row, now) || NUMBER_RELEASE_STATUSES.includes(row.status)) return { keep: 0, reason: "subscription_ended" };
+  if (grantExpired(row, now)) return { keep: 0, reason: "subscription_ended" };
+  if (row.status === "unpaid") return { keep: 0, reason: "payment_failed" };
+  if (NUMBER_RELEASE_STATUSES.includes(row.status)) return { keep: 0, reason: "subscription_ended" };
   if (!ACCESS_STATUSES.includes(row.status)) return null;
   const plan = activePlanKey(row, now);
   if (!plan) return null;
@@ -130,14 +160,23 @@ async function notifyOwners(orgId: string, title: string, body: string): Promise
 
 const dateText = (d: Date) => d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 
+/** An org's numbers this module may act on, oldest first (the order `keep` counts in). */
+const ORG_NUMBERS_OLDEST_FIRST =
+  `SELECT n.id, n.phone_number, n.status, n.release_reason, n.release_eligible_at, n.purchased_at, n.created_at, n.last_error
+     FROM voice_numbers n WHERE n.org_id = $1 AND NOT n.is_test AND ${HOLDING}
+    ORDER BY n.purchased_at ASC NULLS LAST, n.created_at ASC NULLS LAST, n.id ASC`;
+
 export type OrgSchedule = { orgId: string; scheduled: string[]; restored: string[]; due: number };
 
 /**
  * Apply a keep decision to one org under its numbers lock (the same advisory
- * lock a purchase takes, so a buy and a release decision never interleave):
- * the oldest `keep` numbers stay (a scheduled one among them is restored), the
- * newer ones are scheduled for release. Returns what changed and how many
- * scheduled numbers are already eligible.
+ * lock a purchase takes, so a buy and a release decision never interleave) and
+ * a row lock on its numbers (so an in-flight carrier release in
+ * releaseDueCallNumbers finishes first, and a row it released drops out):
+ * the oldest `keep` numbers that can still be kept stay (a scheduled one among
+ * them is restored unless its release is final — releaseIsFinal), the rest are
+ * scheduled for release. Returns what changed and how many scheduled numbers
+ * are already eligible.
  */
 export async function scheduleOrgReleases(org: { id: string; name?: string }, decision: NumberKeep, now = new Date()): Promise<OrgSchedule> {
   const out: OrgSchedule = { orgId: org.id, scheduled: [], restored: [], due: 0 };
@@ -146,18 +185,18 @@ export async function scheduleOrgReleases(org: { id: string; name?: string }, de
   try {
     await c.query("BEGIN");
     await c.query("SELECT pg_advisory_xact_lock(7172, hashtext($1))", [org.id]);
-    const { rows } = await c.query(
-      `SELECT n.id, n.phone_number, n.status, n.release_reason, n.release_eligible_at, n.purchased_at, n.created_at
-         FROM voice_numbers n WHERE n.org_id = $1 AND NOT n.is_test AND ${HOLDING}
-        ORDER BY n.purchased_at ASC NULLS LAST, n.created_at ASC NULLS LAST, n.id ASC`, [org.id]);
+    const { rows } = await c.query(`${ORG_NUMBERS_OLDEST_FIRST} FOR UPDATE`, [org.id]);
     const keep = Math.max(0, decision.keep);
-    for (const [i, r] of rows.entries()) {
-      if (i < keep) {
+    const final = (FINAL_RELEASE_REASONS as readonly string[]).includes(decision.reason);
+    let kept = 0;
+    for (const r of rows) {
+      if (kept < keep && !releaseIsFinal(r)) {
+        kept += 1;
         if (r.status === "releasing") {
-          await c.query(
+          const { rowCount } = await c.query(
             `UPDATE voice_numbers SET status = 'active', release_reason = NULL, release_scheduled_at = NULL, last_error = NULL, updated_at = $2
-              WHERE id = $1 AND status = 'releasing' AND release_reason IS NOT NULL`, [r.id, now]);
-          out.restored.push(r.phone_number);
+              WHERE id = $1 AND status = 'releasing' AND release_reason IS NOT NULL AND last_error IS NULL`, [r.id, now]);
+          if (rowCount === 1) out.restored.push(r.phone_number);
         }
         continue;
       }
@@ -176,6 +215,11 @@ export async function scheduleOrgReleases(org: { id: string; name?: string }, de
             body: `The number is part of the ${ADDONS.call_assistant.name} service, so it is released ${when}. Your own business numbers were never moved: turn off forwarding with your carrier and calls ring through to you as before.`,
           });
         }
+      } else if (final && r.release_reason !== decision.reason && !releaseIsFinal(r)) {
+        // Scheduled for a payment problem or a smaller add-on count, and now the
+        // subscription is cancelled: the release becomes final (no restore on a
+        // later resubscription). Its date and notice stay as they were.
+        await c.query(`UPDATE voice_numbers SET release_reason = $2, updated_at = $3 WHERE id = $1 AND status = 'releasing'`, [r.id, decision.reason, now]);
       }
       if (eligible.getTime() <= now.getTime()) out.due += 1;
     }
@@ -219,6 +263,35 @@ export async function scheduleAccountCallNumbers(userId: number, deps: ReleaseDe
     out.scheduled += r.scheduled.length;
     out.restored += r.restored.length;
     out.due += r.due;
+  }
+  return out;
+}
+
+export type ReleasePreview = { phoneNumber: string; orgName: string }[];
+
+/**
+ * The account's answering Call Assistant numbers that a change WOULD stop and
+ * release (read only — the Billing page's confirm step): `cancel` = the
+ * subscription ends; `addons` = the new add-on quantities (the rest as stored).
+ * Same rule as scheduleOrgReleases: the oldest keepable numbers stay.
+ */
+export async function previewCallNumberReleases(userId: number, change: { cancel?: boolean; addons?: Record<string, number> }): Promise<ReleasePreview> {
+  const orgs = await orgsHoldingNumbers(userId);
+  if (!orgs.length) return [];
+  const row = await accountSubscriptionRow(userId);
+  const admin = isPlatformAdminEmail(row?.email);
+  const decision: NumberKeep | null = admin ? null
+    : change.cancel ? { keep: 0, reason: "subscription_ended" }
+    : numbersKeptFor(row ? { ...row, addons: { ...parseAddons(row.addons), ...(change.addons ?? {}) } } : null, false);
+  if (!decision) return [];
+  const out: ReleasePreview = [];
+  for (const org of orgs) {
+    const { rows } = await pool.query(ORG_NUMBERS_OLDEST_FIRST, [org.id]);
+    let kept = 0;
+    for (const r of rows) {
+      if (kept < decision.keep && !releaseIsFinal(r)) { kept += 1; continue; }
+      if (r.status === "active") out.push({ phoneNumber: r.phone_number, orgName: org.name });
+    }
   }
   return out;
 }
@@ -285,13 +358,18 @@ export async function releaseDueCallNumbers(opts: ReleaseDeps & { orgIds?: strin
 /**
  * After the account's subscription row changed (webhook, add-on change):
  * decide now (awaited, DB only), release what is already eligible in the
- * background. Never throws — a failure is logged and the sweep catches up.
+ * background — only where the release worker is on (the same switch as the
+ * sweep: VOICE_NUMBER_RELEASE_WORKER_ENABLED=false stops every carrier
+ * release). Never throws — a failure is logged and the sweep catches up.
  */
-export async function afterSubscriptionChange(userId: number | null | undefined, deps: ReleaseDeps = {}): Promise<AccountSchedule | null> {
+export async function afterSubscriptionChange(userId: number | null | undefined, deps: ReleaseDeps & { env?: NodeJS.ProcessEnv } = {}): Promise<AccountSchedule | null> {
   if (!userId) return null;
   try {
     const out = await scheduleAccountCallNumbers(userId, deps);
-    if (out.due > 0) {
+    const off = out.due > 0 ? voiceNumberReleaseWorkerOffReason(deps.env) : null;
+    if (off) {
+      console.log(`[voice-numbers] user ${userId}: ${out.due} number(s) due for release, not released now: ${off}.`);
+    } else if (out.due > 0) {
       void releaseDueCallNumbers({ ...deps, orgIds: out.orgIds })
         .catch((e: any) => console.error(`[voice-numbers] background release for user ${userId} failed:`, e?.message || e));
     }

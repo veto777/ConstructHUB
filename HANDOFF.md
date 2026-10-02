@@ -31,6 +31,13 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   scheduled ('releasing') until `release_eligible_at`, then released by a 15-min sweep (ON in production by default;
   `VOICE_NUMBER_RELEASE_WORKER_ENABLED=false` turns it off). past_due never releases. New columns
   `voice_numbers.release_reason`, `release_scheduled_at` (boot DDL + apply-schema-migration).
+- Review round: a cancellation is final for every number (no restore on resubscribing within 14 days; only `unpaid`
+  → card fixed and a re-added extra number restore); webhook subscription events re-read Stripe before writing the
+  row; `VOICE_NUMBER_RELEASE_WORKER_ENABLED=false` now also stops the post-webhook background release; Billing asks
+  before an add-on reduction releases numbers; after cancellation callers hear "no longer answered", not "try later".
+- **Launch gate:** confirm Stripe → Billing → Subscriptions → Manage failed payments is set to *cancel the
+  subscription* or *mark it unpaid*. On "leave it past-due" the agent stays paused (correct) but the number is held
+  forever and the platform keeps paying SignalWire for it — past_due never releases.
 - Still `preview: true` (nobody can buy it). Launch remains a separate step.
 
 ## ☎️ 2026-10-02 — AI Call Assistant built and deployed in admin preview (10:10 UTC)

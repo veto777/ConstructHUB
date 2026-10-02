@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { CreditCard, Loader2, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,8 @@ import {
   formatUsd, intervalSuffix, intervalWord, normalizeLocations, planPriceCents, usageLine, usagePercent,
   type EntitlementsInfo,
 } from "@/lib/pricing-display";
-import { useBillingActions, useEntitlements, useSubscription } from "./use-billing";
+import { CALL_ASSISTANT_NUMBER_RULES } from "@shared/plan-copy";
+import { fetchNumberReleasePreview, useAddonChange, useBillingActions, useEntitlements, useSubscription } from "./use-billing";
 import type { SettingsSectionProps } from "./types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -43,6 +44,15 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
   // Limits and this month's usage, as every gate on the server counts them.
   const { data: entitlements } = useEntitlements();
   const { portal: portalMutation, addon: addonMutation, showError, salesTopic, setSalesTopic, refreshBilling } = useBillingActions();
+  // Fewer Call Assistant add-ons than numbers held asks first (the numbers are released, not kept).
+  const addonChange = useAddonChange(addonMutation);
+  // Cancelling (in Stripe's portal) releases the Call Assistant numbers: say so next to the way there.
+  const holdsCallAssistant = Number(subscription?.addons?.call_assistant ?? 0) > 0;
+  const { data: cancelReleases } = useQuery({
+    queryKey: ["/api/stripe/addons/release-preview", "cancel"],
+    queryFn: () => fetchNumberReleasePreview("cancel=1"),
+    enabled: holdsCallAssistant && view.viaStripe,
+  });
 
   const [locationsInput, setLocationsInput] = useState<string | null>(null);
   const billedLocations = view.locations ?? AGENCY_INCLUDED_LOCATIONS;
@@ -239,7 +249,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
             {addons.map((addon) => {
               const qty = Math.max(0, Number(subscription?.addons?.[addon.key] ?? 0) || 0);
               const pending = pendingAddon === addon.key;
-              const disabled = !editable || addonMutation.isPending;
+              const disabled = !editable || addonMutation.isPending || addonChange.checking;
               return (
                 <div key={addon.key} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3" data-testid={`row-billing-addon-${addon.key}`}>
                   <div className="min-w-0 flex-1">
@@ -257,7 +267,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
                       className="h-8 w-8"
                       aria-label={`Remove one ${addon.name}`}
                       disabled={disabled || qty === 0}
-                      onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty - 1 })}
+                      onClick={() => void addonChange.request({ addon: addon.key, quantity: qty - 1 }, qty)}
                       data-testid={`button-addon-dec-${addon.key}`}
                     >
                       <Minus className="h-4 w-4" />
@@ -293,9 +303,16 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
             <div className="flex items-center gap-3 min-w-0">
               <CreditCard className="h-5 w-5 text-muted-foreground shrink-0" />
               {view.viaStripe ? (
-                <p className="text-sm text-muted-foreground" data-testid="text-billing-portal">
-                  Your card, invoices and cancellation are managed in Stripe's secure billing portal.
-                </p>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground" data-testid="text-billing-portal">
+                    Your card, invoices and cancellation are managed in Stripe's secure billing portal.
+                  </p>
+                  {!!cancelReleases?.length && (
+                    <p className="text-sm text-muted-foreground" data-testid="text-billing-cancel-numbers">
+                      {CALL_ASSISTANT_NUMBER_RULES.cancel} Cancelling releases {cancelReleases.map((n) => n.phoneNumber).join(", ")}; a released number can't be kept or moved.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground" data-testid="text-billing-portal">
                   This account has no Stripe subscription, so there's no card or invoice to show. You enter a card at checkout when you choose a plan.
@@ -321,6 +338,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
         </CardContent>
       </Card>
 
+      {addonChange.dialog}
       <TalkToSalesDialog
         open={salesTopic !== null}
         onOpenChange={(open) => { if (!open) setSalesTopic(null); }}

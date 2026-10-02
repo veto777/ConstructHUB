@@ -11,9 +11,10 @@ import { randomInt, randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { ensureVoiceSchema } from "./schema";
 import {
-  numbersKeptFor, scheduleAccountCallNumbers, releaseDueCallNumbers, afterSubscriptionChange, runCallNumberSweep,
-  voiceNumberReleaseWorkerOffReason, releaseReasonText,
+  numbersKeptFor, scheduleAccountCallNumbers, scheduleOrgReleases, releaseDueCallNumbers, afterSubscriptionChange, runCallNumberSweep,
+  voiceNumberReleaseWorkerOffReason, releaseReasonText, releaseIsFinal, previewCallNumberReleases,
 } from "./number-release";
+import { heldNumberCount } from "./numbers";
 import { lookupNumber } from "./profile-store";
 import { ADMIN_EMAILS, isPlatformAdminEmail } from "../admin";
 import { CALL_NUMBER_MIN_DAYS } from "@shared/plans";
@@ -96,9 +97,11 @@ describe("the release decision (pure)", () => {
     ({ plan: "pro", status, addons, stripe_subscription_id: "sub_x", current_period_end: null, ...extra });
 
   it("ended subscriptions keep nothing; past_due, incomplete and paused hold everything; admins are never touched", () => {
-    for (const status of ["canceled", "unpaid", "incomplete_expired", "inactive"]) {
+    for (const status of ["canceled", "incomplete_expired", "inactive"]) {
       expect(numbersKeptFor(sub(status), false)).toEqual({ keep: 0, reason: "subscription_ended" });
     }
+    // Stripe stopped retrying a failed payment: released too, but a fixed card can still undo it.
+    expect(numbersKeptFor(sub("unpaid"), false)).toEqual({ keep: 0, reason: "payment_failed" });
     expect(numbersKeptFor(null, false)).toEqual({ keep: 0, reason: "subscription_ended" });
     expect(numbersKeptFor({ status: null }, false)).toEqual({ keep: 0, reason: "subscription_ended" });
     // A failed payment pauses the assistant but NEVER releases the number.
@@ -118,6 +121,15 @@ describe("the release decision (pure)", () => {
     // A plan that doesn't sell the add-on pays for no number.
     expect(numbersKeptFor(sub("active", { call_assistant: 1 }, { plan: "starter" }), false)).toEqual({ keep: 0, reason: "addon_removed" });
     expect(releaseReasonText("subscription_ended")).toBe("the subscription ended");
+    expect(releaseReasonText("payment_failed")).toBe("the subscription's payment was not recovered");
+  });
+
+  it("a cancellation (or an attempted release) is final; a payment problem or fewer extras is not", () => {
+    for (const reason of ["subscription_ended", "addon_removed"]) expect(releaseIsFinal({ status: "releasing", release_reason: reason })).toBe(true);
+    for (const reason of ["payment_failed", "over_allowance"]) expect(releaseIsFinal({ status: "releasing", release_reason: reason })).toBe(false);
+    expect(releaseIsFinal({ status: "releasing", release_reason: "over_allowance", last_error: "Release failed, will retry: timeout" })).toBe(true);
+    expect(releaseIsFinal({ status: "active", release_reason: null })).toBe(false);
+    expect(releaseIsFinal({ status: "releasing", release_reason: null, last_error: "manual" })).toBe(false);
   });
 
   it("the sweep worker is on in production unless switched off, and off elsewhere unless switched on", () => {
@@ -259,6 +271,7 @@ describe("a failed payment never releases", () => {
     // Stripe gives up retrying → unpaid: the subscription has ended for the number.
     await setSub(a.userId, { status: "unpaid" });
     expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ scheduled: 1, due: 0 });
+    expect((await row(n.phone)).release_reason).toBe("payment_failed");
     // The card is fixed before the 14 days pass: the number is kept.
     await setSub(a.userId, { status: "active" });
     expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ restored: 1 });
@@ -299,5 +312,121 @@ describe("what is never touched", () => {
     }
     // An account with no numbers costs one query and decides nothing.
     expect(await scheduleAccountCallNumbers(noNumbers.userId, deps())).toMatchObject({ orgIds: [], scheduled: 0 });
+  });
+});
+
+describe("a cancellation is final (owner: \"you don't keep the number\")", () => {
+  it("a customer who cancels and subscribes again within the 14 days does not get the young number back; they can buy a new one", async () => {
+    const a = await account({ status: "active", addons: { call_assistant: 1 } });
+    const n = await number(a.orgId, 3);
+    await setSub(a.userId, { status: "canceled", plan: "free", addons: {} });
+    expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ scheduled: 1, due: 0 });
+    expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "subscription_ended" });
+
+    // A new checkout a few days later (checkout.session.completed → afterSubscriptionChange).
+    await setSub(a.userId, { status: "active", plan: "pro", addons: { call_assistant: 1 } });
+    expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ restored: 0, scheduled: 0 });
+    expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "subscription_ended" });
+    // The old number no longer counts against the allowance: the returning customer can buy a new one now.
+    expect(await heldNumberCount(a.orgId)).toBe(0);
+    // And the sweep still releases it on day 14.
+    const later = new Date(n.bought.getTime() + (CALL_NUMBER_MIN_DAYS + 1) * DAY);
+    expect((await runCallNumberSweep({ ...deps(later), userIds: [a.userId] })).released).toEqual([n.phone]);
+  });
+
+  it("removing the add-on is final too; a payment-failed schedule becomes final when the subscription is then cancelled", async () => {
+    const a = await account({ status: "active", addons: { call_assistant: 1 } });
+    const n = await number(a.orgId, 2);
+    await setSub(a.userId, { addons: {} });
+    expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ decision: { reason: "addon_removed" }, scheduled: 1 });
+    await setSub(a.userId, { addons: { call_assistant: 1 } });
+    expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ restored: 0 });
+    expect((await row(n.phone)).status).toBe("releasing");
+
+    const b = await account({ status: "active", addons: { call_assistant: 1 } });
+    const m = await number(b.orgId, 2);
+    await setSub(b.userId, { status: "unpaid" });
+    await scheduleAccountCallNumbers(b.userId, deps());
+    expect((await row(m.phone)).release_reason).toBe("payment_failed");
+    // Stripe then cancels the unpaid subscription: the release is final from here on.
+    await setSub(b.userId, { status: "canceled", plan: "free", addons: {} });
+    expect(await scheduleAccountCallNumbers(b.userId, deps())).toMatchObject({ scheduled: 0 });
+    const r = await row(m.phone);
+    expect(r).toMatchObject({ status: "releasing", release_reason: "subscription_ended" });
+    expect(new Date(r.release_eligible_at).getTime()).toBe(m.bought.getTime() + CALL_NUMBER_MIN_DAYS * DAY);
+    await setSub(b.userId, { status: "active", plan: "pro", addons: { call_assistant: 1 } });
+    expect(await scheduleAccountCallNumbers(b.userId, deps())).toMatchObject({ restored: 0 });
+    expect((await row(m.phone)).status).toBe("releasing");
+  });
+
+  it("a number whose release was already attempted is not restored (the carrier may have taken it)", async () => {
+    const a = await account({ status: "active", addons: { call_assistant: 1 } });
+    const n = await number(a.orgId, 30);
+    await pool.query("update voice_numbers set status = 'releasing', release_reason = 'payment_failed', last_error = 'Release failed, will retry: timeout' where phone_number = $1", [n.phone]);
+    expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ restored: 0 });
+    expect((await row(n.phone)).status).toBe("releasing");
+    expect(await heldNumberCount(a.orgId)).toBe(0);
+  });
+});
+
+describe("a restore never races a release", () => {
+  it("a decision waits for an in-flight carrier release, never reports the released number as kept, and keeps the next one", async () => {
+    const a = await account({ status: "active", addons: { call_assistant: 1 } });
+    const older = await number(a.orgId, 30);
+    const newer = await number(a.orgId, 2);
+    // Both scheduled (fewer extras); the older is past its 14 days, so the sweep picks it up.
+    await pool.query("update voice_numbers set status = 'releasing', release_reason = 'over_allowance', release_scheduled_at = now() where phone_number = any($1::text[])", [[older.phone, newer.phone]]);
+
+    let unblock!: () => void;
+    const gate = new Promise<void>((r) => { unblock = r; });
+    let entered!: () => void;
+    const inCarrier = new Promise<void>((r) => { entered = r; });
+    const slowCarrier = () => ({
+      ...fakeCarrier(),
+      release: async (sid: string) => { entered(); await gate; carrier.released.push(sid); return { released: true as const, alreadyGone: false }; },
+    });
+    const releasing = releaseDueCallNumbers({ carrierFor: slowCarrier, orgIds: [a.orgId] });
+    await inCarrier;
+    // Meanwhile the subscription pays for one number again: keep 1.
+    const deciding = scheduleOrgReleases({ id: a.orgId }, { keep: 1, reason: "over_allowance" });
+    await new Promise((r) => setTimeout(r, 200));
+    unblock();
+    const [run, decided] = await Promise.all([releasing, deciding]);
+    expect(run.released).toEqual([older.phone]);
+    expect(decided.restored).toEqual([newer.phone]);
+    expect((await row(older.phone)).status).toBe("released");
+    expect((await row(newer.phone)).status).toBe("active");
+  });
+});
+
+describe("the off switch and the Billing preview", () => {
+  it("VOICE_NUMBER_RELEASE_WORKER_ENABLED=false stops the background release after a webhook; decisions still run", async () => {
+    const a = await account({ status: "active", addons: { call_assistant: 1 } });
+    const n = await number(a.orgId, 30);
+    await setSub(a.userId, { status: "canceled", plan: "free", addons: {} });
+    const off = await afterSubscriptionChange(a.userId, { ...deps(), env: { NODE_ENV: "production", VOICE_NUMBER_RELEASE_WORKER_ENABLED: "false" } });
+    expect(off).toMatchObject({ scheduled: 1, due: 1 });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(carrier.released).toEqual([]);
+    expect((await row(n.phone)).status).toBe("releasing");
+
+    await afterSubscriptionChange(a.userId, { ...deps(), env: { NODE_ENV: "production" } });
+    for (let i = 0; i < 40 && (await row(n.phone)).status !== "released"; i++) await new Promise((r) => setTimeout(r, 50));
+    expect(carrier.released).toEqual([n.sid]);
+  });
+
+  it("previews which answering numbers a lower add-on count or a cancellation would release", async () => {
+    const a = await account({ status: "active", addons: { call_assistant: 1, call_number: 1 } });
+    const first = await number(a.orgId, 30);
+    const extra = await number(a.orgId, 5);
+    expect(await previewCallNumberReleases(a.userId, { addons: { call_number: 1 } })).toEqual([]);
+    expect(await previewCallNumberReleases(a.userId, { addons: { call_number: 0 } })).toEqual([{ phoneNumber: extra.phone, orgName: "Vitest Number Release" }]);
+    const all = [first.phone, extra.phone].sort();
+    expect((await previewCallNumberReleases(a.userId, { addons: { call_assistant: 0 } })).map((n) => n.phoneNumber).sort()).toEqual(all);
+    expect((await previewCallNumberReleases(a.userId, { cancel: true })).map((n) => n.phoneNumber).sort()).toEqual(all);
+    // Read only: nothing changed.
+    expect((await row(first.phone)).status).toBe("active");
+    expect((await row(extra.phone)).status).toBe("active");
+    expect(carrier.released).toEqual([]);
   });
 });
