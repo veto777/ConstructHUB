@@ -41,6 +41,25 @@ import { BILLING_LEDGER_DDL } from "../account/schema";
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 
 /**
+ * Add-on introductory prices (server/billing/intro.ts): one row per account and
+ * add-on whose intro coupon was attached — the "once per customer" record.
+ * `ref` is the Stripe object it went on: a Checkout Session (cs_…, counts only
+ * once that session completed) or a subscription (sub_…, counts at once).
+ * Mirrored by `billingAddonIntros` in shared/schema.ts.
+ */
+export const BILLING_INTRO_DDL: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS billing_addon_intros (
+     id serial PRIMARY KEY,
+     user_id integer NOT NULL,
+     addon text NOT NULL,
+     coupon_id text NOT NULL,
+     ref text NOT NULL,
+     created_at timestamp NOT NULL DEFAULT now(),
+     UNIQUE (user_id, addon)
+   )`,
+];
+
+/**
  * One-time purchase fulfilment (./fulfilment.ts) writes course_purchases /
  * service_purchases ON CONFLICT DO NOTHING against these: one row per Checkout
  * Session and item, whichever Stripe event carried it (completed,
@@ -115,4 +134,13 @@ export async function ensureBillingSchema(q: Queryable): Promise<void> {
   }
   await ensureBillingLedgerSchema(q);
   await ensureFulfilmentSchema(q);
+  await ensureBillingIntroSchema(q);
+}
+
+/** The intro ledger table: a catalog read on a routine boot, the CREATE only when it is missing. */
+export async function ensureBillingIntroSchema(q: Queryable): Promise<void> {
+  const { rows } = await q.query(
+    `SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'billing_addon_intros'`);
+  if (rows.length) return;
+  for (const statement of BILLING_INTRO_DDL) await q.query(statement);
 }

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
 import { planRequiredFrom } from "@/components/plan-required";
 import { ADDONS, PLANS, CALL_ASSISTANT_INCLUDED_MINUTES } from "@shared/plans";
-import { formatUsd, joinNames } from "@shared/plan-copy";
+import { callAssistantIntroShort, joinNames } from "@shared/plan-copy";
 import { OverviewPanel } from "./overview";
 import { NumbersPanel } from "./numbers";
 import { StudioPanel } from "./studio";
@@ -77,7 +77,7 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
           <li>Every call logged with a summary, transcript and recording.</li>
         </ul>
         <p className="text-sm">
-          {formatUsd(addon.monthlyCents)} a month with 1 local number and {CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US")} minutes included, on the {plans} plans.
+          <span className="font-semibold" data-testid="text-plan-required-intro">{callAssistantIntroShort()}</span>, with 1 local number and {CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US")} minutes included, on the {plans} plans.
           {preview ? " Pricing is being finalized; it cannot be added yet." : ""}
         </p>
         <Button asChild disabled={preview}>

@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { EmptyState, MetricCard, StatusPill } from "@/components/crm-ui";
 import { prettyPhone } from "@/lib/voice-studio";
 import { CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
+import { callAssistantIntroShort } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
@@ -67,6 +68,9 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
             <p className="text-xs text-muted-foreground">
               {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. Spam and blocked calls count only until the assistant hangs up.
               {status.addon.preview ? " Pricing is being finalized." : ""}
+            </p>
+            <p className="text-xs" data-testid="text-overview-price">
+              <span className="font-medium">{status.addon.name}:</span> {callAssistantIntroShort()} (the intro price applies once, when the add-on is first added).
             </p>
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">{status.addon.name}</Badge>

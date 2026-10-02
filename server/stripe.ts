@@ -30,6 +30,7 @@ import { fulfilOneTimePurchase } from "./billing/fulfilment";
 import { stripeConfigured } from "./billing/client";
 import { onStripeBillingEvent } from "./account/billing-emails";
 import { forgetDashboard } from "./dashboard/cache";
+import { introsForOrder, attachIntrosToItems, recordIntro, type StripeForIntro } from "./billing/intro";
 
 export { PaymentsNotConfiguredError };
 
@@ -157,6 +158,9 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
   if (!change.items.length && !change.addInvoiceItems.length) {
     return { changed: false, subscription: subscriptionSummary(row, cancellationOf(sub)) };
   }
+  // An add-on added for the first time with an intro price (shared/plans.ts) gets its coupon on that item.
+  const intros = await attachIntrosToItems(stripe as unknown as StripeForIntro, change.items,
+    await introsForOrder(stripe as unknown as StripeForIntro, userId, current.addons, order.addons, order.interval), order.interval);
   const updated = await stripe.subscriptions.update(sub.id, {
     items: change.items,
     ...(change.addInvoiceItems.length ? { add_invoice_items: change.addInvoiceItems } : {}),
@@ -164,6 +168,7 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
     payment_behavior: "error_if_incomplete",
     metadata: { userId: String(userId), plan: order.plan, interval: order.interval },
   });
+  for (const intro of intros) await recordIntro(userId, intro.addon, intro.couponId, updated.id);
   const set = await writeSubscriptionRow({ id: row.id }, updated);
   return { changed: true, subscription: subscriptionSummary({ ...row, ...set } as SubscriptionRow, cancellationOf(updated)) };
 }
@@ -264,11 +269,15 @@ export function registerStripeRoutes(app: Express) {
           if (stale.mode === "subscription") await stripe.checkout.sessions.expire(stale.id);
         }
         const metadata = orderMetadata(user.id, order);
+        // Intro price for an add-on bought with the plan (Checkout takes one session-level coupon; it
+        // applies only to that add-on's product). Recorded now, counted only once the session completes.
+        const [intro] = await introsForOrder(stripe as unknown as StripeForIntro, user.id, {}, order.addons, order.interval);
 
         const session = await stripe.checkout.sessions.create({
           customer: customerId,
           mode: "subscription",
           line_items,
+          ...(intro ? { discounts: [{ coupon: intro.couponId }] } : {}),
           subscription_data: {
             ...(trial ? { trial_period_days: TRIAL_DAYS } : {}),
             metadata,
@@ -277,6 +286,7 @@ export function registerStripeRoutes(app: Express) {
           cancel_url: `${getBaseUrl(req)}/pricing?canceled=true`,
           metadata,
         });
+        if (intro) await recordIntro(user.id, intro.addon, intro.couponId, session.id);
         return session.url;
       });
 

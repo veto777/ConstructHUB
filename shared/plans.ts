@@ -214,6 +214,14 @@ export type Addon = {
   preview?: boolean;
   /** An add-on that only makes sense on top of another one (call_number needs call_assistant). */
   requires?: AddonKey;
+  /**
+   * Introductory monthly price for the first `introMonths` months, once per
+   * customer, when the add-on is first added (server/billing/intro.ts: a Stripe
+   * coupon worth monthlyCents − introMonthlyCents a month). Annual buyers get
+   * the same total off their first year.
+   */
+  introMonthlyCents?: number;
+  introMonths?: number;
 };
 export const ADDONS: Record<AddonKey, Addon> = {
   extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location (10+ locations: Agency).", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "pro", "growth"], grants: { locations: 1 } },
@@ -229,6 +237,8 @@ export const ADDONS: Record<AddonKey, Addon> = {
     key: "call_assistant", name: "AI Call Assistant",
     description: "An AI receptionist that answers your phone 24/7, fills in the lead for your CRM and texts the right person. Includes 1 local number and 500 call minutes / month, then $0.15 / minute.",
     monthlyCents: 24900, annualCents: 249000, availableOn: ["pro", "growth", "agency"], grants: {}, preview: true,
+    // Owner, 2026-10-02: "$99 a month for the first 3 months", then the regular price.
+    introMonthlyCents: 9900, introMonths: 3,
   },
   call_number: {
     key: "call_number", name: "Extra Call Assistant number",

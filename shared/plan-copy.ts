@@ -112,16 +112,17 @@ export function addonLines(): string[] {
  * AI Call Assistant launch pricing (owner, 2026-10-02): "$99 a month for the
  * first 3 months", then the add-on's regular monthly price.
  *
- * THE ONLY PLACE the intro figures live. Everything else — the regular price,
- * the included number and minutes, the overage rate, the extra-number price
- * and whether it is for sale yet — is read from the price book
- * (shared/plans.ts ADDONS.call_assistant / call_number and the CALL_*
- * constants). When the price book grows its own intro fields
- * (introMonthlyCents / introMonths on the add-on), point this constant at
- * them and every surface follows: the landing page, /call-assistant, the
- * pricing page and Gabe's knowledge all render through the helpers below.
+ * The figures live in the price book (shared/plans.ts ADDONS.call_assistant
+ * introMonthlyCents / introMonths) — the same fields the Stripe intro coupon is
+ * built from (server/billing/intro.ts) — so the copy can never promise a price
+ * checkout doesn't charge. Every surface renders through the helpers below:
+ * the landing page, /call-assistant, the pricing page, the CRM Overview and
+ * Gabe's knowledge.
  */
-export const CALL_ASSISTANT_INTRO: { readonly monthlyCents: number; readonly months: number } = { monthlyCents: 9900, months: 3 };
+export const CALL_ASSISTANT_INTRO: { readonly monthlyCents: number; readonly months: number } = {
+  monthlyCents: ADDONS.call_assistant.introMonthlyCents ?? ADDONS.call_assistant.monthlyCents,
+  months: ADDONS.call_assistant.introMonths ?? 0,
+};
 
 /** "Pro, Growth and Agency" — the plans the add-on is sold on. */
 export const CALL_ASSISTANT_PLANS = joinNames(ADDONS.call_assistant.availableOn.map((key) => PLANS[key].name));
@@ -149,6 +150,12 @@ export function callAssistantPricing() {
 export function callAssistantIntroLine(): string {
   const p = callAssistantPricing();
   return `${p.intro}/month for your first ${p.introMonths} months, then ${p.regular}/month`;
+}
+
+/** "$99/mo for your first 3 months, then $249/mo" — the short form next to a price (pricing table, CRM Overview). */
+export function callAssistantIntroShort(): string {
+  const p = callAssistantPricing();
+  return `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo`;
 }
 
 /** "1 local number and 500 call minutes a month, then $0.15 a minute; extra numbers $5/month each". */
