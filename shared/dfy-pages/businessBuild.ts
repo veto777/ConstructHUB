@@ -6,14 +6,21 @@ import type { DfyPage } from "./types";
  * Every claim below is backed by the code in `sources`:
  *   - what it contains (formation + licensing, GBP + website, SEO + ads): shared/cart-bundles.ts DFY_BUNDLE_PARTS,
  *     client/src/lib/pricing-display.ts DFY_SERVICES "business-build"; each part is sold on its own too:
- *     server/catalog.ts DFY_CATALOG
- *   - paid upfront, 4–6 months from start to finish, excludes licensing exams and prerequisites, "ready to take
- *     jobs": client/src/pages/landing.tsx (Done-For-You section); "excludes licensing exams, prerequisites and
- *     required testing": client/src/lib/pricing-display.ts
+ *     server/catalog.ts DFY_CATALOG; the monthly SEO packages are not a part (DFY_BUNDLE_PARTS)
+ *   - paid upfront, 4–6 months from start to finish, excludes licensing exams and prerequisites, "from filing your
+ *     LLC to launching your marketing", "ready to take jobs": client/src/pages/landing.tsx (Done-For-You section);
+ *     "excludes licensing exams, prerequisites and required testing": client/src/lib/pricing-display.ts
  *   - quoted by a sales rep, never a listed price or an online checkout: server/catalog.ts isSalesOnly; scope and
  *     price confirmed before you commit or pay, fees non-refundable once work has commenced:
  *     client/src/pages/terms-of-use.tsx section 6
  *   - the request form: client/src/components/talk-to-sales.tsx → POST /api/seo-inquiry in server/routes.ts
+ *   - the parts' own details: shared/dfy-pages/formation.ts, gmbWebsite.ts, seoAds.ts (and their sources)
+ * The In Depth section:
+ *   - Local Services Ads ask for proof of insurance, background checks, a linked Business Profile and trade licenses
+ *     before ads go live: client/src/pages/lsa-guide.tsx section "verification"
+ *   - license rules (and exams) differ by state: server/data/state-guides.json `licensing_required`, `licensing_notes`
+ *   - ConstructHUB's software doesn't create or verify listings; Google verifies: server/data/hub-knowledge.md
+ *   - nobody can promise rankings: client/src/pages/pricing.tsx
  */
 const page: DfyPage = {
   key: "businessBuild",
@@ -51,28 +58,33 @@ const page: DfyPage = {
   cards: [
     {
       icon: "building",
-      title: "Business formation & contractor license",
-      body: "Formation with the Secretary of State, the license application, bond, insurance and tax IDs.",
+      title: "Company formation & tax IDs",
+      body: "Your LLC or corporation with the Secretary of State, your EIN and state tax ID, and business bank guidance.",
+    },
+    {
+      icon: "clipboard",
+      title: "Contractor license, bond & insurance",
+      body: "The license application paperwork, surety bond setup, and general liability, auto and workers' comp.",
+    },
+    {
+      icon: "map-pin",
+      title: "Google Business Profile",
+      body: "Your Business Profile created and taken through Google's verification, with photos and a posting calendar.",
     },
     {
       icon: "globe",
-      title: "Google Business Profile & website",
-      body: "A verified Business Profile and a contractor website with service and location pages.",
+      title: "Contractor website",
+      body: "Design and content, with a service page for each trade and a location page for each area you serve.",
+    },
+    {
+      icon: "search",
+      title: "Local SEO & schema",
+      body: "Local SEO strategy and work, schema markup, and Search Console and Analytics set up.",
     },
     {
       icon: "megaphone",
-      title: "SEO & ad campaigns",
-      body: "Local SEO, Google Ads, Local Services Ads enrollment, schema markup, Search Console and Analytics.",
-    },
-    {
-      icon: "clock",
-      title: "4–6 months, start to finish",
-      body: "One engagement from the first filing to running campaigns.",
-    },
-    {
-      icon: "alert",
-      title: "What it leaves out",
-      body: "Licensing exams, prerequisites and required testing.",
+      title: "Google Ads & Local Services Ads",
+      body: "Google Ads campaigns set up and optimized, and your Local Services Ads enrollment.",
     },
   ],
   audience: [
@@ -97,7 +109,7 @@ const page: DfyPage = {
     },
     {
       q: "How long does it take?",
-      a: "4–6 months from start to finish.",
+      a: "4–6 months from start to finish. The rep goes through the timeline with you when scoping the build; your licensing exams aren't part of it.",
     },
     {
       q: "How is it paid?",
@@ -105,31 +117,65 @@ const page: DfyPage = {
     },
     {
       q: "What isn't included?",
-      a: "Licensing exams, prerequisites and required testing. Those are yours to complete; we handle the paperwork around them.",
+      a: "Licensing exams, prerequisites and required testing. Those are yours to complete; we handle the paperwork around them. Monthly SEO packages are separate too.",
     },
     {
       q: "Can I get just one part?",
       a: "Yes. Business Formation & Filing, GMB & Website Setup and SEO & Ad Campaigns are each available on their own, quoted by a sales rep.",
     },
   ],
+  // WRITING-GUIDE.md → "The In Depth section". Sources: DFY_BUNDLE_PARTS (cart-bundles.ts), DFY_SERVICES
+  // "business-build", the landing Done-For-You section, lsa-guide.tsx "verification", state-guides.json, hub-knowledge.md.
+  inDepth: {
+    heading: { title: "A Turnkey Contracting Business, ", em: "Explained" },
+    paragraphs: [
+      "Turnkey means the setup is done for you and you get back a business that's ready to take jobs. The Complete " +
+        "Business Build puts three of our services into one engagement: Business Formation & Filing, GMB & Website " +
+        "Setup, and SEO & Ad Campaigns. Each is also sold on its own; the build is for contractors who want all three " +
+        "done by one team, from filing the LLC to launching the marketing.",
+      "The order matters. The company comes first: the LLC or corporation with the Secretary of State, the contractor " +
+        "license application, the surety bond and insurance setup, and the EIN and state tax ID. The Google Business " +
+        "Profile and the website are then built for that business, with a service page for each trade and a location " +
+        "page for each area you serve. Marketing runs on top of both: local SEO, schema markup, Search Console and " +
+        "Analytics, Google Ads campaigns and Local Services Ads enrollment.",
+      "The order also fits what Google asks for. Before Local Services Ads go live, Google wants proof of insurance, " +
+        "background checks, a linked Business Profile and your trade licenses. So the paperwork and the profile are in " +
+        "place before the ads are switched on.",
+      "From start to finish the build takes 4–6 months. Some steps run on other people's clocks: the state processes " +
+        "your license application, Google verifies your profile, and the licensing exams, prerequisites and required " +
+        "testing are yours to complete, since nobody can take them for you. License rules differ by state, and some " +
+        "states have no state general contractor license at all, so the rep scopes the build for where you work.",
+      "The build is quoted by a sales rep and paid upfront as one engagement once the scope and the price are agreed. " +
+        "Done-for-you fees are non-refundable once work starts. Ongoing monthly SEO packages are separate, and nobody " +
+        "can promise rankings, because Google decides them.",
+    ],
+  },
   related: ["formation", "gmbWebsite", "seoAds"],
   headings: {
     steps: { title: "From Request to Ready in ", em: "Four Steps" },
-    cards: { title: "Everything in ", em: "One Build" },
+    cards: { title: "Everything in ", em: "One Build" },
+    faq: { title: "Before You ", em: "Send a Request" },
   },
   seo: {
-    title: "Complete Business Build for Contractors | ConstructHUB",
+    title: "Start a Contracting Business, Done for You | ConstructHUB",
     description:
-      "Formation and licensing, Google Business Profile and website, and SEO and ads in one engagement: paid upfront, 4–6 months start to finish. Quoted by a sales rep.",
+      "Your LLC and license paperwork, Google Business Profile, website, SEO and ads in one engagement, paid upfront, done in 4–6 months. Quoted by a sales rep.",
   },
   sources: [
     "shared/cart-bundles.ts",
     "client/src/lib/pricing-display.ts",
     "client/src/pages/landing.tsx",
+    "client/src/pages/pricing.tsx",
     "client/src/pages/terms-of-use.tsx",
+    "client/src/pages/lsa-guide.tsx",
     "client/src/components/talk-to-sales.tsx",
     "server/catalog.ts",
     "server/routes.ts",
+    "server/data/state-guides.json",
+    "server/data/hub-knowledge.md",
+    "shared/dfy-pages/formation.ts",
+    "shared/dfy-pages/gmbWebsite.ts",
+    "shared/dfy-pages/seoAds.ts",
   ],
 };
 
