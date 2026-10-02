@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 type ListPayload = { issues: OpsIssueRow[]; total: number; counts: Record<string, number> };
 
 const STATUS_TONE: Record<IssueStatus, PillTone> = {
-  new: "danger", inspecting: "info", inspected: "neutral", fix_ready: "success", fixed: "teal", ignored: "neutral",
+  triage: "warning", new: "danger", inspecting: "info", inspected: "neutral", fix_ready: "success", fixed: "teal", ignored: "neutral",
 };
 const SEVERITY_DOT: Record<IssueSeverity, string> = {
   critical: "bg-red-600", error: "bg-red-500", warning: "bg-amber-500", info: "bg-blue-500",
@@ -72,7 +72,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
       queryClient.setQueryData(["/api/admin/issues", String(id)], updated);
       // Every list (whatever its filter) and the sidebar's count.
       void queryClient.invalidateQueries({ predicate: (q) => q.queryKey.length === 1 && String(q.queryKey[0]).startsWith("/api/admin/issues") });
-      toast({ title: status === "fixed" ? "Marked fixed" : status === "ignored" ? "Ignored" : "Sent back for inspection", description: status === "new" ? "The next issue-desk run hands it to Claude again." : undefined });
+      toast({ title: status === "fixed" ? "Marked fixed" : status === "ignored" ? "Ignored" : "Sent back for inspection", description: status === "new" ? "The next issue-desk run, within 15 minutes, hands it to Claude." : undefined });
     },
     onError: (e) => toast({ title: "Could not update the issue", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -108,7 +108,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
                 <EyeOff className="mr-1.5 h-4 w-4" aria-hidden="true" /> Ignore
               </Button>
               <Button size="sm" variant="outline" onClick={() => setStatus.mutate("new")} disabled={busy || issue.status === "new" || issue.status === "inspecting"} data-testid="button-issue-reinspect">
-                <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" /> Re-inspect
+                <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" /> {issue.status === "triage" ? "Send to Claude" : "Re-inspect"}
               </Button>
             </div>
 
@@ -130,7 +130,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
               {issue.report ? (
                 <div className="whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 text-sm leading-relaxed" data-testid="text-issue-report">{issue.report}</div>
               ) : (
-                <p className="text-sm text-muted-foreground">{issue.status === "inspecting" ? "Claude is looking at it now." : "Not inspected yet. The issue desk on the tower picks up new issues every 15 minutes."}</p>
+                <p className="text-sm text-muted-foreground">{issue.status === "inspecting" ? "Claude is looking at it now." : issue.status === "triage" ? "Browser reports come from anyone's browser, so Claude only sees one after you press Send to Claude." : "Not inspected yet. The issue desk on the tower picks up new issues every 15 minutes."}</p>
               )}
             </section>
 

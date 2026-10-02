@@ -14,7 +14,8 @@ export type IssueSeverity = (typeof ISSUE_SEVERITIES)[number];
  * new → (the tower claims it) inspecting → inspected | fix_ready | ignored (Claude's verdict)
  * → fixed | ignored (an admin). A fixed issue that happens again goes back to new.
  */
-export const ISSUE_STATUSES = ["new", "inspecting", "inspected", "fix_ready", "fixed", "ignored"] as const;
+/** "triage": a browser report — anonymous internet input — waits for an admin's "Send to Claude" before any run sees it. */
+export const ISSUE_STATUSES = ["triage", "new", "inspecting", "inspected", "fix_ready", "fixed", "ignored"] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
 /** The verdicts Claude may report (POST /api/ops-internal/issues/:id/report). */
@@ -34,6 +35,7 @@ export const ISSUE_SOURCE_LABELS: Record<IssueSource, string> = {
 };
 
 export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = {
+  triage: "Needs review",
   new: "New",
   inspecting: "Inspecting",
   inspected: "Inspected",

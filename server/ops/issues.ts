@@ -118,17 +118,19 @@ const historyEntry = (eventSql: string, bySql?: string) =>
   `jsonb_build_object('at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'event', ${eventSql}${bySql ? `, 'by', ${bySql}` : ""})`;
 
 const UPSERT_SQL = `
-  INSERT INTO ops_issues AS i (fingerprint, source, severity, title, detail, count, history)
-  VALUES ($1, $2, $3, $4, $5::jsonb, $6, jsonb_build_array(${historyEntry("'reported'")}))
+  INSERT INTO ops_issues AS i (fingerprint, source, severity, title, detail, count, history, status)
+  VALUES ($1, $2, $3, $4, $5::jsonb, $6, jsonb_build_array(${historyEntry("'reported'")}),
+          CASE WHEN $2 = 'client' THEN 'triage' ELSE 'new' END)
   ON CONFLICT (fingerprint) DO UPDATE SET
     count = LEAST(i.count::bigint + EXCLUDED.count, 2147483647)::int,
     last_seen = now(),
     updated_at = now(),
-    title = EXCLUDED.title,
-    detail = EXCLUDED.detail,
+    -- a browser report's text is frozen once an admin approved it: a later anonymous post can't rewrite what Claude reads
+    title = CASE WHEN i.source = 'client' AND i.status <> 'triage' THEN i.title ELSE EXCLUDED.title END,
+    detail = CASE WHEN i.source = 'client' AND i.status <> 'triage' THEN i.detail ELSE EXCLUDED.detail END,
     severity = CASE WHEN array_position($7::text[], EXCLUDED.severity) > array_position($7::text[], i.severity)
                     THEN EXCLUDED.severity ELSE i.severity END,
-    status = CASE WHEN i.status = 'fixed' THEN 'new' ELSE i.status END,
+    status = CASE WHEN i.status = 'fixed' THEN (CASE WHEN i.source = 'client' THEN 'triage' ELSE 'new' END) ELSE i.status END,
     claimed_at = CASE WHEN i.status = 'fixed' THEN NULL ELSE i.claimed_at END,
     history = CASE WHEN i.status = 'fixed' THEN ${appendHistory("i.history", historyEntry("'reopened'"))} ELSE i.history END
   RETURNING id`;

@@ -27,6 +27,14 @@ export const OPS_ISSUES_DDL: readonly string[] = [
      history jsonb NOT NULL DEFAULT '[]'::jsonb,
      updated_at timestamptz NOT NULL DEFAULT now()
    )`,
+  // a table made before "triage" existed gets the current status list (idempotent: only when it is missing)
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'ops_issues'::regclass AND contype = 'c'
+                    AND pg_get_constraintdef(oid) LIKE '%status%' AND pg_get_constraintdef(oid) LIKE '%triage%') THEN
+       ALTER TABLE ops_issues DROP CONSTRAINT IF EXISTS ops_issues_status_check;
+       ALTER TABLE ops_issues ADD CONSTRAINT ops_issues_status_check CHECK (status IN (${list(ISSUE_STATUSES)}));
+     END IF;
+   END $$`,
   `CREATE INDEX IF NOT EXISTS ops_issues_status_idx ON ops_issues (status, last_seen DESC)`,
   `CREATE INDEX IF NOT EXISTS ops_issues_last_seen_idx ON ops_issues (last_seen DESC)`,
 ];
