@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -20,6 +18,8 @@ import {
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { GBP_REINSTATEMENT_CENTS } from "@shared/plans";
 import { formatUsd } from "@shared/plan-copy";
+import { StandingGator } from "@/components/mascot";
+import { BTN_LG, BTN_PRIMARY, H2, Kicker, LEAD } from "@/components/feature-landing/primitives";
 
 const SUSPENSION_REASONS = [
   { icon: AlertTriangle, title: "Business name keyword stuffing", desc: "Adding extra keywords or location names to your business name that don't reflect your real-world name." },
@@ -104,43 +104,46 @@ export default function ReinstatementPage() {
   return (
     <div className="h-full overflow-y-auto">
       <PublicPageHeader next="/reinstatement" />
-      <div className="bg-gradient-to-b from-[#1a1f3d] to-[#2d1f4e] text-white py-16 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <Badge className="bg-white/10 text-white/80 border-white/20 mb-4" data-testid="badge-service-label">
-                <ShieldAlert className="h-3 w-3 mr-1" /> GBP REINSTATEMENT SERVICE
-              </Badge>
-              <h1 className="text-4xl font-bold mb-4" data-testid="text-reinstatement-title">
-                Is your Google Business Profile <span className="text-red-400">Suspended</span>?
+      <div className="mkt-editorial mkt-shadcn bg-mkt-paper text-mkt-ink overflow-x-clip" data-testid="page-reinstatement">
+      <section className="relative">
+        <div className="absolute inset-0 mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,black_40%,transparent_100%)]" aria-hidden />
+        <div className={`relative max-w-6xl mx-auto ${SECTION_X} pt-8 sm:pt-12 lg:pt-16 pb-12 lg:pb-20`}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            <div className="lg:col-span-7">
+              <Kicker n="" className="">
+                <span className="inline-flex items-center gap-1.5" data-testid="badge-service-label"><ShieldAlert className="h-3.5 w-3.5" aria-hidden /> GBP REINSTATEMENT SERVICE</span>
+              </Kicker>
+              <h1 className="font-display mt-5 font-semibold text-[2.45rem] leading-[1.04] sm:text-[3.2rem] lg:text-[3.7rem] tracking-[-0.02em] [text-wrap:balance]" data-testid="text-reinstatement-title">
+                Is your Google Business Profile <span className="mkt-marker">Suspended</span>?
               </h1>
-              <p className="text-white/70 text-lg mb-6">
+              <p className="mt-6 text-base sm:text-lg text-mkt-ink-soft leading-relaxed max-w-[37rem]">
                 We get it — it's devastating. Your phones go quiet, customers can't find you, and revenue drops overnight. We'll work tirelessly to get your listing back on the map.
               </p>
-              <div className="flex gap-8 mt-8" data-testid="reinstatement-facts">
-                <div>
-                  <p className="text-3xl font-bold text-[#4A6CF7]">4</p>
-                  <p className="text-sm text-white/60">Step<br />process</p>
+              <div className="mt-9 grid grid-cols-3 max-w-lg border-y border-mkt-rule divide-x divide-[color:var(--mkt-rule)]" data-testid="reinstatement-facts">
+                <div className="py-4 pr-4">
+                  <p className="font-display font-semibold text-[2rem] leading-none text-mkt-orange-ink">4</p>
+                  <p className="mt-2 text-[13px] text-mkt-ink-soft leading-snug">Step<br />process</p>
                 </div>
-                <div>
-                  <p className="text-3xl font-bold text-[#4A6CF7]">1–2</p>
-                  <p className="text-sm text-white/60">Business days<br />to review your case</p>
+                <div className="py-4 px-4">
+                  <p className="font-display font-semibold text-[2rem] leading-none text-mkt-orange-ink">1–2</p>
+                  <p className="mt-2 text-[13px] text-mkt-ink-soft leading-snug">Business days<br />to review your case</p>
                 </div>
-                <div>
-                  <p className="text-3xl font-bold text-[#4A6CF7]">{formatUsd(GBP_REINSTATEMENT_CENTS)}</p>
-                  <p className="text-sm text-white/60">Per<br />project</p>
+                <div className="py-4 pl-4">
+                  <p className="font-display font-semibold text-[2rem] leading-none text-mkt-orange-ink">{formatUsd(GBP_REINSTATEMENT_CENTS)}</p>
+                  <p className="mt-2 text-[13px] text-mkt-ink-soft leading-snug">Per<br />project</p>
                 </div>
               </div>
             </div>
 
-            <Card className="bg-white text-foreground" data-testid="card-reinstatement-pricing">
-              <CardContent className="p-8">
-                <h2 className="text-xl font-bold mb-1">Start your reinstatement</h2>
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-bold text-[#4A6CF7]">{formatUsd(GBP_REINSTATEMENT_CENTS)}</span>
-                  <span className="text-muted-foreground text-sm">per project</span>
+            <div className="lg:col-span-5 rounded-2xl border-2 border-mkt-ink bg-mkt-card overflow-hidden" data-testid="card-reinstatement-pricing">
+              <div className="mkt-hazard h-2" aria-hidden />
+              <div className="p-7 lg:p-8">
+                <h2 className="font-display font-semibold text-[1.4rem] leading-tight">Start your reinstatement</h2>
+                <div className="flex items-baseline gap-1.5 mt-3 mb-5">
+                  <span className="font-display font-semibold text-[3rem] leading-none">{formatUsd(GBP_REINSTATEMENT_CENTS)}</span>
+                  <span className="text-mkt-muted text-[15px]">per project</span>
                 </div>
-                <ul className="space-y-3 mb-6">
+                <ul className="space-y-3 mb-7 border-t border-mkt-rule pt-5">
                   {[
                     "Full profile & eligibility assessment",
                     "Guideline compliance review & fixes",
@@ -148,180 +151,195 @@ export default function ReinstatementPage() {
                     "Expert appeal submission & follow-up",
                     "Ongoing communication until resolved",
                   ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                    <li key={i} className="flex items-start gap-2.5 text-[14.5px]">
+                      <CheckCircle2 className="h-[18px] w-[18px] text-mkt-orange-ink shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
-                <Button
-                  className="w-full bg-[#F97316] hover:bg-[#E86C0A] text-white text-base h-12"
+                <button
+                  type="button"
+                  className={`${BTN_PRIMARY} ${BTN_LG} w-full`}
                   onClick={() => document.getElementById("reinstatement-form")?.scrollIntoView({ behavior: "smooth" })}
                   data-testid="button-get-reinstated"
                 >
                   Get your listing reinstated
-                </Button>
-                <p className="text-xs text-muted-foreground text-center mt-3">
+                </button>
+                <p className="text-[13px] text-mkt-muted text-center mt-3">
                   We only take cases where we're confident we can help.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+        <div className="mkt-ruler" aria-hidden />
+      </section>
 
-      <div className="bg-[#1a1f3d] text-white py-16 px-6">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-3" data-testid="text-consequences-title">A suspension can break your business</h2>
-          <p className="text-white/60 mb-10">If your Google Business Profile disappears, the consequences are immediate and severe.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <section className={`relative bg-mkt-navy text-mkt-navy-ink py-20 lg:py-24 ${SECTION_X} overflow-hidden`}>
+        <div className="absolute inset-0 mkt-grid-paper-panel [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_75%)] opacity-70 dark:opacity-40" aria-hidden />
+        <div className="relative max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-8 items-end">
+            <div className="lg:col-span-8">
+              <Kicker n="01" className="!text-mkt-orange [&>span:nth-child(2)]:!text-mkt-navy-muted">The cost</Kicker>
+              <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3rem] leading-[1.05] tracking-[-0.02em] mt-5 [text-wrap:balance]" data-testid="text-consequences-title">A suspension can break your business</h2>
+              <p className="mt-4 text-[17px] text-mkt-navy-muted">If your Google Business Profile disappears, the consequences are immediate and severe.</p>
+            </div>
+            <div className="hidden lg:flex lg:col-span-4 items-end justify-end gap-3" aria-hidden>
+              <p className="mkt-bubble px-4 py-3 text-[17px] leading-snug -rotate-1 mb-10 max-w-[13rem]">Let's get you back on the map.</p>
+              <StandingGator height={170} className="shrink-0" />
+            </div>
+          </div>
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-5">
             {CONSEQUENCES.map((c, i) => (
-              <Card key={i} className="bg-white/5 border-white/10 text-white" data-testid={`card-consequence-${i}`}>
-                <CardContent className="p-6">
-                  <c.icon className="h-8 w-8 text-red-400 mb-4" />
-                  <h3 className="font-bold mb-2">{c.title}</h3>
-                  <p className="text-sm text-white/60">{c.desc}</p>
-                </CardContent>
-              </Card>
+              <div key={i} className="rounded-2xl border border-mkt-navy-rule bg-[color:color-mix(in_srgb,var(--mkt-navy-ink)_5%,transparent)] p-6 lg:p-7" data-testid={`card-consequence-${i}`}>
+                <c.icon className="h-7 w-7 text-mkt-orange mb-4" strokeWidth={1.75} />
+                <h3 className="font-display font-semibold text-[1.25rem] leading-tight mb-2">{c.title}</h3>
+                <p className="text-[14.5px] text-mkt-navy-muted leading-relaxed">{c.desc}</p>
+              </div>
             ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-background py-16 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+      <section className={`py-20 lg:py-28 ${SECTION_X}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 items-start">
             <div>
-              <h2 className="text-3xl font-bold mb-3" data-testid="text-process-title">How we get you back on the map</h2>
-              <p className="text-muted-foreground mb-8">Our 4-step reinstatement process, from first review to appeal.</p>
-              <div className="space-y-6">
+              <Kicker n="02">How It Works</Kicker>
+              <h2 className={H2} data-testid="text-process-title">How we get you back on the map</h2>
+              <p className={`mt-4 ${LEAD}`}>Our 4-step reinstatement process, from first review to appeal.</p>
+              <ol className="mt-8 border-t border-mkt-rule">
                 {PROCESS_STEPS.map(step => (
-                  <div key={step.num} className="flex gap-4" data-testid={`process-step-${step.num}`}>
-                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[#4A6CF7] text-white text-sm font-bold shrink-0">
-                      {step.num}
-                    </div>
+                  <li key={step.num} className="flex gap-5 py-5 border-b border-mkt-rule" data-testid={`process-step-${step.num}`}>
+                    <span className="font-display italic text-[2.2rem] leading-none text-mkt-orange-ink w-12 shrink-0">{String(step.num).padStart(2, "0")}</span>
                     <div>
-                      <h3 className="font-bold mb-1">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground">{step.desc}</p>
+                      <h3 className="font-display font-semibold text-[1.2rem] leading-tight mb-1.5">{step.title}</h3>
+                      <p className="text-[14.5px] text-mkt-ink-soft leading-relaxed">{step.desc}</p>
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ol>
             </div>
 
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold" data-testid="text-suspension-reasons-title">Why do Google Business Profiles get suspended?</h2>
-              <p className="text-sm text-muted-foreground">
+              <Kicker n="03">The usual causes</Kicker>
+              <h2 className="font-display font-semibold text-[1.8rem] sm:text-[2.1rem] leading-[1.1] tracking-[-0.015em] [text-wrap:balance]" data-testid="text-suspension-reasons-title">Why do Google Business Profiles get suspended?</h2>
+              <p className="text-[15px] text-mkt-ink-soft leading-relaxed">
                 Google can suspend a profile for a wide range of reasons. Even minor or accidental infringements can trigger a suspension — and Google rarely tells you exactly which rule you broke.
               </p>
-              <div className="space-y-3">
+              <div className="border-t border-mkt-rule">
                 {SUSPENSION_REASONS.map((reason, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-border/40" data-testid={`suspension-reason-${i}`}>
-                    <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+                  <div key={i} className="flex items-start gap-3 py-3.5 border-b border-dotted border-mkt-rule" data-testid={`suspension-reason-${i}`}>
+                    <AlertTriangle className="h-4 w-4 text-mkt-orange-ink shrink-0 mt-1" />
                     <div>
-                      <p className="font-medium text-sm">{reason.title}</p>
-                      <p className="text-xs text-muted-foreground">{reason.desc}</p>
+                      <p className="font-semibold text-[15px]">{reason.title}</p>
+                      <p className="text-[13.5px] text-mkt-ink-soft leading-relaxed mt-0.5">{reason.desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <Card className="border-orange-500/20">
-                <CardContent className="p-5">
-                  <h3 className="font-bold mb-3">Types of suspensions</h3>
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-lg border-l-4 border-orange-400 bg-orange-500/5">
-                      <p className="font-semibold text-sm text-orange-600 dark:text-orange-400">SOFT SUSPENSION</p>
-                      <p className="text-xs text-muted-foreground mt-1">Your listing becomes unverified but may still be partially visible. This is the most common type and usually the most straightforward to resolve.</p>
-                    </div>
-                    <div className="p-3 rounded-lg border-l-4 border-red-500 bg-red-500/5">
-                      <p className="font-semibold text-sm text-red-600 dark:text-red-400">HARD SUSPENSION</p>
-                      <p className="text-xs text-muted-foreground mt-1">Your listing is completely removed from Google Search and Maps. You'll see the "not visible to customers" message in your dashboard.</p>
-                    </div>
+              <div className="rounded-2xl border border-mkt-rule bg-mkt-card p-6">
+                <h3 className="font-display font-semibold text-[1.2rem] mb-4">Types of suspensions</h3>
+                <div className="space-y-3">
+                  <div className="p-4 rounded-lg border-l-4 border-mkt-orange bg-mkt-paper">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-orange-ink">SOFT SUSPENSION</p>
+                    <p className="text-[13.5px] text-mkt-ink-soft mt-1.5 leading-relaxed">Your listing becomes unverified but may still be partially visible. This is the most common type and usually the most straightforward to resolve.</p>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="p-4 rounded-lg border-l-4 border-mkt-ink bg-mkt-paper">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-ink">HARD SUSPENSION</p>
+                    <p className="text-[13.5px] text-mkt-ink-soft mt-1.5 leading-relaxed">Your listing is completely removed from Google Search and Maps. You'll see the "not visible to customers" message in your dashboard.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-muted/30 py-16 px-6">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-3" data-testid="text-trust-title">Why trust ConstructHUB with your GBP</h2>
-          <p className="text-muted-foreground mb-10">A compliance-first approach built on Google's own Business Profile guidelines.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className={`py-20 lg:py-28 ${SECTION_X} bg-mkt-paper-2 border-y border-mkt-rule`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center">
+            <Kicker n="04" className="justify-center">Our Approach</Kicker>
+            <h2 className={H2} data-testid="text-trust-title">Why trust ConstructHUB with your GBP</h2>
+            <p className={`mt-4 ${LEAD} max-w-2xl mx-auto`}>A compliance-first approach built on Google's own Business Profile guidelines.</p>
+          </div>
+          <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-mkt-rule border border-mkt-rule rounded-2xl overflow-hidden">
             {TRUST_POINTS.map((point, i) => (
-              <Card key={i} className="text-left" data-testid={`card-trust-${i}`}>
-                <CardContent className="p-5">
-                  <point.icon className="h-8 w-8 text-[#4A6CF7] mb-3" />
-                  <h3 className="font-bold text-sm mb-2">{point.title}</h3>
-                  <p className="text-xs text-muted-foreground">{point.desc}</p>
-                </CardContent>
-              </Card>
+              <div key={i} className="group bg-mkt-paper p-6 lg:p-7 text-left transition-colors hover:bg-mkt-card" data-testid={`card-trust-${i}`}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="h-10 w-10 rounded-lg border border-mkt-rule bg-mkt-card flex items-center justify-center group-hover:border-mkt-orange group-hover:text-mkt-orange-ink transition-colors">
+                    <point.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  </div>
+                  <span className="font-display italic text-mkt-muted text-lg leading-none" aria-hidden>{String(i + 1).padStart(2, "0")}</span>
+                </div>
+                <h3 className="font-display font-semibold text-[1.15rem] leading-tight mb-2">{point.title}</h3>
+                <p className="text-[14px] text-mkt-ink-soft leading-relaxed">{point.desc}</p>
+              </div>
             ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div id="reinstatement-form" className="bg-background py-16 px-6">
-        <div className="max-w-5xl mx-auto">
+      <section id="reinstatement-form" className={`py-20 lg:py-28 ${SECTION_X} scroll-mt-16`}>
+        <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             <div>
-              <h2 className="text-3xl font-bold mb-3" data-testid="text-form-title">Let's get you back on the map!</h2>
-              <p className="text-muted-foreground mb-6">
+              <Kicker n="05">Request</Kicker>
+              <h2 className={H2} data-testid="text-form-title">Let's get you back on the <span className="mkt-marker">map</span>!</h2>
+              <p className={`mt-5 ${LEAD}`}>
                 Complete the form with details about your listing and a member of our team will get right back to you. If you're eligible for a Google Business Profile and willing to do the work, we can likely help.
               </p>
-              <div className="space-y-4">
+              <div className="mt-8 border-t border-mkt-rule">
                 {[
                   { icon: Clock, title: "Quick response", desc: "A team member will review your case and get back to you promptly." },
                   { icon: Search, title: "Honest assessment", desc: "We'll tell you upfront whether we think we can help." },
                   { icon: Shield, title: "No obligation", desc: "There's zero commitment at this stage. Just tell us what's going on." },
                 ].map((item, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                  <div key={i} className="flex items-start gap-3 py-4 border-b border-dotted border-mkt-rule">
+                    <CheckCircle2 className="h-5 w-5 text-mkt-orange-ink shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-sm">{item.title}</p>
-                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                      <p className="font-semibold text-[15px]">{item.title}</p>
+                      <p className="text-[14px] text-mkt-ink-soft">{item.desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <Card data-testid="card-reinstatement-form">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4">Tell us about your suspension</h3>
+            <div className="rounded-2xl border border-mkt-rule bg-mkt-card" data-testid="card-reinstatement-form">
+              <div className="p-6 sm:p-7">
+                <h3 className="font-display font-semibold text-[1.35rem] mb-5">Tell us about your suspension</h3>
                 <form className="space-y-4" onSubmit={handleSubmit} data-testid="form-reinstatement">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs">Your name <span className="text-red-500">(required)</span></Label>
-                      <Input value={formData.name} onChange={e => updateField("name", e.target.value)} className="mt-1" data-testid="input-reinstate-name" />
+                      <Label className={FIELD_LABEL}>Your name <span className={REQUIRED}>(required)</span></Label>
+                      <Input value={formData.name} onChange={e => updateField("name", e.target.value)} className={FIELD} data-testid="input-reinstate-name" />
                     </div>
                     <div>
-                      <Label className="text-xs">Your email <span className="text-red-500">(required)</span></Label>
-                      <Input type="email" required value={formData.email} onChange={e => updateField("email", e.target.value)} className="mt-1" data-testid="input-reinstate-email" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Business name <span className="text-red-500">(required)</span></Label>
-                      <Input value={formData.businessName} onChange={e => updateField("businessName", e.target.value)} className="mt-1" data-testid="input-reinstate-business" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Website URL</Label>
-                      <Input value={formData.websiteUrl} onChange={e => updateField("websiteUrl", e.target.value)} className="mt-1" data-testid="input-reinstate-website" />
+                      <Label className={FIELD_LABEL}>Your email <span className={REQUIRED}>(required)</span></Label>
+                      <Input type="email" required value={formData.email} onChange={e => updateField("email", e.target.value)} className={FIELD} data-testid="input-reinstate-email" />
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-xs">Business address <span className="text-red-500">(required)</span></Label>
-                    <p className="text-[10px] text-muted-foreground">Please include this, even if the address is hidden.</p>
-                    <Input value={formData.businessAddress} onChange={e => updateField("businessAddress", e.target.value)} className="mt-1" data-testid="input-reinstate-address" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className={FIELD_LABEL}>Business name <span className={REQUIRED}>(required)</span></Label>
+                      <Input value={formData.businessName} onChange={e => updateField("businessName", e.target.value)} className={FIELD} data-testid="input-reinstate-business" />
+                    </div>
+                    <div>
+                      <Label className={FIELD_LABEL}>Website URL</Label>
+                      <Input value={formData.websiteUrl} onChange={e => updateField("websiteUrl", e.target.value)} className={FIELD} data-testid="input-reinstate-website" />
+                    </div>
                   </div>
                   <div>
-                    <Label className="text-xs">Which best describes your business? <span className="text-red-500">(required)</span></Label>
+                    <Label className={FIELD_LABEL}>Business address <span className={REQUIRED}>(required)</span></Label>
+                    <p className="text-[12px] text-mkt-muted">Please include this, even if the address is hidden.</p>
+                    <Input value={formData.businessAddress} onChange={e => updateField("businessAddress", e.target.value)} className={FIELD} data-testid="input-reinstate-address" />
+                  </div>
+                  <div>
+                    <Label className={FIELD_LABEL}>Which best describes your business? <span className={REQUIRED}>(required)</span></Label>
                     <Select value={formData.businessType} onValueChange={v => updateField("businessType", v)}>
-                      <SelectTrigger className="mt-1" data-testid="select-business-type">
+                      <SelectTrigger className={FIELD} data-testid="select-business-type">
                         <SelectValue placeholder="Please choose one" />
                       </SelectTrigger>
                       <SelectContent>
@@ -333,7 +351,7 @@ export default function ReinstatementPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-xs">Does this business have multiple locations? <span className="text-red-500">(required)</span></Label>
+                    <Label className={FIELD_LABEL}>Does this business have multiple locations? <span className={REQUIRED}>(required)</span></Label>
                     <RadioGroup value={formData.multipleLocations} onValueChange={v => updateField("multipleLocations", v)} className="flex gap-4 mt-2">
                       <div className="flex items-center gap-2">
                         <RadioGroupItem value="no" id="multi-no" data-testid="radio-multi-no" />
@@ -346,19 +364,19 @@ export default function ReinstatementPage() {
                     </RadioGroup>
                   </div>
                   <div>
-                    <Label className="text-xs">Describe the problem you're having <span className="text-red-500">(required)</span></Label>
+                    <Label className={FIELD_LABEL}>Describe the problem you're having <span className={REQUIRED}>(required)</span></Label>
                     <Textarea
                       value={formData.problemDescription}
                       onChange={e => updateField("problemDescription", e.target.value)}
                       placeholder="Tell us about the suspension — when it happened, any details from Google, anything you've already tried, and anything else we should know."
                       rows={4}
-                      className="mt-1"
+                      className="mt-1.5 rounded-lg bg-mkt-paper text-[15px] md:text-[15px]"
                       data-testid="textarea-problem-description"
                     />
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-[#F97316] hover:bg-[#E86C0A] text-white h-11"
+                    className="w-full h-12 rounded-lg text-base font-semibold"
                     disabled={!canSubmit || submitMutation.isPending}
                     data-testid="button-submit-reinstatement"
                   >
@@ -366,12 +384,18 @@ export default function ReinstatementPage() {
                     Submit
                   </Button>
                 </form>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
       </div>
       <PublicPageFooter />
     </div>
   );
 }
+
+const SECTION_X = "px-4 sm:px-6 lg:px-8";
+const FIELD_LABEL = "text-[13px] font-semibold text-mkt-ink";
+const FIELD = "mt-1.5 h-11 rounded-lg bg-mkt-paper text-[15px] md:text-[15px]";
+const REQUIRED = "font-normal text-mkt-muted";

@@ -10,13 +10,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { KeyRound, ShieldAlert } from "lucide-react";
 import { API_NO_AI_NOTICE } from "@/pages/settings/api/api-keys-panel";
+import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
+import { BTN_PRIMARY, Kicker } from "@/components/feature-landing/primitives";
 
 // ── The slice of OpenAPI 3 this page reads ──────────────────────────────────
 type Schema = {
@@ -115,24 +116,29 @@ export default function DevelopersPage() {
   useEffect(() => { document.title = "Developers | ConstructHUB"; }, []);
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-developers-title">{doc?.info?.title || "ConstructHUB API"}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+    <div className="h-full overflow-y-auto flex flex-col">
+      <PublicPageHeader next="/developers" />
+      <div className="mkt-editorial mkt-shadcn flex-1 bg-mkt-paper text-mkt-ink overflow-x-clip" data-testid="page-developers">
+      <section className="relative">
+        <div className="absolute inset-0 mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,transparent_100%)]" aria-hidden />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-10 sm:pb-12 flex flex-wrap items-end justify-between gap-6">
+          <div className="min-w-0 max-w-2xl">
+            <Kicker n="">Developers</Kicker>
+            <h1 className="font-display mt-5 font-semibold text-[2.4rem] sm:text-[3.1rem] lg:text-[3.6rem] leading-[1.04] tracking-[-0.02em]" data-testid="text-developers-title">{doc?.info?.title || "ConstructHUB API"}</h1>
+            <p className="mt-4 text-base sm:text-lg text-mkt-ink-soft leading-relaxed">
               {doc?.info?.description || "Read your ConstructHUB data and update your records from your own tools."}
               {doc?.info?.version ? ` Version ${doc.info.version}.` : ""}
             </p>
           </div>
-          <Button asChild size="sm">
-            <Link href="/settings/api" data-testid="link-developers-keys"><KeyRound className="h-4 w-4 mr-1.5" aria-hidden="true" />Manage API keys</Link>
-          </Button>
+          <Link href="/settings/api" className={`${BTN_PRIMARY} h-11 px-5 text-[15px]`} data-testid="link-developers-keys"><KeyRound className="h-4 w-4" aria-hidden="true" />Manage API keys</Link>
         </div>
+        <div className="mkt-ruler" aria-hidden />
+      </section>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-8">
 
-        <Alert data-testid="banner-developers-no-ai">
+        <Alert className="rounded-2xl border-mkt-orange bg-mkt-card [&>svg]:text-mkt-orange-ink" data-testid="banner-developers-no-ai">
           <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-          <AlertTitle>What the API doesn't do</AlertTitle>
+          <AlertTitle className="font-display font-semibold text-[1.15rem]">What the API doesn't do</AlertTitle>
           <AlertDescription>
             <span data-testid="text-developers-no-ai">{API_NO_AI_NOTICE}</span>{" "}
             Posts, review replies and social posts you create through the API are stored exactly as you send them (source: api) and
@@ -141,9 +147,9 @@ export default function DevelopersPage() {
           </AlertDescription>
         </Alert>
 
-        <Card data-testid="card-developers-auth">
+        <Card className={CARD} data-testid="card-developers-auth">
           <CardHeader>
-            <CardTitle className="text-lg">Authentication</CardTitle>
+            <CardTitle className={CARD_TITLE}>Authentication</CardTitle>
             <CardDescription>Every request carries an API key from Settings → API keys as a bearer token. A key reads and writes only the account it belongs to.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -155,7 +161,7 @@ export default function DevelopersPage() {
               <dt className="text-muted-foreground">Scopes</dt>
               <dd><Badge variant="secondary" className="mr-1">read</Badge> lists and exports · <Badge variant="secondary" className="mr-1">write</Badge> creates and updates records</dd>
             </dl>
-            <pre className="rounded-lg bg-muted p-3 text-xs overflow-x-auto" data-testid="text-developers-curl">
+            <pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid="text-developers-curl">
 {`curl ${base}/openapi.json \\
   -H "Authorization: Bearer chub_abc123_YOUR_SECRET"`}
             </pre>
@@ -165,9 +171,9 @@ export default function DevelopersPage() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-developers-limits">
+        <Card className={CARD} data-testid="card-developers-limits">
           <CardHeader>
-            <CardTitle className="text-lg">Limits and units</CardTitle>
+            <CardTitle className={CARD_TITLE}>Limits and units</CardTitle>
             <CardDescription>Fair, predictable and the same for everyone on a plan.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
@@ -197,7 +203,8 @@ export default function DevelopersPage() {
 
         <section className="space-y-4" data-testid="section-developers-endpoints">
           <div>
-            <h2 className="text-xl font-semibold">Endpoints</h2>
+            <Kicker n="">Reference</Kicker>
+            <h2 className="font-display font-semibold text-[2rem] leading-tight mt-3">Endpoints</h2>
             <p className="text-sm text-muted-foreground">
               Generated from <a href="/api/v1/openapi.json" className="underline underline-offset-4" data-testid="link-developers-openapi">/api/v1/openapi.json</a>, which is also what an API client or your own AI can read.
             </p>
@@ -205,16 +212,16 @@ export default function DevelopersPage() {
           {isLoading ? (
             <div className="space-y-3" aria-busy="true"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
           ) : error ? (
-            <Card><CardContent className="pt-6 text-sm text-muted-foreground" data-testid="text-developers-unpublished">
+            <Card className={CARD}><CardContent className="pt-6 text-sm text-muted-foreground" data-testid="text-developers-unpublished">
               The API reference isn't published on this server yet ({apiErrorMessage(error, "no response")}). The authentication, limits and AI rules above still apply.
             </CardContent></Card>
           ) : endpoints.length === 0 ? (
-            <Card><CardContent className="pt-6 text-sm text-muted-foreground" data-testid="text-developers-unpublished">The API reference lists no endpoints yet.</CardContent></Card>
+            <Card className={CARD}><CardContent className="pt-6 text-sm text-muted-foreground" data-testid="text-developers-unpublished">The API reference lists no endpoints yet.</CardContent></Card>
           ) : (
             tags.map((tag) => (
-              <Card key={tag} data-testid={`card-developers-tag-${tag.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
+              <Card key={tag} className={CARD} data-testid={`card-developers-tag-${tag.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
                 <CardHeader>
-                  <CardTitle className="text-lg">{tag}</CardTitle>
+                  <CardTitle className={CARD_TITLE}>{tag}</CardTitle>
                   {doc?.tags?.find((t) => t.name === tag)?.description && <CardDescription>{doc.tags.find((t) => t.name === tag)!.description}</CardDescription>}
                 </CardHeader>
                 <CardContent className="divide-y">
@@ -225,9 +232,9 @@ export default function DevelopersPage() {
           )}
         </section>
 
-        <Card data-testid="card-developers-crm">
+        <Card className={CARD} data-testid="card-developers-crm">
           <CardHeader>
-            <CardTitle className="text-lg">CRM API</CardTitle>
+            <CardTitle className={CARD_TITLE}>CRM API</CardTitle>
             <CardDescription>The CRM has its own keys (<code>chk_…</code>, created in the portal under Integrations) for its customers, projects, estimates, invoices and payments.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -235,9 +242,14 @@ export default function DevelopersPage() {
           </CardContent>
         </Card>
       </div>
+      </div>
+      <PublicPageFooter />
     </div>
   );
 }
+
+const CARD = "rounded-2xl border-mkt-rule bg-mkt-card shadow-none";
+const CARD_TITLE = "font-display font-semibold text-[1.35rem] leading-tight";
 
 function EndpointRow({ e, doc, base }: { e: Endpoint; doc: OpenApiDoc | undefined; base: string }) {
   const body = e.op.requestBody?.content?.["application/json"]?.schema;
@@ -297,7 +309,7 @@ function EndpointRow({ e, doc, base }: { e: Endpoint; doc: OpenApiDoc | undefine
           </div>
         )}
         {e.method === "get" && (
-          <pre className="rounded-lg bg-muted p-3 text-xs overflow-x-auto">{`curl "${base}${relative}" -H "Authorization: Bearer chub_abc123_YOUR_SECRET"`}</pre>
+          <pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto">{`curl "${base}${relative}" -H "Authorization: Bearer chub_abc123_YOUR_SECRET"`}</pre>
         )}
       </div>
     </details>

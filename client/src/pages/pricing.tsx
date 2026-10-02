@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -15,7 +14,7 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { VerificationCancelled } from "@/components/recent-auth";
 import {
   Check, Zap, Star, TrendingUp, Building2, Loader2, ExternalLink, X, ArrowDown,
-  Wrench, Globe, Megaphone, Briefcase, Search, MessageSquare, PlusCircle, Settings2,
+  Wrench, Globe, Megaphone, Briefcase, Search, MessageSquare, Settings2,
 } from "lucide-react";
 import {
   PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIER_ADDONS,
@@ -34,23 +33,27 @@ import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote } from "@shared/plan-copy";
 import { CallAssistantTierCards } from "@/components/call-assistant-tiers";
+import { StandingGator } from "@/components/mascot";
+import { H2, Kicker, LEAD, TEXT_LINK } from "@/components/feature-landing/primitives";
 
-const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; chip: string; button: string; check: string }> = {
-  starter: {
-    icon: Zap, card: "border-blue-500/30 hover:border-blue-500/60", chip: "bg-blue-500/10 text-blue-500",
-    button: "bg-blue-500 hover:bg-blue-600 text-white", check: "text-blue-500",
-  },
+// Design B (the marketing site's editorial look): hairline cards on cream, ONE
+// orange for the recommended plan, the navy panel colour for Agency (it turns
+// cream in dark mode, as the hero panels do, so the accent still reads).
+const ORANGE_BUTTON = "border-0 bg-mkt-orange hover:bg-mkt-orange-hover text-white font-semibold rounded-lg";
+const NAVY_BUTTON = "h-11 rounded-lg border-0 bg-mkt-panel text-mkt-panel-ink hover:opacity-90 font-semibold text-[15px]";
+const OUTLINE_BUTTON = "h-11 rounded-lg border-2 border-mkt-ink [border-color:var(--mkt-ink)] bg-transparent text-mkt-ink hover:bg-mkt-ink hover:text-mkt-paper font-semibold text-[15px]";
+const SECTION_X = "px-4 sm:px-6 lg:px-8";
+
+const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; ribbon: string; button: string }> = {
+  starter: { icon: Zap, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
   pro: {
-    icon: Star, card: "ring-2 ring-[#F97316]/40 border-[#F97316]/40 hover:border-[#F97316]/70", chip: "bg-[#F97316]/10 text-[#F97316]",
-    button: "bg-[#F97316] hover:bg-[#ea6c10] text-white", check: "text-[#F97316]",
+    icon: Star, card: "border-2 border-mkt-orange", ribbon: "bg-mkt-orange text-white",
+    button: ORANGE_BUTTON,
   },
-  growth: {
-    icon: TrendingUp, card: "border-teal-500/30 hover:border-teal-500/60", chip: "bg-teal-500/10 text-teal-500",
-    button: "bg-teal-500 hover:bg-teal-600 text-white", check: "text-teal-500",
-  },
+  growth: { icon: TrendingUp, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
   agency: {
-    icon: Building2, card: "border-purple-500/30 hover:border-purple-500/60", chip: "bg-purple-500/10 text-purple-500",
-    button: "bg-purple-600 hover:bg-purple-700 text-white", check: "text-purple-500",
+    icon: Building2, card: "border-2 border-mkt-panel", ribbon: "bg-mkt-panel text-mkt-panel-ink",
+    button: NAVY_BUTTON,
   },
 };
 
@@ -92,9 +95,9 @@ function planRequestPrice(r: PlanRequest): string {
 }
 
 function CompareValue({ value }: { value: CompareCell }) {
-  if (value === true) return <Check className="w-5 h-5 text-green-500 mx-auto" aria-label="Included" />;
-  if (value === false) return <X className="w-4 h-4 text-muted-foreground/40 mx-auto" aria-label="Not included" />;
-  return <span className="text-sm font-medium">{value}</span>;
+  if (value === true) return <Check className="w-5 h-5 text-mkt-orange-ink mx-auto" strokeWidth={2.25} aria-label="Included" />;
+  if (value === false) return <X className="w-4 h-4 text-mkt-muted opacity-60 mx-auto" aria-label="Not included" />;
+  return <span className="text-[14px] font-semibold text-mkt-ink">{value}</span>;
 }
 
 export default function PricingPage() {
@@ -263,52 +266,74 @@ export default function PricingPage() {
     {/* Signed out, this page has no app frame: the header brings the way home,
         sign-in and the cart. */}
     <PublicPageHeader next="/pricing" cart />
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-10">
-        <div className="text-center space-y-3">
-          <h1 className="text-3xl font-extrabold tracking-tight" data-testid="text-pricing-title">
-            Plans &amp; pricing
-          </h1>
-          <p className="text-muted-foreground max-w-xl mx-auto" data-testid="text-trial">
-            A new account starts any plan with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
-            CRM included on every plan.
-          </p>
-          <div
-            role="radiogroup"
-            aria-label="Billing period"
-            className="inline-flex items-center rounded-full border border-border bg-muted/40 p-1"
-            data-testid="toggle-interval"
-          >
-            {(["month", "year"] as const).map((i) => (
-              <button
-                key={i}
-                type="button"
-                role="radio"
-                aria-checked={interval === i}
-                onClick={() => setBillingInterval(i)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${interval === i ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                data-testid={`button-interval-${i}`}
-              >
-                {i === "month" ? "Monthly" : "Annual"}
-                {i === "year" && (
-                  <span className="ml-1.5 rounded-full bg-green-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-green-600 dark:text-green-400">
-                    {monthsFree} months free
-                  </span>
-                )}
-              </button>
-            ))}
+    <div className="mkt-editorial mkt-shadcn h-full overflow-y-auto overflow-x-hidden bg-mkt-paper text-mkt-ink" data-testid="page-pricing">
+      {/* Hero: the title, the trial line and the billing toggle, beside the gator's panel. */}
+      <section className="relative">
+        <div className="absolute inset-0 mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,black_40%,transparent_100%)]" aria-hidden />
+        <div className={`relative max-w-7xl mx-auto ${SECTION_X} lg:grid lg:grid-cols-12 lg:gap-10 lg:items-center`}>
+          <div className="lg:col-span-7 pt-8 sm:pt-12 lg:pt-14 pb-8 lg:pb-14 text-center lg:text-left">
+            <Kicker n="" className="justify-center lg:justify-start">Pricing</Kicker>
+            <h1 className="font-display mt-5 font-semibold text-[2.6rem] leading-[1.02] sm:text-[3.4rem] lg:text-[4rem] tracking-[-0.02em] text-mkt-ink" data-testid="text-pricing-title">
+              Plans &amp; <span className="mkt-marker">pricing</span>
+            </h1>
+            <p className="mt-5 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] mx-auto lg:mx-0 leading-relaxed" data-testid="text-trial">
+              A new account starts any plan with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
+              CRM included on every plan.
+            </p>
+            <div
+              role="radiogroup"
+              aria-label="Billing period"
+              className="mt-7 inline-flex items-center rounded-full border border-mkt-rule bg-mkt-card p-1"
+              data-testid="toggle-interval"
+            >
+              {(["month", "year"] as const).map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  role="radio"
+                  aria-checked={interval === i}
+                  onClick={() => setBillingInterval(i)}
+                  className={`rounded-full px-4 sm:px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange ${interval === i ? "bg-mkt-panel text-mkt-panel-ink" : "text-mkt-ink-soft hover:text-mkt-ink"}`}
+                  data-testid={`button-interval-${i}`}
+                >
+                  {i === "month" ? "Monthly" : "Annual"}
+                  {i === "year" && (
+                    <span className={`ml-2 rounded-full border border-current px-1.5 py-0.5 text-[11px] font-semibold ${interval === i ? "text-mkt-orange dark:text-[#AE4A04]" : "text-mkt-orange-ink"}`}>
+                      {monthsFree} months free
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* The mascot and his line on the navy grid panel (decorative). */}
+          <div className="pb-10 lg:py-10 lg:col-span-5" aria-hidden>
+            <div className="relative overflow-hidden rounded-[28px] lg:rounded-[32px] bg-mkt-panel text-mkt-panel-ink">
+              <div className="absolute inset-0 mkt-grid-paper-panel" />
+              <div className="relative flex lg:flex-col items-center lg:items-center gap-4 lg:gap-5 p-5 sm:p-6 lg:px-8 lg:pt-9 lg:pb-0">
+                <p className="order-1 flex-1 lg:flex-none mkt-bubble px-4 py-3 lg:px-5 lg:py-4 text-[15px] sm:text-[17px] lg:text-[19px] leading-snug lg:-rotate-1" data-testid="text-pricing-bubble">
+                  Pick the plan that fits your crew.
+                </p>
+                <StandingGator height={112} className="order-2 shrink-0 lg:hidden" />
+                <StandingGator height={280} className="hidden lg:block order-2 shrink-0 -mb-1" />
+              </div>
+            </div>
           </div>
         </div>
+        <div className="mkt-ruler" aria-hidden />
+      </section>
 
+      <div className={`max-w-7xl mx-auto ${SECTION_X} py-12 lg:py-16 space-y-20 lg:space-y-28`}>
         {view.live && (
-          <div className="flex flex-wrap items-center justify-center gap-3 text-sm" data-testid="banner-current-plan">
-            <Badge variant="outline" className="px-3 py-1 text-sm border-green-500/30 text-green-600 dark:text-green-400" data-testid="badge-current-plan">
-              <Check className="w-3.5 h-3.5 mr-1" />
+          <div className="flex flex-wrap items-center justify-center gap-3 text-sm -mt-2" data-testid="banner-current-plan">
+            <Badge variant="outline" className="px-3 py-1 text-sm rounded-full border-mkt-ink text-mkt-ink bg-mkt-card" data-testid="badge-current-plan">
+              <Check className="w-3.5 h-3.5 mr-1 text-mkt-orange-ink" />
               Your plan: {view.displayName}
               {view.interval ? ` · ${intervalWord(view.interval)}` : ""}
             </Badge>
             {view.isLegacy && view.planKey && (
-              <span className="text-muted-foreground" data-testid="text-legacy-match">
+              <span className="text-mkt-ink-soft" data-testid="text-legacy-match">
                 Your features now match {PLANS[view.planKey].name}.
               </span>
             )}
@@ -316,7 +341,7 @@ export default function PricingPage() {
               <span className="text-destructive" role="alert">Your last payment didn't go through. Update your card in Manage billing.</span>
             )}
             {view.viaStripe && (
-              <Button variant="outline" size="sm" onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending} data-testid="button-manage-subscription">
+              <Button variant="outline" size="sm" onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending} className="rounded-lg" data-testid="button-manage-subscription">
                 {portalMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ExternalLink className="w-4 h-4 mr-1" />}
                 Manage billing
               </Button>
@@ -324,98 +349,100 @@ export default function PricingPage() {
           </div>
         )}
 
-        <div id="plans" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 scroll-mt-16">
-          {PLAN_KEYS.map((key) => {
-            const plan = PLANS[key];
-            const style = PLAN_STYLE[key];
-            const Icon = style.icon;
-            const current = isCurrent(key);
-            const request: PlanRequest = { plan: key, interval, ...(key === "agency" ? { locations: currentAgencyLocations } : {}) };
-            const pending = busy && pendingPlan?.plan === key && pendingPlan.locations === request.locations;
-            return (
-              <Card key={key} className={`relative flex flex-col transition-colors ${style.card}`} data-testid={`card-plan-${key}`}>
-                {PLAN_RIBBON[key] && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
-                    <Badge className={`border-none px-3 text-xs font-semibold ${style.button}`}>{PLAN_RIBBON[key]}</Badge>
-                  </div>
-                )}
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${style.chip}`}>
-                      <Icon className="w-5 h-5" />
+        <div>
+          <div id="plans" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 pt-3 scroll-mt-16">
+            {PLAN_KEYS.map((key, index) => {
+              const plan = PLANS[key];
+              const style = PLAN_STYLE[key];
+              const Icon = style.icon;
+              const current = isCurrent(key);
+              const request: PlanRequest = { plan: key, interval, ...(key === "agency" ? { locations: currentAgencyLocations } : {}) };
+              const pending = busy && pendingPlan?.plan === key && pendingPlan.locations === request.locations;
+              return (
+                <div key={key} className={`relative flex flex-col rounded-2xl bg-mkt-card transition-colors ${style.card}`} data-testid={`card-plan-${key}`}>
+                  {PLAN_RIBBON[key] && (
+                    <div className={`absolute -top-3 left-6 z-10 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${style.ribbon}`}>
+                      {PLAN_RIBBON[key]}
                     </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-xl">{plan.name}</CardTitle>
-                      {view.live && view.planKey === key && view.isLegacy && (
-                        <p className="text-[11px] text-muted-foreground" data-testid={`text-legacy-${key}`}>Your {view.displayName} features match this plan</p>
+                  )}
+                  <div className="p-6 lg:p-7 pb-0 lg:pb-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink shrink-0">
+                          <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                        </div>
+                        <h3 className="font-display font-semibold text-[1.45rem] leading-tight text-mkt-ink">{plan.name}</h3>
+                      </div>
+                      <span className="font-display italic text-mkt-muted text-lg leading-none pt-1" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
+                    </div>
+                    {view.live && view.planKey === key && view.isLegacy && (
+                      <p className="mt-2 text-[12px] text-mkt-muted" data-testid={`text-legacy-${key}`}>Your {view.displayName} features match this plan</p>
+                    )}
+                    <p className="text-[14.5px] text-mkt-ink-soft pt-3 leading-relaxed">{plan.tagline}</p>
+                    <div className="pt-5 font-display font-semibold text-mkt-ink leading-none" data-testid={`text-price-${key}`}>
+                      <span className="text-[2.9rem] tracking-[-0.02em]">{formatUsd(planPriceCents(plan, interval))}</span>
+                      <span className="font-sans text-[15px] font-medium text-mkt-muted ml-1">{intervalSuffix(interval)}</span>
+                    </div>
+                    <p className="mt-3 text-[12.5px] leading-relaxed text-mkt-muted min-h-[2.5rem]" data-testid={`text-price-note-${key}`}>
+                      {interval === "year"
+                        ? `${formatUsd(Math.round(plan.annualCents / 12))}/mo billed yearly · save ${formatUsd(annualSavingsCents(plan))}`
+                        : `or ${formatUsd(plan.annualCents)}/yr (${monthsFree} months free)`}
+                      {key === "agency" && (
+                        <span className="block">
+                          {AGENCY_INCLUDED_LOCATIONS} locations included, then {formatUsd(Math.max(...bandPrices))} down to {formatUsd(Math.min(...bandPrices))} per location
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col flex-1 p-6 lg:p-7 pt-5 lg:pt-5">
+                    <ul className="space-y-2.5 flex-1 border-t border-mkt-rule pt-5">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2.5 text-[14px] leading-snug text-mkt-ink">
+                          <Check className="w-4 h-4 shrink-0 mt-0.5 text-mkt-orange-ink" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="space-y-2 pt-6">
+                      <Button
+                        className={`w-full h-11 rounded-lg text-[15px] font-semibold ${current ? "border-2 border-mkt-rule bg-transparent text-mkt-ink-soft" : style.button}`}
+                        variant={current ? "outline" : "default"}
+                        disabled={current || busy}
+                        onClick={() => choosePlan(request)}
+                        data-testid={`button-subscribe-${key}`}
+                      >
+                        {pending && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+                        {ctaLabel(key)}
+                      </Button>
+                      {key === "agency" && (
+                        <button type="button" onClick={() => jumpTo("agency")} className="w-full text-[13px] font-semibold text-mkt-ink-soft hover:text-mkt-ink underline decoration-mkt-orange-soft decoration-2 underline-offset-4 inline-flex items-center justify-center gap-1" data-testid="link-agency-calculator">
+                          Price more than {AGENCY_INCLUDED_LOCATIONS} locations <ArrowDown className="w-3 h-3" />
+                        </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground pt-2">{plan.tagline}</p>
-                  <div className="pt-3" data-testid={`text-price-${key}`}>
-                    <span className="text-4xl font-extrabold">{formatUsd(planPriceCents(plan, interval))}</span>
-                    <span className="text-muted-foreground text-sm">{intervalSuffix(interval)}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground min-h-[2rem]" data-testid={`text-price-note-${key}`}>
-                    {interval === "year"
-                      ? `${formatUsd(Math.round(plan.annualCents / 12))}/mo billed yearly · save ${formatUsd(annualSavingsCents(plan))}`
-                      : `or ${formatUsd(plan.annualCents)}/yr (${monthsFree} months free)`}
-                    {key === "agency" && (
-                      <span className="block">
-                        {AGENCY_INCLUDED_LOCATIONS} locations included, then {formatUsd(Math.max(...bandPrices))} down to {formatUsd(Math.min(...bandPrices))} per location
-                      </span>
-                    )}
-                  </p>
-                </CardHeader>
-                <CardContent className="flex flex-col flex-1 space-y-4">
-                  <ul className="space-y-2 flex-1">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm">
-                        <Check className={`w-4 h-4 shrink-0 mt-0.5 ${style.check}`} />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="space-y-2">
-                    <Button
-                      className={`w-full font-semibold border-0 ${current ? "" : style.button}`}
-                      variant={current ? "outline" : "default"}
-                      disabled={current || busy}
-                      onClick={() => choosePlan(request)}
-                      data-testid={`button-subscribe-${key}`}
-                    >
-                      {pending && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
-                      {ctaLabel(key)}
-                    </Button>
-                    {key === "agency" && (
-                      <button type="button" onClick={() => jumpTo("agency")} className="w-full text-xs text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center justify-center gap-1" data-testid="link-agency-calculator">
-                        Price more than {AGENCY_INCLUDED_LOCATIONS} locations <ArrowDown className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-        <p className="text-center text-xs text-muted-foreground -mt-4">
-          No free plan. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
-        </p>
-
-        <section id="comparison" className="space-y-4 scroll-mt-16" aria-labelledby="comparison-heading">
-          <div className="text-center space-y-2">
-            <h2 id="comparison-heading" className="text-2xl font-extrabold tracking-tight" data-testid="text-comparison-heading">Compare plans</h2>
-            <p className="text-sm text-muted-foreground">What each plan includes, side by side.</p>
+                </div>
+              );
+            })}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-border" data-testid="table-plan-comparison">
-            <table className="w-full min-w-[640px] text-sm">
+          <p className="text-center text-[13px] text-mkt-muted mt-6">
+            No free plan. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
+          </p>
+        </div>
+
+        <section id="comparison" className="scroll-mt-16" aria-labelledby="comparison-heading">
+          <SectionHead n="01" kicker="Compare" lede="What each plan includes, side by side.">
+            <h2 id="comparison-heading" className={H2} data-testid="text-comparison-heading">Compare <em className="text-mkt-orange-ink">plans</em></h2>
+          </SectionHead>
+          <div className="mt-10 overflow-x-auto rounded-2xl border border-mkt-rule bg-mkt-card" data-testid="table-plan-comparison">
+            <table className="w-full min-w-[640px] text-[14px]">
               <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th scope="col" className="sticky left-0 z-10 bg-muted text-left p-3 font-bold min-w-[140px] sm:min-w-[180px]">Feature</th>
+                <tr className="border-b border-mkt-rule">
+                  <th scope="col" className="sticky left-0 z-10 bg-mkt-card text-left p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted min-w-[140px] sm:min-w-[200px]">Feature</th>
                   {PLAN_KEYS.map((key) => (
-                    <th key={key} scope="col" className="p-3 text-center font-bold min-w-[110px]">
-                      <span className="block">{PLANS[key].name}</span>
-                      <span className="block text-xs font-normal text-muted-foreground">
+                    <th key={key} scope="col" className={`p-4 text-center min-w-[110px] ${key === "pro" ? "bg-[color:var(--mkt-orange-soft)]" : ""}`}>
+                      <span className="block font-display font-semibold text-[1.15rem] text-mkt-ink">{PLANS[key].name}</span>
+                      <span className="block text-[12px] font-medium text-mkt-muted">
                         {formatUsd(planPriceCents(PLANS[key], interval))}{intervalSuffix(interval)}
                       </span>
                     </th>
@@ -424,14 +451,14 @@ export default function PricingPage() {
               </thead>
               <tbody>
                 {sections.flatMap((section) => [
-                  <tr key={`s-${section.title}`} className="bg-muted/30">
-                    <th scope="colgroup" colSpan={PLAN_KEYS.length + 1} className="sticky left-0 text-left p-3 font-bold">{section.title}</th>
+                  <tr key={`s-${section.title}`} className="bg-mkt-paper-2 border-b border-mkt-rule">
+                    <th scope="colgroup" colSpan={PLAN_KEYS.length + 1} className="sticky left-0 text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-orange-ink">{section.title}</th>
                   </tr>,
                   ...section.rows.map((r) => (
-                    <tr key={r.key} className="border-b border-border/50" data-testid={`row-compare-${r.key}`}>
-                      <th scope="row" className="sticky left-0 z-10 bg-background p-3 text-left font-medium">{r.label}</th>
+                    <tr key={r.key} className="border-b border-dotted border-mkt-rule last:border-b-0" data-testid={`row-compare-${r.key}`}>
+                      <th scope="row" className="sticky left-0 z-10 bg-mkt-card px-4 py-3 text-left font-medium text-mkt-ink">{r.label}</th>
                       {PLAN_KEYS.map((key) => (
-                        <td key={key} className="p-3 text-center" data-testid={`cell-compare-${r.key}-${key}`}>
+                        <td key={key} className="px-4 py-3 text-center text-mkt-ink" data-testid={`cell-compare-${r.key}-${key}`}>
                           <CompareValue value={r.cells[key]} />
                         </td>
                       ))}
@@ -443,44 +470,47 @@ export default function PricingPage() {
           </div>
         </section>
 
-        <section id="agency" className="space-y-5 scroll-mt-16" aria-labelledby="agency-heading">
-          <div className="text-center space-y-2">
-            <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">
-              <Building2 className="w-3.5 h-3.5 mr-1.5" /> Agency
-            </Badge>
-            <h2 id="agency-heading" className="text-2xl font-extrabold tracking-tight">Agency pricing by location</h2>
-            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+        <section id="agency" className="scroll-mt-16" aria-labelledby="agency-heading">
+          <SectionHead
+            n="02"
+            kicker="Agency"
+            lede={<>
               {formatUsd(PLANS.agency.monthlyCents)}/mo includes {AGENCY_INCLUDED_LOCATIONS} client locations. Each location above that is
               priced by the band it falls in, like tax brackets, so adding a location never lowers the bill.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-4xl mx-auto">
-            <Card>
-              <CardContent className="p-0">
-                <table className="w-full text-sm" data-testid="table-agency-bands">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th scope="col" className="text-left p-3">Locations</th>
-                      <th scope="col" className="text-right p-3">Per location / month</th>
+            </>}
+          >
+            <h2 id="agency-heading" className={H2}>Agency pricing <em className="text-mkt-orange-ink">by location</em></h2>
+          </SectionHead>
+          <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-5xl mx-auto">
+            <div className="rounded-2xl border border-mkt-rule bg-mkt-card overflow-hidden">
+              <table className="w-full text-[14px]" data-testid="table-agency-bands">
+                <thead>
+                  <tr className="border-b border-mkt-rule">
+                    <th scope="col" className="text-left p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Locations</th>
+                    <th scope="col" className="text-right p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Per location / month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agencyBandRows().map((b) => (
+                    <tr key={b.label} className="border-b border-dotted border-mkt-rule last:border-0">
+                      <td className="px-4 py-3 font-display font-semibold text-[1.05rem] text-mkt-ink">{b.label}</td>
+                      <td className="px-4 py-3 text-right text-mkt-ink">
+                        {b.centsPerLocation === null ? "Talk to a sales rep" : b.centsPerLocation === 0 ? `Included in ${formatUsd(PLANS.agency.monthlyCents)}` : formatUsd(b.centsPerLocation)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {agencyBandRows().map((b) => (
-                      <tr key={b.label} className="border-b border-border/50 last:border-0">
-                        <td className="p-3 font-medium">{b.label}</td>
-                        <td className="p-3 text-right">
-                          {b.centsPerLocation === null ? "Talk to a sales rep" : b.centsPerLocation === 0 ? `Included in ${formatUsd(PLANS.agency.monthlyCents)}` : formatUsd(b.centsPerLocation)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-            <Card className="border-purple-500/30" data-testid="card-agency-calculator">
-              <CardContent className="p-5 space-y-4">
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="rounded-2xl border border-mkt-rule bg-mkt-card overflow-hidden flex flex-col" data-testid="card-agency-calculator">
+              <div className="relative bg-mkt-panel text-mkt-panel-ink px-5 py-3.5 flex items-center gap-2.5">
+                <div className="absolute inset-0 mkt-grid-paper-panel opacity-60" aria-hidden />
+                <Building2 className="relative w-4 h-4 text-mkt-orange" aria-hidden />
+                <span className="relative text-[11px] font-semibold uppercase tracking-[0.16em]">{PLANS.agency.name} calculator</span>
+              </div>
+              <div className="p-5 lg:p-6 space-y-5 flex-1">
                 <div className="space-y-2">
-                  <Label htmlFor="agency-locations">How many client locations?</Label>
+                  <Label htmlFor="agency-locations" className="text-[13px] font-semibold text-mkt-ink">How many client locations?</Label>
                   <Input
                     id="agency-locations"
                     type="number"
@@ -490,15 +520,16 @@ export default function PricingPage() {
                     value={agencyInput}
                     onChange={(e) => setAgencyInput(e.target.value)}
                     onBlur={() => setAgencyInput(String(agencyLocations))}
+                    className="h-11 rounded-lg text-[15px] md:text-[15px]"
                     data-testid="input-agency-locations"
                   />
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5 pt-1">
                     {AGENCY_PRESETS.map((n) => (
                       <button
                         key={n}
                         type="button"
                         onClick={() => setAgencyInput(String(n))}
-                        className={`rounded-full border px-2.5 py-0.5 text-xs ${agencyLocations === n ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400" : "border-border text-muted-foreground hover:text-foreground"}`}
+                        className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors ${agencyLocations === n ? "border-mkt-panel bg-mkt-panel text-mkt-panel-ink" : "border-mkt-rule text-mkt-ink-soft hover:border-mkt-ink hover:text-mkt-ink"}`}
                         data-testid={`button-agency-preset-${n}`}
                       >
                         {n}
@@ -507,36 +538,36 @@ export default function PricingPage() {
                   </div>
                 </div>
                 {quote.sales ? (
-                  <div className="space-y-3" data-testid="text-agency-sales">
-                    <p className="text-lg font-bold" data-testid="text-agency-total">
+                  <div className="space-y-3 border-t border-mkt-rule pt-5" data-testid="text-agency-sales">
+                    <p className="font-display font-semibold text-[1.4rem] leading-tight text-mkt-ink" data-testid="text-agency-total">
                       {quote.locations.toLocaleString("en-US")} locations = Talk to a sales rep
                     </p>
-                    <p className="text-sm text-muted-foreground">Above {AGENCY_SELF_SERVE_MAX_LOCATIONS.toLocaleString("en-US")} locations we price the workspace with you.</p>
-                    <TalkToSalesButton topic={`Agency plan — ${quote.locations.toLocaleString("en-US")} locations`} className="w-full bg-purple-600 hover:bg-purple-700 text-white" data-testid="button-agency-sales" />
+                    <p className="text-[14px] text-mkt-ink-soft">Above {AGENCY_SELF_SERVE_MAX_LOCATIONS.toLocaleString("en-US")} locations we price the workspace with you.</p>
+                    <TalkToSalesButton topic={`Agency plan — ${quote.locations.toLocaleString("en-US")} locations`} className={`w-full ${NAVY_BUTTON}`} data-testid="button-agency-sales" />
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-2xl font-extrabold" data-testid="text-agency-total">
+                  <div className="space-y-3 border-t border-mkt-rule pt-5">
+                    <p className="font-display font-semibold text-[1.75rem] leading-tight text-mkt-ink" data-testid="text-agency-total">
                       {quote.locations.toLocaleString("en-US")} location{quote.locations === 1 ? "" : "s"} = {formatUsd(interval === "year" ? quote.annualCents : quote.monthlyCents)}{intervalSuffix(interval)}
                     </p>
-                    <ul className="space-y-1 text-sm" data-testid="list-agency-breakdown">
+                    <ul className="space-y-1.5 text-[14px]" data-testid="list-agency-breakdown">
                       {quote.lines.map((l) => (
-                        <li key={l.label} className="flex justify-between gap-3">
-                          <span className="text-muted-foreground">
+                        <li key={l.label} className="flex justify-between gap-3 border-b border-dotted border-mkt-rule pb-1.5 last:border-0">
+                          <span className="text-mkt-ink-soft">
                             {l.label}{l.centsPerLocation > 0 ? ` · ${l.count.toLocaleString("en-US")} × ${formatUsd(l.centsPerLocation)}` : ""}
                           </span>
-                          <span className="font-medium">{formatUsd(l.subtotalCents)}</span>
+                          <span className="font-semibold text-mkt-ink">{formatUsd(l.subtotalCents)}</span>
                         </li>
                       ))}
                     </ul>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[12.5px] text-mkt-muted leading-relaxed">
                       {interval === "year"
                         ? `Billed yearly: ${monthsFree} months free versus ${formatUsd(quote.monthlyCents)}/mo.`
                         : `Or ${formatUsd(quote.annualCents)}/yr billed yearly (${monthsFree} months free).`}
                       {quote.locations > AGENCY_INCLUDED_LOCATIONS && ` About ${formatUsd(Math.round(quote.monthlyCents / quote.locations))} per location per month.`}
                     </p>
                     <Button
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                      className={`w-full ${NAVY_BUTTON}`}
                       disabled={busy || (isCurrent("agency") && view.locations === quote.locations)}
                       onClick={() => choosePlan({ plan: "agency", interval, locations: quote.locations })}
                       data-testid="button-agency-start"
@@ -549,62 +580,62 @@ export default function PricingPage() {
                     </Button>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section id="add-ons" className="space-y-4 scroll-mt-16" aria-labelledby="addons-heading">
-          <div className="text-center space-y-2">
-            <Badge className="bg-[#F97316]/10 text-[#F97316] border-[#F97316]/20">
-              <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Add-ons
-            </Badge>
-            <h2 id="addons-heading" className="text-2xl font-extrabold tracking-tight" data-testid="text-addons-heading">Add-ons: pay per feature</h2>
-            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+        <section id="add-ons" className="scroll-mt-16" aria-labelledby="addons-heading">
+          <SectionHead
+            n="03"
+            kicker="Add-ons"
+            lede={<>
               Need one more of something? Add it to your plan instead of moving up a plan.
               {addonsEditable ? " Add or remove them any time in Settings → Billing." : " Add them in Settings → Billing once you're subscribed to one of these plans."}
-            </p>
-          </div>
+            </>}
+          >
+            <h2 id="addons-heading" className={H2} data-testid="text-addons-heading">Add-ons: <em className="text-mkt-orange-ink">pay per feature</em></h2>
+          </SectionHead>
           {/* The AI Call Assistant: four tiers, one per subscription (shared/plans.ts CALL_ASSISTANT_TIERS). */}
-          <div className="max-w-5xl mx-auto space-y-3" id="call-assistant-tiers" data-testid="block-addon-call-assistant">
+          <div className="mt-10 max-w-5xl mx-auto space-y-3" id="call-assistant-tiers" data-testid="block-addon-call-assistant">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-lg font-bold tracking-tight">{CALL_ASSISTANT_NAME}: pick a tier</h3>
-              <Link href="/call-assistant" className="text-sm font-medium underline underline-offset-2 hover:text-[#C2410C] dark:hover:text-[#FB923C]" data-testid="link-addon-call-assistant">How it works →</Link>
+              <h3 className="font-display font-semibold text-[1.4rem] leading-tight text-mkt-ink">{CALL_ASSISTANT_NAME}: pick a tier</h3>
+              <Link href="/call-assistant" className={TEXT_LINK} data-testid="link-addon-call-assistant">How it works →</Link>
             </div>
-            <p className="text-sm font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">
+            <p className="text-[14px] font-semibold text-mkt-orange-ink" data-testid="text-addon-intro-call_assistant">
               {/* The intro is Solo, monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
               {interval === "year" ? callAssistantYearlyNote() : `Regular prices from ${callAssistantPricing().from}/mo (${callAssistantPricing().fromTier}). Solo launch price: ${callAssistantIntroShort()}`}
             </p>
             <CallAssistantTierCards interval={interval} />
           </div>
-          <div className="overflow-x-auto rounded-xl border border-border max-w-4xl mx-auto">
-            <table className="w-full text-sm" data-testid="table-addons">
+          <div className="mt-8 overflow-x-auto rounded-2xl border border-mkt-rule bg-mkt-card max-w-5xl mx-auto">
+            <table className="w-full text-[14px]" data-testid="table-addons">
               <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th scope="col" className="text-left p-3">Add-on</th>
-                  <th scope="col" className="text-right p-3 whitespace-nowrap">Price</th>
-                  <th scope="col" className="hidden sm:table-cell text-left p-3">Available on</th>
+                <tr className="border-b border-mkt-rule">
+                  <th scope="col" className="text-left p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Add-on</th>
+                  <th scope="col" className="text-right p-4 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Price</th>
+                  <th scope="col" className="hidden sm:table-cell text-left p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Available on</th>
                 </tr>
               </thead>
               <tbody>
                 {(Object.keys(ADDONS) as AddonKey[]).filter((k) => !CALL_ASSISTANT_TIER_ADDONS.includes(k)).map((k) => {
                   const addon = ADDONS[k];
                   return (
-                    <tr key={k} className="border-b border-border/50 last:border-0" data-testid={`row-addon-${k}`}>
-                      <td className="p-3 align-top">
+                    <tr key={k} className="border-b border-dotted border-mkt-rule last:border-0" data-testid={`row-addon-${k}`}>
+                      <td className="px-4 py-3.5 align-top">
                         {/* a div, not a <p>: the Badge renders a <div>, which a <p> may not contain */}
-                        <div className="font-medium flex items-center gap-2 flex-wrap">
+                        <div className="font-display font-semibold text-[1.05rem] text-mkt-ink flex items-center gap-2 flex-wrap">
                           {addon.name}
-                          {addon.preview && <Badge variant="outline" className="text-[10px]" data-testid={`badge-addon-preview-${k}`}>Coming soon</Badge>}
+                          {addon.preview && <Badge variant="outline" className="font-sans text-[10px] rounded-full border-mkt-orange text-mkt-orange-ink" data-testid={`badge-addon-preview-${k}`}>Coming soon</Badge>}
                         </div>
-                        <p className="text-xs text-muted-foreground">{addon.description}</p>
-                        <p className="sm:hidden text-xs text-muted-foreground mt-1">On {addonPlanNames(addon)}</p>
+                        <p className="text-[13px] text-mkt-ink-soft mt-0.5">{addon.description}</p>
+                        <p className="sm:hidden text-[12px] text-mkt-muted mt-1">On {addonPlanNames(addon)}</p>
                       </td>
-                      <td className="p-3 align-top text-right whitespace-nowrap" data-testid={`text-addon-price-${k}`}>
-                        <span className="font-semibold">{formatUsd(addonPriceCents(addon, interval))}{intervalSuffix(interval)}</span>
-                        {addon.setupCents ? <span className="block text-xs text-muted-foreground">+ {formatUsd(addon.setupCents)} setup</span> : null}
+                      <td className="px-4 py-3.5 align-top text-right whitespace-nowrap" data-testid={`text-addon-price-${k}`}>
+                        <span className="font-semibold text-mkt-ink">{formatUsd(addonPriceCents(addon, interval))}{intervalSuffix(interval)}</span>
+                        {addon.setupCents ? <span className="block text-[12px] text-mkt-muted">+ {formatUsd(addon.setupCents)} setup</span> : null}
                       </td>
-                      <td className="hidden sm:table-cell p-3 align-top text-muted-foreground">{addonPlanNames(addon)}</td>
+                      <td className="hidden sm:table-cell px-4 py-3.5 align-top text-mkt-ink-soft">{addonPlanNames(addon)}</td>
                     </tr>
                   );
                 })}
@@ -612,8 +643,8 @@ export default function PricingPage() {
             </table>
           </div>
           {addonsEditable && (
-            <div className="flex justify-center">
-              <Button variant="outline" onClick={() => setLocation("/settings?tab=billing")} data-testid="button-manage-addons">
+            <div className="mt-6 flex justify-center">
+              <Button variant="outline" onClick={() => setLocation("/settings?tab=billing")} className="h-11 rounded-lg border-2 [border-color:var(--mkt-ink)] font-semibold" data-testid="button-manage-addons">
                 <Settings2 className="w-4 h-4 mr-2" /> Manage add-ons
               </Button>
             </div>
@@ -622,25 +653,29 @@ export default function PricingPage() {
 
         {/* #services is where every "Talk to a sales rep" link lands (SALES_HREF in
             shared/plan-copy.ts); #done-for-you is the older anchor the same section kept. */}
-        <section id="services" className="space-y-6 scroll-mt-16" aria-labelledby="dfy-heading">
-          <div id="done-for-you" className="text-center space-y-2 scroll-mt-16">
-            <Badge className="bg-[#F97316]/10 text-[#F97316] border-[#F97316]/20">
-              <Briefcase className="w-3.5 h-3.5 mr-1.5" /> Done for you
-            </Badge>
-            <h2 id="dfy-heading" className="text-2xl font-extrabold tracking-tight" data-testid="text-dfy-heading">Done-for-you services</h2>
-            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-              We quote these for your business. Tell a sales rep what you need and we'll scope it with you —
-              the only thing we can't do is take your licensing exams for you.
-            </p>
+        <section id="services" className="scroll-mt-16" aria-labelledby="dfy-heading">
+          <div id="done-for-you" className="scroll-mt-16">
+            <SectionHead
+              n="04"
+              kicker="Done for you"
+              lede={<>
+                We quote these for your business. Tell a sales rep what you need and we'll scope it with you —
+                the only thing we can't do is take your licensing exams for you.
+              </>}
+            >
+              <h2 id="dfy-heading" className={H2} data-testid="text-dfy-heading">Done-for-you <em className="text-mkt-orange-ink">services</em></h2>
+            </SectionHead>
             {/* The inquiry form for anyone sent here by a "Talk to a sales rep" link elsewhere on the site. */}
-            <TalkToSalesButton topic="Done-for-you services" className="mt-2 border-0 bg-[#F97316] hover:bg-[#ea6c10] text-white" data-testid="button-services-sales" />
+            <div className="mt-7 flex justify-center">
+              <TalkToSalesButton topic="Done-for-you services" className={`${ORANGE_BUTTON} h-12 px-6 text-base`} data-testid="button-services-sales" />
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {DFY_SERVICES.map((service) => (
-              <ServiceCard key={service.id} service={service} />
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {DFY_SERVICES.map((service, i) => (
+              <ServiceCard key={service.id} service={service} index={i} />
             ))}
           </div>
-          <p className="text-center text-xs text-muted-foreground max-w-2xl mx-auto">
+          <p className="mt-6 text-center text-[13px] text-mkt-muted max-w-2xl mx-auto">
             Google decides search rankings, so nobody can guarantee them. Your service agreement spells out exactly what we deliver.
           </p>
         </section>
@@ -689,57 +724,65 @@ export default function PricingPage() {
   );
 }
 
-function ServiceCard({ service }: { service: (typeof DFY_SERVICES)[number] }) {
+function ServiceCard({ service, index }: { service: (typeof DFY_SERVICES)[number]; index: number }) {
   const { toast } = useToast();
   const { addItem, isInCart } = useCart();
   const Icon = SERVICE_ICONS[service.id] ?? Briefcase;
   const salesOnly = isSalesOnlyService(service);
   const cartId = service.cartId ?? service.catalogIds[0];
   return (
-    <Card className="flex flex-col border-border/70 hover:border-[#F97316]/50 transition-colors" data-testid={`card-service-${service.id}`}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#F97316]/10 text-[#F97316] flex items-center justify-center shrink-0">
-            <Icon className="w-5 h-5" />
-          </div>
-          <CardTitle className="text-lg leading-snug">{service.title}</CardTitle>
+    <div className="group flex flex-col rounded-2xl border border-mkt-rule bg-mkt-card p-6 lg:p-7 hover:border-mkt-ink transition-colors" data-testid={`card-service-${service.id}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="h-10 w-10 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink group-hover:border-mkt-orange group-hover:text-mkt-orange-ink transition-colors shrink-0">
+          <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
         </div>
-        <p className="text-sm text-muted-foreground pt-2">{service.blurb}</p>
-      </CardHeader>
-      <CardContent className="flex flex-col flex-1 space-y-4">
-        {service.bullets.length > 0 && (
-          <ul className="space-y-2 flex-1">
-            {service.bullets.map((b) => (
-              <li key={b} className="flex items-start gap-2 text-sm">
-                <Check className="w-4 h-4 shrink-0 mt-0.5 text-green-500" />
-                <span>{b}</span>
-              </li>
-            ))}
-          </ul>
+        <span className="font-display italic text-mkt-muted text-lg leading-none" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
+      </div>
+      <h3 className="mt-4 font-display font-semibold text-[1.25rem] leading-tight text-mkt-ink">{service.title}</h3>
+      <p className="mt-2 text-[14.5px] text-mkt-ink-soft leading-relaxed">{service.blurb}</p>
+      {service.bullets.length > 0 && (
+        <ul className="mt-4 space-y-2 flex-1 border-t border-mkt-rule pt-4">
+          {service.bullets.map((b) => (
+            <li key={b} className="flex items-start gap-2.5 text-[14px] text-mkt-ink">
+              <Check className="w-4 h-4 shrink-0 mt-0.5 text-mkt-orange-ink" />
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-auto pt-5 space-y-2">
+        {salesOnly || !cartId ? (
+          <TalkToSalesButton topic={service.title} className={`w-full ${OUTLINE_BUTTON}`} variant="outline" data-testid={`button-sales-${service.id}`} />
+        ) : (
+          <>
+            <p className="font-display font-semibold text-[2rem] leading-none text-mkt-ink" data-testid={`text-service-price-${service.id}`}>{formatUsd(service.priceCents!)}</p>
+            <Button
+              className={`w-full ${isInCart(cartId) ? ORANGE_BUTTON : OUTLINE_BUTTON}`}
+              variant={isInCart(cartId) ? "default" : "outline"}
+              disabled={isInCart(cartId)}
+              onClick={() => {
+                if (addItem({ id: cartId, type: "dfy_service", name: service.title, price: service.priceCents!, description: service.blurb })) {
+                  toast({ title: "Added to cart", description: `${service.title} has been added to your cart.` });
+                }
+              }}
+              data-testid={`button-add-cart-${service.id}`}
+            >
+              {isInCart(cartId) ? "In cart" : "Add to cart"}
+            </Button>
+          </>
         )}
-        <div className="mt-auto space-y-2">
-          {salesOnly || !cartId ? (
-            <TalkToSalesButton topic={service.title} className="w-full" variant="outline" data-testid={`button-sales-${service.id}`} />
-          ) : (
-            <>
-              <p className="text-2xl font-extrabold" data-testid={`text-service-price-${service.id}`}>{formatUsd(service.priceCents!)}</p>
-              <Button
-                className="w-full"
-                variant={isInCart(cartId) ? "default" : "outline"}
-                disabled={isInCart(cartId)}
-                onClick={() => {
-                  if (addItem({ id: cartId, type: "dfy_service", name: service.title, price: service.priceCents!, description: service.blurb })) {
-                    toast({ title: "Added to cart", description: `${service.title} has been added to your cart.` });
-                  }
-                }}
-                data-testid={`button-add-cart-${service.id}`}
-              >
-                {isInCart(cartId) ? "In cart" : "Add to cart"}
-              </Button>
-            </>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  );
+}
+
+/** A section's kicker, heading and lede, centred — the feature pages' band head. */
+function SectionHead({ n, kicker, lede, children }: { n: string; kicker: string; lede: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="text-center max-w-3xl mx-auto">
+      <Kicker n={n} className="justify-center">{kicker}</Kicker>
+      {children}
+      <p className={`mt-5 ${LEAD} max-w-2xl mx-auto`}>{lede}</p>
+    </div>
   );
 }
