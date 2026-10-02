@@ -215,13 +215,13 @@ export default function LsaGuidePage() {
               <BadgeCheck className="h-4 w-4 text-[#34A853]" />
               <span className="text-sm text-[#34A853] font-medium">Google Verified (Local Services Ads)</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-lsa-title">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-lsa-title">
               Local Services Ads:
               <br />
               <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#4285F4] bg-clip-text text-transparent animate-gradient-text">
                 The Complete LSA Setup & Optimization Playbook
               </span>
-            </h2>
+            </h1>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl mx-auto animate-in-delay-2">
               LSA puts your business at the very top of Google — above regular ads and organic results. You only pay when a real customer contacts you. No clicks, no impressions — just leads. This guide covers every trick to staying on top.
             </p>

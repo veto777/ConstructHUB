@@ -17,7 +17,8 @@ import { featurePriceSummary } from "@shared/feature-pages/pricing";
 import { FEATURE_ICONS } from "@shared/feature-pages/types";
 import { ADDONS, PLANS, PLAN_KEYS, SALES_THRESHOLD_CENTS, showsPrice } from "@shared/plans";
 import { SALES_REP_LABEL, formatUsd } from "@shared/plan-copy";
-import { ROUTE_META } from "@shared/route-meta";
+import { APP_PAGE_META, HOME_META, ROUTE_META } from "@shared/route-meta";
+import { isKnownPath } from "@shared/app-routes";
 import {
   MARKETING_ROUTES, SITE_ORIGIN, breadcrumbJsonLd, canonicalPath, faqPageJsonLd, jsonLdForPath, offerJsonLd, routeSourceFile,
   seoHeadFor, serializeJsonLd, type JsonLd,
@@ -41,6 +42,32 @@ const node = (graph: JsonLd[], type: string) => graph.find((n) => n["@type"] ===
 /** Every "$1,234"-style amount in a text, in cents. */
 const dollarAmounts = (text: string) => [...text.matchAll(/\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g)].map((m) => Math.round(Number(m[1].replace(/,/g, "")) * 100));
 
+describe("the server's list of the app's paths (shared/app-routes.ts)", () => {
+  it("covers every route App.tsx declares, so none of them answers 404", () => {
+    const sample = (r: string) => r.replace(/:[^/]+/g, "Sample1");
+    // /features/:slug and /done-for-you/:slug answer only the slugs in their catalogues (checked below).
+    const routes = [...APP_ROUTES, "/free-site-scan", "/site-scan/report/abc"].filter((r) => !/^\/(features|done-for-you)\/:slug$/.test(r));
+    for (const r of routes) expect(isKnownPath(sample(r)), r).toBe(true);
+    for (const e of [...FEATURE_PAGES.map(featurePagePath), ...DFY_PAGES.map(dfyPagePath), "/features/call-assistant"]) {
+      expect(isKnownPath(e), e).toBe(true);
+    }
+    for (const p of ["/nonexistent-xyz", "/features/nope", "/done-for-you/nope", "/FEATURES"]) expect(isKnownPath(p), p).toBe(false);
+  });
+
+  it("the public app pages marketing pages link to have their own title and description", () => {
+    for (const [p, meta] of Object.entries(APP_PAGE_META)) {
+      expect(isKnownPath(p), p).toBe(true);
+      expect(MARKETING_ROUTES, p).not.toContain(p);
+      expect(meta.title, p).toMatch(/ \| ConstructHUB$/);
+      expect(meta.title.length, p).toBeLessThanOrEqual(60);
+      expect(meta.description.length, p).toBeGreaterThan(50);
+      expect(meta.description.length, p).toBeLessThanOrEqual(155);
+      expect(meta.title, p).not.toBe(HOME_META.title);
+    }
+    expect(PUBLIC_ROUTES).not.toContain("/auth");
+  });
+});
+
 describe("marketing routes: prerendered, in the sitemap, with their own head", () => {
   it("every prerendered route is in the sitemap and has its own title and description", () => {
     const sitemap = buildSitemap();
@@ -51,7 +78,7 @@ describe("marketing routes: prerendered, in the sitemap, with their own head", (
       expect(ROUTE_META[route], route).toBeDefined();
       expect(ROUTE_META[route].title, route).toMatch(/ConstructHUB/);
       expect(ROUTE_META[route].description.length, route).toBeGreaterThan(50);
-      expect(ROUTE_META[route].description.length, route).toBeLessThanOrEqual(220);
+      expect(ROUTE_META[route].description.length, route).toBeLessThanOrEqual(155);
       expect(canonicalPath(route), route).toBe(route);
     }
     // The pages the owner named, and every written feature and service page.
@@ -138,7 +165,7 @@ describe("done-for-you registry", () => {
       expect(page.audience.length, page.key).toBeGreaterThanOrEqual(2);
       expect(page.audience.length, page.key).toBeLessThanOrEqual(4);
       expect(page.seo.title, page.key).toMatch(/\| ConstructHUB$/);
-      expect(page.seo.description.length, page.key).toBeLessThanOrEqual(200);
+      expect(page.seo.description.length, page.key).toBeLessThanOrEqual(155);
       expect(page.blurb.length, page.key).toBeLessThanOrEqual(60);
       expect(FEATURE_ICONS).toContain(page.icon);
       for (const card of page.cards) expect(FEATURE_ICONS).toContain(card.icon);
@@ -380,6 +407,27 @@ describe("the prerendered pages on the server", () => {
     const notBuilt = await (await get("/pricing")).text();
     expect(notBuilt).not.toContain("data-prerendered");
     expect(notBuilt).toContain(`<title>${ROUTE_META["/pricing"].title.replace(/&/g, "&amp;")}</title>`);
+  });
+
+  it("answers an unknown URL with an honest 404 (noindex, no canonical), and a wrong-case marketing URL with a 301", async () => {
+    for (const p of ["/nonexistent-xyz", "/features/no-such-feature", "/done-for-you/nope", "/assets/gone.js"]) {
+      const res = await get(p);
+      expect(res.status, p).toBe(404);
+      const html = await res.text();
+      expect(html, p).toContain('<meta name="robots" content="noindex" />');
+      expect(html, p).not.toContain('rel="canonical"');
+      expect(html, p).not.toContain("data-prerendered");
+    }
+    const moved = await fetch(`${base}/FEATURES/Site-Scan?x=1`, { redirect: "manual" });
+    expect(moved.status).toBe(301);
+    expect(moved.headers.get("location")).toBe("/features/site-scan?x=1");
+    // The app's own pages still answer 200, with their own title where they have one.
+    for (const p of ["/search", "/auth", "/free-site-scan", "/google-ads-guide/campaign-setup", "/review/AbC123", "/features/call-assistant"]) {
+      expect((await get(p)).status, p).toBe(200);
+    }
+    const auth = await (await get("/auth")).text();
+    expect(auth).toContain(`<title>${APP_PAGE_META["/auth"].title}</title>`);
+    expect(auth).not.toContain(HOME_META.title);
   });
 
   it("never serves the snapshot files at their own URL, nor to the CRM host", async () => {

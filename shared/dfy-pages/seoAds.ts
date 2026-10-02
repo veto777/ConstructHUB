@@ -100,7 +100,7 @@ const page: DfyPage = {
   ],
   pricing: {
     kind: "sales",
-    topic: "SEO and ad campaigns",
+    topic: "Your SEO and ad campaign work",
     note: "It runs on a 6-month agreement; a rep scopes it and quotes it before you commit.",
   },
   faqs: [
@@ -110,7 +110,7 @@ const page: DfyPage = {
     },
     {
       q: "How long is the commitment?",
-      a: "It runs on a 6-month agreement that you sign before you pay. Ending it early carries an early termination penalty, set out in your agreement and our Terms of Use, so the rep goes through the scope with you first.",
+      a: "It runs on a 6-month agreement that you sign before you pay. Ending it early carries an early termination penalty, set out in the agreement you sign before paying, so the rep goes through the scope with you first.",
     },
     {
       q: "Can you promise first-page rankings or a number of leads?",
@@ -132,7 +132,7 @@ const page: DfyPage = {
     paragraphs: [
       "There are two ways to show up when someone nearby searches for your trade: the free results, which local SEO " +
         "works on, and the paid spots, which Google Ads and Local Services Ads buy. SEO & Ad Campaigns is our team " +
-        "setting up both and working on them for the length of a 6-month agreement.",
+        "setting up both and working on them under an agreement with a 6-month minimum term.",
       "Local SEO starts with a plan for your trades and the areas you serve, and then the work to carry it out. Part of " +
         "that is citation building: getting your business listed on directory sites with the same name, address and " +
         "phone each time. Schema markup is structured data added to your site's code that tells search engines your " +
@@ -146,8 +146,9 @@ const page: DfyPage = {
         "Google Search; Analytics shows the visits it gets. With both set up, you can see what the work is doing " +
         "instead of taking anyone's word for it. If you'd like to watch your ads yourself, ConstructHUB's Click Guard " +
         "flags suspicious ad clicks and LSA Leads lists your Local Services leads, as software you run.",
-      "It is quoted by a sales rep, and the request is free and needs no account. The agreement runs for 6 months and " +
-        "is signed before you pay; ending it early carries a penalty set out in the agreement and our Terms of Use. " +
+      "It is quoted by a sales rep, and the request is free and needs no account. The agreement has a 6-month minimum " +
+        "term, is signed before you pay, and then renews month to month unless either side gives 30 days' written " +
+        "notice; ending it early carries a penalty set out in the agreement you sign before paying. " +
         "Google decides rankings and which ads show, so nobody can promise first-page results or a number of leads.",
     ],
   },

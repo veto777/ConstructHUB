@@ -9,6 +9,7 @@ import {
   requestHost,
 } from "./site-context";
 import { MARKETING_ROUTES, canonicalPath } from "@shared/seo";
+import { isKnownPath, marketingRouteForCase } from "@shared/app-routes";
 import { withRouteMeta, withSeoHead } from "./seo-html";
 
 export { withRouteMeta, withSeoHead };
@@ -17,12 +18,12 @@ const CANONICAL_HOST = PRIMARY_DOMAIN;
 const BASE = `https://${CANONICAL_HOST}`;
 
 // Public, indexable routes: every marketing page (shared/seo.ts — the same
-// list the build prerenders), plus the sign-in page. App/dashboard routes are
-// deliberately excluded — they render behind auth and shouldn't be indexed.
+// list the build prerenders). The sign-in page is left out (it has nothing to
+// rank for) and so are app/dashboard routes — they render behind auth.
 // Feature and service pages join once written: a stub (status "stub") is not
 // listed. The retired one-off landing pages (/google-ads-landing, …) only
 // redirect to their /features page, so they are not listed.
-export const PUBLIC_ROUTES: readonly string[] = [...MARKETING_ROUTES, "/auth"];
+export const PUBLIC_ROUTES: readonly string[] = [...MARKETING_ROUTES];
 
 /** Where the build writes the prerendered pages (script/prerender.ts), under dist/public. */
 export const PRERENDER_DIR = "prerender";
@@ -168,10 +169,26 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
       return res.type("html").send(html);
     }
     const pagePath = canonicalPath(req.originalUrl);
+    // A marketing page in the wrong case ("/FEATURES/GBP") moves to its one URL.
+    const cased = marketingRouteForCase(pagePath);
+    if (cased) {
+      const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+      return res.redirect(301, `${cased}${query}`);
+    }
     // The HTML depends on the session cookie (snapshot signed out, shell signed in).
     res.setHeader("Vary", "Cookie");
     const snapshot = prerendered.get(pagePath);
     if (snapshot && !isSignedIn(req)) return res.type("html").send(snapshot);
+    // A URL the app doesn't answer is an honest 404 (the app shows its Not Found
+    // page), never a 200 that reads as the home page to a search engine.
+    if (!isKnownPath(pagePath)) {
+      // No canonical: a page that doesn't exist names no URL as its original.
+      const html = indexHtml.replace(
+        /<\/title>/i,
+        () => `</title>\n    <meta name="robots" content="noindex" />`,
+      );
+      return res.status(404).type("html").send(html);
+    }
     res.type("html").send(withSeoHead(indexHtml, pagePath, { origin: BASE }));
   });
 }

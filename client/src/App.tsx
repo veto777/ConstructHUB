@@ -6,7 +6,7 @@ import SocialMediaPage from "@/pages/social-media";
 import GuidesPage from "@/pages/guides";
 import SiteScanPage, { FreeSiteScanPage, SharedSiteScanPage } from "@/pages/site-scan";
 import { Switch, Route, useLocation, Link } from "wouter";
-import { useEffect, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -53,37 +53,9 @@ import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
 import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
-import AdminFeaturePagesPage from "@/pages/admin-feature-pages";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
-import CrmTeamPage from "@/pages/crm-team";
-import CrmJoinPage from "@/pages/crm-join";
-import CrmHomePage from "@/pages/crm-home";
-import CrmSchedulePage from "@/pages/crm-schedule";
-import CrmInboxPage from "@/pages/crm-inbox";
-import CrmCallAssistantPage from "@/pages/crm-call-assistant";
-import CrmClientsPage from "@/pages/crm-clients";
-import CrmClientPage from "@/pages/crm-client";
-import CrmPaymentsPage from "@/pages/crm-payments";
-import CrmEstimatesPage from "@/pages/crm-estimates";
-import CrmEstimateNewPage from "@/pages/crm-estimate-new";
-import CrmEstimateDetailPage from "@/pages/crm-estimate-detail";
-import CrmInvoicesPage from "@/pages/crm-invoices";
-import CrmPipelinePage from "@/pages/crm-pipeline";
-import CrmPriceBookPage from "@/pages/crm-pricebook";
-import CrmProjectPage from "@/pages/crm-project";
-import CrmSettingsPage from "@/pages/crm-settings";
-import CrmIntegrationsPage from "@/pages/crm-integrations";
-import CrmReportsPage from "@/pages/crm-reports";
-import CrmMigratePage from "@/pages/crm-migrate";
-import CrmAdminPage from "@/pages/crm-admin";
 import { CrmLogo } from "@/components/crm-logo";
-import PublicEstimatePage from "@/pages/public-estimate";
-import PublicPortalPage from "@/pages/public-portal";
-import PublicInvoicePage from "@/pages/public-invoice";
-import PublicChangeOrderPage from "@/pages/public-change-order";
-import PublicLeadFormPage from "@/pages/public-lead-form";
-import ClientPortalPage from "@/pages/client-portal";
 import { isPortal, isClientPortal, CRM_NAME } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
 import CrmGatewayPage from "@/pages/crm-gateway";
@@ -103,7 +75,38 @@ import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
 import { useSeoHead } from "@/lib/seo-head";
-import { ROUTE_META } from "@shared/route-meta";
+import { pageMetaFor } from "@shared/route-meta";
+
+// Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
+// on demand, so the marketing pages (and every signed-out visitor) don't download them.
+const AdminFeaturePagesPage = lazy(() => import("@/pages/admin-feature-pages"));
+const CrmTeamPage = lazy(() => import("@/pages/crm-team"));
+const CrmJoinPage = lazy(() => import("@/pages/crm-join"));
+const CrmHomePage = lazy(() => import("@/pages/crm-home"));
+const CrmSchedulePage = lazy(() => import("@/pages/crm-schedule"));
+const CrmInboxPage = lazy(() => import("@/pages/crm-inbox"));
+const CrmCallAssistantPage = lazy(() => import("@/pages/crm-call-assistant"));
+const CrmClientsPage = lazy(() => import("@/pages/crm-clients"));
+const CrmClientPage = lazy(() => import("@/pages/crm-client"));
+const CrmPaymentsPage = lazy(() => import("@/pages/crm-payments"));
+const CrmEstimatesPage = lazy(() => import("@/pages/crm-estimates"));
+const CrmEstimateNewPage = lazy(() => import("@/pages/crm-estimate-new"));
+const CrmEstimateDetailPage = lazy(() => import("@/pages/crm-estimate-detail"));
+const CrmInvoicesPage = lazy(() => import("@/pages/crm-invoices"));
+const CrmPipelinePage = lazy(() => import("@/pages/crm-pipeline"));
+const CrmPriceBookPage = lazy(() => import("@/pages/crm-pricebook"));
+const CrmProjectPage = lazy(() => import("@/pages/crm-project"));
+const CrmSettingsPage = lazy(() => import("@/pages/crm-settings"));
+const CrmIntegrationsPage = lazy(() => import("@/pages/crm-integrations"));
+const CrmReportsPage = lazy(() => import("@/pages/crm-reports"));
+const CrmMigratePage = lazy(() => import("@/pages/crm-migrate"));
+const CrmAdminPage = lazy(() => import("@/pages/crm-admin"));
+const PublicEstimatePage = lazy(() => import("@/pages/public-estimate"));
+const PublicPortalPage = lazy(() => import("@/pages/public-portal"));
+const PublicInvoicePage = lazy(() => import("@/pages/public-invoice"));
+const PublicChangeOrderPage = lazy(() => import("@/pages/public-change-order"));
+const PublicLeadFormPage = lazy(() => import("@/pages/public-lead-form"));
+const ClientPortalPage = lazy(() => import("@/pages/client-portal"));
 
 /**
  * The old one-off landing pages, retired into /features/<slug>: the old URLs
@@ -145,6 +148,7 @@ function SettingsApiRedirect() {
 
 function DashboardRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/search" component={SearchPage} />
@@ -221,6 +225,7 @@ function DashboardRouter() {
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 
@@ -362,6 +367,7 @@ const sidebarStyle = {
 /** The portal (portal.constructhub.*) is the CRM only — no marketing routes. */
 function PortalRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       <Route path="/" component={CrmHomePage} />
       <Route path="/crm" component={CrmHomePage} />
@@ -405,12 +411,14 @@ function PortalRouter() {
       {/* Unknown portal route -> home, which always offers the next action. */}
       <Route component={CrmHomePage} />
     </Switch>
+    </Suspense>
   );
 }
 
 /** Signed-out portal visitors get the login screen, not the marketing landing page. */
 function PortalPublicRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       {/* Client-facing links are token-authorised and must never demand a login. */}
       <Route path="/crm-terms" component={CrmTermsPage} />
@@ -424,6 +432,7 @@ function PortalPublicRouter() {
       <Route path="/auth" component={AuthPage} />
       <Route component={AuthPage} />
     </Switch>
+    </Suspense>
   );
 }
 
@@ -435,6 +444,7 @@ function PortalPublicRouter() {
  */
 function ClientRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       <Route path="/" component={ClientPortalPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
@@ -446,6 +456,7 @@ function ClientRouter() {
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={ClientPortalPage} />
     </Switch>
+    </Suspense>
   );
 }
 
@@ -478,8 +489,8 @@ function AppContent() {
   // effects, so self-titled pages are skipped rather than overwritten).
   useEffect(() => {
     if (portal || clientPortal || isSelfTitled(location)) return;
-    // A marketing page's title is the one the server wrote into its HTML (shared/route-meta.ts).
-    const meta = ROUTE_META[location];
+    // A marketing or public app page's title is the one the server wrote into its HTML (shared/route-meta.ts).
+    const meta = pageMetaFor(location);
     if (meta) { document.title = meta.title; return; }
     const key = Object.keys(PAGE_TITLES).find(p => location === p || location.startsWith(`${p}/`));
     document.title = key ? `${PAGE_TITLES[key]} | ConstructHUB` : DEFAULT_TITLE;
@@ -681,7 +692,10 @@ function App() {
         <CartProvider>
           <TooltipProvider>
             <CookieConsent />
-            <AppContent />
+            {/* The lazily loaded pages outside a router (a document link, the client portal) wait here. */}
+            <Suspense fallback={null}>
+              <AppContent />
+            </Suspense>
             <Toaster />
           </TooltipProvider>
         </CartProvider>

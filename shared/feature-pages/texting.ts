@@ -155,8 +155,8 @@ const page: FeaturePage = {
         "SignalWire account, whose token is stored encrypted. The CRM never sends a client text from the shared number. " +
         "If your own account's details are incomplete, texts fall back to the shared number, which only texts your team.",
       "Texts are counted in segments, the unit carriers bill. A plain text fits 160 characters in one segment and 153 " +
-        "in each segment after that. A single emoji, curly quote or accented capital letter switches the whole text to a " +
-        "different encoding: 70 characters in one segment and 67 in each one after. Every text your CRM sends is counted " +
+        "in each segment after that. A single emoji, a curly quote or most accented capital letters switch the whole text " +
+        "to a different encoding: 70 characters in one segment and 67 in each one after. Every text your CRM sends is counted " +
         "against your plan's monthly allowance before it goes out. A text the carrier refuses gives its segments back, " +
         "and once the month's allowance is spent, texts are skipped until the 1st instead of running up charges.",
       "Opt-outs are handled the way carriers require. A reply of STOP, UNSUBSCRIBE, CANCEL, END or QUIT opts that phone " +

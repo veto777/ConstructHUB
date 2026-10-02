@@ -32,7 +32,7 @@ const page: DfyPage = {
   headline: { lead: "Your Contracting Business, Built ", swipe: "Start to Finish" },
   lede:
     "Formation and licensing, your Google Business Profile and website, and SEO and ad campaigns in one engagement, " +
-    "paid upfront and done in 4–6 months from start to finish. The licensing exams stay with you.",
+    "paid upfront and planned for 4–6 months from start to finish. The licensing exams stay with you.",
   hero: { mascot: "standing", bubble: "Bring the skills. We'll build the business around them." },
   catalogIds: ["dfy_bundle"],
   icon: "hard-hat",
@@ -51,8 +51,8 @@ const page: DfyPage = {
       body: "Your company and license paperwork, your Business Profile and website, then your SEO and ad campaigns.",
     },
     {
-      title: "Ready to take jobs",
-      body: "Start to finish takes 4–6 months. The licensing exams are the one part we can't do for you.",
+      title: "Handover",
+      body: "The build is planned for 4–6 months; the state's processing, Google's verification and your licensing exams can move that.",
     },
   ],
   cards: [
@@ -109,7 +109,7 @@ const page: DfyPage = {
     },
     {
       q: "How long does it take?",
-      a: "4–6 months from start to finish. The rep goes through the timeline with you when scoping the build; your licensing exams aren't part of it.",
+      a: "It's planned for 4–6 months from start to finish, and other parties' steps can move that. The rep goes through the timeline with you when scoping the build; your licensing exams aren't part of it.",
     },
     {
       q: "How is it paid?",
@@ -141,7 +141,7 @@ const page: DfyPage = {
       "The order also fits what Google asks for. Before Local Services Ads go live, Google wants proof of insurance, " +
         "background checks, a linked Business Profile and your trade licenses. So the paperwork and the profile are in " +
         "place before the ads are switched on.",
-      "From start to finish the build takes 4–6 months. Some steps run on other people's clocks: the state processes " +
+      "From start to finish the build is planned for 4–6 months. Some steps run on other people's clocks: the state processes " +
         "your license application, Google verifies your profile, and the licensing exams, prerequisites and required " +
         "testing are yours to complete, since nobody can take them for you. License rules differ by state, and some " +
         "states have no state general contractor license at all, so the rep scopes the build for where you work.",
@@ -152,14 +152,14 @@ const page: DfyPage = {
   },
   related: ["formation", "gmbWebsite", "seoAds"],
   headings: {
-    steps: { title: "From Request to Ready in ", em: "Four Steps" },
+    steps: { title: "From Request to Handover in ", em: "Four Steps" },
     cards: { title: "Everything in ", em: "One Build" },
     faq: { title: "Before You ", em: "Send a Request" },
   },
   seo: {
     title: "Start a Contracting Business, Done for You | ConstructHUB",
     description:
-      "Your LLC and license paperwork, Google Business Profile, website, SEO and ads in one engagement, paid upfront, done in 4–6 months. Quoted by a sales rep.",
+      "Your LLC and license paperwork, Business Profile, website, SEO and ads in one engagement, paid upfront, planned for 4–6 months. Quoted by a sales rep.",
   },
   sources: [
     "shared/cart-bundles.ts",

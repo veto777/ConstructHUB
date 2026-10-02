@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { DFY_CATALOGUE, DFY_PAGES, dfyPagePath } from "../shared/dfy-pages";
+import { DFY_CATALOGUE, DFY_PAGES, DFY_PATH, dfyPagePath } from "../shared/dfy-pages";
+import { FEATURES_PATH, FEATURE_CATALOGUE } from "../shared/feature-pages";
 import { MARKETING_ROUTES } from "../shared/seo";
 import { SALES_REP_LABEL } from "../shared/plan-copy";
 
@@ -17,6 +18,9 @@ import { SALES_REP_LABEL } from "../shared/plan-copy";
  *   FP_SIGNED_OUT_URL=http://127.0.0.1:8411 FP_SCREENSHOT_DIR=… \
  *     npx playwright test -c playwright.feature-pages.config.ts marketing-seo
  */
+
+/** The menu's links: both hubs, every service, every feature that isn't behind a feature flag. */
+const MENU_HREFS = [FEATURES_PATH, DFY_PATH, ...DFY_CATALOGUE.map((e) => e.path), ...FEATURE_CATALOGUE.filter((e) => !e.flag).map((e) => e.path)];
 
 const SIGNED_OUT = process.env.FP_SIGNED_OUT_URL || `http://127.0.0.1:${process.env.E2E_PORT ?? "8291"}`;
 const SHOTS = process.env.FP_SCREENSHOT_DIR;
@@ -162,6 +166,21 @@ test.describe("the ribbon, 1440px", () => {
       await expect(bar.getByTestId("nav-dropdown-features"), route).toBeVisible();
       await expect(bar.getByTestId("nav-dropdown-dfy"), route).toBeVisible();
       for (const id of ["plans", "stats", "coverage"]) await expect(bar.getByTestId(`link-nav-${id}`), route).toBeVisible();
+      // Every dropdown link is in the page while the dropdowns are shut (what a search engine reads), never shown.
+      const directory = page.getByTestId("nav-directory");
+      await expect(directory, route).toBeHidden();
+      const hrefs = await directory.locator("a").evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+      expect(hrefs, route).toEqual(expect.arrayContaining(MENU_HREFS));
+    }
+  });
+
+  test("the prerendered HTML carries every dropdown link (production server only)", async ({ page }) => {
+    for (const route of MARKETING_ROUTES) {
+      const html = await (await page.request.get(`${SIGNED_OUT}${route}`)).text();
+      if (!html.includes("data-prerendered=")) continue; // the dev server sends the shell
+      for (const href of MENU_HREFS) {
+        expect(html, `${route} → ${href}`).toContain(`href="${href}"`);
+      }
     }
   });
 
@@ -259,6 +278,35 @@ test.describe("the ribbon, 390px", () => {
       await expect(page.getByTestId("button-landing-menu"), route).toBeVisible();
       expect(await overflow(page), route).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+test.describe("the ribbon on tablets", () => {
+  for (const width of [768, 820, 900, 1023]) {
+    test(`${width}px: the slide-over menu, an unsqueezed logo, a one-line bar`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1024 });
+      for (const route of ["/", "/features/permits", "/done-for-you"]) {
+        await open(page, `${SIGNED_OUT}${route}`);
+        await expect(page.getByTestId("site-nav-links"), route).toBeHidden();
+        await expect(page.getByTestId("button-landing-menu"), route).toBeVisible();
+        const logo = await page.getByTestId("link-public-home").boundingBox();
+        expect(logo!.x, route).toBeGreaterThanOrEqual(0);
+        expect(logo!.width, route).toBeGreaterThan(120);
+        const bar = await page.getByTestId("link-nav-getstarted").boundingBox();
+        expect(bar!.height, route).toBeLessThanOrEqual(40);
+        expect(await overflow(page), route).toBeLessThanOrEqual(1);
+      }
+    });
+  }
+
+  test("1024px: the dropdowns are in the bar, each label on one line", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await open(page, `${SIGNED_OUT}/`);
+    for (const id of ["nav-dropdown-features", "nav-dropdown-dfy"]) {
+      const box = await page.getByTestId(id).boundingBox();
+      expect(box!.height, id).toBeLessThanOrEqual(36);
+    }
+    expect((await page.getByTestId("link-public-home").boundingBox())!.width).toBeGreaterThan(120);
   });
 });
 

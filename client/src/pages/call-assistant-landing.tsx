@@ -122,7 +122,8 @@ const IN_DEPTH: string[] = [
   "When the call ends, a real lead becomes a client in your CRM with Call Assistant as the lead source, or is " +
     "added to the client who already has that phone number, and the call log keeps the summary, transcript and " +
     "recording. If a caller hangs up before the details were submitted but had given a callback number and said " +
-    "what they need, the lead is still filed from the transcript, so a dropped call doesn't mean a lost job.",
+    "what they need, the assistant files the lead from the transcript, or alerts your office to call back, so a " +
+    "dropped call isn't simply lost.",
 ];
 
 function faqs(): { q: string; a: string }[] {
@@ -538,7 +539,7 @@ export default function CallAssistantLandingPage() {
           <div className="max-w-3xl mx-auto">
             <Kicker n="07">In Depth</Kicker>
             <h2 className={H2}>An AI Answering Service for <em className="text-mkt-orange-ink">Contractors</em></h2>
-            <div className="mt-8 space-y-5 text-[16.5px] text-mkt-ink-soft leading-[1.75]" data-testid="text-ca-in-depth">
+            <div className="mt-8 space-y-5 text-[16.5px] text-mkt-ink-soft leading-[1.75] [&>p]:max-w-[35rem]" data-testid="text-ca-in-depth">
               {IN_DEPTH.map((para) => <p key={para}>{para}</p>)}
             </div>
           </div>

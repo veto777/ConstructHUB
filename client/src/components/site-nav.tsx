@@ -14,10 +14,14 @@
  *   Plans · Results · Coverage   sections of the home page; on the home page
  *                   they jump, elsewhere they go to "/#section".
  *
- * Desktop uses one Radix navigation menu for both dropdowns (hover or click,
- * arrow keys between them, Escape); phones get the same links, with the
- * features and the services as fold-out groups, in the slide-over menu
- * (SiteMobileMenu).
+ * Desktop (1024px and up) uses one Radix navigation menu for both dropdowns
+ * (hover or click, arrow keys between them, Escape); phones and tablets get the
+ * same links, with the features and the services as fold-out groups, in the
+ * slide-over menu (SiteMobileMenu).
+ *
+ * Radix mounts a dropdown's panel only while it is open, so the bar also
+ * carries every dropdown link as a plain, never-shown list (NavDirectory): the
+ * HTML a search engine reads, prerendered or booted, holds the whole menu.
  */
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -130,7 +134,7 @@ function ServiceItem({ entry }: { entry: DfyCatalogueEntry }) {
   );
 }
 
-const TRIGGER = "group inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-white/75 hover:text-white data-[state=open]:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange transition-colors";
+const TRIGGER = "group inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-white/75 hover:text-white data-[state=open]:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange transition-colors";
 const CHEVRON = "h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180";
 const ALL_BUTTON = "inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-mkt-orange px-4 h-9 text-sm font-semibold text-white hover:bg-mkt-orange-hover transition-colors";
 
@@ -142,7 +146,7 @@ const ALL_BUTTON = "inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-mkt-
 function SiteDropdowns() {
   return (
     <NavigationMenuPrimitive.Root className="static" delayDuration={80}>
-      <NavigationMenuPrimitive.List className="flex items-center gap-1 lg:gap-3">
+      <NavigationMenuPrimitive.List className="flex items-center gap-3">
         <NavigationMenuPrimitive.Item value="features">
           <NavigationMenuPrimitive.Trigger className={TRIGGER} data-testid="nav-dropdown-features">
             Features
@@ -200,7 +204,36 @@ function SiteDropdowns() {
   );
 }
 
-/** Phones: the same bar in a slide-over, the features and the services as fold-out groups. */
+/**
+ * Every link in the two dropdowns, as plain links that are never shown (display:
+ * none, so not focusable and not read out twice): the dropdown panels exist only
+ * while open, and this keeps the menu's links in every page's HTML for search
+ * engines. The same entries, from the same catalogues, as the panels.
+ */
+function NavDirectory() {
+  return (
+    <div className="hidden" data-testid="nav-directory">
+      <ul>
+        <li><a href={FEATURES_PATH}>Features</a>
+          <ul>
+            {NAV_FEATURE_GROUPS.flatMap((g) => g.entries).map((e) => (
+              <li key={e.key}><a href={e.path} data-testid={`nav-directory-item-${lastSegment(e.path)}`}>{e.title}</a></li>
+            ))}
+          </ul>
+        </li>
+        <li><a href={DFY_PATH}>Done-For-You</a>
+          <ul>
+            {DFY_CATALOGUE.map((e) => (
+              <li key={e.key}><a href={e.path} data-testid={`nav-directory-item-dfy-${lastSegment(e.path)}`}>{e.title}</a></li>
+            ))}
+          </ul>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+/** Phones and tablets: the same bar in a slide-over, the features and the services as fold-out groups. */
 function SiteMobileMenu({ signedIn, signInHref }: { signedIn: boolean; signInHref: string }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -210,7 +243,7 @@ function SiteMobileMenu({ signedIn, signInHref }: { signedIn: boolean; signInHre
       <SheetTrigger asChild>
         <button
           type="button"
-          className="md:hidden inline-flex items-center justify-center rounded-md h-9 w-9 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+          className="lg:hidden inline-flex items-center justify-center rounded-md h-9 w-9 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
           aria-label="Open menu"
           data-testid="button-landing-menu"
         >
@@ -287,18 +320,19 @@ function SiteMobileMenu({ signedIn, signInHref }: { signedIn: boolean; signInHre
  */
 export function SiteNavBar({ signedIn, next = "/", cart = true }: { signedIn: boolean; next?: string; cart?: boolean }) {
   const signInHref = next && next !== "/" ? `/auth?next=${encodeURIComponent(next)}` : "/auth";
-  const link = "rounded-md px-2 py-1.5 text-white/75 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange transition-colors";
+  const link = "whitespace-nowrap rounded-md px-2 py-1.5 text-white/75 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange transition-colors";
   return (
     <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
-      <Link href="/" onClick={toTop} aria-label="ConstructHUB home" data-testid="link-public-home">
+      <Link href="/" onClick={toTop} aria-label="ConstructHUB home" className="shrink-0" data-testid="link-public-home">
         <CHLogo height={38} />
       </Link>
-      <div className="hidden md:flex items-center gap-1 lg:gap-3 text-[14px] lg:text-[15px] font-medium" data-testid="site-nav-links">
+      <div className="hidden lg:flex items-center gap-3 text-[15px] font-medium" data-testid="site-nav-links">
         <SiteDropdowns />
         {SECTIONS.map((s) => (
           <SectionLink key={s.id} id={s.id} label={s.label} className={link} testid={`link-nav-${s.id}`} />
         ))}
       </div>
+      <NavDirectory />
       <div className="flex items-center gap-1 lg:gap-3">
         {cart && <div className="text-white"><CartSheet /></div>}
         <div className="text-white hidden sm:block"><ThemeToggle /></div>

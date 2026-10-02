@@ -31,6 +31,7 @@ import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUs
 import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
 import { callAssistantPricing } from "@shared/plan-copy";
 import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
+import { FooterGuides } from "@/components/public-page-chrome";
 import { DFY_PATH, dfyPageByKey, dfyPagePath } from "@shared/dfy-pages";
 
 
@@ -477,7 +478,7 @@ export default function LandingPage() {
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
-              Every plan starts with a {TRIAL_LABEL} and includes the CRM. Pay monthly, or yearly at 10 times the monthly price.
+              A new account's first plan starts with a {TRIAL_LABEL}, and every plan includes the CRM. Pay monthly, or yearly at 10 times the monthly price.
             </p>
           </div>
 
@@ -571,6 +572,8 @@ export default function LandingPage() {
               <span aria-hidden className="opacity-40">·</span>
               <Link href="/features" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-features">Features</Link>
               <span aria-hidden className="opacity-40">·</span>
+              <Link href="/done-for-you" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-dfy">Done-For-You</Link>
+              <span aria-hidden className="opacity-40">·</span>
               <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">AI Call Assistant</Link>
               <span aria-hidden className="opacity-40">·</span>
               <a href="/terms" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-terms">Terms of Use</a>
@@ -579,6 +582,7 @@ export default function LandingPage() {
             </div>
             <p className="text-[13px] text-mkt-navy-muted">{copyrightNotice()}</p>
           </div>
+          <FooterGuides className="mt-4 text-[13px] text-mkt-navy-muted" />
         </div>
       </footer>
     </div>

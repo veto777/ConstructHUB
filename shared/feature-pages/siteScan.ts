@@ -194,7 +194,7 @@ const page: FeaturePage = {
   seo: {
     title: "Site Scan — Website SEO Audit for Contractors | ConstructHUB",
     description:
-      "Scan your contractor website for technical, speed, local, content and AI-readiness issues, get a fix list with steps for your site builder, and rescan to verify the fixes.",
+      "Scan your contractor site for technical, speed, local, content and AI-readiness issues, get fix steps for your site builder, and rescan to verify.",
   },
   sources: [
     "server/sitescan/audit.ts",

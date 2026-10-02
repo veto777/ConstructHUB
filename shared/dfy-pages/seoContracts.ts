@@ -7,13 +7,14 @@ import type { DfyPage } from "./types";
  *   - what every package includes (a dedicated SEO strategist, a technical SEO audit and fixes, keyword
  *     research + content + backlink building, monthly ranking reports) and "ongoing SEO for the keywords and
  *     service areas you choose, on a 6-month minimum": client/src/lib/pricing-display.ts DFY_SERVICES "seo-packages"
- *   - packages differ by how many keywords they target (the catalog names), all 6-month terms:
+ *   - three packages covering one to five keywords (the catalog names: 1-2, 1-2 and 3-5), all 6-month terms:
  *     server/catalog.ts DFY_CATALOG, server/routes.ts SEO_PACKAGES (termMonths 6), SEO_CONTRACT_REQUIRED_IDS
  *     ("require a signed contract before payment")
  *   - quoted by a sales rep, never a listed price or an online checkout or contract: server/catalog.ts isSalesOnly,
  *     server/routes.ts /api/contracts/create (sendTalkToSales for every package at or above the threshold)
- *   - the 6-month minimum, the early-termination penalty: client/src/pages/terms-of-use.tsx section 6 (its size is
- *     left to the agreement and the Terms here: the two word it differently, see the report)
+ *   - the 6-month minimum, the early-termination penalty and the month-to-month renewal after it: the standard
+ *     agreement (contract-sign.tsx sections 3 and 6). The penalty points to that agreement only: its size there and in
+ *     terms-of-use.tsx section 6 differ, which is an owner/legal decision (see the report)
  *   - nobody can promise rankings; the service agreement spells out what we deliver: client/src/pages/pricing.tsx
  *   - the request form: client/src/components/talk-to-sales.tsx → POST /api/seo-inquiry in server/routes.ts
  * The spotlight and In Depth section read the standard SEO agreement, client/src/pages/contract-sign.tsx:
@@ -48,7 +49,7 @@ const page: DfyPage = {
     },
     {
       title: "Agree the package",
-      body: "Packages are scoped by how many keywords you target. The rep confirms the scope and the price, on a 6-month minimum.",
+      body: "There are three packages, covering one to five keywords. The rep confirms the scope and the price, on a 6-month minimum.",
     },
     {
       title: "Audit and fixes",
@@ -96,6 +97,7 @@ const page: DfyPage = {
     heading: { title: "What the SEO Agreement ", em: "Puts in Writing" },
     points: [
       "Every package runs on a signed agreement with a 6-month minimum term.",
+      "After the 6 months it renews month to month unless either side gives 30 days' written notice.",
       "The agreement lists the work in plain terms, and states that no ranking, traffic level or conversion rate is promised.",
       "Content written for your site becomes yours once the month it was made in is paid.",
       "You give your strategist access to your website, hosting and analytics, and review content within five business days.",
@@ -123,17 +125,17 @@ const page: DfyPage = {
   ],
   pricing: {
     kind: "sales",
-    topic: "Monthly SEO packages",
+    topic: "Each monthly SEO package",
     note: "Every package runs for a 6-month minimum; a rep scopes it and quotes it before you commit.",
   },
   faqs: [
     {
       q: "How are the packages different?",
-      a: "They're scoped by how many keywords you target. A sales rep matches the package to the services and areas you choose and quotes it for your business.",
+      a: "There are three packages, covering one to five keywords. A sales rep matches one to the services and areas you choose and quotes it for your business.",
     },
     {
       q: "How long is the commitment?",
-      a: "Every SEO package has a 6-month minimum, on an agreement you sign before you pay. Ending an SEO contract early carries an early termination penalty, set out in your agreement and our Terms of Use, so the rep goes through the scope with you first.",
+      a: "Every SEO package has a 6-month minimum, on an agreement you sign before you pay. Ending an SEO contract early carries an early termination penalty, set out in the agreement you sign before paying, so the rep goes through the scope with you first.",
     },
     {
       q: "Can you promise first-page rankings?",
@@ -161,10 +163,11 @@ const page: DfyPage = {
         "search the page that should answer it. Off-page work happens on other sites: backlinks (links from other " +
         "websites to yours), citation building (directory listings with your name, address and phone) and directory " +
         "submissions. Content strategy decides what to write next, and rank tracking follows where your keywords stand.",
-      "Every month you get a ranking report for the keywords in your package. Packages are scoped by how many keywords " +
-        "you target, and a sales rep matches one to the services and areas you choose and quotes it. The agreement is " +
-        "signed before you pay; ending it before the 6 months are up carries an early termination penalty, set out in " +
-        "the agreement and our Terms of Use.",
+      "Every month you get a ranking report for the keywords in your package. There are three packages, covering one " +
+        "to five keywords, and a sales rep matches one to the services and areas you choose and quotes it. The agreement " +
+        "is signed before you pay; ending it before the 6 months are up carries an early termination penalty, set out " +
+        "in the agreement you sign. After the 6 months it renews month to month unless either side gives 30 days' " +
+        "written notice.",
       "Google decides rankings, so no package promises a position, traffic or conversions, and the agreement says " +
         "so in writing. If you want to see the picture yourself between reports, ConstructHUB's Site Scan audits your " +
         "site and the GMB Ranking Grid shows where you appear in Google Maps for a keyword, as software in a plan.",

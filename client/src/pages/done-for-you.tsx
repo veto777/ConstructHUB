@@ -60,7 +60,7 @@ const COMPARE = [
     key: "features",
     kicker: "Features",
     title: "Software you run",
-    body: "Tools in your ConstructHUB plan that you use yourself, whenever you like: Site Scan, the CRM, Click Guard, permit search and the rest. Each one is priced by plan, and every plan starts with a trial.",
+    body: "Tools in your ConstructHUB plan that you use yourself, whenever you like: Site Scan, the CRM, Click Guard, permit search and the rest. Each one is priced by plan, and a new account's first plan starts with a trial.",
     points: ["You do the work, with the tools", "Priced by plan or as an add-on", "Open any time from your dashboard"],
     link: { label: "See every feature", href: FEATURES_PATH, testId: "link-dfy-compare-features" },
   },
@@ -68,7 +68,7 @@ const COMPARE = [
     key: "services",
     kicker: "Done-For-You",
     title: "Work our team does",
-    body: "People, not software: we file the paperwork, build your profile and website, and run your SEO and ads for you. A sales rep scopes each service with you and confirms the price before you commit or pay.",
+    body: "People, not software: we file the paperwork, build your profile and website, and run your SEO and ads for you. A sales rep scopes and quotes each service with you before you commit or pay; GBP Reinstatement has one listed price per project and its own request form.",
     points: ["We do the work for you", "Scoped and quoted for your business", "One engagement, or ongoing on an agreement"],
     link: null,
   },
@@ -102,8 +102,8 @@ export function DfyCataloguePage() {
               </h1>
               <p className="mt-6 text-base sm:text-lg text-mkt-ink-soft max-w-[37rem] leading-relaxed">
                 Business formation and licensing, your Google Business Profile and website, SEO and ad campaigns, and
-                help with a suspended profile: work our team does for you. Tell a sales rep what you need and we scope
-                it with you before you commit or pay.
+                help with a suspended profile: work our team does for you. Tell a sales rep what you need, or send a
+                reinstatement request, and we scope it with you before you commit or pay.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
                 {sales(BTN_PRIMARY, "hero")}

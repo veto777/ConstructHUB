@@ -312,13 +312,13 @@ export default function GoogleAdFraudPage() {
               <Skull className="h-4 w-4 text-[#FBBC05]" />
               <span className="text-sm text-[#FBBC05] font-medium">Industry Investigation</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-fraud-title">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-fraud-title">
               Google Click Fraud:
               <br />
               <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#4285F4] bg-clip-text text-transparent animate-gradient-text">
                 The Billion-Dollar Scam Nobody Talks About
               </span>
-            </h2>
+            </h1>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl mx-auto animate-in-delay-2">
               In contractor Google Ads accounts we have worked on, we used IP tracking, device fingerprinting, and screen recording to review ad traffic. This page shares what we observed and our opinion of it — it is not an independent audit, and your results may differ.
             </p>

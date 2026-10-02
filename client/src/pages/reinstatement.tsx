@@ -31,9 +31,9 @@ const SUSPENSION_REASONS = [
 
 const PROCESS_STEPS = [
   { num: 1, title: "Tell us about your situation", desc: "Fill out our request form to get things started. We'll review your case, follow up with any questions, and let you know if we think we can help." },
-  { num: 2, title: "Full assessment", desc: "If we're confident we can get you reinstated, we'll request all the details and perform an in-depth evaluation to get to the bottom of your suspension." },
-  { num: 3, title: "Fix & comply", desc: "We'll advise you on all actions required, including any supporting documentation, and ensure your Profile is fully compliant and eligible for reinstatement." },
-  { num: 4, title: "Appeal & reinstate", desc: "We'll craft and submit a compelling, evidence-based appeal and manage all communication until your Profile is restored." },
+  { num: 2, title: "Full assessment", desc: "If we think we can help, we ask for all the details and look into what caused the suspension." },
+  { num: 3, title: "Fix & comply", desc: "We tell you every change to make and every supporting document that may be needed, and bring the profile in line with Google's guidelines before anything is submitted." },
+  { num: 4, title: "Appeal", desc: "We write and submit an evidence-based appeal and keep you updated until Google makes its decision." },
 ];
 
 const CONSEQUENCES = [
@@ -117,7 +117,7 @@ export default function ReinstatementPage() {
                 Is your Google Business Profile <span className="mkt-marker">Suspended</span>?
               </h1>
               <p className="mt-6 text-base sm:text-lg text-mkt-ink-soft leading-relaxed max-w-[37rem]">
-                We get it — it's devastating. Your phones go quiet, customers can't find you, and revenue drops overnight. We'll work tirelessly to get your listing back on the map.
+                We get it — it's devastating. Your phones go quiet, customers can't find you, and revenue drops overnight. We'll work your case and do everything we can to get your listing back on the map.
               </p>
               <div className="mt-9 grid grid-cols-3 max-w-lg border-y border-mkt-rule divide-x divide-[color:var(--mkt-rule)]" data-testid="reinstatement-facts">
                 <div className="py-4 pr-4">
@@ -163,7 +163,7 @@ export default function ReinstatementPage() {
                   onClick={() => document.getElementById("reinstatement-form")?.scrollIntoView({ behavior: "smooth" })}
                   data-testid="button-get-reinstated"
                 >
-                  Get your listing reinstated
+                  Request a case review
                 </button>
                 <p className="text-[13px] text-mkt-muted text-center mt-3">
                   We only take cases where we're confident we can help.

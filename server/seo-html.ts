@@ -6,7 +6,7 @@
  * (shared/route-meta.ts, shared/seo.ts). Pure string work, no side effects:
  * the build imports it too.
  */
-import { ROUTE_META } from "@shared/route-meta";
+import { pageMetaFor } from "@shared/route-meta";
 import { DEFAULT_OG_IMAGE, SITE_ORIGIN, seoHeadFor, serializeJsonLd, type JsonLd } from "@shared/seo";
 
 const escapeAttr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -21,11 +21,12 @@ function setMeta(html: string, attr: "name" | "property", key: string, value: st
 
 /**
  * The page's own <title>, meta description and Open Graph / Twitter
- * title + description (shared/route-meta.ts). Paths without an entry keep
+ * title + description (shared/route-meta.ts: a marketing page's, or a public
+ * app page's). Paths without an entry keep
  * index.html's defaults.
  */
 export function withRouteMeta(html: string, path: string): string {
-  const meta = ROUTE_META[path];
+  const meta = pageMetaFor(path);
   if (!meta) return html;
   let out = html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeAttr(meta.title)}</title>`);
   out = setMeta(out, "name", "description", meta.description);

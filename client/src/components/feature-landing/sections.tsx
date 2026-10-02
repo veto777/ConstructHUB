@@ -426,7 +426,7 @@ export function InDepthSection({ page, n, tone }: { page: LandingContent; n: str
   if (!d) return null;
   return (
     <Band id="in-depth" n={n} kicker="In Depth" heading={d.heading} tone={tone} testId="section-feature-in-depth" narrow>
-      <div className="mt-8 space-y-5 text-[16.5px] text-mkt-ink-soft leading-[1.75]" data-testid="text-feature-in-depth">
+      <div className="mt-8 space-y-5 text-[16.5px] text-mkt-ink-soft leading-[1.75] [&>p]:max-w-[35rem]" data-testid="text-feature-in-depth">
         {d.paragraphs.map((para) => <p key={para}>{para}</p>)}
         {d.bullets && d.bullets.length > 0 && (
           <>

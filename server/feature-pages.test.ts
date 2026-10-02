@@ -134,7 +134,7 @@ describe("feature page registry", () => {
       expect(page.related.length, page.key).toBeGreaterThanOrEqual(1);
       expect(page.headline.swipe.trim().length, page.key).toBeGreaterThan(0);
       expect(page.seo.title, page.key).toMatch(/\| ConstructHUB$/);
-      expect(page.seo.description.length, page.key).toBeLessThanOrEqual(200);
+      expect(page.seo.description.length, page.key).toBeLessThanOrEqual(155);
       // No testimonials, invented numbers or promises.
       const text = JSON.stringify(page);
       expect(text, page.key).not.toMatch(/testimonial|guarantee|#1\b|\b\d+%|\b\d+x\b/i);

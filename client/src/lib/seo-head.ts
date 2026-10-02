@@ -1,12 +1,14 @@
 /**
  * Keeps the <head> right as the visitor moves between pages in the app: the
  * canonical link and og:url follow the path, and on a marketing page the
- * description, Open Graph / Twitter text and JSON-LD follow it too — the same
+ * description, Open Graph / Twitter text and JSON-LD follow it too (a public
+ * app page with its own entry gets its description and text) — the same
  * values the server writes into the HTML for a fresh load (server/seo-html.ts,
  * shared/seo.ts). The tab title stays with App.tsx and the pages.
  */
 import { useEffect } from "react";
 import { SITE_ORIGIN, canonicalPath, seoHeadFor, serializeJsonLd } from "@shared/seo";
+import { APP_PAGE_META } from "@shared/route-meta";
 
 function setMeta(attr: "name" | "property", key: string, value: string) {
   let tag = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
@@ -32,15 +34,18 @@ export function applySeoHead(location: string) {
 
   const head = seoHeadFor(path);
   const current = document.head.querySelector<HTMLScriptElement>('script[type="application/ld+json"][data-seo="jsonld"]');
+  const text = head ?? APP_PAGE_META[path];
+  if (text) {
+    setMeta("name", "description", text.description);
+    setMeta("property", "og:title", text.title);
+    setMeta("property", "og:description", text.description);
+    setMeta("name", "twitter:title", text.title);
+    setMeta("name", "twitter:description", text.description);
+  }
   if (!head) {
     current?.remove();
     return;
   }
-  setMeta("name", "description", head.description);
-  setMeta("property", "og:title", head.title);
-  setMeta("property", "og:description", head.description);
-  setMeta("name", "twitter:title", head.title);
-  setMeta("name", "twitter:description", head.description);
   // The build may have added nodes read off the rendered page (the /call-assistant FAQ):
   // keep the script it wrote for the page it was written for.
   if (current?.dataset.path === path) return;
