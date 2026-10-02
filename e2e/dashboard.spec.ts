@@ -3,10 +3,11 @@
  * growth-app lane (VITE_FORCE_PORTAL=false, DEV_AUTH_BYPASS_USER1=true):
  *   E2E_PORT=<port> E2E_DB=constructhub_dev_a6 E2E_WORKERS=1 npx playwright test e2e/dashboard.spec.ts
  *
- * Against the skeleton the route answers SAMPLE payloads (fixture: true);
- * ?fixture=new|noplan is added with page.route. The assertions are about
- * statuses, links and layout — never about the sample numbers — so the same
- * spec keeps working once the real aggregator replaces the fixture.
+ * The first block runs against the REAL aggregator (no ?fixture=): it reads
+ * GET /api/dashboard for the bypass user and checks the page prints exactly
+ * that payload. The rest pin layout and edge states with the dev-only sample
+ * scenarios (?fixture=full|new|noplan, added with page.route; ignored in
+ * production), because a real account can't be every state at once.
  * Screenshots (1440 / 390, light / dark) land in DASHBOARD_SHOTS_DIR when set.
  */
 import { test, expect, type Page } from "@playwright/test";
@@ -52,7 +53,120 @@ async function openDashboard(page: Page) {
 
 const tile = (page: Page, key: string) => page.getByTestId(`tile-${key}`);
 
-test.describe("signed-in dashboard", () => {
+/** The real payload for the signed-in (bypass) user — same 60 s server cache the page reads. */
+async function realPayload(page: Page): Promise<DashboardPayload> {
+  const res = await page.request.get("/api/dashboard");
+  expect(res.ok()).toBeTruthy();
+  const body = (await res.json()) as DashboardPayload;
+  expect(body.fixture).toBe(false);
+  return body;
+}
+
+const nf = new Intl.NumberFormat("en-US");
+
+test.describe("signed-in dashboard: real aggregate", () => {
+  test("prints the account's own payload: statuses, metrics, usage, checklist, recent", async ({ page }) => {
+    const body = await realPayload(page);
+    await openDashboard(page);
+    await expect(page.getByTestId("badge-dashboard-fixture")).toHaveCount(0);
+    await expect(page.getByText("Stop Guessing")).toHaveCount(0);
+    await expect(page.getByTestId("badge-dashboard-plan")).toHaveAttribute("data-plan-status", body.account.status);
+    if (body.account.planName && body.account.status !== "none") {
+      await expect(page.getByTestId("badge-dashboard-plan")).toContainText(body.account.planName);
+    }
+
+    // Every tile the server sent (bar the CRM card) is on the page with the server's status.
+    for (const t of body.tiles.filter((x) => x.key !== "crm")) {
+      await expect(tile(page, t.key)).toHaveAttribute("data-status", t.status);
+      if (t.status === "locked") await expect(tile(page, t.key).locator('[data-testid^="metric-"]')).toHaveCount(0);
+      // Grid tiles show the hero number + two rows.
+      if (t.status === "ok") {
+        for (const m of t.metrics.slice(0, 3)) await expect(page.getByTestId(`metric-${t.key}-${m.key}`)).toBeVisible();
+        const hero = t.metrics[0];
+        if (hero && hero.format === "count" && typeof hero.value === "number") {
+          await expect(page.getByTestId(`metric-${t.key}-${hero.key}`)).toContainText(nf.format(hero.value));
+        }
+      }
+    }
+
+    // CRM snapshot card: the org's own numbers (cents rounded to whole dollars).
+    const crm = body.tiles.find((t) => t.key === "crm");
+    if (crm) {
+      const card = page.getByTestId("card-dashboard-crm");
+      await expect(card).toHaveAttribute("data-status", crm.status);
+      for (const m of crm.metrics.slice(0, 6)) {
+        const el = card.getByTestId(`metric-crm-${m.key}`);
+        await expect(el).toBeVisible();
+        if (typeof m.value === "number" && m.format === "cents") await expect(el).toContainText(`$${nf.format(Math.round(m.value / 100))}`);
+        if (typeof m.value === "number" && m.format === "count") await expect(el).toContainText(nf.format(m.value));
+      }
+    }
+
+    // Usage meters: used / limit as the server counted them; portal meters go to the CRM host.
+    for (const u of body.account.usage) {
+      const meter = page.getByTestId(`usage-${u.key}`);
+      await expect(meter).toContainText(u.limit < 0 ? `${nf.format(u.used)} · Unlimited` : `${nf.format(u.used)} / ${nf.format(u.limit)}`);
+      if (u.period === "count" && u.limit > 0 && u.used > u.limit) await expect(meter).toContainText("Over your plan's limit");
+      if (u.surface === "portal") await expect(page.getByTestId(`link-usage-${u.key}`)).toHaveAttribute("href", /^https?:\/\/portal\./);
+    }
+
+    // Checklist: hidden only when every step is done; otherwise the done count matches.
+    const steps = body.checklist;
+    const card = page.getByTestId("card-dashboard-checklist");
+    if (steps.every((c) => c.done)) {
+      await expect(card).toHaveCount(0);
+    } else {
+      await expect(card).toBeVisible();
+      for (const c of steps) {
+        const row = card.getByTestId(`checklist-${c.key}`);
+        if (await row.count()) await expect(row).toHaveAttribute("data-done", String(c.done));
+      }
+    }
+
+    // Recent activity: the newest real items, in the server's order.
+    if (body.recent.length) {
+      await expect(page.getByTestId(`recent-${body.recent[0].id}`)).toBeVisible();
+    } else {
+      await expect(page.getByTestId("text-dashboard-recent-empty")).toBeVisible();
+    }
+  });
+
+  test("Refresh asks the server for ?fresh=1 and the page keeps real data", async ({ page }) => {
+    await openDashboard(page);
+    const fresh = page.waitForResponse((r) => r.url().includes("/api/dashboard") && r.url().includes("fresh=1"));
+    await page.getByTestId("button-dashboard-refresh").click();
+    const res = await fresh;
+    expect(res.status()).toBe(200);
+    expect(((await res.json()) as DashboardPayload).fixture).toBe(false);
+    await expect(page.getByTestId("button-dashboard-refresh")).toBeEnabled();
+    await expect(page.getByTestId("badge-dashboard-fixture")).toHaveCount(0);
+  });
+
+  test("no horizontal scroll at 390px with real data", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openDashboard(page);
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector("main")!;
+      return Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, main.scrollWidth - main.clientWidth);
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
+    await shot(page, "real-390-light");
+  });
+
+  test("real data at 1440 light and dark (screenshots)", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openDashboard(page);
+    await expect(page.getByTestId("card-dashboard-crm")).toBeVisible();
+    await shot(page, "real-1440-light");
+    await page.evaluate(() => { try { localStorage.setItem("theme", "dark"); } catch { /* blocked */ } });
+    await page.reload();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(page.getByTestId("text-dashboard-greeting")).toBeVisible();
+    await shot(page, "real-1440-dark");
+  });
+});
+
+test.describe("signed-in dashboard: sample scenarios", () => {
   test("renders every group and tile status, never the old marketing home", async ({ page }) => {
     await useScenario(page, "full");
     await openDashboard(page);

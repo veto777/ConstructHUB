@@ -15,7 +15,9 @@ export function UsageStrip({ usage }: { usage: DashboardUsage[] }) {
         const tone = u.period === "count" && raw === "bad" ? "warn" : raw;
         const pct = unlimited ? 0 : Math.min(100, (u.used / Math.max(1, u.limit)) * 100);
         const amount = unlimited ? `${formatCount(u.used)} · Unlimited` : `${formatCount(u.used)} / ${formatCount(u.limit)}`;
-        const state = raw === "bad" ? (u.period === "count" ? "All in use" : "Limit reached") : raw === "warn" ? "Almost at the limit" : null;
+        // A standing count can sit above the plan's limit (sites added before a downgrade): say so, never "All in use".
+        const countState = u.used > u.limit ? "Over your plan's limit" : "All in use";
+        const state = raw === "bad" ? (u.period === "count" ? countState : "Limit reached") : raw === "warn" ? "Almost at the limit" : null;
         return (
           <li key={u.key} className="min-w-0" data-testid={`usage-${u.key}`} data-tone={tone}>
             <DashLink

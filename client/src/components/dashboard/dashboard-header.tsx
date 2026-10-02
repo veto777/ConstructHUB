@@ -71,6 +71,8 @@ export function DashboardHeader({
   const greeting = `${greetingFor(now)}${account.firstName ? `, ${account.firstName}` : ""}`;
   const meta: string[] = [];
   if (account.status === "active" && account.renewsAt) meta.push(`Renews ${shortDate(account.renewsAt, now)}`);
+  // A Stripe plan set to cancel: renewsAt is null and endsAt says when it stops.
+  else if (account.endsAt) meta.push(`Plan ends ${shortDate(account.endsAt, now)}`);
   if (account.usage.some((u) => u.period === "monthly")) meta.push(`Usage resets ${shortDate(account.resetsAt, now, true)}`);
   meta.push(`Updated ${relativeTime(generatedAt, now)}`);
 
