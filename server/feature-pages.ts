@@ -1,14 +1,19 @@
 /**
  * GET /api/admin/feature-pages — the admin index of every feature intro page
  * (/admin/feature-pages): title, group, stub/ready status, the public page and
- * the in-app page, plus the hand-built pages (/call-assistant, the home
- * landing). Platform admins only (server/admin.ts — the same check behind the
+ * the in-app page, then every done-for-you service page as a second group
+ * (shared/dfy-pages), plus the hand-built pages (/call-assistant,
+ * /reinstatement, the home landing). Platform admins only (server/admin.ts — the same check behind the
  * sidebar's "Account Manager · ADMIN" entry): 401 signed out, 403 for anyone
  * else. The pages themselves are public; this list is the admins' map of them.
  */
 import type { Express } from "express";
 import { FEATURE_CATALOGUE, FEATURE_GROUPS, FEATURE_PAGES, FEATURES_PATH, featurePageByKey } from "@shared/feature-pages";
+import { DFY_CATALOGUE, DFY_PAGES, DFY_PATH, dfyPageByKey } from "@shared/dfy-pages";
 import { isPlatformAdmin } from "./admin";
+
+/** The admin index's group for the done-for-you services. */
+export const DFY_ADMIN_GROUP = { key: "dfy", label: "Done-For-You Services" } as const;
 
 export type AdminFeaturePageRow = {
   key: string;
@@ -25,7 +30,18 @@ export type AdminFeaturePageRow = {
   sources: string[];
 };
 
-export function adminFeaturePageRows(): { catalogue: string; pages: AdminFeaturePageRow[]; counts: { ready: number; stub: number } } {
+type Counts = { ready: number; stub: number };
+
+export function adminFeaturePageRows(): {
+  catalogue: string;
+  /** The done-for-you catalogue page. */
+  services: string;
+  pages: AdminFeaturePageRow[];
+  /** Feature pages written / still stubs. */
+  counts: Counts;
+  /** Service pages written / still stubs. */
+  serviceCounts: Counts;
+} {
   const label = new Map(FEATURE_GROUPS.map((g) => [g.key as string, g.label]));
   const pages: AdminFeaturePageRow[] = FEATURE_CATALOGUE.map((e) => {
     const page = featurePageByKey(e.key);
@@ -34,6 +50,13 @@ export function adminFeaturePageRows(): { catalogue: string; pages: AdminFeature
       app: e.app, legacyPath: page?.legacyPath ?? null, sources: page?.sources ?? [],
     };
   });
+  // The second group: every done-for-you service (no in-app page — it's work our team does).
+  for (const e of DFY_CATALOGUE) {
+    pages.push({
+      key: e.key, group: DFY_ADMIN_GROUP.key, groupLabel: DFY_ADMIN_GROUP.label, title: e.title, status: e.status, path: e.path,
+      app: null, legacyPath: null, sources: dfyPageByKey(e.key)?.sources ?? ["client/src/pages/reinstatement.tsx"],
+    });
+  }
   // The marketing home (signed-in visitors reach it at /landing; / is their dashboard).
   pages.push({
     key: "landing", group: "site", groupLabel: "Site", title: "Home landing page", status: "page", path: "/landing",
@@ -41,10 +64,15 @@ export function adminFeaturePageRows(): { catalogue: string; pages: AdminFeature
   });
   return {
     catalogue: FEATURES_PATH,
+    services: DFY_PATH,
     pages,
     counts: {
       ready: FEATURE_PAGES.filter((p) => p.status === "ready").length,
       stub: FEATURE_PAGES.filter((p) => p.status === "stub").length,
+    },
+    serviceCounts: {
+      ready: DFY_PAGES.filter((p) => p.status === "ready").length,
+      stub: DFY_PAGES.filter((p) => p.status === "stub").length,
     },
   };
 }

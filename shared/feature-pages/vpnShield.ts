@@ -122,15 +122,48 @@ const page: FeaturePage = {
       a: "No. It acts in the browser after the page loads: someone who blocks scripts still sees your site, and requests to your server aren't stopped. On the Agency plan, the Cloudflare tool can block IP addresses you choose at the edge.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): its own script and the crawler skip are
+  // server/routes.ts GET /api/vpn-shield/script/:trackingId (crawlers regex, checkWebRTC, checkVpnExtensions, the
+  // Access Restricted overlay, the redirect); the checks are POST /api/vpn-shield/track (CRAWLER_PATTERNS,
+  // identifyVpnProvider/VPN_PROVIDERS, isDatacenterIp/DATACENTER_CIDRS, the IPv4 WebRTC comparison, vpnExtension,
+  // the "block" default, createVpnVisit fields); settings and the 500-address exact-IP whitelist are POST …/settings;
+  // the default shown in the app is client/src/pages/vpn-shield.tsx (useState(settings.vpnBlockMode || "block")).
+  inDepth: {
+    heading: { title: "VPN and Proxy Detection for Your Website, ", em: "Explained" },
+    paragraphs: [
+      "VPN Shield is VPN and proxy detection for contractor websites. A VPN or proxy sends a visitor's traffic through " +
+        "another address, often one in a data center, so the visit doesn't come from where the person is. VPN Shield " +
+        "looks for signs that a visit is coming through one, then does what you told it to. It runs from its own " +
+        "script tag, separate from the Click Guard code, and it leaves search engines alone: Googlebot, Bingbot, " +
+        "AdsBot-Google and other known crawlers are passed through without a check.",
+      "Each visit is checked three ways. The IP address is compared with a built-in list of address prefixes for " +
+        "well-known VPN providers and for data center and cloud hosting networks. The browser is asked for its public " +
+        "address over WebRTC (the browser feature behind video calls), and the visit is flagged when that IPv4 " +
+        "address differs from the one the request came from. And the script looks for markers some VPN browser " +
+        "extensions leave on the page. The flagged visit log records which signal fired, with the IP, the provider " +
+        "when the address matched one, the landing page and the action taken.",
+      "You choose the response for each website. Block replaces the page with an Access Restricted screen for flagged " +
+        "browsers. Log only records the visit and lets it through. Redirect sends the visitor to a full http or https " +
+        "link you set. A whitelist of up to 500 IP addresses, one per line, is never checked, which is where your " +
+        "office and crew belong. Until you pick, the response is Block, so switch to Log only first if you would " +
+        "rather watch before anything is blocked.",
+      "VPN Shield works in the visitor's browser once the page has started loading. Someone who blocks scripts still " +
+        "sees your site and requests to your server aren't stopped, so it is not a firewall. The provider and data " +
+        "center list is a limited built-in set that can be incomplete or out of date, and proxies that use home " +
+        "internet addresses won't match it. Every signal can misfire, and plenty of real customers use a VPN for good " +
+        "reasons. The detection counts for today and all time, the unique IPs and the top providers and countries " +
+        "show how much of your traffic it actually touches before you decide to block.",
+    ],
+  },
   related: ["clickGuard", "ipTracker", "cloudflare"],
   app: { href: "/vpn-shield", surface: "app" },
   headings: {
     cards: { title: "How VPN Shield ", em: "Checks a Visit" },
   },
   seo: {
-    title: "VPN Shield — Block VPN and Proxy Visits | ConstructHUB",
+    title: "Block VPN and Proxy Traffic on Your Website | ConstructHUB",
     description:
-      "Detect visits from VPNs, proxies and data center IP ranges on your website, then block, log or redirect them, with a whitelist and a log of every flagged visit.",
+      "Detect website visits from VPNs, proxies and data center IPs, then block, log or redirect them, with a whitelist and a log of every flagged visit.",
   },
   sources: [
     "client/src/pages/vpn-shield.tsx",

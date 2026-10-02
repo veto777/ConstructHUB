@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import { Link } from "wouter";
 import {
   Shield, ShieldCheck, ShieldAlert, Search, BarChart3,
@@ -154,6 +155,8 @@ export default function GoogleAdsGuidePage() {
 
   if (!hasAccess) {
     return (
+      <>
+      <PublicPageHeader next="/google-ads-guide" />
       <div className="min-h-screen bg-background text-foreground">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-8" data-testid="view-google-ads-locked">
           <div className="text-center max-w-3xl mx-auto">
@@ -161,13 +164,13 @@ export default function GoogleAdsGuidePage() {
               <Lock className="h-4 w-4 text-[#4285F4]" />
               <span className="text-sm text-[#4285F4] font-medium">Master Class Students Only</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3" data-testid="text-locked-title">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3" data-testid="text-locked-title">
               Google Ads for Contractors:
               <br />
               <span className="bg-gradient-to-r from-[#4285F4] to-[#34A853] bg-clip-text text-transparent">
                 The Complete Campaign Setup Playbook
               </span>
-            </h2>
+            </h1>
             <p className="text-muted-foreground text-sm leading-relaxed mb-8">
               12 in-depth sections with real Google Ads screenshots showing you exactly how to set up campaigns that generate real leads — and every trap Google sets to drain your budget.
             </p>
@@ -193,12 +196,37 @@ export default function GoogleAdsGuidePage() {
               </p>
             </CardContent>
           </Card>
+
+          {/* The outline is public (the same titles and summaries the unlocked page lists); the walkthroughs stay locked. */}
+          <section className="max-w-4xl mx-auto" aria-labelledby="locked-outline-title" data-testid="section-locked-outline">
+            <h2 id="locked-outline-title" className="text-xl font-bold text-foreground text-center mb-2">What the 12 Sections Cover</h2>
+            <p className="text-sm text-muted-foreground text-center max-w-2xl mx-auto mb-6">
+              Each section is a full walkthrough in the Master Class. Here is what every one of them covers.
+            </p>
+            <ol className="space-y-3">
+              {GUIDE_SECTIONS.map((s) => (
+                <li key={s.slug} className="flex items-start gap-4 rounded-xl border border-border bg-card p-5" data-testid={`locked-outline-${s.slug}`}>
+                  <span className="text-lg font-bold text-muted-foreground w-7 text-right flex-shrink-0">{s.number}</span>
+                  <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
+                    <s.icon className={`h-5 w-5 ${s.color}`} aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-semibold text-foreground">{s.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
         </div>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+    <PublicPageHeader next="/google-ads-guide" />
     <div className="h-full overflow-y-auto bg-background text-foreground overflow-x-hidden">
       <section className="relative z-10 pt-12 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
@@ -208,13 +236,13 @@ export default function GoogleAdsGuidePage() {
               <GraduationCap className="h-4 w-4 text-[#4285F4]" />
               <span className="text-sm text-[#4285F4] font-medium">Google Ads Master Class</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-masterclass-title">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-masterclass-title">
               Google Ads for Contractors:
               <br />
               <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#4285F4] bg-clip-text text-transparent animate-gradient-text">
                 The Complete Campaign Setup Playbook
               </span>
-            </h2>
+            </h1>
             <p className="text-muted-foreground text-sm leading-relaxed animate-in-delay-2">
               12 detailed guide pages showing you exactly how to set up profitable Google Ads campaigns. Each page is a complete walkthrough with real screenshots, step-by-step instructions, and the strategies that actually generate leads.
             </p>
@@ -315,5 +343,6 @@ export default function GoogleAdsGuidePage() {
         </div>
       </section>
     </div>
+    </>
   );
 }

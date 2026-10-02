@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,6 +203,8 @@ export default function LsaGuidePage() {
   };
 
   return (
+    <>
+    <PublicPageHeader next="/lsa-guide" />
     <div className="h-full overflow-y-auto bg-background text-foreground overflow-x-hidden">
       <section className="pt-12 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto space-y-8">
@@ -212,13 +215,13 @@ export default function LsaGuidePage() {
               <BadgeCheck className="h-4 w-4 text-[#34A853]" />
               <span className="text-sm text-[#34A853] font-medium">Google Verified (Local Services Ads)</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-lsa-title">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-lsa-title">
               Local Services Ads:
               <br />
               <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#4285F4] bg-clip-text text-transparent animate-gradient-text">
                 The Complete LSA Setup & Optimization Playbook
               </span>
-            </h2>
+            </h1>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl mx-auto animate-in-delay-2">
               LSA puts your business at the very top of Google — above regular ads and organic results. You only pay when a real customer contacts you. No clicks, no impressions — just leads. This guide covers every trick to staying on top.
             </p>
@@ -456,5 +459,6 @@ export default function LsaGuidePage() {
         </div>
       </section>
     </div>
+    </>
   );
 }

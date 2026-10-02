@@ -148,6 +148,41 @@ const page: FeaturePage = {
       a: "Yes. The free scan checks up to 11 pages of your site. Verify your email address and the full quick report unlocks.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the checks are audit.ts findings(),
+  // the five scores and "starts at 100" are scoresFor()/scoreExplanation(), the builders are guidance.ts
+  // detectPlatform(), the impact order is guidance.ts fixesFor(), the GBP comparison is the profile checks in findings().
+  inDepth: {
+    heading: { title: "A Website Audit for Contractors, ", em: "Explained" },
+    paragraphs: [
+      "Site Scan is a website audit for contractors. It reads your site the way a search engine does: it starts from " +
+        "your robots.txt rules and your sitemap, follows the pages it is allowed to read and checks each one. Nothing " +
+        "is installed on your website and nothing on it is changed, because the scan only reads public pages.",
+      "The local checks are the part of contractor website SEO that ties your site to your Google Business Profile. " +
+        "The scan looks for business structured data, a click-to-call link, a Google Maps embed and review content. " +
+        "Run it from a linked Business Profile location and it also checks that your business name, street address and " +
+        "phone number appear on the site, and whether each service and service area on your profile has a page whose " +
+        "title or main heading names it. These local checks are educated guesses across the pages scanned, and the " +
+        "report says so.",
+      "AI Readiness covers how AI search tools can read your site: whether your robots.txt blocks crawlers such as " +
+        "GPTBot, ClaudeBot, PerplexityBot and Google-Extended, whether your pages carry structured data and FAQ " +
+        "content, whether an llms.txt file exists, and whether your text is in the page itself or only appears after " +
+        "JavaScript runs. Letting those crawlers in is your business decision; the scan shows the setting, it doesn't " +
+        "promise visibility.",
+      "Every finding lists the pages it was found on, why it matters and what to change, and the fix list puts the " +
+        "high-impact fixes first. When the scan recognizes your site builder (WordPress, Elementor, Wix, Squarespace, " +
+        "GoDaddy, Webflow, Shopify or Duda), the steps follow that builder's menus. Each score starts at 100 and loses " +
+        "points for the problems found, so fixing a confirmed finding raises it. A higher score is not a ranking " +
+        "promise. It is an SEO checklist you or your web person can work through, then rescan to confirm what got fixed.",
+    ],
+    bulletsIntro: "The technical, content and speed checks look for:",
+    bullets: [
+      "Pages that return errors, redirect chains, and pages still on HTTP or loading insecure files",
+      "Missing or conflicting canonical tags, noindex tags and pages missing from your sitemap",
+      "Missing, long or duplicate page titles and meta descriptions, and a missing or doubled H1 heading",
+      "Thin pages and images without alt text",
+      "Google PageSpeed's mobile and desktop lab scores when Google returns them, a missing mobile viewport and oversized images",
+    ],
+  },
   related: ["gbp", "rankingGrid", "searchConsole"],
   app: { href: "/site-scan", surface: "app" },
   tryIt: { label: "Free 60-second website scan", href: "/free-site-scan" },
@@ -159,7 +194,7 @@ const page: FeaturePage = {
   seo: {
     title: "Site Scan — Website SEO Audit for Contractors | ConstructHUB",
     description:
-      "Scan your contractor website for technical, speed, local, content and AI-readiness issues, get a fix list with steps for your site builder, and rescan to verify the fixes.",
+      "Scan your contractor site for technical, speed, local, content and AI-readiness issues, get fix steps for your site builder, and rescan to verify.",
   },
   sources: [
     "server/sitescan/audit.ts",

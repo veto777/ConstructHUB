@@ -44,14 +44,40 @@ export function PublicPageHeader({ next, cart = false }: { next: string; cart?: 
   );
 }
 
+/**
+ * The free guides and reports (in the sitemap, but in neither dropdown): linked
+ * from every public footer so no marketing page is left without links to it.
+ */
+export const FOOTER_GUIDES = [
+  { href: "/google-ads-guide", label: "Google Ads Guide", testId: "google-ads-guide" },
+  { href: "/lsa-guide", label: "LSA Guide", testId: "lsa-guide" },
+  { href: "/google-ad-fraud", label: "Click Fraud: What We Observed", testId: "google-ad-fraud" },
+  { href: "/google-business", label: "Google Business Profile Tools", testId: "google-business" },
+] as const;
+
+export function FooterGuides({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1 ${className}`} data-testid="footer-guides">
+      {FOOTER_GUIDES.map((g, i) => (
+        <span key={g.href} className="inline-flex items-center gap-x-3">
+          {i > 0 && <span aria-hidden className="opacity-40">·</span>}
+          <Link href={g.href} onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid={`link-footer-guide-${g.testId}`}>{g.label}</Link>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function PublicPageFooter() {
   if (!useSignedOut()) return null;
   return (
-    <footer className="mkt-editorial bg-mkt-navy text-mkt-navy-muted border-t border-mkt-navy-rule py-8 px-4 text-center text-[13px]" data-testid="footer-public-page">
+    <footer className="mkt-editorial bg-mkt-navy text-mkt-navy-muted border-t border-mkt-navy-rule pt-8 pb-24 sm:pb-8 px-4 text-center text-[13px]" data-testid="footer-public-page">
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         <Link href="/" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors">Home</Link>
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/features" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-features">Features</Link>
+        <span aria-hidden className="opacity-40">·</span>
+        <Link href="/done-for-you" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-dfy">Done-For-You</Link>
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/call-assistant" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-call-assistant">AI Call Assistant</Link>
         <span aria-hidden className="opacity-40">·</span>
@@ -61,6 +87,7 @@ export function PublicPageFooter() {
         <span aria-hidden className="opacity-40">·</span>
         <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors">Privacy</a>
       </div>
+      <FooterGuides className="mt-2" />
       <p className="mt-2">{copyrightNotice()}</p>
     </footer>
   );

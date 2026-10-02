@@ -26,8 +26,8 @@ import {
   BTN_LG, BTN_OUTLINE, BTN_OUTLINE_ON_NAVY, BTN_PRIMARY, TEXT_LINK, useDocumentTitle, useMetaDescription, useStartAtTop,
 } from "./primitives";
 import {
-  AudienceSection, CardsSection, FaqSection, FeatureHero, FinalCta, PricingSection, RelatedSection, SpotlightSection,
-  StepsSection, type Tone,
+  AudienceSection, CardsSection, FaqSection, FeatureHero, FinalCta, InDepthSection, PricingSection, RelatedSection,
+  SpotlightSection, StepsSection, type Tone,
 } from "./sections";
 
 const FLAGS: Record<NonNullable<FeaturePage["flag"]>, boolean> = { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS };
@@ -103,6 +103,7 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
   const nAudience = n("audience", page.audience.length > 0);
   const nPricing = n("pricing", true);
   const nFaq = n("faq", page.faqs.length > 0);
+  const nInDepth = n("in-depth", !!page.inDepth);
   const nRelated = n("related", related.length > 0);
 
   return (
@@ -122,6 +123,7 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
         <AudienceSection page={page} n={nAudience} tone={tone("audience")} />
         <PricingSection page={page} price={price} n={nPricing} tone={tone("pricing")} ctas={<>{primaryCta("pricing")}{salesCta(BTN_OUTLINE, "pricing")}</>} />
         <FaqSection page={page} n={nFaq} tone={tone("faq")} />
+        <InDepthSection page={page} n={nInDepth} tone={tone("in-depth")} />
         <RelatedSection page={page} entries={related} n={nRelated} tone={tone("related")} />
         <FinalCta page={page} price={price} ctas={<>{primaryCta("cta")}{salesCta(BTN_OUTLINE_ON_NAVY, "cta")}</>} />
       </div>

@@ -3206,7 +3206,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/course-purchases", async (req, res) => {
-    const user = getDevUser(req, res);
+    // Signed out: no purchases (getDevUser would already have sent a 401, so it isn't asked).
+    const user = req.user ? getDevUser(req, res) : null;
     if (!user) return res.json([]);
     const purchases = await db.select().from(coursePurchases).where(eq(coursePurchases.userId, user.id));
     res.json(purchases);

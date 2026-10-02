@@ -19,6 +19,7 @@ import { formatUsd } from "@shared/plan-copy";
 import { ROUTE_META } from "@shared/route-meta";
 import { buildSitemap, PUBLIC_ROUTES, withRouteMeta } from "./static";
 import { adminFeaturePageRows, registerFeaturePageRoutes } from "./feature-pages";
+import { DFY_CATALOGUE } from "@shared/dfy-pages";
 
 const root = path.resolve(import.meta.dirname, "..");
 const dir = path.join(root, "shared/feature-pages");
@@ -133,10 +134,24 @@ describe("feature page registry", () => {
       expect(page.related.length, page.key).toBeGreaterThanOrEqual(1);
       expect(page.headline.swipe.trim().length, page.key).toBeGreaterThan(0);
       expect(page.seo.title, page.key).toMatch(/\| ConstructHUB$/);
-      expect(page.seo.description.length, page.key).toBeLessThanOrEqual(200);
+      expect(page.seo.description.length, page.key).toBeLessThanOrEqual(155);
       // No testimonials, invented numbers or promises.
       const text = JSON.stringify(page);
       expect(text, page.key).not.toMatch(/testimonial|guarantee|#1\b|\b\d+%|\b\d+x\b/i);
+    }
+  });
+
+  it("an In Depth section is 2–5 paragraphs and 250–500 words (WRITING-GUIDE.md), and Site Scan has the reference one", () => {
+    expect(featurePageByKey("siteScan")!.inDepth).toBeDefined();
+    for (const page of FEATURE_PAGES) {
+      const d = page.inDepth;
+      if (!d) continue;
+      expect(d.paragraphs.length, page.key).toBeGreaterThanOrEqual(2);
+      expect(d.paragraphs.length, page.key).toBeLessThanOrEqual(5);
+      const words = [...d.paragraphs, d.bulletsIntro ?? "", ...(d.bullets ?? [])].join(" ").split(/\s+/).filter(Boolean).length;
+      expect(words, page.key).toBeGreaterThanOrEqual(250);
+      expect(words, page.key).toBeLessThanOrEqual(500);
+      expect(d.heading.title.trim().length, page.key).toBeGreaterThan(0);
     }
   });
 });
@@ -208,10 +223,10 @@ describe("feature pages on the server", () => {
     expect(ROUTE_META["/features/site-scan"].title).toBe(featurePageByKey("siteScan")!.seo.title);
   });
 
-  it("the admin index lists every page plus /call-assistant and the home landing", () => {
+  it("the admin index lists every page plus /call-assistant, the done-for-you services and the home landing", () => {
     const { pages, counts, catalogue } = adminFeaturePageRows();
     expect(catalogue).toBe("/features");
-    expect(pages.length).toBe(FEATURE_CATALOGUE.length + 1);
+    expect(pages.length).toBe(FEATURE_CATALOGUE.length + DFY_CATALOGUE.length + 1);
     expect(pages.find((r) => r.key === "callAssistant")).toMatchObject({ path: "/call-assistant", status: "external" });
     expect(pages.find((r) => r.key === "landing")).toMatchObject({ path: "/landing", status: "page" });
     expect(pages.find((r) => r.key === "siteScan")).toMatchObject({ path: "/features/site-scan", status: "ready" });
@@ -236,7 +251,7 @@ describe("feature pages on the server", () => {
       expect(ok.status).toBe(200);
       expect(ok.headers.get("cache-control")).toContain("no-store");
       const body = await ok.json();
-      expect(body.pages.length).toBe(FEATURE_CATALOGUE.length + 1);
+      expect(body.pages.length).toBe(FEATURE_CATALOGUE.length + DFY_CATALOGUE.length + 1);
     } finally {
       server.close();
     }

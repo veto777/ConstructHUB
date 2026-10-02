@@ -7,13 +7,17 @@
  * Section rhythm, as on /call-assistant: paper / paper-2 bands with hairline
  * borders, numbered small-caps kickers, Fraunces headings with one orange
  * italic phrase, hairline card grids, and a navy close.
+ *
+ * The same sections serve the done-for-you service pages (shared/dfy-pages):
+ * they take the shared content shape (LandingContent), and the few lines that
+ * differ — the back link, the compare link, the closing headline — are props.
  */
 import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, CheckCircle2, ChevronDown, Minus } from "lucide-react";
-import type { FeatureHeading, FeaturePage } from "@shared/feature-pages/types";
+import type { FeatureHeading, LandingContent } from "@shared/feature-pages/types";
 import type { FeaturePriceSummary } from "@shared/feature-pages/pricing";
-import type { FeatureCatalogueEntry } from "@shared/feature-pages";
+import { SALES_REP_LABEL } from "@shared/plan-copy";
 import { GabeAvatar, StandingGator } from "@/components/mascot";
 import { FEATURE_ICON_COMPONENTS } from "./icons";
 import { H2, Kicker, LEAD, PANEL_RULE, TEXT_LINK } from "./primitives";
@@ -48,8 +52,13 @@ export function ComingSoonPill({ className = "" }: { className?: string }) {
   );
 }
 
-/** "Included in every plan — from $29/mo." for the hero and the closing band. */
+/**
+ * "Included in every plan — from $29/mo." for the hero and the closing band;
+ * "Quoted by a sales rep for your business." when a rep prices it (the button
+ * beside it already says "Talk to a sales rep").
+ */
 export function priceSentence(s: FeaturePriceSummary): { strong: string; rest: string } {
+  if (!s.price && s.headline === SALES_REP_LABEL) return { strong: "Quoted by a sales rep", rest: " for your business." };
   if (!s.price) return { strong: s.headline, rest: "." };
   const from = s.plans.length > 1 ? "from " : "";
   return { strong: s.headline, rest: ` — ${from}${s.price}${s.per}.` };
@@ -57,14 +66,21 @@ export function priceSentence(s: FeaturePriceSummary): { strong: string; rest: s
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
+/** A plain link the page passes to a section: where it goes and its testid. */
+export type SectionLink = { label: string; href: string; testId: string };
+
+const ALL_FEATURES: SectionLink = { label: "All features", href: "/features", testId: "link-feature-all" };
+
 export function FeatureHero({
-  page, price, primaryCta, salesCta, tryIt,
+  page, price, primaryCta, salesCta, tryIt, back = ALL_FEATURES,
 }: {
-  page: FeaturePage;
+  page: LandingContent;
   price: FeaturePriceSummary;
   primaryCta: ReactNode;
   salesCta: ReactNode;
   tryIt: ReactNode;
+  /** The small link above the kicker: "All features" (a service page: "All services"). */
+  back?: SectionLink;
 }) {
   const sentence = priceSentence(price);
   return (
@@ -72,8 +88,8 @@ export function FeatureHero({
       <div className="absolute inset-0 mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,black_45%,transparent_100%)]" aria-hidden />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:grid lg:grid-cols-12 lg:gap-10 lg:items-center">
         <div className="lg:col-span-7 pt-8 sm:pt-12 lg:pt-16 pb-10 lg:pb-20">
-          <Link href="/features" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-mkt-muted hover:text-mkt-ink transition-colors mb-6" data-testid="link-feature-all">
-            <ArrowRight className="h-3.5 w-3.5 rotate-180" aria-hidden /> All features
+          <Link href={back.href} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-mkt-muted hover:text-mkt-ink transition-colors mb-6" data-testid={back.testId}>
+            <ArrowRight className="h-3.5 w-3.5 rotate-180" aria-hidden /> {back.label}
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <Kicker n="">{page.kicker}</Kicker>
@@ -170,7 +186,7 @@ function Band({
 
 // ── How it works ─────────────────────────────────────────────────────────────
 
-export function StepsSection({ page, n, tone }: { page: FeaturePage; n: string; tone: Tone }) {
+export function StepsSection({ page, n, tone }: { page: LandingContent; n: string; tone: Tone }) {
   if (!page.steps.length) return null;
   const count = page.steps.length;
   const heading = page.headings?.steps ?? { title: "Up and Running in ", em: `${NUMBER_WORDS[count] ?? count} Steps` };
@@ -192,7 +208,7 @@ export function StepsSection({ page, n, tone }: { page: FeaturePage; n: string; 
 
 // ── What you get ─────────────────────────────────────────────────────────────
 
-export function CardsSection({ page, n, tone }: { page: FeaturePage; n: string; tone: Tone }) {
+export function CardsSection({ page, n, tone }: { page: LandingContent; n: string; tone: Tone }) {
   if (!page.cards.length) return null;
   const heading = page.headings?.cards ?? { title: "What You Get With ", em: page.title };
   return (
@@ -241,7 +257,7 @@ function GridFillers({ count }: { count: number }) {
 
 // ── Spotlight (the "Calls & CRM" layout) ─────────────────────────────────────
 
-export function SpotlightSection({ page, n, tone }: { page: FeaturePage; n: string; tone: Tone }) {
+export function SpotlightSection({ page, n, tone }: { page: LandingContent; n: string; tone: Tone }) {
   const s = page.spotlight;
   if (!s) return null;
   return (
@@ -283,7 +299,7 @@ export function SpotlightSection({ page, n, tone }: { page: FeaturePage; n: stri
 
 // ── Who it's for ─────────────────────────────────────────────────────────────
 
-export function AudienceSection({ page, n, tone }: { page: FeaturePage; n: string; tone: Tone }) {
+export function AudienceSection({ page, n, tone }: { page: LandingContent; n: string; tone: Tone }) {
   if (!page.audience.length) return null;
   const heading = page.headings?.audience ?? { title: "Who It's ", em: "Built For" };
   const cols = page.audience.length === 2 ? "lg:grid-cols-2" : page.audience.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3";
@@ -305,13 +321,15 @@ export function AudienceSection({ page, n, tone }: { page: FeaturePage; n: strin
 // ── Pricing ──────────────────────────────────────────────────────────────────
 
 export function PricingSection({
-  page, price, n, tone, ctas,
+  page, price, n, tone, ctas, compare,
 }: {
-  page: FeaturePage;
+  page: LandingContent;
   price: FeaturePriceSummary;
   n: string;
   tone: Tone;
   ctas: ReactNode;
+  /** The line under the price card; default "Every plan and add-on, side by side: <price.link>". */
+  compare?: { lead: string; label: string; href: string };
 }) {
   const heading = page.headings?.pricing ?? { title: "What It ", em: "Costs" };
   // No plan rows (free, add-on-less, services): list what you get instead.
@@ -364,8 +382,8 @@ export function PricingSection({
             <p className="text-[15px] text-mkt-ink-soft leading-relaxed">{page.lede}</p>
           )}
           <p className="mt-6 pt-5 border-t border-mkt-rule text-[14px] text-mkt-ink-soft leading-relaxed">
-            Every plan and add-on, side by side:{" "}
-            <Link href={price.link.href} className={TEXT_LINK} data-testid="link-feature-pricing">{price.link.label}</Link>
+            {compare?.lead ?? "Every plan and add-on, side by side:"}{" "}
+            <Link href={compare?.href ?? price.link.href} className={TEXT_LINK} data-testid="link-feature-pricing">{compare?.label ?? price.link.label}</Link>
           </p>
         </div>
       </div>
@@ -376,7 +394,7 @@ export function PricingSection({
 
 // ── FAQ ──────────────────────────────────────────────────────────────────────
 
-export function FaqSection({ page, n, tone }: { page: FeaturePage; n: string; tone: Tone }) {
+export function FaqSection({ page, n, tone }: { page: LandingContent; n: string; tone: Tone }) {
   if (!page.faqs.length) return null;
   const heading = page.headings?.faq ?? { title: "Before You ", em: "Decide" };
   return (
@@ -396,9 +414,43 @@ export function FaqSection({ page, n, tone }: { page: FeaturePage; n: string; to
   );
 }
 
+// ── In depth ─────────────────────────────────────────────────────────────────
+
+/**
+ * The long-form explanation (content `inDepth`): its own band near the end of
+ * the page — kicker "In Depth", an H2, 2–5 paragraphs and an optional bullet
+ * list, in a reading column. Plain text, so it is in the prerendered HTML as is.
+ */
+export function InDepthSection({ page, n, tone }: { page: LandingContent; n: string; tone: Tone }) {
+  const d = page.inDepth;
+  if (!d) return null;
+  return (
+    <Band id="in-depth" n={n} kicker="In Depth" heading={d.heading} tone={tone} testId="section-feature-in-depth" narrow>
+      <div className="mt-8 space-y-5 text-[16.5px] text-mkt-ink-soft leading-[1.75] [&>p]:max-w-[35rem]" data-testid="text-feature-in-depth">
+        {d.paragraphs.map((para) => <p key={para}>{para}</p>)}
+        {d.bullets && d.bullets.length > 0 && (
+          <>
+            {d.bulletsIntro && <p className="font-semibold text-mkt-ink">{d.bulletsIntro}</p>}
+            <ul className="border-t border-mkt-rule">
+              {d.bullets.map((line) => (
+                <li key={line} className="flex gap-3 py-3 border-b border-dotted border-mkt-rule text-[15.5px] text-mkt-ink leading-relaxed">
+                  <CheckCircle2 className="h-[18px] w-[18px] mt-1 text-mkt-orange-ink shrink-0" aria-hidden /> {line}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </Band>
+  );
+}
+
 // ── Related features ─────────────────────────────────────────────────────────
 
-export function RelatedSection({ page, entries, n, tone }: { page: FeaturePage; entries: FeatureCatalogueEntry[]; n: string; tone: Tone }) {
+/** One related card: a feature or a done-for-you service. */
+export type RelatedEntry = { key: string; title: string; lede: string; path: string };
+
+export function RelatedSection({ page, entries, n, tone }: { page: LandingContent; entries: readonly RelatedEntry[]; n: string; tone: Tone }) {
   if (!entries.length) return null;
   const heading = page.headings?.related ?? { title: "Works Well ", em: "Together" };
   return (
@@ -425,12 +477,18 @@ export function RelatedSection({ page, entries, n, tone }: { page: FeaturePage; 
 
 // ── Closing band ─────────────────────────────────────────────────────────────
 
+const COMPARE_FEATURES: SectionLink = { label: "Compare every feature", href: "/features", testId: "link-feature-cta-all" };
+
 export function FinalCta({
-  page, price, ctas,
+  page, price, ctas, headline, more = COMPARE_FEATURES,
 }: {
-  page: FeaturePage;
+  page: LandingContent;
   price: FeaturePriceSummary;
   ctas: ReactNode;
+  /** The closing H2; default "Put <feature> to Work". */
+  headline?: string;
+  /** "Still deciding? <link>": every feature (a service page: every service). */
+  more?: SectionLink;
 }) {
   const sentence = priceSentence(price);
   return (
@@ -441,7 +499,7 @@ export function FinalCta({
           ? <GabeAvatar size={96} className="mx-auto mb-7 rounded-full" />
           : <StandingGator height={120} className="mx-auto mb-6" />}
         <h2 className="font-display font-semibold text-[2.3rem] sm:text-[2.9rem] lg:text-[3.3rem] leading-[1.05] tracking-[-0.02em] [overflow-wrap:anywhere] [text-wrap:balance]">
-          Put {page.ctaTitle ?? page.title} to Work
+          {headline ?? `Put ${page.ctaTitle ?? page.title} to Work`}
         </h2>
         <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
           {sentence.strong}{sentence.rest}
@@ -449,8 +507,8 @@ export function FinalCta({
         <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">{ctas}</div>
         <p className="mt-8 text-[14px] text-mkt-navy-muted">
           Still deciding?{" "}
-          <Link href="/features" className="font-semibold text-mkt-navy-ink underline decoration-2 decoration-mkt-orange underline-offset-4" data-testid="link-feature-cta-all">
-            Compare every feature
+          <Link href={more.href} className="font-semibold text-mkt-navy-ink underline decoration-2 decoration-mkt-orange underline-offset-4" data-testid={more.testId}>
+            {more.label}
           </Link>
         </p>
       </div>

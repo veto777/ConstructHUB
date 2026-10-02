@@ -1,7 +1,8 @@
 /**
  * /admin/feature-pages — platform admins' map of every feature intro page:
  * its group, whether it is written yet (stub / ready), the public page and the
- * page inside the app, plus /call-assistant and the home landing. Reached from
+ * page inside the app; then every done-for-you service page as a second group;
+ * plus /call-assistant, /reinstatement and the home landing. Reached from
  * the sidebar ("Feature pages · ADMIN") and the dashboard header.
  *
  * The list comes from GET /api/admin/feature-pages, which answers 403 to
@@ -27,7 +28,8 @@ type Row = {
   legacyPath: string | null;
   sources: string[];
 };
-type Payload = { catalogue: string; pages: Row[]; counts: { ready: number; stub: number } };
+type Counts = { ready: number; stub: number };
+type Payload = { catalogue: string; services?: string; pages: Row[]; counts: Counts; serviceCounts?: Counts };
 
 const STATUS: Record<Row["status"], { label: string; className: string; title: string }> = {
   ready: { label: "Ready", className: "border-emerald-500/50 text-emerald-700 dark:text-emerald-400", title: "Written and checked; in the sitemap" },
@@ -75,11 +77,19 @@ export default function AdminFeaturePagesPage() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground" data-testid="text-feature-pages-counts">
             {data.counts.ready} of {data.counts.ready + data.counts.stub} feature pages written{data.counts.stub > 0 ? " · the rest are stubs until their copy lands." : " · no stubs left."}
+            {data.serviceCounts && ` · ${data.serviceCounts.ready} of ${data.serviceCounts.ready + data.serviceCounts.stub} service pages written.`}
           </p>
         </div>
-        <Link href={data.catalogue} className={`${linkClass} shrink-0`} data-testid="link-admin-features-catalogue">
-          <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Open the public catalogue ({data.catalogue})
-        </Link>
+        <div className="flex shrink-0 flex-col gap-1 sm:items-end">
+          <Link href={data.catalogue} className={linkClass} data-testid="link-admin-features-catalogue">
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Open the public catalogue ({data.catalogue})
+          </Link>
+          {data.services && (
+            <Link href={data.services} className={linkClass} data-testid="link-admin-dfy-catalogue">
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Open the services catalogue ({data.services})
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 space-y-6">

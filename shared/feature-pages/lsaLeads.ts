@@ -120,6 +120,34 @@ const page: FeaturePage = {
       a: "It doesn't change your LSA budget, service areas or profile, and it doesn't call or message leads for you. For setup help, the free LSA guide covers verification, services, service areas and photos.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // pay per lead: client/src/pages/lsa-guide.tsx; discovery of every reachable account (customer_client tree), LSA first:
+  // server/lsa/sync.ts header + discovery; the rotating sync every minute + Sync now: server/lsa/routes.ts startLsaTimers,
+  // POST /api/lsa/sync; the three-day overlap: server/lsa/sync.ts OVERLAP_MS; Google-owned fields only on refresh:
+  // server/lsa/sync.ts upsert; the cost split per day: server/lsa/sync.ts syncLeadCostsForAccount; Good = SATISFIED,
+  // Bad = DISSATISFIED + reason, never re-rated: server/lsa/routes.ts /good, server/lsa/disputes.ts, shared/schema.ts
+  // LSA_DISPUTE_REASONS; the Telegram link and message: server/lsa/routes.ts /telegram/link, server/lsa/telegram.ts notifyNewLead.
+  inDepth: {
+    heading: { title: "Local Services Ads Leads, ", em: "Explained" },
+    paragraphs: [
+      "With Google Local Services Ads you pay per lead, so it matters which leads you were charged for and which ones " +
+        "were never real jobs. LSA Leads connects with the Google sign-in that has access to your Local Services Ads, " +
+        "finds every account that sign-in can reach, including client accounts under a manager account, and lists the " +
+        "accounts running Local Services first.",
+      "Leads sync in the background. A rotating sync runs every minute and works through your accounts, least recently " +
+        "synced first, and Sync now pulls right away. Each sync also re-reads the last three days, so a lead whose " +
+        "charged status changes shortly after it arrives is brought up to date. Google stays the source for the lead " +
+        "itself: the contact details its lead type includes, the service and category, the status, whether you were " +
+        "charged and its credit state.",
+      "The cost per lead is an estimate. Google reports an account's spend by day, not by lead, so LSA Leads splits " +
+        "each day's spend evenly across that day's charged leads. A lead you weren't charged for carries no cost.",
+      "Rating a lead sends your feedback to Google. Marking it good tells Google you were satisfied. Reporting it bad " +
+        "sends the reason you pick from Google's own list: a duplicate, outside your service area, a job type you don't " +
+        "offer, not ready to book, a sales call, or spam. Google decides whether to credit the lead, and the credit state " +
+        "shows what it decided. A lead Google already has feedback on can't be rated again. Link Telegram and each new " +
+        "lead also arrives as a direct message, with a button to report it as a bad lead right from the chat.",
+    ],
+  },
   related: ["adsManager", "guides", "crmLeads"],
   app: { href: "/lsa-leads", surface: "app" },
   headings: {
@@ -127,9 +155,9 @@ const page: FeaturePage = {
     cards: { title: "What LSA Leads ", em: "Gives You" },
   },
   seo: {
-    title: "LSA Leads — Local Services Ads Lead Tracking | ConstructHUB",
+    title: "Google LSA Lead Tracking & Disputes | ConstructHUB",
     description:
-      "Pull your Google Local Services Ads leads into one list, see which were charged, get Telegram alerts, and report bad leads to Google with a reason you choose.",
+      "Pull every Google Local Services Ads lead into one list, see which were charged and an estimated cost, get Telegram alerts, and report bad leads to Google.",
   },
   sources: [
     "client/src/pages/lsa-leads.tsx",

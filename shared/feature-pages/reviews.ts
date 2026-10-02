@@ -163,6 +163,39 @@ const page: FeaturePage = {
       a: "No. Only Google removes reviews. For a review that breaks Google's rules, Report gathers the evidence and opens Google's official form; a low rating on its own isn't a rule break.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the private 1–10 rating and showReview:true
+  // for every rating are server/routes.ts POST /api/review/:token/feedback; the AI review draft rules (client's own
+  // words, criticism kept, no keywords, never the score) are server/review-draft.ts reviewDraftMessages; reminders only
+  // to unanswered requests (status "sent"), up to 10, interval, windows and timezone are server/storage.ts
+  // getPendingReminders + server/review-reminders.ts; suppression is server/review-suppression.ts; tracking is
+  // shared/schema.ts reviewRequests; the AI reply rules, per-star rules, scope (new / existing reviews) and the
+  // low-star hold are server/gbp/review-automation.ts (replyPrompt, shouldAutoPublish, replySettingsSchema, the existing-review preview).
+  inDepth: {
+    heading: { title: "How to Ask for Google Reviews, ", em: "Explained" },
+    paragraphs: [
+      "Google Reviews is a review request tool for contractors. When a job wraps up, you send the client an email with " +
+        "your company name and logo and a link to a short page. There the client rates the job privately on a 1 to 10 " +
+        "scale and can write what went well or what didn't. Asking for Google reviews becomes one routine step at the " +
+        "end of every job.",
+      "That private rating never decides whether the client sees Google. Every client, whatever the score, is offered " +
+        "the option to leave a Google review; a low rating also opens a private form, so the feedback reaches you too. " +
+        "Asking only happy clients, often called review gating, is against Google's rules, and the page is built so it " +
+        "can't happen. If the client wants help with the wording, AI edits what they typed into a first-person draft. " +
+        "It uses only their own words, keeps any criticism, adds no keywords and never mentions the private score. The " +
+        "client checks the draft and posts it on Google themselves.",
+      "Reminders go only to clients who haven't answered yet. You set how many to send, up to 10, how far apart, and " +
+        "the hours of the day they may go out in your time zone. A client who unsubscribes gets no more reminders and " +
+        "can't be sent a new request. Each request records whether the email was opened, the link clicked, the job " +
+        "rated and the Google link opened. Google doesn't report whether a review was actually posted, so the request " +
+        "doesn't claim it.",
+      "On the reply side, link the listing in Locations and its Google reviews sync in with the rest of the profile, " +
+        "with an alert in the app and by email when a new one arrives. AI reply drafts follow the tone, sign-off, " +
+        "length and per-star rules you set, and use only what the review says: they don't invent work, staff, refunds " +
+        "or promises, and they acknowledge a complaint without confirming it as fact. Replies wait for your approval " +
+        "unless you choose auto-publish on a plan that includes it, and even then 1 and 2 star reviews stay drafts " +
+        "unless you allow them. You can apply your reply settings to new reviews only, or to older unanswered ones too.",
+    ],
+  },
   related: ["gbp", "profileGuard", "crm"],
   app: { href: "/google-reviews", surface: "app" },
   headings: {
@@ -171,9 +204,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Send a Request" },
   },
   seo: {
-    title: "Google Review Requests and AI Replies | ConstructHUB",
+    title: "Google Review Requests for Contractors | ConstructHUB",
     description:
-      "Email every client a review request with reminders, offer each one the Google review option, and reply to your Google reviews with AI drafts you approve.",
+      "Email clients a Google review request after each job, with reminders and no review gating, then answer Google reviews with AI reply drafts you approve.",
   },
   flag: "SHOW_GOOGLE_REVIEWS",
   sources: [
@@ -188,6 +221,7 @@ const page: FeaturePage = {
     "server/review-suppression.ts",
     "server/notification-kinds.ts",
     "server/routes.ts",
+    "server/storage.ts",
     "shared/schema.ts",
     "shared/plans.ts",
   ],

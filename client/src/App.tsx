@@ -7,7 +7,8 @@ import SocialMediaPage from "@/pages/social-media";
 import GuidesPage from "@/pages/guides";
 import SiteScanPage, { FreeSiteScanPage, SharedSiteScanPage } from "@/pages/site-scan";
 import { Switch, Route, useLocation, Link } from "wouter";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -52,37 +53,10 @@ import LsaGuidePage from "@/pages/lsa-guide";
 import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
-import AdminFeaturePagesPage from "@/pages/admin-feature-pages";
+import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
-import CrmTeamPage from "@/pages/crm-team";
-import CrmJoinPage from "@/pages/crm-join";
-import CrmHomePage from "@/pages/crm-home";
-import CrmSchedulePage from "@/pages/crm-schedule";
-import CrmInboxPage from "@/pages/crm-inbox";
-import CrmCallAssistantPage from "@/pages/crm-call-assistant";
-import CrmClientsPage from "@/pages/crm-clients";
-import CrmClientPage from "@/pages/crm-client";
-import CrmPaymentsPage from "@/pages/crm-payments";
-import CrmEstimatesPage from "@/pages/crm-estimates";
-import CrmEstimateNewPage from "@/pages/crm-estimate-new";
-import CrmEstimateDetailPage from "@/pages/crm-estimate-detail";
-import CrmInvoicesPage from "@/pages/crm-invoices";
-import CrmPipelinePage from "@/pages/crm-pipeline";
-import CrmPriceBookPage from "@/pages/crm-pricebook";
-import CrmProjectPage from "@/pages/crm-project";
-import CrmSettingsPage from "@/pages/crm-settings";
-import CrmIntegrationsPage from "@/pages/crm-integrations";
-import CrmReportsPage from "@/pages/crm-reports";
-import CrmMigratePage from "@/pages/crm-migrate";
-import CrmAdminPage from "@/pages/crm-admin";
 import { CrmLogo } from "@/components/crm-logo";
-import PublicEstimatePage from "@/pages/public-estimate";
-import PublicPortalPage from "@/pages/public-portal";
-import PublicInvoicePage from "@/pages/public-invoice";
-import PublicChangeOrderPage from "@/pages/public-change-order";
-import PublicLeadFormPage from "@/pages/public-lead-form";
-import ClientPortalPage from "@/pages/client-portal";
 import { isPortal, isClientPortal, CRM_NAME } from "@/lib/site";
 import IpTrackerPage from "@/pages/ip-tracker";
 import CrmGatewayPage from "@/pages/crm-gateway";
@@ -101,6 +75,39 @@ import MediaLibraryPage from "@/pages/media-library";
 import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
+import { useSeoHead } from "@/lib/seo-head";
+import { pageMetaFor } from "@shared/route-meta";
+
+// Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
+// on demand, so the marketing pages (and every signed-out visitor) don't download them.
+const AdminFeaturePagesPage = lazy(() => import("@/pages/admin-feature-pages"));
+const CrmTeamPage = lazy(() => import("@/pages/crm-team"));
+const CrmJoinPage = lazy(() => import("@/pages/crm-join"));
+const CrmHomePage = lazy(() => import("@/pages/crm-home"));
+const CrmSchedulePage = lazy(() => import("@/pages/crm-schedule"));
+const CrmInboxPage = lazy(() => import("@/pages/crm-inbox"));
+const CrmCallAssistantPage = lazy(() => import("@/pages/crm-call-assistant"));
+const CrmClientsPage = lazy(() => import("@/pages/crm-clients"));
+const CrmClientPage = lazy(() => import("@/pages/crm-client"));
+const CrmPaymentsPage = lazy(() => import("@/pages/crm-payments"));
+const CrmEstimatesPage = lazy(() => import("@/pages/crm-estimates"));
+const CrmEstimateNewPage = lazy(() => import("@/pages/crm-estimate-new"));
+const CrmEstimateDetailPage = lazy(() => import("@/pages/crm-estimate-detail"));
+const CrmInvoicesPage = lazy(() => import("@/pages/crm-invoices"));
+const CrmPipelinePage = lazy(() => import("@/pages/crm-pipeline"));
+const CrmPriceBookPage = lazy(() => import("@/pages/crm-pricebook"));
+const CrmProjectPage = lazy(() => import("@/pages/crm-project"));
+const CrmSettingsPage = lazy(() => import("@/pages/crm-settings"));
+const CrmIntegrationsPage = lazy(() => import("@/pages/crm-integrations"));
+const CrmReportsPage = lazy(() => import("@/pages/crm-reports"));
+const CrmMigratePage = lazy(() => import("@/pages/crm-migrate"));
+const CrmAdminPage = lazy(() => import("@/pages/crm-admin"));
+const PublicEstimatePage = lazy(() => import("@/pages/public-estimate"));
+const PublicPortalPage = lazy(() => import("@/pages/public-portal"));
+const PublicInvoicePage = lazy(() => import("@/pages/public-invoice"));
+const PublicChangeOrderPage = lazy(() => import("@/pages/public-change-order"));
+const PublicLeadFormPage = lazy(() => import("@/pages/public-lead-form"));
+const ClientPortalPage = lazy(() => import("@/pages/client-portal"));
 
 /**
  * The old one-off landing pages, retired into /features/<slug>: the old URLs
@@ -142,6 +149,7 @@ function SettingsApiRedirect() {
 
 function DashboardRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/search" component={SearchPage} />
@@ -186,6 +194,9 @@ function DashboardRouter() {
       {/* Every feature's intro page (shared/feature-pages), inside the app frame when signed in. */}
       <Route path="/features" component={FeaturesCataloguePage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
+      {/* Every done-for-you service's page (shared/dfy-pages), inside the app frame when signed in. */}
+      <Route path="/done-for-you" component={DfyCataloguePage} />
+      <Route path="/done-for-you/:slug" component={DfyPageRoute} />
       {/* Platform admins: every feature page, its status and links (the API answers 403 to anyone else). */}
       <Route path="/admin/feature-pages" component={AdminFeaturePagesPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
@@ -216,36 +227,73 @@ function DashboardRouter() {
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
+
+/**
+ * The signed-out tool pages and the CRM legal pages have no masthead of their
+ * own: the site's ribbon (Features ▾, Done-For-You ▾, Plans, Results, Coverage,
+ * sign in) goes above them, as on every other public page (owner, 2026-10-02:
+ * "make sure every page keeps the menu details in the ribbon"). Defined once at
+ * module scope so a re-render never remounts the page. Left out on purpose: the
+ * pages a contractor's own customer opens (/review/<token>, /contract/sign/<token>).
+ */
+function withRibbon(Page: ComponentType<any>): ComponentType<any> {
+  function RibbonedPage(props: any) {
+    const [location] = useLocation();
+    return (
+      <>
+        <PublicPageHeader next={`${location}${window.location.search}`} />
+        <Page {...props} />
+      </>
+    );
+  }
+  return RibbonedPage;
+}
+
+const Ribboned = {
+  DatabasesPage: withRibbon(DatabasesPage),
+  PropertyPage: withRibbon(PropertyPage),
+  PhotosPage: withRibbon(PhotosPage),
+  GoogleAdsPage: withRibbon(GoogleAdsPage),
+  AdsManagerPage: withRibbon(AdsManagerPage),
+  GoogleAdsGuideSectionPage: withRibbon(GoogleAdsGuideSectionPage),
+  IpTrackerPage: withRibbon(IpTrackerPage),
+  VpnShieldPage: withRibbon(VpnShieldPage),
+  CrmTermsPage: withRibbon(CrmTermsPage),
+  CrmPrivacyPage: withRibbon(CrmPrivacyPage),
+};
 
 function PublicRouter() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/databases" component={DatabasesPage} />
-      <Route path="/property" component={PropertyPage} />
-      <Route path="/photos" component={PhotosPage} />
+      <Route path="/databases" component={Ribboned.DatabasesPage} />
+      <Route path="/property" component={Ribboned.PropertyPage} />
+      <Route path="/photos" component={Ribboned.PhotosPage} />
       <Route path="/pricing" component={PricingPage} />
       {/* Signed-out visitors get the free public scan; the full tool needs an account. */}
       <Route path="/site-scan" component={FreeSiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
-      <Route path="/google-ads" component={GoogleAdsPage} />
-      <Route path="/ads-manager" component={AdsManagerPage} />
+      <Route path="/google-ads" component={Ribboned.GoogleAdsPage} />
+      <Route path="/ads-manager" component={Ribboned.AdsManagerPage} />
       <Route path="/google-ads-landing" component={GoogleAdsLanding} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
-      <Route path="/google-ads-guide/:section" component={GoogleAdsGuideSectionPage} />
+      <Route path="/google-ads-guide/:section" component={Ribboned.GoogleAdsGuideSectionPage} />
       <Route path="/google-ad-fraud" component={GoogleAdFraudPage} />
       <Route path="/lsa-guide" component={LsaGuidePage} />
-      <Route path="/ip-tracker" component={IpTrackerPage} />
+      <Route path="/ip-tracker" component={Ribboned.IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/features" component={FeaturesCataloguePage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
-      <Route path="/vpn-shield" component={VpnShieldPage} />
+      <Route path="/done-for-you" component={DfyCataloguePage} />
+      <Route path="/done-for-you/:slug" component={DfyPageRoute} />
+      <Route path="/vpn-shield" component={Ribboned.VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/developers" component={DevelopersPage} />
       <Route path="/permits-landing" component={PermitsLanding} />
@@ -254,8 +302,8 @@ function PublicRouter() {
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
       <Route path="/contract/sign/:token" component={ContractSignPage} />
-      <Route path="/crm-terms" component={CrmTermsPage} />
-      <Route path="/crm-privacy" component={CrmPrivacyPage} />
+      <Route path="/crm-terms" component={Ribboned.CrmTermsPage} />
+      <Route path="/crm-privacy" component={Ribboned.CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/landing" component={LandingPage} />
@@ -289,9 +337,10 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/admin/feature-pages"];
-/** Feature intro pages title themselves from their content (seo.title). */
-const isSelfTitled = (location: string) => SELF_TITLED.includes(location) || location.startsWith("/features/");
+const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages"];
+/** Feature and service pages title themselves from their content (seo.title). */
+const isSelfTitled = (location: string) =>
+  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
 const PAGE_TITLES: Record<string, string> = {
   "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
   "/schedules": "Scrape Schedules", "/history": "Search History", "/photos": "Photo Optimizer",
@@ -320,6 +369,7 @@ const sidebarStyle = {
 /** The portal (portal.constructhub.*) is the CRM only — no marketing routes. */
 function PortalRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       <Route path="/" component={CrmHomePage} />
       <Route path="/crm" component={CrmHomePage} />
@@ -363,12 +413,14 @@ function PortalRouter() {
       {/* Unknown portal route -> home, which always offers the next action. */}
       <Route component={CrmHomePage} />
     </Switch>
+    </Suspense>
   );
 }
 
 /** Signed-out portal visitors get the login screen, not the marketing landing page. */
 function PortalPublicRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       {/* Client-facing links are token-authorised and must never demand a login. */}
       <Route path="/crm-terms" component={CrmTermsPage} />
@@ -382,6 +434,7 @@ function PortalPublicRouter() {
       <Route path="/auth" component={AuthPage} />
       <Route component={AuthPage} />
     </Switch>
+    </Suspense>
   );
 }
 
@@ -393,6 +446,7 @@ function PortalPublicRouter() {
  */
 function ClientRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       <Route path="/" component={ClientPortalPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
@@ -404,6 +458,7 @@ function ClientRouter() {
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={ClientPortalPage} />
     </Switch>
+    </Suspense>
   );
 }
 
@@ -436,9 +491,15 @@ function AppContent() {
   // effects, so self-titled pages are skipped rather than overwritten).
   useEffect(() => {
     if (portal || clientPortal || isSelfTitled(location)) return;
+    // A marketing or public app page's title is the one the server wrote into its HTML (shared/route-meta.ts).
+    const meta = pageMetaFor(location);
+    if (meta) { document.title = meta.title; return; }
     const key = Object.keys(PAGE_TITLES).find(p => location === p || location.startsWith(`${p}/`));
     document.title = key ? `${PAGE_TITLES[key]} | ConstructHUB` : DEFAULT_TITLE;
   }, [location, portal, clientPortal]);
+
+  // Canonical link, Open Graph / Twitter tags and JSON-LD follow the page (lib/seo-head.ts); never on the portals.
+  useSeoHead(location, !portal && !clientPortal);
 
   if (location === "/free-site-scan") return <FreeSiteScanPage />;
   if (location.startsWith("/site-scan/report/")) return <SharedSiteScanPage />;
@@ -633,7 +694,10 @@ function App() {
         <CartProvider>
           <TooltipProvider>
             <CookieConsent />
-            <AppContent />
+            {/* The lazily loaded pages outside a router (a document link, the client portal) wait here. */}
+            <Suspense fallback={null}>
+              <AppContent />
+            </Suspense>
             <Toaster />
           </TooltipProvider>
         </CartProvider>

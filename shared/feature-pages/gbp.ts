@@ -156,6 +156,39 @@ const page: FeaturePage = {
       a: "We don't promise that. It shows the figures Google reports and keeps your listing data in one place; it doesn't change how Google ranks your business.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the connection and the account list are
+  // server/gbp/routes.ts + server/gbp/grants.ts; linking a Places-added row on connect is service.ts autoLinkAndSync;
+  // the three independent sync parts, the 90-day first window, the 7-day overlap, the one-time back-fill
+  // (PERFORMANCE_HISTORY_DAYS ≈ 18 months), "verified listings only" and the snapshot Site Scan compares against are
+  // service.ts syncLocation (read by server/sitescan/worker.ts); the metrics are client.ts METRICS; the six-hour schedule on an active plan is
+  // server/agency/jobs.ts syncDue/scheduleSyncs; unlink clears synced data is service.ts unlinkLocation.
+  inDepth: {
+    heading: { title: "Google Business Profile Management, ", em: "Explained" },
+    paragraphs: [
+      "Your Google Business Profile is the listing that shows your business on Google Search and Maps. The Locations " +
+        "page keeps a synced copy of each listing you manage, next to the rest of your tools. It connects through " +
+        "Google's own sign-in: you approve access for the Google account that owns or manages the listing, and " +
+        "ConstructHUB lists the profiles that account can reach. If you had already added the business by searching " +
+        "Google, connecting the account that manages it links that location to the listing and syncs it.",
+      "A sync reads three parts, each on its own: the profile (name, address, phone, website, categories, services, " +
+        "hours, service areas, open status and every business and customer photo), the reviews, and the daily " +
+        "performance figures. If one part fails, the others still update, the last good copy of the failed part stays " +
+        "in place, and the location says what went wrong. Syncs run every six hours while your plan is active and the " +
+        "Google account stays connected. Site Scan uses the synced name, address, phone, services and service areas to " +
+        "check your website against your profile.",
+      "Performance figures come from Google's Business Profile performance reports: views on Search and Maps, split by " +
+        "mobile and desktop, plus website clicks, call clicks and direction requests. The first sync asks for about 90 " +
+        "days, then reaches back once for the older days Google still holds, roughly 18 months. Every later sync " +
+        "re-reads the last seven days, because Google corrects recent days after the fact; that's why the newest days " +
+        "are marked not final yet. Google keeps a rolling window, but every day ConstructHUB has synced stays stored, " +
+        "so your own history keeps growing.",
+      "Google shares performance figures only for listings it has verified, so an unverified listing syncs its details " +
+        "and shows a message instead of figures. The Locations page reads your listing; it doesn't edit it. You keep " +
+        "making changes in Google Business Profile, and the next sync brings them in. Unlinking a location stops the " +
+        "sync and clears the Google data stored for it, and removing a location from ConstructHUB leaves your Google " +
+        "listing exactly as it is.",
+    ],
+  },
   related: ["profileGuard", "reviews", "gbpContent"],
   app: { href: "/locations", surface: "app", label: "Open Locations" },
   headings: {
@@ -164,15 +197,18 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Connect" },
   },
   seo: {
-    title: "Google Business Profile Management for Contractors | ConstructHUB",
+    title: "Contractor Google Business Profile Management | ConstructHUB",
     description:
-      "Connect your Google Business Profile, import your locations and see details, services, photos and Google performance figures in one place, synced every six hours.",
+      "Manage every Google Business Profile location in one place: details, services, photos, reviews and Search and Maps figures, synced every six hours.",
   },
   sources: [
     "client/src/pages/locations.tsx",
     "client/src/components/agency-workspace.tsx",
     "server/gbp/routes.ts",
     "server/gbp/service.ts",
+    "server/gbp/client.ts",
+    "server/gbp/grants.ts",
+    "server/sitescan/worker.ts",
     "server/agency/jobs.ts",
     "server/routes.ts",
     "shared/plans.ts",

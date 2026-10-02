@@ -1,4 +1,5 @@
 import { AgencyWorkspace } from "@/components/agency-workspace";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import {
   FixChecklist,
   ReportFilters,
@@ -1295,6 +1296,8 @@ export function FreeSiteScanPage() {
     retry: false,
   });
   return (
+    <>
+    <PublicPageHeader next="/free-site-scan" />
     <main className="max-w-4xl mx-auto p-8 space-y-6">
       <a href="/" className="text-primary">
         ConstructHUB
@@ -1399,6 +1402,7 @@ export function FreeSiteScanPage() {
       {data?.summary && <ScanReport report={data.summary} summary />}
       <ScanReport report={data?.report} />
     </main>
+    </>
   );
 }
 export function SiteScanLeads() {

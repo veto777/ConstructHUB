@@ -171,6 +171,38 @@ const page: FeaturePage = {
       a: "It isn't accounting or payroll software and doesn't sync with one; export your data or use the scheduled backups instead. Client text replies don't come back into the CRM: client conversations happen in the portal and by email.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // tax order (typed rate, city override, division default, org default): server/crm/tax.ts header; email-gated links and
+  // no costs/internal items on public pages: server/crm/portal.ts header; seven-day expiry: server/crm/entities.ts
+  // ESTIMATE_EXPIRY_DAYS; first open / repeat views / reading time / 30-minute refresh rule: server/crm/portal.ts
+  // VIEW_DEDUPE_MIN, engagementIncrement; the contract PDF contents and who gets it: server/crm/contract-pdf.ts header;
+  // Connect Standard, merchant of record, no application fee, ACH/card/both and card withheld above an amount:
+  // server/crm/payments.ts header, paymentSettingsOf, client/src/pages/crm-settings.tsx; divisions: server/crm/divisions.ts;
+  // no accounting sync, CSV export, backups: server/crm/entities.ts export.csv, server/crm/backups.ts.
+  inDepth: {
+    heading: { title: "How a Contractor CRM ", em: "Runs a Job" },
+    paragraphs: [
+      "ConstructHub CRM is a construction CRM built around the estimate. You build it from your price book, with good, " +
+        "better and best options if you want them. Sales tax fills in from the rate you set for the job's city, then the " +
+        "division's default, then the company's, unless you type a rate yourself. When you send it, the client gets an " +
+        "email with a secure link. That link only opens for someone who can confirm the email address it was sent to, so " +
+        "a forwarded link is no use to anyone else, and your costs and internal-only line items never reach the client's " +
+        "page.",
+      "A sent estimate expires seven days after sending by default. Until the client answers, the CRM records when they " +
+        "first open it, each time they come back and how long they spend reading; a refresh within half an hour from the " +
+        "same place isn't counted as a new view. When the client approves by typing their name, the CRM builds the signed " +
+        "contract PDF with your letterhead, the options, the discounts they chose, the totals, your terms and the " +
+        "signature, and emails it to the client and to you.",
+      "Payments run through your own Stripe account using Stripe Connect Standard, so you are the merchant of record " +
+        "and the money goes straight to you; ConstructHUB takes no application fee. You choose whether clients can pay by " +
+        "bank transfer (ACH), by card or both, and you can switch card off above an amount you set, since bank transfers " +
+        "cost far less on a large deposit. Cash, checks and wires can be recorded by hand.",
+      "If you run more than one division, each one can carry its own letterhead and tax rates, and team members can be " +
+        "kept to their own division's work. The CRM is not accounting or payroll software and doesn't sync with one. " +
+        "Export your client list as a CSV file, or have your clients, estimates and invoices emailed to you on a " +
+        "schedule.",
+    ],
+  },
   related: ["crmSchedule", "crmLeads", "texting"],
   app: { href: "/crm", surface: "portal", label: "Open your CRM" },
   headings: {
@@ -179,9 +211,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Switch" },
   },
   seo: {
-    title: "ConstructHub CRM — Estimates, Jobs & Payments | ConstructHUB",
+    title: "Contractor CRM — Estimates, Jobs & Payments | ConstructHUB",
     description:
-      "A CRM for contractors: estimates clients sign online, a client portal, a job pipeline, invoices and ACH or card payments into your own Stripe account.",
+      "A contractor CRM with estimates clients sign online, a client portal, a job pipeline, and invoices paid by ACH or card into your own Stripe account.",
   },
   sources: [
     "server/crm/tenancy.ts",
@@ -213,6 +245,7 @@ const page: FeaturePage = {
     "server/crm/migrate-lib.ts",
     "server/crm/backups.ts",
     "server/crm/entities.ts",
+    "client/src/pages/crm-settings.tsx",
   ],
 };
 

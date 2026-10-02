@@ -129,15 +129,50 @@ const page: FeaturePage = {
       a: "Yes. Google limits URL inspections per property each day and each minute, and ConstructHUB stops before reaching that limit. Background work is also capped per hour.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the separate grant and scope are
+  // server/gsc/client.ts GSC_SCOPE + service.ts saveGscGrant; properties → locations is discoverProperties +
+  // server/cloudflare/common.ts mapLocations; the sync (sitemaps, date/query/page/device/country, default 31→3 days ago,
+  // type "web", dataState "final") is service.ts syncProperty/analyticsPage and the 16-month floor is
+  // server/cloudflare/routes.ts; day/week/month grouping and Google's caveats (top rows, anonymised queries, weighted
+  // CTR/position) are server/gsc/routes.ts GET …/analytics; inspection and its per-property day/minute budgets are
+  // service.ts inspectUrl; the Site Scan and location cards are indexingForUrls/locationSearchClicks with
+  // client/src/pages/site-connections.tsx ScanIndexingSummary/LocationSearchSummary; onboarding emails are
+  // server/cloudflare/routes.ts /invites.
+  inDepth: {
+    heading: { title: "Google Search Console for Every Property, ", em: "Explained" },
+    paragraphs: [
+      "Google Search Console is Google's own report on how a website does in Google Search: the searches it showed up " +
+        "for, how often it was clicked, and whether Google has indexed its pages. This tool brings that data into " +
+        "ConstructHUB for every property a Google account can open, so an agency or a multi-location company doesn't " +
+        "have to sign in to each one. The Google connection is its own permission, kept apart from your Business " +
+        "Profile connection, and each property is linked to the location whose website matches.",
+      "A sync reads the property's sitemaps and its search performance for the dates you choose, up to 16 months back. " +
+        "By default it covers about the last month and stops three days short of today, because Google reports search " +
+        "data with a delay and only finished data is requested. Clicks, impressions and average position are kept by " +
+        "date, query, page, device and country for web search, and you can read them grouped by day, week or month. " +
+        "Click-through rate and position are weighted by impressions. Google returns the top rows and leaves out some " +
+        "anonymised queries, so a list of queries won't add up to every click.",
+      "URL inspection asks Google for its current verdict on a page: whether it is indexed and its coverage state. " +
+        "Results are kept and summarised across the URLs you've inspected, and a Site Scan report shows the latest " +
+        "result next to each page it scanned, which ties your contractor website SEO checklist to what Google actually " +
+        "did with the page. Google limits inspections per property each day and each minute, and ConstructHUB stops " +
+        "before reaching that limit. Sitemaps can be submitted from here too, after you confirm, when the account has " +
+        "full or owner access.",
+      "Two other places use the data. A location's Insights tab shows its property's clicks and impressions for the " +
+        "last 30 days, and client onboarding emails a client the steps to add your Google account as a user on their " +
+        "property, which then shows up here. What it does not do: verify a website in Search Console for you, request " +
+        "indexing, or decide what Google indexes. Viewing works with restricted access.",
+    ],
+  },
   related: ["siteScan", "cloudflare", "gbp"],
   app: { href: "/search-console", surface: "app" },
   headings: {
     cards: { title: "What It ", em: "Shows You" },
   },
   seo: {
-    title: "Search Console — Clicks, Queries and Indexing | ConstructHUB",
+    title: "Google Search Console Reports and Indexing | ConstructHUB",
     description:
-      "Sync Google Search Console clicks, impressions, CTR and position by query, page, device and country, inspect URLs and submit sitemaps for each property.",
+      "Sync Google Search Console clicks, impressions, CTR and position by query, page, device and country, inspect URLs and submit sitemaps for each site.",
   },
   sources: [
     "client/src/pages/site-connections.tsx",

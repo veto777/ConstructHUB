@@ -77,7 +77,7 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
       return {
         headline: "Included in every plan",
         price: formatUsd(PLANS[cheapest].monthlyCents), per: PER_MONTH,
-        priceNote: `From the ${fromPlan(cheapest)}. Every plan starts with a ${TRIAL_DAYS}-day trial.`,
+        priceNote: `From the ${fromPlan(cheapest)}. A new account's first plan starts with a ${TRIAL_DAYS}-day trial.`,
         rows: spec.allowance ? allowanceRows(spec.allowance) : includedRows(PLAN_KEYS),
         plans: [...PLAN_KEYS], comingSoon: false, link: PLANS_LINK, note,
       };
@@ -89,7 +89,7 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
       return {
         headline: plans.length === PLAN_KEYS.length ? "Included in every plan" : `Included from the ${PLANS[cheapest].name} plan`,
         price: formatUsd(PLANS[cheapest].monthlyCents), per: PER_MONTH,
-        priceNote: `From the ${fromPlan(cheapest)}. Every plan starts with a ${TRIAL_DAYS}-day trial.`,
+        priceNote: `From the ${fromPlan(cheapest)}. A new account's first plan starts with a ${TRIAL_DAYS}-day trial.`,
         rows: allowanceRows(a), plans, comingSoon: false, link: PLANS_LINK, note,
       };
     }

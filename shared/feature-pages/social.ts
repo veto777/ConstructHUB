@@ -137,6 +137,38 @@ const page: FeaturePage = {
       a: "Yes. The How it works tab on the Social Media page has step-by-step guides for connecting Blotato, manual posting, auto mode and multi-business work.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the encrypted Blotato key is
+  // server/social/client.ts encryptKey + service.ts; per-network tweaks, titles and limits, 10 media links and 20
+  // destinations are shared/social.ts postSchema/socialLimits; per-destination status and queued ≠ published are
+  // server/social/routes.ts + client/src/pages/guides.tsx ("Manual posting"); the content mix and its sources (photos
+  // from the linked profile or Media Library, tips, synced reviews, offers and Google updates from the last 30 days)
+  // are server/social/service.ts sourceFor; the draft rules are service.ts generatePostText; cadence, quiet hours,
+  // time zone, daily AI budget, approval vs automatic, and queued automatic posts back to drafts are shared/social.ts
+  // autoSchema/inBlackout + service.ts saveSettings and the publish loop.
+  inDepth: {
+    heading: { title: "Social Media Scheduling for Contractors, ", em: "Explained" },
+    paragraphs: [
+      "Social Media is a social media scheduler: you write a post once, adjust it for each network, and send it to " +
+        "the pages and accounts you've mapped to a business. Publishing runs through Blotato, a separate posting " +
+        "service where you connect your social accounts. ConstructHUB stores your Blotato API key encrypted, never " +
+        "shows it again, and hands each post to Blotato for every destination you picked.",
+      "Each network has its own rules, so each destination gets its own text tweak and character counter, plus the " +
+        "settings some networks require, such as a YouTube title or TikTok privacy. Once a post is sent, every " +
+        "destination keeps its own status. A post that is queued or accepted isn't confirmed until the network " +
+        "publishes it; when it is, the calendar links to the live post. If a status stays unclear, check before " +
+        "posting again so the same post doesn't go out twice.",
+      "Auto mode drafts posts from material that already exists, in the mix you choose: project photos from your " +
+        "linked Google profile or Media Library, general maintenance tips, your synced Google reviews, and the offers " +
+        "and Google updates saved in the last 30 days. Each draft is a short post written only from that material and " +
+        "your business facts, and the AI is told never to invent completed work, customer quotes, offers, credentials or " +
+        "results. When a type has nothing to draw on, such as no recent offer, auto mode reports it instead of making " +
+        "one up.",
+      "You set how often auto mode posts, one to seven times per day or per week, your time zone, quiet hours when " +
+        "automatic posts wait, and a daily AI budget. Drafts wait in the approval queue by default. Fully automatic " +
+        "publishing is a separate setting, and switching back to approval returns queued automatic posts to drafts. " +
+        "ConstructHUB doesn't bill for posting or count your posts; Blotato bills you under your own subscription.",
+    ],
+  },
   related: ["gbpContent", "media", "gbp"],
   app: { href: "/social-media", surface: "app" },
   headings: {
@@ -144,9 +176,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Connect" },
   },
   seo: {
-    title: "Social Media Scheduling for Contractors | ConstructHUB",
+    title: "Social Media Scheduler for Contractors | ConstructHUB",
     description:
-      "Compose once, tune it for each network and publish now or on a schedule. Auto mode drafts posts from your offers and Google updates for you to approve.",
+      "Write a post once, tune it per network and publish now or on a schedule. Auto mode drafts posts from your offers, photos and Google updates to approve.",
   },
   sources: [
     "client/src/pages/social-media.tsx",
