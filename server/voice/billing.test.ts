@@ -2,8 +2,8 @@
  * Call Assistant billing (numbers+billing lane): the price-book block, the
  * voice_usage meter and overage billing.
  *
- * Part 1 is pure (the price book, the add-on checkout rules with `preview`
- * lifted in-process, the minute maths). Part 2 runs the meter against the
+ * Part 1 is pure (the price book, the add-on checkout rules — the tiers are
+ * for sale since the launch — and the minute maths). Part 2 runs the meter against the
  * development lane DB (rows in the year 2001, so nothing real is touched) and
  * bills overage through a FAKE Stripe that records every call — nothing
  * leaves the box.
@@ -54,7 +54,9 @@ describe("Call Assistant price book: four tiers (owner, 2026-10-02)", () => {
       const a = ADDONS[t.addon];
       // The add-on IS the tier: one source for checkout, Stripe prices and the pages.
       expect(a).toMatchObject({ key: t.addon, name: `AI Call Assistant — ${t.name}`, monthlyCents: t.monthlyCents, annualCents: t.annualCents,
-        availableOn: ["pro", "growth", "agency"], preview: true, exclusiveGroup: "call_assistant_tier", grants: {} });
+        availableOn: ["pro", "growth", "agency"], exclusiveGroup: "call_assistant_tier", grants: {} });
+      // Launched (owner, 2026-10-02: "the call assistant is live not coming soon"): every tier is for sale.
+      expect(a.preview ?? false).toBe(false);
       // Each yearly price is its own number (not 10 × monthly); it shows despite the $1,000 sales threshold (add-on annuals are exempt).
       expect(a.annualCents).not.toBe(a.monthlyCents * ANNUAL_MONTHS);
       expect(a.monthlyCents).toBeLessThan(SALES_THRESHOLD_CENTS);
@@ -72,7 +74,8 @@ describe("Call Assistant price book: four tiers (owner, 2026-10-02)", () => {
     expect(CALL_ASSISTANT_TIERS.filter((t) => t.introMonthlyCents).map((t) => t.tier)).toEqual(["solo"]);
     expect(ADDONS.call_assistant_crew.introMonthlyCents).toBeUndefined();
     expect(ADDONS.call_assistant_fleet.introMonthlyCents).toBeUndefined();
-    expect(ADDONS.call_number).toMatchObject({ key: "call_number", monthlyCents: 500, preview: true });
+    expect(ADDONS.call_number).toMatchObject({ key: "call_number", monthlyCents: 500 });
+    expect(ADDONS.call_number.preview ?? false).toBe(false);
     expect(ADDONS.call_number.requires).toEqual(["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet"]);
     expect(ADDONS.call_number.annualCents).toBe(ADDONS.call_number.monthlyCents * ANNUAL_MONTHS);
   });
@@ -89,49 +92,52 @@ describe("Call Assistant price book: four tiers (owner, 2026-10-02)", () => {
     expect(callAssistantTier("crew").name).toBe("Crew");
   });
 
-  it("buys through the existing add-on checkout once preview is lifted: plan, requires, exclusivity and preview rules", async () => {
+  it("buys through the existing add-on checkout, on sale since the launch: plan, requires, exclusivity and preview rules", async () => {
     const { checkAddonsForPlan, mergeAddonRequest } = await import("../billing/order");
-    // While in preview: refused, nothing charged — every tier.
-    for (const t of CALL_ASSISTANT_TIERS) expect(() => checkAddonsForPlan("pro", { [t.addon]: 1 })).toThrow(/isn't available yet/);
+    // Launched (owner, 2026-10-02): every tier and the extra number are for sale — Pro, Growth and Agency.
     const keys = ["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet", "call_number"] as const;
+    for (const k of keys) expect(ADDONS[k].preview ?? false, k).toBe(false);
+    for (const plan of ["pro", "growth", "agency"] as const) {
+      for (const t of CALL_ASSISTANT_TIERS) {
+        expect(() => checkAddonsForPlan(plan, { [t.addon]: 1 })).not.toThrow();
+        expect(() => checkAddonsForPlan(plan, { [t.addon]: 1, call_number: 2 })).not.toThrow();
+      }
+    }
+    expect(() => checkAddonsForPlan("starter", { call_assistant_crew: 1 })).toThrow(/isn't available on the Starter plan/);
+    expect(() => checkAddonsForPlan("pro", { call_number: 1 })).toThrow(/needs one of these add-ons/);
+    // Exactly one tier, one unit.
+    expect(() => checkAddonsForPlan("pro", { call_assistant: 1, call_assistant_crew: 1 })).toThrow(/can't both be on one subscription/);
+    expect(() => checkAddonsForPlan("pro", { call_assistant_fleet: 2 })).toThrow(/one per subscription/);
+    // Lite is a tier like the others: one at a time, starter can't have it.
+    expect(() => checkAddonsForPlan("pro", { call_assistant_lite: 1, call_assistant: 1 })).toThrow(/can't both be on one subscription/);
+    expect(() => checkAddonsForPlan("starter", { call_assistant_lite: 1 })).toThrow(/isn't available on the Starter plan/);
+    // Asking for another tier is a switch: the held one goes to 0 in the same change.
+    expect(mergeAddonRequest({ call_assistant: 1, call_number: 2 }, { call_assistant_crew: 1 }))
+      .toEqual({ call_assistant_lite: 0, call_assistant: 0, call_assistant_fleet: 0, call_assistant_crew: 1, call_number: 2 });
+    expect(mergeAddonRequest({ call_assistant_lite: 1 }, { call_assistant: 1 }))
+      .toEqual({ call_assistant_lite: 0, call_assistant: 1, call_assistant_crew: 0, call_assistant_fleet: 0 });
+    expect(mergeAddonRequest({ call_assistant: 1, call_number: 1 }, { call_assistant_lite: 1 }))
+      .toEqual({ call_assistant_lite: 1, call_assistant: 0, call_assistant_crew: 0, call_assistant_fleet: 0, call_number: 1 });
+    // Removing a tier switches nothing on; naming two tiers is refused, not guessed.
+    expect(mergeAddonRequest({ call_assistant_crew: 1 }, { call_assistant_crew: 0 })).toEqual({ call_assistant_crew: 0 });
+    expect(mergeAddonRequest({ call_assistant: 1 }, { call_assistant: 1, call_assistant_fleet: 1 })).toMatchObject({ call_assistant: 1, call_assistant_fleet: 1 });
+    // The Stripe price is the standard add-on spec (lookup key spells the price); Solo keeps the original key.
+    const { addonPriceSpec } = await import("../billing/prices");
+    expect(addonPriceSpec("call_assistant", "month").lookupKey).toBe("chub_v1_addon_call_assistant_month_24900");
+    expect(addonPriceSpec("call_assistant_crew", "year").lookupKey).toBe("chub_v1_addon_call_assistant_crew_year_359900");
+    expect(addonPriceSpec("call_assistant_fleet", "month").lookupKey).toBe("chub_v1_addon_call_assistant_fleet_month_79900");
+    expect(addonPriceSpec("call_assistant_lite", "month").lookupKey).toBe("chub_v1_addon_call_assistant_lite_month_14900");
+    expect(addonPriceSpec("call_assistant_lite", "year").lookupKey).toBe("chub_v1_addon_call_assistant_lite_year_119900");
+    expect(addonPriceSpec("call_number", "year").lookupKey).toBe("chub_v1_addon_call_number_year_5000");
+    // The preview rule still guards the next listed-only add-on: while a tier is preview it is refused, nothing charged.
     const saved = keys.map((k) => ADDONS[k].preview);
     try {
-      for (const k of keys) delete ADDONS[k].preview;
-      for (const plan of ["pro", "growth", "agency"] as const) {
-        for (const t of CALL_ASSISTANT_TIERS) {
-          expect(() => checkAddonsForPlan(plan, { [t.addon]: 1 })).not.toThrow();
-          expect(() => checkAddonsForPlan(plan, { [t.addon]: 1, call_number: 2 })).not.toThrow();
-        }
-      }
-      expect(() => checkAddonsForPlan("starter", { call_assistant_crew: 1 })).toThrow(/isn't available on the Starter plan/);
-      expect(() => checkAddonsForPlan("pro", { call_number: 1 })).toThrow(/needs one of these add-ons/);
-      // Exactly one tier, one unit.
-      expect(() => checkAddonsForPlan("pro", { call_assistant: 1, call_assistant_crew: 1 })).toThrow(/can't both be on one subscription/);
-      expect(() => checkAddonsForPlan("pro", { call_assistant_fleet: 2 })).toThrow(/one per subscription/);
-      // Lite is a tier like the others: one at a time, starter can't have it.
-      expect(() => checkAddonsForPlan("pro", { call_assistant_lite: 1, call_assistant: 1 })).toThrow(/can't both be on one subscription/);
-      expect(() => checkAddonsForPlan("starter", { call_assistant_lite: 1 })).toThrow(/isn't available on the Starter plan/);
-      // Asking for another tier is a switch: the held one goes to 0 in the same change.
-      expect(mergeAddonRequest({ call_assistant: 1, call_number: 2 }, { call_assistant_crew: 1 }))
-        .toEqual({ call_assistant_lite: 0, call_assistant: 0, call_assistant_fleet: 0, call_assistant_crew: 1, call_number: 2 });
-      expect(mergeAddonRequest({ call_assistant_lite: 1 }, { call_assistant: 1 }))
-        .toEqual({ call_assistant_lite: 0, call_assistant: 1, call_assistant_crew: 0, call_assistant_fleet: 0 });
-      expect(mergeAddonRequest({ call_assistant: 1, call_number: 1 }, { call_assistant_lite: 1 }))
-        .toEqual({ call_assistant_lite: 1, call_assistant: 0, call_assistant_crew: 0, call_assistant_fleet: 0, call_number: 1 });
-      // Removing a tier switches nothing on; naming two tiers is refused, not guessed.
-      expect(mergeAddonRequest({ call_assistant_crew: 1 }, { call_assistant_crew: 0 })).toEqual({ call_assistant_crew: 0 });
-      expect(mergeAddonRequest({ call_assistant: 1 }, { call_assistant: 1, call_assistant_fleet: 1 })).toMatchObject({ call_assistant: 1, call_assistant_fleet: 1 });
-      // The Stripe price is the standard add-on spec (lookup key spells the price); Solo keeps the original key.
-      const { addonPriceSpec } = await import("../billing/prices");
-      expect(addonPriceSpec("call_assistant", "month").lookupKey).toBe("chub_v1_addon_call_assistant_month_24900");
-      expect(addonPriceSpec("call_assistant_crew", "year").lookupKey).toBe("chub_v1_addon_call_assistant_crew_year_359900");
-      expect(addonPriceSpec("call_assistant_fleet", "month").lookupKey).toBe("chub_v1_addon_call_assistant_fleet_month_79900");
-      expect(addonPriceSpec("call_assistant_lite", "month").lookupKey).toBe("chub_v1_addon_call_assistant_lite_month_14900");
-      expect(addonPriceSpec("call_assistant_lite", "year").lookupKey).toBe("chub_v1_addon_call_assistant_lite_year_119900");
-      expect(addonPriceSpec("call_number", "year").lookupKey).toBe("chub_v1_addon_call_number_year_5000");
+      for (const k of keys) ADDONS[k].preview = true;
+      for (const t of CALL_ASSISTANT_TIERS) expect(() => checkAddonsForPlan("pro", { [t.addon]: 1 })).toThrow(/isn't available yet/);
     } finally {
-      keys.forEach((k, i) => { ADDONS[k].preview = saved[i]; });
+      keys.forEach((k, i) => { if (saved[i] === undefined) delete ADDONS[k].preview; else ADDONS[k].preview = saved[i]; });
     }
+    for (const t of CALL_ASSISTANT_TIERS) expect(() => checkAddonsForPlan("pro", { [t.addon]: 1 })).not.toThrow();
     expect(PLANS.pro.name).toBeTruthy();
   });
 

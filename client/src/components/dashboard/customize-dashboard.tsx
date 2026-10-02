@@ -25,6 +25,8 @@ type Row = {
   /** Plan name when the account's plan doesn't include it (it can be shown or hidden, never unlocked here). */
   lockedPlan: string | null;
   comingSoon: boolean;
+  /** An add-on (the AI Call Assistant): locked means "not bought", so it says "Add-on", not a plan. */
+  addon: boolean;
 };
 
 /** `subset` (a reordered slice of `order`) written back into the slots its keys held. */
@@ -148,7 +150,7 @@ export function CustomizeDashboard({ open, onOpenChange, data, flagOff }: {
     for (const def of DASHBOARD_TILES as readonly DashboardTileDef[]) {
       if (DASHBOARD_CRM_CARD_TILES.has(def.key) || flagOff(def.key)) continue;
       const s = status.get(def.key) ?? { lockedPlan: null, comingSoon: false };
-      out.set(def.key, { key: def.key, title: def.title, group: def.group, ...s });
+      out.set(def.key, { key: def.key, title: def.title, group: def.group, ...s, addon: def.gate.kind === "addon" });
     }
     return out;
   }, [data.tiles, data.hiddenTiles, flagOff]);
@@ -210,7 +212,7 @@ export function CustomizeDashboard({ open, onOpenChange, data, flagOff }: {
                 <span className="min-w-0 truncate font-medium">{row.title}</span>
                 {row.lockedPlan && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground" data-testid={`badge-customize-locked-${key}`}>
-                    <Lock className="h-3 w-3" aria-hidden="true" /> {row.lockedPlan} plan
+                    <Lock className="h-3 w-3" aria-hidden="true" /> {row.addon ? "Add-on" : `${row.lockedPlan} plan`}
                   </span>
                 )}
                 {row.comingSoon && <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Coming soon</span>}

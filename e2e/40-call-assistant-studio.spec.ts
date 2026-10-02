@@ -96,12 +96,13 @@ class VoiceMock {
   statusResponse() {
     return {
       enabled: this.opts.enabled !== false,
-      addon: { key: "call_assistant", name: "AI Call Assistant", preview: true, availableOn: ["pro", "growth", "agency"] },
+      // `preview` as server/voice/billing.ts reports it: from the price book (false since the launch).
+      addon: { key: "call_assistant", name: "AI Call Assistant", preview: ADDONS.call_assistant.preview === true, availableOn: ["pro", "growth", "agency"] },
       plan: "pro",
       allowance: { numbers: 1, minutes: 500 },
       pricing: { includedMinutes: 500, overageCentsPerMinute: 10, freeSpamCalls: 500 },
       tier: { key: "solo", addon: "call_assistant", name: "Solo" },
-      tiers: CALL_ASSISTANT_TIERS.map((t) => ({ key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents, includedMinutes: t.includedMinutes, includedNumbers: t.includedNumbers, preview: true })),
+      tiers: CALL_ASSISTANT_TIERS.map((t) => ({ key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents, includedMinutes: t.includedMinutes, includedNumbers: t.includedNumbers, preview: ADDONS[t.addon].preview === true })),
       canManage: true,
       engine: { configured: true, reachable: false, models: false, checkedAt: "2026-10-02T00:00:00.000Z" },
       numbers: [{ id: "n1", phoneNumber: "+13605550100", label: "Main line", location: "Bellingham", status: "active", isTest: true }],
@@ -433,7 +434,10 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await expect(page.getByTestId("link-overview-call-0")).toHaveAttribute("href", /\/crm\/call-assistant\?tab=calls&call=/);
     // The engine is probed: configured but not answering reads "Engine down", never "configured".
     await expect(page.getByTestId("pill-overview-engine")).toHaveText("Engine down");
-    await expect(page.getByTestId("badge-overview-preview")).toBeVisible();
+    // Launched: no "Coming soon" badge while the price book sells the add-on.
+    expect(ADDONS.call_assistant.preview ?? false).toBe(false);
+    await expect(page.getByTestId("badge-overview-preview")).toHaveCount(0);
+    await expect(page.getByText("Pricing is being finalized")).toHaveCount(0);
     // The tier, the tiers to move between, and this month's spam (owner, 2026-10-02).
     await expect(page.getByTestId("text-overview-tier")).toHaveText("Solo — 2,000 minutes and 1 local number a month");
     for (const t of CALL_ASSISTANT_TIERS) await expect(page.getByTestId(`row-overview-tier-${t.tier}`)).toContainText(t.name);
@@ -504,6 +508,11 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await gotoCrm(page, "/crm/call-assistant?tab=studio");
     await expect(page.getByTestId("plan-required-callAssistant")).toBeVisible();
     await expect(page.getByTestId("tabs-call-assistant")).toHaveCount(0);
+    // On sale (launched): the prompt links Billing to buy it — no "Coming soon", no disabled "Not available yet".
+    await expect(page.getByTestId("link-call-assistant-billing")).toHaveAttribute("href", "/settings?tab=billing");
+    await expect(page.getByTestId("button-call-assistant-unavailable")).toHaveCount(0);
+    await expect(page.getByTestId("badge-call-assistant-preview")).toHaveCount(0);
+    await expect(page.getByTestId("plan-required-callAssistant")).not.toContainText("Pricing is being finalized");
   });
 });
 
@@ -513,7 +522,7 @@ test.describe("Call Assistant — paused for a payment", () => {
     // The CRM's voice API answered as server/voice/billing.ts does for a past_due owner (mocked: no subscription is touched).
     const status = {
       enabled: false, paused: true, pausedReason: "payment_needed", billingHref: "/settings?tab=billing", subscriptionStatus: "past_due",
-      addon: { key: "call_assistant", name: ADDONS.call_assistant.name, preview: true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents },
+      addon: { key: "call_assistant", name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents },
       plan: "pro", allowance: { numbers: 1, minutes: 500 }, units: { callAssistant: 1, callNumber: 0 },
       pricing: { includedMinutes: 500, overageCentsPerMinute: 15, numberMinDays: 14 },
       engine: { configured: true, reachable: true, models: true, checkedAt: new Date().toISOString() },

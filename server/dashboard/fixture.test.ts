@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { DASHBOARD_GROUPS, DASHBOARD_TILES, DASHBOARD_TILE_KEYS, dashboardAttention, type DashboardAccount, type DashboardTile } from "@shared/dashboard";
-import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { ADDONS, PLANS, PLAN_KEYS, type AddonKey } from "@shared/plans";
 import { buildDashboardFixture, DASHBOARD_FIXTURE_SCENARIOS } from "./fixture";
 import { cheapestPlanAllowing, tileAccess } from "./access";
 
@@ -42,11 +42,22 @@ describe("tileAccess", () => {
     expect(tileAccess(def("cloudflare"), starter)).toEqual({ entitled: false, requiredPlan: "agency", module: "cloudflareSearchConsole" });
   });
 
-  it("opens Agency modules on the Agency plan; the call assistant stays coming soon", () => {
+  it("opens Agency modules on the Agency plan; the call assistant (on sale) is locked until its add-on is bought", () => {
     const agency = { accessPlan: "agency" as const, allowances: PLANS.agency.limits, modules: ALL, hasCrmOrg: true };
     expect(tileAccess(def("adsManager"), agency).entitled).toBe(true);
-    expect(tileAccess(def("callAssistant"), agency)).toMatchObject({ entitled: false, comingSoon: true, addon: "call_assistant" });
-    expect(tileAccess(def("callAssistant"), { ...agency, addonModules: { callAssistant: false } })).toMatchObject({ entitled: false, comingSoon: true });
+    // Launched: a plain lock naming the add-on, never "coming soon".
+    expect(tileAccess(def("callAssistant"), agency)).toEqual({ entitled: false, requiredPlan: "pro", addon: "call_assistant" });
+    expect(tileAccess(def("callAssistant"), { ...agency, addonModules: { callAssistant: false } })).toEqual({ entitled: false, requiredPlan: "pro", addon: "call_assistant" });
+    // "Coming soon" follows the price book: while an add-on is `preview`, its tile is coming soon.
+    const saved = ADDONS.call_assistant.preview;
+    try {
+      ADDONS.call_assistant.preview = true;
+      expect(tileAccess(def("callAssistant"), agency)).toEqual({ entitled: false, requiredPlan: "pro", addon: "call_assistant", comingSoon: true });
+      // A bought add-on opens whatever the flag says.
+      expect(tileAccess(def("callAssistant"), { ...agency, addonModules: { callAssistant: true } })).toEqual({ entitled: true, addon: "call_assistant" });
+    } finally {
+      if (saved === undefined) delete ADDONS.call_assistant.preview; else ADDONS.call_assistant.preview = saved;
+    }
   });
 
   it("opens the call assistant tile when its add-on module is on (platform admins)", () => {
@@ -75,15 +86,17 @@ describe("sample payloads", () => {
         if (t.status === "locked") expect(t.requiredPlan && !t.entitled && t.metrics.length === 0).toBe(true);
         if (t.status === "error" || t.status === "empty") expect(t.metrics).toEqual([]);
       }
-      expect(p.tiles.find((t) => t.key === "callAssistant")!.status).toBe("coming_soon");
+      // The AI Call Assistant is on sale and none of the samples bought it: a plain lock, never "coming soon".
+      expect(p.tiles.find((t) => t.key === "callAssistant")).toMatchObject({ status: "locked", entitled: false, requiredPlan: "pro", addon: "call_assistant", metrics: [] });
       expect(p.account.usage.every((u) => u.limit !== 0)).toBe(true);
       expect(p.account.resetsAt).toBe("2026-11-01T00:00:00.000Z");
     });
   }
 
-  it("full shows every status at least once", () => {
+  it("full shows every status at least once (coming_soon only while a tile's add-on is still preview)", () => {
     const statuses = new Set(buildDashboardFixture("full").tiles.map((t) => t.status));
-    expect([...statuses].sort()).toEqual(["coming_soon", "empty", "error", "locked", "ok"]);
+    const previewTile = DASHBOARD_TILES.some((t) => t.gate.kind === "addon" && ADDONS[t.gate.addon as AddonKey]?.preview === true);
+    expect([...statuses].sort()).toEqual([...(previewTile ? ["coming_soon"] : []), "empty", "error", "locked", "ok"]);
   });
 
   it("greets by first name, or not at all", () => {

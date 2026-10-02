@@ -229,8 +229,14 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     await expect(page.locator('[data-testid^="tile-"][data-status]')).toHaveCount(DASHBOARD_TILES.length - CRM_CARD.size);
 
     await expect(tile(page, "cloudflare")).toHaveAttribute("data-status", "locked");
-    await expect(tile(page, "callAssistant")).toHaveAttribute("data-status", "coming_soon");
-    await expect(tile(page, "callAssistant")).toContainText("Coming soon");
+    // The AI Call Assistant is on sale (launched) and the Growth sample hasn't bought it: locked as an add-on — never
+    // "Coming soon", and never "Pro" / "On a higher plan" for an account whose plan already sells it.
+    await expect(tile(page, "callAssistant")).toHaveAttribute("data-status", "locked");
+    await expect(tile(page, "callAssistant")).not.toContainText("Coming soon");
+    await expect(page.getByTestId("status-callAssistant")).toHaveText("Add-on");
+    await expect(tile(page, "callAssistant")).toHaveAttribute("title", "AI Call Assistant is an add-on for the Pro, Growth and Agency plans");
+    await expect(tile(page, "callAssistant").getByTestId("link-tile-callAssistant-intro")).toHaveAttribute("href", "/call-assistant");
+    await expect(page.getByTestId("locked-row-run")).toContainText("Not on your plan");
     await expect(tile(page, "social")).toHaveAttribute("data-status", "error");
     await expect(tile(page, "social").getByTestId("link-tile-social")).toHaveAttribute("href", "/social-media");
     await expect(tile(page, "media")).toHaveAttribute("data-status", "empty");
@@ -538,6 +544,7 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
       await expect(sheet.getByTestId(`customize-tile-${def.key}`)).toBeVisible();
     }
     await expect(sheet.getByTestId("badge-customize-locked-cloudflare")).toContainText("Agency plan");
+    await expect(sheet.getByTestId("badge-customize-locked-callAssistant")).toHaveText("Add-on");
     await expect.poll(async () => (await sheet.boundingBox())!.x).toBeLessThanOrEqual(1440 - 447);
     await viewShot(page, "controls-customize-1440");
 

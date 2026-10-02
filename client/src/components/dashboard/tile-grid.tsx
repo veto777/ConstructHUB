@@ -3,7 +3,8 @@ import { DASHBOARD_GROUPS, type DashboardGroupKey, type DashboardTile, type Dash
 import { DASHBOARD_CRM_CARD_TILES, dashboardGroupsInOrder } from "@shared/dashboard-prefs";
 import { Button } from "@/components/ui/button";
 import { featureIntroPath } from "@shared/feature-pages";
-import { MODULE_NAMES, PLANS } from "@shared/plans";
+import { ADDONS, MODULE_NAMES, PLANS, type AddonKey } from "@shared/plans";
+import { joinNames } from "@shared/plan-copy";
 import { DashboardTileCard } from "./dashboard-tile";
 import { DashLink, FOCUS_RING } from "./dash-link";
 import { TILE_ICONS } from "./tile-icons";
@@ -21,26 +22,31 @@ export const CRM_CARD_TILES: ReadonlySet<DashboardTileKey> = DASHBOARD_CRM_CARD_
  */
 function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all"; tiles: DashboardTile[]; spaced: boolean }) {
   const labelId = `dashboard-locked-${group}`;
+  // An add-on the account hasn't bought (the AI Call Assistant) is bought on top of a plan, not "on a higher plan".
+  const anyAddon = tiles.some((t) => t.addon);
+  const addonsOnly = tiles.every((t) => t.addon);
   return (
     <div
       className={`${spaced ? "mt-4 " : ""}flex flex-col gap-3 rounded-lg border border-dashed bg-muted/30 px-3 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4`}
       data-testid={`locked-row-${group}`}
     >
       <p id={labelId} className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
-        <Lock className="h-3.5 w-3.5" aria-hidden="true" /> On a higher plan
+        <Lock className="h-3.5 w-3.5" aria-hidden="true" /> {anyAddon ? "Not on your plan" : "On a higher plan"}
         <span className="hidden sm:inline">· open any to see what it does</span>
       </p>
       <ul className="flex min-w-0 flex-1 flex-wrap gap-2" aria-labelledby={labelId}>
         {tiles.map((t) => {
           const Icon = TILE_ICONS[t.key] ?? LayoutGrid;
           const plan = t.requiredPlan ? PLANS[t.requiredPlan].name : "Paid plan";
+          const addon = t.addon ? ADDONS[t.addon as AddonKey] : undefined;
+          const addonPlans = addon ? joinNames(addon.availableOn.map((k) => PLANS[k].name)) : null;
           const intro = featureIntroPath(t.key);
           const chip = (
             <>
               <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
               <span className="font-medium">{t.title}</span>
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground" data-testid={`status-${t.key}`}>
-                <span className="sr-only">Included with the </span>{plan}<span className="sr-only"> plan</span>
+                {addonPlans ? "Add-on" : <><span className="sr-only">Included with the </span>{plan}<span className="sr-only"> plan</span></>}
               </span>
             </>
           );
@@ -48,7 +54,7 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all";
             <li
               key={t.key}
               className="inline-flex"
-              title={t.module ? `${MODULE_NAMES[t.module]} is included with the ${plan} plan` : `Included with the ${plan} plan`}
+              title={addonPlans ? `${t.title} is an add-on for the ${addonPlans} plans` : t.module ? `${MODULE_NAMES[t.module]} is included with the ${plan} plan` : `Included with the ${plan} plan`}
               data-testid={`tile-${t.key}`}
               data-status="locked"
             >
@@ -71,12 +77,12 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all";
         })}
       </ul>
       <DashLink
-        href="/pricing"
+        href={addonsOnly ? "/pricing#add-ons" : "/pricing"}
         surface="app"
         className={`inline-flex min-h-10 shrink-0 items-center gap-1 rounded-md text-sm font-medium text-primary hover:underline underline-offset-4 sm:min-h-8 ${FOCUS_RING}`}
         data-testid={`link-locked-${group}-plans`}
       >
-        See plans <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        {addonsOnly ? "See add-ons" : "See plans"} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
       </DashLink>
     </div>
   );

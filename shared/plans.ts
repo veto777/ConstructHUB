@@ -322,7 +322,6 @@ function callAssistantTierAddon(key: CallAssistantTierKey): Addon {
     annualCents: t.annualCents,
     availableOn: CALL_ASSISTANT_SOLD_ON,
     grants: {},
-    preview: true,
     exclusiveGroup: "call_assistant_tier",
     ...(t.introMonthlyCents ? { introMonthlyCents: t.introMonthlyCents, introMonths: t.introMonths } : {}),
   };
@@ -349,8 +348,9 @@ export const ADDONS: Record<AddonKey, Addon> = {
   // The number is part of the service (owner, 2026-10-02): when the
   // subscription ends or the tier is removed, the org's numbers are released
   // (server/voice/number-release.ts); a failed payment pauses the assistant
-  // (ADDON_MODULE_RUN_STATUSES) but keeps the number. Every tier stays
-  // `preview` (listed, not sellable) until the owner launches it.
+  // (ADDON_MODULE_RUN_STATUSES) but keeps the number. Launched (owner,
+  // 2026-10-02: "the call assistant is live not coming soon"): no tier is
+  // `preview` any more — every tier and the extra number are for sale.
   call_assistant_lite: callAssistantTierAddon("lite"),
   call_assistant: callAssistantTierAddon("solo"),
   call_assistant_crew: callAssistantTierAddon("crew"),
@@ -358,7 +358,7 @@ export const ADDONS: Record<AddonKey, Addon> = {
   call_number: {
     key: "call_number", name: "Extra Call Assistant number",
     description: "One more local number for the AI Call Assistant (a second location or a tracking line).",
-    monthlyCents: 500, annualCents: 5000, availableOn: ["pro", "growth", "agency"], grants: {}, preview: true,
+    monthlyCents: 500, annualCents: 5000, availableOn: ["pro", "growth", "agency"], grants: {},
     requires: CALL_ASSISTANT_TIER_ADDONS,
   },
 };
