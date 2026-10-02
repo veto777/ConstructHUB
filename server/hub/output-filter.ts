@@ -21,7 +21,7 @@ export type OCode = "O1" | "O2" | "O4" | "O6" | "O7" | "O8" | "O9" | "O10" | "O1
 export type ModelOutput = { content?: string | null; finishReason?: string | null; toolCalls?: unknown; functionCall?: unknown };
 /**
  * `echo`: the request's own turns. A reply may not repeat a run of the visitor's words (O18);
- * text that is in an earlier (signed, already filtered) Hub answer or in the knowledge pack is fine.
+ * text that is in an earlier (signed, already filtered) Gabe answer or in the knowledge pack is fine.
  */
 export type FilterOptions = { publicOnly: boolean; canary?: string; book?: KnowledgeBook; echo?: { user: readonly string[]; assistant?: readonly string[] } };
 export type FilterResult = { ok: true; text: string } | { ok: false; code: OCode };
@@ -146,9 +146,9 @@ const NOT_A_BOT = /\bnot an? (bot|ai|robot|machine|chatbot|computer|program)\b/i
 const REAL_PERSON = /\breal (person|human|rep|representative|agent|employee|staff member|team member|people)\b/gi;
 /** "I'm Mike from the ConstructHUB team", "Mike, ConstructHUB billing team", "my name is Mike". */
 const STAFF_SIGNOFF: RegExp[] = [
-  /\b(I'?m|I am|this is|it'?s|my name is)\s+(?!Hub\b)[A-Z][a-z]+\b[^.]{0,30}\b(from|with|on|at|of) (the )?ConstructHUB\b/,
-  /\b(?!Hub\b)[A-Z][a-z]{1,15}, (the |your )?ConstructHUB('s)? (\w+ )?(team|billing|support|sales|staff|rep|representative|agent|office)\b/,
-  /\bmy name is (?!Hub\b)[A-Z]/,
+  /\b(I'?m|I am|this is|it'?s|my name is)\s+(?!Gabe\b)[A-Z][a-z]+\b[^.]{0,30}\b(from|with|on|at|of) (the )?ConstructHUB\b/,
+  /\b(?!Gabe\b)[A-Z][a-z]{1,15}, (the |your )?ConstructHUB('s)? (\w+ )?(team|billing|support|sales|staff|rep|representative|agent|office)\b/,
+  /\bmy name is (?!Gabe\b)[A-Z]/,
 ];
 /** A real ConstructHUB button label ("I submitted the form — mark reported"), not a claim. */
 const UI_LABELS = /\bI submitted the form\s*[—–-]\s*mark reported\b/gi;
@@ -165,7 +165,7 @@ const LEAKS: RegExp[] = [
 const CODE: RegExp[] = [/\bdef \w+\(/, /\bfunction\s*\(/, /\bconsole\./, /\bimport\s+[\w{*].*\bfrom\s+['"]/, /#include/, /\bSELECT\b.+\bFROM\b/];
 const PROFANITY = /\b(fuck\w*|shit\w*|bitch\w*|asshole\w*|bastard\w*|cunt\w*|motherf\w*|slut\w*|whore\w*|retard\w*|f[a@]gg?ot\w*|n[i1]gg(er|a)\w*|dickhead\w*|piss off)\b/i;
 /**
- * Other companies Hub never names, as letters only: a name matches however it is cased, spaced or
+ * Other companies Gabe never names, as letters only: a name matches however it is cased, spaced or
  * hyphenated ("House Call Pro", "Job-ber", "ANGI"), but never inside a longer word ("changing").
  * Google, Stripe, Cloudflare, SignalWire, Gmail, Blotato, HOVER, NETR Online and the citation and
  * social sites the pack lists (Yelp, BBB, Apple Maps, Bing Places, Facebook…) are named in the pack.
@@ -538,7 +538,7 @@ function run(out: ModelOutput, opts: FilterOptions): string {
   if (/<\/?visitor>/i.test(t)) block("O13");
 
   // O5 + O17 + style (strip), before any content check. Formatting that only settles over several
-  // passes ("$<i>_</i>5_") is not something Hub writes: block it rather than guess what it shows.
+  // passes ("$<i>_</i>5_") is not something Gabe writes: block it rather than guess what it shows.
   t = tidy(t);
   if (tidy(t) !== t) block("O17");
   if (ACTIVE.test(t)) block("O4");

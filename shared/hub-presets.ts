@@ -38,5 +38,5 @@ export const PRIMARY_PRESETS: readonly PresetId[] = [
   "pricing", "which-plan", "features", "trial", "agency", "crm", "get-started", "done-for-you",
 ];
 
-/** Chips Hub offers a brand-new account (the welcome after sign-up). */
+/** Chips Gabe offers a brand-new account (the welcome after sign-up). */
 export const WELCOME_PRESETS: readonly PresetId[] = ["get-started", "google-profile", "crm", "pricing"];

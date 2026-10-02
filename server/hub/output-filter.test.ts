@@ -301,8 +301,9 @@ describe("F5: claimed account actions and claims to be a person (O12)", () => {
   it.each([
     "Once your payment has been processed, the invoice shows Paid.",
     "Ask for the assisted import, where a person moves your data within 1 business day.",
-    "I'm not a real person; I'm Hub, the AI helper.",
-    "I'm Hub, ConstructHUB's AI helper. I can't see your account, but I can walk you through it.",
+    "I'm not a real person; I'm Gabe, the AI helper.",
+    "I'm Gabe, ConstructHUB's AI helper. I can't see your account, but I can walk you through it.",
+    "My name is Gabe and I'm ConstructHUB's AI helper, so I can't see your account.",
   ])("delivered: %s", (text) => {
     delivered(text);
   });
@@ -355,7 +356,7 @@ describe("F1: the visitor's own words echoed back (O18)", () => {
     expect(withEcho(reply, [q])).toEqual({ ok: false, code: "O18" });
   });
 
-  it("restating the question, a short echo of the visitor's situation, pack wording and earlier Hub answers are fine", () => {
+  it("restating the question, a short echo of the visitor's situation, pack wording and earlier Gabe answers are fine", () => {
     const q = "How do I connect my Google Business Profile and turn on review alerts?";
     expect(withEcho("To connect your Google Business Profile and turn on review alerts, open **Locations** and click **Connect Google Business Profile**.", [q]).ok).toBe(true);
     const situation = "I run a roofing company with three crews and two offices in Texas. Which plan fits?";
@@ -367,7 +368,7 @@ describe("F1: the visitor's own words echoed back (O18)", () => {
   });
 });
 
-describe("Hub's own fixed text passes its own filter", () => {
+describe("Gabe's own fixed text passes its own filter", () => {
   it.each(Object.entries(REPLIES))("%s", (_code, text) => {
     expect(run(text).ok).toBe(true);
   });
