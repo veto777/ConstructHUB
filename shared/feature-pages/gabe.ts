@@ -143,6 +143,39 @@ const page: FeaturePage = {
       a: "He's an AI helper, so check anything important on the page itself. His prices come from the price book, and when the knowledge pack doesn't cover a question he says he's not sure instead of guessing.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the matching knowledge sections and the
+  // price-book tokens are server/hub/knowledge.ts (header, knowledgeSlice) and prompt.ts buildMessages()/systemPrompt()
+  // (the page you're on); the rules are prompt.ts hardRulesText() (3 off-topic, 5 sales-rep pricing, 6 not sure,
+  // 7 other companies, 8 links); 120 words and English only are prompt.ts STYLE; every reply checked, failures replaced,
+  // presets too: server/hub/output-filter.ts (header; O6 links, O8 prices, O10 guarantees/discounts, O12 actions, O13
+  // instructions) and replies.ts R_FALLBACK; redaction: prefilter.ts redact()/forModel(); 500 characters, verified email:
+  // server/hub/routes.ts MAX_USER_CHARS, access.ts.
+  inDepth: {
+    heading: { title: "How Gabe Builds ", em: "an Answer" },
+    paragraphs: [
+      "Gabe is an AI helper for ConstructHUB, not a general chatbot. When you ask him something, the server picks the " +
+        "parts of ConstructHUB's written knowledge pack that match your question and the page you have open, and sends " +
+        "only those with your words. Every plan name, price and limit in that pack is filled in from the same price " +
+        "book the pricing page uses, so what he says about a plan matches what the pricing page says.",
+      "He works to a short set of fixed rules. He only talks about ConstructHUB: questions about other companies or " +
+        "products, or about legal, tax or financial matters, get a polite redirect. Anything a sales rep quotes, such " +
+        "as done-for-you services, SEO programs, website builds or the Master Class, he never prices; he points you to " +
+        "a sales rep instead. When the knowledge pack doesn't cover a question, he says he's not sure rather than " +
+        "making something up. Answers stay short, at most around 120 words, and come in English.",
+      "Every answer is checked before it reaches you, and that includes the ready-made answers to the quick " +
+        "questions. A reply that links outside ConstructHUB, quotes a price that isn't in the price book, offers a " +
+        "discount or promises a result, claims to have done something in an account, or repeats his own instructions is " +
+        "not fixed up and shown anyway: it is replaced by a short fallback line that points to the quick questions " +
+        "and the pricing page.",
+      "Your own words are cleaned before they go to the AI model. Email addresses, phone numbers, street addresses " +
+        "and ID-like numbers are swapped for placeholders, so a question pasted with a customer's email, phone number " +
+        "or address doesn't carry them along. Typing your own questions needs a signed-in account with a verified email, and a message " +
+        "can be up to 500 characters.",
+      "Gabe explains; he doesn't act. He can't look anything up in your account, change a setting, or send, book or " +
+        "create anything, and he will tell you so. He is an AI helper, so before you rely on an answer for something " +
+        "that matters, check it on the page it links to.",
+    ],
+  },
   related: ["crm", "gbp", "customerApi"],
   app: { href: "/", surface: "app", label: "Ask Gabe on your dashboard" },
   tryIt: { label: "Ask Gabe a quick question on the pricing page", href: "/pricing" },
@@ -152,9 +185,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Ask" },
   },
   seo: {
-    title: "Gabe, the AI Helper in ConstructHUB | ConstructHUB",
+    title: "Gabe — AI Help With ConstructHUB Features | ConstructHUB",
     description:
-      "Gabe answers questions about ConstructHUB's features, setup and plans from its own knowledge pack and price book. He can't see your account or your customers.",
+      "Gabe, the AI helper, explains ConstructHUB's features, setup and plans from its own knowledge pack and price book. He can't see your account.",
   },
   sources: [
     "client/src/components/hub/hub-widget.tsx",
@@ -165,6 +198,7 @@ const page: FeaturePage = {
     "server/hub/turns.ts",
     "server/hub/replies.ts",
     "server/hub/prompt.ts",
+    "server/hub/output-filter.ts",
     "server/hub/knowledge.ts",
     "server/hub/prefilter.ts",
     "server/hub/store.ts",

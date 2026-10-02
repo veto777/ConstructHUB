@@ -136,6 +136,37 @@ const page: FeaturePage = {
       a: "It isn't a tool you run inside ConstructHUB: our team works the case with you, starting from your request. It doesn't work around Google's rules; the fix is a profile that follows them.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): soft vs hard suspensions and "Google rarely
+  // tells you" are reinstatement.tsx (the "Types of suspensions" box and the causes intro); the review-first, fix-first
+  // order is PROCESS_STEPS + TRUST_POINTS; the form (storefront / service-area / hybrid, more than one location, the
+  // address even if hidden, website optional) is the form's fields and SelectItems; the request goes to the team by
+  // email with reply-to set to the requester, no account and no payment: server/routes.ts /api/reinstatement/request;
+  // one price per project: shared/plans.ts GBP_REINSTATEMENT_CENTS (shown by the price block, never typed here).
+  inDepth: {
+    heading: { title: "Suspended Google Business Profile? ", em: "What Happens Next" },
+    paragraphs: [
+      "A Google Business Profile suspension can take your listing off Google Maps or leave it unverified, and Google " +
+        "rarely says exactly which rule it thinks you broke. Reinstatement is a done-for-you service: people on our " +
+        "team work the case with you. It isn't a tool you run inside ConstructHUB, and it doesn't need an account.",
+      "There are two kinds of suspension. In a soft suspension the profile loses its verification but may still be " +
+        "partly visible; it is the most common kind. In a hard suspension the listing is removed from Google Search " +
+        "and Maps, and your dashboard shows it as not visible to customers. Knowing which one you have, and why it " +
+        "happened, shapes the rest of the case.",
+      "That is why the work starts with the cause rather than the appeal. An appeal asks Google to look at the " +
+        "profile again, so the profile is first checked against Google's published Business Profile guidelines. We " +
+        "tell you every change to make and every supporting document that may be needed, and the profile is brought " +
+        "in line before anything is submitted. Then we write and submit an evidence-based appeal and keep you updated " +
+        "until Google decides.",
+      "The request form asks for what a case review needs: your business name, the business address even if it is " +
+        "hidden on Google, whether you are a storefront, a service-area business or a hybrid, whether you have more " +
+        "than one location, and what happened. A website is optional. The form goes to our team by email and we reply " +
+        "to the address you give. Sending it is free and commits you to nothing; we tell you whether we think we can " +
+        "help before taking the case, and a case we take on has one price per project, shown on this page.",
+      "Google alone decides whether a profile is reinstated, so nobody can promise the outcome, and this service " +
+        "doesn't work around Google's rules. The aim is a profile that follows them. Once a profile is back, Profile " +
+        "Guard in ConstructHUB can watch its fields and tell you when one changes.",
+    ],
+  },
   related: ["gbp", "profileGuard", "reviews"],
   app: { href: "/reinstatement", surface: "app", label: "Open Reinstatement" },
   tryIt: { label: "Send a free case review request", href: "/reinstatement#reinstatement-form" },
@@ -145,14 +176,15 @@ const page: FeaturePage = {
     audience: { title: "Who It ", em: "Helps" },
   },
   seo: {
-    title: "GBP Reinstatement — Suspended Profile Help | ConstructHUB",
+    title: "Suspended Google Business Profile Help | ConstructHUB",
     description:
-      "Suspended Google Business Profile? Our team reviews your case, fixes guideline issues and submits the appeal. One price per project; Google makes the final decision.",
+      "Google Business Profile suspended? Our team finds the cause, brings the profile in line with Google's guidelines and writes the appeal. Free case review.",
   },
   sources: [
     "client/src/pages/reinstatement.tsx",
     "server/routes.ts",
     "client/src/App.tsx",
+    "server/gbp/guard.ts",
     "shared/plans.ts (GBP_REINSTATEMENT_CENTS)",
     "shared/feature-pages/pricing.ts",
   ],

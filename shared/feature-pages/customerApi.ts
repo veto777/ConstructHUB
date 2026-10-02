@@ -159,6 +159,36 @@ const page: FeaturePage = {
       a: "A key is shown once when you create it and stored only as a hash. Give it only the scopes it needs, set an expiry or a unit cap, and revoke it the moment it may have leaked.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): reads come from the data ConstructHUB has
+  // stored (google_profile_reviews, gbp_daily_metrics… in server/public-api/resources/*.ts), linked locations only;
+  // JSON and the one error envelope: server/public-api/errors.ts apiError(); agency workspaces (?workspace=, assigned
+  // clients only): server/public-api/resources/_shared.ts; writes through the app's own code: gbp-write.ts (content
+  // worker, gbp/reply.ts checks), social-write.ts (createPosts, requestId idempotency), sitescan-write.ts (reserveQuota);
+  // the reference from the live document: client/src/pages/developers.tsx; keys only under /api/v1 and not the CRM's
+  // keys: server/public-api/guard.ts, auth.ts; no AI: server/public-api/no-ai.test.ts.
+  inDepth: {
+    heading: { title: "A REST API for Reviews, Posts and ", em: "Site Scans" },
+    paragraphs: [
+      "The Customer API is a REST API over the data your ConstructHUB account already holds: the Google Business " +
+        "Profile locations you have linked, their reviews, insights, photos and posts, your social posts, your Site " +
+        "Scan reports and your citations. It reads what ConstructHUB has stored and synced. It is not a direct line to " +
+        "Google's own APIs, and a location that isn't linked to your account isn't in it.",
+      "Every request sends an API key as a bearer token to /api/v1 and gets JSON back. When something goes wrong, the " +
+        "error comes back in one shape, with a stable code your script can check and a message a person can read. A " +
+        "key reads and writes only its own account's data. A key that belongs to a member of an agency workspace can " +
+        "also read that workspace's data, limited to the clients the member is assigned to, just as in the app.",
+      "Writes go through the same code the app uses, so they follow the same rules. A Google Business Profile post " +
+        "you schedule joins the regular publishing queue. A review reply goes through the same checks as one typed in " +
+        "the app, and can be published or saved as a draft. A social post goes to the business's mapped destinations " +
+        "and carries a request ID, so sending the same request twice doesn't queue it twice. A Site Scan started " +
+        "through the API uses the plan's Site Scan allowance, like one started on the Site Scan page.",
+      "The reference on the Developers page is drawn from the live OpenAPI document at /api/v1/openapi.json, so the " +
+        "page and the document your API client reads describe the same endpoints.",
+      "API keys are kept apart from everything else. A key works only under /api/v1: it can't sign in to the app or " +
+        "reach your settings, and it is not a key for the CRM's own API. AI features stay inside the app, and an " +
+        "automated test walks the API's code to make sure no AI module can be reached from it.",
+    ],
+  },
   related: ["siteScan", "gbpContent", "social"],
   app: { href: "/developers", surface: "app", label: "Open the API reference" },
   tryIt: { label: "Read the API reference", href: "/developers" },
@@ -168,9 +198,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Build" },
   },
   seo: {
-    title: "Customer API — Your Data in Your Own Tools | ConstructHUB",
+    title: "Customer API — REST API for Your GBP Data | ConstructHUB",
     description:
-      "Read your locations, reviews, insights and Site Scan reports, and schedule posts or reply to reviews from your own scripts. Plan-based monthly units. No AI.",
+      "A REST API for your Google Business Profile reviews, insights and posts, social posts and Site Scan reports. API keys with scopes, monthly units, no AI.",
   },
   sources: [
     "client/src/pages/developers.tsx",
@@ -178,6 +208,10 @@ const page: FeaturePage = {
     "server/public-api/index.ts",
     "server/public-api/auth.ts",
     "server/public-api/guard.ts",
+    "server/public-api/errors.ts",
+    "server/public-api/resources/_shared.ts",
+    "server/public-api/resources/reviews.ts",
+    "server/public-api/resources/insights.ts",
     "server/public-api/quota.ts",
     "server/public-api/rate-limit.ts",
     "server/public-api/no-ai.test.ts",
