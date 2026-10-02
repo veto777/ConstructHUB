@@ -200,7 +200,10 @@ export type DashboardUsage = {
   /** "monthly" resets on account.resetsAt; "count" is a standing count (locations, sites, seats). */
   period: "monthly" | "count";
   href: string;
-  /** Where `href` lives (backend lane extension; absent = "app"). CRM seats link into the portal. */
+  /**
+   * Where `href` lives (optional). Absent = "app", except a "/crm/…" path, which the
+   * client treats as "portal". The aggregator sets "portal" on crmSeats.
+   */
   surface?: DashboardSurface;
 };
 
