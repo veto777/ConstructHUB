@@ -83,6 +83,82 @@ async function followUpsForOrg(ctx: OrgContext): Promise<FollowUpRow[]> {
   return out;
 }
 
+/**
+ * The /api/crm/attention rollup for an org context: follow-ups due, brand-new
+ * leads and leads with no estimate yet, each list at most `cap` long (the
+ * route's 10), from the newest `rowLimit` prospect projects (the route's 200).
+ * `truncated` says the prospect read hit `rowLimit`. server/dashboard passes
+ * cap Infinity to count the lists.
+ */
+export async function crmAttentionFor(ctx: OrgContext, { cap = 10, rowLimit = 200 }: { cap?: number; rowLimit?: number } = {}) {
+  const orgId = ctx.org.id;
+
+  const prospectStages = Object.entries(CRM_PROJECT_STAGE_META)
+    .filter(([, m]) => m.group === "Prospect")
+    .map(([k]) => k);
+
+  const rows = await db
+    .select({
+      id: crmProjects.id,
+      name: crmProjects.name,
+      number: crmProjects.number,
+      status: crmProjects.status,
+      customerId: crmProjects.customerId,
+      divisionId: crmProjects.divisionId,
+      pmId: crmProjects.projectManagerMemberId,
+      createdAt: crmProjects.createdAt,
+      customerName: crmCustomers.displayName,
+    })
+    .from(crmProjects)
+    .leftJoin(crmCustomers, eq(crmCustomers.id, crmProjects.customerId))
+    .where(and(
+      eq(crmProjects.orgId, orgId),
+      isNull(crmProjects.archivedAt),
+      inArray(crmProjects.status, prospectStages.length ? prospectStages : ["lead"]),
+    ))
+    .orderBy(desc(crmProjects.createdAt))
+    .limit(rowLimit);
+
+  const scope = divisionScopeOf(ctx.member);
+  const visible = rows.filter((p) =>
+    (ctx.permissions.viewAllJobs || p.pmId === ctx.member.id) &&
+    (!scope || divisionVisible(scope, p.divisionId)));
+
+  // An estimate "covers" a lead when it points at the project OR at the
+  // lead's customer (estimates created from the client page carry no
+  // projectId).
+  const estimates = await db
+    .select({ projectId: crmEstimates.projectId, customerId: crmEstimates.customerId })
+    .from(crmEstimates)
+    .where(eq(crmEstimates.orgId, orgId))
+    .limit(2000);
+  const coveredProjects = new Set(estimates.map((e) => e.projectId).filter(Boolean));
+  const coveredCustomers = new Set(estimates.map((e) => e.customerId));
+
+  const present = (p: (typeof visible)[number]) => ({
+    id: p.id,
+    name: p.name,
+    number: p.number,
+    status: p.status,
+    stageLabel: CRM_PROJECT_STAGE_META[p.status]?.label ?? p.status,
+    customerName: p.customerName ?? null,
+    createdAt: p.createdAt,
+  });
+
+  const cutoff = Date.now() - NEW_LEAD_WINDOW_MS;
+  const newLeads = visible
+    .filter((p) => (p.createdAt?.getTime() ?? 0) >= cutoff)
+    .slice(0, cap)
+    .map(present);
+  const leadsNeedingEstimate = visible
+    .filter((p) => !coveredProjects.has(p.id) && !coveredCustomers.has(p.customerId))
+    .slice(0, cap)
+    .map(present);
+
+  const followUpsDue = (await followUpsForOrg(ctx)).filter((f) => f.due).slice(0, cap);
+  return { followUpsDue, newLeads, leadsNeedingEstimate, truncated: rows.length >= rowLimit };
+}
+
 export function registerCrmFollowUpRoutes(app: Express, getDevUser: GetUser): void {
   async function ctxFor(req: any, res: any, perm?: any): Promise<OrgContext | null> {
     const user = getDevUser(req, res);
@@ -149,71 +225,7 @@ export function registerCrmFollowUpRoutes(app: Express, getDevUser: GetUser): vo
   app.get("/api/crm/attention", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
-    const orgId = ctx.org.id;
-
-    const prospectStages = Object.entries(CRM_PROJECT_STAGE_META)
-      .filter(([, m]) => m.group === "Prospect")
-      .map(([k]) => k);
-
-    const rows = await db
-      .select({
-        id: crmProjects.id,
-        name: crmProjects.name,
-        number: crmProjects.number,
-        status: crmProjects.status,
-        customerId: crmProjects.customerId,
-        divisionId: crmProjects.divisionId,
-        pmId: crmProjects.projectManagerMemberId,
-        createdAt: crmProjects.createdAt,
-        customerName: crmCustomers.displayName,
-      })
-      .from(crmProjects)
-      .leftJoin(crmCustomers, eq(crmCustomers.id, crmProjects.customerId))
-      .where(and(
-        eq(crmProjects.orgId, orgId),
-        isNull(crmProjects.archivedAt),
-        inArray(crmProjects.status, prospectStages.length ? prospectStages : ["lead"]),
-      ))
-      .orderBy(desc(crmProjects.createdAt))
-      .limit(200);
-
-    const scope = divisionScopeOf(ctx.member);
-    const visible = rows.filter((p) =>
-      (ctx.permissions.viewAllJobs || p.pmId === ctx.member.id) &&
-      (!scope || divisionVisible(scope, p.divisionId)));
-
-    // An estimate "covers" a lead when it points at the project OR at the
-    // lead's customer (estimates created from the client page carry no
-    // projectId).
-    const estimates = await db
-      .select({ projectId: crmEstimates.projectId, customerId: crmEstimates.customerId })
-      .from(crmEstimates)
-      .where(eq(crmEstimates.orgId, orgId))
-      .limit(2000);
-    const coveredProjects = new Set(estimates.map((e) => e.projectId).filter(Boolean));
-    const coveredCustomers = new Set(estimates.map((e) => e.customerId));
-
-    const present = (p: (typeof visible)[number]) => ({
-      id: p.id,
-      name: p.name,
-      number: p.number,
-      status: p.status,
-      stageLabel: CRM_PROJECT_STAGE_META[p.status]?.label ?? p.status,
-      customerName: p.customerName ?? null,
-      createdAt: p.createdAt,
-    });
-
-    const cutoff = Date.now() - NEW_LEAD_WINDOW_MS;
-    const newLeads = visible
-      .filter((p) => (p.createdAt?.getTime() ?? 0) >= cutoff)
-      .slice(0, 10)
-      .map(present);
-    const leadsNeedingEstimate = visible
-      .filter((p) => !coveredProjects.has(p.id) && !coveredCustomers.has(p.customerId))
-      .slice(0, 10)
-      .map(present);
-
-    const followUpsDue = (await followUpsForOrg(ctx)).filter((f) => f.due).slice(0, 10);
+    const { followUpsDue, newLeads, leadsNeedingEstimate } = await crmAttentionFor(ctx);
     res.json({ followUpsDue, newLeads, leadsNeedingEstimate });
   });
 }

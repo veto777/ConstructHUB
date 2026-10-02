@@ -200,6 +200,8 @@ export type DashboardUsage = {
   /** "monthly" resets on account.resetsAt; "count" is a standing count (locations, sites, seats). */
   period: "monthly" | "count";
   href: string;
+  /** Where `href` lives (backend lane extension; absent = "app"). CRM seats link into the portal. */
+  surface?: DashboardSurface;
 };
 
 export type DashboardAccountStatus = "active" | "trialing" | "past_due" | "none";
@@ -216,8 +218,10 @@ export type DashboardAccount = {
   isPlatformAdmin: boolean;
   /** End of a trial or trial-code grant (ISO), else null. */
   trialEndsAt: string | null;
-  /** Next renewal / period end for a paid Stripe plan (ISO), else null. */
+  /** Next renewal / period end for a paid Stripe plan (ISO), else null. Null when the plan is set to cancel. */
   renewsAt: string | null;
+  /** Backend lane extension: when a Stripe plan set to cancel ends (ISO). Absent otherwise. */
+  endsAt?: string | null;
   usage: DashboardUsage[];
   /** When the monthly counts reset (first of next month, UTC). */
   resetsAt: string;
