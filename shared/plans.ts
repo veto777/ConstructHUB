@@ -53,6 +53,12 @@ export type PlanLimits = {
 /** The numeric limits (the ones an add-on can raise). */
 export type CountLimitKey = { [K in keyof PlanLimits]: PlanLimits[K] extends number ? K : never }[keyof PlanLimits];
 
+/** A count or monthly limit with no ceiling (PlanLimits: "-1 means unlimited"). Platform admins run on it. */
+export const UNLIMITED = -1;
+export const isUnlimited = (limit: number | null | undefined) => limit === UNLIMITED;
+/** Does `used + adding` fit under a count limit? An unlimited limit always fits. */
+export const fitsLimit = (limit: number, used: number, adding = 1) => limit === UNLIMITED || used + adding <= limit;
+
 export type PlanModules = {
   agencyWorkspace: boolean;
   adsManager: boolean;

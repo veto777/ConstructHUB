@@ -8,13 +8,20 @@
  * bills overage through a FAKE Stripe that records every call — nothing
  * leaves the box.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import {
   ADDONS, PLANS, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_ASSISTANT_INCLUDED_NUMBERS, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS,
   SALES_THRESHOLD_CENTS, ANNUAL_MONTHS,
 } from "@shared/plans";
+
+// Throwaway "p-voice-admin-…@example.invalid" accounts count as platform admins (the real ADMIN_EMAILS are never used).
+vi.mock("../admin", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../admin")>();
+  const testAdmin = (email?: string | null) => !!email && /^p-voice-admin-.*@example\.invalid$/i.test(email);
+  return { ...real, isPlatformAdminEmail: (email?: string | null) => real.isPlatformAdminEmail(email) || testAdmin(email), isPlatformAdmin: (user: any) => real.isPlatformAdmin(user) || testAdmin(user?.email) };
+});
 
 process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_module_import";
 process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATABASE_URL ?? "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
@@ -79,6 +86,15 @@ describe("Call Assistant price book (PLACEHOLDER pricing, owner to confirm)", ()
     expect(u.summarizeVoiceUsage({ minutes: 530, includedMinutes: 500 }, "2026-10", 1000).overageMinutes).toBe(0);
     expect(u.summarizeVoiceUsage({ minutes: 530, includedMinutes: 500 }, "2026-10", 0).overageMinutes).toBe(30);
     expect(u.voiceOverageLookupKey()).toBe(`chub_v1_meter_call_minutes_${CALL_MINUTE_OVERAGE_CENTS}`);
+  });
+
+  it("unlimited minutes (-1, platform admins): never overage, nothing counting down", async () => {
+    const u = await import("./billing-usage");
+    expect(u.summarizeVoiceUsage({ minutes: 9_000, includedMinutes: -1 }, "2026-10", -1))
+      .toMatchObject({ minutes: 9_000, includedMinutes: -1, remainingMinutes: -1, overageMinutes: 0, overageCents: 0 });
+    expect(u.summarizeVoiceUsage(null, "2026-10", -1)).toMatchObject({ includedMinutes: -1, remainingMinutes: -1, overageMinutes: 0 });
+    // A month that was unlimited stays unlimited (the snapshot only ever grows), even if the allowance is read lower later.
+    expect(u.summarizeVoiceUsage({ minutes: 900, includedMinutes: -1 }, "2026-10", 500)).toMatchObject({ includedMinutes: -1, overageMinutes: 0 });
   });
 
   it("the overage sweep only runs in production with Stripe and the explicit switch", async () => {
@@ -205,6 +221,23 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     expect(calls[1].params.subscription).toBeUndefined();
     expect(calls[1].params.pricing).toEqual({ price: "price_existing" });
     expect(calls[2].params).toMatchObject({ customer: "cus_y", pending_invoice_items_behavior: "include", auto_advance: true });
+  });
+
+  it("a platform admin's minutes are unlimited: recorded, never overage, never billed", async () => {
+    const { rows: [u] } = await db.query("insert into users(email,display_name,email_verified) values($1,'P-Voice admin',true) returning id", [`p-voice-admin-${randomUUID()}@example.invalid`]);
+    users.push(u.id);
+    const o = org();
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: u.id, outcome: "lead_submitted", billedMinutes: 600, at: AT });
+    const row = await usage.recordVoiceCallUsage({ orgId: o, accountUserId: u.id, outcome: "info", billedMinutes: 400, at: AT });
+    expect(row).toMatchObject({ calls: 2, minutes: 1000, includedMinutes: -1, overageMinutes: 0 });
+    const { stripe, calls } = fakeStripe();
+    const out = await usage.reportVoiceOverage(o, MONTH, { stripe, configured: () => true, subscriptionFor: async () => ({ stripeCustomerId: "cus_x", stripeSubscriptionId: "sub_x", status: "active", billingInterval: "month" }) });
+    expect(out).toEqual({ reported: 0, reason: "nothing_to_report" });
+    expect(calls).toEqual([]);
+    // A customer on the same month is unchanged: past the included 500, the rest is overage.
+    const o2 = org();
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: payer, outcome: "info", billedMinutes: 1000, at: AT }))
+      .toMatchObject({ includedMinutes: 500, overageMinutes: 500 });
   });
 
   it("the sweep bills every org with unreported overage in the month and reports what it skipped", async () => {
