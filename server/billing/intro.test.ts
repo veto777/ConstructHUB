@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import pg from "pg";
 import {
   addonIntro, introFor, introCouponSpec, resolveIntroCoupon, resetIntroCouponCache, introEligible, recordIntro, introsForOrder, attachIntrosToItems,
+  markIntrosUsedByHeldAddons, INTRO_USED_BY_SIBLING,
 } from "./intro";
 import { BILLING_INTRO_DDL } from "./schema";
 import { resetPriceCache, addonPriceSpec, describeSubscription } from "./prices";
@@ -17,7 +18,7 @@ import { CALL_ASSISTANT_INTRO, callAssistantIntroLine, callAssistantIntroShort }
 const pool = new pg.Pool({ connectionString: process.env.CRM_TEST_DATABASE_URL || process.env.DATABASE_URL });
 // Account ids far above any real users row (the table has no FK; rows are removed after).
 const USER = 900_000_000 + Math.floor(Math.random() * 1_000_000);
-const users = [USER, USER + 1, USER + 2, USER + 3];
+const users = [USER, USER + 1, USER + 2, USER + 3, USER + 4, USER + 5, USER + 6];
 
 function fakeStripe() {
   const coupons = new Map<string, any>();
@@ -165,5 +166,53 @@ describe("the coupon lands on the item that first adds the add-on", () => {
     expect(await introsForOrder(f.stripe, USER + 3, { call_assistant: 1 }, { call_assistant: 2 }, "month", pool)).toEqual([]);
     await recordIntro(USER + 3, "call_assistant", "coupon_x", "sub_9", pool);
     expect(await introsForOrder(f.stripe, USER + 3, {}, { call_assistant: 1 }, "month", pool)).toEqual([]);
+  });
+
+  it("tiers: the intro is Solo on monthly billing only; Crew and Fleet have none, and a switch between tiers never grants it", async () => {
+    expect(addonIntro("call_assistant")).toEqual({ addon: "call_assistant", monthlyCents: 9_900, months: 3 });
+    expect(addonIntro("call_assistant_crew")).toBeNull();
+    expect(addonIntro("call_assistant_fleet")).toBeNull();
+    expect(introFor("call_assistant", "year")).toBeNull();
+    expect(introCouponSpec("call_assistant_crew", "month")).toBeNull();
+    const f = fakeStripe();
+    // A new customer adding Crew or Fleet: no coupon, no grant, no Stripe call.
+    expect(await introsForOrder(f.stripe, USER + 1, {}, { call_assistant_crew: 1 }, "month", pool)).toEqual([]);
+    expect(await introsForOrder(f.stripe, USER + 1, {}, { call_assistant_fleet: 1 }, "month", pool)).toEqual([]);
+    // Crew → Solo is a switch, not a first purchase: no intro, even for an account that never had one.
+    expect(await introsForOrder(f.stripe, USER + 1, { call_assistant_crew: 1 }, { call_assistant: 1 }, "month", pool)).toEqual([]);
+    expect(f.stripe.coupons.create).not.toHaveBeenCalled();
+    // The same account adding Solo as its first tier still gets it.
+    expect((await introsForOrder(f.stripe, USER + 1, {}, { call_assistant: 1 }, "month", pool)).map((i) => i.addon)).toEqual(["call_assistant"]);
+  });
+
+  it("a former Crew/Fleet customer never gets the Solo intro: not in a later request, not on a new subscription", async () => {
+    const f = fakeStripe();
+    // Held Crew on a live subscription (recorded after every subscription write) → the Solo intro is used up.
+    expect(await markIntrosUsedByHeldAddons(USER + 4, { call_assistant_crew: 1 }, "active", "sub_crew", pool)).toEqual(["call_assistant"]);
+    // Request 1 removes Crew; request 2 adds Solo with nothing held before: no coupon.
+    expect(await introsForOrder(f.stripe, USER + 4, {}, { call_assistant: 1 }, "month", pool)).toEqual([]);
+    // Fleet, then cancelled, then a brand-new checkout with Solo: no coupon either.
+    await markIntrosUsedByHeldAddons(USER + 5, { call_assistant_fleet: 1, call_number: 2 }, "trialing", "sub_fleet", pool);
+    expect(await introEligible(f.stripe, USER + 5, "call_assistant", pool)).toBe(false);
+    expect(f.stripe.coupons.create).not.toHaveBeenCalled();
+
+    // Nothing is marked for Solo itself, an add-on outside the tiers, an ended subscription or a grant row.
+    expect(await markIntrosUsedByHeldAddons(USER + 6, { call_assistant: 1 }, "active", "sub_solo", pool)).toEqual([]);
+    expect(await markIntrosUsedByHeldAddons(USER + 6, { extra_seat: 3 }, "active", "sub_solo", pool)).toEqual([]);
+    expect(await markIntrosUsedByHeldAddons(USER + 6, { call_assistant_crew: 1 }, "canceled", "sub_old", pool)).toEqual([]);
+    expect(await markIntrosUsedByHeldAddons(USER + 6, { call_assistant_crew: 1 }, "active", null, pool)).toEqual([]);
+    expect(await introEligible(f.stripe, USER + 6, "call_assistant", pool)).toBe(true);
+
+    // A real grant is never overwritten; a pending checkout grant is replaced by the subscription.
+    await recordIntro(USER + 6, "call_assistant", "coupon_real", "sub_real", pool);
+    await markIntrosUsedByHeldAddons(USER + 6, { call_assistant_crew: 1 }, "active", "sub_later", pool);
+    const row = async (u: number) => (await pool.query("SELECT coupon_id, ref FROM billing_addon_intros WHERE user_id = $1 AND addon = 'call_assistant'", [u])).rows[0];
+    expect(await row(USER + 6)).toEqual({ coupon_id: "coupon_real", ref: "sub_real" });
+    f.sessions.set("cs_abandoned", { id: "cs_abandoned", status: "expired" });
+    await pool.query("UPDATE billing_addon_intros SET ref = 'cs_abandoned' WHERE user_id = $1 AND addon = 'call_assistant'", [USER + 6]);
+    expect(await introEligible(f.stripe, USER + 6, "call_assistant", pool)).toBe(true);
+    await markIntrosUsedByHeldAddons(USER + 6, { call_assistant_fleet: 1 }, "active", "sub_fleet2", pool);
+    expect(await row(USER + 6)).toEqual({ coupon_id: INTRO_USED_BY_SIBLING, ref: "sub_fleet2" });
+    expect(await introEligible(f.stripe, USER + 6, "call_assistant", pool)).toBe(false);
   });
 });

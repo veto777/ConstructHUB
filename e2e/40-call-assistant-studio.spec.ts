@@ -2,8 +2,8 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { gotoCrm } from "./helpers";
 import { defaultVoiceProfile, type VoiceProfile } from "../shared/voice-profile";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
-import { ADDONS } from "../shared/plans";
-import { CALL_ASSISTANT_NUMBER_RULES, callAssistantIntroShort } from "../shared/plan-copy";
+import { ADDONS, CALL_ASSISTANT_TIERS } from "../shared/plans";
+import { CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, callAssistantIntroShort } from "../shared/plan-copy";
 
 /**
  * Call Assistant — Agent Studio, Overview and Simulator (studio-frontend lane).
@@ -43,6 +43,11 @@ class VoiceMock {
   publishes: Array<Record<string, unknown>> = [];
   simTurns = 0;
   simSessionBodies: Array<Record<string, unknown>> = [];
+  unblocked: string[] = [];
+  spamEntries = [
+    { id: 41, phoneNumber: "+13605550199", strikes: 2, calls: 5, blocked: true, blockedBy: "auto", lastReason: "Sales pitch about Google listings", lastConfidence: 0.97, lastSeenAt: "2026-10-01T16:00:00.000Z" },
+    { id: 42, phoneNumber: "+13605550142", strikes: 1, calls: 1, blocked: false, blockedBy: null, lastReason: "Robocall", lastConfidence: 0.9, lastSeenAt: "2026-10-02T09:00:00.000Z" },
+  ];
 
   constructor(private opts: MockOpts = {}) {
     // What the backend seeds a new org with: the CRM's own company fields, nothing invented.
@@ -94,11 +99,14 @@ class VoiceMock {
       addon: { key: "call_assistant", name: "AI Call Assistant", preview: true, availableOn: ["pro", "growth", "agency"] },
       plan: "pro",
       allowance: { numbers: 1, minutes: 500 },
-      pricing: { includedMinutes: 500, overageCentsPerMinute: 15 },
+      pricing: { includedMinutes: 500, overageCentsPerMinute: 10, freeSpamCalls: 500 },
+      tier: { key: "solo", addon: "call_assistant", name: "Solo" },
+      tiers: CALL_ASSISTANT_TIERS.map((t) => ({ key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents, includedMinutes: t.includedMinutes, includedNumbers: t.includedNumbers, preview: true })),
+      canManage: true,
       engine: { configured: true, reachable: false, models: false, checkedAt: "2026-10-02T00:00:00.000Z" },
       numbers: [{ id: "n1", phoneNumber: "+13605550100", label: "Main line", location: "Bellingham", status: "active", isTest: true }],
       profile: { status: this.status, publishedVersion: this.publishedVersion },
-      usage: { month: "2026-10", minutes: 120, calls: 14, overageMinutes: 0 },
+      usage: { month: "2026-10", minutes: 120, calls: 14, overageMinutes: 0, spamCallsThisMonth: 37, freeSpamCalls: 30, freeSpamMinutes: 41, freeSpamCallsLimit: 500 },
     };
   }
 
@@ -166,6 +174,20 @@ class VoiceMock {
     }
     if (path.startsWith("/simulator/session/") && method === "DELETE") return json({ ended: true, summary: "Stopped after 2 caller turns; a lead was submitted." });
     if (path.startsWith("/numbers")) return json({ numbers: [], allowance: { numbers: 1 }, forwarding: [] });
+    if (path === "/spam") {
+      return json({
+        entries: this.spamEntries, blocked: this.spamEntries.filter((e) => e.blocked).length,
+        thisMonth: { month: "2026-10", spamCalls: 37, screened: 30, rejected: 7, freeSpamCalls: 30, freeSpamMinutes: 41, freeSpamCallsLimit: 500 },
+      });
+    }
+    const unblock = path.match(/^\/spam\/(\d+)\/unblock$/);
+    if (unblock && method === "POST") {
+      this.unblocked.push(unblock[1]);
+      const entry = this.spamEntries.find((e) => String(e.id) === unblock[1])!;
+      Object.assign(entry, { blocked: false, strikes: 0 });
+      return json({ unblocked: true, entry });
+    }
+    if (path === "/escalations" || path.startsWith("/escalations?")) return json({ escalations: [] });
     return json({ code: "not_implemented", lane: "fixture", todo: path }, 501);
   }
 }
@@ -412,6 +434,32 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     // The engine is probed: configured but not answering reads "Engine down", never "configured".
     await expect(page.getByTestId("pill-overview-engine")).toHaveText("Engine down");
     await expect(page.getByTestId("badge-overview-preview")).toBeVisible();
+    // The tier, the tiers to move between, and this month's spam (owner, 2026-10-02).
+    await expect(page.getByTestId("text-overview-tier")).toHaveText("Solo — 2,000 minutes and 1 local number a month");
+    for (const t of CALL_ASSISTANT_TIERS) await expect(page.getByTestId(`row-overview-tier-${t.tier}`)).toContainText(t.name);
+    await expect(page.getByTestId("row-overview-tier-solo")).toContainText("Current");
+    await expect(page.getByTestId("row-overview-tier-fleet")).toContainText("Upgrade");
+    await expect(page.getByTestId("link-overview-change-tier")).toHaveAttribute("href", "/settings?tab=billing");
+    await expect(page.getByTestId("metric-overview-spam")).toContainText("37");
+    await expect(page.getByTestId("metric-overview-spam")).toContainText("30 of 500 free spam calls used");
+  });
+
+  test("calls: the Spam blocked view shows this month's count and the ledger; a false positive is unblocked in one click", async ({ page }) => {
+    const errors = trackErrors(page);
+    const mock = await mockVoice(page, { published: true }, { manageSettings: true });
+    await gotoCrm(page, "/crm/call-assistant?tab=calls");
+    await expect(page.getByTestId("badge-spam-this-month")).toHaveText("37");
+    await page.getByTestId("button-calls-view-spam").click();
+    await expect(page.getByTestId("card-spam-summary")).toContainText(CALL_ASSISTANT_SPAM.headline);
+    await expect(page.getByTestId("text-spam-this-month")).toHaveText("37");
+    await expect(page.getByTestId("text-spam-rejected")).toHaveText("7");
+    await expect(page.getByTestId("text-spam-numbers-blocked")).toHaveText("1");
+    await expect(page.getByTestId("text-spam-free-used")).toHaveText("30 / 500");
+    await expect(page.getByTestId("pill-spam-status-41")).toHaveText("Blocked (auto)");
+    await page.getByTestId("button-spam-unblock-41").click();
+    await expect(page.getByTestId("pill-spam-status-41")).toHaveText("Watching");
+    expect(mock.unblocked).toEqual(["41"]);
+    expect(errors).toEqual([]);
   });
 
   test("simulator: a turn shows the decision and slots; engine down is said, never faked", async ({ page }) => {

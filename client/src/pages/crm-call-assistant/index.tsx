@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
 import { planRequiredFrom } from "@/components/plan-required";
-import { ADDONS, PLANS, CALL_ASSISTANT_INCLUDED_MINUTES } from "@shared/plans";
-import { callAssistantIntroShort, joinNames } from "@shared/plan-copy";
+import { ADDONS, PLANS, CALL_ASSISTANT_NAME } from "@shared/plans";
+import { callAssistantIntroShort, callAssistantSpamAllowanceLine, callAssistantTiers, joinNames } from "@shared/plan-copy";
 import { OverviewPanel } from "./overview";
 import { CallAssistantPausedBanner } from "./paused-banner";
 import { NumbersPanel } from "./numbers";
@@ -51,13 +51,20 @@ export type VoiceStatus = {
   /** An automatic number release: "releasing" = a fixed card still keeps it; "released" = gone (or final). */
   numberRelease?: "releasing" | "released" | null;
   addon: { key: string; name: string; preview: boolean; availableOn: string[] };
+  canManage?: boolean;
+  /** The held tier (absent on an older server; null without one). */
+  tier?: { key: string; addon: string; name: string } | null;
+  tiers?: { key: string; addon: string; name: string; monthlyCents: number; annualCents: number; includedMinutes: number; includedNumbers: number; preview: boolean }[];
   plan: string | null;
   allowance: { numbers: number; minutes: number };
-  pricing: { includedMinutes: number; overageCentsPerMinute: number };
+  pricing: { includedMinutes: number; overageCentsPerMinute: number; freeSpamCalls?: number };
   engine: { configured: boolean; reachable: boolean; models: boolean; checkedAt: string };
   numbers: unknown[];
   profile: { status: string; publishedVersion: number | null } | null;
-  usage: { month: string; minutes: number; calls: number; overageMinutes: number } | null;
+  usage: {
+    month: string; minutes: number; calls: number; overageMinutes: number;
+    spamCallsThisMonth?: number; freeSpamCalls?: number; freeSpamMinutes?: number; freeSpamCallsLimit?: number;
+  } | null;
 };
 
 function tabFromSearch(): CallAssistantTab {
@@ -71,13 +78,14 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
   const addon = ADDONS.call_assistant;
   const plans = joinNames(addon.availableOn.map((k) => PLANS[k].name));
   const preview = status?.addon.preview ?? addon.preview === true;
-  const message = body?.message || `${addon.name} is an add-on for the ${plans} plans. Add it in Settings → Billing to use it.`;
+  const message = body?.message || `${CALL_ASSISTANT_NAME} is an add-on for the ${plans} plans. Add it in Settings → Billing to use it.`;
+  const tiers = callAssistantTiers();
   return (
     <Card role="region" aria-labelledby="call-assistant-gate" data-testid="plan-required-callAssistant">
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h2 id="call-assistant-gate" className="text-xl font-semibold leading-none tracking-tight">{addon.name}</h2>
+          <h2 id="call-assistant-gate" className="text-xl font-semibold leading-none tracking-tight">{CALL_ASSISTANT_NAME}</h2>
           <Badge variant="secondary">Add-on</Badge>
           {preview && <Badge variant="outline" data-testid="badge-call-assistant-preview">Coming soon</Badge>}
         </div>
@@ -87,11 +95,20 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           <li>Answers every call, 24/7, in a voice and name you choose, and says it is a virtual assistant when asked.</li>
           <li>Asks what the caller needs, the address, a name, a good email and the best time to call — then files the lead in your CRM.</li>
-          <li>Texts or emails the right person for emergencies, existing customers and "I want a person"; screens telemarketers.</li>
+          <li>Texts or emails the right person for emergencies, existing customers and "I want a person".</li>
+          <li>Screens out spam on every call forwarded to it, so you stop answering telemarketers and robocalls; a number caught twice as near-certain spam is blocked before it's answered.</li>
           <li>Every call logged with a summary, transcript and recording.</li>
         </ul>
+        <ul className="grid gap-2 sm:grid-cols-3 text-sm" data-testid="list-plan-required-tiers">
+          {tiers.map((t) => (
+            <li key={t.tier} className="rounded-md border p-2.5" data-testid={`text-plan-required-tier-${t.tier}`}>
+              <span className="font-semibold">{t.name}</span> · {t.monthly}/mo
+              <span className="block text-xs text-muted-foreground">{t.minutes} minutes / month · {t.numbersLabel}</span>
+            </li>
+          ))}
+        </ul>
         <p className="text-sm">
-          <span className="font-semibold" data-testid="text-plan-required-intro">{callAssistantIntroShort()}</span>, with 1 local number and {CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US")} minutes included, on the {plans} plans.
+          Solo launch price: <span className="font-semibold" data-testid="text-plan-required-intro">{callAssistantIntroShort()}</span>. {callAssistantSpamAllowanceLine()}. On the {plans} plans.
           {preview ? " Pricing is being finalized; it cannot be added yet." : ""}
         </p>
         {/* a disabled <a> still navigates: while the add-on is in preview there is no link at all */}

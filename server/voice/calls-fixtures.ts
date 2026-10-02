@@ -95,7 +95,7 @@ export async function makeCall(pool: pg.Pool, orgId: string, opts: { numberId?: 
 export async function cleanup(pool: pg.Pool, bag: Made): Promise<void> {
   const orgs = bag.orgs, users = bag.users;
   if (orgs.length) {
-    for (const t of ["voice_escalations", "voice_spam", "voice_usage", "voice_calls", "voice_numbers", "voice_profiles", "voice_profile_versions",
+    for (const t of ["voice_escalations", "voice_spam", "voice_spam_reports", "voice_usage", "voice_calls", "voice_numbers", "voice_profiles", "voice_profile_versions",
       "crm_activity_log", "crm_notifications", "crm_projects", "crm_customers", "crm_lead_sources", "crm_sms_optouts", "crm_members"]) {
       await pool.query(`delete from ${t} where org_id = any($1::text[])`, [orgs]).catch(() => {});
     }

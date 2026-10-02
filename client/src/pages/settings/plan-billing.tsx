@@ -10,9 +10,10 @@ import { TalkToSalesButton, TalkToSalesDialog } from "@/components/talk-to-sales
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import {
-  ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS, PLAN_KEYS, TRIAL_DAYS,
-  type BillingInterval,
+  ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS, PLAN_KEYS, TRIAL_DAYS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIER_ADDONS, callAssistantTierOf,
+  type AddonKey, type BillingInterval,
 } from "@shared/plans";
+import { CallAssistantTierPicker } from "@/components/call-assistant-tiers";
 import {
   AGENCY_INCLUDED_LOCATIONS, PAYMENT_PROBLEM_STATUSES, USAGE_METERS, addonPriceCents, addonsForPlan, agencyQuote,
   formatUsd, intervalSuffix, intervalWord, normalizeLocations, planPriceCents, usageLine, usagePercent,
@@ -47,7 +48,8 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
   // Fewer Call Assistant add-ons than numbers held asks first (the numbers are released, not kept).
   const addonChange = useAddonChange(addonMutation);
   // Cancelling (in Stripe's portal) releases the Call Assistant numbers: say so next to the way there.
-  const holdsCallAssistant = Number(subscription?.addons?.call_assistant ?? 0) > 0;
+  const heldTier = callAssistantTierOf((subscription?.addons ?? {}) as Partial<Record<AddonKey, number>>);
+  const holdsCallAssistant = !!heldTier;
   const { data: cancelReleases } = useQuery({
     queryKey: ["/api/stripe/addons/release-preview", "cancel"],
     queryFn: () => fetchNumberReleasePreview("cancel=1"),
@@ -94,7 +96,9 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
           return q.sales ? null : `${formatUsd(view.interval === "year" ? q.annualCents : q.monthlyCents)}${intervalSuffix(view.interval)} for ${view.locations.toLocaleString("en-US")} locations`;
         })()
       : `${formatUsd(planPriceCents(plan, view.interval))}${intervalSuffix(view.interval)}`;
-  const addons = plan ? addonsForPlan(plan.key) : [];
+  // The Call Assistant tiers are one choice (a picker below), not three counters.
+  const addons = plan ? addonsForPlan(plan.key).filter((a) => !CALL_ASSISTANT_TIER_ADDONS.includes(a.key)) : [];
+  const sellsCallAssistant = !!plan && ADDONS.call_assistant.availableOn.includes(plan.key);
   const pendingAddon = addonMutation.isPending ? addonMutation.variables?.addon : null;
 
   return (
@@ -244,6 +248,35 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
                     {wantedLocations.toLocaleString("en-US")} locations = {formatUsd(interval === "year" ? locationsQuote.annualCents : locationsQuote.monthlyCents)}{intervalSuffix(interval)}
                   </p>
                 )}
+              </div>
+            )}
+            {sellsCallAssistant && (
+              <div className="rounded-lg border p-3 space-y-3" data-testid="row-billing-call-assistant">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{CALL_ASSISTANT_NAME}</p>
+                    <p className="text-xs text-muted-foreground" data-testid="text-billing-call-assistant-tier">
+                      {heldTier ? `You're on ${heldTier.name}. Switching tiers is prorated on this subscription.` : "Pick a tier: one per subscription."}
+                    </p>
+                  </div>
+                  {heldTier && editable && (
+                    <Button
+                      size="sm" variant="ghost"
+                      disabled={addonMutation.isPending || addonChange.checking}
+                      onClick={() => void addonChange.request({ addon: heldTier.addon, quantity: 0 }, 1)}
+                      data-testid="button-billing-call-assistant-remove"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <CallAssistantTierPicker
+                  addons={subscription?.addons as Partial<Record<AddonKey, number>> | undefined}
+                  interval={interval}
+                  editable={editable && !addonChange.checking}
+                  pending={pendingAddon}
+                  onSwitch={(addon) => void addonChange.request({ addon, quantity: 1 }, 0)}
+                />
               </div>
             )}
             {addons.map((addon) => {

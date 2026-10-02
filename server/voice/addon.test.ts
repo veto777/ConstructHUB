@@ -18,8 +18,8 @@ import {
   getEntitlements, addonModulesFor, moduleEnabled, modulePaused, callAssistantAllowance, sendModuleRequired, requireModule, allowancesFor,
 } from "../entitlements";
 import {
-  ADDONS, ADDON_MODULES, PLANS, PLAN_KEYS, MODULE_NAMES, planForModule, moduleName, isAddonModule,
-  CALL_ASSISTANT_INCLUDED_MINUTES, CALL_ASSISTANT_INCLUDED_NUMBERS,
+  ADDONS, ADDON_MODULES, ADDON_MODULE_UNLOCKED_BY, PLANS, PLAN_KEYS, MODULE_NAMES, planForModule, moduleName, isAddonModule,
+  CALL_ASSISTANT_TIERS, CALL_ASSISTANT_TIER_ADDONS, callAssistantTier,
 } from "@shared/plans";
 import { checkAddonsForPlan, BillingRequestError } from "../billing/order";
 import { AGENCY_ONLY_MODULES, addonLines } from "@shared/plan-copy";
@@ -36,7 +36,7 @@ beforeEach(() => { mocks.row = undefined; });
 
 describe("price book: the Call Assistant add-ons", () => {
   it("are sold on Pro, Growth and Agency, grant no count limits, and stay in preview until the owner confirms pricing", () => {
-    for (const key of ["call_assistant", "call_number"] as const) {
+    for (const key of [...CALL_ASSISTANT_TIER_ADDONS, "call_number"] as const) {
       expect(ADDONS[key].availableOn).toEqual(["pro", "growth", "agency"]);
       expect(ADDONS[key].grants).toEqual({});
       expect(ADDONS[key].preview).toBe(true);
@@ -45,15 +45,17 @@ describe("price book: the Call Assistant add-ons", () => {
     // Owner, 2026-10-02: "annually price can be $1999 for this service" — its own number, not 10 × monthly.
     expect(ADDONS.call_assistant.annualCents).toBe(199_900);
     expect(ADDONS.call_number.annualCents).toBe(ADDONS.call_number.monthlyCents * 10);
-    expect(ADDONS.call_number.requires).toBe("call_assistant");
-    expect(ADDONS.call_assistant.description).toContain(`${CALL_ASSISTANT_INCLUDED_MINUTES} call minutes`);
-    expect(CALL_ASSISTANT_INCLUDED_NUMBERS).toBe(1);
+    // An extra number needs any one tier.
+    expect(ADDONS.call_number.requires).toEqual(["call_assistant", "call_assistant_crew", "call_assistant_fleet"]);
+    for (const t of CALL_ASSISTANT_TIERS) expect(ADDONS[t.addon].description).toContain(`${t.includedMinutes.toLocaleString("en-US")} call minutes`);
+    expect(callAssistantTier("solo").includedNumbers).toBe(1);
     // Every add-on line the Hub assistant quotes still comes from the price book, preview ones included.
     expect(addonLines()).toHaveLength(Object.keys(ADDONS).length);
   });
 
   it("is an add-on module, not a plan module: the Agency-only list is unchanged", () => {
     expect(ADDON_MODULES.callAssistant).toBe("call_assistant");
+    expect(ADDON_MODULE_UNLOCKED_BY.callAssistant).toEqual(["call_assistant", "call_assistant_crew", "call_assistant_fleet"]);
     expect(isAddonModule("callAssistant")).toBe(true);
     expect(isAddonModule("adsManager")).toBe(false);
     expect(Object.keys(MODULE_NAMES)).not.toContain("callAssistant");
@@ -75,6 +77,10 @@ describe("price book: the Call Assistant add-ons", () => {
 describe("entitlements: the callAssistant add-on module", () => {
   it("is on only when the add-on is on the subscription, the plan sells it and the subscription is paid up", () => {
     expect(addonModulesFor("pro", { call_assistant: 1 }, "active")).toEqual({ callAssistant: true });
+    // Any tier unlocks the module.
+    expect(addonModulesFor("pro", { call_assistant_crew: 1 }, "active")).toEqual({ callAssistant: true });
+    expect(addonModulesFor("growth", { call_assistant_fleet: 1 }, "trialing")).toEqual({ callAssistant: true });
+    expect(addonModulesFor("pro", { call_number: 2 }, "active")).toEqual({ callAssistant: false });
     expect(addonModulesFor("pro", { call_assistant: 1 }, "trialing")).toEqual({ callAssistant: true });
     expect(addonModulesFor("pro", { call_assistant: 1 }, "past_due")).toEqual({ callAssistant: false });
     expect(addonModulesFor("pro", { call_assistant: 1 }, null)).toEqual({ callAssistant: false });
@@ -87,11 +93,16 @@ describe("entitlements: the callAssistant add-on module", () => {
     expect(allowancesFor("pro", { call_assistant: 2, call_number: 3 })).toEqual(PLANS.pro.limits);
   });
 
-  it("buys numbers and minutes per unit; platform admins get one unit's worth", () => {
-    const on = { addonModules: { callAssistant: true }, addons: { call_assistant: 2, call_number: 3 }, isPlatformAdmin: false };
-    expect(callAssistantAllowance(on)).toEqual({ numbers: 2 + 3, minutes: 2 * CALL_ASSISTANT_INCLUDED_MINUTES });
+  it("buys the held tier's numbers and minutes plus extra numbers; platform admins get Solo's worth", () => {
+    const allowance = (addons: Record<string, number>, isPlatformAdmin = false) =>
+      callAssistantAllowance({ addonModules: { callAssistant: true }, addons, isPlatformAdmin });
+    expect(allowance({ call_assistant: 1, call_number: 3 })).toEqual({ numbers: 1 + 3, minutes: 2000 });
+    expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 3, minutes: 5000 });
+    expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 6, minutes: 12_000 });
     expect(callAssistantAllowance({ addonModules: { callAssistant: false }, addons: { call_assistant: 2 }, isPlatformAdmin: false })).toEqual({ numbers: 0, minutes: 0 });
-    expect(callAssistantAllowance({ addonModules: { callAssistant: true }, addons: {}, isPlatformAdmin: true })).toEqual({ numbers: 1, minutes: CALL_ASSISTANT_INCLUDED_MINUTES });
+    expect(allowance({}, true)).toEqual({ numbers: 1, minutes: 2000 });
+    // An admin who holds a tier gets that tier.
+    expect(allowance({ call_assistant_fleet: 1 }, true)).toEqual({ numbers: 5, minutes: 12_000 });
   });
 
   it("getEntitlements reports addonModules beside modules, and legacy Platinum has no add-on", async () => {
@@ -121,7 +132,7 @@ describe("entitlements: the callAssistant add-on module", () => {
     expect(modulePaused(ent, "callAssistant")).toBe(paused);
     expect(ent.subscriptionStatus).toBe(status);
     // A paused add-on still shows what it bought (its numbers are held); an ended one shows nothing.
-    expect(callAssistantAllowance(ent)).toEqual(on || paused ? { numbers: 3, minutes: CALL_ASSISTANT_INCLUDED_MINUTES } : { numbers: 0, minutes: 0 });
+    expect(callAssistantAllowance(ent)).toEqual(on || paused ? { numbers: 3, minutes: callAssistantTier("solo").includedMinutes } : { numbers: 0, minutes: 0 });
     // past_due keeps the PLAN's own access (only the add-on stops).
     if (status === "past_due") expect(ent.plan).toBe("pro");
   });

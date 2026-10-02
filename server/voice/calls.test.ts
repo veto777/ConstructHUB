@@ -221,7 +221,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(call.flags.processedAt).toBeTruthy();
       expect(call.flags.processingAt).toBeUndefined();
       expect(call.flags.alertedKinds).toEqual(["urgent"]);
-      expect(await usage(A.orgId)).toMatchObject({ calls: 1, minutes: 3, included_minutes: 500, overage_minutes: 0, account_user_id: A.userId });
+      expect(await usage(A.orgId)).toMatchObject({ calls: 1, minutes: 3, included_minutes: 2000, overage_minutes: 0, account_user_id: A.userId });
     });
 
     it("two end reports racing for one call: exactly one does the work, minutes counted once", async () => {
@@ -341,6 +341,12 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       const ledger = await crm(a, "GET", "/spam");
       const entry = ledger.body.entries.find((e: any) => e.phoneNumber === shared.spammer);
       expect(entry).toMatchObject({ blocked: true, strikes: 2, blockedBy: "auto" });
+      // This month's count from the meter: the spammer's calls (screened, then rejected once blocked), and the free allowance.
+      expect(ledger.body.thisMonth).toMatchObject({ month: new Date().toISOString().slice(0, 7), freeSpamCallsLimit: 500 });
+      expect(ledger.body.thisMonth.spamCalls).toBe(ledger.body.thisMonth.screened + ledger.body.thisMonth.rejected);
+      expect(ledger.body.thisMonth.spamCalls).toBeGreaterThanOrEqual(2);
+      // Another org sees none of it.
+      expect((await crm(c, "GET", "/spam")).body).toMatchObject({ entries: [], blocked: 0, thisMonth: { spamCalls: 0 } });
       expect((await crm(field, "GET", "/spam")).status).toBe(200);
       expect((await crm(field, "POST", `/spam/${entry.id}/unblock`)).status).toBe(403);
       expect((await crm(c, "POST", `/spam/${entry.id}/unblock`)).status).toBe(404);

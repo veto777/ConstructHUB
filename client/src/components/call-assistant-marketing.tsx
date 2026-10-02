@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST, type VoicePersona } from "@shared/voice-personas";
-import { callAssistantPricing, callAssistantIntroShort } from "@shared/plan-copy";
+import { callAssistantPricing, callAssistantIntroShort, callAssistantSpamAllowanceLine } from "@shared/plan-copy";
 
 export const CALL_ASSISTANT_PATH = "/call-assistant";
 
@@ -71,8 +71,8 @@ export const CA_HIGHLIGHTS: { icon: LucideIcon; title: string; body: string }[] 
   },
   {
     icon: ShieldBan,
-    title: "Spam screened",
-    body: "Telemarketers and robocalls are screened and never ping your phone. A number flagged twice is blocked before it rings through.",
+    title: "You never answer spam again",
+    body: `Telemarketers and robocalls forwarded to your assistant are screened and never ping your phone. A number caught twice as near-certain spam is blocked before it's answered, and every one lands in your spam report. ${callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase())}.`,
   },
   {
     icon: Clock3,
@@ -252,8 +252,8 @@ export function CallAssistantSection() {
           </div>
           <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
             A missed call is a job that goes to the next contractor on the list. Pick who answers, get a local number
-            in your state and forward the lines you already have. The assistant asks your questions your way and files
-            every real caller in your CRM.
+            in your state and forward the lines you already have. The assistant asks your questions your way, files
+            every real caller in your CRM and screens out the spam, so you never answer a robocall again.
           </p>
         </div>
 
@@ -309,14 +309,16 @@ export function CallAssistantSection() {
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <p className="font-display font-semibold text-[1.5rem] sm:text-[1.75rem] leading-tight text-mkt-ink" data-testid="text-call-assistant-landing-price">
-                {price.intro}<span className="font-sans text-sm font-medium text-mkt-muted">/mo</span>{" "}
+                <span className="font-sans text-[15px] font-medium text-mkt-ink-soft">Solo </span>{price.intro}<span className="font-sans text-sm font-medium text-mkt-muted">/mo</span>{" "}
                 <span className="block sm:inline font-sans text-[15px] font-medium text-mkt-ink-soft">for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr</span>
               </p>
               <ComingSoonTag />
             </div>
-            <p className="mt-1.5 text-[14px] text-mkt-ink-soft">
-              Includes {price.includedNumbers} local number and {price.includedMinutes} minutes a month; extra numbers {price.extraNumber}/mo.
-              An add-on for the {price.plans} plans.
+            <p className="mt-1.5 text-[14px] text-mkt-ink-soft" data-testid="text-call-assistant-landing-tiers">
+              {price.tiers.map((t, i) => (
+                <span key={t.tier}>{i > 0 ? (i === price.tiers.length - 1 ? " and " : ", ") : "Three tiers: "}<strong className="font-semibold text-mkt-ink">{t.name}</strong> ({t.minutes} min, {t.numbersLabel})</span>
+              ))}
+              . The first {price.freeSpamCalls} spam calls each month are free on every tier. An add-on for the {price.plans} plans.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">

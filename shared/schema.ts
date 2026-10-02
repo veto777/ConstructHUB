@@ -1468,6 +1468,7 @@ export const CRM_NOTIFICATION_PREFS = [
   "memberLogin",         // a team member signed in
   "memberAccountChange", // a team member changed their own profile or password
   "leadReceived",        // a lead came in through the website lead form
+  "spamReport",          // the AI Call Assistant's weekly "we stopped N spam calls" report (server/voice/spam-report.ts)
 ] as const;
 export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 
@@ -2713,6 +2714,9 @@ export const voiceUsage = pgTable("voice_usage", {
   minutes: integer("minutes").notNull().default(0),
   spamCalls: integer("spam_calls").notNull().default(0),
   blockedCalls: integer("blocked_calls").notNull().default(0),
+  /** Spam calls this month whose minutes were not counted (≤ CALL_ASSISTANT_FREE_SPAM_CALLS), and those minutes. */
+  spamFreeCalls: integer("spam_free_calls").notNull().default(0),
+  spamFreeMinutes: integer("spam_free_minutes").notNull().default(0),
   includedMinutes: integer("included_minutes"),
   overageMinutes: integer("overage_minutes").notNull().default(0),
   overageReportedMinutes: integer("overage_reported_minutes").notNull().default(0),
@@ -2720,6 +2724,19 @@ export const voiceUsage = pgTable("voice_usage", {
   stripeUsageRecordId: text("stripe_usage_record_id"),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => [uniqueIndex("voice_usage_org_month_key").on(t.orgId, t.month)]);
+
+/** The weekly spam report sent to an org (server/voice/spam-report.ts): one row per org per week (Monday, UTC). */
+export const voiceSpamReports = pgTable("voice_spam_reports", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  weekStart: date("week_start").notNull(),
+  spamCalls: integer("spam_calls").notNull().default(0),
+  blockedCalls: integer("blocked_calls").notNull().default(0),
+  /** What happened to the email: sent / queued / duplicate / no_address / opted_out. */
+  email: text("email"),
+  bell: boolean("bell").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [uniqueIndex("voice_spam_reports_org_id_week_start_key").on(t.orgId, t.weekStart)]);
 
 export type VoiceProfileRow = typeof voiceProfiles.$inferSelect;
 export type VoiceProfileVersionRow = typeof voiceProfileVersions.$inferSelect;

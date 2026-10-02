@@ -8,13 +8,13 @@ import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sen
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 import {
   PLANS as PRICE_BOOK, PLAN_KEYS, ADDON_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
-  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS,
+  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS, CALL_ASSISTANT_TIER_ADDONS,
 } from "@shared/plans";
 import { stripe, PaymentsNotConfiguredError } from "./billing/client";
 import { describeSubscription } from "./billing/prices";
 import {
-  BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities, checkAddonsForPlan,
-  checkoutLineItems, subscriptionChange, type PlanOrder,
+  BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities, checkAddonsForPlan, mergeAddonRequest,
+  checkoutLineItems, subscriptionChange, type PlanOrder, type AddonQuantities,
 } from "./billing/order";
 import {
   billingSchemaReady, hasLiveStripeSubscription, trialEligible, eventAppliesToRow, subscriptionRowUpdate,
@@ -30,7 +30,7 @@ import { fulfilOneTimePurchase } from "./billing/fulfilment";
 import { stripeConfigured } from "./billing/client";
 import { onStripeBillingEvent } from "./account/billing-emails";
 import { forgetDashboard } from "./dashboard/cache";
-import { introsForOrder, attachIntrosToItems, recordIntro, type StripeForIntro } from "./billing/intro";
+import { introsForOrder, attachIntrosToItems, recordIntro, markIntrosUsedByHeldAddons, type StripeForIntro } from "./billing/intro";
 import { afterSubscriptionChange, previewCallNumberReleases } from "./voice/number-release";
 
 export { PaymentsNotConfiguredError };
@@ -150,6 +150,15 @@ async function writeSubscriptionRow(where: { id: number } | { userId: number }, 
   return set;
 }
 
+/** Holding Crew or Fleet uses the Solo intro up (server/billing/intro.ts). Never fails the caller: the next write retries it. */
+async function noteIntrosUsed(userId: number, set: ReturnType<typeof subscriptionRowUpdate>) {
+  try {
+    await markIntrosUsedByHeldAddons(userId, set.addons as AddonQuantities | undefined, set.status, set.stripeSubscriptionId);
+  } catch (e: any) {
+    console.error(`[billing] intro bookkeeping for user ${userId} failed:`, e?.message || e);
+  }
+}
+
 /**
  * Apply an order to the EXISTING subscription: items are repriced/requantified
  * in place with proration, invoiced immediately; if the card can't pay, Stripe
@@ -172,6 +181,7 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
   });
   for (const intro of intros) await recordIntro(userId, intro.addon, intro.couponId, updated.id);
   const set = await writeSubscriptionRow({ id: row.id }, updated);
+  await noteIntrosUsed(userId, set);
   // Fewer Call Assistant numbers paid for (or the add-on removed): the extras are released.
   await afterSubscriptionChange(userId);
   return { changed: true, subscription: subscriptionSummary({ ...row, ...set } as SubscriptionRow, cancellationOf(updated)) };
@@ -355,8 +365,9 @@ export function registerStripeRoutes(app: Express) {
           throw new BillingRequestError(409,
             "Your subscription is on an older plan. Switch to a current plan first (Change plan), then add add-ons.", "legacy_plan");
         }
+        // Asking for another Call Assistant tier is a switch: the held one goes in the same (prorated) update.
         const addons = Object.fromEntries(
-          Object.entries({ ...current.addons, ...requested }).filter(([, qty]) => (qty ?? 0) > 0));
+          Object.entries(mergeAddonRequest(current.addons, requested)).filter(([, qty]) => (qty ?? 0) > 0));
         checkAddonsForPlan(current.plan, addons);
         const order: PlanOrder = {
           plan: current.plan,
@@ -378,7 +389,9 @@ export function registerStripeRoutes(app: Express) {
    * The Call Assistant numbers a change would stop and release, for the
    * confirm step before it (owner, 2026-10-02: the number is part of the
    * service and is not kept). ?cancel=1 = the subscription ends;
-   * ?call_assistant=N&call_number=M = the new add-on quantities.
+   * ?call_assistant=N&call_number=M = the new add-on quantities; a Call
+   * Assistant tier key with 1 (?call_assistant_crew=1) = a switch to that
+   * tier (a downgrade keeps fewer numbers: the newest extras go first).
    * → { numbers: [{ phoneNumber, orgName }] } (only the account's own orgs).
    */
   app.get("/api/stripe/addons/release-preview", async (req: Request, res: Response) => {
@@ -386,7 +399,7 @@ export function registerStripeRoutes(app: Express) {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       const addons: Record<string, number> = {};
-      for (const key of ["call_assistant", "call_number"] as const) {
+      for (const key of [...CALL_ASSISTANT_TIER_ADDONS, "call_number"] as const) {
         const raw = req.query[key];
         if (typeof raw !== "string" || raw === "") continue;
         const n = Number(raw);
@@ -679,6 +692,7 @@ export function registerStripeRoutes(app: Express) {
               console.error(`[billing] user ${userId} now has two live subscriptions (${tracked.stripeSubscriptionId} and ${stripeSubscription.id}); tracking the new one — cancel the other in Stripe.`);
             }
             const set = await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
+            await noteIntrosUsed(userId, set);
             emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
             // A returning customer's scheduled number release is cancelled when the add-on is back.
             await afterSubscriptionChange(userId);
@@ -748,6 +762,7 @@ export function registerStripeRoutes(app: Express) {
             // when Stripe's previous_attributes don't say.
             const stored = existingSub.stripeSubscriptionId === sub.id ? await cancellationFor(existingSub.id) : null;
             const set = await writeSubscriptionRow({ id: existingSub.id }, sub);
+            await noteIntrosUsed(existingSub.userId, set);
             if (event.type === "customer.subscription.updated") {
               // previous_attributes describe this event's snapshot, so the change is read from it.
               emitCancellationChange(existingSub.userId, payload, event.data.previous_attributes as Record<string, unknown> | undefined,

@@ -18,7 +18,7 @@ import {
   Wrench, Globe, Megaphone, Briefcase, Search, MessageSquare, PlusCircle, Settings2,
 } from "lucide-react";
 import {
-  PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
+  PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIER_ADDONS,
   type AddonKey, type BillingInterval, type PlanKey,
 } from "@shared/plans";
 import {
@@ -33,6 +33,7 @@ import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { callAssistantIntroShort, callAssistantYearlyNote } from "@shared/plan-copy";
+import { CallAssistantTierCards } from "@/components/call-assistant-tiers";
 
 const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; chip: string; button: string; check: string }> = {
   starter: {
@@ -564,6 +565,18 @@ export default function PricingPage() {
               {addonsEditable ? " Add or remove them any time in Settings → Billing." : " Add them in Settings → Billing once you're subscribed to one of these plans."}
             </p>
           </div>
+          {/* The AI Call Assistant: three tiers, one per subscription (shared/plans.ts CALL_ASSISTANT_TIERS). */}
+          <div className="max-w-4xl mx-auto space-y-3" id="call-assistant-tiers" data-testid="block-addon-call-assistant">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-lg font-bold tracking-tight">{CALL_ASSISTANT_NAME}: pick a tier</h3>
+              <Link href="/call-assistant" className="text-sm font-medium underline underline-offset-2 hover:text-[#C2410C] dark:hover:text-[#FB923C]" data-testid="link-addon-call-assistant">How it works →</Link>
+            </div>
+            <p className="text-sm font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">
+              {/* The intro is Solo, monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
+              {interval === "year" ? callAssistantYearlyNote() : `Solo launch price: ${callAssistantIntroShort()}`}
+            </p>
+            <CallAssistantTierCards interval={interval} />
+          </div>
           <div className="overflow-x-auto rounded-xl border border-border max-w-4xl mx-auto">
             <table className="w-full text-sm" data-testid="table-addons">
               <thead>
@@ -574,7 +587,7 @@ export default function PricingPage() {
                 </tr>
               </thead>
               <tbody>
-                {(Object.keys(ADDONS) as AddonKey[]).map((k) => {
+                {(Object.keys(ADDONS) as AddonKey[]).filter((k) => !CALL_ASSISTANT_TIER_ADDONS.includes(k)).map((k) => {
                   const addon = ADDONS[k];
                   return (
                     <tr key={k} className="border-b border-border/50 last:border-0" data-testid={`row-addon-${k}`}>
@@ -585,15 +598,6 @@ export default function PricingPage() {
                           {addon.preview && <Badge variant="outline" className="text-[10px]" data-testid={`badge-addon-preview-${k}`}>Coming soon</Badge>}
                         </div>
                         <p className="text-xs text-muted-foreground">{addon.description}</p>
-                        {k === "call_assistant" && (
-                          <p className="text-xs mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">
-                              {/* The intro is monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
-                              {interval === "year" ? callAssistantYearlyNote() : `Launch price: ${callAssistantIntroShort()}`}
-                            </span>
-                            <Link href="/call-assistant" className="font-medium underline underline-offset-2 hover:text-[#C2410C] dark:hover:text-[#FB923C]" data-testid="link-addon-call-assistant">How it works →</Link>
-                          </p>
-                        )}
                         <p className="sm:hidden text-xs text-muted-foreground mt-1">On {addonPlanNames(addon)}</p>
                       </td>
                       <td className="p-3 align-top text-right whitespace-nowrap" data-testid={`text-addon-price-${k}`}>

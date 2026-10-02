@@ -19,6 +19,20 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## ☎️ 2026-10-02 — Call Assistant tiers, 10¢ overage, 500 free spam calls — branch `ca/tiers`, NOT deployed
+- Owner: "offer 3 different tiers … 3-5k min used a month … all plans cover 500 spam calls that aren't charged … we
+  can charge 10 cents". Solo $249 (2,000 min, 1 number, the $99 × 3 intro), Crew $449 (5,000 min, 3 numbers), Fleet
+  $799 (12,000 min, 5 numbers); one tier per subscription; overage $0.10/min; the first 500 spam calls a month free.
+- Overage accrues **per call** against the tier in force when the call ends (server/voice/billing-usage.ts), so a
+  mid-month upgrade never erases minutes already over, and a downgrade lowers the allowance from then on.
+- Holding Crew or Fleet uses the Solo intro up (`markIntrosUsedByHeldAddons`, after every subscription write).
+- The "never answer spam" promise is tied to forwarding: with no-answer forwarding spam still rings the contractor
+  first; copy says so and tells them to switch to 'always' (CALL_ASSISTANT_SPAM.forwarding).
+- **Owner decision:** "reports them" is built as a weekly spam report to the customer (email + bell + Calls → Spam
+  blocked). Nothing is reported to SignalWire, carriers or the FTC. Say if you want that. All copy stays limited to
+  "your spam report" until then.
+- Still `preview: true` (nobody can buy any tier).
+
 ## ☎️ 2026-10-02 — Call Assistant billing rules (owner's words) — branch `ca/billing-rules`, NOT deployed
 - Owner: "When a person cancels they lose their number … As soon as they stop paying the agent stops working. And
   annually price can be $1999". Answers the two open questions below (intro on annual: no; number on cancel: released).

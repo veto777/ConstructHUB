@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { PhoneIncoming, ShieldAlert, BellRing, Mic, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { PhoneIncoming, ShieldAlert, ShieldBan, BellRing, Mic, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { EmptyState, StatusPill, crmTable, crmTableCards } from "@/components/crm-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
+import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { CallDetailSheet, EscalationRow } from "./calls-detail";
 import {
   OUTCOME_LABELS, outcomeLabel, outcomeTone, fmtPhone, fmtDuration, fmtWhen,
@@ -55,6 +57,8 @@ export function CallsPanel({ canManage }: { canManage: boolean }) {
   const [openCall, setOpenCall] = useState<string | null>(() => readParam("call"));
   const openEscalations = useQuery<{ escalations: VoiceEscalation[] }>({ queryKey: ["/api/crm/voice/escalations?open=1"] });
   const openCount = openEscalations.data?.escalations.length ?? 0;
+  const spam = useQuery<SpamLedger>({ queryKey: ["/api/crm/voice/spam"] });
+  const spamThisMonth = spam.data?.thisMonth?.spamCalls ?? 0;
 
   const show = (id: string | null) => {
     setOpenCall(id);
@@ -69,7 +73,12 @@ export function CallsPanel({ canManage }: { canManage: boolean }) {
     <div data-testid="panel-call-assistant-calls" className="space-y-4 pt-4">
       <div role="tablist" aria-label="Calls views" className="inline-flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
         <ViewButton active={view === "log"} onClick={() => pick("log")} testId="button-calls-view-log" icon={PhoneIncoming}>Calls</ViewButton>
-        <ViewButton active={view === "spam"} onClick={() => pick("spam")} testId="button-calls-view-spam" icon={ShieldAlert}>Spam</ViewButton>
+        <ViewButton active={view === "spam"} onClick={() => pick("spam")} testId="button-calls-view-spam" icon={ShieldBan}>
+          Spam blocked
+          {spamThisMonth > 0 && (
+            <span className="ml-1.5 rounded-full bg-emerald-500/15 px-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400" data-testid="badge-spam-this-month">{spamThisMonth}</span>
+          )}
+        </ViewButton>
         <ViewButton active={view === "escalations"} onClick={() => pick("escalations")} testId="button-calls-view-escalations" icon={BellRing}>
           Escalations
           {openCount > 0 && (
@@ -279,10 +288,18 @@ function Pager({ page, limit, total, onPage }: { page: number; limit: number; to
   );
 }
 
+type SpamLedger = {
+  entries: VoiceSpamEntry[];
+  blocked: number;
+  /** This month's meter (absent on an older server). */
+  thisMonth?: { month: string; spamCalls: number; screened: number; rejected: number; freeSpamCalls: number; freeSpamMinutes: number; freeSpamCallsLimit: number };
+};
+
 function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: string) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const ledger = useQuery<{ entries: VoiceSpamEntry[]; blocked: number }>({ queryKey: ["/api/crm/voice/spam"] });
+  const ledger = useQuery<SpamLedger>({ queryKey: ["/api/crm/voice/spam"] });
+  const month = ledger.data?.thisMonth;
   const spamCalls = useQuery<VoiceCallList>({ queryKey: [callsUrl({ spam: 1, limit: PAGE_SIZE })] });
   const [number, setNumber] = useState("");
 
@@ -302,12 +319,44 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
 
   return (
     <div className="space-y-6">
+      <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 sm:p-5 space-y-3" aria-labelledby="spam-summary-title" data-testid="card-spam-summary">
+        <div className="flex flex-wrap items-start gap-3">
+          <ShieldBan className="h-6 w-6 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <h2 id="spam-summary-title" className="text-lg font-semibold">{CALL_ASSISTANT_SPAM.headline}</h2>
+            <p className="text-sm text-muted-foreground">{CALL_ASSISTANT_SPAM.lead} {CALL_ASSISTANT_SPAM.screen} {CALL_ASSISTANT_SPAM.forwarding}</p>
+          </div>
+        </div>
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <div className="rounded-lg bg-background/70 border p-3">
+            <dt className="text-xs text-muted-foreground">Spam stopped this month</dt>
+            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-this-month">{(month?.spamCalls ?? 0).toLocaleString("en-US")}</dd>
+          </div>
+          <div className="rounded-lg bg-background/70 border p-3">
+            <dt className="text-xs text-muted-foreground">Rejected before answering</dt>
+            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-rejected">{(month?.rejected ?? 0).toLocaleString("en-US")}</dd>
+          </div>
+          <div className="rounded-lg bg-background/70 border p-3">
+            <dt className="text-xs text-muted-foreground">Numbers blocked</dt>
+            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-numbers-blocked">{(ledger.data?.blocked ?? 0).toLocaleString("en-US")}</dd>
+          </div>
+          <div className="rounded-lg bg-background/70 border p-3">
+            <dt className="text-xs text-muted-foreground">Free spam calls used</dt>
+            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-free-used">
+              {(month?.freeSpamCalls ?? 0).toLocaleString("en-US")}<span className="text-sm font-medium text-muted-foreground"> / {(month?.freeSpamCallsLimit ?? CALL_ASSISTANT_FREE_SPAM_CALLS).toLocaleString("en-US")}</span>
+            </dd>
+          </div>
+        </dl>
+        <p className="text-xs text-muted-foreground">{CALL_ASSISTANT_SPAM.block} {CALL_ASSISTANT_SPAM.report}</p>
+      </section>
+
       <section className="space-y-3" aria-labelledby="spam-ledger-title">
         <div>
           <h2 id="spam-ledger-title" className="text-base font-semibold">Screened numbers</h2>
           <p className="text-sm text-muted-foreground">
             The assistant asks every caller what the call is about. A near-certain sales pitch or scam is a strike;
             two strikes and the number is rejected before it rings through. Spam calls never notify anyone or create a lead.
+            Got one wrong? Unblock it and its next calls are answered again.
           </p>
         </div>
 

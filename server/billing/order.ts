@@ -90,8 +90,21 @@ export function checkAddonsForPlan(plan: PlanKey, addons: AddonQuantities): void
       throw new BillingRequestError(409, `${ADDONS[key].name} isn't available yet. Nothing was charged.`, "addon_unavailable");
     }
     const needs = ADDONS[key].requires;
-    if (needs && (addons[needs] ?? 0) <= 0) {
-      throw new BillingRequestError(400, `${ADDONS[key].name} needs the ${ADDONS[needs].name} add-on on the same subscription.`, "addon_unavailable");
+    if (needs?.length && !needs.some((k) => (addons[k] ?? 0) > 0)) {
+      const names = needs.map((k) => ADDONS[k].name);
+      const which = names.length === 1 ? `the ${names[0]} add-on` : `one of these add-ons (${names.join(", ")})`;
+      throw new BillingRequestError(400, `${ADDONS[key].name} needs ${which} on the same subscription.`, "addon_unavailable");
+    }
+    const group = ADDONS[key].exclusiveGroup;
+    if (group) {
+      if (quantity > 1) {
+        throw new BillingRequestError(400, `${ADDONS[key].name}: one per subscription. Choose a different tier instead of a second one.`, "addon_limit");
+      }
+      const others = ADDON_KEYS.filter((k) => k !== key && ADDONS[k].exclusiveGroup === group && (addons[k] ?? 0) > 0);
+      if (others.length) {
+        throw new BillingRequestError(400,
+          `${ADDONS[key].name} and ${others.map((k) => ADDONS[k].name).join(", ")} can't both be on one subscription. Choose one tier.`, "addon_limit");
+      }
     }
     if (key === "extra_location" && quantity > maxExtraLocations(plan)) {
       const max = maxExtraLocations(plan);
@@ -116,6 +129,25 @@ export function parseAgencyLocations(raw: unknown, fallback: number): number {
   return Math.max(value, PLANS.agency.limits.locations);
 }
 
+/**
+ * A requested add-on change applied to what the subscription holds. Asking
+ * for one member of an exclusive group (a Call Assistant tier) with a
+ * positive quantity is a SWITCH: every other member of that group goes to 0
+ * in the same change (one Stripe update, prorated), unless the request names
+ * it itself — then checkAddonsForPlan refuses two tiers.
+ */
+export function mergeAddonRequest(current: AddonQuantities, requested: AddonQuantities): AddonQuantities {
+  const out: AddonQuantities = { ...current };
+  for (const [key, qty] of Object.entries(requested) as [AddonKey, number][]) {
+    const group = ADDONS[key].exclusiveGroup;
+    if (!group || qty <= 0) continue;
+    for (const other of ADDON_KEYS) {
+      if (other !== key && ADDONS[other].exclusiveGroup === group && !(other in requested)) out[other] = 0;
+    }
+  }
+  return { ...out, ...requested };
+}
+
 const positive = (addons: AddonQuantities): AddonQuantities =>
   Object.fromEntries(Object.entries(addons).filter(([, qty]) => (qty ?? 0) > 0)) as AddonQuantities;
 
@@ -130,7 +162,7 @@ export function parsePlanOrder(
 ): PlanOrder {
   const plan = parsePlanKey(body?.plan);
   const interval = parseInterval(body?.interval, current.interval ?? "month");
-  const addons = positive({ ...(current.addons ?? {}), ...parseAddonQuantities(body?.addons) });
+  const addons = positive(mergeAddonRequest(current.addons ?? {}, parseAddonQuantities(body?.addons)));
   checkAddonsForPlan(plan, addons);
   const agencyLocations = plan === "agency"
     ? parseAgencyLocations(body?.locations, current.agencyLocations ?? PLANS.agency.limits.locations)

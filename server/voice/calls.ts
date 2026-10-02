@@ -22,6 +22,7 @@ import { CALL_OUTCOMES } from "@shared/voice-profile";
 import { voiceContext, type GetUser } from "./context";
 import { openRecording, parseRange } from "./recordings";
 import { listSpamLedger, presentSpamRow, unblockNumber, blockNumber, spamNumber } from "./spam";
+import { getVoiceUsageRow, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
 import { closeEscalation, listEscalations, confirmEscalationByToken, startVoiceEscalationWorker, kindLabel } from "./escalations";
 import { logActivity } from "../crm/activity";
 
@@ -161,12 +162,26 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     }
   });
 
-  /** GET → { entries: VoiceSpamRow[] } */
+  /**
+   * GET → { entries: VoiceSpamRow[], blocked, thisMonth } — `thisMonth` is the
+   * month's spam count from the meter (spam + blocked calls, and how many of
+   * the free spam calls are used: billing-usage.ts).
+   */
   app.get("/api/crm/voice/spam", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
-    const entries = (await listSpamLedger(v.ctx.org.id)).map(presentSpamRow);
-    sendUnlogged(res, { entries, blocked: entries.filter((e) => e.blocked).length });
+    const month = voiceMonthKey();
+    const [ledger, usage] = await Promise.all([listSpamLedger(v.ctx.org.id), getVoiceUsageRow(v.ctx.org.id, month)]);
+    const entries = ledger.map(presentSpamRow);
+    const u = summarizeVoiceUsage(usage, month, v.allowance.minutes);
+    sendUnlogged(res, {
+      entries,
+      blocked: entries.filter((e) => e.blocked).length,
+      thisMonth: {
+        month, spamCalls: u.spamCallsThisMonth, screened: u.spamCalls, rejected: u.blockedCalls,
+        freeSpamCalls: u.freeSpamCalls, freeSpamMinutes: u.freeSpamMinutes, freeSpamCallsLimit: u.freeSpamCallsLimit,
+      },
+    });
   });
   /** POST /:id/unblock → { unblocked: true, entry } */
   app.post("/api/crm/voice/spam/:id/unblock", async (req: any, res) => {

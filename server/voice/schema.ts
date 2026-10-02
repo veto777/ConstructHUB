@@ -187,6 +187,24 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
   `ALTER TABLE voice_numbers ADD COLUMN IF NOT EXISTS release_reason text`,
   `ALTER TABLE voice_numbers ADD COLUMN IF NOT EXISTS release_scheduled_at timestamp`,
   `CREATE INDEX IF NOT EXISTS voice_numbers_release_due_idx ON voice_numbers(release_eligible_at) WHERE status = 'releasing' AND release_reason IS NOT NULL`,
+  // Tiers + spam (owner, 2026-10-02: "all plans cover 500 spam calls that aren't
+  // charged"): spam calls whose minutes were not counted this month, and those
+  // minutes (billing-usage.ts recordVoiceCallUsage). `minutes` stays the billable total.
+  `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS spam_free_calls integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS spam_free_minutes integer NOT NULL DEFAULT 0`,
+  // The weekly spam report (spam-report.ts): one claimed row per org per week
+  // (Monday, UTC) — the claim is what makes the email + bell exactly once.
+  `CREATE TABLE IF NOT EXISTS voice_spam_reports (
+     id bigserial PRIMARY KEY,
+     org_id varchar NOT NULL,
+     week_start date NOT NULL,
+     spam_calls integer NOT NULL DEFAULT 0,
+     blocked_calls integer NOT NULL DEFAULT 0,
+     email text,
+     bell boolean NOT NULL DEFAULT false,
+     created_at timestamp DEFAULT now(),
+     UNIQUE (org_id, week_start)
+   )`,
   // ── end lane: numbers+billing ──
 
   // ── lane: studio-backend — append here ──
@@ -198,6 +216,7 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
 
 export const VOICE_TABLES: readonly string[] = [
   "voice_profiles", "voice_profile_versions", "voice_numbers", "voice_calls", "voice_escalations", "voice_spam", "voice_usage",
+  "voice_spam_reports",
 ];
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
