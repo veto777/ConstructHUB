@@ -230,7 +230,9 @@ Engine (`voice/.env`, gitignored): `VOICE_PORT` 8152, `VOICE_BIND` `127.0.0.1,10
 `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_MODEL`, `AI_TIMEOUT_MS` (copied by the
 operator from the app's values), `VOICE_ANTHROPIC_API_KEY`, `VOICE_ANTHROPIC_MODEL`, `SIGNALWIRE_SPACE_URL/
 PROJECT_ID/API_TOKEN/SIGNING_KEY` (verification only), `VOICE_WHISPER_MODEL`, `VOICE_TTS_DEVICE`,
-`VOICE_STT_DEVICE`, `VOICE_MODELS_DIR`, `VOICE_RECORDINGS_DIR`, `VOICE_GREETING_DELAY_S`, `VOICE_SKIP_SIGNATURE`.
+`VOICE_STT_DEVICE`, `VOICE_MODELS_DIR`, `VOICE_RECORDINGS_DIR`, `VOICE_GREETING_DELAY_S`, `VOICE_SKIP_SIGNATURE` (the
+engine refuses to start with it on a non-loopback `VOICE_BIND`), `VOICE_MAX_ACTIVE_CALLS` (default 6),
+`VOICE_LOG_TRANSCRIPTS` (dev only; default off: the journal gets lengths, not words, and masked caller numbers).
 
 ## 10. Lead delivery into the CRM (calls+crm lane, `server/voice/leads.ts`)
 
@@ -332,12 +334,23 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
 
 - Internal API: bearer only, constant-time compare, 503 when unset; recordings capped at 40 MB.
 - Webhooks: signature (`SIGNALWIRE_SIGNING_KEY`) or CallSid lookup; `VOICE_SKIP_SIGNATURE=1` only on a dev
-  box with no public webhook.
+  box with no public webhook, and only with loopback binds (the engine refuses to start otherwise).
+- Media stream: `/media` is public, so the verified webhook mints a one-use token per CallSid and puts it in the
+  `<Stream>` as `<Parameter name="token">`; `start` must carry it (constant-time compare) or the CallSid must be
+  live in our SignalWire project for that `to`. `from`/`to` come from the webhook, never the client. Concurrent
+  calls are capped (`VOICE_MAX_ACTIVE_CALLS`).
+- Engine profile: `GET /profile` answers 423 `paused` (reason `addon_inactive`) when the org owner's subscription
+  no longer carries the Call Assistant add-on.
+- Escalation confirmations by text: only a verified (signed) inbound webhook with a `To` changes escalation
+  state; the route stays fail-open only for STOP/START/HELP.
 - The engine reads only `voice/.env`; the operator copies ConstructHUB's own AI and SignalWire values in.
   Nothing from the Alpine receptionist's environment or any other project is ever read or copied. Never restart/stop
   `alpine-voice*` or touch +1 360-585-8200.
 - No PII in logs beyond what the CRM already logs; recordings only through the org-scoped route.
-- Two-party-consent states: `recordingNotice` on by default; the Studio warns when turning it off.
+- Two-party-consent states (`TWO_PARTY_CONSENT_STATES` in shared/voice-profile.ts: CA, CT, DE, FL, IL, MD, MA, MI,
+  MT, NV, NH, OR, PA, WA): when the service area or default state includes one, the compiler forces the notice on
+  and the Studio shows the switch locked on. Whenever the notice is on, a custom greeting that doesn't mention
+  recording gets "Calls may be recorded." appended.
 
 ## 18. Launch checklist (owner + infra, in order)
 

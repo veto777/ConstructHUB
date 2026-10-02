@@ -363,8 +363,8 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
                         {e.blocked ? (e.blockedBy === "auto" ? "Blocked (auto)" : "Blocked") : "Watching"}
                       </StatusPill>
                     </td>
-                    <td className={cn(crmTable.tdRight, crmTableCards.td)}>{e.strikes}</td>
-                    <td className={cn(crmTable.tdRight, crmTableCards.td)}>{e.calls}</td>
+                    <td className={cn(crmTable.tdRight, crmTableCards.td)}><span className="sm:hidden text-muted-foreground">Strikes </span>{e.strikes}</td>
+                    <td className={cn(crmTable.tdRight, crmTableCards.td)}><span className="sm:hidden text-muted-foreground">Calls </span>{e.calls}</td>
                     <td className={cn(crmTable.td, crmTableCards.td, "hidden md:table-cell max-w-sm text-muted-foreground")}>
                       <span className="line-clamp-2">{e.lastReason || "—"}{e.lastConfidence != null ? ` (${Math.round(e.lastConfidence * 100)}%)` : ""}</span>
                     </td>

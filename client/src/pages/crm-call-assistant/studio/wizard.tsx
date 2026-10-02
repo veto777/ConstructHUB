@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { WIZARD_STEPS, issuesFor, profileIssueText, studioIssues, type StudioSectionId, type WizardStepId } from "@/lib/voice-studio";
 import { VOICE_PERSONAS } from "@shared/voice-personas";
-import type { VoiceProfile } from "@shared/voice-profile";
+import { recordingNoticeStates, type VoiceProfile } from "@shared/voice-profile";
 import { StudioSection } from "./sections";
 import { invalidateProfile, publishDraft, saveDraft } from "./api";
 
@@ -22,6 +22,8 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
   const { toast } = useToast();
   const [draft, setDraft] = useState<VoiceProfile>(initial);
   const [stepIdx, setStepIdx] = useState(0);
+  /** Steps whose last draft save failed: the wizard stays put and the chip turns red until a save succeeds. */
+  const [saveFailed, setSaveFailed] = useState<ReadonlySet<WizardStepId>>(new Set());
   const step = WIZARD_STEPS[stepIdx];
   const issues = useMemo(() => studioIssues(draft), [draft]);
   const stepIssues = issuesFor(issues, step.sections as readonly StudioSectionId[]);
@@ -41,7 +43,16 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
       toast({ title: "A few things to fix first", description: stepIssues[0].message, variant: "destructive" });
       return;
     }
-    if (next > stepIdx) await save.mutateAsync().catch(() => undefined);
+    if (next > stepIdx) {
+      // "Every Next saves the draft" — so a failed save must not move on with a checkmark.
+      try {
+        await save.mutateAsync();
+        setSaveFailed((prev) => { const n = new Set(prev); n.delete(step.id); return n; });
+      } catch {
+        setSaveFailed((prev) => new Set(prev).add(step.id));
+        return;
+      }
+    }
     setStepIdx(Math.max(0, Math.min(WIZARD_STEPS.length - 1, next)));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -59,13 +70,15 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
       <ol className="flex flex-wrap gap-1.5" aria-label="Setup steps" data-testid="wizard-steps">
         {WIZARD_STEPS.map((s, i) => {
           const done = i < stepIdx;
-          const bad = issuesFor(issues, s.sections as readonly StudioSectionId[]).length > 0 && i < stepIdx;
+          const bad = saveFailed.has(s.id) || (issuesFor(issues, s.sections as readonly StudioSectionId[]).length > 0 && i < stepIdx);
           return (
             <li key={s.id}>
               <button type="button" data-testid={`wizard-step-${s.id}`} aria-current={i === stepIdx ? "step" : undefined}
                 onClick={() => (i <= stepIdx ? setStepIdx(i) : void go(i))}
+                data-save-failed={saveFailed.has(s.id) ? "true" : undefined}
                 className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
-                  i === stepIdx ? "border-primary bg-primary text-primary-foreground" : done ? "bg-muted" : "text-muted-foreground")}>
+                  i === stepIdx ? "border-primary bg-primary text-primary-foreground" : done ? "bg-muted" : "text-muted-foreground",
+                  saveFailed.has(s.id) && "border-destructive")}>
                 {bad ? <CircleAlert className="h-3 w-3 text-destructive" /> : done ? <Check className="h-3 w-3" /> : <span className="tabular-nums">{i + 1}</span>}
                 {s.label}
               </button>
@@ -77,7 +90,7 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
       <Card>
         <CardContent className="p-4 sm:p-6 space-y-6">
           {step.id === "review" ? (
-            <ReviewStep draft={draft} issues={issues} onJump={(id) => setStepIdx(WIZARD_STEPS.findIndex((s) => (s.sections as readonly string[]).includes(id)))} />
+            <ReviewStep draft={draft} issues={issues} noticeForced={recordingNoticeStates(draft).length > 0} onJump={(id) => setStepIdx(WIZARD_STEPS.findIndex((s) => (s.sections as readonly string[]).includes(id)))} />
           ) : (
             step.sections.map((id) => <StudioSection key={id} id={id} draft={draft} onChange={setDraft} />)
           )}
@@ -106,7 +119,7 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
   );
 }
 
-function ReviewStep({ draft, issues, onJump }: { draft: VoiceProfile; issues: ReturnType<typeof studioIssues>; onJump: (section: StudioSectionId) => void }) {
+function ReviewStep({ draft, issues, noticeForced, onJump }: { draft: VoiceProfile; issues: ReturnType<typeof studioIssues>; noticeForced: boolean; onJump: (section: StudioSectionId) => void }) {
   const persona = VOICE_PERSONAS[draft.persona.presetId];
   const rows: Array<{ section: StudioSectionId; label: string; value: string }> = [
     { section: "company", label: "Company", value: `${draft.company.name || "—"}${draft.company.trade ? ` · ${draft.company.trade}` : ""}` },
@@ -116,7 +129,7 @@ function ReviewStep({ draft, issues, onJump }: { draft: VoiceProfile; issues: Re
     { section: "credibility", label: "Credibility", value: [draft.credibility.yearsInBusiness ? `${draft.credibility.yearsInBusiness} years` : null, draft.credibility.insured ? "insured" : null, draft.credibility.bonded ? "bonded" : null, draft.credibility.reviews || null, ...draft.credibility.licenses].filter(Boolean).join(" · ") || "nothing yet" },
     { section: "offers", label: "Offers", value: [draft.offers.financing.available ? "financing" : null, draft.offers.freeEstimate ? "free estimates" : null, draft.offers.promotions.length ? `${draft.offers.promotions.length} promotion(s)` : null].filter(Boolean).join(" · ") || "none" },
     { section: "policies", label: "Policies", value: `prices: ${draft.policies.pricing} · ${draft.policies.repairs.replace(/_/g, " ")} · emergencies ${draft.policies.emergencies.handle ? "on" : "off"}` },
-    { section: "persona", label: "Persona", value: `${draft.persona.assistantName || persona.name} (${persona.name}, ${persona.gender}) · recording notice ${draft.persona.recordingNotice ? "on" : "off"}` },
+    { section: "persona", label: "Persona", value: `${draft.persona.assistantName || persona.name} (${persona.name}, ${persona.gender}) · recording notice ${noticeForced ? "on (required in your state)" : draft.persona.recordingNotice ? "on" : "off"}` },
     { section: "intake", label: "Questions", value: `${draft.intake.questions.length}: ${draft.intake.questions.map((q) => q.key).join(" → ")}` },
     { section: "escalations", label: "Escalations", value: draft.escalations.rules.length ? draft.escalations.rules.map((r) => `${r.recipientName || r.id} (${r.channel})`).join(", ") : "owners only (CRM channels)" },
     { section: "leadDelivery", label: "Lead delivery", value: [draft.leadDelivery.crm.enabled ? "CRM" : null, draft.leadDelivery.email.enabled ? "email" : null, draft.leadDelivery.sms.enabled ? "text" : null].filter(Boolean).join(" + ") || "nowhere (!)" },
@@ -134,15 +147,17 @@ function ReviewStep({ draft, issues, onJump }: { draft: VoiceProfile; issues: Re
           ))}
         </ul>
       )}
-      <dl className="divide-y rounded-lg border">
+      <ul className="divide-y rounded-lg border" aria-label="Your assistant">
         {rows.map((r, i) => (
-          <button key={i} type="button" onClick={() => onJump(r.section)} className="w-full grid gap-1 sm:grid-cols-[10rem_1fr] px-3 py-2 text-left text-sm hover:bg-muted/50" data-testid={`review-row-${r.section}-${i}`}>
-            <dt className="font-medium">{r.label}</dt>
-            <dd className="text-muted-foreground break-words">{r.value}</dd>
-          </button>
+          <li key={i}>
+            <button type="button" onClick={() => onJump(r.section)} className="w-full grid gap-1 sm:grid-cols-[10rem_1fr] px-3 py-2 text-left text-sm hover:bg-muted/50" data-testid={`review-row-${r.section}-${i}`}>
+              <span className="font-medium">{r.label}</span>
+              <span className="text-muted-foreground break-words">{r.value}</span>
+            </button>
+          </li>
         ))}
-      </dl>
-      <p className="text-sm flex items-center gap-2"><Badge variant="secondary">Next</Badge> Publish, then try it in the Simulator before you forward a real line.</p>
+      </ul>
+      <div className="text-sm flex items-center gap-2"><Badge variant="secondary">Next</Badge> Publish, then try it in the Simulator before you forward a real line.</div>
     </div>
   );
 }

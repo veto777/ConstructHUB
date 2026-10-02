@@ -166,6 +166,9 @@ Alpine's own receptionist (Janice — a separate project with its own checkout, 
   `constructhub-voice.service.d/checkout.conf` → runs from `~/ConstructHUB-voice-infra/voice` (venv
   `.venv`, env `voice/.env` with a freshly generated secret, `VOICE_SKIP_SIGNATURE=1`, no AI/SignalWire
   values). Started, **not enabled** at login (the worktree is temporary).
+  **Before its next restart:** an engine with `VOICE_SKIP_SIGNATURE=1` now refuses to start unless `VOICE_BIND` is
+  loopback only (QA: the dev stage listened on the tailnet address with signature checks off). Either set
+  `VOICE_BIND=127.0.0.1` for the dev stage or set `SIGNALWIRE_SIGNING_KEY` and drop the skip flag.
 - A dev app spawned from the same worktree on `http://127.0.0.1:8201` (`tmp/dev-app.pid`, log
   `tmp/dev-app.log`, relaunch with `bash tmp/dev-app.sh` — gitignored; it reads the secret from
   `voice/.env` so both sides match) with `VOICE_ENGINE_URL=http://127.0.0.1:8152`, DB `constructhub_dev_a6`.

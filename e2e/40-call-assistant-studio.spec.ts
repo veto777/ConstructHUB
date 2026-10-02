@@ -29,7 +29,7 @@ const BORDER_TO_TACOMA = ["Whatcom", "San Juan", "Skagit", "Island", "Snohomish"
 
 type Version = { version: number; note: string | null; createdAt: string; createdBy: string | null; profile: VoiceProfile };
 
-type MockOpts = { enabled?: boolean; published?: boolean; engineDownOnTurn?: number };
+type MockOpts = { enabled?: boolean; published?: boolean; engineDownOnTurn?: number; failPuts?: number };
 
 class VoiceMock {
   draft: VoiceProfile;
@@ -93,7 +93,7 @@ class VoiceMock {
       plan: "pro",
       allowance: { numbers: 1, minutes: 500 },
       pricing: { includedMinutes: 500, overageCentsPerMinute: 15 },
-      engine: { configured: false, url: "http://engine.invalid", publicBase: "https://example.invalid/voice" },
+      engine: { configured: true, reachable: false, models: false, checkedAt: "2026-10-02T00:00:00.000Z" },
       numbers: [{ id: "n1", phoneNumber: "+13605550100", label: "Main line", location: "Bellingham", status: "active", isTest: true }],
       profile: { status: this.status, publishedVersion: this.publishedVersion },
       usage: { month: "2026-10", minutes: 120, calls: 14, overageMinutes: 0 },
@@ -114,6 +114,10 @@ class VoiceMock {
     }
     if (path === "/profile" && method === "GET") return json(this.profileResponse());
     if (path === "/profile" && method === "PUT") {
+      if ((this.opts.failPuts ?? 0) > 0) {
+        this.opts.failPuts!--;
+        return json({ code: "invalid", issues: [{ path: "offers.promotions.0.name", message: "String must contain at least 1 character(s)" }] }, 400);
+      }
       this.draft = structuredClone(body.profile);
       this.puts.push(structuredClone(body.profile));
       return json(this.profileResponse());
@@ -332,6 +336,45 @@ test.describe("Call Assistant — Agent Studio", () => {
     expect(errors).toEqual([]);
   });
 
+  test("wizard: a failed draft save keeps the step (red chip) instead of moving on with a checkmark", async ({ page }) => {
+    const mock = await mockVoice(page, { failPuts: 1 });
+    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-wizard")).toBeVisible();
+    await page.getByTestId("button-wizard-next").click();
+    await expect(page.getByTestId("wizard-step-company")).toHaveAttribute("aria-current", "step");
+    await expect(page.getByTestId("wizard-step-company")).toHaveAttribute("data-save-failed", "true");
+    expect(mock.puts).toHaveLength(0);
+    // the next save works: the wizard moves on and the chip is no longer red
+    await page.getByTestId("button-wizard-next").click();
+    await expect(page.getByTestId("wizard-step-services")).toHaveAttribute("aria-current", "step");
+    await expect(page.getByTestId("wizard-step-company")).not.toHaveAttribute("data-save-failed", "true");
+    expect(mock.puts).toHaveLength(1);
+  });
+
+  test("editor: a value the server would refuse (max turns 999) blocks Publish; the field clamps on blur", async ({ page }) => {
+    await mockVoice(page, { published: true });
+    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-editor")).toBeVisible();
+    await page.getByTestId("studio-nav-advanced").click();
+    await page.getByTestId("input-max-turns").fill("999");
+    await expect(page.getByTestId("button-studio-publish")).toBeDisabled();
+    await expect(page.getByTestId("text-studio-issues")).toContainText("1 to fix");
+    await page.getByTestId("input-max-turns").blur();
+    await expect(page.getByTestId("input-max-turns")).toHaveValue("80");
+    await expect(page.getByTestId("button-studio-publish")).toBeEnabled();
+  });
+
+  test("intake: an open options panel moves with its question", async ({ page }) => {
+    await mockVoice(page, { published: true });
+    await gotoCrm(page, "/crm/call-assistant?tab=studio");
+    await page.getByTestId("studio-nav-intake").click();
+    await page.getByTestId("button-intake-options-1").click();
+    await expect(page.getByTestId("input-intake-key-1")).toHaveValue("address");
+    await page.getByTestId("button-intake-down-1").click();
+    await expect(page.getByTestId("panel-intake-options-1")).toHaveCount(0);
+    await expect(page.getByTestId("input-intake-key-2")).toHaveValue("address");
+  });
+
   test("members without manageSettings see the Studio read-only", async ({ page }) => {
     await mockVoice(page, { published: true }, { manageSettings: false });
     await gotoCrm(page, "/crm/call-assistant?tab=studio");
@@ -361,7 +404,11 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await expect(page.getByTestId("metric-overview-minutes")).toContainText("120");
     await expect(page.getByTestId("text-overview-minutes-pct")).toHaveText("24%");
     await expect(page.getByTestId("row-overview-number-0")).toContainText("(360) 555-0100");
-    await expect(page.getByTestId("row-overview-call-0")).toContainText("lead submitted");
+    // Same labels as the Calls tab, and each row opens that call.
+    await expect(page.getByTestId("row-overview-call-0")).toContainText("Lead");
+    await expect(page.getByTestId("link-overview-call-0")).toHaveAttribute("href", /\/crm\/call-assistant\?tab=calls&call=/);
+    // The engine is probed: configured but not answering reads "Engine down", never "configured".
+    await expect(page.getByTestId("pill-overview-engine")).toHaveText("Engine down");
     await expect(page.getByTestId("badge-overview-preview")).toBeVisible();
   });
 

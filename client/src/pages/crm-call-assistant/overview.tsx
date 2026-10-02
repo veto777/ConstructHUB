@@ -10,6 +10,7 @@ import { prettyPhone } from "@/lib/voice-studio";
 import { CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
 import { callAssistantIntroShort } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
+import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
 type CallRow = { id: string | number; startedAt?: string; from?: string; fromNumber?: string; outcome?: string; summary?: string | null; durationSeconds?: number };
@@ -39,6 +40,12 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
   const pct = included > 0 ? Math.min(100, Math.round((used / included) * 100)) : 0;
   const overage = status.usage?.overageMinutes ?? 0;
   const profileStatus = status.profile?.status ?? "draft";
+  // The server probes the engine's /health (cached ~30 s); "configured" alone says nothing about whether calls get answered.
+  const engine: { tone: "success" | "warning" | "danger"; text: string; hint: string } =
+    !status.engine.configured ? { tone: "warning", text: "Engine not configured", hint: "The app has no engine secret set." }
+    : !status.engine.reachable ? { tone: "danger", text: "Engine down", hint: "The voice engine is not answering; calls to your numbers can't be picked up right now." }
+    : !status.engine.models ? { tone: "warning", text: "Engine starting", hint: "The engine is up but its speech models are still loading." }
+    : { tone: "success", text: "Engine up", hint: "The voice engine is answering." };
   const nextStep =
     !status.profile || status.profile.publishedVersion == null ? { text: "Set up and publish your assistant", href: "/crm/call-assistant?tab=studio", testid: "link-overview-next-studio" }
     : numbers.length === 0 ? { text: "Get a local number", href: "/crm/call-assistant?tab=numbers", testid: "link-overview-next-numbers" }
@@ -66,7 +73,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
             </div>
             <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />
             <p className="text-xs text-muted-foreground">
-              {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. Spam and blocked calls count only until the assistant hangs up.
+              {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. Spam calls count only until the assistant hangs up; blocked numbers are rejected before answering and cost nothing.
               {status.addon.preview ? " Pricing is being finalized." : ""}
             </p>
             <p className="text-xs" data-testid="text-overview-price">
@@ -76,7 +83,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
               <Badge variant="secondary">{status.addon.name}</Badge>
               {status.addon.preview && <Badge variant="outline" data-testid="badge-overview-preview">Coming soon</Badge>}
               {status.plan && <Badge variant="outline" className="capitalize">{status.plan} plan</Badge>}
-              <StatusPill tone={status.engine.configured ? "success" : "warning"} data-testid="pill-overview-engine">{status.engine.configured ? "Engine configured" : "Engine not configured"}</StatusPill>
+              <StatusPill tone={engine.tone} data-testid="pill-overview-engine" title={engine.hint}>{engine.text}</StatusPill>
             </div>
           </CardContent>
         </Card>
@@ -119,12 +126,14 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
           ) : (
             <ul className="divide-y rounded-md border text-sm" data-testid="list-overview-calls">
               {recent.map((c, i) => (
-                <li key={String(c.id)} className="flex flex-wrap items-center gap-2 px-3 py-2" data-testid={`row-overview-call-${i}`}>
-                  <Activity className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>
-                  {c.outcome && <StatusPill tone={c.outcome === "lead_submitted" ? "success" : c.outcome === "spam" || c.outcome === "blocked" ? "danger" : "neutral"}>{c.outcome.replace(/_/g, " ")}</StatusPill>}
-                  <span className="text-muted-foreground truncate flex-1 min-w-0">{c.summary ?? ""}</span>
-                  {c.startedAt && <span className="text-xs text-muted-foreground">{new Date(c.startedAt).toLocaleString()}</span>}
+                <li key={String(c.id)} data-testid={`row-overview-call-${i}`}>
+                  <Link href={`/crm/call-assistant?tab=calls&call=${encodeURIComponent(String(c.id))}`} className="flex flex-wrap items-center gap-2 px-3 py-2 hover:bg-muted/40" data-testid={`link-overview-call-${i}`}>
+                    <Activity className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>
+                    {c.outcome && <StatusPill tone={outcomeTone(c.outcome)}>{outcomeLabel(c.outcome)}</StatusPill>}
+                    <span className="text-muted-foreground truncate flex-1 min-w-0">{c.summary ?? ""}</span>
+                    {c.startedAt && <span className="text-xs text-muted-foreground">{fmtWhen(c.startedAt)}</span>}
+                  </Link>
                 </li>
               ))}
             </ul>

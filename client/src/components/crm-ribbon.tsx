@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight,
+  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight, Phone,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -33,6 +33,10 @@ const MORE_LINKS: {
   platformAdmin?: boolean;
   active: (l: string) => boolean;
 }[] = [
+  // The AI receptionist, as in the sidebar: every member sees it; the page shows the add-on prompt itself.
+  { title: "Call Assistant", url: "/crm/call-assistant", icon: Phone, testid: "ribbon-more-call-assistant",
+    infoKey: "call-assistant",
+    active: (l) => l.startsWith("/crm/call-assistant") },
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
     infoKey: "pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },

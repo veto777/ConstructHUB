@@ -19,7 +19,7 @@ type Persona = VoiceProfile["persona"];
  * null until the engine lane renders client/public/persona-samples/<id>.mp3).
  * OWNER: studio-frontend lane.
  */
-export function PersonaSection({ value, onChange, disabled, companyName }: SectionProps<Persona> & { companyName?: string }) {
+export function PersonaSection({ value, onChange, disabled, companyName, noticeStates = [] }: SectionProps<Persona> & { companyName?: string; noticeStates?: string[] }) {
   const set = <K extends keyof Persona>(k: K, v: Persona[K]) => onChange({ ...value, [k]: v });
   const personas = useQuery<{ personas: VoicePersona[] }>({ queryKey: ["/api/crm/voice/personas"] });
   const list = personas.data?.personas ?? VOICE_PERSONA_LIST;
@@ -41,7 +41,10 @@ export function PersonaSection({ value, onChange, disabled, companyName }: Secti
   };
 
   const assistantName = value.assistantName || list.find((p) => p.id === value.presetId)?.name || "";
-  const greetingPlaceholder = `Thank you for calling ${companyName || "us"}, this is ${assistantName || "your assistant"}. ${value.recordingNotice ? "Calls may be recorded. " : ""}What can we help you with today?`;
+  // In an all-party-consent state the compiler says the notice whatever this switch says (the engine records every call).
+  const noticeForced = noticeStates.length > 0;
+  const noticeOn = value.recordingNotice || noticeForced;
+  const greetingPlaceholder = `Thank you for calling ${companyName || "us"}, this is ${assistantName || "your assistant"}. ${noticeOn ? "Calls may be recorded. " : ""}What can we help you with today?`;
 
   return (
     <SectionCard title="Persona" blurb="Pick a voice, give it a name, write the first thing a caller hears." testid="section-persona">
@@ -87,9 +90,11 @@ export function PersonaSection({ value, onChange, disabled, companyName }: Secti
           hint="Always honest. The assistant never claims to be a person." />
       </div>
       <TextAreaField id="greeting" label="Greeting" value={value.greeting} onChange={(v) => set("greeting", v)} disabled={disabled} testid="textarea-greeting" rows={2} maxLength={200}
-        placeholder={greetingPlaceholder} hint="Blank = the default above, built from your company name and the assistant's name." />
-      <SwitchRow id="recording-notice" label='Say "calls may be recorded"' checked={value.recordingNotice} onChange={(v) => set("recordingNotice", v)} disabled={disabled} testid="switch-recording-notice"
-        hint={value.recordingNotice ? "Keep this on in two-party-consent states (Washington, Florida, California and others)." : "Off: calls are still recorded for your log. In a two-party-consent state that may be unlawful — turn it back on unless you have checked."} />
+        placeholder={greetingPlaceholder} hint={`Blank = the default above, built from your company name and the assistant's name.${noticeOn ? " A greeting that doesn't mention recording gets \"Calls may be recorded.\" added." : ""}`} />
+      <SwitchRow id="recording-notice" label='Say "calls may be recorded"' checked={noticeOn} onChange={(v) => set("recordingNotice", v)} disabled={disabled || noticeForced} testid="switch-recording-notice"
+        hint={noticeForced
+          ? `Always on: your service area includes ${noticeStates.join(", ")}, where everyone on a call must be told it is recorded.`
+          : value.recordingNotice ? "Keep this on in two-party-consent states (Washington, Florida, California and others)." : "Off: calls are still recorded for your log. In a two-party-consent state that may be unlawful — turn it back on unless you have checked."} />
       <div className="grid gap-4 sm:grid-cols-3">
         {([["warmth", "Warmth", "Reserved", "Warm"], ["brevity", "Brevity", "Chatty", "Brief"], ["formality", "Formality", "Casual", "Formal"]] as const).map(([k, label, lo, hi]) => (
           <div key={k} className="space-y-2">

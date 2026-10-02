@@ -61,10 +61,13 @@ Where SPEC.md is silent, this file describes what the engine actually does.
 **Webhook (`POST /signalwire/voice`)**
 - Verification order: the signature (URL built from `X-Forwarded-Proto/Host/Prefix`, which the infra proxy sends),
   then a CallSid lookup (the call must be live and `to` must match), and otherwise a 403. With `VOICE_SKIP_SIGNATURE=1`
-  everything is accepted; use that on a dev box only.
+  everything is accepted; use that on a dev box only (loopback binds only — the engine refuses to start otherwise).
+  A malformed CallSid is a 400.
 - What the app's answer turns into:
-  - Live: `<Connect><Stream url="wss://…/voice/media"><Parameter from/to/callSid/></Stream></Connect><Hangup/>`. The
-    trailing `<Hangup/>` makes "the engine closed the socket" equal "the call is over".
+  - Live: `<Connect><Stream url="wss://…/voice/media"><Parameter from/to/callSid/token/></Stream></Connect><Hangup/>`. The
+    trailing `<Hangup/>` makes "the engine closed the socket" equal "the call is over". `token` is minted per call
+    and stored with the pending profile; `/media` runs a stream only when `start` carries it (one use), else only a
+    CallSid SignalWire knows as live for that `to`. Without either the socket closes before anything is fetched.
   - `caller.blocked`: `<Reject reason="rejected"/>`. The **engine itself** reports the blocked call with
     `POST /calls` followed by `PUT /calls/:sid {outcome:"blocked", durationSeconds:0, transcript:[], …}`.
   - 404 or 423: `<Say>{say or a generic line}</Say><Hangup/>`.

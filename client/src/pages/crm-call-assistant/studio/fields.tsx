@@ -55,21 +55,32 @@ export function TextAreaField({ id, label, hint, value, onChange, placeholder, d
   );
 }
 
-export function NumberField({ id, label, hint, value, onChange, min, max, step = 1, disabled, testid, className, suffix }: {
-  id: string; label: ReactNode; hint?: ReactNode; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number;
+/**
+ * A number input that keeps the profile valid: on blur a value outside min/max is clamped into range (the
+ * server's schema would refuse it), and with `onClear` an emptied field means "no value" (null in the profile)
+ * instead of snapping back to the old number.
+ */
+export function NumberField({ id, label, hint, value, onChange, onClear, min, max, step = 1, disabled, testid, className, suffix }: {
+  id: string; label: ReactNode; hint?: ReactNode; value: number | null; onChange: (v: number) => void; onClear?: () => void; min?: number; max?: number; step?: number;
   disabled?: boolean; testid: string; className?: string; suffix?: string;
 }) {
   const [raw, setRaw] = useState<string | null>(null);
+  const clamp = (n: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n));
   return (
     <Field label={label} hint={hint} htmlFor={id} className={className}>
       <div className="flex items-center gap-2">
-        <Input id={id} type="number" inputMode="decimal" value={raw ?? String(value)} min={min} max={max} step={step} disabled={disabled} data-testid={testid}
+        <Input id={id} type="number" inputMode="decimal" value={raw ?? (value == null ? "" : String(value))} min={min} max={max} step={step} disabled={disabled} data-testid={testid}
           onChange={(e) => {
             setRaw(e.target.value);
             const n = Number(e.target.value);
-            if (e.target.value !== "" && Number.isFinite(n)) onChange(n);
+            if (e.target.value === "") onClear?.();
+            else if (Number.isFinite(n)) onChange(n);
           }}
-          onBlur={() => setRaw(null)}
+          onBlur={() => {
+            const n = raw === null || raw === "" ? null : Number(raw);
+            if (n !== null && Number.isFinite(n) && clamp(n) !== n) onChange(clamp(n));
+            setRaw(null);
+          }}
           className="max-w-[9rem]" />
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>

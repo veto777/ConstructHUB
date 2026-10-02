@@ -97,7 +97,7 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="voice-number-area">Area code <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input id="voice-number-area" inputMode="numeric" maxLength={3} placeholder="360" value={areaCode}
+                <Input id="voice-number-area" inputMode="numeric" placeholder="360" value={areaCode}
                   onChange={(e) => setAreaCode(e.target.value.replace(/\D/g, "").slice(0, 3))}
                   aria-invalid={!areaCodeOk} data-testid="input-voice-number-area-code" />
                 {!areaCodeOk && <p className="text-xs text-destructive">An area code is three digits.</p>}

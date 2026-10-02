@@ -17,13 +17,14 @@ export function CompanySection({ value, onChange, disabled }: SectionProps<Compa
     <SectionCard title="Company" blurb="The assistant introduces itself with these words. Say it the way a caller would hear it." testid="section-company">
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField id="company-name" label="Company name" value={value.name} onChange={(v) => set("name", v)} disabled={disabled}
-          testid="input-company-name" placeholder="Alpine Exteriors" hint="Required. Used everywhere, never abbreviated unless you set a spoken name." maxLength={200} />
+          testid="input-company-name" placeholder="Evergreen Exteriors LLC" hint="Required. Used everywhere, never abbreviated unless you set a spoken name." maxLength={200} />
         <TextField id="company-spoken" label="Spoken name (optional)" value={value.spokenName} onChange={(v) => set("spokenName", v)} disabled={disabled}
-          testid="input-company-spoken-name" placeholder="Alpine" hint="How the assistant says the name on the phone if the legal name is a mouthful." maxLength={200} />
+          testid="input-company-spoken-name" placeholder="Evergreen" hint="How the assistant says the name on the phone if the legal name is a mouthful." maxLength={200} />
         <TextField id="company-trade" label="Trade, in one line" value={value.trade} onChange={(v) => set("trade", v)} disabled={disabled}
           testid="input-company-trade" placeholder="licensed exterior contractor" hint='Finishes the sentence "We are a …".' maxLength={200} />
         <TextField id="company-tagline" label="Tagline (optional)" value={value.tagline} onChange={(v) => set("tagline", v)} disabled={disabled}
-          testid="input-company-tagline" placeholder="Siding, roofing, windows and decks since 1998" maxLength={200} />
+          testid="input-company-tagline" placeholder="Siding, roofing, windows and decks since 1998" maxLength={200}
+          hint="The assistant may use it when a caller asks what the company is about." />
         <TextField id="company-phone" label="Office phone" value={value.officePhone} onChange={(v) => set("officePhone", toE164(v))} disabled={disabled}
           testid="input-company-phone" placeholder="+13605551234" inputMode="tel" hint={'For "what is your number?" — the office line, never the assistant\'s own.'} />
         <TextField id="company-website" label="Website" value={value.website} onChange={(v) => set("website", v)} disabled={disabled}

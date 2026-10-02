@@ -16,17 +16,17 @@ export function CredibilitySection({ value, onChange, disabled }: SectionProps<C
   return (
     <SectionCard title="Credibility" blurb="What the assistant can say when a caller asks why they should trust you. Only what you type here — it never invents a rating or a license." testid="section-credibility">
       <div className="grid gap-4 sm:grid-cols-2">
-        <NumberField id="years" label="Years in business" value={value.yearsInBusiness ?? 0} min={0} max={200} disabled={disabled} testid="input-years-in-business"
-          onChange={(n) => set("yearsInBusiness", n > 0 ? n : null)} hint="0 = don't mention." />
-        <NumberField id="founded" label="Founded (year)" value={value.foundedYear ?? 0} min={0} max={2100} disabled={disabled} testid="input-founded-year"
-          onChange={(n) => set("foundedYear", n >= 1800 ? n : null)} hint="Leave 0 to skip." />
+        <NumberField id="years" label="Years in business" value={value.yearsInBusiness} min={0} max={200} disabled={disabled} testid="input-years-in-business"
+          onChange={(n) => set("yearsInBusiness", Math.round(n))} onClear={() => set("yearsInBusiness", null)} hint="Leave blank to skip." />
+        <NumberField id="founded" label="Founded (year)" value={value.foundedYear} min={1800} max={2100} disabled={disabled} testid="input-founded-year"
+          onChange={(n) => set("foundedYear", Math.round(n))} onClear={() => set("foundedYear", null)} hint="Leave blank to skip." />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <SwitchRow id="insured" label="Insured" checked={value.insured} onChange={(v) => set("insured", v)} disabled={disabled} testid="switch-insured" />
         <SwitchRow id="bonded" label="Bonded" checked={value.bonded} onChange={(v) => set("bonded", v)} disabled={disabled} testid="switch-bonded" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <StringListEditor id="licenses" label="Licenses" values={value.licenses} onChange={(v) => set("licenses", v)} disabled={disabled} testid="list-licenses" placeholder="WA license ALPINEX123AB" max={20} />
+        <StringListEditor id="licenses" label="Licenses" values={value.licenses} onChange={(v) => set("licenses", v)} disabled={disabled} testid="list-licenses" placeholder="State license number" max={20} />
         <StringListEditor id="warranties" label="Warranties" values={value.warranties} onChange={(v) => set("warranties", v)} disabled={disabled} testid="list-warranties" placeholder="Lifetime workmanship warranty" max={20} />
         <StringListEditor id="certifications" label="Certifications" values={value.certifications} onChange={(v) => set("certifications", v)} disabled={disabled} testid="list-certifications" placeholder="James Hardie Elite Preferred" max={20} />
         <StringListEditor id="awards" label="Awards" values={value.awards} onChange={(v) => set("awards", v)} disabled={disabled} testid="list-awards" placeholder="Best of Bellingham 2025" max={20} />

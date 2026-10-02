@@ -111,7 +111,7 @@ export function EscalationsSection({ value, onChange, disabled }: SectionProps<E
                     onChange={(n) => setRule(i, { reminders: { ...r.reminders, everyMinutes: n } })} />
                   <NumberField id={`esc-from-${i}`} label="From" value={r.reminders.fromHour} min={0} max={23} suffix="h" disabled={disabled} testid={`input-escalation-from-${i}`}
                     onChange={(n) => setRule(i, { reminders: { ...r.reminders, fromHour: n } })} />
-                  <NumberField id={`esc-to-${i}`} label="Until" value={r.reminders.toHour} min={1} max={24} suffix="h" disabled={disabled} testid={`input-escalation-to-${i}`}
+                  <NumberField id={`esc-until-${i}`} label="Until" value={r.reminders.toHour} min={1} max={24} suffix="h" disabled={disabled} testid={`input-escalation-to-${i}`}
                     onChange={(n) => setRule(i, { reminders: { ...r.reminders, toHour: n } })} />
                   <NumberField id={`esc-days-${i}`} label="For up to" value={r.reminders.maxDays} min={1} max={30} suffix="days" disabled={disabled} testid={`input-escalation-days-${i}`}
                     onChange={(n) => setRule(i, { reminders: { ...r.reminders, maxDays: n } })} />

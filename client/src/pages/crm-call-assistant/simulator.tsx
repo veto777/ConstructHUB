@@ -153,7 +153,7 @@ export function SimulatorPanel() {
                 {ended && <p className="text-xs text-muted-foreground" data-testid="text-simulator-ended">Call ended{ended.outcome ? ` — outcome: ${ended.outcome}` : ""}.</p>}
               </div>
               <form className="flex gap-2 border-t p-2" onSubmit={(e) => { e.preventDefault(); const t = text.trim(); if (t && !ended && !turn.isPending) turn.mutate(t); }}>
-                <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={ended ? "The call has ended — start a new one" : "Say something as the caller…"} disabled={!!ended || turn.isPending} data-testid="input-simulator-text" autoFocus />
+                <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={ended ? "The call has ended — start a new one" : "Say something as the caller…"} disabled={!!ended} readOnly={turn.isPending} aria-busy={turn.isPending} data-testid="input-simulator-text" autoFocus />
                 <Button type="submit" disabled={!text.trim() || !!ended || turn.isPending} aria-label="Send" data-testid="button-simulator-send"><Send className="h-4 w-4" /></Button>
               </form>
             </CardContent>

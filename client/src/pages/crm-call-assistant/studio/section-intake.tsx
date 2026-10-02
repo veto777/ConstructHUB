@@ -23,55 +23,59 @@ export function IntakeSection({ value, onChange, disabled }: SectionProps<Intake
   const qs = value.questions;
   const setQ = (i: number, patch: Partial<IntakeQuestion>) => set("questions", qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
-  const [open, setOpen] = useState<Record<number, boolean>>({});
+  // Which rows show their options, aligned with `qs`: the flags move with their question on reorder/remove,
+  // so an open panel never ends up showing a different question's key.
+  const [open, setOpen] = useState<boolean[]>([]);
   const [newPrompt, setNewPrompt] = useState("");
+  const flags = qs.map((_, i) => open[i] === true);
+  const move = (from: number, to: number) => { set("questions", moveItem(qs, from, to)); setOpen(moveItem(flags, from, to)); };
+  const remove = (i: number) => { set("questions", qs.filter((_, j) => j !== i)); setOpen(flags.filter((_, j) => j !== i)); };
 
   const addQuestion = () => {
     const prompt = newPrompt.trim();
     if (!prompt) return;
     set("questions", [...qs, newIntakeQuestion(prompt, qs)]);
     setNewPrompt("");
-    setOpen((o) => ({ ...o, [qs.length]: true }));
+    setOpen([...flags, true]);
   };
 
   return (
     <SectionCard title="Intake questions" blurb="Asked in this order, one at a time, in the assistant's own words. The caller-id number is confirmed, never read back digit by digit." testid="section-intake">
       <ol className="space-y-2" data-testid="list-intake-questions">
         {qs.map((q, i) => {
-          const expanded = open[i] === true;
+          const expanded = flags[i];
           return (
             <li key={`${q.key}-${i}`} draggable={!disabled} data-testid={`row-intake-${i}`}
               className={cn("rounded-lg border bg-card", dragFrom === i && "opacity-50")}
               onDragStart={() => setDragFrom(i)}
               onDragOver={(e) => { if (dragFrom !== null) e.preventDefault(); }}
-              onDrop={(e) => { e.preventDefault(); if (dragFrom !== null) { set("questions", moveItem(qs, dragFrom, i)); setDragFrom(null); } }}
+              onDrop={(e) => { e.preventDefault(); if (dragFrom !== null) { move(dragFrom, i); setDragFrom(null); } }}
               onDragEnd={() => setDragFrom(null)}>
-              <div className="flex items-center gap-2 p-2">
+              {/* phones: the question gets its own full-width line; the handle, number and buttons go on the next */}
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-2">
                 <span className={cn("text-muted-foreground", disabled ? "opacity-40" : "cursor-grab")} aria-hidden="true"><GripVertical className="h-4 w-4" /></span>
                 <span className="w-5 text-center text-xs text-muted-foreground tabular-nums">{i + 1}</span>
-                <Input value={q.prompt} disabled={disabled} className="flex-1 min-w-0" aria-label={`Question ${i + 1}`} data-testid={`input-intake-prompt-${i}`}
+                <Input value={q.prompt} disabled={disabled} className="order-first basis-full sm:order-none sm:basis-auto flex-1 min-w-0" aria-label={`Question ${i + 1}`} data-testid={`input-intake-prompt-${i}`}
                   onChange={(e) => setQ(i, { prompt: e.target.value })} />
+                <Badge variant={q.required ? "default" : "outline"} className="text-[10px] sm:hidden">{q.required ? "required" : "optional"}</Badge>
                 <div className="hidden sm:flex items-center gap-1.5 shrink-0">
                   <Label htmlFor={`intake-required-${i}`} className="text-xs text-muted-foreground">Required</Label>
                   <Switch id={`intake-required-${i}`} checked={q.required} disabled={disabled} data-testid={`switch-intake-required-${i}`} onCheckedChange={(v) => setQ(i, { required: v })} />
                 </div>
                 {!disabled && (
-                  <div className="flex items-center shrink-0">
+                  <div className="flex items-center shrink-0 ml-auto sm:ml-0">
                     <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Move up" disabled={i === 0} data-testid={`button-intake-up-${i}`}
-                      onClick={() => set("questions", moveItem(qs, i, i - 1))}><ArrowUp className="h-4 w-4" /></Button>
+                      onClick={() => move(i, i - 1)}><ArrowUp className="h-4 w-4" /></Button>
                     <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Move down" disabled={i === qs.length - 1} data-testid={`button-intake-down-${i}`}
-                      onClick={() => set("questions", moveItem(qs, i, i + 1))}><ArrowDown className="h-4 w-4" /></Button>
+                      onClick={() => move(i, i + 1)}><ArrowDown className="h-4 w-4" /></Button>
                     <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Remove question" data-testid={`button-intake-remove-${i}`}
-                      onClick={() => set("questions", qs.filter((_, j) => j !== i))}><X className="h-4 w-4" /></Button>
+                      onClick={() => remove(i)}><X className="h-4 w-4" /></Button>
                   </div>
                 )}
                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-expanded={expanded} aria-label={expanded ? "Hide options" : "Show options"}
-                  data-testid={`button-intake-options-${i}`} onClick={() => setOpen((o) => ({ ...o, [i]: !expanded }))}>
+                  data-testid={`button-intake-options-${i}`} onClick={() => setOpen(flags.map((f, j) => (j === i ? !expanded : f)))}>
                   {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </Button>
-              </div>
-              <div className="flex flex-wrap gap-1.5 px-3 pb-2 sm:hidden">
-                <Badge variant={q.required ? "default" : "outline"} className="text-[10px]">{q.required ? "required" : "optional"}</Badge>
               </div>
               {expanded && (
                 <div className="border-t p-3 grid gap-3 sm:grid-cols-2" data-testid={`panel-intake-options-${i}`}>
@@ -107,7 +111,7 @@ export function IntakeSection({ value, onChange, disabled }: SectionProps<Intake
               onChange={(e) => setNewPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addQuestion(); } }} />
             <Button type="button" variant="outline" onClick={addQuestion} disabled={!newPrompt.trim() || qs.length >= 20} data-testid="button-intake-add"><Plus className="h-4 w-4 mr-1" /> Add</Button>
           </div>
-          <Button type="button" variant="ghost" data-testid="button-intake-reset" onClick={() => set("questions", defaultIntakeQuestions())}><RotateCcw className="h-4 w-4 mr-1" /> Default script</Button>
+          <Button type="button" variant="ghost" data-testid="button-intake-reset" onClick={() => { set("questions", defaultIntakeQuestions()); setOpen([]); }}><RotateCcw className="h-4 w-4 mr-1" /> Default script</Button>
         </div>
       )}
       <div className="grid gap-4 sm:grid-cols-2">

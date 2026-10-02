@@ -235,7 +235,7 @@ function VersionHistory({ data, canManage, dirty, onRestored }: { data: VoicePro
             <li key={v.version} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm" data-testid={`row-version-${v.version}`}>
               <Badge variant={v.version === data.publishedVersion ? "default" : "outline"}>v{v.version}</Badge>
               <span className="flex-1 min-w-0 truncate">{v.note || "No note"}</span>
-              <span className="text-xs text-muted-foreground">{new Date(v.createdAt).toLocaleString()}{v.createdBy ? ` · ${v.createdBy}` : ""}</span>
+              <span className="text-xs text-muted-foreground">{new Date(v.createdAt).toLocaleString()}{v.author ? ` · ${v.author}` : ""}</span>
               <Button variant="ghost" size="sm" onClick={() => setSelected(selected === v.version ? null : v.version)} data-testid={`button-version-view-${v.version}`}>{selected === v.version ? "Hide" : "View"}</Button>
               {canManage && <Button variant="outline" size="sm" onClick={() => setConfirm(v.version)} disabled={restore.isPending} data-testid={`button-version-restore-${v.version}`}>Restore</Button>}
             </li>

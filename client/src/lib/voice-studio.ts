@@ -10,6 +10,7 @@
 import {
   DEFAULT_INTAKE_QUESTIONS,
   ESCALATION_KINDS,
+  voiceProfileSchema,
   type CompiledProfile,
   type DayKey,
   type EscalationKind,
@@ -28,7 +29,7 @@ export type VoiceProfileResponse = {
   setupCompletedAt: string | null;
 };
 
-export type VoiceVersionRow = { version: number; note: string | null; createdAt: string; createdBy: string | null };
+export type VoiceVersionRow = { version: number; note: string | null; createdAt: string; createdBy: string | null; author?: string | null };
 export type VoiceVersionDetail = VoiceVersionRow & { profile: VoiceProfile; compiled: CompiledProfile | null };
 
 export type CountyRef = VoiceProfile["serviceArea"]["counties"][number];
@@ -285,6 +286,63 @@ export function studioIssues(p: VoiceProfile): StudioIssue[] {
   p.leadDelivery.sms.recipients.forEach((n) => { if (!E164.test(n)) out.push({ section: "leadDelivery", message: `"${n}" must look like +13605551234.` }); });
   if (p.policies.pricing === "ranges" && p.policies.priceRanges.length === 0)
     out.push({ section: "policies", message: "You chose to read price ranges, but none are listed." });
+  return [...out, ...schemaIssues(p)];
+}
+
+/** Paths the friendly rules above already explain (the schema's own message for them would be a duplicate). */
+const HAND_CHECKED = [
+  /^company\.name$/, /^company\.officePhone$/, /^company\.services\.\d+\.name$/, /^company\.declines\.\d+\.what$/,
+  /^intake\.questions(\.\d+\.(key|prompt|choices))?$/, /^faq\.\d+\.(question|answer)$/,
+  /^escalations\.rules\.\d+\.(recipientName|kinds|recipient)$/, /^leadDelivery\.(email\.extraRecipients|sms\.recipients)\.\d+$/,
+];
+
+/** Which Studio section edits a profile path. */
+export function sectionForPath(path: ReadonlyArray<string | number>): StudioSectionId {
+  const [top, sub] = path;
+  if (top === "company") return ["services", "materials", "brands", "declines"].includes(String(sub)) ? "services" : "company";
+  const ids = STUDIO_SECTIONS.map((x) => x.id) as readonly string[];
+  return (ids.includes(String(top)) ? top : "advanced") as StudioSectionId;
+}
+
+const FIELD_WORDS: Record<string, string> = {
+  promotions: "promotion", priceRanges: "price range", crews: "crew", windows: "window", rules: "rule",
+  maxTurns: "max turns", greetingDelaySeconds: "greeting delay (seconds)", silencePromptSeconds: "silence before \"are you still there?\" (seconds)",
+  silencePromptsBeforeHangup: "silence prompts before hanging up", maxCallSeconds: "longest call (seconds)", yearsInBusiness: "years in business",
+  foundedYear: "year founded", everyMinutes: "remind every (minutes)", fromHour: "reminders from (hour)", toHour: "reminders until (hour)",
+  maxDays: "remind for (days)", bufferMinutes: "buffer (minutes)", slotMinutes: "appointment length (minutes)", endsOn: "ends on",
+};
+
+/** One zod issue → plain words: "Advanced › max turns must be 80 or less." */
+function plainIssue(issue: { path: (string | number)[]; code: string; message: string; minimum?: unknown; maximum?: unknown; type?: string }): string {
+  const parts = issue.path.slice(1).map((x) => typeof x === "number" ? `#${x + 1}` : FIELD_WORDS[x] ?? String(x).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase());
+  const where = [SECTION_BY_PATH[String(issue.path[0])] ?? "Profile", parts.join(" ").replace(/ #/g, " #")].filter(Boolean).join(" › ");
+  let what = issue.message;
+  if (issue.code === "too_big" && issue.type === "number") what = `must be ${issue.maximum} or less`;
+  else if (issue.code === "too_small" && issue.type === "number") what = `must be at least ${issue.minimum}`;
+  else if (issue.code === "too_small" && issue.type === "string") what = "can't be empty";
+  else if (issue.code === "too_big" && issue.type === "string") what = `is too long (${issue.maximum} characters at most)`;
+  else if (issue.code === "too_big" && issue.type === "array") what = `has too many entries (${issue.maximum} at most)`;
+  else if (issue.code === "invalid_string") what = "isn't in the right format";
+  else if (issue.code === "invalid_type") what = "is missing or not a valid value";
+  return `${where} ${what}.`;
+}
+
+/**
+ * Everything else the server's schema (shared/voice-profile.ts) would refuse — ranges, required names in
+ * promotions / price ranges / crews, clock formats — so Publish is never enabled for a draft that will 400.
+ * One source of truth: the same zod schema the API validates with.
+ */
+export function schemaIssues(p: VoiceProfile): StudioIssue[] {
+  const r = voiceProfileSchema.safeParse(p);
+  if (r.success) return [];
+  const seen = new Set<string>();
+  const out: StudioIssue[] = [];
+  for (const issue of r.error.issues) {
+    const key = issue.path.join(".");
+    if (HAND_CHECKED.some((re) => re.test(key)) || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ section: sectionForPath(issue.path), message: plainIssue(issue as any) });
+  }
   return out;
 }
 

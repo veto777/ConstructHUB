@@ -1,4 +1,4 @@
-import type { VoiceProfile } from "@shared/voice-profile";
+import { recordingNoticeStates, type VoiceProfile } from "@shared/voice-profile";
 import type { StudioSectionId } from "@/lib/voice-studio";
 import { CompanySection, ServicesSection } from "./section-company";
 import { ServiceAreaSection } from "./section-service-area";
@@ -23,7 +23,7 @@ export function StudioSection({ id, draft, onChange, disabled }: {
     case "credibility": return <CredibilitySection value={draft.credibility} onChange={(v) => patch("credibility", v)} disabled={disabled} />;
     case "offers": return <OffersSection value={draft.offers} onChange={(v) => patch("offers", v)} disabled={disabled} />;
     case "policies": return <PoliciesSection value={draft.policies} onChange={(v) => patch("policies", v)} disabled={disabled} />;
-    case "persona": return <PersonaSection value={draft.persona} onChange={(v) => patch("persona", v)} disabled={disabled} companyName={draft.company.spokenName || draft.company.name} />;
+    case "persona": return <PersonaSection value={draft.persona} onChange={(v) => patch("persona", v)} disabled={disabled} companyName={draft.company.spokenName || draft.company.name} noticeStates={recordingNoticeStates(draft)} />;
     case "intake": return <IntakeSection value={draft.intake} onChange={(v) => patch("intake", v)} disabled={disabled} />;
     case "faq": return <FaqSection value={draft.faq} onChange={(v) => patch("faq", v)} disabled={disabled} />;
     case "escalations": return <EscalationsSection value={draft.escalations} onChange={(v) => patch("escalations", v)} disabled={disabled} />;
