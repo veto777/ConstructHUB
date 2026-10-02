@@ -81,6 +81,8 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
   const openEnded = !!periodEnd && periodEnd.getUTCFullYear() >= 2099;
   const periodText = !periodEnd ? null
     : openEnded ? "No end date"
+    // A Stripe-less active row is access an admin granted (/admin/access); a trial code's is "trialing".
+    : !view.viaStripe && status === "active" ? `Access granted by ConstructHUB until ${periodEnd.toLocaleDateString()}`
     : !view.viaStripe ? `Access through ${periodEnd.toLocaleDateString()}`
     : status === "trialing" ? `Trial ends ${periodEnd.toLocaleDateString()}`
     : subscription?.cancelAtPeriodEnd === true ? `Ends ${periodEnd.toLocaleDateString()}`

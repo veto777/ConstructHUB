@@ -18,6 +18,7 @@ import { BILLING_SUBSCRIPTION_DDL, FULFILMENT_DDL, BILLING_INTRO_DDL } from "../
 import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
 import { VOICE_SCHEMA_BACKFILL, VOICE_SCHEMA_DDL } from "../server/voice/schema";
 import { DASHBOARD_PREFS_DDL } from "../server/dashboard/prefs";
+import { ACCESS_GRANTS_DDL } from "../server/access-grants-schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -58,6 +59,9 @@ const STATEMENTS = [
   // Dashboard preferences: the saved layout and cleared "Needs you today" items
   // (server/dashboard/prefs.ts also runs these at boot).
   ...DASHBOARD_PREFS_DDL,
+  // Admin access grants (/admin/access): who gave which account which plan,
+  // for how long, and who revoked it (server/access-grants.ts also runs these at boot).
+  ...ACCESS_GRANTS_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

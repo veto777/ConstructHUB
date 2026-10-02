@@ -20,7 +20,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/mail-alerts", "/gbp-content", "/social-media", "/guides", "/cloudflare", "/search-console", "/site-scan",
   "/free-site-scan", "/site-scan/report/*", "/master-class", "/master-class-landing", "/google-ads", "/ads-manager",
   "/google-ads-landing", "/permits-landing", "/google-ads-guide/:section", "/lsa-leads", "/lsa-account-manager",
-  "/ip-tracker", "/crm-app", "/admin", "/admin/feature-pages",
+  "/ip-tracker", "/crm-app", "/admin", "/admin/feature-pages", "/admin/access",
   "/vpn-shield", "/individual-pricing", "/google-reviews", "/settings", "/settings/billing", "/settings/api",
   "/developers", "/crm-terms", "/crm-privacy",
   // Pages a contractor's own customer opens from a link.

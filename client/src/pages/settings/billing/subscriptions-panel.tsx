@@ -63,6 +63,8 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
   // trial or not — so that case is read before the trial wording.
   const nextBilling = !periodEnd ? "—"
     : openEnded ? "No end date"
+    // A Stripe-less active row is access an admin granted (/admin/access); a trial code's is "trialing".
+    : !view.viaStripe && status === "active" ? `Access granted by ConstructHUB until ${formatDate(subscription?.currentPeriodEnd)}`
     : !view.viaStripe ? `Access through ${formatDate(subscription?.currentPeriodEnd)}`
     : subscription?.cancelAtPeriodEnd === true ? `Ends ${formatDate(subscription?.currentPeriodEnd)} (won't renew)`
     : status === "trialing" ? `Trial ends ${formatDate(subscription?.currentPeriodEnd)} — first charge that day`

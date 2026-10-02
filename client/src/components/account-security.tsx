@@ -30,6 +30,7 @@ const ACTIVITY_LABELS: Record<string, string> = {'sitescan.deleted':'Site Scan d
   'google.connected': 'Google account connected', 'google.disconnected': 'Google account disconnected',
   'sitescan.started': 'Site Scan started', 'sitescan.shared': 'Site Scan report shared',
   'sitescan.plan_drafted': 'Site Scan fix plan drafted', 'sitescan.fixes_updated': 'Site Scan fixes updated',
+  'billing.access_granted': 'Access granted by ConstructHUB', 'billing.access_revoked': 'Granted access ended by ConstructHUB',
 };
 const ACTIVITY_AREAS: Record<string, string> = {
   auth: 'Sign-in', security: 'Security', google: 'Google', gbp: 'Google Business Profile', sitescan: 'Site Scan',

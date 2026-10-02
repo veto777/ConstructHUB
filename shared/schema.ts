@@ -764,6 +764,33 @@ export const insertBetaAccessCodeSchema = createInsertSchema(betaAccessCodes).om
 export type BetaAccessCode = typeof betaAccessCodes.$inferSelect;
 export type InsertBetaAccessCode = z.infer<typeof insertBetaAccessCodeSchema>;
 
+// ── Admin access grants (server/access-grants.ts, /admin/access) ─────────────
+// Mirror of server/access-grants-schema.ts ACCESS_GRANTS_DDL (THE DDL; boot and
+// scripts/apply-schema-migration.ts run it). One row per grant: the plan an
+// admin gave an account, for how many days, and who revoked it. The access
+// itself is the account's Stripe-less subscriptions row (subscriptionId).
+export const adminAccessGrants = pgTable("admin_access_grants", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull(),
+  subscriptionId: integer("subscription_id"),
+  plan: text("plan").notNull(),
+  days: integer("days").notNull(),
+  note: text("note"),
+  grantedByUserId: integer("granted_by_user_id").notNull(),
+  grantedByEmail: text("granted_by_email").notNull(),
+  grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  /** What the subscriptions row held before the grant (plan, status, end, Stripe subscription id). */
+  previous: jsonb("previous"),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedByUserId: integer("revoked_by_user_id"),
+  revokedByEmail: text("revoked_by_email"),
+  /** Set when the admin granted this account again (extend): the newer grant's id. */
+  replacedAt: timestamp("replaced_at", { withTimezone: true }),
+  replacedByGrantId: integer("replaced_by_grant_id"),
+});
+export type AdminAccessGrant = typeof adminAccessGrants.$inferSelect;
+
 export const googleProfileReviews = pgTable("google_profile_reviews", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull(),

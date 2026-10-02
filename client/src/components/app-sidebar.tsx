@@ -5,7 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
@@ -510,6 +510,18 @@ export function AppSidebar() {
                     <Link href="/admin/feature-pages" data-testid="link-nav-admin-feature-pages" className="flex items-center gap-2 w-full">
                       <LayoutGrid className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Feature pages</span>
+                      <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Give an account a plan for 1–1000 days, and revoke it. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/access"}>
+                    <Link href="/admin/access" data-testid="link-nav-admin-access" className="flex items-center gap-2 w-full">
+                      <KeyRound className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Access grants</span>
                       <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
                     </Link>
                   </SidebarMenuButton>

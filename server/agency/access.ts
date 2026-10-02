@@ -47,6 +47,10 @@ export async function ownerHasPlan(owner: number): Promise<boolean> {
   if (planCache.size > 50_000) planCache.clear();
   return ok;
 }
+/** A plan granted or ended outside Stripe (server/access-grants.ts): the next sync asks again. */
+export function forgetOwnerPlan(owner: number): void {
+  planCache.delete(owner);
+}
 export async function accessFor(actor: number, owner = actor): Promise<AgencyAccess> {
   if (owner === actor) return {owner,actor,role:'owner',allClients:true};
   const { rows:[m] } = await pool.query('SELECT role,all_clients FROM agency_members WHERE user_id=$1 AND member_id=$2',[owner,actor]);
