@@ -124,6 +124,36 @@ const page: FeaturePage = {
       a: "Not today. Schedule is your team's calendar: clients don't book through it, and it doesn't text or email them about their appointments.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // the visit fields, all day = no end time: client/src/components/crm-appointment-form.tsx; the double-booking check on
+  // POST (overlap with the same people, cancelled and end-less visits skipped): server/crm/schedule.ts POST
+  // /api/crm/appointments; booking needs manageJobs, assigned-only view: server/crm/schedule.ts, shared/schema.ts
+  // CRM_ROLE_DEFAULTS; the feed (token is the auth, only its hash stored, regenerate kills old copies) and the Google push
+  // (calendar.app.created scope, own "ConstructHub CRM" calendar, edits and deletes carried, per-member connections with
+  // their own visits): server/crm/calendar.ts header, CALENDAR_SCOPE, memberConnectionOf, orgFeedEvents.
+  inDepth: {
+    heading: { title: "Crew Scheduling for Contractors, ", em: "Explained" },
+    paragraphs: [
+      "Schedule is the crew scheduling calendar inside ConstructHub CRM. A visit has a title, a date, a start and end " +
+        "time or all day, notes, and the crew members going. It links to a project and a client, so the same visits show " +
+        "on the client's page and can be booked from there too, and a job with three visits can have a different crew on " +
+        "each.",
+      "When you book a timed visit, Schedule checks the crew you picked against every other visit that overlaps it and " +
+        "warns you how many clashes there are before you commit the day. Cancelled visits don't count, and an all-day " +
+        "visit isn't part of the check because it has no end time. Who sees what follows the CRM roles: anyone who can " +
+        "manage jobs can book and move visits, and a crew member without access to every job sees only the visits they " +
+        "are on or booked.",
+      "There are two ways to get the schedule onto phones. The company calendar feed is a private subscription link " +
+        "that Apple Calendar, Outlook, Google and other calendar apps can follow. Calendar apps can't sign in, so the " +
+        "link itself is the key: only a scrambled fingerprint of it is stored, and regenerating it stops every old copy. " +
+        "The feed is read-only, and each app refreshes it on its own timetable.",
+      "Google Calendar push is a one-way sync. Connect a Google account and press Sync now: ConstructHUB creates its " +
+        "own ConstructHub CRM calendar and keeps your visits there up to date, carrying edits and deletions across. It " +
+        "asks Google only for permission to manage the calendar it creates, not your other calendars. Each team member " +
+        "can connect their own Google account to get just their own visits. Events added in Google don't come back into " +
+        "the CRM.",
+    ],
+  },
   related: ["crm", "crmLeads", "texting"],
   app: { href: "/crm/schedule", surface: "portal", label: "Open Schedule" },
   headings: {
@@ -131,9 +161,9 @@ const page: FeaturePage = {
     cards: { title: "What Schedule ", em: "Gives You" },
   },
   seo: {
-    title: "Schedule — Crew Calendar for Contractors | ConstructHUB",
+    title: "Crew Scheduling Calendar for Contractors | ConstructHUB",
     description:
-      "Book appointments and crew visits, get crew conflict warnings, filter to anyone's calendar, and push the schedule to Google Calendar or any calendar app.",
+      "Book crew visits, get double-booking warnings, give each crew member their own view, and push the schedule to Google Calendar or any calendar app.",
   },
   sources: [
     "client/src/pages/crm-schedule.tsx",

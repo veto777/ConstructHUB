@@ -136,6 +136,34 @@ const page: FeaturePage = {
       a: "No. Replies of STOP, START and HELP are handled, but other replies don't show up in the CRM. Client conversations happen in their portal and by email.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // the alert events and channels: shared/schema.ts CRM_NOTIFICATION_PREFS, server/crm/notify.ts; client texts: server/crm/portal.ts,
+  // server/crm/sms.ts, server/crm/messages.ts; the senders, encrypted BYO token, client texts never from the shared number, an
+  // incomplete own account falling back to the shared one: server/crm/sms.ts resolveSmsSender, orgCanTextClients; segment sizes
+  // (160/153, 70/67, one character switches the whole text): server/crm/sms-segments.ts; reserve before send, refund on a
+  // carrier refusal, a spent month skipped: server/crm/sms.ts sendSms / reserveSmsSegments; STOP words, START, HELP, opted-out
+  // numbers never texted, other replies not shown: server/crm/sms.ts inbound webhook, isSmsOptedOut.
+  inDepth: {
+    heading: { title: "Business Texting for Contractors, ", em: "Explained" },
+    paragraphs: [
+      "Texting covers two different kinds of text. Team alerts go to you and your staff: an estimate opened, approved " +
+        "or declined, a payment, a website lead and more, with in-app, email or text chosen event by event. Client texts " +
+        "go to homeowners: the estimate link when you send it, a reminder about an estimate that's still waiting, or a " +
+        "quick message.",
+      "Which number a text comes from matters. Team alerts can use the shared ConstructHUB number with nothing to set " +
+        "up. Texting clients needs a number of your own: a number set up for you on ConstructHUB's carrier, or your own " +
+        "SignalWire account, whose token is stored encrypted. The CRM never sends a client text from the shared number. " +
+        "If your own account's details are incomplete, texts fall back to the shared number, which only texts your team.",
+      "Texts are counted in segments, the unit carriers bill. A plain text fits 160 characters in one segment and 153 " +
+        "in each segment after that. A single emoji, curly quote or accented capital letter switches the whole text to a " +
+        "different encoding: 70 characters in one segment and 67 in each one after. Every text your CRM sends is counted " +
+        "against your plan's monthly allowance before it goes out. A text the carrier refuses gives its segments back, " +
+        "and once the month's allowance is spent, texts are skipped until the 1st instead of running up charges.",
+      "Opt-outs are handled the way carriers require. A reply of STOP, UNSUBSCRIBE, CANCEL, END or QUIT opts that phone " +
+        "out and gets a confirmation; START opts it back in, and HELP gets a help reply. A number on the opt-out list is " +
+        "never texted. Other replies don't appear in the CRM, so client conversations stay in their portal and email.",
+    ],
+  },
   related: ["crm", "crmLeads", "callAssistant"],
   app: { href: "/crm/settings", surface: "portal", label: "Open text settings" },
   headings: {
@@ -144,9 +172,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Turn It On" },
   },
   seo: {
-    title: "Texting — Text Alerts & Client Texts | ConstructHUB",
+    title: "Contractor Text Alerts & Client Texting | ConstructHUB",
     description:
-      "Text alerts when a bid is signed or a payment lands, estimate links and reminders by text from your own number, and a monthly allowance counted in carrier segments.",
+      "Text alerts when a bid is signed or a payment lands, estimate links and reminders texted from your own number, and STOP opt-outs handled for you.",
   },
   sources: [
     "server/crm/sms.ts",

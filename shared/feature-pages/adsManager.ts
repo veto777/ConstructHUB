@@ -145,6 +145,36 @@ const page: FeaturePage = {
       a: "Map each client account to its Click Guard website. The IP exclusion protection then uses that site's newest flagged IPs, rotating out the oldest exclusions to stay inside Google's limit for each campaign.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // the MCC connection, client discovery and invitations: server/ads/routes.ts /connect, /accounts, /invitations,
+  // server/ads/worker.ts; the audit checks and wording (LAST_30_DAYS, >10% budget-lost share, 'unavailable' is not a pass,
+  // presence does not verify tag firing, LSA criteria/budget/charged leads): server/ads/audit.ts; the protections and IP
+  // rotation inside the 500 limit: server/ads/protections.ts buildPlan; expiry, confirm, re-read before writing, the
+  // reversal stop: server/ads/routes.ts /plans/confirm, server/ads/worker.ts (fingerprint checks).
+  inDepth: {
+    heading: { title: "A Google Ads Audit for Agencies, ", em: "Explained" },
+    paragraphs: [
+      "Agency Ads & LSA works through your Google Ads manager account (MCC). You connect it once with Google sign-in, " +
+        "and the client accounts linked under it appear in one list. To add clients, you paste customer ID and email " +
+        "pairs: ConstructHUB sends a Google manager invitation from your MCC and an email to the client explaining how to " +
+        "accept it. A client account only shows up once it is linked to your MCC.",
+      "The health audit is read-only. For each account it checks for enabled conversion actions and call conversion " +
+        "actions, campaigns that lost more than a tenth of their search impression share to budget, search terms that " +
+        "spent money without a reported conversion, disapproved ads, campaigns not set to presence-only location " +
+        "targeting, and campaigns without an ad schedule. Budget, search-term and charged-lead checks cover the last 30 " +
+        "days. For accounts running Local Services Ads it also reads the service areas, job types and budget Google has " +
+        "on file, and counts charged leads still waiting for feedback. A check Google doesn't answer is reported as " +
+        "unavailable, never as a pass, and a conversion action being present doesn't prove its tag fires.",
+      "A protection starts as a preview for each account: switch campaigns to presence-only targeting, add a shared " +
+        "negative keyword list, exclude placements across the account, set an ad schedule, or exclude the IP addresses " +
+        "Click Guard flagged on that client's website. IP exclusions keep the newest flagged addresses and rotate out the " +
+        "oldest existing ones to stay inside Google's limit for each campaign.",
+      "Previews expire. You tick a box to confirm, and each account is read again right before anything is written: if " +
+        "it changed since the preview, nothing is written and you prepare a new one. An applied change can be reversed " +
+        "through its own preview, as long as the account hasn't changed since the write. It doesn't build campaigns, " +
+        "write ads or change bids and budgets.",
+    ],
+  },
   related: ["clickGuard", "lsaLeads", "agency"],
   app: { href: "/ads-manager", surface: "app" },
   headings: {
@@ -152,9 +182,9 @@ const page: FeaturePage = {
     cards: { title: "What the Manager ", em: "Gives You" },
   },
   seo: {
-    title: "Agency Ads & LSA Manager for Google Ads | ConstructHUB",
+    title: "Google Ads & LSA Audits for Agencies | ConstructHUB",
     description:
-      "Connect your Google Ads MCC, request client access in bulk, audit client accounts and preview protections like presence-only targeting before anything changes.",
+      "Connect your Google Ads MCC, request client access in bulk, audit every client account and LSA setup, and preview protections before anything changes.",
   },
   sources: [
     "client/src/pages/ads-manager.tsx",
