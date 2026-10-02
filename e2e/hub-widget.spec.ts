@@ -81,7 +81,7 @@ test.describe("signed out", () => {
       await page.waitForLoadState("networkidle");
       await expect(page.getByTestId("hub-launcher"), path).toHaveCount(0);
     }
-    for (const path of ["/pricing", "/reinstatement", "/master-class-landing"]) {
+    for (const path of ["/pricing", "/reinstatement", "/features", "/features/master-class", "/master-class-landing"]) {
       await page.goto(`${SIGNED_OUT}${path}`);
       await expect(page.getByTestId("hub-launcher"), path).toBeVisible();
     }

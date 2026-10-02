@@ -207,8 +207,7 @@ describe("emails and in-app help", () => {
 describe("page copy outside /pricing", () => {
   const root = path.resolve(import.meta.dirname, "..");
   const PAGES = [
-    "home", "landing", "permits-landing", "competitors-landing", "google-ads-landing", "master-class",
-    "master-class-landing", "reinstatement", "terms-of-use", "privacy-policy", "crm-gateway", "crm-legal",
+    "home", "landing", "master-class", "reinstatement", "terms-of-use", "privacy-policy", "crm-gateway", "crm-legal",
     "competitors", "google-ads-guide", "call-assistant-landing",
   ].map((p) => `client/src/pages/${p}.tsx`);
   const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
@@ -222,7 +221,7 @@ describe("page copy outside /pricing", () => {
     expect(src).not.toMatch(/["'](gold|platinum)["']/);
   });
 
-  it.each(["landing", "master-class-landing", "terms-of-use", "call-assistant-landing"])(
+  it.each(["landing", "terms-of-use", "call-assistant-landing"])(
     "%s prints no literal price at or above the sales threshold",
     (page) => {
       const src = read(`client/src/pages/${page}.tsx`);

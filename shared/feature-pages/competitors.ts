@@ -165,7 +165,6 @@ const page: FeaturePage = {
   flag: "SHOW_COMPETITOR_INTEL",
   sources: [
     "client/src/pages/competitors.tsx",
-    "client/src/pages/competitors-landing.tsx",
     "client/src/lib/features.ts",
     "server/routes.ts",
     "server/competitor-analysis.ts",

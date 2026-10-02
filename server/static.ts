@@ -17,16 +17,16 @@ const BASE = `https://${CANONICAL_HOST}`;
 // Public, indexable routes (marketing + legal). App/dashboard routes are
 // deliberately excluded — they render behind auth and shouldn't be indexed.
 // Feature intro pages join once written: a stub (status "stub") is not listed.
+// The retired one-off landing pages (/google-ads-landing, …) only redirect to
+// their /features page, so they are not listed.
 export const PUBLIC_ROUTES = [
   "/",
   "/pricing",
   "/call-assistant",
   FEATURES_PATH,
   ...READY_FEATURE_PAGES.map(featurePagePath),
-  "/google-ads-landing",
   "/google-ads-guide",
   "/google-ad-fraud",
-  "/master-class-landing",
   "/lsa-guide",
   "/google-business",
   "/privacy",

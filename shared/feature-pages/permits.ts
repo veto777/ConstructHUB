@@ -156,7 +156,6 @@ const page: FeaturePage = {
     "client/src/pages/search.tsx",
     "client/src/pages/databases.tsx",
     "client/src/pages/history.tsx",
-    "client/src/pages/permits-landing.tsx",
     "client/src/App.tsx",
     "server/routes.ts",
     "server/scraper.ts",

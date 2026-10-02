@@ -49,10 +49,6 @@ import GoogleAdsGuideSectionPage from "@/pages/google-ads-guide-section";
 import GoogleAdFraudPage from "@/pages/google-ad-fraud";
 import LsaGuidePage from "@/pages/lsa-guide";
 import LsaLeadsPage from "@/pages/lsa-leads";
-import GoogleAdsLandingPage from "@/pages/google-ads-landing";
-import PermitsLandingPage from "@/pages/permits-landing";
-import CompetitorsLandingPage from "@/pages/competitors-landing";
-import MasterClassLandingPage from "@/pages/master-class-landing";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
 import AdminFeaturePagesPage from "@/pages/admin-feature-pages";
@@ -106,14 +102,14 @@ import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
 
 /**
- * The old one-off landing pages, retired into /features/<slug>: each keeps
- * rendering until its feature page is written ("ready"), then redirects there
- * (LegacyLanding in pages/features.tsx).
+ * The old one-off landing pages, retired into /features/<slug>: the old URLs
+ * stay and replace themselves with the feature page (LegacyLanding in
+ * pages/features.tsx).
  */
-const PermitsLanding = () => <LegacyLanding featureKey="permits" fallback={PermitsLandingPage} />;
-const GoogleAdsLanding = () => <LegacyLanding featureKey="clickGuard" fallback={GoogleAdsLandingPage} />;
-const CompetitorsLanding = () => <LegacyLanding featureKey="competitors" fallback={CompetitorsLandingPage} />;
-const MasterClassLanding = () => <LegacyLanding featureKey="masterClass" fallback={MasterClassLandingPage} />;
+const PermitsLanding = () => <LegacyLanding featureKey="permits" />;
+const GoogleAdsLanding = () => <LegacyLanding featureKey="clickGuard" />;
+const CompetitorsLanding = () => <LegacyLanding featureKey="competitors" />;
+const MasterClassLanding = () => <LegacyLanding featureKey="masterClass" />;
 
 /** The old à-la-carte tools page: single features are add-ons on /pricing now. */
 function IndividualPricingRedirect() {
@@ -173,7 +169,9 @@ function DashboardRouter() {
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
       <Route path="/ads-manager" component={AdsManagerPage} />
+      {/* Retired landing pages: the old URLs redirect to their /features page. */}
       <Route path="/google-ads-landing" component={GoogleAdsLanding} />
+      <Route path="/permits-landing" component={PermitsLanding} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
       <Route path="/google-ads-guide/:section" component={GoogleAdsGuideSectionPage} />
       <Route path="/google-ad-fraud" component={GoogleAdFraudPage} />
@@ -569,23 +567,6 @@ function AppContent() {
         <HubWidget surface="marketing" signedIn />
       </>
     );
-  }
-
-  // Retired landing pages: full-bleed until their feature page is ready, then a redirect into the app frame.
-  if (location === "/google-ads-landing") {
-    return <><GoogleAdsLanding /><HubWidget surface="marketing" signedIn /></>;
-  }
-
-  if (location === "/permits-landing") {
-    return <><PermitsLanding /><HubWidget surface="marketing" signedIn /></>;
-  }
-
-  if (location === "/competitors-landing" && SHOW_COMPETITOR_INTEL) {
-    return <><CompetitorsLanding /><HubWidget surface="marketing" signedIn /></>;
-  }
-
-  if (location === "/master-class-landing") {
-    return <><MasterClassLanding /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location.startsWith("/contract/sign/")) {

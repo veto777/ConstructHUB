@@ -152,7 +152,6 @@ const page: FeaturePage = {
   legacyPath: "/master-class-landing",
   sources: [
     "client/src/pages/master-class.tsx",
-    "client/src/pages/master-class-landing.tsx",
     "client/src/pages/google-ads-guide.tsx",
     "server/data/master-class-modules.json",
     "server/data/state-guides.json",

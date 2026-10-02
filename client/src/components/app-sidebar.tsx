@@ -220,7 +220,7 @@ const permitsGroup: NavGroup = {
   label: "Permits & Databases",
   icon: HardHat,
   logo: permitsLogo,
-  landingUrl: "/permits-landing",
+  landingUrl: "/features/permits",
   children: [
     { title: "Search Permits", url: "/search", icon: Search },
     { title: "Database Directory", url: "/databases", icon: Database },
@@ -254,7 +254,7 @@ const googleGroups: NavGroup[] = [
     label: "Google Ads",
     icon: TrendingUp,
     logoComponent: GoogleAdsIcon,
-    landingUrl: "/google-ads-landing",
+    landingUrl: "/features/click-guard",
     children: [
       { title: "Agency Ads & LSA", url: "/ads-manager", icon: Megaphone, badge: "new" as BadgeType },
       { title: "Click Guard", url: "/google-ads", icon: ShieldCheck, badge: "hot" as BadgeType },
@@ -278,8 +278,8 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "Search Console", url: "/search-console", icon: Search, logoComponent: SearchConsoleIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
-  ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/competitors-landing" }] : []),
-  { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/master-class-landing" },
+  ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/features/competitors" }] : []),
+  { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/features/master-class" },
 ];
 
 const pricingGroup: NavGroup = {
@@ -289,7 +289,7 @@ const pricingGroup: NavGroup = {
   children: [
     { title: "Subscription Plans", url: "/pricing", icon: Layers },
     { title: "Add-ons", url: "/pricing#add-ons", icon: PlusCircle },
-    { title: "Master Class", url: "/master-class-landing", icon: BookOpen, testId: "link-nav-pricing-master-class" },
+    { title: "Master Class", url: "/features/master-class", icon: BookOpen, testId: "link-nav-pricing-master-class" },
     // The done-for-you SEO packages section of the pricing page.
     { title: "SEO Services", url: "/pricing#services", icon: Rocket },
   ],

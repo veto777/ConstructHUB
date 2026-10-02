@@ -74,7 +74,7 @@ export default function AdminFeaturePagesPage() {
             <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground" data-testid="text-feature-pages-counts">
-            {data.counts.ready} of {data.counts.ready + data.counts.stub} feature pages written · the rest are stubs until their copy lands.
+            {data.counts.ready} of {data.counts.ready + data.counts.stub} feature pages written{data.counts.stub > 0 ? " · the rest are stubs until their copy lands." : " · no stubs left."}
           </p>
         </div>
         <Link href={data.catalogue} className={`${linkClass} shrink-0`} data-testid="link-admin-features-catalogue">

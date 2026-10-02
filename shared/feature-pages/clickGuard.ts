@@ -166,7 +166,6 @@ const page: FeaturePage = {
   legacyPath: "/google-ads-landing",
   sources: [
     "client/src/pages/google-ads.tsx",
-    "client/src/pages/google-ads-landing.tsx",
     "server/routes.ts",
     "server/tracking-script.ts",
     "server/click-guard-exclusions.ts",

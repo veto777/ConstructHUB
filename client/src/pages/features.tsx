@@ -7,12 +7,11 @@
  * Signed out: public header + footer. Signed in: the app frame with the
  * sidebar (App.tsx registers both routes in both routers).
  *
- * Also here: LegacyLanding, which retires the old one-off landing pages
+ * Also here: LegacyLanding, which redirects the old one-off landing pages
  * (/permits-landing, /google-ads-landing, /competitors-landing,
- * /master-class-landing) into /features/<slug> — but only once that page is
- * written ("ready"); until then the old page keeps rendering.
+ * /master-class-landing) to their /features/<slug> page.
  */
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
@@ -201,12 +200,12 @@ export function FeaturePageRoute() {
 }
 
 /**
- * A retired one-off landing page: once the feature's page is written
- * (status "ready") the old URL replaces itself with /features/<slug>; until
- * then the old page keeps rendering, so nothing is lost while copy is ported.
+ * A retired one-off landing page (/permits-landing, …): the old URL replaces
+ * itself with the feature's /features/<slug> page, so links and bookmarks
+ * keep working. A flagged-off feature is the 404 page, as /features/<slug> is.
  */
-export function LegacyLanding({ featureKey, fallback: Fallback }: { featureKey: string; fallback: ComponentType }) {
+export function LegacyLanding({ featureKey }: { featureKey: string }) {
   const page = featurePageByKey(featureKey);
-  if (page?.status === "ready" && featureVisible(page.flag)) return <Replace to={featurePagePath(page)} />;
-  return <Fallback />;
+  if (page && featureVisible(page.flag)) return <Replace to={featurePagePath(page)} />;
+  return <NotFound />;
 }

@@ -96,11 +96,16 @@ test.describe("signed out: routing", () => {
     await expect(page.getByTestId("page-call-assistant")).toBeVisible();
   });
 
-  test("a retired landing page keeps rendering until its feature page is ready", async ({ page }) => {
-    const permits = FEATURE_PAGES.find((p) => p.key === "permits")!;
-    await open(page, `${SIGNED_OUT}/permits-landing`);
-    if (permits.status === "ready") await expect(page).toHaveURL(new RegExp(`${featurePagePath(permits)}$`));
-    else await expect(page).toHaveURL(/\/permits-landing$/);
+  test("every retired landing page redirects to its feature page", async ({ page }) => {
+    const retired = PAGES.filter((p) => p.legacyPath);
+    expect(retired.map((p) => p.key).sort()).toEqual(
+      ["clickGuard", "masterClass", "permits", ...(SHOW_COMPETITOR_INTEL ? ["competitors"] : [])].sort(),
+    );
+    for (const fp of retired) {
+      await open(page, `${SIGNED_OUT}${fp.legacyPath}`);
+      await expect(page, fp.legacyPath).toHaveURL(new RegExp(`${featurePagePath(fp)}$`));
+      await expect(page.getByTestId(`page-feature-${fp.slug}`)).toBeVisible();
+    }
   });
 
   test("the admin index asks a signed-out visitor to sign in", async ({ page }) => {
@@ -131,7 +136,10 @@ test.describe("platform admin (signed in)", () => {
     }
     await expect(page.getByTestId("row-admin-feature-callAssistant")).toHaveAttribute("data-status", "external");
     await expect(page.getByTestId("link-admin-feature-public-landing")).toHaveAttribute("href", "/landing");
-    await expect(page.getByTestId("row-admin-feature-siteScan")).toHaveAttribute("data-status", "ready");
+    // Every template page is written: no stub is left.
+    for (const fp of FEATURE_PAGES) {
+      await expect(page.getByTestId(`row-admin-feature-${fp.key}`)).toHaveAttribute("data-status", "ready");
+    }
     const nav = page.getByTestId("link-nav-admin-feature-pages");
     await expect(nav).toBeVisible();
     await expect(nav).toHaveAttribute("href", "/admin/feature-pages");

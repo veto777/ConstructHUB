@@ -129,9 +129,11 @@ test("Master Class: modules and bundle at $1,000+ are sold through a sales rep",
   // The inquiry form names what they asked about.
   await page.getByTestId("button-bundle-sales").click();
   await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText("Master Class — Complete Bundle");
+  // The old Master Class landing page is now its feature page, sold through a sales rep.
   await page.goto("/master-class-landing");
-  await expect(page.getByTestId("link-hero-enroll")).toHaveAttribute("href", "/pricing#services");
-  await expect(page.getByTestId("link-hero-enroll")).toContainText(SALES_REP_LABEL);
+  await expect(page).toHaveURL(/\/features\/master-class$/);
+  await expect(page.getByTestId("button-feature-sales-hero")).toContainText(SALES_REP_LABEL);
+  await expect(page.getByTestId("text-feature-price")).toHaveCount(0);
 });
 
 test("CRM gateway says the CRM is included in every plan", async ({ page }) => {
