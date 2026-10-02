@@ -91,6 +91,7 @@ export function isBackupDue(cfg: BackupConfig, now: Date = new Date()): boolean 
 // ── CSV (RFC 4180, by hand) ───────────────────────────────────────────────────
 
 import { toCsv, type CellValue } from "./csv";
+import { recordFailure } from "../ops/issues";
 export { csvCell, toCsv } from "./csv";
 export interface BackupSection {
   name: string;
@@ -320,6 +321,7 @@ export async function runDueBackups(now: Date = new Date()): Promise<void> {
     } catch (e: any) {
       // Never crash the app over a backup: log + stamp, the card surfaces it.
       console.error(`[crm-backup] org ${org.id} failed:`, e?.message || e);
+      void recordFailure("job", "CRM scheduled backup (one org)", e, { orgId: org.id });
       await stampBackup(org.id, {
         lastError: String(e?.message || e).slice(0, 500),
         lastErrorAt: now.toISOString(),
@@ -334,7 +336,10 @@ export function startBackupScheduler(): void {
   if (schedulerStarted) return;
   schedulerStarted = true;
   const timer = setInterval(() => {
-    runDueBackups().catch((e) => console.error("[crm-backup] tick failed:", e?.message || e));
+    runDueBackups().catch((e) => {
+      console.error("[crm-backup] tick failed:", e?.message || e);
+      void recordFailure("job", "CRM backup scheduler tick", e);
+    });
   }, BACKUP_SCHEDULER_TICK_MS);
   timer.unref();
 }

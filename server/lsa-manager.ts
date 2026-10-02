@@ -2,6 +2,7 @@ import { db } from "./db";
 import { lsaManagerConnection, lsaManagerAccounts, lsaManagerLeads, lsaConnections, users } from "@shared/schema";
 import { eq, desc, and, count } from "drizzle-orm";
 import { sendLsaChargedLeadAlert } from "./email";
+import { recordFailure } from "./ops/issues";
 
 export const GOOGLE_ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v17";
 const GOOGLE_ADS_BASE = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
@@ -689,6 +690,7 @@ export function startManagerLeadSync(intervalMs = 5 * 60 * 1000) {
       }
     } catch (e) {
       console.error("[lsa-manager] lead sync tick error:", e);
+      void recordFailure("job", "LSA manager lead sync tick", e);
     }
   };
 

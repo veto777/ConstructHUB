@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { pool } from '../db';
+import { recordFailure } from '../ops/issues';
 let warned = false;
 export function tokenKey(): Buffer {
   const value = process.env.GBP_TOKEN_KEY;
@@ -38,6 +39,7 @@ export async function ensureGbpTokenEncryption(db: Pick<typeof pool, 'query'> = 
       try { decryptToken(value); }
       catch (e: any) {
         console.error(`[security] unreadable GBP credential for user ${row.user_id} (${e?.message}); marking reconnect_required`);
+        void recordFailure('job', 'GBP credential decryption at boot', e, { userId: row.user_id, column }, 'warning');
         await db.query('UPDATE gbp_grants SET access_token=NULL,refresh_token=NULL,reconnect_required=true WHERE user_id=$1 AND google_subject=$2',[row.user_id,row.google_subject]);
       }
     }

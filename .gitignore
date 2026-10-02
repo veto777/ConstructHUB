@@ -46,3 +46,6 @@ voice/models/
 voice/__pycache__/
 voice/**/__pycache__/
 client/public/persona-samples/*.wav
+
+# Issue desk tower config (ISSUE_DESK_SECRET) — never commit
+ops/issue-desk/.env

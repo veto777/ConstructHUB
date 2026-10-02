@@ -36,6 +36,7 @@ import { crmNotificationChannel } from "@shared/schema";
 import { CALL_ASSISTANT_NAME } from "@shared/plans";
 import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { emailLayout, type EmailMessage } from "../account/billing-email-templates";
+import { recordFailure } from "../ops/issues";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
 
@@ -205,6 +206,7 @@ export async function sendWeeklySpamReport(orgId: string, week: SpamReportWeek, 
     } catch (e: any) {
       email = "failed";
       console.error(`[voice-spam] report email for org ${orgId} ${week.key} failed:`, e?.message || e);
+      void recordFailure("job", "Weekly spam report email", e, { orgId, week: week.key }, "warning");
     }
   } else {
     email = "opted_out";
@@ -234,6 +236,7 @@ export async function runWeeklySpamReports(now = new Date(), deps: SpamReportDep
     } catch (e: any) {
       skipped.error = (skipped.error ?? 0) + 1;
       console.error(`[voice-spam] weekly report for org ${r.org_id} failed:`, e?.message || e);
+      void recordFailure("job", "Weekly spam report (one org)", e, { orgId: r.org_id, week: week.key });
     }
   }
   return { week: week.key, sent, skipped };
@@ -276,6 +279,7 @@ export function startVoiceSpamReportWorker(): boolean {
       if (out.sent || Object.keys(out.skipped).length) console.log(`[voice-spam] week ${out.week}: ${out.sent} report(s) sent; skipped ${JSON.stringify(out.skipped)}`);
     } catch (e: any) {
       console.error("[voice-spam] weekly report run failed:", e?.message || e);
+      void recordFailure("job", "Weekly spam report run", e);
     } finally { running = false; }
   };
   setTimeout(run, FIRST_DELAY_MS).unref();

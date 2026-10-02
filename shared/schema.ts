@@ -2502,6 +2502,39 @@ export const dashboardDismissals = pgTable("dashboard_dismissals", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.scope, t.itemKey] })]);
 
+// ── Issue desk (server/ops/*, docs/ops/ISSUE-DESK.md) ───────────────────────
+// Created idempotently by server/ops/schema.ts OPS_ISSUES_DDL (boot, the
+// migration script, and recordIssue's first write). One row per failure
+// fingerprint; shared/ops-issues.ts holds the source/severity/status values.
+export const opsIssues = pgTable("ops_issues", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  /** sha256(source + key), 32 hex: the same failure again is the same row. */
+  fingerprint: text("fingerprint").notNull().unique(),
+  /** server | job | client | call_assistant | health */
+  source: text("source").notNull(),
+  /** info | warning | error | critical (a repeat keeps the worst) */
+  severity: text("severity").notNull().default("error"),
+  title: text("title").notNull(),
+  /** Scrubbed (server/ops/scrub.ts): no secrets, tokens, passwords or card data; emails/phones masked. */
+  detail: jsonb("detail").$type<Record<string, unknown>>().notNull().default({}),
+  count: integer("count").notNull().default(1),
+  firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+  /** new | inspecting | inspected | fix_ready | fixed | ignored */
+  status: text("status").notNull().default("new"),
+  /** Claude's report (plain English: what happened, cause, fix or recommendation). */
+  report: text("report"),
+  /** The branch with Claude's fix (issue/<id>), never pushed or deployed. */
+  branch: text("branch"),
+  inspectedAt: timestamp("inspected_at", { withTimezone: true }),
+  /** When the tower claimed it (a claim older than 3 h is taken again). */
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  /** The timeline: reported / claimed / inspected / fixed / … (last 50). */
+  history: jsonb("history").$type<{ at: string; event: string; by?: string }[]>().notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export type OpsIssueRecord = typeof opsIssues.$inferSelect;
+
 // ── Account: billing records, transactional-email log, public API keys ──────
 // Created idempotently by server/account/schema.ts (boot + the migration
 // script); the drizzle definitions let other modules read and write them.

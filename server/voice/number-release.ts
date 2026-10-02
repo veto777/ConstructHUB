@@ -68,6 +68,7 @@ import { mergeAddonRequest } from "../billing/order";
 // Type only: the carrier code (./numbers → ./proxy) loads lazily, so the Stripe
 // webhook that imports this module does not pull in the voice routes.
 import type { NumbersMock } from "./numbers";
+import { recordFailure } from "../ops/issues";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
 
@@ -160,7 +161,10 @@ async function notifyOwners(orgId: string, title: string, body: string): Promise
      SELECT $1::varchar, m.id, 'call.number_released', $2::text, $3::text, '/crm/call-assistant?tab=numbers'
        FROM crm_members m WHERE m.org_id = $1::varchar AND m.role = 'owner' AND m.status = 'active'`,
     [orgId, title.slice(0, 300), body.slice(0, 1000)],
-  ).catch((e: any) => console.error("[voice-numbers] notification insert failed:", e?.message || e));
+  ).catch((e: any) => {
+    console.error("[voice-numbers] notification insert failed:", e?.message || e);
+    void recordFailure("job", "Call number release bell notification", e, { orgId });
+  });
 }
 
 const dateText = (d: Date) => d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -341,6 +345,7 @@ export async function releaseDueCallNumbers(opts: ReleaseDeps & { orgIds?: strin
         await c.query("COMMIT");
         out.failed.push({ phone: row.phone_number, error: msg });
         console.error(`[voice-numbers] release of ${row.phone_number} (org ${row.org_id}) failed, will retry: ${msg}`);
+        void recordFailure("job", "Call number release", e, { orgId: row.org_id, numberId: row.id }, "warning");
       }
     } catch (e) {
       await c.query("ROLLBACK").catch(() => {});
@@ -376,11 +381,15 @@ export async function afterSubscriptionChange(userId: number | null | undefined,
       console.log(`[voice-numbers] user ${userId}: ${out.due} number(s) due for release, not released now: ${off}.`);
     } else if (out.due > 0) {
       void releaseDueCallNumbers({ ...deps, orgIds: out.orgIds })
-        .catch((e: any) => console.error(`[voice-numbers] background release for user ${userId} failed:`, e?.message || e));
+        .catch((e: any) => {
+          console.error(`[voice-numbers] background release for user ${userId} failed:`, e?.message || e);
+          void recordFailure("job", "Call number background release", e, { userId });
+        });
     }
     return out;
   } catch (e: any) {
     console.error(`[voice-numbers] release decision for user ${userId} failed (the sweep retries):`, e?.message || e);
+    void recordFailure("job", "Call number release decision", e, { userId }, "warning");
     return null;
   }
 }
@@ -402,6 +411,7 @@ export async function runCallNumberSweep(deps: ReleaseDeps & { userIds?: number[
       scheduled += s.scheduled; restored += s.restored;
     } catch (e: any) {
       console.error(`[voice-numbers] sweep: account ${r.owner_user_id} failed:`, e?.message || e);
+      void recordFailure("job", "Call number sweep (one account)", e, { userId: Number(r.owner_user_id) });
     }
   }
   let orgIds: string[] | undefined;
@@ -452,6 +462,7 @@ export function startVoiceNumberReleaseWorker(): boolean {
       }
     } catch (e: any) {
       console.error("[voice-numbers] sweep failed:", e?.message || e);
+      void recordFailure("job", "Call number sweep", e);
     } finally { running = false; }
   };
   setTimeout(run, SWEEP_FIRST_DELAY_MS).unref();

@@ -13,6 +13,7 @@ import { siteUrl } from '../sitescan/http';
 import { getEntitlements } from '../entitlements';
 import { reserveQuotaFor, refundReservation } from '../growth-quotas';
 import { accessFor, agencyPlanPaused, gbpSyncPaused, ownerHasPlan, filters, locationAccess, locationFilter, locationJoin, positiveId, requireWrite, clientAccess, workspaceEntitled, type AgencyAccess } from './access';
+import { recordFailure } from '../ops/issues';
 export const bulkInput = z.object({
   requestKey:z.string().uuid(), action:z.enum(['sync','unlink','link','guard','ai-replies','content','scan','assign']),
   selection:z.object({allMatching:z.boolean().default(false),ids:z.array(positiveId).max(50).default([]),filters:filters.default({})}).strict(),
@@ -135,6 +136,9 @@ export async function runAgencyJobs(perform=performJob,limit=10,onlyUser?:number
       }catch(e) {
         const quota=e instanceof GoogleError&&e.kind==='quota';
         const retry=quota||(e instanceof GoogleError&&e.kind==='transient'&&j.attempts<5);
+        // The issue desk: a job that failed for good on something other than the customer's own setup
+        // (a code error, Google API disabled on our project, a sync that stayed transient through every retry).
+        if(!retry&&!(e instanceof GoogleError&&['invalid','auth','permission'].includes(e.kind))) void recordFailure('job',`GBP ${j.action} job`,e,{jobId:j.id,action:j.action,attempts:j.attempts,locationId:j.location_id},e instanceof GoogleError?'warning':'error');
         const delay=e instanceof GoogleError&&e.kind==='quota'?3600:Math.min(3600,60*2**j.attempts);
         await c.query(`UPDATE agency_jobs SET status=$2,error=$3,attempts=attempts-CASE WHEN $5 THEN 1 ELSE 0 END,due_at=now()+$4*interval '1 second',finished_at=CASE WHEN $2='failed' THEN now() END WHERE id=$1`,[j.id,retry?'queued':'failed',e instanceof GoogleError?e.message:'Operation failed; review location configuration',delay,quota]);
       }
@@ -164,5 +168,5 @@ export async function scheduleSyncs(onlyUser?:number) {
 }
 export function startAgencyWorker() {
   if(process.env.GBP_SYNC_DISABLED==='true')return;
-  const timer=setInterval(()=>void scheduleSyncs().then(()=>runAgencyJobs()).catch(()=>console.error('Agency queue tick failed')),15000);timer.unref();return timer;
+  const timer=setInterval(()=>void scheduleSyncs().then(()=>runAgencyJobs()).catch((e)=>{console.error('Agency queue tick failed');void recordFailure('job','Agency queue tick',e);}),15000);timer.unref();return timer;
 }

@@ -42,6 +42,7 @@ import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDis
 import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed, ADMIN_REAUTH_BODY } from "./crm/admin";
 import { trialCodeDays, ACCESS_GRANT_MIN_DAYS, ACCESS_GRANT_MAX_DAYS } from "@shared/access-grants";
+import { recordFailure } from "./ops/issues";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -286,6 +287,12 @@ export async function registerRoutes(
   const { ensureAccessGrantsSchema, registerAccessGrantRoutes } = await import("./access-grants");
   await ensureAccessGrantsSchema();
   registerAccessGrantRoutes(app, getDevUser);
+  // The issue desk (docs/ops/ISSUE-DESK.md): captured failures, /admin/issues,
+  // the browser's error reports and the tower's hand-off to Claude.
+  const { ensureOpsIssuesSchema } = await import("./ops/schema");
+  await ensureOpsIssuesSchema();
+  const { registerOpsIssueRoutes } = await import("./ops/routes");
+  registerOpsIssueRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
   const { ensureAgencySchema } = await import("./agency/schema");
@@ -395,6 +402,9 @@ export async function registerRoutes(
     await ensureVoiceSchema();
     const { registerVoiceRoutes } = await import("./voice");
     registerVoiceRoutes(app, getDevUser);
+    // Production: an engine outage reaches the issue desk even when nobody opens the Call Assistant page.
+    const { startEngineHealthWatch } = await import("./voice/billing");
+    startEngineHealthWatch();
   } catch (e: any) {
     console.error("Failed to initialize the Call Assistant module:", e?.message || e);
   }
@@ -840,7 +850,7 @@ export async function registerRoutes(
     const tick = async () => {
       if (scheduleBusy) return;
       scheduleBusy = true;
-      try { await runDueScrapeSchedules(); } catch (err) { console.error("Scrape schedule runner failed:", err); }
+      try { await runDueScrapeSchedules(); } catch (err) { console.error("Scrape schedule runner failed:", err); void recordFailure("job", "Scrape schedule runner", err); }
       finally { scheduleBusy = false; }
     };
     setInterval(tick, 15 * 60 * 1000).unref();
@@ -5841,10 +5851,12 @@ function main() {
           console.log(`Sent reminder #${newCount} to ${request.clientEmail} for review ${request.id}`);
         } catch (err) {
           console.error(`Failed to send reminder for review ${request.id}:`, err);
+          void recordFailure("job", "Review reminder email", err, { reviewRequestId: request.id }, "warning");
         }
       }
     } catch (err) {
       console.error("Reminder scheduler error:", err);
+      void recordFailure("job", "Review reminder scheduler", err);
     }
   }
 
@@ -5886,10 +5898,12 @@ function main() {
           console.log(`Sent scheduled review request ${request.id} to ${request.clientEmail}`);
         } catch (err) {
           console.error(`Failed to send scheduled review ${request.id}:`, err);
+          void recordFailure("job", "Scheduled review request email", err, { reviewRequestId: request.id }, "warning");
         }
       }
     } catch (err) {
       console.error("Scheduled review processor error:", err);
+      void recordFailure("job", "Scheduled review processor", err);
     }
   }
 

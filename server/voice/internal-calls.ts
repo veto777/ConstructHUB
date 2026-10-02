@@ -31,6 +31,8 @@ import { recordSpamVerdict, recordBlockedCall, callerSpamStatus, spamConfidenceW
 import { meterCallUsage, billedMinutesFor } from "./usage";
 import { putRecording, recordingsConfigured } from "./recordings";
 import { recordActivity } from "../crm/activity";
+import { recordFailure } from "../ops/issues";
+import { recordCallReportIssues } from "../ops/call-assistant";
 
 /** A 15-minute 8 kHz mono WAV is ~14 MB; cap recordings well under the app's 50 MB JSON limit. */
 export const RECORDING_MAX_BYTES = 40 * 1024 * 1024;
@@ -255,6 +257,7 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
         if (outcome !== "booked") outcome = "lead_submitted";
       } catch (e: any) {
         console.error("[voice] lead delivery failed:", e?.message || e);
+        void recordFailure("call_assistant", "Call Assistant lead delivery", e, { callId: row.id, orgId: ctx.org.id });
         patch.leadError = String(e?.message || e).slice(0, 300);
       }
     }
@@ -268,13 +271,17 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
         if (r.escalationId) result.escalations.push(r.escalationId);
       } catch (e: any) {
         console.error("[voice] escalation failed:", e?.message || e);
+        void recordFailure("call_assistant", "Call Assistant escalation", e, { callId: row.id, orgId: ctx.org.id, kind });
       }
     }
     if (alertKinds.size && !delivered) outcome = "alerted";
     const quiet = (outcome === "hangup" || outcome === "voicemail") && durationSeconds < QUIET_CALL_SECONDS;
     if (!delivered && !alertKinds.size && !quiet) {
       if (profile.leadDelivery.notifyOnEveryCall) {
-        await notifyCallSummary(ctx, { ...row, outcome }).catch((e: any) => console.error("[voice] summary notify failed:", e?.message || e));
+        await notifyCallSummary(ctx, { ...row, outcome }).catch((e: any) => {
+          console.error("[voice] summary notify failed:", e?.message || e);
+          void recordFailure("call_assistant", "Call Assistant call-summary notification", e, { callId: row.id, orgId: ctx.org.id });
+        });
       }
       recordActivity({ orgId: ctx.org.id, actorLabel: actor, action: "call.answered", entityType: "voice_call", entityId: row.id, customerId: row.customerId ?? null, meta: { outcome, durationSeconds, summary: row.summary, recording: !!row.recordingKey } });
     }
@@ -288,6 +295,7 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
     patch.metered = billedMinutes;
   } catch (e: any) {
     console.error("[voice] usage metering failed:", e?.message || e);
+    void recordFailure("call_assistant", "Call Assistant usage metering", e, { callId: row.id, orgId: ctx.org.id, billedMinutes });
     patch.meterError = String(e?.message || e).slice(0, 300);
   }
 
@@ -295,6 +303,12 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
   patch.result = result;
   await db.update(voiceCalls).set({ outcome }).where(eq(voiceCalls.id, row.id));
   await mergeCallFlags(row.id, patch, { dropKeys: ["processingAt"] });
+  // The issue desk: one-way audio suspicion, engine errors, an `error` outcome (ops/call-assistant.ts).
+  recordCallReportIssues({ id: row.id, orgId: ctx.org.id }, {
+    durationSeconds, outcome, transcript: report.transcript, events: report.events as any,
+    startedAt: report.startedAt ?? row.startedAt?.toISOString() ?? null, answeredAt: report.answeredAt ?? row.answeredAt?.toISOString() ?? null,
+    endedAt: report.endedAt ?? row.endedAt?.toISOString() ?? null, engine: row.engine, model: row.model,
+  });
   return result;
 }
 
@@ -336,6 +350,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
       res.status(201).json({ callId: row.id, orgId: row.orgId });
     } catch (e: any) {
       console.error("[voice] call start failed:", e?.message || e);
+      void recordFailure("call_assistant", "Call Assistant call start", e);
       res.status(500).json({ code: "call_start_failed", message: "Could not record the call." });
     }
   });
@@ -362,6 +377,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
     } catch (e: any) {
       if (e instanceof CallInProgressError) return res.status(409).json({ code: e.code, message: e.message });
       console.error("[voice] call finish failed:", e?.message || e);
+      void recordFailure("call_assistant", "Call Assistant end-of-call processing", e, { callSid });
       res.status(500).json({ code: "call_finish_failed", message: "Could not finish the call." });
     }
   });
@@ -381,6 +397,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
       res.json(await handleCallEvent(call, parsed.data));
     } catch (e: any) {
       console.error("[voice] call event failed:", e?.message || e);
+      void recordFailure("call_assistant", "Call Assistant mid-call event", e, { type: parsed.data.type });
       res.status(500).json({ code: "call_event_failed", message: "Could not deliver the event." });
     }
   });
@@ -401,6 +418,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
         res.json({ recordingKey, seconds });
       } catch (e: any) {
         console.error("[voice] recording upload failed:", e?.message || e);
+        void recordFailure("call_assistant", "Call Assistant recording upload", e);
         res.status(502).json({ code: "recording_failed", message: "Could not store the recording." });
       }
     });
@@ -424,6 +442,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
       res.json({ ok: true, known: true });
     } catch (e: any) {
       console.error("[voice] status callback failed:", e?.message || e);
+      void recordFailure("call_assistant", "Call Assistant carrier status callback", e);
       res.status(500).json({ code: "status_failed" });
     }
   });
@@ -443,6 +462,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
       res.json({ orgId: org, ...(await callerSpamStatus(org, from)) });
     } catch (e: any) {
       console.error("[voice] blocklist failed:", e?.message || e);
+      void recordFailure("call_assistant", "Call Assistant blocklist check", e);
       res.status(500).json({ code: "blocklist_failed" });
     }
   });
