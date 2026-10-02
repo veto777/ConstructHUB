@@ -259,7 +259,7 @@ export function CustomizeDashboard({ open, onOpenChange, data, flagOff }: {
               <Switch id="customize-keep-groups" checked={draft.keepGroups} onCheckedChange={setKeepGroups} data-testid="switch-customize-keep-groups" />
             </div>
             <p id="customize-reorder-help" className="mt-2 text-xs text-muted-foreground">
-              Drag the grip, use the arrows, or focus the grip and press ↑ ↓ (Home / End for first / last). Hidden tools aren't loaded, and their alerts leave Needs you today.
+              Drag the grip, use the arrows, or focus the grip and press ↑ ↓ (Home / End for first / last). Hidden tools leave the grid; their alerts still show in Needs you today until you clear them.
             </p>
 
             <div className="mt-3">

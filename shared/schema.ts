@@ -2468,10 +2468,12 @@ export const dashboardPrefs = pgTable("dashboard_prefs", {
 export const dashboardDismissals = pgTable("dashboard_dismissals", {
   userId: integer("user_id").notNull(),
   itemKey: text("item_key").notNull(),
+  /** The CRM org a CRM item was cleared in; "" for every other item. */
+  scope: text("scope").notNull().default(""),
   itemValue: text("item_value").notNull(),
   snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, t => [primaryKey({ columns: [t.userId, t.itemKey] })]);
+}, t => [primaryKey({ columns: [t.userId, t.scope, t.itemKey] })]);
 
 // ── Account: billing records, transactional-email log, public API keys ──────
 // Created idempotently by server/account/schema.ts (boot + the migration

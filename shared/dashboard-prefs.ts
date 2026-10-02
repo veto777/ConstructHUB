@@ -11,7 +11,7 @@
  */
 import {
   DASHBOARD_GROUPS, DASHBOARD_TILES, DASHBOARD_TILE_KEYS,
-  type DashboardAttentionItem, type DashboardGroupKey, type DashboardTileKey,
+  type DashboardAttentionItem, type DashboardGroupKey, type DashboardTile, type DashboardTileKey,
 } from "./dashboard";
 import type { PlanKey } from "./plans";
 
@@ -39,7 +39,11 @@ export const DASHBOARD_CRM_CARD_TILES: ReadonlySet<DashboardTileKey> = new Set([
 export type DashboardLayout = {
   /** Every catalogue tile, in the user's order. */
   order: DashboardTileKey[];
-  /** Tiles the user turned off: never computed, never shown. */
+  /**
+   * Tiles the user turned off: not shown in the grid. Still computed, so their
+   * alerts stay in "Needs you today" until cleared. Never the CRM card's tiles
+   * (the "crm" section turns that card off).
+   */
   hidden: DashboardTileKey[];
   sections: Record<DashboardSectionKey, boolean>;
   /**
@@ -50,7 +54,7 @@ export type DashboardLayout = {
   keepGroups: boolean;
 };
 
-/** A tile the user hid: not computed, so only whether the plan includes it (for the Customize sheet). */
+/** A tile the user hid: only whether it opens for this account (for the Customize sheet), no numbers. */
 export type DashboardHiddenTile = {
   key: DashboardTileKey;
   entitled: boolean;
@@ -104,7 +108,8 @@ export function normalizeDashboardLayout(input: unknown): DashboardLayout {
   for (const k of DASHBOARD_SECTION_KEYS) sections[k] = typeof sectionsIn[k] === "boolean" ? (sectionsIn[k] as boolean) : true;
   const layout: DashboardLayout = {
     order,
-    hidden: tileKeys(raw.hidden),
+    // The CRM card's tiles are the "crm" section: the sheet never lists them, so they are never hidden one by one.
+    hidden: tileKeys(raw.hidden).filter((k) => !DASHBOARD_CRM_CARD_TILES.has(k)),
     sections,
     keepGroups: typeof raw.keepGroups === "boolean" ? raw.keepGroups : true,
   };
@@ -170,6 +175,24 @@ export function sortByDashboardLayout<T extends { key: DashboardTileKey }>(items
   return [...items].sort((a, b) => (pos.get(a.key) ?? 1e6) - (pos.get(b.key) ?? 1e6));
 }
 
+/**
+ * Every computed tile → what the grid shows (in the layout's order) and what
+ * the Customize sheet needs about the hidden ones. A hidden tile counts as
+ * locked exactly when it would show as locked: a teammate's delegated page
+ * (status "empty", not entitled) opens, so it is not locked.
+ */
+export function splitDashboardTiles(all: readonly DashboardTile[], layout: DashboardLayout): { tiles: DashboardTile[]; hiddenTiles: DashboardHiddenTile[] } {
+  const hidden = new Set(layout.hidden);
+  return {
+    tiles: sortByDashboardLayout(all.filter((t) => !hidden.has(t.key)), layout),
+    hiddenTiles: all.filter((t) => hidden.has(t.key)).map((t) => ({
+      key: t.key, entitled: t.status !== "locked",
+      ...(t.status === "locked" && t.requiredPlan ? { requiredPlan: t.requiredPlan } : {}),
+      ...(t.status === "coming_soon" ? { comingSoon: true } : {}),
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Cleared and snoozed "Needs you today" items
 
@@ -180,6 +203,8 @@ export function sortByDashboardLayout<T extends { key: DashboardTileKey }>(items
  */
 export type DashboardDismissal = {
   key: string;
+  /** The CRM org a CRM item was cleared in (dismissalScope); "" for every other item. */
+  scope: string;
   value: string;
   /** End of a snooze (ISO); null = "Done" (until the value changes). */
   until: string | null;
@@ -194,6 +219,25 @@ export const DASHBOARD_DISMISS_BATCH_MAX = 50;
 export const DASHBOARD_SNOOZE_MAX_DAYS = 31;
 export const DASHBOARD_DISMISS_KEY_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 export const DASHBOARD_DISMISS_VALUE_MAX = 200;
+export const DASHBOARD_DISMISS_SCOPE_RE = /^[A-Za-z0-9_-]{1,80}$/;
+
+/** Item sources that read the active CRM org: their numbers, and so their clears, are per org. */
+const SCOPED_SOURCES: ReadonlySet<string> = new Set(["crm", "crmLeads", "crmSchedule", "texting"]);
+
+/** Where an item comes from: its tile key, "usage", "notifications" or "billing". */
+export const attentionSource = (key: string): string => key.split(".")[0];
+
+/** The scope a clear of this item is stored under: the CRM org for a CRM item, "" otherwise. */
+export function dismissalScope(key: string, scope: string | null | undefined): string {
+  return SCOPED_SOURCES.has(attentionSource(key)) ? scope ?? "" : "";
+}
+
+/**
+ * Items that can be snoozed but not marked Done (nor swept by "Clear all"):
+ * "Payment past due" keeps its value for as long as the account stays past
+ * due, so a Done would hide it for good.
+ */
+export const dashboardItemSnoozeOnly = (key: string): boolean => key === "billing";
 
 /**
  * What an item's situation is, as one string: its value and, for a meter, its
@@ -212,43 +256,74 @@ export function dismissalHolds(item: DashboardAttentionItem, d: DashboardDismiss
   return true;
 }
 
+export type SplitAttentionOptions = {
+  /** The payload's CRM org (DashboardPayload.scope): a CRM item's clear from another org does not apply. */
+  scope?: string | null;
+  /** The sources that answered in full (DashboardPayload.answered): an item missing from one is gone. */
+  answered?: readonly string[];
+  /** When the payload was built (default: now). A payload built before a clear was saved never judges it. */
+  builtAt?: Date;
+};
+
 /**
  * Split the action list into what shows and what the user cleared. `stale`
- * names dismissals that no longer hold for an item on the list (its value
- * changed or its snooze ended): the server forgets them, so a value that later
- * returns to the old number counts as new.
+ * lists the dismissals that no longer hold: the item's value changed, its
+ * snooze ended, or it left the list while its source answered in full. The
+ * server forgets them (only those exact rows), so a value that later returns
+ * to the old number counts as new. A source that failed or timed out never
+ * makes a clear stale; neither does a payload older than the clear, nor one
+ * for another CRM org.
  */
 export function splitAttention(
   items: readonly DashboardAttentionItem[], dismissals: readonly DashboardDismissal[], now: Date,
-): { attention: DashboardAttentionItem[]; cleared: DashboardClearedItem[]; stale: string[] } {
-  const byKey = new Map(dismissals.map((d) => [d.key, d]));
+  opts: SplitAttentionOptions = {},
+): { attention: DashboardAttentionItem[]; cleared: DashboardClearedItem[]; stale: DashboardDismissal[] } {
+  const ended = (d: DashboardDismissal) => d.until !== null && !(Date.parse(d.until) > now.getTime());
+  const builtAt = (opts.builtAt ?? now).getTime();
+  const judges = (d: DashboardDismissal) => builtAt > Date.parse(d.at);
+  const answered = new Set(opts.answered ?? []);
+  // Only this scope's clears apply here.
+  const byKey = new Map(dismissals.filter((d) => d.scope === dismissalScope(d.key, opts.scope)).map((d) => [d.key, d]));
   const attention: DashboardAttentionItem[] = [];
   const cleared: DashboardClearedItem[] = [];
-  const stale: string[] = [];
+  const stale = new Set<DashboardDismissal>();
+  const listed = new Set<string>();
   for (const item of items) {
+    listed.add(item.key);
     const d = byKey.get(item.key);
     if (dismissalHolds(item, d, now)) cleared.push({ ...item, signature: attentionSignature(item), until: d!.until });
     else {
-      if (d) stale.push(d.key);
+      if (d && (ended(d) || judges(d))) stale.add(d);
       attention.push(item);
     }
   }
-  // Snoozes that ended for an item that is gone too.
-  for (const d of dismissals) {
-    if (d.until !== null && !(Date.parse(d.until) > now.getTime()) && !stale.includes(d.key)) stale.push(d.key);
-  }
-  return { attention, cleared, stale };
+  // Gone from a source that answered in full: the situation is over.
+  byKey.forEach((d) => {
+    if (!listed.has(d.key) && answered.has(attentionSource(d.key)) && judges(d)) stale.add(d);
+  });
+  // Snoozes that ended, in any scope.
+  for (const d of dismissals) if (ended(d)) stale.add(d);
+  return { attention, cleared, stale: Array.from(stale) };
 }
 
 export type DashboardDismissInput = { key: string; value: string; until?: string | null };
+export type DashboardDismissRow = { key: string; scope: string; value: string; until: string | null };
 
-/** PUT /api/dashboard/dismissals body check. */
-export function parseDismissInput(input: unknown, now: Date): { ok: true; items: { key: string; value: string; until: string | null }[] } | { ok: false; message: string } {
+/** A request's `scope` (the payload's CRM org): absent or null is "", a bad one is undefined. */
+export function parseDismissScope(v: unknown): string | undefined {
+  if (v === undefined || v === null || v === "") return "";
+  return typeof v === "string" && DASHBOARD_DISMISS_SCOPE_RE.test(v) ? v : undefined;
+}
+
+/** PUT /api/dashboard/dismissals body check ({ items, scope? }: scope is the payload's CRM org). */
+export function parseDismissInput(input: unknown, now: Date): { ok: true; items: DashboardDismissRow[] } | { ok: false; message: string } {
   const bad = (message: string) => ({ ok: false as const, message });
   const list = (input as { items?: unknown } | null)?.items;
   if (!Array.isArray(list) || list.length === 0) return bad("Send the items to clear.");
   if (list.length > DASHBOARD_DISMISS_BATCH_MAX) return bad(`Clear at most ${DASHBOARD_DISMISS_BATCH_MAX} items at once.`);
-  const out = new Map<string, { key: string; value: string; until: string | null }>();
+  const scope = parseDismissScope((input as { scope?: unknown }).scope);
+  if (scope === undefined) return bad("Unknown scope.");
+  const out = new Map<string, DashboardDismissRow>();
   const maxUntil = now.getTime() + DASHBOARD_SNOOZE_MAX_DAYS * 86_400_000;
   for (const raw of list) {
     if (!raw || typeof raw !== "object") return bad("Each item needs a key and a value.");
@@ -263,7 +338,8 @@ export function parseDismissInput(input: unknown, now: Date): { ok: true; items:
       if (t > maxUntil) return bad(`Snooze for at most ${DASHBOARD_SNOOZE_MAX_DAYS} days.`);
       end = new Date(t).toISOString();
     }
-    out.set(key, { key, value, until: end });
+    if (end === null && dashboardItemSnoozeOnly(key)) return bad("A past-due payment can be snoozed, not cleared.");
+    out.set(key, { key, scope: dismissalScope(key, scope), value, until: end });
   }
   return { ok: true, items: Array.from(out.values()) };
 }

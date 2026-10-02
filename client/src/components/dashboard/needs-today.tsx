@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlarmClock, ArrowRight, Check, CircleCheck, RotateCcw, TriangleAlert, X } from "lucide-react";
 import type { DashboardAttentionItem } from "@shared/dashboard";
-import { snoozeUntil, type DashboardClearedItem } from "@shared/dashboard-prefs";
+import { dashboardItemSnoozeOnly, snoozeUntil, type DashboardClearedItem } from "@shared/dashboard-prefs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +37,9 @@ const ICON_BTN = "h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground
  * computes the list: shared/dashboard.ts dashboardAttention).
  *
  * Each item can be marked Done (hidden until its number changes) or snoozed
- * (until tomorrow / for a week); "Clear all" does the lot. Cleared items are
+ * (until tomorrow / for a week); "Clear all" does the lot. "Payment past due"
+ * can only be snoozed: its number never changes while the account is past
+ * due, so a Done would hide it for good. Cleared items are
  * kept on the account (server-side) and listed under "Show cleared (N)",
  * where each can be restored.
  */
@@ -98,6 +100,9 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
     const n = list ? list.length : cleared.length;
     setAnnounce(`Restored ${n === 1 ? "1 item" : `${n} items`} to Needs you today.`);
   };
+
+  /** What "Clear all" marks Done: everything but the snooze-only items. */
+  const doneable = items.filter((i) => !dashboardItemSnoozeOnly(i.key));
 
   const live = <span className="sr-only" role="status" aria-live="polite" data-testid="text-needs-live">{announce}</span>;
 
@@ -174,15 +179,17 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-x-3">
           {clearedToggle}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="min-h-10 sm:min-h-8"
-            onClick={() => clear(items, null)}
-            data-testid="button-needs-clear-all"
-          >
-            <Check className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Clear all
-          </Button>
+          {doneable.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-10 sm:min-h-8"
+              onClick={() => clear(doneable, null)}
+              data-testid="button-needs-clear-all"
+            >
+              <Check className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Clear all
+            </Button>
+          )}
         </div>
       </div>
       <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -214,17 +221,19 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
                 <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </DashLink>
               <span className="flex shrink-0 items-center gap-0.5 border-l p-1 sm:flex-col sm:justify-center">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={ICON_BTN}
-                  title="Done"
-                  aria-label={`Done: ${name}`}
-                  onClick={() => clear([item], null)}
-                  data-testid={`button-needs-done-${item.key}`}
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </Button>
+                {!dashboardItemSnoozeOnly(item.key) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={ICON_BTN}
+                    title="Done"
+                    aria-label={`Done: ${name}`}
+                    onClick={() => clear([item], null)}
+                    data-testid={`button-needs-done-${item.key}`}
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button

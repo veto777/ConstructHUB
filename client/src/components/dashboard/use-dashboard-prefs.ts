@@ -42,12 +42,20 @@ function useDashboardWrite<V>(opts: {
 
 export type DismissVars = { items: DashboardAttentionItem[]; until: Date | null };
 
+/** The CRM org the shown answer is for: CRM items are cleared and restored in it only. */
+function useScope() {
+  const qc = useQueryClient();
+  return () => qc.getQueryData<DashboardPayload>(DASHBOARD_QUERY_KEY)?.scope ?? "";
+}
+
 /** Clear ("Done", until: null) or snooze items. */
 export function useDismissItems() {
+  const scope = useScope();
   return useDashboardWrite<DismissVars>({
     failTitle: "Couldn't clear that",
     request: ({ items, until }) => apiRequest("PUT", "/api/dashboard/dismissals", {
       items: items.map((i) => ({ key: i.key, value: attentionSignature(i), until: until ? until.toISOString() : null })),
+      scope: scope(),
     }),
     optimistic: (data, { items, until }) => {
       const keys = new Set(items.map((i) => i.key));
@@ -63,11 +71,13 @@ export function useDismissItems() {
 
 /** Restore cleared items: these, or every one (`items` null). */
 export function useRestoreItems() {
+  const scope = useScope();
   return useDashboardWrite<{ items: DashboardClearedItem[] | null }>({
     failTitle: "Couldn't restore that",
     request: async ({ items }) => {
-      if (!items) return apiRequest("DELETE", "/api/dashboard/dismissals");
-      for (const i of items) await apiRequest("DELETE", `/api/dashboard/dismissals/${encodeURIComponent(i.key)}`);
+      const q = `?scope=${encodeURIComponent(scope())}`;
+      if (!items) return apiRequest("DELETE", `/api/dashboard/dismissals${q}`);
+      for (const i of items) await apiRequest("DELETE", `/api/dashboard/dismissals/${encodeURIComponent(i.key)}${q}`);
     },
     optimistic: (data, { items }) => {
       const back = items ?? data.cleared;
@@ -84,7 +94,11 @@ export function useRestoreItems() {
   });
 }
 
-/** Save the layout (the default is saved as a reset). Tiles reorder and hide at once; newly shown ones load with the refetch. */
+/**
+ * Save the layout (the default is saved as a reset). Tiles reorder and hide at
+ * once; newly shown ones load with the refetch. A hidden tile's alerts stay in
+ * "Needs you today".
+ */
 export function useSaveLayout() {
   return useDashboardWrite<DashboardLayout>({
     failTitle: "Couldn't save your dashboard",
@@ -97,7 +111,6 @@ export function useSaveLayout() {
         ...data,
         layout,
         tiles: sortByDashboardLayout(data.tiles.filter((t) => !hidden.has(t.key)), layout),
-        attention: data.attention.filter((i) => !(hidden as Set<string>).has(i.key.split(".")[0])),
       };
     },
   });

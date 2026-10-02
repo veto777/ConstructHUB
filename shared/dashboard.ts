@@ -275,12 +275,13 @@ export type DashboardPayload = {
   /**
    * Every tile the user shows, in their layout's order (DASHBOARD_TILES order
    * by default). Flagged-off tiles included; the client drops them. Tiles the
-   * user hid are not computed: they are in `hiddenTiles`.
+   * user hid leave this list (they are in `hiddenTiles`), but are still
+   * computed for "Needs you today".
    */
   tiles: DashboardTile[];
   /**
-   * "Needs you today" (dashboardAttention over `tiles` + `account`), minus the
-   * items the user cleared or snoozed. Computed by the server.
+   * "Needs you today" (dashboardAttention over every tile, shown or hidden,
+   * + `account`), minus the items the user cleared or snoozed. Computed by the server.
    */
   attention: DashboardAttentionItem[];
   /** Cleared or snoozed items that still hold (same value, snooze not over): "Show cleared (N)". */
@@ -293,6 +294,19 @@ export type DashboardPayload = {
   checklist: DashboardChecklistItem[];
   /** Newest first, at most 12. */
   recent: DashboardRecentItem[];
+  /**
+   * Optional (added with clear/snooze). The CRM org the CRM items (crm.*,
+   * crmLeads.*, crmSchedule.*, texting.*) describe: clearing one of them holds
+   * in this org only. Absent when no CRM org was read.
+   */
+  scope?: string;
+  /**
+   * Optional (added with clear/snooze). The item sources that answered in full
+   * on this build (tile keys with status ok/empty, "usage", "notifications",
+   * "billing"): an item missing from one of these is really gone, so its old
+   * clear is forgotten. Absent on the sample payload.
+   */
+  answered?: string[];
 };
 
 /** Per-tile time budget on the server. */

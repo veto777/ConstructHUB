@@ -8,7 +8,8 @@
  *     failing source is one "error" tile and never the page.
  *
  * Locked and coming-soon tiles are decided by tileAccess before any query
- * runs: a locked tile reads no feature data.
+ * runs: a locked tile reads no feature data. Tiles the user hid are computed
+ * too (their alerts stay in "Needs you today"), then left out of `tiles`.
  */
 import { PLANS } from "@shared/plans";
 import {
@@ -25,7 +26,7 @@ import { buildChecklist } from "./checklist";
 import { buildRecent } from "./recent";
 import { CTA_START, COMING_SOON_MESSAGE, failedMessage, lockedMessage, timeoutMessage } from "./copy";
 import { tileSource, type TileOutcome, type TileSources } from "./tiles";
-import { sortByDashboardLayout, type DashboardHiddenTile, type DashboardLayout } from "@shared/dashboard-prefs";
+import { splitDashboardTiles, type DashboardLayout } from "@shared/dashboard-prefs";
 import { readDashboardLayout } from "./prefs";
 
 export class DashboardTimeout extends Error {
@@ -107,18 +108,8 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
   const ctx = makeContext(userId, ent, crm, now);
   const access = { accessPlan: ent.accessPlan, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, hasCrmOrg: crmFailed || !!crm };
 
-  // Tiles the user hid are never computed (no queries): only whether the plan includes them.
-  const hidden = new Set(layout.hidden);
-  const shown = sortByDashboardLayout(DASHBOARD_TILES.filter((d) => !hidden.has(d.key)), layout);
-  const hiddenTiles: DashboardHiddenTile[] = DASHBOARD_TILES.filter((d) => hidden.has(d.key)).map((def) => {
-    const a = tileAccess(def, access);
-    return {
-      key: def.key, entitled: a.entitled,
-      ...(a.requiredPlan && !a.entitled ? { requiredPlan: a.requiredPlan } : {}),
-      ...(a.comingSoon ? { comingSoon: true } : {}),
-    };
-  });
-  const tilesP = Promise.all(shown.map((def) => computeTile(def, ctx, access, {
+  // Every tile, hidden ones too: a tile the user hid leaves the grid, not "Needs you today".
+  const tilesP = Promise.all(DASHBOARD_TILES.map((def) => computeTile(def, ctx, access, {
     budget, crmFailed, sources: opts.sources, workspace: opts.workspace ?? null, onError: (e) => fail(`tile ${def.key}`)(e),
   })));
 
@@ -149,7 +140,15 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
     unreadNotifications: unread.status === "fulfilled" ? unread.value : 0,
   };
 
-  const tiles = await tilesP;
+  const all = await tilesP;
+  const { tiles, hiddenTiles } = splitDashboardTiles(all, layout);
+  // Sources that answered in full: an item missing from one of these is really gone (its old clear is forgotten).
+  const answered = [
+    ...all.filter((t) => t.status === "ok" || t.status === "empty").map((t) => t.key),
+    ...(usage.status === "fulfilled" ? ["usage"] : []),
+    ...(unread.status === "fulfilled" ? ["notifications"] : []),
+    ...(header.status === "fulfilled" ? ["billing"] : []),
+  ];
   return {
     payload: {
       generatedAt: now.toISOString(),
@@ -157,13 +156,15 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
       fixture: false,
       account,
       tiles,
-      // Every item; the route takes out what the user cleared (fresh on every answer, cached or not).
-      attention: dashboardAttention(tiles, account),
+      // Every item, from every tile shown or hidden; the route takes out what the user cleared (fresh on every answer, cached or not).
+      attention: dashboardAttention(all, account),
       cleared: [],
       layout,
       hiddenTiles,
       checklist: checklist.status === "fulfilled" ? checklist.value : [],
       recent: recent.status === "fulfilled" ? recent.value : [],
+      ...(crm ? { scope: crm.org.id } : {}),
+      answered,
     },
     // A default layout standing in for an unreadable saved one is never kept either.
     cacheable: header.status === "fulfilled" && !layoutFailed,

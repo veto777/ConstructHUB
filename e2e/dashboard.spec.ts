@@ -557,6 +557,8 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
 
     const check = async () => {
       await expect(tile(page, "reviews")).toHaveCount(0);
+      // A hidden tool leaves the grid, not Needs you today.
+      await expect(needs(page).getByTestId("needs-reviews.unanswered")).toBeVisible();
       await expect(page.getByTestId("section-dashboard-grow").locator('[data-testid^="tile-"][data-status]').first()).toHaveAttribute("data-testid", "tile-siteScan");
       const win = (await page.getByTestId("section-dashboard-win").boundingBox())!;
       const grow = (await page.getByTestId("section-dashboard-grow").boundingBox())!;
@@ -603,6 +605,41 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
     const body = (await res.json()) as DashboardPayload;
     expect(body.layout.hidden).toEqual([]);
     expect(body.layout.keepGroups).toBe(true);
+  });
+
+  test("'Payment past due' can be snoozed but not marked Done, and Clear all leaves it", async ({ page }) => {
+    // No sample scenario is past due: add the billing item to the full sample's answer.
+    await page.route(/\/api\/dashboard(\?.*)?$/, async (route) => {
+      const url = new URL(route.request().url());
+      url.searchParams.set("fixture", "full");
+      const res = await route.fetch({ url: url.toString() });
+      const body = (await res.json()) as DashboardPayload;
+      if (!body.cleared.some((c) => c.key === "billing")) {
+        body.attention = [{ key: "billing", source: "Billing", label: "Payment past due", value: body.account.planName, format: "text", tone: "bad", href: "/settings?tab=billing", surface: "app" }, ...body.attention];
+      }
+      body.account.status = "past_due";
+      await route.fulfill({ response: res, json: body });
+    });
+    await openDashboard(page);
+    const card = needs(page);
+    const billing = card.getByTestId("needs-billing");
+    await expect(billing).toBeVisible();
+    await expect(card.getByTestId("button-needs-done-billing")).toHaveCount(0);
+    await expect(card.getByTestId("button-needs-snooze-billing")).toBeVisible();
+    await viewShot(page, "controls-past-due-1440");
+    await card.getByTestId("button-needs-clear-all").click();
+    await expect(card).toHaveAttribute("data-count", "1");
+    await expect(billing).toBeVisible();
+    await expect(card.getByTestId("button-needs-clear-all")).toHaveCount(0);
+    // The server refuses a Done for it too.
+    const done = await page.request.put("/api/dashboard/dismissals", {
+      headers: { origin: E2E_BASE_URL }, data: { items: [{ key: "billing", value: "Growth" }] },
+    });
+    expect(done.status()).toBe(400);
+    await card.getByTestId("button-needs-snooze-billing").click();
+    await expect(page.getByTestId("menu-needs-snooze-tomorrow-billing")).toBeVisible();
+    await expect(page.getByTestId("menu-needs-snooze-week-billing")).toBeVisible();
+    await page.keyboard.press("Escape");
   });
 
   test("Customize: drag a tool by its grip", async ({ page }) => {

@@ -210,12 +210,20 @@ describe("GET /api/dashboard (child server from this checkout)", () => {
     expect(target).toBeTruthy();
     const others = first.body.attention.length - 1;
 
-    // A value that is not the current one hides nothing (and is forgotten).
+    // A value that is not the current one hides nothing. The cached answer is older than the clear, so it
+    // never judges it; a fresh answer forgets it.
+    const count = async () => (await pool.query("SELECT count(*)::int n FROM dashboard_dismissals WHERE user_id=$1", [s!.agency])).rows[0].n;
     expect((await send("PUT", "/api/dashboard/dismissals", cookie, { items: [{ key: "notifications", value: "999" }] })).status).toBe(200);
     const wrong = await get("/api/dashboard", cookie);
+    expect(wrong.body.cached).toBe(true);
     expect(wrong.body.attention.some((i) => i.key === "notifications")).toBe(true);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await count()).toBe(1);
+    await send("DELETE", "/api/dashboard/layout", cookie); // forgets the cached answer: the next load is rebuilt
+    const rebuilt = await get("/api/dashboard", cookie);
+    expect(rebuilt.body.cached).toBe(false);
     await new Promise((r) => setTimeout(r, 200)); // the stale row is dropped in the background
-    expect((await pool.query("SELECT count(*)::int n FROM dashboard_dismissals WHERE user_id=$1", [s!.agency])).rows[0].n).toBe(0);
+    expect(await count()).toBe(0);
 
     const done = await send("PUT", "/api/dashboard/dismissals", cookie, { items: [{ key: "notifications", value: attentionSignature(target) }] });
     expect(done.body).toEqual({ ok: true, cleared: 1 });
@@ -246,13 +254,42 @@ describe("GET /api/dashboard (child server from this checkout)", () => {
     expect((await send("DELETE", "/api/dashboard/dismissals/notifications", cookie)).body).toEqual({ ok: true, restored: 1 });
     expect((await get("/api/dashboard", cookie)).body.attention.some((i) => i.key === "notifications")).toBe(true);
 
-    const all = (await get("/api/dashboard", cookie)).body.attention;
-    await send("PUT", "/api/dashboard/dismissals", cookie, { items: all.map((i) => ({ key: i.key, value: attentionSignature(i) })) });
+    const { attention: all, scope } = (await get("/api/dashboard", cookie)).body;
+    await send("PUT", "/api/dashboard/dismissals", cookie, { items: all.map((i) => ({ key: i.key, value: attentionSignature(i) })), scope });
     const cleared = await get("/api/dashboard", cookie);
     expect(cleared.body.attention).toEqual([]);
     expect(cleared.body.cleared).toHaveLength(all.length);
-    expect((await send("DELETE", "/api/dashboard/dismissals", cookie)).body).toEqual({ ok: true, restored: all.length });
+    expect((await send("DELETE", `/api/dashboard/dismissals?scope=${scope}`, cookie)).body).toEqual({ ok: true, restored: all.length });
     expect((await get("/api/dashboard", cookie)).body.attention).toHaveLength(all.length);
+  });
+
+  it("a CRM item cleared in one org stays cleared there after viewing another org", async () => {
+    const own = await session(s!.agency);
+    const pinned = await session(s!.agency, { activeOrgId: s!.otherOrg });
+    await send("DELETE", "/api/dashboard/layout", own); // a rebuilt answer for each org
+    const inOwn = (await get("/api/dashboard", own)).body;
+    const inOther = (await get("/api/dashboard", pinned)).body;
+    expect(inOwn.scope).toBe(s!.agencyOrg);
+    expect(inOther.scope).toBe(s!.otherOrg);
+    const crmItem = inOwn.attention.find((i) => /^(crm|crmLeads|crmSchedule|texting)\./.test(i.key));
+    expect(crmItem, "the seeded agency org raises a CRM item").toBeTruthy();
+    await send("PUT", "/api/dashboard/dismissals", own, { items: [{ key: crmItem!.key, value: attentionSignature(crmItem!) }], scope: inOwn.scope });
+    // Viewing the other org (another number, or none) neither shows it as cleared nor forgets it.
+    const other = (await get("/api/dashboard", pinned)).body;
+    expect(other.cleared.some((i) => i.key === crmItem!.key)).toBe(false);
+    await new Promise((r) => setTimeout(r, 200));
+    const back = (await get("/api/dashboard", own)).body;
+    expect(back.cleared.map((i) => i.key)).toContain(crmItem!.key);
+    expect(back.attention.some((i) => i.key === crmItem!.key)).toBe(false);
+    // Restore all in the other org leaves it; a bad scope is refused.
+    expect((await send("DELETE", `/api/dashboard/dismissals?scope=${s!.otherOrg}`, pinned)).body).toEqual({ ok: true, restored: 0 });
+    expect((await send("DELETE", "/api/dashboard/dismissals?scope=bad%20scope", own)).status).toBe(400);
+    expect((await send("DELETE", `/api/dashboard/dismissals/${encodeURIComponent(crmItem!.key)}?scope=${s!.agencyOrg}`, own)).body).toEqual({ ok: true, restored: 1 });
+  });
+
+  it("'Payment past due' can only be snoozed", async () => {
+    const cookie = await session(s!.agency);
+    expect((await send("PUT", "/api/dashboard/dismissals", cookie, { items: [{ key: "billing", value: "Agency" }] })).status).toBe(400);
   });
 
   it("keeps the sample payload for client-shape tests in development only", async () => {

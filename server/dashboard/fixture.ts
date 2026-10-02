@@ -16,7 +16,7 @@ import {
   type DashboardAccount, type DashboardChecklistItem, type DashboardMetric, type DashboardPayload, type DashboardRecentItem,
   type DashboardTile, type DashboardTileKey, type DashboardUsage,
 } from "@shared/dashboard";
-import { defaultDashboardLayout, sortByDashboardLayout, type DashboardLayout } from "@shared/dashboard-prefs";
+import { defaultDashboardLayout, splitDashboardTiles, type DashboardLayout } from "@shared/dashboard-prefs";
 import { cheapestPlanAllowing, tileAccess } from "./access";
 import { CTA_START, COMING_SOON_MESSAGE, lockedMessage } from "./copy";
 
@@ -192,22 +192,15 @@ export function buildDashboardFixture(
 }
 
 /**
- * The sample payload under a user's saved layout (the real build never
- * computes hidden tiles; the sample just drops them), so the Customize sheet
- * can be exercised against the sample scenarios too.
+ * The sample payload under a user's saved layout, so the Customize sheet can
+ * be exercised against the sample scenarios too.
  */
 export function applyLayoutToFixture(payload: DashboardPayload, layout: DashboardLayout): DashboardPayload {
-  const hidden = new Set(layout.hidden);
-  const tiles = sortByDashboardLayout(payload.tiles.filter((t) => !hidden.has(t.key)), layout);
+  // As the real build does: hidden tiles leave the grid, their alerts stay.
   return {
     ...payload,
-    tiles,
-    attention: dashboardAttention(tiles, payload.account),
+    ...splitDashboardTiles(payload.tiles, layout),
+    attention: dashboardAttention(payload.tiles, payload.account),
     layout,
-    hiddenTiles: payload.tiles.filter((t) => hidden.has(t.key)).map((t) => ({
-      key: t.key, entitled: t.entitled,
-      ...(t.requiredPlan && !t.entitled ? { requiredPlan: t.requiredPlan } : {}),
-      ...(t.status === "coming_soon" ? { comingSoon: true } : {}),
-    })),
   };
 }
