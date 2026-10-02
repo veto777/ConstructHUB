@@ -11,6 +11,7 @@ import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { callAssistantIntroShort, callAssistantTiers, formatUsd } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
 import { CallAssistantPausedBanner } from "./paused-banner";
+import { CallResults, type ResultsPick } from "./results";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
@@ -23,7 +24,7 @@ type CallRow = { id: string | number; startedAt?: string; from?: string; fromNum
  * and GET /api/crm/voice/calls?limit=5 (calls+crm lane; an error here just
  * hides the list). OWNER: studio-frontend lane.
  */
-export function OverviewPanel({ status, loading }: { status: VoiceStatus | null; loading: boolean }) {
+export function OverviewPanel({ status, loading, onPickResult }: { status: VoiceStatus | null; loading: boolean; onPickResult?: (pick: ResultsPick) => void }) {
   const calls = useQuery<{ calls: CallRow[] } | CallRow[]>({ queryKey: ["/api/crm/voice/calls?limit=5"], enabled: !!status?.enabled || !!status?.paused, retry: false });
   const recent: CallRow[] = Array.isArray(calls.data) ? calls.data : calls.data?.calls ?? [];
 
@@ -80,6 +81,11 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
         <MetricCard icon={ShieldBan} label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
           context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/crm/call-assistant?tab=calls&view=spam" />
       </div>
+
+      <CallResults onPick={(p) => {
+        if (onPickResult) onPickResult(p);
+        else window.location.assign(p === "spam" ? "/crm/call-assistant?tab=calls&view=spam" : `/crm/call-assistant?tab=calls&outcome=${p}`);
+      }} />
 
       <Card data-testid="card-overview-tier">
         <CardContent className="p-5 space-y-3">

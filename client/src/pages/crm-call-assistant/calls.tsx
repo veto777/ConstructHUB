@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { CallDetailSheet, EscalationRow } from "./calls-detail";
+import { CallResults } from "./results";
 import {
   OUTCOME_LABELS, outcomeLabel, outcomeTone, fmtPhone, fmtDuration, fmtWhen,
   type VoiceCallList, type VoiceCallListRow, type VoiceEscalation, type VoiceSpamEntry,
@@ -55,6 +56,11 @@ export function CallsPanel({ canManage }: { canManage: boolean }) {
     return (VIEWS as readonly string[]).includes(v ?? "") ? (v as View) : "log";
   });
   const [openCall, setOpenCall] = useState<string | null>(() => readParam("call"));
+  // The log's outcome filter lives here so a Results tile can set it (?outcome= deep-links it from the Overview).
+  const [outcome, setOutcome] = useState<string>(() => {
+    const o = readParam("outcome");
+    return o && o in OUTCOME_LABELS && o !== "spam" && o !== "blocked" ? o : "all";
+  });
   const openEscalations = useQuery<{ escalations: VoiceEscalation[] }>({ queryKey: ["/api/crm/voice/escalations?open=1"] });
   const openCount = openEscalations.data?.escalations.length ?? 0;
   const spam = useQuery<SpamLedger>({ queryKey: ["/api/crm/voice/spam"] });
@@ -71,6 +77,12 @@ export function CallsPanel({ canManage }: { canManage: boolean }) {
 
   return (
     <div data-testid="panel-call-assistant-calls" className="space-y-4 pt-4">
+      <CallResults onPick={(p) => {
+        if (p === "spam") { pick("spam"); return; }
+        pick("log");
+        setOutcome(p);
+        writeParams({ outcome: p });
+      }} />
       <div role="tablist" aria-label="Calls views" className="inline-flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
         <ViewButton active={view === "log"} onClick={() => pick("log")} testId="button-calls-view-log" icon={PhoneIncoming}>Calls</ViewButton>
         <ViewButton active={view === "spam"} onClick={() => pick("spam")} testId="button-calls-view-spam" icon={ShieldBan}>
@@ -87,7 +99,7 @@ export function CallsPanel({ canManage }: { canManage: boolean }) {
         </ViewButton>
       </div>
 
-      {view === "log" && <CallLog onOpen={show} />}
+      {view === "log" && <CallLog onOpen={show} outcome={outcome} setOutcome={(o) => { setOutcome(o); writeParams({ outcome: o === "all" ? null : o }); }} />}
       {view === "spam" && <SpamView canManage={canManage} onOpen={show} />}
       {view === "escalations" && <EscalationsView onOpen={show} />}
 
@@ -133,9 +145,8 @@ function callsUrl(params: Record<string, string | number | undefined>): string {
   return `/api/crm/voice/calls?${qs.toString()}`;
 }
 
-function CallLog({ onOpen }: { onOpen: (id: string) => void }) {
+function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) => void; outcome: string; setOutcome: (o: string) => void }) {
   const [search, setSearch] = useState("");
-  const [outcome, setOutcome] = useState<string>("all");
   const [page, setPage] = useState(1);
   const q = useDebounced(search.trim());
   useEffect(() => setPage(1), [q, outcome]);

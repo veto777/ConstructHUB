@@ -61,6 +61,52 @@ function sendUnlogged(res: Response, body: unknown) {
   res.type("application/json").send(JSON.stringify(body));
 }
 
+/** An IANA zone name we can hand to Postgres (anything else → the CRM's default, America/New_York). */
+export function summaryTimezone(raw: unknown): string {
+  const tz = typeof raw === "string" ? raw.trim() : "";
+  if (!tz || !/^[A-Za-z]+(?:\/[A-Za-z0-9_+-]+){0,2}$/.test(tz)) return "America/New_York";
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return tz; } catch { return "America/New_York"; }
+}
+
+export type CallResultsRange = "7d" | "30d" | "month" | "all";
+
+/** The Results panel's numbers for one org, counted from voice_calls (see the /calls/summary route). */
+export async function callResultsSummary(orgId: string, range: CallResultsRange, timezone: unknown) {
+  const tz = summaryTimezone(timezone);
+  const since =
+    range === "7d" ? sql`now() AT TIME ZONE 'UTC' - interval '7 days'`
+    : range === "30d" ? sql`now() AT TIME ZONE 'UTC' - interval '30 days'`
+    : range === "month" ? sql`(date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) AT TIME ZONE 'UTC'`
+    : null;
+  const where = since ? sql`c.org_id = ${orgId} AND c.started_at >= ${since}` : sql`c.org_id = ${orgId}`;
+  const totals = await db.execute(sql`
+    SELECT count(*)::int AS total,
+           coalesce(round(sum(coalesce(c.duration_seconds, 0)) / 60.0), 0)::int AS minutes,
+           count(c.recording_key)::int AS recordings,
+           min(c.started_at) AS first_call
+      FROM voice_calls c WHERE ${where}`);
+  const outcomes = await db.execute(sql`
+    SELECT coalesce(c.outcome, 'in_progress') AS outcome, count(*)::int AS n
+      FROM voice_calls c WHERE ${where} GROUP BY 1`);
+  const lines = await db.execute(sql`
+    SELECT coalesce(nullif(c.flags->'ingest'->>'market', '') || ' line', n.label, n.phone_number, c.to_number, 'Unknown line') AS label,
+           count(*)::int AS n,
+           count(*) FILTER (WHERE c.outcome IN ('lead_submitted', 'booked'))::int AS leads
+      FROM voice_calls c LEFT JOIN voice_numbers n ON n.id = c.number_id AND n.org_id = c.org_id
+     WHERE ${where} GROUP BY 1 ORDER BY 2 DESC LIMIT 20`);
+  const t = (totals as any).rows?.[0] ?? {};
+  return {
+    range,
+    timezone: tz,
+    total: Number(t.total ?? 0),
+    minutes: Number(t.minutes ?? 0),
+    recordings: Number(t.recordings ?? 0),
+    firstCallAt: t.first_call ?? null,
+    outcomes: Object.fromEntries(((outcomes as any).rows ?? []).map((r: any) => [String(r.outcome), Number(r.n)])) as Record<string, number>,
+    lines: ((lines as any).rows ?? []).map((r: any) => ({ label: String(r.label), calls: Number(r.n), leads: Number(r.leads) })),
+  };
+}
+
 export function presentEscalation(row: typeof voiceEscalations.$inferSelect) {
   const state = row.closedAt ? "closed" : row.followupSentAt ? "followed_up" : row.confirmedAt ? "confirmed" : "waiting";
   return { ...row, state, kindLabel: kindLabel(row.kind) };
@@ -98,6 +144,24 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const calls = await db.select(listColumns).from(voiceCalls).where(cond)
       .orderBy(desc(voiceCalls.startedAt)).limit(q.limit).offset((q.page - 1) * q.limit);
     sendUnlogged(res, { calls: calls.map((c) => ({ ...c, spamConfidence: c.spamConfidence == null ? null : Number(c.spamConfidence), hasRecording: !!c.recordingKey })), total, page: q.page, limit: q.limit });
+  });
+
+  /**
+   * GET ?range=7d|30d|month|all → the Results panel (owner, 2026-10-02: "The clients want to see this data when
+   * using this service"): calls by outcome, by line, minutes talked and recordings, counted from the call log itself
+   * (so calls another receptionist pushed in through ingest.ts count too, though they are never metered).
+   * "month" is the calendar month in the org's timezone. Registered before /calls/:id so "summary" isn't an id.
+   */
+  app.get("/api/crm/voice/calls/summary", async (req: any, res) => {
+    const v = await voiceContext(req, res, getDevUser);
+    if (!v) return;
+    const range = (["7d", "30d", "month", "all"] as const).find((r) => r === req.query.range) ?? "30d";
+    try {
+      sendUnlogged(res, await callResultsSummary(v.ctx.org.id, range, (v.ctx.org as any).timezone));
+    } catch (e: any) {
+      console.error("[voice] calls summary failed:", e?.message || e);
+      res.status(500).json({ message: "Could not load the call results." });
+    }
   });
 
   /** GET → VoiceCallRow + { customer, project, number, escalations } */

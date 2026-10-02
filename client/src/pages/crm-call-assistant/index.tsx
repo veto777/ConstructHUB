@@ -173,7 +173,11 @@ export default function CrmCallAssistantPage() {
               <TabsTrigger key={t} value={t} data-testid={`tab-call-assistant-${t}`}>{TAB_LABELS[t]}</TabsTrigger>
             ))}
           </TabsList>
-          <TabsContent value="overview"><OverviewPanel status={status.data ?? null} loading={status.isLoading} /></TabsContent>
+          <TabsContent value="overview"><OverviewPanel status={status.data ?? null} loading={status.isLoading} onPickResult={(p) => {
+            // Open the Calls tab already filtered: the Calls panel reads ?outcome= / ?view= when it mounts.
+            setTab("calls");
+            navigate(p === "spam" ? "/crm/call-assistant?tab=calls&view=spam" : `/crm/call-assistant?tab=calls&outcome=${p}`, { replace: true });
+          }} /></TabsContent>
           <TabsContent value="numbers"><NumbersPanel canManage={canManage} /></TabsContent>
           <TabsContent value="studio"><StudioPanel canManage={canManage} /></TabsContent>
           <TabsContent value="simulator"><SimulatorPanel /></TabsContent>

@@ -53,6 +53,7 @@ import GoogleAdFraudPage from "@/pages/google-ad-fraud";
 import LsaGuidePage from "@/pages/lsa-guide";
 import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
+import CallAssistantEntry from "@/pages/call-assistant-entry";
 import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
 import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
 import SettingsPage from "@/pages/settings";
@@ -194,7 +195,7 @@ function DashboardRouter() {
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
-      <Route path="/call-assistant" component={CallAssistantLandingPage} />
+      <Route path="/call-assistant" component={CallAssistantEntry} />
       {/* Every feature's intro page (shared/feature-pages), inside the app frame when signed in. */}
       <Route path="/features" component={FeaturesCataloguePage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />

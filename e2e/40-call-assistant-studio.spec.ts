@@ -156,6 +156,7 @@ class VoiceMock {
       return json({ state, counties, regions });
     }
     if (path === "/personas") return json({ personas: VOICE_PERSONA_LIST });
+    if (path === "/calls/summary") return json({ range: "30d", total: 14, minutes: 37, recordings: 12, firstCallAt: "2026-09-05T15:00:00.000Z", outcomes: { lead_submitted: 5, info: 4, hangup: 3, spam: 2 }, lines: [{ label: "Main line", calls: 14, leads: 5 }] });
     if (path.startsWith("/calls")) return json({ calls: [{ id: "c1", startedAt: "2026-10-02T15:00:00.000Z", fromNumber: "+13605551111", outcome: "lead_submitted", summary: "Hardie siding, whole house" }] });
     if (path === "/simulator/session" && method === "POST") {
       this.simSessionBodies.push(body);
