@@ -31,6 +31,7 @@ import { stripeConfigured } from "./billing/client";
 import { onStripeBillingEvent } from "./account/billing-emails";
 import { forgetDashboard } from "./dashboard/cache";
 import { introsForOrder, attachIntrosToItems, recordIntro, type StripeForIntro } from "./billing/intro";
+import { afterSubscriptionChange, previewCallNumberReleases } from "./voice/number-release";
 
 export { PaymentsNotConfiguredError };
 
@@ -134,6 +135,7 @@ async function liveSubscription(userId: number) {
     // create-checkout stops answering has_subscription and the customer can
     // start a new plan instead of being refused by both routes.
     await writeSubscriptionRow({ id: row.id }, sub);
+    await afterSubscriptionChange(row.userId);
     throw NO_SUBSCRIPTION();
   }
   return { row, sub, current: describeSubscription(sub.items.data) };
@@ -170,6 +172,8 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
   });
   for (const intro of intros) await recordIntro(userId, intro.addon, intro.couponId, updated.id);
   const set = await writeSubscriptionRow({ id: row.id }, updated);
+  // Fewer Call Assistant numbers paid for (or the add-on removed): the extras are released.
+  await afterSubscriptionChange(userId);
   return { changed: true, subscription: subscriptionSummary({ ...row, ...set } as SubscriptionRow, cancellationOf(updated)) };
 }
 
@@ -365,6 +369,32 @@ export function registerStripeRoutes(app: Express) {
       // Add-ons change allowances (texts, sites): the dashboard rebuilds on the next load.
       forgetDashboard(user.id);
       res.json(changed);
+    } catch (err: any) {
+      sendStripeError(res, err);
+    }
+  });
+
+  /**
+   * The Call Assistant numbers a change would stop and release, for the
+   * confirm step before it (owner, 2026-10-02: the number is part of the
+   * service and is not kept). ?cancel=1 = the subscription ends;
+   * ?call_assistant=N&call_number=M = the new add-on quantities.
+   * → { numbers: [{ phoneNumber, orgName }] } (only the account's own orgs).
+   */
+  app.get("/api/stripe/addons/release-preview", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ message: "Login required" });
+      const addons: Record<string, number> = {};
+      for (const key of ["call_assistant", "call_number"] as const) {
+        const raw = req.query[key];
+        if (typeof raw !== "string" || raw === "") continue;
+        const n = Number(raw);
+        if (!Number.isInteger(n) || n < 0) return res.status(400).json({ message: `${key} must be a whole number of 0 or more.` });
+        addons[key] = n;
+      }
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ numbers: await previewCallNumberReleases(user.id, { cancel: req.query.cancel === "1", addons }) });
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -650,6 +680,8 @@ export function registerStripeRoutes(app: Express) {
             }
             const set = await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
             emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
+            // A returning customer's scheduled number release is cancelled when the add-on is back.
+            await afterSubscriptionChange(userId);
           }
           break;
         }
@@ -693,8 +725,8 @@ export function registerStripeRoutes(app: Express) {
         }
         case "customer.subscription.created":
         case "customer.subscription.updated": {
-          const sub = event.data.object as Stripe.Subscription;
-          const customerId = sub.customer as string;
+          const payload = event.data.object as Stripe.Subscription;
+          const customerId = payload.customer as string;
           await billingSchemaReady();
 
           const [existingSub] = await db
@@ -703,19 +735,31 @@ export function registerStripeRoutes(app: Express) {
             .where(eq(subscriptions.stripeCustomerId, customerId))
             .limit(1);
 
-          if (existingSub && eventAppliesToRow(existingSub, sub)) {
+          // Stripe does not deliver events in order (and a failed handler is
+          // retried later), so the row takes the subscription as Stripe has it
+          // NOW, never the event's snapshot: a late past_due / unpaid event must
+          // not pause a paying customer's assistant or release their number,
+          // which cannot be undone. checkout.session.completed does the same.
+          const sub = existingSub && eventAppliesToRow(existingSub, payload)
+            ? await stripe.subscriptions.retrieve(payload.id) : null;
+          if (existingSub && sub && eventAppliesToRow(existingSub, sub)) {
             eventUserId = existingSub.userId;
             // What we had before this event, for "set to end" / "resumed"
             // when Stripe's previous_attributes don't say.
             const stored = existingSub.stripeSubscriptionId === sub.id ? await cancellationFor(existingSub.id) : null;
             const set = await writeSubscriptionRow({ id: existingSub.id }, sub);
             if (event.type === "customer.subscription.updated") {
-              emitCancellationChange(existingSub.userId, sub, event.data.previous_attributes as Record<string, unknown> | undefined,
+              // previous_attributes describe this event's snapshot, so the change is read from it.
+              emitCancellationChange(existingSub.userId, payload, event.data.previous_attributes as Record<string, unknown> | undefined,
                 stored, set.plan ?? existingSub.plan);
             }
+            // The Call Assistant number is part of the service (owner, 2026-10-02): an ended
+            // subscription (canceled / unpaid / incomplete_expired) or a removed add-on releases
+            // the org's numbers; past_due only pauses the assistant (entitlements) and keeps them.
+            await afterSubscriptionChange(existingSub.userId);
           } else if (existingSub) {
             sendBillingEmail = false;
-            console.warn(`[billing] ${event.type} for ${sub.id} (${sub.status}) ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "a live trial-code grant"}.`);
+            console.warn(`[billing] ${event.type} for ${payload.id} (${(sub ?? payload).status}) ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "a live trial-code grant"}.`);
           }
           break;
         }
@@ -739,6 +783,8 @@ export function registerStripeRoutes(app: Express) {
               .where(eq(subscriptions.id, existingSub.id));
             await recordCancellation({ id: existingSub.id }, null);
             emitSubscriptionCanceled(existingSub.userId, sub, existingSub.plan);
+            // Cancelled: the Call Assistant numbers are released (now, or once SignalWire's minimum days pass).
+            await afterSubscriptionChange(existingSub.userId);
           } else if (existingSub) {
             sendBillingEmail = false;
             console.warn(`[billing] deletion of ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "no subscription"}.`);

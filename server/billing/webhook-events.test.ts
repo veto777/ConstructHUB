@@ -117,6 +117,10 @@ let eventSeq = 0;
 async function webhook(event: any) {
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_local_mock";
   event.id ??= `evt_test_${++eventSeq}`;
+  // The subscription.created/updated handler re-reads the subscription from Stripe (events are not ordered): Stripe "has" the event's snapshot.
+  if (/^customer\.subscription\.(created|updated)$/.test(event.type)) {
+    mocks.retrieve.mockImplementation(async (id: string) => (id === event.data.object.id ? event.data.object : undefined));
+  }
   mocks.verify.mockReturnValue(event);
   const res: any = { code: 200, status(n: number) { this.code = n; return this; }, json(data: any) { this.body = data; return this; } };
   await routes.get("/api/stripe/webhook")!({ headers: { "stripe-signature": "t=1,v1=mock" }, rawBody: Buffer.from("{}"), body: {} }, res);

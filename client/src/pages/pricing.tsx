@@ -32,7 +32,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
-import { callAssistantIntroShort } from "@shared/plan-copy";
+import { callAssistantIntroShort, callAssistantYearlyNote } from "@shared/plan-copy";
 
 const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; chip: string; button: string; check: string }> = {
   starter: {
@@ -579,14 +579,18 @@ export default function PricingPage() {
                   return (
                     <tr key={k} className="border-b border-border/50 last:border-0" data-testid={`row-addon-${k}`}>
                       <td className="p-3 align-top">
-                        <p className="font-medium flex items-center gap-2 flex-wrap">
+                        {/* a div, not a <p>: the Badge renders a <div>, which a <p> may not contain */}
+                        <div className="font-medium flex items-center gap-2 flex-wrap">
                           {addon.name}
                           {addon.preview && <Badge variant="outline" className="text-[10px]" data-testid={`badge-addon-preview-${k}`}>Coming soon</Badge>}
-                        </p>
+                        </div>
                         <p className="text-xs text-muted-foreground">{addon.description}</p>
                         {k === "call_assistant" && (
                           <p className="text-xs mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">Launch price: {callAssistantIntroShort()}</span>
+                            <span className="font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">
+                              {/* The intro is monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
+                              {interval === "year" ? callAssistantYearlyNote() : `Launch price: ${callAssistantIntroShort()}`}
+                            </span>
                             <Link href="/call-assistant" className="font-medium underline underline-offset-2 hover:text-[#C2410C] dark:hover:text-[#FB923C]" data-testid="link-addon-call-assistant">How it works →</Link>
                           </p>
                         )}

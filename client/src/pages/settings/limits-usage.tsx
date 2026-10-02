@@ -12,7 +12,7 @@ import {
   AGENCY_INCLUDED_LOCATIONS, addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
 } from "@/lib/pricing-display";
 import { LoadingCard, formatCount, useOptionalQuery } from "./shared";
-import { useBillingActions, useEntitlements, useSubscription } from "./use-billing";
+import { useAddonChange, useBillingActions, useEntitlements, useSubscription } from "./use-billing";
 import type { SettingsSectionProps } from "./types";
 
 /**
@@ -52,6 +52,8 @@ type LimitGroup = { title: string; rows: LimitRow[] };
 /** GET /api/crm/voice/status — the subset this page reads (server/voice/billing.ts). Answers without the add-on. */
 type VoiceStatusLite = {
   enabled: boolean;
+  /** Bought, but paused until a payment goes through (server/voice/billing.ts). */
+  paused?: boolean;
   allowance: { numbers: number; minutes: number };
   pricing: { includedMinutes: number; overageCentsPerMinute: number };
   numberAllowance?: { used: number };
@@ -80,6 +82,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const ent = useEntitlements();
   const { data: subscription, view } = useSubscription();
   const { addon: addonMutation, salesTopic, setSalesTopic } = useBillingActions();
+  // Fewer Call Assistant add-ons than numbers held asks first (the numbers are released, not kept).
+  const addonChange = useAddonChange(addonMutation);
 
   const entitlements = ent.data;
   const plan: PlanKey | null = entitlements?.accessPlan ?? null;
@@ -229,6 +233,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   if (callAssistantSold) {
     const vs = voice.data ?? null;
     const on = vs?.enabled === true;
+    const paused = !on && vs?.paused === true;
     const minutes = on ? vs!.allowance.minutes : 0;
     const numbers = on ? vs!.allowance.numbers : 0;
     const overage = on && vs!.usage && vs!.usage.overageMinutes > 0 ? vs!.usage : null;
@@ -238,12 +243,14 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "callAssistantMinutes",
           label: "Call Assistant minutes",
-          included: on ? perMonth(minutes) : "Add-on",
+          included: on ? perMonth(minutes) : paused ? "Paused" : "Add-on",
           excluded: !on,
           used: !on ? null : vs!.usage ? vs!.usage.minutes : 0,
           ceiling: on && minutes > 0 ? minutes : undefined,
           monthly: true,
-          hint: overage
+          hint: paused
+            ? "Paused: the subscription's payment didn't go through. Update your payment method in Billing and the assistant answers again; your number is held meanwhile."
+            : overage
             ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} at ${formatUsd(vs!.pricing.overageCentsPerMinute)}/min, on your next invoice.`
             : `Every started minute of an answered call counts; blocked spam costs nothing. Above the included minutes: ${formatUsd(vs?.pricing.overageCentsPerMinute ?? 0)}/min.`,
           addon: "call_assistant",
@@ -382,8 +389,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                               variant="outline"
                               className="h-8 w-8"
                               aria-label={`Remove one ${addon.name}`}
-                              disabled={!editable || addonMutation.isPending || qty === 0 || addon.preview === true}
-                              onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty - 1 })}
+                              disabled={!editable || addonMutation.isPending || addonChange.checking || qty === 0 || addon.preview === true}
+                              onClick={() => void addonChange.request({ addon: addon.key, quantity: qty - 1 }, qty)}
                               data-testid={`button-limit-addon-dec-${addon.key}`}
                             >
                               <Minus className="h-4 w-4" />
@@ -414,6 +421,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         </Card>
       ))}
 
+      {addonChange.dialog}
       <TalkToSalesDialog
         open={salesTopic !== null}
         onOpenChange={(open) => { if (!open) setSalesTopic(null); }}

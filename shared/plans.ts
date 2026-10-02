@@ -216,9 +216,10 @@ export type Addon = {
   requires?: AddonKey;
   /**
    * Introductory monthly price for the first `introMonths` months, once per
-   * customer, when the add-on is first added (server/billing/intro.ts: a Stripe
-   * coupon worth monthlyCents − introMonthlyCents a month). Annual buyers get
-   * the same total off their first year.
+   * customer, when the add-on is first added on MONTHLY billing
+   * (server/billing/intro.ts: a Stripe coupon worth monthlyCents −
+   * introMonthlyCents a month). Annual billing has no intro: its price is
+   * `annualCents` from the first invoice.
    */
   introMonthlyCents?: number;
   introMonths?: number;
@@ -230,14 +231,19 @@ export const ADDONS: Record<AddonKey, Addon> = {
   texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier: 500 texts / month, then $0.02 each.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"], grants: { competitorScans: 10 } },
   // ── Call Assistant (docs/call-assistant/SPEC.md) ─────────────────────────
-  // PLACEHOLDER PRICING — the owner has not confirmed these numbers. Both
-  // add-ons stay `preview` (listed, not sellable) until they do. Owned by the
-  // numbers+billing lane after the skeleton (docs/call-assistant/LANES.md).
+  // Both add-ons stay `preview` (listed, not sellable) until the owner launches
+  // them. Owned by the numbers+billing lane (docs/call-assistant/LANES.md).
+  // Owner, 2026-10-02: "$99 a month for the first 3 months" (monthly billing
+  // only), "annually price can be $1999 for this service". The annual price is
+  // NOT ANNUAL_MONTHS × monthly: it is its own number.
+  // The number is part of the service (owner, 2026-10-02): when the
+  // subscription ends or the add-on is removed, the org's numbers are released
+  // (server/voice/number-release.ts); a failed payment pauses the assistant
+  // (CALL_ASSISTANT_RUN_STATUSES) but keeps the number.
   call_assistant: {
     key: "call_assistant", name: "AI Call Assistant",
     description: "An AI receptionist that answers your phone 24/7, fills in the lead for your CRM and texts the right person. Includes 1 local number and 500 call minutes / month, then $0.15 / minute.",
-    monthlyCents: 24900, annualCents: 249000, availableOn: ["pro", "growth", "agency"], grants: {}, preview: true,
-    // Owner, 2026-10-02: "$99 a month for the first 3 months", then the regular price.
+    monthlyCents: 24900, annualCents: 199900, availableOn: ["pro", "growth", "agency"], grants: {}, preview: true,
     introMonthlyCents: 9900, introMonths: 3,
   },
   call_number: {
@@ -299,11 +305,38 @@ export const LEGACY_PLAN_MAP: Record<string, PlanKey> = {
  */
 export const ACCESS_STATUSES: readonly string[] = ["active", "trialing", "past_due"];
 
+/**
+ * Subscription statuses under which an add-on MODULE runs (the AI Call
+ * Assistant answers calls). Stricter than ACCESS_STATUSES on purpose — owner,
+ * 2026-10-02: "As soon as they stop paying the agent stops working." The plan
+ * itself keeps its features through Stripe's retries (past_due); the
+ * assistant, which costs GPU, AI and carrier minutes per call, does not.
+ */
+export const ADDON_MODULE_RUN_STATUSES: readonly string[] = ["active", "trialing"];
+/**
+ * Statuses that mean "a payment is needed" rather than "the subscription
+ * ended": the add-on is paused, not gone. Fixing the card restores it.
+ */
+export const PAYMENT_NEEDED_STATUSES: readonly string[] = ["past_due", "unpaid", "incomplete", "paused"];
+/**
+ * Statuses on which the subscription has ENDED for the Call Assistant number:
+ * its numbers are released (server/voice/number-release.ts). past_due is never
+ * here — the number is held so fixing the card restores the agent. `inactive`
+ * is a row that never had (or no longer has) a subscription.
+ */
+export const NUMBER_RELEASE_STATUSES: readonly string[] = ["canceled", "unpaid", "incomplete_expired", "inactive"];
+
+/** A stored plan key (current or legacy) as the plan it maps to, whatever the status; null for "free" or unknown. */
+export function storedPlanKey(plan: string | null | undefined): PlanKey | null {
+  if (!plan) return null;
+  if ((PLAN_KEYS as readonly string[]).includes(plan)) return plan as PlanKey;
+  return LEGACY_PLAN_MAP[plan] ?? null;
+}
+
 /** Resolve a stored subscription row to the plan whose entitlements apply, or null (no active plan). */
 export function effectivePlanKey(sub: { plan?: string | null; status?: string | null } | null | undefined): PlanKey | null {
   if (!sub?.plan || !ACCESS_STATUSES.includes(sub.status ?? "")) return null;
-  if ((PLAN_KEYS as readonly string[]).includes(sub.plan)) return sub.plan as PlanKey;
-  return LEGACY_PLAN_MAP[sub.plan] ?? null;
+  return storedPlanKey(sub.plan);
 }
 
 /**

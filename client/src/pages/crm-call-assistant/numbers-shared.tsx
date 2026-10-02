@@ -28,6 +28,10 @@ export type VoiceNumber = {
   releasedAt: string | null;
   lastError: string | null;
   createdAt: string | null;
+  /** Being released automatically (the subscription ended or no longer pays for it): why, and when it was decided. */
+  releaseReason?: string | null;
+  releaseReasonText?: string | null;
+  releaseScheduledAt?: string | null;
 };
 
 export type NumberAllowance = { numbers: number; used: number; remaining: number; includedNumbers: number; extraNumberMonthlyCents: number };
@@ -44,6 +48,8 @@ export type NumbersResponse = {
   configured: boolean;
   mock: boolean;
   canManage: boolean;
+  /** The add-on is paused until a payment goes through: the list is read-only. */
+  paused?: boolean;
 };
 
 export type AvailableNumber = {

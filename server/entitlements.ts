@@ -17,6 +17,13 @@
  * follow their Stripe status only (the webhook keeps it current): active,
  * trialing and past_due (Stripe still retrying the card) have access —
  * ACCESS_STATUSES in shared/plans.ts.
+ *
+ * Add-on MODULES (the AI Call Assistant) are stricter: they run only while the
+ * subscription is active or trialing (ADDON_MODULE_RUN_STATUSES). Owner,
+ * 2026-10-02: "As soon as they stop paying the agent stops working." On a
+ * payment-needed status (past_due, unpaid, incomplete, paused) the module is
+ * off and `addonModulesPaused` says why, so the CRM can say "update your
+ * payment method" instead of "buy the add-on".
  */
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "./db";
@@ -25,6 +32,7 @@ import { forgetDashboard } from "./dashboard/cache";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
   ADDON_MODULES, isAddonModule, moduleName, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_ASSISTANT_INCLUDED_NUMBERS,
+  ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, storedPlanKey,
   type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
   type AddonModuleKey, type AnyModuleKey,
 } from "@shared/plans";
@@ -43,11 +51,26 @@ export type Entitlements = {
   modules: PlanModules;
   /**
    * Modules an add-on unlocks (shared/plans.ts ADDON_MODULES): on when the
-   * add-on is on the subscription and the plan sells it. Platform admins get
-   * them all, like the plan modules.
+   * add-on is on the subscription, the plan sells it and the subscription is
+   * active or trialing (ADDON_MODULE_RUN_STATUSES — never past_due). Platform
+   * admins get them all, like the plan modules.
    */
   addonModules: Record<AddonModuleKey, boolean>;
+  /**
+   * An add-on module that is bought but off because a payment is needed
+   * (PAYMENT_NEEDED_STATUSES): the CRM shows "Paused — update your payment
+   * method", reads stay open, edits and the engine are refused. Never a gate
+   * that grants anything.
+   */
+  addonModulesPaused: Record<AddonModuleKey, boolean>;
   addons: Partial<Record<AddonKey, number>>;
+  /**
+   * Add-on quantities on the stored row whatever its status (a paused add-on
+   * keeps its numbers on display). Display only — every gate reads `addons`.
+   */
+  storedAddons: Partial<Record<AddonKey, number>>;
+  /** The deciding subscription row's status (null without one). */
+  subscriptionStatus: string | null;
   isPlatformAdmin: boolean;
   /** End of a Stripe-less grant (trial code); null for Stripe-managed or open-ended rows. */
   grantEndsAt: Date | null;
@@ -57,12 +80,35 @@ const ALL_MODULES: PlanModules = { agencyWorkspace: true, adsManager: true, clou
 const NO_MODULES: PlanModules = { agencyWorkspace: false, adsManager: false, cloudflareSearchConsole: false, domainsMailAlerts: false };
 const ADDON_MODULE_KEYS = Object.keys(ADDON_MODULES) as AddonModuleKey[];
 
-/** Which add-on modules a plan + add-on set unlocks (every one for platform admins). */
-export function addonModulesFor(plan: PlanKey | null, addons: Partial<Record<AddonKey, number>>, admin = false): Record<AddonModuleKey, boolean> {
+/**
+ * Which add-on modules a plan + add-on set unlocks under a subscription status
+ * (every one for platform admins). The status is required: an add-on module
+ * runs only while the subscription is active or trialing.
+ */
+export function addonModulesFor(plan: PlanKey | null, addons: Partial<Record<AddonKey, number>>, status: string | null | undefined, admin = false): Record<AddonModuleKey, boolean> {
   const out = {} as Record<AddonModuleKey, boolean>;
+  const running = ADDON_MODULE_RUN_STATUSES.includes(status ?? "");
   for (const key of ADDON_MODULE_KEYS) {
     const addon = ADDON_MODULES[key];
-    out[key] = admin || (!!plan && (addons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan));
+    out[key] = admin || (running && !!plan && (addons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan));
+  }
+  return out;
+}
+
+/**
+ * Add-on modules that are bought but paused for a payment: the stored row
+ * carries the add-on on a plan that sells it, and its status says a payment is
+ * needed (past_due, unpaid, incomplete, paused). Never for platform admins
+ * (their modules are on) and never for an ended subscription (that is "not
+ * subscribed", not "paused").
+ */
+export function addonModulesPausedFor(storedPlan: string | null | undefined, storedAddons: Partial<Record<AddonKey, number>>, status: string | null | undefined, admin = false): Record<AddonModuleKey, boolean> {
+  const out = {} as Record<AddonModuleKey, boolean>;
+  const plan = storedPlanKey(storedPlan);
+  const needsPayment = PAYMENT_NEEDED_STATUSES.includes(status ?? "");
+  for (const key of ADDON_MODULE_KEYS) {
+    const addon = ADDON_MODULES[key];
+    out[key] = !admin && needsPayment && !!plan && (storedAddons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan);
   }
   return out;
 }
@@ -78,11 +124,14 @@ export function moduleEnabled(ent: Pick<Entitlements, "modules" | "addonModules"
  * included minutes per call_assistant unit. Platform admins get one unit's
  * worth (they run the product, they do not get unlimited carrier numbers).
  */
-export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin">): { numbers: number; minutes: number } {
-  if (!ent.addonModules.callAssistant) return { numbers: 0, minutes: 0 };
-  const units = Math.max(ent.isPlatformAdmin ? 1 : 0, ent.addons.call_assistant ?? 0);
+export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number } {
+  // A paused add-on (payment needed) still shows what it bought: its numbers are held, not released.
+  const paused = !ent.addonModules.callAssistant && ent.addonModulesPaused?.callAssistant === true;
+  if (!ent.addonModules.callAssistant && !paused) return { numbers: 0, minutes: 0 };
+  const addons = paused ? ent.storedAddons ?? {} : ent.addons;
+  const units = Math.max(ent.isPlatformAdmin ? 1 : 0, addons.call_assistant ?? 0);
   return {
-    numbers: units * CALL_ASSISTANT_INCLUDED_NUMBERS + (ent.addons.call_number ?? 0),
+    numbers: units * CALL_ASSISTANT_INCLUDED_NUMBERS + (addons.call_number ?? 0),
     minutes: units * CALL_ASSISTANT_INCLUDED_MINUTES,
   };
 }
@@ -156,18 +205,30 @@ export function allowancesFor(plan: PlanKey, addons: Partial<Record<AddonKey, nu
   return out;
 }
 
-export async function getEntitlements(userId: number, now = new Date()): Promise<Entitlements> {
-  // s.* includes subscriptions.addons (the billing columns).
+/**
+ * The account's email and its deciding subscription row (SUBSCRIPTION_ORDER;
+ * every column, the billing ones included), or undefined for an unknown user.
+ * A user without a subscription row comes back with the subscription columns null.
+ */
+export async function accountSubscriptionRow(userId: number): Promise<(SubscriptionRow & { email?: string | null; addons?: unknown; id?: number | null }) | undefined> {
   const { rows: [row] } = await pool.query(
     `SELECT u.email, s.* FROM users u
        LEFT JOIN LATERAL (
          SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
        ) s ON true
       WHERE u.id = $1`, [userId, ACCESS_STATUSES]);
+  return row;
+}
+
+export async function getEntitlements(userId: number, now = new Date()): Promise<Entitlements> {
+  // s.* includes subscriptions.addons (the billing columns).
+  const row = await accountSubscriptionRow(userId);
   const admin = isPlatformAdminEmail(row?.email);
   const plan = activePlanKey(row, now);
   const accessPlan = admin ? TOP_PLAN : plan;
-  const addons = plan ? parseAddons(row?.addons) : {};
+  const storedAddons = parseAddons(row?.addons);
+  const addons = plan ? storedAddons : {};
+  const status = row?.status ?? null;
   const grantEnd = row && !row.stripe_subscription_id && row.current_period_end ? new Date(row.current_period_end) : null;
   return {
     plan,
@@ -176,8 +237,11 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
     limits: accessPlan ? PLANS[accessPlan].limits : null,
     allowances: accessPlan ? allowancesFor(accessPlan, admin ? {} : addons) : null,
     modules: admin ? ALL_MODULES : plan ? PLANS[plan].modules : NO_MODULES,
-    addonModules: addonModulesFor(plan, addons, admin),
+    addonModules: addonModulesFor(plan, addons, status, admin),
+    addonModulesPaused: addonModulesPausedFor(grantExpired(row, now) ? null : row?.plan, storedAddons, status, admin),
     addons,
+    storedAddons,
+    subscriptionStatus: status,
     isPlatformAdmin: admin,
     grantEndsAt: plan && grantEnd ? grantEnd : null,
   };
@@ -451,6 +515,30 @@ export function sendModuleRequired(res: Response, module: AnyModuleKey) {
   });
 }
 
+/** `code` on the 402 for a bought add-on module that is paused until a payment goes through. */
+export const PAYMENT_REQUIRED_CODE = "payment_required";
+/** Where the client sends the owner to fix the card. */
+export const BILLING_HREF = "/settings?tab=billing";
+
+/** Is this add-on module bought but paused for a payment? */
+export function modulePaused(ent: Pick<Entitlements, "addonModules"> & Partial<Pick<Entitlements, "addonModulesPaused">>, module: AnyModuleKey): boolean {
+  return isAddonModule(module) && !ent.addonModules[module] && ent.addonModulesPaused?.[module] === true;
+}
+
+/**
+ * The 402 for a bought add-on module paused by a failed or missing payment:
+ * not "buy it" — "update your payment method". The body carries `addon` and
+ * `billingHref` so the client can link Settings → Billing.
+ */
+export function sendModulePaymentNeeded(res: Response, module: AddonModuleKey) {
+  return res.status(402).json({
+    code: PAYMENT_REQUIRED_CODE,
+    addon: ADDON_MODULES[module],
+    billingHref: BILLING_HREF,
+    message: `${moduleName(module)} is paused because the subscription's payment didn't go through. Update your payment method in Settings → Billing and it starts working again.`,
+  });
+}
+
 /** Express middleware for a whole module's routes. Expects req.user (session auth). */
 export function requireModule(module: AnyModuleKey) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -459,6 +547,7 @@ export function requireModule(module: AnyModuleKey) {
     try {
       const ent = await getEntitlements(user.id);
       if (moduleEnabled(ent, module)) return next();
+      if (isAddonModule(module) && modulePaused(ent, module)) return sendModulePaymentNeeded(res, module);
       return sendModuleRequired(res, module);
     } catch (e) {
       next(e);

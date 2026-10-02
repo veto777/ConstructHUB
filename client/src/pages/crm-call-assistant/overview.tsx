@@ -10,6 +10,7 @@ import { prettyPhone } from "@/lib/voice-studio";
 import { CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
 import { callAssistantIntroShort } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
+import { CallAssistantPausedBanner } from "./paused-banner";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
@@ -23,7 +24,7 @@ type CallRow = { id: string | number; startedAt?: string; from?: string; fromNum
  * hides the list). OWNER: studio-frontend lane.
  */
 export function OverviewPanel({ status, loading }: { status: VoiceStatus | null; loading: boolean }) {
-  const calls = useQuery<{ calls: CallRow[] } | CallRow[]>({ queryKey: ["/api/crm/voice/calls?limit=5"], enabled: !!status?.enabled, retry: false });
+  const calls = useQuery<{ calls: CallRow[] } | CallRow[]>({ queryKey: ["/api/crm/voice/calls?limit=5"], enabled: !!status?.enabled || !!status?.paused, retry: false });
   const recent: CallRow[] = Array.isArray(calls.data) ? calls.data : calls.data?.calls ?? [];
 
   if (loading || !status) {
@@ -51,12 +52,16 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
     : numbers.length === 0 ? { text: "Get a local number", href: "/crm/call-assistant?tab=numbers", testid: "link-overview-next-numbers" }
     : { text: "Try a test conversation", href: "/crm/call-assistant?tab=simulator", testid: "link-overview-next-simulator" };
 
+  const paymentPaused = !status.enabled && status.paused === true;
   return (
     <div data-testid="panel-call-assistant-overview" className="pt-4 space-y-4">
+      {paymentPaused && <CallAssistantPausedBanner status={status} />}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard icon={Sparkles} label="Assistant" testid="metric-overview-assistant"
-          value={<StatusPill tone={profileStatus === "live" ? "success" : profileStatus === "paused" ? "warning" : "neutral"} className="text-sm">{profileStatus}</StatusPill>}
-          context={status.profile?.publishedVersion != null ? `Published version ${status.profile.publishedVersion}` : "Nothing published yet"} href="/crm/call-assistant?tab=studio" />
+          value={paymentPaused
+            ? <StatusPill tone="warning" className="text-sm">paused</StatusPill>
+            : <StatusPill tone={profileStatus === "live" ? "success" : profileStatus === "paused" ? "warning" : "neutral"} className="text-sm">{profileStatus}</StatusPill>}
+          context={paymentPaused ? "Waiting for a payment" : status.profile?.publishedVersion != null ? `Published version ${status.profile.publishedVersion}` : "Nothing published yet"} href="/crm/call-assistant?tab=studio" />
         <MetricCard icon={Hash} label="Numbers" value={numbers.length} testid="metric-overview-numbers"
           context={`${status.allowance.numbers} included with your add-on`} href="/crm/call-assistant?tab=numbers" />
         <MetricCard icon={Timer} label="Minutes this month" value={used.toLocaleString("en-US")} testid="metric-overview-minutes"
@@ -77,7 +82,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
               {status.addon.preview ? " Pricing is being finalized." : ""}
             </p>
             <p className="text-xs" data-testid="text-overview-price">
-              <span className="font-medium">{status.addon.name}:</span> {callAssistantIntroShort()} (the intro price applies once, when the add-on is first added).
+              <span className="font-medium">{status.addon.name}:</span> {callAssistantIntroShort()} (the intro price is for monthly billing and applies once, when the add-on is first added).
             </p>
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">{status.addon.name}</Badge>

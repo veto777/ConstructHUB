@@ -22,6 +22,7 @@ import { registerVoiceProfileRoutes } from "./profile";
 import { registerVoiceSimulatorRoutes } from "./simulator";
 import { registerVoiceCallRoutes } from "./calls";
 import { startVoiceOverageWorker } from "./billing-usage";
+import { startVoiceNumberReleaseWorker } from "./number-release";
 
 export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   // engine → app
@@ -35,4 +36,7 @@ export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   registerVoiceCallRoutes(app, getDevUser); // also starts the escalation reminder worker (off unless VOICE_ESCALATION_WORKER_ENABLED=true)
   // Overage minutes → Stripe (off unless production + STRIPE_SECRET_KEY + VOICE_OVERAGE_WORKER_ENABLED=true).
   startVoiceOverageWorker();
+  // Numbers of ended subscriptions / removed add-ons → released on SignalWire once eligible
+  // (on in production unless VOICE_NUMBER_RELEASE_WORKER_ENABLED=false; number-release.ts).
+  startVoiceNumberReleaseWorker();
 }

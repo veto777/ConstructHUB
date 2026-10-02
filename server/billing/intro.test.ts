@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // Fake Stripe; the grant ledger (billing_addon_intros) on the real dev DB.
 import pg from "pg";
 import {
-  addonIntro, introCouponSpec, resolveIntroCoupon, resetIntroCouponCache, introEligible, recordIntro, introsForOrder, attachIntrosToItems,
+  addonIntro, introFor, introCouponSpec, resolveIntroCoupon, resetIntroCouponCache, introEligible, recordIntro, introsForOrder, attachIntrosToItems,
 } from "./intro";
 import { BILLING_INTRO_DDL } from "./schema";
 import { resetPriceCache, addonPriceSpec, describeSubscription } from "./prices";
@@ -67,19 +67,34 @@ describe("the intro offer comes from the price book", () => {
     // The copy reads the same fields the coupon is built from.
     expect(CALL_ASSISTANT_INTRO).toEqual({ monthlyCents: ADDONS.call_assistant.introMonthlyCents, months: ADDONS.call_assistant.introMonths });
     const regular = `$${ADDONS.call_assistant.monthlyCents / 100}`;
-    expect(callAssistantIntroShort()).toBe(`$99/mo for your first 3 months, then ${regular}/mo`);
-    expect(callAssistantIntroLine()).toBe(`$99/month for your first 3 months, then ${regular}/month`);
+    // Owner, 2026-10-02: "annually price can be $1999" — every surface states it beside the intro.
+    expect(ADDONS.call_assistant.annualCents).toBe(199_900);
+    expect(callAssistantIntroShort()).toBe(`$99/mo for your first 3 months, then ${regular}/mo — or $1,999/yr`);
+    expect(callAssistantIntroLine()).toBe(`$99/month for your first 3 months, then ${regular}/month — or $1,999/year`);
   });
 
-  it("monthly: regular − intro off, repeating for 3 months; annual: the same total once", () => {
+  it("monthly: regular − intro off, repeating for 3 months; annual: no intro at all", () => {
     const perMonth = ADDONS.call_assistant.monthlyCents - 9900;
     const month = introCouponSpec("call_assistant", "month")!;
     expect(month.params).toMatchObject({ amount_off: perMonth, currency: "usd", duration: "repeating", duration_in_months: 3 });
     expect(month.id).toBe(`chub_v1_intro_call_assistant_month_${ADDONS.call_assistant.monthlyCents}_9900x3`);
-    const year = introCouponSpec("call_assistant", "year")!;
-    expect(year.params).toMatchObject({ amount_off: perMonth * 3, duration: "once" });
-    expect((year.params as any).duration_in_months).toBeUndefined();
+    expect(introFor("call_assistant", "month")).toEqual({ addon: "call_assistant", monthlyCents: 9900, months: 3 });
+    // The yearly price ($1,999) is the yearly deal: no coupon, no grant.
+    expect(introFor("call_assistant", "year")).toBeNull();
+    expect(introCouponSpec("call_assistant", "year")).toBeNull();
     expect(introCouponSpec("extra_seat", "month")).toBeNull();
+  });
+
+  it("an annual order gets no coupon, creates none and records no grant (the intro stays unused)", async () => {
+    const f = fakeStripe();
+    expect(await resolveIntroCoupon(f.stripe, "call_assistant", "year")).toBeNull();
+    expect(await introsForOrder(f.stripe, USER + 2, {}, { call_assistant: 1 }, "year", pool)).toEqual([]);
+    expect(f.stripe.coupons.create).not.toHaveBeenCalled();
+    expect(f.stripe.coupons.retrieve).not.toHaveBeenCalled();
+    // The same account buying monthly later still gets it.
+    expect(await introsForOrder(f.stripe, USER + 2, {}, { call_assistant: 1 }, "month", pool)).toEqual([
+      { addon: "call_assistant", couponId: introCouponSpec("call_assistant", "month")!.id },
+    ]);
   });
 });
 

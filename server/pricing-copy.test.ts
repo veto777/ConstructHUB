@@ -7,9 +7,12 @@ import {
 import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
-  CALL_ASSISTANT_INTRO, callAssistantIntroLine, callAssistantPricing,
+  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote,
 } from "@shared/plan-copy";
-import { knowledgeBook } from "./hub/knowledge";
+import { knowledgeBook, priceBookCents } from "./hub/knowledge";
+import { filterOutput } from "./hub/output-filter";
+
+const filterReply = (content: string) => filterOutput({ content, finishReason: "stop" }, { publicOnly: false });
 import { hardRulesText } from "./hub/prompt";
 import { ADS_CONSULTANT_KNOWLEDGE, ADS_CONSULTANT_PROMPT } from "./ads-consultant";
 import { TRIAL_CODE_PLAN_NAME } from "./email";
@@ -78,23 +81,61 @@ describe("plan copy helpers", () => {
 describe("AI Call Assistant launch price", () => {
   const root = path.resolve(import.meta.dirname, "..");
 
-  it("is one constant, then the price book's regular price", () => {
+  it("is one constant, then the price book's regular price — or the annual price", () => {
     expect(callAssistantIntroLine()).toBe(
-      `${formatUsd(CALL_ASSISTANT_INTRO.monthlyCents)}/month for your first ${CALL_ASSISTANT_INTRO.months} months, then ${formatUsd(ADDONS.call_assistant.monthlyCents)}/month`,
+      `${formatUsd(CALL_ASSISTANT_INTRO.monthlyCents)}/month for your first ${CALL_ASSISTANT_INTRO.months} months, then ${formatUsd(ADDONS.call_assistant.monthlyCents)}/month — or ${formatUsd(ADDONS.call_assistant.annualCents)}/year`,
     );
+    expect(callAssistantIntroShort()).toBe(
+      `${formatUsd(CALL_ASSISTANT_INTRO.monthlyCents)}/mo for your first ${CALL_ASSISTANT_INTRO.months} months, then ${formatUsd(ADDONS.call_assistant.monthlyCents)}/mo — or ${formatUsd(ADDONS.call_assistant.annualCents)}/yr`,
+    );
+    // Owner, 2026-10-02: "$99 a month for the first 3 months" … "annually price can be $1999".
+    expect(callAssistantIntroShort()).toBe("$99/mo for your first 3 months, then $249/mo — or $1,999/yr");
     const p = callAssistantPricing();
+    expect(p.annual).toBe("$1,999");
+    // Add-ons follow the plan's billing interval (server/billing/order.ts): yearly is not a choice for the add-on alone.
+    expect(callAssistantYearlyNote()).toBe("$1,999/yr when your plan is billed yearly (add-ons follow your plan's billing); the $99/mo intro for your first 3 months is on monthly billing");
     expect(p.extraNumber).toBe(formatUsd(ADDONS.call_number.monthlyCents));
     expect(p.comingSoon).toBe(ADDONS.call_assistant.preview === true);
-    expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`Launch price: ${callAssistantIntroLine()}.`);
+    expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).`);
     expect(knowledgeBook().pack).toContain(callAssistantIntroLine());
+    expect(knowledgeBook().pack).toContain("The intro price is for monthly billing");
+  });
+
+  it("$1,999/yr is an add-on annual price, so it shows despite the $1,000 sales threshold", () => {
+    expect(ADDONS.call_assistant.annualCents).toBeGreaterThanOrEqual(SALES_THRESHOLD_CENTS);
+    // The price-book helpers print it (the threshold applies to services, not plan/add-on annual prices) …
+    expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`or ${formatUsd(ADDONS.call_assistant.annualCents)}/year`);
+    // … the knowledge pack says yearly is NOT 10 × monthly for this add-on …
+    expect(pricingKnowledge()).toContain(`except the ${ADDONS.call_assistant.name}, which is ${formatUsd(ADDONS.call_assistant.annualCents)}/year`);
+    // … and the Hub's output filter lets Gabe say it.
+    expect(priceBookCents().has(ADDONS.call_assistant.annualCents)).toBe(true);
+    expect(filterReply(`The AI Call Assistant is ${callAssistantIntroLine()}.`).ok).toBe(true);
+    expect(filterReply(`On yearly billing the AI Call Assistant add-on costs ${formatUsd(ADDONS.call_assistant.annualCents)}/year on the Pro plan.`).ok).toBe(true);
+    // A made-up yearly price is still refused.
+    expect(filterReply("The AI Call Assistant add-on costs $1,899/year.").ok).toBe(false);
+  });
+
+  it("the number rules (owner, 2026-10-02) are stated on the FAQ, the Numbers tab and in Gabe's knowledge", () => {
+    const faq = fs.readFileSync(path.join(root, "client/src/pages/call-assistant-landing.tsx"), "utf8");
+    const numbers = fs.readFileSync(path.join(root, "client/src/pages/crm-call-assistant/numbers.tsx"), "utf8");
+    for (const key of ["ownNumbers", "cancel", "payment"] as const) {
+      expect(faq).toContain(`CALL_ASSISTANT_NUMBER_RULES.${key}`);
+      expect(numbers).toContain(`CALL_ASSISTANT_NUMBER_RULES.${key}`);
+      expect(knowledgeBook().pack).toContain(CALL_ASSISTANT_NUMBER_RULES[key]);
+    }
+    expect(CALL_ASSISTANT_NUMBER_RULES.ownNumbers).toMatch(/never moved/);
+    expect(CALL_ASSISTANT_NUMBER_RULES.cancel).toMatch(/part of the service.*cancel.*released and stops working/);
+    expect(CALL_ASSISTANT_NUMBER_RULES.payment).toMatch(/payment fails.*pauses until the card is updated/);
   });
 
   it.each([
     "client/src/pages/landing.tsx", "client/src/pages/call-assistant-landing.tsx",
     "client/src/components/call-assistant-marketing.tsx", "client/src/pages/pricing.tsx",
+    "client/src/pages/crm-call-assistant/overview.tsx", "client/src/pages/crm-call-assistant/index.tsx",
+    "client/src/pages/crm-call-assistant/numbers.tsx",
   ])("%s types no Call Assistant price (it renders them from the price book)", (file) => {
     const src = fs.readFileSync(path.join(root, file), "utf8");
-    for (const cents of [CALL_ASSISTANT_INTRO.monthlyCents, ADDONS.call_assistant.monthlyCents, ADDONS.call_number.monthlyCents]) {
+    for (const cents of [CALL_ASSISTANT_INTRO.monthlyCents, ADDONS.call_assistant.monthlyCents, ADDONS.call_assistant.annualCents, ADDONS.call_number.monthlyCents]) {
       expect(src).not.toMatch(new RegExp(`\\${formatUsd(cents).replace(".", "\\.")}(?![\\d,])`));
     }
   });

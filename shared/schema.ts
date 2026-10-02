@@ -2597,6 +2597,15 @@ export const voiceNumbers = pgTable("voice_numbers", {
   lastError: text("last_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  /**
+   * Why the number is being released automatically (subscription_ended |
+   * addon_removed — final; payment_failed | over_allowance — restorable;
+   * server/voice/number-release.ts), null for
+   * a held number or a release someone started by hand.
+   */
+  releaseReason: text("release_reason"),
+  /** When the automatic release was decided (status went to 'releasing'). */
+  releaseScheduledAt: timestamp("release_scheduled_at"),
 });
 
 /** One transcript line. */

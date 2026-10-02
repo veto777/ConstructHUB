@@ -21,12 +21,13 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { voiceProfiles } from "@shared/schema";
 import { voiceContext, type GetUser } from "./context";
-import { moduleEnabled } from "../entitlements";
+import { moduleEnabled, modulePaused, BILLING_HREF } from "../entitlements";
 import { ADDONS, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
-import { listOrgNumbers, numberView, numberAllowance, HELD_STATUSES, numbersMockEnabled } from "./numbers";
+import { listOrgNumbers, numberView, numberAllowance, countsAgainstAllowance, numbersMockEnabled } from "./numbers";
 import { signalwireConfig } from "./numbers-signalwire";
+import { releaseIsFinal } from "./number-release";
 import { getVoiceUsageRow, listVoiceUsage, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -59,15 +60,23 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
    * Overview status. Answers for every org member; `enabled` is false (with
    * the add-on to buy) when the owner's subscription lacks the add-on. With
    * it, the numbers, the profile's state and this month's minutes come too.
+   * `paused` (enabled false) = the add-on is bought but the subscription needs
+   * a payment: the assistant doesn't answer, the numbers are held, and the
+   * Overview says "Paused — update your payment method" (billingHref).
    */
   app.get("/api/crm/voice/status", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser, { skipModule: true });
     if (!v) return;
     const enabled = moduleEnabled(v.ent, "callAssistant");
+    const paused = modulePaused(v.ent, "callAssistant");
     res.setHeader("Cache-Control", "no-store");
     const base = {
       enabled,
-      addon: { key: ADDONS.call_assistant.key, name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
+      paused,
+      pausedReason: paused ? ("payment_needed" as const) : null,
+      billingHref: BILLING_HREF,
+      subscriptionStatus: v.ent.subscriptionStatus,
+      addon: { key: ADDONS.call_assistant.key, name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
       plan: v.ent.accessPlan,
       allowance: v.allowance,
       units: { callAssistant: v.ent.addons.call_assistant ?? 0, callNumber: v.ent.addons.call_number ?? 0 },
@@ -77,7 +86,7 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       numbersProvider: { configured: numbersMockEnabled() || signalwireConfig() !== null, mock: numbersMockEnabled() },
       canManage: v.ctx.permissions.manageSettings === true,
     };
-    if (!enabled) return res.json({ ...base, numbers: [], profile: null, usage: null });
+    if (!enabled && !paused) return res.json({ ...base, numbers: [], profile: null, usage: null });
     const orgId = v.ctx.org.id;
     const month = voiceMonthKey();
     const [rows, profile, usageRow] = await Promise.all([
@@ -86,9 +95,15 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
         .from(voiceProfiles).where(eq(voiceProfiles.orgId, orgId)).limit(1).then((r) => r[0] ?? null),
       getVoiceUsageRow(orgId, month),
     ]);
-    const held = rows.filter((r) => (HELD_STATUSES as readonly string[]).includes(r.status)).length;
+    const held = rows.filter(countsAgainstAllowance).length;
+    // For the "paused" banner: can a fixed card still keep the number ("releasing"),
+    // or has it gone / is its release final ("released")? null = no automatic release.
+    const auto = rows.filter((r) => !r.isTest && r.releaseReason && (r.status === "releasing" || r.status === "released"));
+    const numberRelease = auto.some((r) => r.status === "releasing" && !releaseIsFinal({ status: r.status, release_reason: r.releaseReason, last_error: r.lastError }))
+      ? "releasing" as const : auto.length ? "released" as const : null;
     res.json({
       ...base,
+      numberRelease,
       numbers: rows.filter((r) => r.status !== "released").map(numberView),
       numberAllowance: numberAllowance(v, held),
       profile: profile ? { status: profile.status, publishedVersion: profile.publishedVersion, setupCompletedAt: profile.setupCompletedAt?.toISOString() ?? null, updatedAt: profile.updatedAt?.toISOString() ?? null } : null,

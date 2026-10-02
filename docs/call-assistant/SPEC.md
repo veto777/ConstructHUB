@@ -73,7 +73,7 @@ file and the drizzle block.
 |---|---|---|
 | `voice_profiles` | one per org: Studio draft, published copy, compiled prompt | `org_id UNIQUE`, `profile jsonb` (draft), `published_version int`, `published_profile jsonb`, `compiled jsonb`, `status` draft/live/paused, `setup_completed_at`, `updated_by_member_id` |
 | `voice_profile_versions` | every publish | `org_id`, `profile_id`, `version int` (UNIQUE per org), `profile jsonb`, `compiled jsonb`, `note`, `created_by_member_id` |
-| `voice_numbers` | SignalWire numbers an org owns | `phone_number UNIQUE` (E.164), `label`, `location`, `state`, `area_code`, `locality`, `provider` ='signalwire', `provider_sid`, `friendly_name`, `voice_url`, `status_callback_url`, `status` pending/active/releasing/released/failed, `is_test`, `forwarding_from`, `monthly_cents`, `purchased_at`, `release_eligible_at` (= purchased + 14 d), `released_at`, `last_error` |
+| `voice_numbers` | SignalWire numbers an org owns | `phone_number UNIQUE` (E.164), `label`, `location`, `state`, `area_code`, `locality`, `provider` ='signalwire', `provider_sid`, `friendly_name`, `voice_url`, `status_callback_url`, `status` pending/active/releasing/released/failed, `is_test`, `forwarding_from`, `monthly_cents`, `purchased_at`, `release_eligible_at` (= purchased + 14 d), `released_at`, `last_error`, `release_reason` (subscription_ended/addon_removed — final; payment_failed/over_allowance — restorable; set while an automatic release is scheduled), `release_scheduled_at` |
 | `voice_calls` | one row per call, transcript on the row | `call_sid UNIQUE`, `number_id`, `from_number`, `to_number`, `engine`, `model`, `persona`, `profile_version`, `started_at`, `answered_at`, `ended_at`, `duration_seconds`, `billed_minutes` (ceil/60), `outcome`, `caller_name/email/address/city`, `service_needed`, `summary`, `transcript jsonb []`, `slots jsonb`, `events jsonb`, `recording_key` (R2), `recording_seconds`, `customer_id`, `project_id`, `lead_delivered_at`, `spam_confidence numeric(3,2)`, `spam_reason`, `flags jsonb` |
 | `voice_escalations` | text/email hand-offs with reminders | `call_id`, `kind`, `rule_id`, `channel` sms/email, `recipient`, `recipient_name`, `body`, `sent_count`, `last_sent_at`, `last_provider_sid`, `remind_every_minutes` 120, `remind_from_hour` 8, `remind_to_hour` 20, `max_days` 14, `follow_up_next_day`, `confirmed_at`, `reply_text`, `followup_sent_at`, `closed_at`, `close_reason`, `last_error` |
 | `voice_spam` | ledger per caller number | `(org_id, phone_number) UNIQUE`, `strikes`, `calls`, `last_confidence`, `last_reason`, `last_call_id`, `blocked_at`, `unblocked_at`, `blocked_by` ('auto' or member id), `first_seen_at`, `last_seen_at` |
@@ -299,12 +299,53 @@ label `constructhub-test`, `is_test=true`; tests mock the REST client. Forwardin
 carrier (AT&T `*72`, Verizon `*72`, T-Mobile `**21*`, Spectrum/Comcast portal, CallRail: edit the tracking
 number's destination and turn off call whisper) are static copy in the Numbers tab.
 
-## 14. Pricing (shared/plans.ts) — **PLACEHOLDER, owner must confirm**
+**The number is part of the service — FIXED (owner, 2026-10-02):** "When a person cancels they lose their
+number - that is the entire purpose of the service you don't keep the number." `server/voice/number-release.ts`:
+- the subscription ENDS (`customer.subscription.deleted`, or status canceled / unpaid / incomplete_expired, or a
+  trial grant ran out) or the `call_assistant` add-on is removed → every number the org holds is released;
+- `call_number` quantity drops below what the org holds → the NEWEST extras are released, the oldest kept;
+- `past_due` NEVER releases (the assistant pauses, the number is held so fixing the card restores the agent);
+- past `release_eligible_at` → released on SignalWire at once; earlier → `status='releasing'` + `release_reason`
+  (stops answering immediately: 423 `number_releasing`, callers hear "This line is no longer answered by our
+  assistant"), released by the sweep (every 15 min, boot-started) as soon as it is eligible;
+- a cancellation is FINAL whatever the number's age: a number scheduled because the subscription ended or the
+  Call Assistant add-on was removed (`release_reason` subscription_ended / addon_removed) is never restored, even
+  if the customer subscribes again within the 14 days — they buy a new number (a final release does not count
+  against the allowance). Only `unpaid` (reason payment_failed: the card is fixed before day 14) and a smaller
+  `call_number` count (over_allowance: the extra is re-added) restore a scheduled number. A number whose release
+  was already attempted (`last_error`) is never restored either (the carrier may have taken it);
+- `VOICE_NUMBER_RELEASE_WORKER_ENABLED=false` (and any non-production server without `=true`) stops every carrier
+  release — the sweep AND the background release after a webhook/add-on change; decisions (DB only) still run;
+- called from the Stripe webhook (subscription created/updated/deleted, checkout completed) and the add-on routes;
+  subscription created/updated re-read the subscription from Stripe (`subscriptions.retrieve`) instead of trusting
+  the event snapshot, since Stripe does not order events; idempotent (row-locked carrier call; a decision locks
+  the org's rows too, so it never "keeps" a number an in-flight release just took; `released` rows never touched
+  again); only `voice_numbers` rows of orgs the account OWNS, by their own SID; never a platform admin's org or the
+  `is_test` number;
+- Settings → Billing / Limits: lowering `call_assistant` or `call_number` below the numbers held opens a confirm
+  dialog listing the numbers that stop now and are released (`GET /api/stripe/addons/release-preview`); the
+  "cancellation … billing portal" line names them too;
+- the org's owners get an activity row and a bell notification ("Your Call Assistant number +1… was released
+  because the subscription ended").
 
-| add-on | monthly | annual (10×) | includes | on |
+## 14. Pricing (shared/plans.ts)
+
+| add-on | monthly | annual | includes | on |
 |---|---|---|---|---|
-| `call_assistant` "AI Call Assistant" | $249 | $2,490 | 1 number + 500 min/mo, then $0.15/min overage | pro, growth, agency |
-| `call_number` "Extra Call Assistant number" | $5 | $50 | one more number (requires call_assistant) | pro, growth, agency |
+| `call_assistant` "AI Call Assistant" | $249 (intro $99 × 3 months, monthly billing only) | **$1,999** (owner, 2026-10-02; no intro) | 1 number + 500 min/mo, then $0.15/min overage | pro, growth, agency |
+| `call_number` "Extra Call Assistant number" | $5 | $50 (10×) | one more number (requires call_assistant) | pro, growth, agency |
+
+Every surface reads "$99/mo for your first 3 months, then $249/mo — or $1,999/yr" from the price book
+(`shared/plan-copy.ts callAssistantIntroShort/Line`). $1,999 is above the $1,000 sales threshold but is an
+add-on annual price, exempt like plan annuals (pricing page, Hub output filter). The intro coupon
+(`server/billing/intro.ts`) is monthly-only.
+
+**Stop paying → the agent stops — FIXED (owner, 2026-10-02):** the `callAssistant` module is on only while the
+subscription is `active` or `trialing` (`ADDON_MODULE_RUN_STATUSES`), though the plan keeps `past_due` access.
+On past_due / unpaid / incomplete / paused the add-on is PAUSED (`ent.addonModulesPaused`): `/profile` answers 423
+`paused` reason `payment_needed` on the very next call (no cache; the engine fetches per call), CRM reads stay
+open, edits/buys/the Simulator answer 402 `payment_required`, and the Overview shows "Paused — update your payment
+method" with a link to Billing.
 
 Both carry `preview: true`: listed on Pricing/Terms with a "Coming soon" badge, refused at checkout
 (`server/billing/order.ts checkAddonsForPlan` → 409 `addon_unavailable`), and `GET /api/crm/voice/status`
@@ -339,8 +380,11 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
   `<Stream>` as `<Parameter name="token">`; `start` must carry it (constant-time compare) or the CallSid must be
   live in our SignalWire project for that `to`. `from`/`to` come from the webhook, never the client. Concurrent
   calls are capped (`VOICE_MAX_ACTIVE_CALLS`).
-- Engine profile: `GET /profile` answers 423 `paused` (reason `addon_inactive`) when the org owner's subscription
-  no longer carries the Call Assistant add-on.
+- Engine profile: `GET /profile` answers 423 `paused` — reason `addon_inactive` when the org owner's subscription
+  no longer carries the Call Assistant add-on, `payment_needed` when it does but is not active/trialing,
+  `number_releasing` for a number being released. `say` is the "taking a short break" line only for
+  `payment_needed` (and a profile the owner paused); `addon_inactive` / `number_releasing` say "This line is no
+  longer answered by our assistant. Please reach the business through its website."
 - Escalation confirmations by text: only a verified (signed) inbound webhook with a `To` changes escalation
   state; the route stays fail-open only for STOP/START/HELP.
 - The engine reads only `voice/.env`; the operator copies ConstructHUB's own AI and SignalWire values in.
@@ -372,7 +416,8 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
 ## 19. Open questions for the owner
 
 - Pricing (§14): $249/mo incl. 1 number + 500 min, $0.15/min overage, $5/mo per extra number — confirm or change.
-- Annual = 10× monthly for the add-on too (consistent with the price book) — confirm.
+  (Answered 2026-10-02: $99/mo × 3 intro on monthly billing; annual $1,999 with no intro; a cancelled
+  subscription loses its number; a failed payment pauses the agent.)
 - Spanish: STT/TTS support for `languages: ["es"]` is a later lane; keep the field but hide the option until then?
 - Appointments: keep OFF for v1 (schema present, booking tools not built) — confirm.
 - Telegram alerts: the CRM has no Telegram channel; v1 uses SMS/email/in-app. Add Telegram to the CRM later?

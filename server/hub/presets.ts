@@ -13,7 +13,7 @@ import { AGENCY_SELF_SERVE_MAX_LOCATIONS, ANNUAL_MONTHS, PLANS, PLAN_KEYS } from
 import {
   planPriceLine, agencyBandsLine, joinNames, planNamesWhere, AGENCY_ONLY_MODULES, CRM_SEATS_LINE,
   PROTECTED_SITE_PLANS, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL,
-  CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantIncludesLine, callAssistantIntroLine, callAssistantPricing,
+  CALL_ASSISTANT_PLANS, CALL_ASSISTANT_NUMBER_RULES, callAssistantAvailabilityLine, callAssistantIncludesLine, callAssistantIntroLine, callAssistantPricing,
 } from "@shared/plan-copy";
 import { HUB_PRESETS, PRESET_IDS, type PresetId } from "@shared/hub-presets";
 import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
@@ -62,7 +62,7 @@ export function templateAnswer(presetId: PresetId): string {
     case "call-assistant":
       return `The **AI Call Assistant** is an AI receptionist for your business line. It answers every call on a local number, day or night, in a woman's or man's voice you pick (${PERSONA_NAMES}). It asks the questions you set in the **Agent Studio**, files each real lead in the ConstructHub CRM with a summary, transcript and recording, texts or emails the teammate you choose for emergencies, and screens spam calls.\nLaunch price: ${callAssistantIntroLine()}, including ${callAssistantIncludesLine()}. It is an add-on to the ${CALL_ASSISTANT_PLANS} plans. ${callAssistantAvailabilityLine()} See [AI Call Assistant](/call-assistant).`;
     case "call-number":
-      return `1. The **AI Call Assistant** is an add-on to the ${CALL_ASSISTANT_PLANS} plans. ${callAssistantAvailabilityLine()}\n2. In the CRM, open **Call Assistant** → **Numbers**, pick a state (and an area code or city if you like) and choose a local number. ConstructHUB buys it for you. ${callAssistantPricing().includedNumbers} number comes with the add-on; extra numbers are ${callAssistantPricing().extraNumber}/month each.\n3. Keep your existing numbers: forward them to the new number from your phone carrier, only when you don't answer, after hours or always. Nothing is ported, and the Numbers tab shows how for common carriers.\nSee [AI Call Assistant](/call-assistant).`;
+      return `1. The **AI Call Assistant** is an add-on to the ${CALL_ASSISTANT_PLANS} plans. ${callAssistantAvailabilityLine()}\n2. In the CRM, open **Call Assistant** → **Numbers**, pick a state (and an area code or city if you like) and choose a local number. ConstructHUB buys it for you. ${callAssistantPricing().includedNumbers} number comes with the add-on; extra numbers are ${callAssistantPricing().extraNumber}/month each.\n3. Keep your existing numbers: forward them to the new number from your phone carrier, only when you don't answer, after hours or always. Nothing is ported, and the Numbers tab shows how for common carriers.\n4. ${CALL_ASSISTANT_NUMBER_RULES.cancel} ${CALL_ASSISTANT_NUMBER_RULES.payment}\nSee [AI Call Assistant](/call-assistant).`;
   }
 }
 
@@ -83,7 +83,7 @@ export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
     case "call-assistant": {
       // The launch price as the pack words it, and "coming soon" while the price book says so.
       const p = callAssistantPricing();
-      return answer.includes(`${p.intro}/month`) && answer.includes(p.regular) && (!p.comingSoon || COMING_SOON.test(answer));
+      return answer.includes(`${p.intro}/month`) && answer.includes(p.regular) && answer.includes(p.annual) && (!p.comingSoon || COMING_SOON.test(answer));
     }
     case "call-number":
       return /\bstate\b/i.test(answer) && /\bforward/i.test(answer) && (!callAssistantPricing().comingSoon || COMING_SOON.test(answer));

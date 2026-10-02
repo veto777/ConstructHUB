@@ -215,7 +215,7 @@ export function personaNames(gender: VoicePersona["gender"]): string {
   return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** "<intro>/mo for your first <N> months, then <regular>/mo" — the owner's launch price, from the price book. */
+/** "<intro>/mo for your first <N> months, then <regular>/mo — or <annual>/yr" — the owner's launch price, from the price book. */
 export function introPriceShort(): string {
   return callAssistantIntroShort();
 }
@@ -310,7 +310,7 @@ export function CallAssistantSection() {
             <div className="flex flex-wrap items-center gap-3">
               <p className="font-display font-semibold text-[1.5rem] sm:text-[1.75rem] leading-tight text-mkt-ink" data-testid="text-call-assistant-landing-price">
                 {price.intro}<span className="font-sans text-sm font-medium text-mkt-muted">/mo</span>{" "}
-                <span className="block sm:inline font-sans text-[15px] font-medium text-mkt-ink-soft">for your first {price.introMonths} months, then {price.regular}/mo</span>
+                <span className="block sm:inline font-sans text-[15px] font-medium text-mkt-ink-soft">for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr</span>
               </p>
               <ComingSoonTag />
             </div>
