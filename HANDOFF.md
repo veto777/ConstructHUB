@@ -57,6 +57,10 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   `/api/voice-ingest` over the tailnet only, authenticated with `VOICE_INGEST_SECRET`. Calls land in `voice_calls`
   under `VOICE_INGEST_ORG_ID` (Alpine Exteriors) with `engine='external'` and show on Call Assistant → Calls. They
   are records only: never billed, never a lead or alert.
+- **Call Assistant Results panel** (Overview and Calls tabs, `client/src/pages/crm-call-assistant/results.tsx`):
+  outcome tiles, calls by line, minutes and recordings over a chosen period. The numbers are counted from
+  `voice_calls` by `callResultsSummary`, so pushed-in calls count too. Signed in, `/call-assistant` sends a CRM
+  member straight to `portal…/crm/call-assistant` (`pages/call-assistant-entry.tsx`).
 
 ## ☎️ 2026-10-02 — Call Assistant tiers, 10¢ overage, 500 free spam calls — branch `ca/tiers`, NOT deployed
 - Owner: "offer 3 different tiers … 3-5k min used a month … all plans cover 500 spam calls that aren't charged … we
