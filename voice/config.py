@@ -48,7 +48,7 @@ class Settings:
     ai_model: str = _env("AI_MODEL", "truthcode-api")
     ai_timeout_s: float = _int("AI_TIMEOUT_MS", 12000) / 1000.0
     anthropic_api_key: str = _env("VOICE_ANTHROPIC_API_KEY")
-    anthropic_model: str = _env("VOICE_ANTHROPIC_MODEL", "claude-haiku-4-5")
+    anthropic_model: str = _env("VOICE_ANTHROPIC_MODEL", "claude-opus-5-5")
     # signalwire (verification only)
     sw_space_url: str = _env("SIGNALWIRE_SPACE_URL")
     sw_project_id: str = _env("SIGNALWIRE_PROJECT_ID")
@@ -59,7 +59,7 @@ class Settings:
     whisper_model: str = _env("VOICE_WHISPER_MODEL", "large-v3-turbo")
     tts_device: str = _env("VOICE_TTS_DEVICE", "cuda")
     stt_device: str = _env("VOICE_STT_DEVICE", "cuda")
-    models_dir: Path = Path(_env("VOICE_MODELS_DIR", str(HERE / "models")))
+    models_dir: str = _env("VOICE_MODELS_DIR")       # Whisper download root; empty = the Hugging Face cache (shared)
     recordings_dir: Path = Path(_env("VOICE_RECORDINGS_DIR", str(HERE / "recordings")))
     # tuning (Alpine's proven defaults; the compiled profile can override timings per org)
     greeting_delay_s: float = _float("VOICE_GREETING_DELAY_S", 3.0)

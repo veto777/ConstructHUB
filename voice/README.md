@@ -23,8 +23,11 @@ API. It runs on the **tower GPU** as the user unit `constructhub-voice.service`
 | `brain.py` | the decision loop: compiled profile + transcript → `Decision` JSON (provider-agnostic) | engine |
 | `decision.py` | validation + cleanup of the model's JSON (tool-call/`<think>` stripping, one retry, honest fallback) | engine |
 | `personas.json` | verified Kokoro voice ids (mirrored in `shared/voice-personas.ts`) | engine |
-| `sim.py` | text simulator CLI (`python sim.py --profile fixtures/x.json --script tests/…txt`) | harness |
-| `tests/` | `fake_signalwire.py` synthetic caller, scripted calls, decision-protocol unit tests | harness |
+| `providers/` | `openai_compat.py` (default, TruthCoder) · `anthropic_tools.py` (optional, real tool use) | engine |
+| `render_samples.py` | verify persona voice ids + render `client/public/voice/samples/<id>.mp3` | engine |
+| `selftest/` | the engine's own tests (`pytest selftest`: no GPU, no network) + `mock_app.py` + `e2e_media.py` (GPU smoke) | engine |
+| `sim.py` | text simulator CLI (`python sim.py --profile tests/profiles/sample.json --script tests/scripts/booking.txt`) | harness (first version by engine) |
+| `tests/` | `fake_signalwire.py` synthetic caller, scripted calls, decision-protocol unit tests | harness (sample profile + scripts by engine) |
 | `deploy/` | systemd unit, install script, `RUNBOOK.md` pointer | infra |
 
 ## Setup (tower)
@@ -37,7 +40,18 @@ cp .env.example .env && $EDITOR .env     # VOICE_INTERNAL_SECRET must equal the 
 python server.py                         # http://127.0.0.1:8152/health
 ```
 
-Models download on first run to `models/` (gitignored). Kokoro voice ids are
+## Tests
+
+```bash
+cd voice
+.venv/bin/python -m pytest selftest -q            # 64 tests, ~15 s, no GPU/network/AI (stub provider, fake VAD/STT/TTS, mock app)
+.venv/bin/python sim.py --profile tests/profiles/sample.json --script tests/scripts/booking.txt   # real AI provider, text only
+```
+
+GPU smoke run of a whole call (real VAD + Whisper + brain + Kokoro, synthetic caller over `/media`, mock app):
+see the header of `selftest/e2e_media.py`. Use a free port (e.g. 8159) — `constructhub-voice.service` owns 8152.
+
+Models download on first run to the Hugging Face cache. Kokoro voice ids are
 verified at startup; a missing id is swapped for the closest match and the
 final list written to `personas.json` — then mirror it in
 `shared/voice-personas.ts`.
