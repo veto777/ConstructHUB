@@ -139,15 +139,49 @@ const page: FeaturePage = {
       a: "No. It stores, labels and matches them and sends you a notification. Fixing the issue happens in the provider's own dashboard.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the senders, the per-provider subject topics,
+  // the critical words and the forwarding code/link are server/mail-alerts/classify.ts SENDERS/REGISTRAR_SENDERS/
+  // classifyMail; "dropped without being stored" is storeMatched returning before the INSERT when classifyMail is null;
+  // matching (exactly one domain → its location, else exactly one business name of 4+ letters), the notification,
+  // 30-day expiry and holding alerts while the plan lacks the module are server/mail-alerts/service.ts storeMatched/
+  // ingest/HELD_ALERT_NOTE; manual mapping, filters and read state are server/mail-alerts/routes.ts; the Gmail setup
+  // steps and "treat as a reported alert" are client/src/pages/mail-alerts.tsx.
+  inDepth: {
+    heading: { title: "Business Profile and Ads Alert Emails, ", em: "Explained" },
+    paragraphs: [
+      "The emails that matter most to a local business land in the same inbox as everything else: a Google Business " +
+        "Profile suspension, an ownership request, a Search Console manual action, a Google Ads policy notice, a domain " +
+        "about to expire. Mail alerts pulls those out. You forward provider emails from Gmail to a private address that " +
+        "belongs to your account, and each one is checked against a fixed list of provider senders and alert subjects. " +
+        "A message that doesn't match is dropped without being stored.",
+      "The known senders are the alert addresses Google Business Profile, Search Console, Google Ads and Cloudflare " +
+        "send from, plus a list of domain registrars. A message is kept only when its subject fits that provider's " +
+        "alert topics: verification, suspension, ownership or access requests for a Business Profile; indexing, crawl, " +
+        "manual action or security for Search Console; policy, disapproval, billing or suspension for Google Ads; " +
+        "expiry, renewal, transfer, nameservers or DNS for a registrar. Ownership requests, new owners, manual actions, " +
+        "security issues, suspensions and registrar transfers are marked critical, other alerts are warnings, and " +
+        "Gmail's own forwarding confirmation is info.",
+      "Each alert is then matched to a client. When the email names exactly one of the domains you keep in Domains, it " +
+        "goes to that domain's location; failing that, when it names exactly one of your business names, it goes to " +
+        "that location. Anything it can't place waits for you to map it by hand. Every new alert sends you a " +
+        "notification, marked critical when it is, and alerts are deleted 30 days after they arrive. If your plan " +
+        "doesn't include Mail alerts yet, forwarded alerts are still kept for those 30 days and appear once it does.",
+      "Setup happens in Gmail: add the forwarding address, confirm it with the code Mail alerts pulls out of Gmail's " +
+        "confirmation email, then create a filter for the provider senders and keep general forwarding off, so only " +
+        "those messages leave your inbox. A matching sender address doesn't prove an email is genuine, so treat each " +
+        "one as a reported alert and check anything about security or billing in the provider's own dashboard. Mail " +
+        "alerts stores, labels and matches; it doesn't reply, appeal or fix anything for you.",
+    ],
+  },
   related: ["domains", "profileGuard", "agency"],
   app: { href: "/mail-alerts", surface: "app" },
   headings: {
     cards: { title: "What Mail Alerts ", em: "Keeps for You" },
   },
   seo: {
-    title: "Mail Alerts — Provider Alert Emails by Client | ConstructHUB",
+    title: "GBP, Ads and Domain Alert Emails by Client | ConstructHUB",
     description:
-      "Forward Google Business Profile, Search Console, Google Ads, Cloudflare and registrar alert emails to a private address, labelled by severity and matched to clients.",
+      "Forward Google Business Profile, Search Console, Google Ads, Cloudflare and registrar alert emails to a private address, sorted by severity and client.",
   },
   sources: [
     "client/src/pages/mail-alerts.tsx",

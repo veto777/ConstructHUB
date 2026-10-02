@@ -145,15 +145,48 @@ const page: FeaturePage = {
       a: "Country and city come from Cloudflare on visits recorded since that was added. Older visits, and visits it couldn't place, show Unknown.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the shared code and what it reports are
+  // server/tracking-script.ts send(); the IP is server/route-guards.ts visitorIp and country/city edgeGeo (Cloudflare
+  // headers, never guessed); visitor grouping, "online" = 20 minutes, the 50-visit detail and suspicion reasons are
+  // server/routes.ts GET …/visitors and …/visitors/:visitorIp; referrer domains and "NO REFERRER DATA" are
+  // GET …/analytics; pages, geo and platforms are GET …/pages, …/geo, …/platforms; the 1,000-visit window is
+  // server/storage.ts getClickVisits + client/src/pages/ip-tracker.tsx VISIT_ROW_CAP; removal is the ip-tracker.tsx dialog.
+  inDepth: {
+    heading: { title: "Website Visitor Tracking by IP, ", em: "Explained" },
+    paragraphs: [
+      "IP Tracker is website visitor tracking for contractors who want to see their traffic one visit at a time, not " +
+        "only as a monthly total. It uses the same tracking code as Click Guard, so one script tag on your site feeds " +
+        "both. Each time a page with the code loads, the visitor's browser reports its device type, browser, operating " +
+        "system, screen size, language and time zone, the address of the page and the site that sent them. The IP " +
+        "address comes from the connection itself. Country and city come from Cloudflare's network when it supplies " +
+        "them, and a visit it can't place shows as Unknown rather than a guess.",
+      "Visits are grouped by IP address. The visitor list shows each IP with its visit count, first and last visit, " +
+        "latest device and location, and marks anyone seen in the last 20 minutes as online. Open an IP and you get " +
+        "its system details, a computer ID made from the browser fingerprint, and up to 50 recent visits with the " +
+        "referrer and landing page of each. When Click Guard flagged that IP, its reasons are listed there too, so the " +
+        "two tools tell one story about the same visitor.",
+      "The other tabs answer the everyday questions about a contractor website. Traffic Sources groups visits by the " +
+        "website that sent them (the referrer), shown by domain name; visits that arrive without one, such as a typed " +
+        "address or a bookmark, are grouped as No referrer data. Pages lists hits and unique visitors for each landing " +
+        "page. Geo counts visits by country and city. Platforms breaks down browsers, operating systems, device types " +
+        "and screen resolutions. The dashboard adds counts for today, yesterday, the last 7 days and this month, and a " +
+        "14-day chart.",
+      "What it can't do matters as much. An IP address is not a person: an office, a household or a phone network can " +
+        "share one, and IP Tracker doesn't give you names, companies or contact details. Visits only count where the " +
+        "code runs, so pages without it and browsers that block scripts are missing. Each view loads the most recent " +
+        "1,000 visits for its period; when a site has more, the counts carry a + because they are a lower bound. " +
+        "Removing a site stops tracking it and deletes its recorded visits and blocked IPs.",
+    ],
+  },
   related: ["clickGuard", "vpnShield", "siteScan"],
   app: { href: "/ip-tracker", surface: "app" },
   headings: {
     cards: { title: "What You See in ", em: "IP Tracker" },
   },
   seo: {
-    title: "IP Tracker — Website Visitor Tracking | ConstructHUB",
+    title: "Website Visitor Tracking by IP Address | ConstructHUB",
     description:
-      "See each visit to your website by IP address: device, browser, landing page, referrer and location, who is online now, and your daily visit counts.",
+      "See every visit to your contractor website by IP address: device, browser, landing page, referrer and location, who is online now and daily counts.",
   },
   sources: [
     "client/src/pages/ip-tracker.tsx",
