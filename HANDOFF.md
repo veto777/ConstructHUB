@@ -59,8 +59,14 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   are records only: never billed, never a lead or alert.
 - **Call Assistant Results panel** (Overview and Calls tabs, `client/src/pages/crm-call-assistant/results.tsx`):
   outcome tiles, calls by line, minutes and recordings over a chosen period. The numbers are counted from
-  `voice_calls` by `callResultsSummary`, so pushed-in calls count too. Signed in, `/call-assistant` sends a CRM
-  member straight to `portal…/crm/call-assistant` (`pages/call-assistant-entry.tsx`).
+  `voice_calls` by `callResultsSummary`, so pushed-in calls count too.
+- **The Call Assistant is a platform page, NOT a CRM page** (owner: "the CRM is a standalone service"). Signed
+  in, `constructhub.us/call-assistant` is the dashboard, in the main shell. The CRM sidebar and ribbon don't list
+  it. The CRM's `/crm/call-assistant` and `/call-assistant` only redirect to the platform, keeping the query, so
+  CRM-bell links still work. Leads still land in the CRM as clients.
+- **Call numbers:** `voice_calls.call_no` is "Call #57", numbered per account by the `voice_calls_assign_no`
+  trigger and unique per org. It shows in the list, the call's title and search (`#57`), and the ingest reply
+  returns it as `callNo`. Janice's recordings are two-sided from 2026-10-02 evening. The 63 earlier ones are caller-only.
 
 ## ☎️ 2026-10-02 — Call Assistant tiers, 10¢ overage, 500 free spam calls — branch `ca/tiers`, NOT deployed
 - Owner: "offer 3 different tiers … 3-5k min used a month … all plans cover 500 spam calls that aren't charged … we
