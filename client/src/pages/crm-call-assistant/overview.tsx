@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState, MetricCard, StatusPill } from "@/components/crm-ui";
 import { prettyPhone } from "@/lib/voice-studio";
-import { CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
+import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { callAssistantIntroShort, callAssistantTiers, formatUsd } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
 import { CallAssistantPausedBanner } from "./paused-banner";
@@ -40,6 +40,8 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
   const included = status.allowance.minutes || status.pricing.includedMinutes;
   const pct = included > 0 ? Math.min(100, Math.round((used / included) * 100)) : 0;
   const overage = status.usage?.overageMinutes ?? 0;
+  // Each call's overage is priced at the rate of the tier it was taken on (server/voice/billing-usage.ts): show the meter's cents.
+  const overageCost = formatUsd(status.usage?.overageCents ?? overage * (status.pricing.overageCentsPerMinute ?? 0));
   const profileStatus = status.profile?.status ?? "draft";
   // The server probes the engine's /health (cached ~30 s); "configured" alone says nothing about whether calls get answered.
   const engine: { tone: "success" | "warning" | "danger"; text: string; hint: string } =
@@ -71,7 +73,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
         <MetricCard icon={Hash} label="Numbers" value={numbers.length} testid="metric-overview-numbers"
           context={`${status.allowance.numbers} included with your add-on`} href="/crm/call-assistant?tab=numbers" />
         <MetricCard icon={Timer} label="Minutes this month" value={used.toLocaleString("en-US")} testid="metric-overview-minutes"
-          context={`of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over at ${formatUsd(status.pricing.overageCentsPerMinute ?? CALL_MINUTE_OVERAGE_CENTS)}/min` : ""}`} />
+          context={`of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
         <MetricCard icon={PhoneCall} label="Calls this month" value={status.usage?.calls ?? 0} testid="metric-overview-calls" href="/crm/call-assistant?tab=calls" />
         <MetricCard icon={ShieldBan} label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
           context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/crm/call-assistant?tab=calls&view=spam" />
@@ -92,7 +94,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
               </Button>
             )}
           </div>
-          <ul className="grid gap-2 sm:grid-cols-3 text-sm" data-testid="list-overview-tiers">
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm" data-testid="list-overview-tiers">
             {tiers.map((t, i) => (
               <li key={t.tier} className={`rounded-md border px-3 py-2 ${t === heldTier ? "border-primary/60 bg-primary/5" : ""}`} data-testid={`row-overview-tier-${t.tier}`}>
                 <div className="flex items-center justify-between gap-2">
@@ -101,7 +103,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
                     {t === heldTier ? "Current" : heldIndex < 0 ? "" : i > heldIndex ? "Upgrade" : "Downgrade"}
                   </span>
                 </div>
-                <span className="text-xs text-muted-foreground">{t.monthly}/mo · {t.minutes} min · {t.numbersLabel}</span>
+                <span className="text-xs text-muted-foreground">{t.monthly}/mo · {t.minutes} min · {t.numbersLabel} · {t.overageShort}/min over</span>
               </li>
             ))}
           </ul>

@@ -119,18 +119,21 @@ export function moduleEnabled(ent: Pick<Entitlements, "modules" | "addonModules"
 /**
  * The Call Assistant allowance the subscription buys: numbers = the held
  * tier's numbers (shared/plans.ts CALL_ASSISTANT_TIERS) plus every call_number
- * unit; minutes per month = the tier's included minutes. Platform admins get
- * one unit's worth (they run the product, they do not get unlimited carrier numbers).
+ * unit; minutes per month = the tier's included minutes; overageCentsPerMinute
+ * = the tier's own overage rate (0 with no allowance: the meter then keeps the
+ * month's snapshot). Platform admins get one Solo unit's worth (they run the
+ * product, they do not get unlimited carrier numbers).
  */
-export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number } {
+export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number; overageCentsPerMinute: number } {
   // A paused add-on (payment needed) still shows what it bought: its numbers are held, not released.
   const paused = !ent.addonModules.callAssistant && ent.addonModulesPaused?.callAssistant === true;
-  if (!ent.addonModules.callAssistant && !paused) return { numbers: 0, minutes: 0 };
+  if (!ent.addonModules.callAssistant && !paused) return { numbers: 0, minutes: 0, overageCentsPerMinute: 0 };
   const addons = paused ? ent.storedAddons ?? {} : ent.addons;
   const included = callAssistantIncluded(ent.isPlatformAdmin && !callAssistantIncluded(addons).tier ? { call_assistant: 1 } : addons);
   return {
     numbers: included.numbers + (addons.call_number ?? 0),
     minutes: included.minutes,
+    overageCentsPerMinute: included.overageCentsPerMinute,
   };
 }
 

@@ -3,10 +3,10 @@
  * (SPEC.md § CRM API → Overview / Usage). OWNER: numbers+billing lane.
  *
  * Fixed by the architect:
- *   - the add-on block in shared/plans.ts (the three tiers in
- *     CALL_ASSISTANT_TIERS — call_assistant = Solo, call_assistant_crew,
- *     call_assistant_fleet — call_number, CALL_MINUTE_OVERAGE_CENTS,
- *     CALL_ASSISTANT_FREE_SPAM_CALLS) — the lane
+ *   - the add-on block in shared/plans.ts (the four tiers in
+ *     CALL_ASSISTANT_TIERS — call_assistant_lite, call_assistant = Solo,
+ *     call_assistant_crew, call_assistant_fleet, each with its own overage
+ *     rate — call_number, CALL_ASSISTANT_FREE_SPAM_CALLS) — the lane
  *     owns it from here on, and removes `preview` only when the owner confirms;
  *   - voice_usage is the meter (server/voice/schema.ts): minutes per org per
  *     month, included snapshot, overage billed to Stripe (billing-usage.ts);
@@ -25,8 +25,8 @@ import { voiceProfiles } from "@shared/schema";
 import { voiceContext, type GetUser } from "./context";
 import { moduleEnabled, modulePaused, BILLING_HREF } from "../entitlements";
 import {
-  ADDONS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS,
-  callAssistantTierOf,
+  ADDONS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_NUMBER_MIN_DAYS,
+  callAssistantTier, callAssistantTierOf,
 } from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
@@ -91,13 +91,14 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       tier: tier ? { key: tier.tier, addon: tier.addon, name: tier.name } : null,
       tiers: CALL_ASSISTANT_TIERS.map((t) => ({
         key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents,
-        includedMinutes: t.includedMinutes, includedNumbers: t.includedNumbers, preview: ADDONS[t.addon].preview === true,
+        includedMinutes: t.includedMinutes, includedNumbers: t.includedNumbers, overageCentsPerMinute: t.overageCentsPerMinute, preview: ADDONS[t.addon].preview === true,
       })),
       plan: v.ent.accessPlan,
       allowance: v.allowance,
       units: { callAssistant: tier ? 1 : 0, tier: tier?.tier ?? null, callNumber: heldAddons.call_number ?? 0 },
       pricing: {
-        includedMinutes: tier?.includedMinutes ?? CALL_ASSISTANT_TIERS[0].includedMinutes, overageCentsPerMinute: CALL_MINUTE_OVERAGE_CENTS,
+        // Without a held tier: Solo's (the tier a prompt offers and a platform admin runs on).
+        includedMinutes: (tier ?? callAssistantTier("solo")).includedMinutes, overageCentsPerMinute: (tier ?? callAssistantTier("solo")).overageCentsPerMinute,
         numberMinDays: CALL_NUMBER_MIN_DAYS, freeSpamCalls: CALL_ASSISTANT_FREE_SPAM_CALLS,
       },
       // The engine's internal address never goes to the browser; only whether it answers.
@@ -126,7 +127,7 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       numbers: rows.filter((r) => r.status !== "released").map(numberView),
       numberAllowance: numberAllowance(v, held),
       profile: profile ? { status: profile.status, publishedVersion: profile.publishedVersion, setupCompletedAt: profile.setupCompletedAt?.toISOString() ?? null, updatedAt: profile.updatedAt?.toISOString() ?? null } : null,
-      usage: summarizeVoiceUsage(usageRow, month, v.allowance.minutes),
+      usage: summarizeVoiceUsage(usageRow, month, v.allowance.minutes, v.allowance.overageCentsPerMinute),
     });
   });
 
@@ -140,9 +141,9 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
     const [row, history] = await Promise.all([getVoiceUsageRow(orgId, asked), listVoiceUsage(orgId, 12)]);
     res.setHeader("Cache-Control", "no-store");
     res.json({
-      ...summarizeVoiceUsage(row, asked, v.allowance.minutes),
+      ...summarizeVoiceUsage(row, asked, v.allowance.minutes, v.allowance.overageCentsPerMinute),
       allowance: v.allowance,
-      history: history.map((h) => summarizeVoiceUsage(h, h.month, h.includedMinutes ?? v.allowance.minutes)),
+      history: history.map((h) => summarizeVoiceUsage(h, h.month, h.includedMinutes ?? v.allowance.minutes, v.allowance.overageCentsPerMinute)),
     });
   });
 }

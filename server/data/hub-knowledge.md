@@ -614,9 +614,9 @@ For contractors who'd rather have the work done for them. Every one of these is 
 
 An AI receptionist for the contractor's own phone line. It answers every call, day or night, collects the lead the way the contractor wants, files it in the CRM and gets urgent calls to the right person. Page: [AI Call Assistant](/call-assistant). In the CRM it lives under **Call Assistant** (tabs: Overview, Numbers, Agent Studio, Simulator, Calls).
 
-**Price and availability:** three tiers, one per account: {{CALL_ASSISTANT_TIERS_LINE}}. Solo's launch price is {{CALL_ASSISTANT_INTRO_LINE}}. The intro price is Solo on monthly billing; yearly billing is the yearly price from the start, and Crew and Fleet have no intro. On every tier, {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own; the contractor can move between tiers any time in Settings → Billing (the difference is prorated, and a smaller tier keeps fewer numbers). {{CALL_ASSISTANT_AVAILABILITY}}
+**Price and availability:** {{CALL_ASSISTANT_TIER_COUNT}} tiers, one per account: {{CALL_ASSISTANT_TIERS_LINE}}. Solo's launch price is {{CALL_ASSISTANT_INTRO_LINE}}. The intro price is Solo on monthly billing; yearly billing is the yearly price from the start, and {{CALL_ASSISTANT_NO_INTRO_TIERS}} have no intro. On every tier, {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own; the contractor can move between tiers any time in Settings → Billing (the difference is prorated, and a smaller tier keeps fewer numbers). {{CALL_ASSISTANT_AVAILABILITY}}
 
-**Which tier:** {{CALL_ASSISTANT_TIER_ADVICE}} **What counts as a minute:** {{CALL_ASSISTANT_MINUTE_RULE}}
+**Which tier:** {{CALL_ASSISTANT_TIER_ADVICE}} **What counts as a minute:** {{CALL_ASSISTANT_MINUTE_RULE}} **Minutes over:** {{CALL_ASSISTANT_OVERAGE_RULE}}
 
 **Voices:** the contractor picks a name and voice for the assistant: {{CALL_ASSISTANT_PERSONAS}}, and can change the greeting. (The phone voice named Gabe is one of those choices; it is not this website helper.) It speaks English today.
 

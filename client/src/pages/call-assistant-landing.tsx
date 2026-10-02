@@ -28,8 +28,8 @@ import {
 } from "@/components/call-assistant-marketing";
 import { PLANS } from "@shared/plans";
 import {
-  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantMinuteRule, callAssistantPricing, callAssistantSpamAllowanceLine,
-  callAssistantTierAdvice, callAssistantYearlyNote, formatUsd,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantMinuteRule, callAssistantOverageRule, callAssistantPricing, callAssistantSpamAllowanceLine,
+  callAssistantTierAdvice, callAssistantYearlyNote, formatUsd, joinNames,
 } from "@shared/plan-copy";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { ROUTE_META } from "@shared/route-meta";
@@ -129,7 +129,7 @@ function faqs(): { q: string; a: string }[] {
     },
     {
       q: "What counts as a minute?",
-      a: `${callAssistantMinuteRule()} Each tier includes its minutes every calendar month; above them it's ${p.overagePerMinute} a minute, on your next invoice.`,
+      a: `${callAssistantMinuteRule()} ${callAssistantOverageRule()}`,
     },
     {
       q: "Do spam calls use my minutes?",
@@ -167,6 +167,10 @@ export default function CallAssistantLandingPage() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [salesOpen, setSalesOpen] = useState(false);
   const price = callAssistantPricing();
+  const tierCountWord = price.tierCountWord;
+  const TierCountWord = tierCountWord.replace(/^./, (c) => c.toUpperCase());
+  /** "Crew and Fleet" — the tiers with the lower overage rate. */
+  const lowerOverageTiers = joinNames(price.tiers.filter((t) => t.lowerOverage).map((t) => t.name));
   useMetaDescription(ROUTE_META[CALL_ASSISTANT_PATH].description);
 
   // Signed out: create an account. Signed in: the CRM, where the Call Assistant lives.
@@ -206,9 +210,10 @@ export default function CallAssistantLandingPage() {
                 {salesCta(BTN_OUTLINE, "button-ca-sales-hero")}
               </div>
               <p className="mt-5 text-[15px] text-mkt-ink-soft" data-testid="text-ca-hero-price">
-                Solo: <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr.
-                {" "}Crew and Fleet for busier phones.
-                {" "}<a href="#pricing" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">Compare the three tiers</a>
+                From <strong className="font-semibold text-mkt-ink">{price.from}/mo</strong> ({price.fromTier}).
+                {" "}Solo: <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr.
+                {" "}{lowerOverageTiers} for busier phones, at a lower rate per extra minute.
+                {" "}<a href="#pricing" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">Compare the {tierCountWord} tiers</a>
               </p>
             </div>
 
@@ -394,23 +399,23 @@ export default function CallAssistantLandingPage() {
           <div className="max-w-6xl mx-auto">
             <div className="text-center">
               <Kicker n="05" className="justify-center">Pricing</Kicker>
-              <h2 className={H2}>Three Tiers. <em className="text-mkt-orange-ink">Pick Your Call Volume.</em></h2>
+              <h2 className={H2}>{TierCountWord} Tiers. <em className="text-mkt-orange-ink">Pick Your Call Volume.</em></h2>
             </div>
             <p className="mt-5 text-center text-[16px] text-mkt-ink-soft max-w-2xl mx-auto" data-testid="text-call-assistant-price">
-              Three tiers, one per account. Solo starts at {introPriceShort()}.
+              {TierCountWord} tiers, one per account, from {price.from}/mo. Solo starts at {introPriceShort()}.
             </p>
-            <div className="mt-10 grid md:grid-cols-3 gap-5" data-testid="card-ca-pricing">
-              {price.tiers.map((t, i) => (
+            <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5" data-testid="card-ca-pricing">
+              {price.tiers.map((t) => (
                 <div
                   key={t.tier}
-                  className={`relative bg-mkt-card border rounded-2xl p-7 flex flex-col ${i === 1 ? "border-mkt-ink" : "border-mkt-rule"}`}
+                  className={`relative bg-mkt-card border rounded-2xl p-6 xl:p-7 flex flex-col ${t.intro ? "border-mkt-ink" : "border-mkt-rule"}`}
                   data-testid={`card-ca-tier-${t.tier}`}
                 >
                   <div className="flex flex-wrap items-center gap-2.5">
                     <h3 className="font-display font-semibold text-[1.5rem] text-mkt-ink">{t.name}</h3>
                     <ComingSoonTag />
                   </div>
-                  <div className="mt-4 font-display font-semibold text-[2.8rem] leading-none text-mkt-ink" data-testid={`text-ca-tier-price-${t.tier}`}>
+                  <div className="mt-4 font-display font-semibold text-[2.6rem] leading-none text-mkt-ink" data-testid={`text-ca-tier-price-${t.tier}`}>
                     {t.intro ?? t.monthly}<span className="font-sans text-base font-medium text-mkt-muted ml-1">/mo</span>
                   </div>
                   <p className="mt-2 text-[14px] text-mkt-ink-soft min-h-[2.6em]" data-testid={`text-ca-tier-terms-${t.tier}`}>
@@ -420,6 +425,17 @@ export default function CallAssistantLandingPage() {
                     <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> {t.minutes} call minutes a month</li>
                     <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> {t.numbersLabel} in the state you choose</li>
                     <li className="flex gap-3 text-mkt-ink-soft"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Fits {t.estimatedCalls} (estimate)</li>
+                    <li className="flex gap-3" data-testid={`text-ca-tier-overage-${t.tier}`}>
+                      <CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" />
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {t.overageShort}/min over
+                        {t.lowerOverage && (
+                          <span className="inline-flex items-center rounded-full bg-mkt-orange px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white" data-testid={`badge-ca-tier-lower-overage-${t.tier}`}>
+                            Lower overage
+                          </span>
+                        )}
+                      </span>
+                    </li>
                   </ul>
                 </div>
               ))}
@@ -429,7 +445,7 @@ export default function CallAssistantLandingPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">On every tier</p>
                 <ul className="mt-4 space-y-3 text-[15px] text-mkt-ink">
                   <li className="flex gap-3"><ShieldBan className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> <span><strong className="font-semibold">The first {price.freeSpamCalls} spam calls each month free</strong>: they never count toward your minutes</span></li>
-                  <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Then {price.overagePerMinute} a minute above your included minutes</li>
+                  <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Above your included minutes: {price.overageLine}</li>
                   <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Extra local numbers {price.extraNumber}/mo each</li>
                 </ul>
               </div>
@@ -489,7 +505,7 @@ export default function CallAssistantLandingPage() {
               Let Every Call Be Answered
             </h2>
             <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
-              Solo from {introPriceShort()}; Crew and Fleet for busier phones. Spam screened on every call. An add-on for the {price.plans} plans, with every call in your CRM.
+              From {price.from}/mo with {price.fromTier}. Solo from {introPriceShort()}; {lowerOverageTiers} for busier phones. Spam screened on every call. An add-on for the {price.plans} plans, with every call in your CRM.
             </p>
             <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               {primaryCta("cta")}

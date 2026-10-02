@@ -38,7 +38,7 @@ export type VoiceContext = {
   /** The org owner's entitlements (the subscription that holds the add-on). */
   ent: Entitlements;
   /** Numbers and monthly minutes the add-on buys. */
-  allowance: { numbers: number; minutes: number };
+  allowance: { numbers: number; minutes: number; overageCentsPerMinute: number };
   /** The add-on is bought but paused until a payment goes through (only ever true on a read). */
   paused: boolean;
 };

@@ -32,7 +32,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
-import { callAssistantIntroShort, callAssistantYearlyNote } from "@shared/plan-copy";
+import { callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote } from "@shared/plan-copy";
 import { CallAssistantTierCards } from "@/components/call-assistant-tiers";
 
 const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; chip: string; button: string; check: string }> = {
@@ -565,15 +565,15 @@ export default function PricingPage() {
               {addonsEditable ? " Add or remove them any time in Settings → Billing." : " Add them in Settings → Billing once you're subscribed to one of these plans."}
             </p>
           </div>
-          {/* The AI Call Assistant: three tiers, one per subscription (shared/plans.ts CALL_ASSISTANT_TIERS). */}
-          <div className="max-w-4xl mx-auto space-y-3" id="call-assistant-tiers" data-testid="block-addon-call-assistant">
+          {/* The AI Call Assistant: four tiers, one per subscription (shared/plans.ts CALL_ASSISTANT_TIERS). */}
+          <div className="max-w-5xl mx-auto space-y-3" id="call-assistant-tiers" data-testid="block-addon-call-assistant">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-lg font-bold tracking-tight">{CALL_ASSISTANT_NAME}: pick a tier</h3>
               <Link href="/call-assistant" className="text-sm font-medium underline underline-offset-2 hover:text-[#C2410C] dark:hover:text-[#FB923C]" data-testid="link-addon-call-assistant">How it works →</Link>
             </div>
             <p className="text-sm font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">
               {/* The intro is Solo, monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
-              {interval === "year" ? callAssistantYearlyNote() : `Solo launch price: ${callAssistantIntroShort()}`}
+              {interval === "year" ? callAssistantYearlyNote() : `From ${callAssistantPricing().from}/mo (${callAssistantPricing().fromTier}). Solo launch price: ${callAssistantIntroShort()}`}
             </p>
             <CallAssistantTierCards interval={interval} />
           </div>
