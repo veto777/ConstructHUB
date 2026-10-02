@@ -37,6 +37,7 @@ const page: FeaturePage = {
   group: "run",
   status: "ready",
   title: "Agency workspace",
+  ctaTitle: "Agency Workspace",
   kicker: "For agencies",
   headline: { lead: "All Your Clients in ", swipe: "One\u00a0Workspace" },
   lede:
@@ -143,7 +144,7 @@ const page: FeaturePage = {
     },
     {
       q: "Does a bulk action change Google right away?",
-      a: "It is queued and runs in the background; Jobs shows each location's progress and any failure. Profile Guard needs an approved snapshot for each location before it can be switched on, and Site Scans use each location's monthly scan allowance.",
+      a: "It is queued and runs in the background; Jobs shows each location's progress and any failure. Profile Guard needs an approved snapshot for each location before it can be switched on, and each location scanned uses one Site Scan from your account's monthly allowance.",
     },
     {
       q: "What doesn't it do?",

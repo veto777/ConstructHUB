@@ -17,7 +17,7 @@ export interface LandingSectionLink {
   label: string;
 }
 
-export function LandingMobileMenu({ links, signInHref }: { links: LandingSectionLink[]; signInHref?: string }) {
+export function LandingMobileMenu({ links, routeLinks = [], signInHref }: { links: LandingSectionLink[]; routeLinks?: { href: string; label: string }[]; signInHref?: string }) {
   const [open, setOpen] = useState(false);
 
   const jump = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -43,9 +43,9 @@ export function LandingMobileMenu({ links, signInHref }: { links: LandingSection
       <SheetContent side="right" className="w-72 max-w-[85vw]" onCloseAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader>
           <SheetTitle>Menu</SheetTitle>
-          <SheetDescription>Jump to a section of this page.</SheetDescription>
+          <SheetDescription>{routeLinks.length ? "Jump to a section of this page, or open another page." : "Jump to a section of this page."}</SheetDescription>
         </SheetHeader>
-        <nav className="mt-4 flex flex-col gap-1" aria-label="Page sections">
+        <nav className="mt-4 flex flex-col gap-1" aria-label={routeLinks.length ? "Menu" : "Page sections"}>
           {links.map((link) => (
             <a
               key={link.href}
@@ -56,6 +56,17 @@ export function LandingMobileMenu({ links, signInHref }: { links: LandingSection
             >
               {link.label}
             </a>
+          ))}
+          {routeLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setOpen(false)}
+              className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted transition-colors"
+              data-testid={`link-mobile-nav-${link.href.slice(1)}`}
+            >
+              {link.label}
+            </Link>
           ))}
         </nav>
         <div className="mt-4 border-t pt-4 space-y-2">

@@ -7,7 +7,7 @@
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
   MODULE_NAMES, agencyMonthlyCents, effectivePlanKey, showsPrice,
-  type Addon, type AddonKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
+  type Addon, type AddonKey, type AddonModuleKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "@shared/plans";
 
 // ── Money ───────────────────────────────────────────────────────────────────
@@ -137,6 +137,8 @@ export type EntitlementsInfo = {
   grantEndsAt: string | null;
   allowances: PlanLimits | null;
   modules: Record<ModuleKey, boolean>;
+  /** Add-on modules that are on (every one for platform admins). */
+  addonModules?: Partial<Record<AddonModuleKey, boolean>>;
   addons: Partial<Record<AddonKey, number>>;
   locations: UsageMeter;
   usage: Partial<Record<UsageKey, UsageMeter>>;

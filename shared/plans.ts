@@ -138,7 +138,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "15 Site Scans / month",
       "5,000 permit searches / month",
       "CRM — 10 seats, team text alerts (1,500 / month)",
-      "1 client-texting number included (500 texts / month)",
+      "1 client-texting number included",
       "Priority support + onboarding call",
     ],
     limits: {
@@ -234,7 +234,7 @@ export const ADDONS: Record<AddonKey, Addon> = {
   extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location (10+ locations: Agency).", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "pro", "growth"], grants: { locations: 1 } },
   extra_seat: { key: "extra_seat", name: "Extra seat", description: "One more CRM or agency team seat.", monthlyCents: 1500, annualCents: 15000, availableOn: ["starter", "pro", "growth", "agency"], grants: { crmSeats: 1 } },
   protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["pro", "growth", "agency"], grants: { protectedSites: 1 } },
-  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier: 500 texts / month, then $0.02 each.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
+  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"], grants: { competitorScans: 10 } },
   // ── Call Assistant (docs/call-assistant/SPEC.md) ─────────────────────────
   // Both add-ons stay `preview` (listed, not sellable) until the owner launches

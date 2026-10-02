@@ -57,7 +57,7 @@ const page: FeaturePage = {
     {
       icon: "map",
       title: "A guide for all 50 states",
-      body: "Each state's Secretary of State, licensing board, workers' comp agency and tax agency, with notes on licensing, bonds, insurance and payroll.",
+      body: "Each state's Secretary of State, workers' comp agency and tax agency, plus its licensing board where the state licenses contractors, with notes on licensing, bonds, insurance and payroll.",
     },
     {
       icon: "link",
@@ -87,13 +87,13 @@ const page: FeaturePage = {
       "Pick a state to see whether it requires a state contractor license, a bond, or sales tax on labor.",
       "The comparison table puts every state's license, workers' comp, sales tax and B&O tax side by side, free to read.",
       "Unlocked, each agency tile opens the agency's own site, and a link our check couldn't confirm says so.",
-      "Some states have a detailed step-by-step walkthrough; more are being added state by state.",
+      "A few states also have a detailed step-by-step walkthrough; every state links straight to its agencies.",
     ],
     panel: {
       label: "State guide",
       title: "What each state guide covers",
       items: [
-        "State overview", "Secretary of State", "Licensing board", "Workers' comp agency", "Tax agency", "Entity types",
+        "State overview", "Secretary of State", "Licensing board (where one exists)", "Workers' comp agency", "Tax agency", "Entity types",
         "Workers' comp type", "Sales tax on labor", "Contractor bond", "Licensing details", "Insurance notes", "Payroll notes",
       ],
       note: "The full state guide unlocks with the Business Formation & Licensing module or the bundle.",

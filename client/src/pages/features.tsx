@@ -29,7 +29,7 @@ import {
   BTN_LG, BTN_OUTLINE, BTN_OUTLINE_ON_NAVY, BTN_PRIMARY, H2, Kicker, LEAD, useDocumentTitle, useMetaDescription,
   useStartAtTop,
 } from "@/components/feature-landing/primitives";
-import { ComingSoonPill } from "@/components/feature-landing/sections";
+import { ComingSoonPill, priceSentence } from "@/components/feature-landing/sections";
 import { StandingGator } from "@/components/mascot";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
@@ -41,6 +41,8 @@ const GROUP_ICONS: Record<FeatureGroupKey, FeatureIcon> = {
 
 function CatalogueCard({ entry }: { entry: FeatureCatalogueEntry }) {
   const price = featurePriceSummary(entry.pricing);
+  // The same figure the feature page's hero states ("Included from the Pro plan — from $79/mo").
+  const figure = price.price ? priceSentence(price).rest.replace(/^ — /, "").replace(/\.$/, "") : null;
   const Icon = FEATURE_ICON_COMPONENTS[entry.icon ?? GROUP_ICONS[entry.group]];
   return (
     <Link
@@ -58,6 +60,7 @@ function CatalogueCard({ entry }: { entry: FeatureCatalogueEntry }) {
       <p className="mt-2 text-[14.5px] text-mkt-ink-soft leading-relaxed flex-1">{entry.lede}</p>
       <p className="mt-4 pt-4 border-t border-dotted border-mkt-rule text-[11px] font-semibold uppercase tracking-[0.14em] text-mkt-muted" data-testid={`text-catalogue-plan-${entry.key}`}>
         {price.headline}
+        {figure && <span className="block mt-1 normal-case tracking-normal text-[14px] text-mkt-ink" data-testid={`text-catalogue-price-${entry.key}`}>{figure}</span>}
       </p>
       <span className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-semibold text-mkt-orange-ink">
         See how it works <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />

@@ -226,7 +226,9 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "clientTexting",
           label: "Two-way client texting",
-          included: allowances.clientTexting === "none" ? "Not included"
+          // A platform admin can't buy the add-on (the button is hidden) and texting is on (orgSmsEntitled).
+          included: admin ? "Included (own or dedicated number)"
+            : allowances.clientTexting === "none" ? "Not included"
             : allowances.clientTexting === "included" ? "1 number included"
             : "Your SignalWire number or the texting add-on",
           excluded: allowances.clientTexting === "none",
@@ -323,7 +325,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                 {resets ? `Monthly counts reset ${resets.toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone: "UTC" })}.` : ""}
                 {isAgency ? " Agency allowances grow with the locations you're billed for." : ""}
                 {admin
-                  ? " This is a platform admin account: every feature and add-on is on, and every usage limit is unlimited, whatever plan it holds. The Call Assistant keeps a ceiling on phone numbers." : ""}
+                  ? " This is a platform admin account: every feature and add-on is on, and every plan limit is unlimited, whatever plan it holds. Per-day safety caps still apply (for example 5 Site Scans and 40 Gabe questions a day), and the Call Assistant keeps a ceiling on phone numbers." : ""}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

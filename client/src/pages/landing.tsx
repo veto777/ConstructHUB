@@ -33,6 +33,7 @@ import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
 import { callAssistantPricing } from "@shared/plan-copy";
+import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
 
 const SECTION_LINKS = [
   { href: "#services", label: "Services" },
@@ -40,6 +41,8 @@ const SECTION_LINKS = [
   { href: "#stats", label: "Results" },
   { href: "#coverage", label: "Coverage" },
 ] as const;
+/** Other pages in the nav (the section links above jump within this one). */
+const ROUTE_LINKS = [{ href: FEATURES_PATH, label: "Features" }];
 
 /** Button recipes — anchors styled as buttons (no <button> nested in <a>). */
 const BTN = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange focus-visible:ring-offset-2 focus-visible:ring-offset-mkt-paper";
@@ -144,46 +147,55 @@ const services = [
   {
     icon: Search,
     title: "Nationwide Permit Search",
+    href: featureIntroPath("permits"),
     description: "Find the permit office for any county or city we list in all 50 states and DC, and search the government portals we support by address, contractor, or company name.",
   },
   {
     icon: Camera,
     title: "SEO Photo Optimizer",
+    href: featureIntroPath("media"),
     description: "Watermark, rename, geotag and describe your job photos in one batch. Google strips EXIF on upload, so geotags don't promise a ranking benefit.",
   },
   {
     icon: Eye,
     title: "GMB Monitor",
+    href: featureIntroPath("profileGuard"),
     description: "Check your Google Business listings against Google on demand and keep a history of every change a check finds. Includes AI Review Response Generator.",
   },
   {
     icon: Grid3X3,
     title: "GMB Ranking Grid",
+    href: featureIntroPath("rankingGrid"),
     description: "Visualize exactly where you rank on Google Maps across your service area. Monitor local keyword performance with a geographic heatmap grid.",
   },
   {
     icon: MapPin,
     title: "GMB Locations Manager",
+    href: featureIntroPath("gbp"),
     description: "Manage all your business locations with Semrush-style GBP analytics — search/maps views, interactions, phone calls, and citation campaign tracking.",
   },
   {
     icon: ShieldAlert,
     title: "GBP Reinstatement",
+    href: featureIntroPath("reinstatement"),
     description: "Suspended Google Business Profile? Our reinstatement service handles soft and hard suspensions with a proven 4-step recovery process.",
   },
   {
     icon: Crosshair,
     title: "Competitor Intelligence",
+    href: featureIntroPath("competitors"),
     description: "Analyze competitors in your market. Track their permit activity, ranking positions, and business moves so you always stay one step ahead.",
   },
   {
     icon: GraduationCap,
     title: "Master Class",
+    href: featureIntroPath("masterClass"),
     description: "Complete state-by-state guide to starting a construction business — LLC formation, licensing, bonding, insurance, plus website & SEO training.",
   },
   {
     icon: Users,
     title: "Contractor CRM",
+    href: featureIntroPath("crm"),
     description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — included with every plan.",
   },
   {
@@ -262,6 +274,9 @@ export default function LandingPage() {
             {SECTION_LINKS.map((link) => (
               <a key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
             ))}
+            {ROUTE_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</Link>
+            ))}
           </div>
           <div className="flex items-center gap-1 lg:gap-3">
             {user && (
@@ -287,7 +302,7 @@ export default function LandingPage() {
                 </Link>
               </>
             )}
-            <LandingMobileMenu signInHref={user ? undefined : "/auth"} links={[...SECTION_LINKS]} />
+            <LandingMobileMenu signInHref={user ? undefined : "/auth"} links={[...SECTION_LINKS]} routeLinks={ROUTE_LINKS} />
           </div>
         </div>
       </nav>

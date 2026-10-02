@@ -6,8 +6,8 @@
  * and the entitlement gates don't.
  */
 import {
-  ADDONS, GBP_REINSTATEMENT_CENTS, PLANS, PLAN_KEYS, TRIAL_DAYS, planForModule, showsPrice,
-  type CountLimitKey, type Plan, type PlanKey,
+  ADDONS, ADDON_MODULES, GBP_REINSTATEMENT_CENTS, PLANS, PLAN_KEYS, TRIAL_DAYS, planForModule, showsPrice,
+  type AddonModuleKey, type CountLimitKey, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "../plans";
 import { SALES_HREF, SALES_REP_LABEL, formatUsd, joinNames, plansWhere, priceOrSalesRep } from "../plan-copy";
 import type { FeatureAllowance, FeaturePricing } from "./types";
@@ -162,4 +162,47 @@ export function allowanceLine(a: FeatureAllowance): string {
     return value ? [`${plan.name} ${value}`] : [];
   });
   return `${a.unit}${a.period === "month" ? " a month" : ""}: ${joinNames(parts)}`;
+}
+
+/** The slice of GET /api/entitlements the "is it in my plan?" check reads. */
+export type FeatureEntitlementsInput = {
+  accessPlan: PlanKey | null;
+  allowances: PlanLimits | null;
+  modules: Partial<Record<ModuleKey, boolean>>;
+  addonModules?: Partial<Record<AddonModuleKey, boolean>>;
+};
+
+/** What a signed-in account on a plan that lacks the feature is offered instead of "Open <feature>". */
+export type FeaturePlanGap = { label: string; href: string; note: string };
+
+/**
+ * Null when the account can use the feature (or the page can't tell); otherwise
+ * the upgrade step. It mirrors the server's gates (requireModule, the allowance
+ * tests, add-on modules). An account with no plan of its own gets null: a crew
+ * seat or workspace teammate works under someone else's plan, which this check
+ * can't see, so the page keeps "Open <feature>" and the app decides.
+ */
+export function featurePlanGap(spec: FeaturePricing, ent: FeatureEntitlementsInput): FeaturePlanGap | null {
+  if (!ent.accessPlan) return null;
+  const current = PLANS[ent.accessPlan].name;
+  const upgrade = (plans: PlanKey[]): FeaturePlanGap | null => {
+    const target = plans.find((k) => k !== ent.accessPlan);
+    return target ? { label: `Upgrade to ${PLANS[target].name}`, href: "/pricing", note: `Not in your ${current} plan.` } : null;
+  };
+  switch (spec.kind) {
+    case "module":
+      return ent.modules[spec.module] ? null : upgrade(plansWhere((plan) => plan.modules[spec.module]));
+    case "allowance": {
+      const a = spec.allowance, l = ent.allowances;
+      const has = !!l && ((l[a.limit] as number) !== 0 || (!!a.perLocation && (l[a.perLocation] as number) > 0));
+      return has ? null : upgrade(plansWhere((plan) => allowanceValue(plan, a) !== null));
+    }
+    case "addon": {
+      const module = (Object.keys(ADDON_MODULES) as AddonModuleKey[]).find((k) => ADDON_MODULES[k] === spec.addon);
+      if (!module || ent.addonModules?.[module]) return null;
+      return { label: "See add-ons", href: "/pricing#add-ons", note: `Not on your ${current} plan yet: it's an add-on.` };
+    }
+    default:
+      return null;
+  }
 }

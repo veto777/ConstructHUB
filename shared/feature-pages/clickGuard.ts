@@ -159,7 +159,7 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Install It" },
   },
   seo: {
-    title: "Click Guard — Ad Click Fraud Protection | ConstructHUB",
+    title: "Click Guard — Flag Ad Clicks, Exclude IPs | ConstructHUB",
     description:
       "Flag repeat and automated visits from your Google Ads, block suspicious IPs and sync an IP exclusion list to your campaigns with a script you schedule.",
   },

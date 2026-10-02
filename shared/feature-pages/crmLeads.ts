@@ -33,6 +33,7 @@ const page: FeaturePage = {
   group: "run",
   status: "ready",
   title: "Leads & follow-ups",
+  ctaTitle: "Leads & Follow-Ups",
   kicker: "Lead pipeline",
   headline: { lead: "Know Which Lead to ", swipe: "Call\u00a0Next" },
   lede:

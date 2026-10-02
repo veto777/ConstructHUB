@@ -74,7 +74,7 @@ const page: FeaturePage = {
     {
       icon: "building",
       title: "Straight to property records",
-      body: "Every result has a Property lookup link to the assessor or appraiser office for its county.",
+      body: "Each result has a Property lookup link to the county's assessor or appraiser office when one is on record.",
     },
     {
       icon: "history",

@@ -76,7 +76,7 @@ const page: FeaturePage = {
     {
       icon: "star",
       title: "Review sample breakdown",
-      body: "From the reviews Google returns: positive and negative, reviews with photos, generic wording and repeated common phrases.",
+      body: "From the reviews Google returns: positive and negative, reviewers with a profile photo, generic wording and repeated common phrases.",
     },
     {
       icon: "history",

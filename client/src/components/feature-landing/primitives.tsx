@@ -18,7 +18,7 @@ export const PANEL_RULE = "border-[color:color-mix(in_srgb,var(--mkt-panel-ink)_
 export const PANEL_RULE_STRONG = "border-[color:color-mix(in_srgb,var(--mkt-panel-ink)_42%,transparent)]";
 
 /** Section H2 and lead paragraph, as on /call-assistant. */
-export const H2 = "font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5";
+export const H2 = "font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5 [text-wrap:balance]";
 export const LEAD = "text-[17px] text-mkt-ink-soft leading-relaxed";
 /** An inline text link on paper. */
 export const TEXT_LINK = "font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange";

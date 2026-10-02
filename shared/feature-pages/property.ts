@@ -42,7 +42,7 @@ const page: FeaturePage = {
     },
     {
       title: "Or start from a permit",
-      body: "The Property lookup link on a permit search result opens this directory already filtered to that county.",
+      body: "The Property lookup link on a permit search result opens this directory filtered to that county when its office is on record.",
     },
   ],
   cards: [
@@ -74,7 +74,7 @@ const page: FeaturePage = {
     {
       icon: "search",
       title: "Linked from permit search",
-      body: "Every permit search result links to the records office for its county, so you go from permit to property in one click.",
+      body: "Permit search results link to the county's records office when one is on record, so you can go from permit to property in one click.",
     },
   ],
   audience: [

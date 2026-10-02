@@ -73,7 +73,7 @@ const page: FeaturePage = {
     {
       icon: "map",
       title: "State licensing guides",
-      body: "Every state's formation, licensing, workers' comp and tax agencies. The comparison table is free; the full guides are part of the Master Class.",
+      body: "Every state's formation, workers' comp and tax agencies, and its licensing board where there is one. The comparison table is free; the full guides are part of the Master Class.",
     },
     {
       icon: "cloud",

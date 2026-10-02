@@ -289,6 +289,8 @@ const pricingGroup: NavGroup = {
   children: [
     { title: "Subscription Plans", url: "/pricing", icon: Layers },
     { title: "Add-ons", url: "/pricing#add-ons", icon: PlusCircle },
+    // Every feature's intro page, for any signed-in account deciding what to add.
+    { title: "All features", url: "/features", icon: LayoutGrid },
     { title: "Master Class", url: "/features/master-class", icon: BookOpen, testId: "link-nav-pricing-master-class" },
     // The done-for-you SEO packages section of the pricing page.
     { title: "SEO Services", url: "/pricing#services", icon: Rocket },

@@ -81,6 +81,11 @@ describe("dashboard for a platform admin", () => {
     const attention = dashboardAttention(p.tiles, p.account);
     expect(attention.filter((a) => a.key.startsWith("usage."))).toEqual([]);
     expect(attention.some((a) => a.hint === "Over your plan's limit" || a.hint === "Limit reached this month")).toBe(false);
+
+    // Every feature is on: the AI Call Assistant tile opens the CRM's Call Assistant, never "coming soon".
+    const ca = p.tiles.find((t) => t.key === "callAssistant")!;
+    expect(ca.status).not.toBe("coming_soon");
+    expect(ca).toMatchObject({ entitled: true, status: "ok", cta: { href: "/crm/call-assistant", surface: "portal" } });
   });
 
   it("control: a customer with the same rows on the same plan IS flagged (unchanged)", async () => {
@@ -92,5 +97,6 @@ describe("dashboard for a platform admin", () => {
     expect(usage.protectedSites).toBeUndefined();
     const keys = dashboardAttention(p.tiles, p.account).map((a) => a.key);
     expect(keys).toEqual(expect.arrayContaining(["usage.locations", "usage.searches"]));
+    expect(p.tiles.find((t) => t.key === "callAssistant")!.status).toBe("coming_soon");
   });
 });

@@ -143,7 +143,10 @@ export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | 
   return { numbers: bought, minutes: units * CALL_ASSISTANT_INCLUDED_MINUTES };
 }
 
-/** Call Assistant numbers a platform admin may hold (owner, 2026-10-02: up to 5 — numbers cost real money). */
+/**
+ * Call Assistant numbers a platform admin may hold: an engineering safeguard (each one is a
+ * real carrier number that costs money), not an owner rule. Confirm the number with the owner.
+ */
 export const ADMIN_CALL_ASSISTANT_NUMBERS = 5;
 
 /** The most complete plan: what platform admins run with. */

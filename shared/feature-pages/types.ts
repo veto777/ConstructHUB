@@ -87,6 +87,8 @@ export type FeaturePage = {
   status: "stub" | "ready";
   /** The feature's name as the app's sidebar / page calls it. */
   title: string;
+  /** The name in Title Case for the closing "Put … to Work" headline, when `title` is sentence case. */
+  ctaTitle?: string;
   /** The hero's small-caps kicker, e.g. "Website audit". */
   kicker: string;
   /** The H1: `lead` + the marker-swiped `swipe` phrase + optional `tail`. */

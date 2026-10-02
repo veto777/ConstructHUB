@@ -11,7 +11,7 @@ import {
   EXTERNAL_FEATURE_PAGES, FEATURE_CATALOGUE, FEATURE_GROUPS, FEATURE_PAGES, FEATURES_PATH, READY_FEATURE_PAGES,
   featureIntroPath, featurePageByKey, featurePageBySlug, featurePagePath,
 } from "@shared/feature-pages";
-import { allowanceLine, allowanceValue, featurePriceSummary, singularUnit } from "@shared/feature-pages/pricing";
+import { allowanceLine, allowanceValue, featurePlanGap, featurePriceSummary, singularUnit } from "@shared/feature-pages/pricing";
 import { FEATURE_ICONS } from "@shared/feature-pages/types";
 import { DASHBOARD_TILES } from "@shared/dashboard";
 import { ADDONS, PLANS, PLAN_KEYS } from "@shared/plans";
@@ -240,5 +240,28 @@ describe("feature pages on the server", () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe("featurePlanGap: signed-in CTA for an account whose plan lacks the feature", () => {
+  const ent = (plan: keyof typeof PLANS | null, extra: Partial<Parameters<typeof featurePlanGap>[1]> = {}) => ({
+    accessPlan: plan, allowances: plan ? PLANS[plan].limits : null, modules: plan ? PLANS[plan].modules : {}, ...extra,
+  });
+  it("offers the cheapest plan that has a module or an allowance, and says the current plan lacks it", () => {
+    expect(featurePlanGap(featurePageByKey("cloudflare")!.pricing, ent("starter")))
+      .toEqual({ label: "Upgrade to Agency", href: "/pricing", note: "Not in your Starter plan." });
+    expect(featurePlanGap(featurePageByKey("clickGuard")!.pricing, ent("starter")))
+      .toEqual({ label: "Upgrade to Pro", href: "/pricing", note: "Not in your Starter plan." });
+  });
+  it("is null when the plan includes it, for features every plan has, and for accounts with no plan of their own", () => {
+    expect(featurePlanGap(featurePageByKey("clickGuard")!.pricing, ent("pro"))).toBeNull();
+    expect(featurePlanGap(featurePageByKey("cloudflare")!.pricing, ent("agency"))).toBeNull();
+    expect(featurePlanGap(featurePageByKey("siteScan")!.pricing, ent("starter"))).toBeNull();
+    expect(featurePlanGap(featurePageByKey("cloudflare")!.pricing, ent(null))).toBeNull();
+  });
+  it("sends an add-on to the add-ons list unless its module is on", () => {
+    const spec = { kind: "addon", addon: "call_assistant" } as const;
+    expect(featurePlanGap(spec, ent("pro"))).toMatchObject({ label: "See add-ons", href: "/pricing#add-ons" });
+    expect(featurePlanGap(spec, ent("pro", { addonModules: { callAssistant: true } }))).toBeNull();
   });
 });

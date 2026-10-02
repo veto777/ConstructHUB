@@ -29,6 +29,7 @@ const page: FeaturePage = {
   group: "protect",
   status: "ready",
   title: "Mail alerts",
+  ctaTitle: "Mail Alerts",
   kicker: "Provider alerts",
   headline: { lead: "The Alerts That Matter, ", swipe: "Matched", tail: " to the Right Client" },
   lede:

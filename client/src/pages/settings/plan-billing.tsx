@@ -366,7 +366,7 @@ export function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) 
       <CardContent className="space-y-4">
         {admin && (
           <p className="text-xs text-muted-foreground" data-testid="text-usage-admin">
-            Platform admin: every feature is on and every usage limit is unlimited on this account, whatever plan it holds.
+            Platform admin: every feature is on and every plan limit is unlimited on this account, whatever plan it holds. Per-day safety caps (for example 5 Site Scans a day) still apply.
           </p>
         )}
         {locations && (

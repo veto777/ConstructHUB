@@ -54,7 +54,8 @@ const TOKEN_PAGES = ["/e/", "/i/", "/co/", "/lead-form/", "/portal/", "/review/"
 const NEVER = ["/admin", "/crm/admin", "/auth", "/crm/join", "/crm-terms", "/crm-privacy", "/privacy", "/terms", "/free-site-scan"];
 // Signed-out visitors see Gabe on the marketing pages.
 const MARKETING = ["/", "/landing", "/pricing", "/reinstatement", "/google-ad-fraud", "/lsa-guide", "/google-ads-guide",
-  "/master-class", "/crm-app", "/google-business", "/databases", "/property", "/features"];
+  "/master-class", "/crm-app", "/google-business", "/databases", "/property"];
+// Not /features: like /call-assistant, the feature pages keep the hero and CTAs clear of the launcher on phones.
 
 export function hubVisible(location: string, surface: HubSurface): boolean {
   if (isClientPortal()) return false;

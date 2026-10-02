@@ -79,7 +79,7 @@ export function FeatureHero({
             <Kicker n="">{page.kicker}</Kicker>
             {price.comingSoon && <ComingSoonPill />}
           </div>
-          <h1 className="font-display mt-5 font-semibold text-[2.45rem] leading-[1.04] sm:text-[3.3rem] lg:text-[3.85rem] tracking-[-0.02em] text-mkt-ink [overflow-wrap:anywhere]" data-testid="text-feature-title">
+          <h1 className="font-display mt-5 font-semibold text-[2.45rem] leading-[1.04] sm:text-[3.3rem] lg:text-[3.85rem] tracking-[-0.02em] text-mkt-ink [overflow-wrap:anywhere] [text-wrap:balance]" data-testid="text-feature-title">
             {page.headline.lead}<span className="mkt-marker">{page.headline.swipe}</span>{page.headline.tail}
           </h1>
           <p className="mt-6 text-base sm:text-lg text-mkt-ink-soft max-w-[37rem] leading-relaxed" data-testid="text-feature-lede">
@@ -441,7 +441,7 @@ export function FinalCta({
           ? <GabeAvatar size={96} className="mx-auto mb-7 rounded-full" />
           : <StandingGator height={120} className="mx-auto mb-6" />}
         <h2 className="font-display font-semibold text-[2.3rem] sm:text-[2.9rem] lg:text-[3.3rem] leading-[1.05] tracking-[-0.02em] [overflow-wrap:anywhere] [text-wrap:balance]">
-          Put {page.title} to Work
+          Put {page.ctaTitle ?? page.title} to Work
         </h2>
         <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
           {sentence.strong}{sentence.rest}

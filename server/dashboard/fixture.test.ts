@@ -46,6 +46,12 @@ describe("tileAccess", () => {
     const agency = { accessPlan: "agency" as const, allowances: PLANS.agency.limits, modules: ALL, hasCrmOrg: true };
     expect(tileAccess(def("adsManager"), agency).entitled).toBe(true);
     expect(tileAccess(def("callAssistant"), agency)).toMatchObject({ entitled: false, comingSoon: true, addon: "call_assistant" });
+    expect(tileAccess(def("callAssistant"), { ...agency, addonModules: { callAssistant: false } })).toMatchObject({ entitled: false, comingSoon: true });
+  });
+
+  it("opens the call assistant tile when its add-on module is on (platform admins)", () => {
+    const admin = { accessPlan: "agency" as const, allowances: PLANS.agency.limits, modules: ALL, hasCrmOrg: true, addonModules: { callAssistant: true } };
+    expect(tileAccess(def("callAssistant"), admin)).toEqual({ entitled: true, addon: "call_assistant" });
   });
 
   it("lets a crew member without a plan of their own into the CRM tiles, texting included (the org owner's plan decides it)", () => {

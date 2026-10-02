@@ -6,19 +6,22 @@
  *
  * Every price comes from the price book through shared/feature-pages/pricing.ts.
  * The calls to action: signed out "Create Your Account" (back to the feature
- * after sign-up) + "Talk to a sales rep"; signed in "Open <feature>".
+ * after sign-up) + "Talk to a sales rep"; signed in "Open <feature>", or, when
+ * the account's plan lacks it (featurePlanGap), "Upgrade to <plan>" / "See
+ * add-ons" with a "Not in your <Plan> plan" line.
  */
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { FEATURE_CATALOGUE, featurePagePath, type FeaturePage } from "@shared/feature-pages";
-import { featurePriceSummary } from "@shared/feature-pages/pricing";
+import { featurePlanGap, featurePriceSummary } from "@shared/feature-pages/pricing";
 import { SALES_REP_LABEL } from "@shared/plan-copy";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import { DashLink } from "@/components/dashboard/dash-link";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
+import type { EntitlementsInfo } from "@/lib/pricing-display";
 import {
   BTN_LG, BTN_OUTLINE, BTN_OUTLINE_ON_NAVY, BTN_PRIMARY, TEXT_LINK, useDocumentTitle, useMetaDescription, useStartAtTop,
 } from "./primitives";
@@ -39,6 +42,10 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [salesOpen, setSalesOpen] = useState(false);
   const price = useMemo(() => featurePriceSummary(page.pricing), [page.pricing]);
+  // Portal (CRM) features follow the org owner's plan, which this account's entitlements don't show.
+  const checkPlan = !!user && page.app.surface === "app";
+  const { data: ent } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"], enabled: checkPlan });
+  const gap = checkPlan && ent ? featurePlanGap(page.pricing, ent) : null;
   useMetaDescription(page.seo.description);
   useDocumentTitle(page.seo.title);
   useStartAtTop(page.slug);
@@ -50,7 +57,13 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
     [page.related],
   );
 
-  const primaryCta = (where: string) => user
+  const primaryCta = (where: string) => gap
+    ? (
+      <Link href={gap.href} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`cta-feature-primary-${where}`} data-cta="upgrade">
+        {gap.label} <ArrowRight className="h-4 w-4" />
+      </Link>
+    )
+    : user
     ? (
       <DashLink href={page.app.href} surface={page.app.surface} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`cta-feature-primary-${where}`} data-cta="open">
         {page.app.label ?? `Open ${page.title}`} <ArrowRight className="h-4 w-4" />
@@ -66,7 +79,9 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
       {SALES_REP_LABEL}
     </button>
   );
-  const tryIt = page.tryIt && !user ? (
+  const tryIt = gap ? (
+    <p className="mt-4 text-[15px] text-mkt-ink-soft" data-testid="text-feature-plan-gap">{gap.note}</p>
+  ) : page.tryIt && !user ? (
     <p className="mt-4 text-[15px] text-mkt-ink-soft">
       Not ready to sign up?{" "}
       <Link href={page.tryIt.href} className={`inline-block ${TEXT_LINK}`} data-testid="link-feature-try">{page.tryIt.label}</Link>
