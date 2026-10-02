@@ -76,8 +76,8 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   expect(p.annual).toBe("$1,999");
   // Owner, 2026-10-02: "lets do 1000 min for $149 a month so 4 tiers instead of 3".
   expect(p.tiers.map((t) => t.tier)).toEqual(["lite", "solo", "crew", "fleet"]);
-  await expect(page.getByTestId("text-call-assistant-price")).toHaveText(`Four tiers, one per account, from ${p.from}/mo. Solo starts at ${short}.`);
-  await expect(page.getByTestId("text-ca-hero-price")).toContainText(`From ${p.from}/mo (${p.fromTier})`);
+  await expect(page.getByTestId("text-call-assistant-price")).toHaveText(`Four tiers, one per account, regular prices from ${p.from}/mo. Solo starts at ${short}.`);
+  await expect(page.getByTestId("text-ca-hero-price")).toContainText(`Regular prices from ${p.from}/mo (${p.fromTier})`);
   await expect(page.getByTestId("text-ca-hero-price")).toContainText(`${p.regular}/mo — or ${p.annual}/yr`);
   await expect(page.getByTestId("text-ca-hero-price")).toContainText(`Solo: ${p.intro}/mo for your first ${p.introMonths} months`);
   // Every figure from the price book; Crew and Fleet: "for the crew and fleet the cost per minute is 5 not 10 cents".
@@ -133,7 +133,7 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`${p.intro}/mo`);
   await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`then ${p.regular}/mo — or ${p.annual}/yr`);
   for (const t of p.tiers) await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`${t.name} (${t.minutes} min, ${t.numbersLabel})`);
-  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`From ${p.from}/mo. Four tiers:`);
+  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`Regular prices from ${p.from}/mo. Four tiers:`);
   await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText("Crew and Fleet pay less per extra minute");
   await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`The first ${p.freeSpamCalls} spam calls each month are free on every tier`);
   await expect(page.getByTestId("link-call-assistant-learn-more")).toHaveAttribute("href", "/call-assistant");
@@ -141,7 +141,7 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
 
   await page.goto("/pricing");
   await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(callAssistantIntroShort());
-  await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(`From ${p.from}/mo (${p.fromTier})`);
+  await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(`Regular prices from ${p.from}/mo (${p.fromTier})`);
   await expect(page.getByTestId("link-addon-call-assistant")).toHaveAttribute("href", "/call-assistant");
   // Four tier cards above the add-on table; the tiers are not rows of it.
   await expect(page.locator('[data-testid^="card-call-assistant-tier-"]')).toHaveCount(4);

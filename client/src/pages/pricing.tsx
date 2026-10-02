@@ -573,7 +573,7 @@ export default function PricingPage() {
             </div>
             <p className="text-sm font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">
               {/* The intro is Solo, monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
-              {interval === "year" ? callAssistantYearlyNote() : `From ${callAssistantPricing().from}/mo (${callAssistantPricing().fromTier}). Solo launch price: ${callAssistantIntroShort()}`}
+              {interval === "year" ? callAssistantYearlyNote() : `Regular prices from ${callAssistantPricing().from}/mo (${callAssistantPricing().fromTier}). Solo launch price: ${callAssistantIntroShort()}`}
             </p>
             <CallAssistantTierCards interval={interval} />
           </div>

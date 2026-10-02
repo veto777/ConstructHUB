@@ -376,7 +376,7 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
       .toMatchObject({ includedMinutes: 1000, overageMinutes: 17, overageRateMinutes: { "10": 17 } });
   });
 
-  it("per-tier overage on an annual subscription: one item per rate, one invoice for both", async () => {
+  it("per-tier overage on an annual subscription: one item per rate, each invoiced and recorded before the next", async () => {
     const setAddons = (uid: number, addons: Record<string, number>) => db.query("update subscriptions set addons = $2 where user_id = $1", [uid, JSON.stringify(addons)]);
     const acct = await user({ call_assistant_lite: 1 });
     const o = org();
@@ -388,11 +388,76 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     const { stripe, calls } = fakeStripe("price_existing");
     const out = await usage.reportVoiceOverage(o, MONTH, { stripe, configured: () => true, subscriptionFor: async () => ({ stripeCustomerId: "cus_a", stripeSubscriptionId: "sub_a", status: "active", billingInterval: "year" }) });
     // 1,004 + 4,000 = 5,004 on Crew → 4 over at 5¢; Lite's 4 at 10¢.
-    expect(out).toMatchObject({ reported: 8, reportedCents: 60, invoiceId: "in_fake_2" });
-    expect(calls.map((c) => c.method)).toEqual(["prices.list", "invoiceItems.create", "prices.list", "invoiceItems.create", "invoices.create"]);
+    expect(out).toMatchObject({ reported: 8, reportedCents: 60, invoiceId: "in_fake_1", lines: [{ centsPerMinute: 10, invoiceId: "in_fake_1" }, { centsPerMinute: 5, invoiceId: "in_fake_2" }] });
+    expect(calls.map((c) => c.method)).toEqual(["prices.list", "invoiceItems.create", "invoices.create", "prices.list", "invoiceItems.create", "invoices.create"]);
+    expect(calls.filter((c) => c.method === "invoices.create").map((c) => c.opts?.idempotencyKey)).toEqual([
+      `chub-voice-overage-${o}-${MONTH}-r10-4-invoice`, `chub-voice-overage-${o}-${MONTH}-r5-4-invoice`,
+    ]);
     expect(calls.filter((c) => c.method === "invoiceItems.create").map((c) => [c.params.pricing.price, c.params.quantity, c.params.subscription])).toEqual([
       ["price_existing_10", 4, undefined], ["price_existing_5", 4, undefined],
     ]);
+  });
+
+  it("a failure on one rate leaves the rates already sent recorded: the retry sends only the missing line (no reliance on Stripe's 24-hour key)", async () => {
+    const setAddons = (uid: number, addons: Record<string, number>) => db.query("update subscriptions set addons = $2 where user_id = $1", [uid, JSON.stringify(addons)]);
+    const acct = await user({ call_assistant: 1 });
+    const o = org();
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 2030, at: AT });
+    await setAddons(acct, { call_assistant_crew: 1 });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 3090, at: AT });
+    expect(await usage.getVoiceUsageRow(o, MONTH)).toMatchObject({ overageRateMinutes: { "10": 30, "5": 120 }, overageReportedMinutes: 0 });
+
+    for (const interval of ["month", "year"] as const) {
+      const oo = interval === "month" ? o : org();
+      if (interval === "year") {
+        await setAddons(acct, { call_assistant: 1 });
+        await usage.recordVoiceCallUsage({ orgId: oo, accountUserId: acct, outcome: "info", billedMinutes: 2030, at: AT });
+        await setAddons(acct, { call_assistant_crew: 1 });
+        await usage.recordVoiceCallUsage({ orgId: oo, accountUserId: acct, outcome: "info", billedMinutes: 3090, at: AT });
+      }
+      // A Stripe with NO idempotency memory (a key older than 24 hours) that rejects the 5¢ price twice.
+      usage.resetVoiceOveragePriceCache();
+      const { stripe, calls } = fakeStripe();
+      let failures = 2;
+      const create = stripe.prices.create;
+      stripe.prices.create = async (params: any, opts?: any) => {
+        if (params.unit_amount === 5 && failures-- > 0) throw new Error("price create failed");
+        return create(params, opts);
+      };
+      const deps = { stripe, configured: () => true, subscriptionFor: async () => ({ stripeCustomerId: "cus_f", stripeSubscriptionId: "sub_f", status: "active", billingInterval: interval }) };
+      await expect(usage.reportVoiceOverage(oo, MONTH, deps)).rejects.toThrow("price create failed");
+      // The 10¢ line is recorded the moment Stripe has it (and, annual, its invoice).
+      expect(await usage.getVoiceUsageRow(oo, MONTH)).toMatchObject({ overageReportedMinutes: 30, overageReportedRateMinutes: { "10": 30 } });
+      await expect(usage.reportVoiceOverage(oo, MONTH, deps)).rejects.toThrow("price create failed");
+      const out = await usage.reportVoiceOverage(oo, MONTH, deps);
+      expect(out).toMatchObject({ reported: 120, reportedCents: 600, lines: [{ centsPerMinute: 5, minutes: 120 }] });
+      // Three runs, but the 10¢ minutes went to Stripe exactly once.
+      expect(calls.filter((c) => c.method === "invoiceItems.create").map((c) => [c.params.pricing.price, c.params.quantity])).toEqual([
+        ["price_fake_overage_10", 30], ["price_fake_overage_5", 120],
+      ]);
+      expect(calls.filter((c) => c.method === "invoices.create")).toHaveLength(interval === "year" ? 2 : 0);
+      expect(await usage.getVoiceUsageRow(oo, MONTH)).toMatchObject({ overageReportedMinutes: 150, overageReportedRateMinutes: { "10": 30, "5": 120 } });
+      expect(await usage.reportVoiceOverage(oo, MONTH, deps)).toEqual({ reported: 0, reason: "nothing_to_report" });
+    }
+  });
+
+  it("annual: an invoice that fails leaves its bucket unrecorded, so the retry invoices it", async () => {
+    const o = org();
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "info", billedMinutes: 2005, at: AT });
+    usage.resetVoiceOveragePriceCache();
+    const { stripe, calls } = fakeStripe("price_existing");
+    const invoice = stripe.invoices.create;
+    let fail = true;
+    stripe.invoices.create = async (params: any, opts?: any) => { if (fail) { fail = false; throw new Error("invoice failed"); } return invoice(params, opts); };
+    const deps = { stripe, configured: () => true, subscriptionFor: async () => ({ stripeCustomerId: "cus_i", stripeSubscriptionId: "sub_i", status: "active", billingInterval: "year" }) };
+    await expect(usage.reportVoiceOverage(o, MONTH, deps)).rejects.toThrow("invoice failed");
+    expect(await usage.getVoiceUsageRow(o, MONTH)).toMatchObject({ overageMinutes: 5, overageReportedMinutes: 0 });
+    expect(await usage.reportVoiceOverage(o, MONTH, deps)).toMatchObject({ reported: 5, invoiceId: expect.stringMatching(/^in_fake_/) });
+    // The retry re-sends the item under the same key (Stripe returns the first one) and invoices it.
+    expect(calls.filter((c) => c.method === "invoiceItems.create").map((c) => c.opts?.idempotencyKey)).toEqual([
+      `chub-voice-overage-${o}-${MONTH}-r10-5`, `chub-voice-overage-${o}-${MONTH}-r10-5`,
+    ]);
+    expect(await usage.getVoiceUsageRow(o, MONTH)).toMatchObject({ overageReportedMinutes: 5, overageReportedRateMinutes: { "10": 5 } });
   });
 
   it("overage: monthly subscription → one invoice item on the subscription, only the new minutes, idempotent", async () => {
@@ -406,7 +471,7 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     const sub = { stripeCustomerId: "cus_x", stripeSubscriptionId: "sub_x", status: "active", billingInterval: "month" };
     const deps = { stripe, configured: () => true, subscriptionFor: async () => sub };
     const out = await usage.reportVoiceOverage(o, MONTH, deps);
-    expect(out).toEqual({ reported: 3, reportedCents: 30, lines: [{ centsPerMinute: 10, minutes: 3, invoiceItemId: "ii_fake_1" }], invoiceItemId: "ii_fake_1", invoiceId: null });
+    expect(out).toEqual({ reported: 3, reportedCents: 30, lines: [{ centsPerMinute: 10, minutes: 3, invoiceItemId: "ii_fake_1", invoiceId: null }], invoiceItemId: "ii_fake_1", invoiceId: null });
     expect(calls.map((c) => c.method)).toEqual(["prices.list", "prices.create", "invoiceItems.create"]);
     expect(calls[1].params).toMatchObject({ currency: "usd", unit_amount: 10, lookup_key: usage.voiceOverageLookupKey(10) });
     expect(calls[1].params.recurring).toBeUndefined();

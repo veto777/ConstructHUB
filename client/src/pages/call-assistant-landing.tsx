@@ -210,7 +210,7 @@ export default function CallAssistantLandingPage() {
                 {salesCta(BTN_OUTLINE, "button-ca-sales-hero")}
               </div>
               <p className="mt-5 text-[15px] text-mkt-ink-soft" data-testid="text-ca-hero-price">
-                From <strong className="font-semibold text-mkt-ink">{price.from}/mo</strong> ({price.fromTier}).
+                Regular prices from <strong className="font-semibold text-mkt-ink">{price.from}/mo</strong> ({price.fromTier}).
                 {" "}Solo: <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr.
                 {" "}{lowerOverageTiers} for busier phones, at a lower rate per extra minute.
                 {" "}<a href="#pricing" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">Compare the {tierCountWord} tiers</a>
@@ -402,7 +402,7 @@ export default function CallAssistantLandingPage() {
               <h2 className={H2}>{TierCountWord} Tiers. <em className="text-mkt-orange-ink">Pick Your Call Volume.</em></h2>
             </div>
             <p className="mt-5 text-center text-[16px] text-mkt-ink-soft max-w-2xl mx-auto" data-testid="text-call-assistant-price">
-              {TierCountWord} tiers, one per account, from {price.from}/mo. Solo starts at {introPriceShort()}.
+              {TierCountWord} tiers, one per account, regular prices from {price.from}/mo. Solo starts at {introPriceShort()}.
             </p>
             <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5" data-testid="card-ca-pricing">
               {price.tiers.map((t) => (
@@ -505,7 +505,7 @@ export default function CallAssistantLandingPage() {
               Let Every Call Be Answered
             </h2>
             <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
-              From {price.from}/mo with {price.fromTier}. Solo from {introPriceShort()}; {lowerOverageTiers} for busier phones. Spam screened on every call. An add-on for the {price.plans} plans, with every call in your CRM.
+              Regular prices from {price.from}/mo with {price.fromTier}. Solo from {introPriceShort()}; {lowerOverageTiers} for busier phones. Spam screened on every call. An add-on for the {price.plans} plans, with every call in your CRM.
             </p>
             <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               {primaryCta("cta")}

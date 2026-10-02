@@ -216,7 +216,10 @@ export function callAssistantPricing() {
     includedMinutes: count(SOLO.includedMinutes),
     /** "four" — how many tiers, as a word for headings. */
     tierCountWord: ["zero", "one", "two", "three", "four", "five", "six"][CALL_ASSISTANT_TIERS.length] ?? String(CALL_ASSISTANT_TIERS.length),
-    /** The cheapest tier's monthly price and name: "From $149/mo" (Lite). */
+    /**
+     * The cheapest tier's REGULAR monthly price and name ($149, Lite). Solo's intro ($99 for 3 months) is
+     * lower, so copy says "Regular prices from $149/mo", never a bare "From $149/mo" next to the intro.
+     */
     from: formatUsd(CHEAPEST.monthlyCents),
     fromTier: CHEAPEST.name,
     /** "$0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet" — overage is per tier. */

@@ -31,11 +31,12 @@
  * subscription item that server/billing/order.ts treats as "set up by sales";
  * an invoice item touches nothing on the subscription. A monthly subscription
  * picks it up on its next invoice; an ANNUAL one would hold it for up to a
- * year, so for those the items are invoiced on their own right away. Reporting
- * is idempotent per month and rate: only each bucket's minutes above its
- * reported count (overage_reported_rate_minutes) are ever sent, one invoice
- * item per rate (Stripe idempotency key per rate and running total), and the
- * item ids are kept.
+ * year, so for those each rate's item is invoiced on its own right away.
+ * Reporting is idempotent per month and rate: only each bucket's minutes above
+ * its reported count (overage_reported_rate_minutes) are ever sent, one invoice
+ * item per rate (Stripe idempotency key per rate and running total), and each
+ * bucket is recorded as billed as soon as Stripe has it, so a failure on one
+ * rate never re-sends another.
  */
 import { pool } from "../db";
 import { getEntitlements, callAssistantAllowance } from "../entitlements";
@@ -290,9 +291,10 @@ export type OverageReport =
       /** What they cost: each rate's minutes at that rate. */
       reportedCents: number;
       /** One line per rate, highest rate first. */
-      lines: { centsPerMinute: number; minutes: number; invoiceItemId: string }[];
+      lines: { centsPerMinute: number; minutes: number; invoiceItemId: string; invoiceId: string | null }[];
       /** The first line's item (kept for callers that bill one rate). */
       invoiceItemId: string;
+      /** Annual only: the first line's invoice (each rate is invoiced on its own; see `lines`). */
       invoiceId: string | null;
     };
 
@@ -376,11 +378,15 @@ export async function reportVoiceOverage(orgId: string, month: string, deps: Ove
   if (!sub.stripeCustomerId) return { reported: 0, reason: "no_customer" };
   const stripe = deps.stripe ?? (stripeClient as unknown as StripeForOverage);
   const annual = sub.billingInterval === "year";
-  const lines: { centsPerMinute: number; minutes: number; invoiceItemId: string }[] = [];
+  const lines: { centsPerMinute: number; minutes: number; invoiceItemId: string; invoiceId: string | null }[] = [];
+  // Bucket by bucket: each rate is sent, (annual) invoiced, then recorded as billed before the next rate is
+  // touched. A failure on a later rate leaves the earlier ones recorded, so a retry re-sends only the rates
+  // that were not billed — never relying on Stripe's 24-hour idempotency window for minutes already billed.
   for (const { rate, from, upTo } of pending) {
     const price = await resolveOveragePriceId(stripe, rate);
     const delta = upTo - from;
     const description = `${CALL_ASSISTANT_NAME}: ${delta} minute${delta === 1 ? "" : "s"} over the included minutes in ${month}, at ${perMinute(rate)} a minute`;
+    const key = `chub-voice-overage-${orgId}-${month}-r${rate}-${upTo}`;
     const item = await stripe.invoiceItems.create(
       {
         customer: sub.stripeCustomerId,
@@ -392,37 +398,36 @@ export async function reportVoiceOverage(orgId: string, month: string, deps: Ove
         metadata: { chub_kind: "voice_overage", chub_org: orgId, chub_month: month, chub_minutes: String(delta), chub_cents_per_minute: String(rate) },
       },
       // One item per (org, month, rate, running total): a retry after a crash never bills the same minutes twice.
-      { idempotencyKey: `chub-voice-overage-${orgId}-${month}-r${rate}-${upTo}` },
+      { idempotencyKey: key },
     );
-    lines.push({ centsPerMinute: rate, minutes: delta, invoiceItemId: item.id });
+    let invoiceId: string | null = null;
+    if (annual) {
+      // Invoiced before the bucket is recorded: a failure here leaves it unrecorded, so the retry
+      // re-sends this item (same key) and invoices it — a recorded bucket is always invoiced.
+      const invoice = await stripe.invoices.create(
+        {
+          customer: sub.stripeCustomerId,
+          pending_invoice_items_behavior: "include",
+          collection_method: "charge_automatically",
+          auto_advance: true,
+          description,
+          metadata: { chub_kind: "voice_overage", chub_org: orgId, chub_month: month },
+        },
+        { idempotencyKey: `${key}-invoice` },
+      );
+      invoiceId = invoice.id;
+    }
+    lines.push({ centsPerMinute: rate, minutes: delta, invoiceItemId: item.id, invoiceId });
+    await q.query(
+      `UPDATE voice_usage SET overage_reported_minutes = $3,
+         overage_reported_rate_minutes = overage_reported_rate_minutes || jsonb_build_object($4::text, $5::int),
+         overage_reported_at = now(), stripe_usage_record_id = $6, updated_at = now() WHERE org_id = $1 AND month = $2`,
+      [orgId, month, row.overageReportedMinutes + lines.reduce((n, l) => n + l.minutes, 0), String(rate), upTo, lines.map((l) => l.invoiceItemId).join(",")],
+    );
   }
   const reported = lines.reduce((n, l) => n + l.minutes, 0);
   const reportedCents = lines.reduce((n, l) => n + l.minutes * l.centsPerMinute, 0);
-  const upToTotal = row.overageReportedMinutes + reported;
-  let invoiceId: string | null = null;
-  if (annual) {
-    const key = `chub-voice-overage-${orgId}-${month}-${pending.map((p) => `r${p.rate}-${p.upTo}`).join("-")}`;
-    const invoice = await stripe.invoices.create(
-      {
-        customer: sub.stripeCustomerId,
-        pending_invoice_items_behavior: "include",
-        collection_method: "charge_automatically",
-        auto_advance: true,
-        description: `${CALL_ASSISTANT_NAME}: ${reported} minute${reported === 1 ? "" : "s"} over the included minutes in ${month}`,
-        metadata: { chub_kind: "voice_overage", chub_org: orgId, chub_month: month },
-      },
-      { idempotencyKey: `${key}-invoice` },
-    );
-    invoiceId = invoice.id;
-  }
-  // Every billed bucket at once, after Stripe has them (a crash before this re-sends the same idempotency keys).
-  const nextReported: Record<string, number> = { ...row.overageReportedRateMinutes };
-  for (const p of pending) nextReported[String(p.rate)] = p.upTo;
-  await q.query(
-    `UPDATE voice_usage SET overage_reported_minutes = $3, overage_reported_rate_minutes = $5::jsonb, overage_reported_at = now(),
-       stripe_usage_record_id = $4, updated_at = now() WHERE org_id = $1 AND month = $2`,
-    [orgId, month, upToTotal, lines.map((l) => l.invoiceItemId).join(","), JSON.stringify(nextReported)],
-  );
+  const invoiceId = lines.find((l) => l.invoiceId)?.invoiceId ?? null;
   return { reported, reportedCents, lines, invoiceItemId: lines[0].invoiceItemId, invoiceId };
 }
 
