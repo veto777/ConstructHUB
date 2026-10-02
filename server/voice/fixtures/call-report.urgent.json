@@ -1,0 +1,169 @@
+{
+  "scenario": "emergency_after_hours",
+  "callSid": "CAtestemergencyafterhours",
+  "start": {
+    "callSid": "CAtestemergencyafterhours",
+    "to": "+13605550199",
+    "from": "+13605550110",
+    "startedAt": "2026-10-06T17:30:00Z",
+    "engine": "constructhub-voice",
+    "model": "truthcode-api",
+    "persona": "janice",
+    "profileVersion": 1
+  },
+  "events": [
+    {
+      "type": "alert",
+      "kind": "urgent",
+      "summary": "ACTIVE LEAK: Dana, 2200 Bayview Drive, Everett — storm tore siding off, water pouring in; call back immediately.",
+      "slots": {
+        "first_name": "Dana",
+        "need": "EMERGENCY: storm tore siding off, water pouring in",
+        "address": "2200 Bayview Drive, Everett",
+        "phone": "+13605550110"
+      }
+    },
+    {
+      "type": "lead",
+      "slots": {
+        "first_name": "Dana",
+        "need": "EMERGENCY: storm tore siding off, water pouring in",
+        "address": "2200 Bayview Drive, Everett",
+        "phone": "+13605550110"
+      }
+    }
+  ],
+  "report": {
+    "endedAt": "2026-10-06T17:31:12Z",
+    "durationSeconds": 72,
+    "outcome": "lead_submitted",
+    "summary": "Dana called: EMERGENCY: storm tore siding off, water pouring in. Escalated (urgent).",
+    "transcript": [
+      {
+        "role": "assistant",
+        "text": "Thank you for calling Cascade Exteriors, this is Janice. Calls may be recorded. What can we help you with today?",
+        "t": "2026-10-06T17:30:00Z"
+      },
+      {
+        "role": "caller",
+        "text": "This is Dana, water is pouring in where the siding came off in the storm, it's an emergency, I need someone right now.",
+        "t": "2026-10-06T17:30:08Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I'm so sorry, Dana — what's the street address and city so I can page the team?",
+        "t": "2026-10-06T17:30:16Z"
+      },
+      {
+        "role": "caller",
+        "text": "2200 Bayview Drive in Everett. This is my cell.",
+        "t": "2026-10-06T17:30:24Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I'm paging the team now; someone will call you right back at this number. Please stay safe and away from any wiring.",
+        "t": "2026-10-06T17:30:32Z"
+      },
+      {
+        "role": "caller",
+        "text": "Okay, please have them call me. Thank you.",
+        "t": "2026-10-06T17:30:40Z"
+      },
+      {
+        "role": "assistant",
+        "text": "They will, Dana. I've also sent your request to our team for the siding replacement. Goodbye.",
+        "t": "2026-10-06T17:30:48Z"
+      },
+      {
+        "role": "caller",
+        "text": "Bye.",
+        "t": "2026-10-06T17:30:56Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Goodbye.",
+        "t": "2026-10-06T17:31:04Z"
+      }
+    ],
+    "slots": {
+      "first_name": "Dana",
+      "need": "EMERGENCY: storm tore siding off, water pouring in",
+      "address": "2200 Bayview Drive, Everett",
+      "phone": "+13605550110"
+    },
+    "events": [
+      {
+        "t": "2026-10-06T17:30:08Z",
+        "type": "decision",
+        "decision": {
+          "say": "I'm so sorry, Dana — what's the street address and city so I can page the team?",
+          "action": "continue",
+          "slots": {
+            "first_name": "Dana",
+            "need": "EMERGENCY: storm tore siding off, water pouring in"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:16Z",
+        "type": "decision",
+        "decision": {
+          "say": "I'm paging the team now; someone will call you right back at this number. Please stay safe and away from any wiring.",
+          "action": "alert",
+          "slots": {
+            "address": "2200 Bayview Drive, Everett",
+            "phone": "+13605550110"
+          },
+          "alert": {
+            "kind": "urgent",
+            "summary": "ACTIVE LEAK: Dana, 2200 Bayview Drive, Everett — storm tore siding off, water pouring in; call back immediately."
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:24Z",
+        "type": "alert",
+        "detail": "urgent"
+      },
+      {
+        "t": "2026-10-06T17:30:32Z",
+        "type": "decision",
+        "decision": {
+          "say": "They will, Dana. I've also sent your request to our team for the siding replacement. Goodbye.",
+          "action": "submit_lead",
+          "slots": {}
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:40Z",
+        "type": "lead"
+      },
+      {
+        "t": "2026-10-06T17:30:48Z",
+        "type": "decision",
+        "decision": {
+          "say": "Goodbye.",
+          "action": "end_call",
+          "slots": {},
+          "outcome": "lead_submitted"
+        }
+      }
+    ],
+    "caller": {
+      "name": "Dana",
+      "email": "",
+      "address": "2200 Bayview Drive",
+      "city": "Everett"
+    },
+    "serviceNeeded": "EMERGENCY: storm tore siding off, water pouring in",
+    "lead": {
+      "requested": true
+    },
+    "alerts": [
+      {
+        "kind": "urgent",
+        "summary": "ACTIVE LEAK: Dana, 2200 Bayview Drive, Everett — storm tore siding off, water pouring in; call back immediately."
+      }
+    ]
+  }
+}

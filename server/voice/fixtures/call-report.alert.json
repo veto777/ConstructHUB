@@ -1,0 +1,153 @@
+{
+  "scenario": "existing_customer",
+  "callSid": "CAtestexistingcustomer",
+  "start": {
+    "callSid": "CAtestexistingcustomer",
+    "to": "+13605550199",
+    "from": "+13605550107",
+    "startedAt": "2026-10-06T17:30:00Z",
+    "engine": "constructhub-voice",
+    "model": "truthcode-api",
+    "persona": "janice",
+    "profileVersion": 1
+  },
+  "events": [
+    {
+      "type": "alert",
+      "kind": "existing_customer",
+      "summary": "Linda Park, 88 Harbor View Drive, Anacortes: roof job in progress, crew did not show this morning; wants an update.",
+      "slots": {
+        "first_name": "Linda",
+        "need": "existing roof job: crew did not show up this morning",
+        "address": "88 Harbor View Drive, Anacortes"
+      }
+    }
+  ],
+  "report": {
+    "endedAt": "2026-10-06T17:31:12Z",
+    "durationSeconds": 72,
+    "outcome": "alerted",
+    "summary": "Linda called: existing roof job: crew did not show up this morning. Escalated (existing_customer).",
+    "transcript": [
+      {
+        "role": "assistant",
+        "text": "Thank you for calling Cascade Exteriors, this is Janice. Calls may be recorded. What can we help you with today?",
+        "t": "2026-10-06T17:30:00Z"
+      },
+      {
+        "role": "caller",
+        "text": "Hi, this is Linda Park, you're doing my roof right now and the crew didn't show up this morning. What's going on?",
+        "t": "2026-10-06T17:30:08Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I'm sorry about that, Linda. What's the address of the job so I can get this to the right person?",
+        "t": "2026-10-06T17:30:16Z"
+      },
+      {
+        "role": "caller",
+        "text": "88 Harbor View Drive in Anacortes.",
+        "t": "2026-10-06T17:30:24Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Thank you. I've passed this straight to the right person and they'll get back to you — is this the best number for them to reach you?",
+        "t": "2026-10-06T17:30:32Z"
+      },
+      {
+        "role": "caller",
+        "text": "Yes. Who's going to call me? Give me the project manager's number.",
+        "t": "2026-10-06T17:30:40Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I can't give out a direct number, but the right person has your details and will call you at this number shortly. Anything else?",
+        "t": "2026-10-06T17:30:48Z"
+      },
+      {
+        "role": "caller",
+        "text": "No, that's it.",
+        "t": "2026-10-06T17:30:56Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Thanks for calling, Linda. Goodbye.",
+        "t": "2026-10-06T17:31:04Z"
+      }
+    ],
+    "slots": {
+      "first_name": "Linda",
+      "need": "existing roof job: crew did not show up this morning",
+      "address": "88 Harbor View Drive, Anacortes",
+      "phone": "+13605550107"
+    },
+    "events": [
+      {
+        "t": "2026-10-06T17:30:08Z",
+        "type": "decision",
+        "decision": {
+          "say": "I'm sorry about that, Linda. What's the address of the job so I can get this to the right person?",
+          "action": "continue",
+          "slots": {
+            "first_name": "Linda",
+            "need": "existing roof job: crew did not show up this morning"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:16Z",
+        "type": "decision",
+        "decision": {
+          "say": "Thank you. I've passed this straight to the right person and they'll get back to you — is this the best number for them to reach you?",
+          "action": "alert",
+          "slots": {
+            "address": "88 Harbor View Drive, Anacortes"
+          },
+          "alert": {
+            "kind": "existing_customer",
+            "summary": "Linda Park, 88 Harbor View Drive, Anacortes: roof job in progress, crew did not show this morning; wants an update."
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:24Z",
+        "type": "alert",
+        "detail": "existing_customer"
+      },
+      {
+        "t": "2026-10-06T17:30:32Z",
+        "type": "decision",
+        "decision": {
+          "say": "I can't give out a direct number, but the right person has your details and will call you at this number shortly. Anything else?",
+          "action": "continue",
+          "slots": {
+            "phone": "+13605550107"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:40Z",
+        "type": "decision",
+        "decision": {
+          "say": "Thanks for calling, Linda. Goodbye.",
+          "action": "end_call",
+          "slots": {},
+          "outcome": "alerted"
+        }
+      }
+    ],
+    "caller": {
+      "name": "Linda",
+      "email": "",
+      "address": "88 Harbor View Drive",
+      "city": "Anacortes"
+    },
+    "serviceNeeded": "existing roof job: crew did not show up this morning",
+    "alerts": [
+      {
+        "kind": "existing_customer",
+        "summary": "Linda Park, 88 Harbor View Drive, Anacortes: roof job in progress, crew did not show this morning; wants an update."
+      }
+    ]
+  }
+}

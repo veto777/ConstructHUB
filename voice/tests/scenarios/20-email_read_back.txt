@@ -1,0 +1,19 @@
+#! id: email_read_back
+#! title: Email read back exactly once; a correction is read back once more, never spelled twice
+#! tags: lead intake
+#! caller: +13605550120
+#! expect.outcome: lead_submitted
+#! expect.slot: email = m.torres@example.org
+#! expect.say_once: /m\.torres@example\.org|m dot torres at example dot org/
+#! expect.say_never: /\b\d{3}[ .-]?\d{3}[ .-]?\d{4}\b/
+#! expect.ended: true
+Hi, new windows for the whole house, probably twelve of them. 500 Elm Street, Mount Vernon. Mike.
+=> {"say": "Thanks, Mike. Is the number you're calling from the best one to reach you?", "action": "continue", "slots": {"need": "whole-house window replacement, about twelve windows", "address": "500 Elm Street, Mount Vernon", "first_name": "Mike"}}
+Yes.
+=> {"say": "What's a good email for the estimate?", "action": "continue", "slots": {"phone": "+13605550120"}}
+m dot torres at example dot org
+=> {"say": "I have m.torres@example.org, is that right?", "action": "continue", "slots": {"email": "m.torres@example.org"}}
+That's right. Any time is fine. That's all.
+=> {"say": "I've sent your request to our team, and someone will call you to set up your free estimate. Goodbye, Mike.", "action": "submit_lead", "slots": {"best_time": "any time"}}
+Bye.
+=> {"say": "Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

@@ -1,0 +1,14 @@
+#! id: windows_two_only
+#! title: Two windows only — below the five-window minimum, Safelite referral
+#! tags: decline core
+#! caller: +13605550104
+#! expect.outcome: declined
+#! expect.never: submit_lead alert flag_spam
+#! expect.say_any: /safelite/
+#! expect.ended: true
+#! expect.lead: false
+#! expect.max_turns: 3
+Hi, I've got two windows in the back bedroom I'd like replaced.
+=> {"say": "For a job of one to four windows on its own, Safelite's residential window division would be a good fit; we take window projects of five or more. Anything else I can help with?", "action": "continue", "outcome": "declined", "slots": {"need": "two window replacements"}}
+No thanks, bye.
+=> {"say": "Thanks for calling Cascade Exteriors. Goodbye.", "action": "end_call", "outcome": "declined", "slots": {}}

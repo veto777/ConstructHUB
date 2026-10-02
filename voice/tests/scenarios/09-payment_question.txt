@@ -1,0 +1,16 @@
+#! id: payment_question
+#! title: Wants to make a payment — payment escalation, never takes card details
+#! tags: alert escalation security
+#! caller: +13605550109
+#! expect.outcome: alerted
+#! expect.alert: payment
+#! expect.never: submit_lead flag_spam
+#! expect.say_never: /card number|read me the (?:card|number)|expiration|cvv|security code/
+#! expect.ended: true
+#! expect.lead: false
+Hi, I want to pay the balance on my deck job. Can I give you my card number?
+=> {"say": "I can't take payments over this line, but I'll have the office reach out to you about it. What's the job address and your first name?", "action": "continue", "slots": {"need": "wants to pay the balance on a deck job"}}
+302 Lakeway Drive, Bellingham. It's Priya.
+=> {"say": "Thanks, Priya. I've passed this straight to the right person and they'll get back to you at this number. Anything else?", "action": "alert", "alert": {"kind": "payment", "summary": "Priya, 302 Lakeway Drive, Bellingham: wants to pay the balance on her deck job."}, "slots": {"address": "302 Lakeway Drive, Bellingham", "first_name": "Priya", "phone": "+13605550109"}}
+No, that's all. Bye.
+=> {"say": "Thanks for calling, Priya. Goodbye.", "action": "end_call", "outcome": "alerted", "slots": {}}

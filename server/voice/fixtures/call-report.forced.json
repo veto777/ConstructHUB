@@ -1,0 +1,91 @@
+{
+  "scenario": "caller_hangs_up_mid_call",
+  "callSid": "CAtestcallerhangsupmidcall",
+  "start": {
+    "callSid": "CAtestcallerhangsupmidcall",
+    "to": "+13605550199",
+    "from": "+13605550129",
+    "startedAt": "2026-10-06T17:30:00Z",
+    "engine": "constructhub-voice",
+    "model": "truthcode-api",
+    "persona": "janice",
+    "profileVersion": 1
+  },
+  "events": [],
+  "report": {
+    "endedAt": "2026-10-06T17:30:40Z",
+    "durationSeconds": 40,
+    "outcome": "lead_submitted",
+    "summary": "A caller requested an estimate: whole-house siding replacement at 15 Juniper Way, Anacortes.",
+    "transcript": [
+      {
+        "role": "assistant",
+        "text": "Thank you for calling Cascade Exteriors, this is Janice. Calls may be recorded. What can we help you with today?",
+        "t": "2026-10-06T17:30:00Z"
+      },
+      {
+        "role": "caller",
+        "text": "I need the siding done on my whole house.",
+        "t": "2026-10-06T17:30:08Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I can help with that. What's the street address and city for the property?",
+        "t": "2026-10-06T17:30:16Z"
+      },
+      {
+        "role": "caller",
+        "text": "15 Juniper Way, Anacortes.",
+        "t": "2026-10-06T17:30:24Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Got it. And who am I speaking with? A first name is fine.",
+        "t": "2026-10-06T17:30:32Z"
+      }
+    ],
+    "slots": {
+      "need": "whole-house siding replacement",
+      "address": "15 Juniper Way, Anacortes"
+    },
+    "events": [
+      {
+        "t": "2026-10-06T17:30:08Z",
+        "type": "decision",
+        "decision": {
+          "say": "I can help with that. What's the street address and city for the property?",
+          "action": "continue",
+          "slots": {
+            "need": "whole-house siding replacement"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:16Z",
+        "type": "decision",
+        "decision": {
+          "say": "Got it. And who am I speaking with? A first name is fine.",
+          "action": "continue",
+          "slots": {
+            "address": "15 Juniper Way, Anacortes"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:24Z",
+        "type": "lead",
+        "detail": "forced submit from transcript"
+      }
+    ],
+    "caller": {
+      "name": "",
+      "email": "",
+      "address": "15 Juniper Way",
+      "city": "Anacortes"
+    },
+    "serviceNeeded": "whole-house siding replacement",
+    "lead": {
+      "requested": true
+    }
+  }
+}

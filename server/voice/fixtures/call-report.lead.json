@@ -1,0 +1,230 @@
+{
+  "scenario": "routine_lead",
+  "callSid": "CAtestroutinelead",
+  "start": {
+    "callSid": "CAtestroutinelead",
+    "to": "+13605550199",
+    "from": "+13605550101",
+    "startedAt": "2026-10-06T17:30:00Z",
+    "engine": "constructhub-voice",
+    "model": "truthcode-api",
+    "persona": "janice",
+    "profileVersion": 1
+  },
+  "events": [
+    {
+      "type": "lead",
+      "slots": {
+        "need": "whole-house siding replacement",
+        "address": "55 Oak Lane, Bellingham",
+        "first_name": "Robert",
+        "phone": "+13605550101",
+        "email": "robert.hale@example.com",
+        "best_time": "mornings"
+      }
+    }
+  ],
+  "report": {
+    "endedAt": "2026-10-06T17:32:16Z",
+    "durationSeconds": 136,
+    "outcome": "lead_submitted",
+    "summary": "Robert requested an estimate: whole-house siding replacement at 55 Oak Lane, Bellingham.",
+    "transcript": [
+      {
+        "role": "assistant",
+        "text": "Thank you for calling Cascade Exteriors, this is Janice. Calls may be recorded. What can we help you with today?",
+        "t": "2026-10-06T17:30:00Z"
+      },
+      {
+        "role": "caller",
+        "text": "Hi, I'm looking to get the siding on my whole house replaced.",
+        "t": "2026-10-06T17:30:08Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I can help with that. What's the street address and city for the property?",
+        "t": "2026-10-06T17:30:16Z"
+      },
+      {
+        "role": "caller",
+        "text": "It's 55 Oak Lane in Bellingham.",
+        "t": "2026-10-06T17:30:24Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Got it. And who am I speaking with? A first name is fine.",
+        "t": "2026-10-06T17:30:32Z"
+      },
+      {
+        "role": "caller",
+        "text": "Robert.",
+        "t": "2026-10-06T17:30:40Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Thanks, Robert. Is the number you're calling from the best one to reach you?",
+        "t": "2026-10-06T17:30:48Z"
+      },
+      {
+        "role": "caller",
+        "text": "Yes, that works.",
+        "t": "2026-10-06T17:30:56Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Great. What's a good email for the estimate?",
+        "t": "2026-10-06T17:31:04Z"
+      },
+      {
+        "role": "caller",
+        "text": "robert dot hale at example dot com",
+        "t": "2026-10-06T17:31:12Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I have robert.hale@example.com, is that right?",
+        "t": "2026-10-06T17:31:20Z"
+      },
+      {
+        "role": "caller",
+        "text": "Yes.",
+        "t": "2026-10-06T17:31:28Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Perfect. When is the best time for someone to call you back?",
+        "t": "2026-10-06T17:31:36Z"
+      },
+      {
+        "role": "caller",
+        "text": "Mornings are best.",
+        "t": "2026-10-06T17:31:44Z"
+      },
+      {
+        "role": "assistant",
+        "text": "I've sent your request to our team, and someone will call you in the morning to set up your free estimate. Is there anything else I can help with?",
+        "t": "2026-10-06T17:31:52Z"
+      },
+      {
+        "role": "caller",
+        "text": "No, that's everything. Thanks, bye.",
+        "t": "2026-10-06T17:32:00Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Thank you for calling Cascade Exteriors, Robert. Goodbye.",
+        "t": "2026-10-06T17:32:08Z"
+      }
+    ],
+    "slots": {
+      "need": "whole-house siding replacement",
+      "address": "55 Oak Lane, Bellingham",
+      "first_name": "Robert",
+      "phone": "+13605550101",
+      "email": "robert.hale@example.com",
+      "best_time": "mornings"
+    },
+    "events": [
+      {
+        "t": "2026-10-06T17:30:08Z",
+        "type": "decision",
+        "decision": {
+          "say": "I can help with that. What's the street address and city for the property?",
+          "action": "continue",
+          "slots": {
+            "need": "whole-house siding replacement"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:16Z",
+        "type": "decision",
+        "decision": {
+          "say": "Got it. And who am I speaking with? A first name is fine.",
+          "action": "continue",
+          "slots": {
+            "need": "whole-house siding replacement",
+            "address": "55 Oak Lane, Bellingham"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:24Z",
+        "type": "decision",
+        "decision": {
+          "say": "Thanks, Robert. Is the number you're calling from the best one to reach you?",
+          "action": "continue",
+          "slots": {
+            "first_name": "Robert"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:32Z",
+        "type": "decision",
+        "decision": {
+          "say": "Great. What's a good email for the estimate?",
+          "action": "continue",
+          "slots": {
+            "phone": "+13605550101"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:40Z",
+        "type": "decision",
+        "decision": {
+          "say": "I have robert.hale@example.com, is that right?",
+          "action": "continue",
+          "slots": {
+            "email": "robert.hale@example.com"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:48Z",
+        "type": "decision",
+        "decision": {
+          "say": "Perfect. When is the best time for someone to call you back?",
+          "action": "continue",
+          "slots": {}
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:56Z",
+        "type": "decision",
+        "decision": {
+          "say": "I've sent your request to our team, and someone will call you in the morning to set up your free estimate. Is there anything else I can help with?",
+          "action": "submit_lead",
+          "slots": {
+            "best_time": "mornings"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:31:04Z",
+        "type": "lead"
+      },
+      {
+        "t": "2026-10-06T17:31:12Z",
+        "type": "decision",
+        "decision": {
+          "say": "Thank you for calling Cascade Exteriors, Robert. Goodbye.",
+          "action": "end_call",
+          "slots": {},
+          "outcome": "lead_submitted"
+        }
+      }
+    ],
+    "caller": {
+      "name": "Robert",
+      "email": "robert.hale@example.com",
+      "address": "55 Oak Lane",
+      "city": "Bellingham"
+    },
+    "serviceNeeded": "whole-house siding replacement",
+    "lead": {
+      "requested": true
+    }
+  }
+}

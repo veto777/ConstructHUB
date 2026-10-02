@@ -1,0 +1,16 @@
+#! id: scheduling_job_start
+#! title: Existing customer wants to schedule the job start — scheduling escalation
+#! tags: alert escalation
+#! caller: +13605550128
+#! expect.outcome: alerted
+#! expect.alert: scheduling
+#! expect.never: submit_lead flag_spam
+#! expect.say_never: /we can start on|I've scheduled|booked you for/
+#! expect.ended: true
+#! expect.lead: false
+Hi, we signed for a siding job and I wanted to see when the crew can start. Can we do the week of the 20th?
+=> {"say": "I'll get that to the person who sets the schedule. What's the job address, and who am I speaking with?", "action": "continue", "slots": {"need": "existing signed siding job: wants to schedule the start, week of the 20th"}}
+7 Cherry Street, Bellingham. Nora.
+=> {"say": "Thanks, Nora. I've passed this straight to the right person and they'll get back to you at this number with dates. Anything else?", "action": "alert", "alert": {"kind": "scheduling", "summary": "Nora, 7 Cherry Street, Bellingham: signed siding job, asks to start the week of the 20th."}, "slots": {"address": "7 Cherry Street, Bellingham", "first_name": "Nora", "phone": "+13605550128"}}
+No, thanks, bye.
+=> {"say": "Thanks for calling, Nora. Goodbye.", "action": "end_call", "outcome": "alerted", "slots": {}}

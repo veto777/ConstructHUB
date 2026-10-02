@@ -1,0 +1,15 @@
+#! id: silence_hangup
+#! title: Silence twice — ask once, say goodbye, hang up with no lead
+#! tags: hangup core
+#! caller: +13605550113
+#! expect.outcome: hangup
+#! expect.actions: end_call
+#! expect.never: submit_lead alert flag_spam
+#! expect.say_any: /still there/
+#! expect.ended: true
+#! expect.lead: false
+#! expect.notify: none
+<silence>
+=> {"say": "Are you still there?", "action": "continue", "slots": {}}
+<silence>
+=> {"say": "I'm not hearing anything, so I'll let you go — please call back any time. Goodbye.", "action": "end_call", "outcome": "hangup", "slots": {}}

@@ -1,0 +1,18 @@
+#! id: spam_google_listing
+#! title: Google listing "verification" pitch — asked what it's about, then flagged
+#! tags: spam core
+#! caller: +14155550115
+#! expect.outcome: spam
+#! expect.actions: flag_spam
+#! expect.never: submit_lead alert
+#! expect.spam_min: 0.95
+#! expect.say_never: /the owner (?:is|will be) available|let me get the owner/
+#! expect.ended: true
+#! expect.notify: none
+#! expect.max_turns: 4
+Hi, I'm calling about your Google Business listing — it's showing as unverified and could be removed. I just need the owner to confirm a few details.
+=> {"say": "Can I ask what company you're calling from, and what this is regarding exactly?", "action": "continue", "slots": {}}
+I'm with the Google listing department. Is the owner available?
+=> {"say": "We're not interested in listing services, thank you. Goodbye.", "action": "flag_spam", "spam": {"confidence": 0.97, "reason": "Google listing verification scam"}, "slots": {}}
+It's about your business listing, this is important for your ranking.
+=> {"say": "Goodbye.", "action": "end_call", "outcome": "spam", "slots": {}}

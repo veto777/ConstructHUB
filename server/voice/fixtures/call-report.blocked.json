@@ -1,0 +1,36 @@
+{
+  "scenario": "blocked_second_call",
+  "callSid": "CAtestblockedsecondcall",
+  "start": {
+    "callSid": "CAtestblockedsecondcall",
+    "to": "+13605550199",
+    "from": "+14155550122",
+    "startedAt": "2026-10-06T17:30:00Z",
+    "engine": "constructhub-voice",
+    "model": "",
+    "persona": "janice",
+    "profileVersion": 1
+  },
+  "events": [],
+  "report": {
+    "endedAt": "2026-10-06T17:30:00Z",
+    "durationSeconds": 0,
+    "outcome": "blocked",
+    "summary": "",
+    "transcript": [],
+    "slots": {},
+    "events": [
+      {
+        "t": "2026-10-06T17:30:00Z",
+        "type": "blocked"
+      }
+    ],
+    "caller": {
+      "name": "",
+      "email": "",
+      "address": "",
+      "city": ""
+    },
+    "serviceNeeded": ""
+  }
+}

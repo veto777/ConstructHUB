@@ -1,0 +1,19 @@
+#! id: address_corrected
+#! title: Address given wrong, then corrected — the final slot holds the correction
+#! tags: lead intake
+#! caller: +13605550117
+#! expect.outcome: lead_submitted
+#! expect.actions: submit_lead
+#! expect.slot: address ~ 65 Oak Lane
+#! expect.slot: address !~ 55 Oak
+#! expect.ended: true
+I need a new deck built, the old one's rotten.
+=> {"say": "We can help with that. What's the street address and city for the property?", "action": "continue", "slots": {"need": "deck replacement"}}
+55 Oak Lane, Bellingham.
+=> {"say": "Got it. And who am I speaking with?", "action": "continue", "slots": {"address": "55 Oak Lane, Bellingham"}}
+Sorry, I said that wrong, it's 65 Oak Lane, not 55.
+=> {"say": "No problem, 65 Oak Lane in Bellingham. And your first name?", "action": "continue", "slots": {"address": "65 Oak Lane, Bellingham"}}
+Maria. This number is good, no email. Afternoons.
+=> {"say": "Thanks, Maria. I've sent your request to our team, and someone will call you in the afternoon to set up your free estimate. Anything else?", "action": "submit_lead", "slots": {"first_name": "Maria", "phone": "+13605550117", "best_time": "afternoons"}}
+No, bye.
+=> {"say": "Thanks for calling, Maria. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

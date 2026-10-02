@@ -1,0 +1,16 @@
+#! id: spam_press1
+#! title: "Press 1" robocall — flag spam, end the call, no notifications
+#! tags: spam core
+#! caller: +18005550114
+#! expect.outcome: spam
+#! expect.actions: flag_spam
+#! expect.never: submit_lead alert
+#! expect.spam_min: 0.95
+#! expect.ended: true
+#! expect.lead: false
+#! expect.notify: none
+#! expect.max_turns: 3
+This is an important message about your business's Google listing. Press 1 to speak with a representative or press 2 to be removed.
+=> {"say": "Thanks, but we're not interested. Goodbye.", "action": "flag_spam", "spam": {"confidence": 0.98, "reason": "press-1 robocall, Google listing pitch"}, "slots": {}}
+Press 1 now to keep your listing active.
+=> {"say": "Goodbye.", "action": "end_call", "outcome": "spam", "slots": {}}

@@ -1,0 +1,17 @@
+#! id: goodbye_mid_intake
+#! title: Goodbye mid-intake — submit immediately with what we have, no more questions
+#! tags: lead core
+#! caller: +13605550118
+#! expect.outcome: lead_submitted
+#! expect.actions: submit_lead
+#! expect.never: alert flag_spam
+#! expect.say_never: /what's a good email|best time|who am I speaking/
+#! expect.slot: address ~ 9 Ridge Road
+#! expect.ended: true
+#! expect.lead: true
+#! expect.max_turns: 3
+Hi, I want a quote on a full roof replacement, 9 Ridge Road in Lynden, I'm Ken.
+=> {"say": "Thanks, Ken. Is the number you're calling from the best one to reach you?", "action": "continue", "slots": {"need": "full roof replacement", "address": "9 Ridge Road, Lynden", "first_name": "Ken"}}
+Yeah — sorry, I've got to run, just have someone call me, bye.
+=> {"say": "Will do, Ken — I've sent your request and someone will call you at this number. Goodbye.", "action": "submit_lead", "slots": {"phone": "+13605550118"}}
+<hangup>
