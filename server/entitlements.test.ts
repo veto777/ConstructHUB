@@ -142,7 +142,7 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
     expect(pro.allowances).toEqual(PLANS.pro.limits);
     for (const k of USAGE_CAPS) expect(pro.allowances![k], k).not.toBe(-1);
     expect(Object.values(pro.modules).some(Boolean)).toBe(false);
-    expect(callAssistantAllowance(pro)).toEqual({ numbers: 1, minutes: 500 });
+    expect(callAssistantAllowance(pro)).toEqual({ numbers: 1, minutes: 2000 }); // Solo: the price book's tier
     // A full pro location count is still refused.
     expect(fitsLimit(pro.allowances!.locations, 1)).toBe(false);
   });

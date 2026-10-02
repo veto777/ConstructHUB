@@ -136,8 +136,9 @@ describe("Call Assistant price book: three tiers (owner, 2026-10-02)", () => {
     expect(u.summarizeVoiceUsage({ minutes: 9_000, includedMinutes: -1 }, "2026-10", -1))
       .toMatchObject({ minutes: 9_000, includedMinutes: -1, remainingMinutes: -1, overageMinutes: 0, overageCents: 0 });
     expect(u.summarizeVoiceUsage(null, "2026-10", -1)).toMatchObject({ includedMinutes: -1, remainingMinutes: -1, overageMinutes: 0 });
-    // A month that was unlimited stays unlimited (the snapshot only ever grows), even if the allowance is read lower later.
-    expect(u.summarizeVoiceUsage({ minutes: 900, includedMinutes: -1 }, "2026-10", 500)).toMatchObject({ includedMinutes: -1, overageMinutes: 0 });
+    // Overage accrues per call against the allowance in force (recordVoiceCallUsage): calls made while unlimited
+    // accrued none, so a later, lower allowance never turns them into overage.
+    expect(u.summarizeVoiceUsage({ minutes: 900, includedMinutes: -1, overageMinutes: 0 }, "2026-10", 500)).toMatchObject({ overageMinutes: 0, overageCents: 0 });
   });
 
   it("the overage sweep only runs in production with Stripe and the explicit switch", async () => {
@@ -360,10 +361,10 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     const out = await usage.reportVoiceOverage(o, MONTH, { stripe, configured: () => true, subscriptionFor: async () => ({ stripeCustomerId: "cus_x", stripeSubscriptionId: "sub_x", status: "active", billingInterval: "month" }) });
     expect(out).toEqual({ reported: 0, reason: "nothing_to_report" });
     expect(calls).toEqual([]);
-    // A customer on the same month is unchanged: past the included 500, the rest is overage.
+    // A customer on the same month is unchanged: past Solo's included 2,000, the rest is overage.
     const o2 = org();
-    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: payer, outcome: "info", billedMinutes: 1000, at: AT }))
-      .toMatchObject({ includedMinutes: 500, overageMinutes: 500 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: payer, outcome: "info", billedMinutes: 2500, at: AT }))
+      .toMatchObject({ includedMinutes: 2000, overageMinutes: 500 });
   });
 
   it("the sweep bills every org with unreported overage in the month and reports what it skipped", async () => {
