@@ -36,11 +36,18 @@ def cuda() -> str:
 
 def whisper() -> str:
     from faster_whisper import WhisperModel
-    settings.models_dir.mkdir(parents=True, exist_ok=True)
+    # models_dir is a string from voice/.env; a relative one means relative to voice/ (the unit's
+    # WorkingDirectory, where speech.py resolves it), and empty means the shared Hugging Face cache.
+    root = None
+    if settings.models_dir:
+        root = Path(settings.models_dir)
+        if not root.is_absolute():
+            root = Path(__file__).resolve().parents[1] / root
+        root.mkdir(parents=True, exist_ok=True)
     device = settings.stt_device if settings.stt_device in ("cuda", "cpu") else "auto"
     compute = "float16" if device == "cuda" else "int8"
-    m = WhisperModel(settings.whisper_model, device=device, compute_type=compute, download_root=str(settings.models_dir))
-    return f"{settings.whisper_model} on {device} -> {settings.models_dir}"
+    WhisperModel(settings.whisper_model, device=device, compute_type=compute, download_root=str(root) if root else None)
+    return f"{settings.whisper_model} on {device} -> {root or 'HF cache'}"
 
 
 def kokoro() -> str:
