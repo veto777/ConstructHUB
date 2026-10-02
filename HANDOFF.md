@@ -48,6 +48,15 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   `ISSUE_DESK_SECRET` is in vb11's `.env` and `ops/issue-desk/.env` (600, gitignored). There is a cap of $10 per run
   and 6 runs per day. **Browser reports start as "Needs review"**: they are anonymous input, so Claude only sees one
   after an admin presses Send to Claude. Review every `issue/<id>` branch before merging.
+- **Trial invites are one click:** the invite email has an "Accept your invite" button that opens `/invite/<code>`.
+  Signing in or signing up there brings the person back, and one click starts the trial. The code also works in
+  Settings → Account. Giving access (trial codes, Access grants) never asks the admin for a verification code
+  (owner's rule). `script/send-trial-invite.ts` sends one from the command line. Dennis
+  (nextsteppainting@gmail.com) got an unlimited invite, TRIAL-B0190130, on 2026-10-02.
+- **Janice call log** (`server/voice/ingest.ts`): Alpine's receptionist pushes every finished call to
+  `/api/voice-ingest` over the tailnet only, authenticated with `VOICE_INGEST_SECRET`. Calls land in `voice_calls`
+  under `VOICE_INGEST_ORG_ID` (Alpine Exteriors) with `engine='external'` and show on Call Assistant → Calls. They
+  are records only: never billed, never a lead or alert.
 
 ## ☎️ 2026-10-02 — Call Assistant tiers, 10¢ overage, 500 free spam calls — branch `ca/tiers`, NOT deployed
 - Owner: "offer 3 different tiers … 3-5k min used a month … all plans cover 500 spam calls that aren't charged … we
