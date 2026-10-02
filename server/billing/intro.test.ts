@@ -166,4 +166,21 @@ describe("the coupon lands on the item that first adds the add-on", () => {
     await recordIntro(USER + 3, "call_assistant", "coupon_x", "sub_9", pool);
     expect(await introsForOrder(f.stripe, USER + 3, {}, { call_assistant: 1 }, "month", pool)).toEqual([]);
   });
+
+  it("tiers: the intro is Solo on monthly billing only; Crew and Fleet have none, and a switch between tiers never grants it", async () => {
+    expect(addonIntro("call_assistant")).toEqual({ addon: "call_assistant", monthlyCents: 9_900, months: 3 });
+    expect(addonIntro("call_assistant_crew")).toBeNull();
+    expect(addonIntro("call_assistant_fleet")).toBeNull();
+    expect(introFor("call_assistant", "year")).toBeNull();
+    expect(introCouponSpec("call_assistant_crew", "month")).toBeNull();
+    const f = fakeStripe();
+    // A new customer adding Crew or Fleet: no coupon, no grant, no Stripe call.
+    expect(await introsForOrder(f.stripe, USER + 1, {}, { call_assistant_crew: 1 }, "month", pool)).toEqual([]);
+    expect(await introsForOrder(f.stripe, USER + 1, {}, { call_assistant_fleet: 1 }, "month", pool)).toEqual([]);
+    // Crew → Solo is a switch, not a first purchase: no intro, even for an account that never had one.
+    expect(await introsForOrder(f.stripe, USER + 1, { call_assistant_crew: 1 }, { call_assistant: 1 }, "month", pool)).toEqual([]);
+    expect(f.stripe.coupons.create).not.toHaveBeenCalled();
+    // The same account adding Solo as its first tier still gets it.
+    expect((await introsForOrder(f.stripe, USER + 1, {}, { call_assistant: 1 }, "month", pool)).map((i) => i.addon)).toEqual(["call_assistant"]);
+  });
 });

@@ -72,7 +72,7 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
             {d.allowance.used} of {d.allowance.numbers} number{d.allowance.numbers === 1 ? "" : "s"} in use
           </p>
           <p className="text-xs text-muted-foreground">
-            {d.allowance.includedNumbers} included with the add-on; more are {formatUsd(d.allowance.extraNumberMonthlyCents)}/mo each ({ADDONS.call_number.name}).
+            {d.allowance.includedNumbers} included with your tier; more are {formatUsd(d.allowance.extraNumberMonthlyCents)}/mo each ({ADDONS.call_number.name}), or move to a bigger tier.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -106,9 +106,9 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
       {manage && full && d.configured && (
         <Card data-testid="card-voice-numbers-full">
           <CardContent className="p-4 text-sm space-y-2">
-            <p>Every number your add-on includes is in use.</p>
+            <p>Every number your tier includes is in use.</p>
             <p className="text-muted-foreground">
-              Add the {ADDONS.call_number.name} add-on ({formatUsd(ADDONS.call_number.monthlyCents)}/mo each) in Billing for another, or release one you no longer need.
+              Add the {ADDONS.call_number.name} add-on ({formatUsd(ADDONS.call_number.monthlyCents)}/mo each) or move to a bigger tier in Billing for another, or release one you no longer need.
               {ADDONS.call_number.preview ? " (It isn't on sale yet.)" : ""}
             </p>
             {!ADDONS.call_number.preview && (

@@ -17,7 +17,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight, Building2, MapPinned, BadgeCheck, Tag, ScrollText, UserRound, ListOrdered, MessagesSquare,
-  Siren, Send, Settings2, FlaskConical, CheckCircle2, ChevronDown, type LucideIcon,
+  Siren, Send, Settings2, FlaskConical, CheckCircle2, ChevronDown, ShieldBan, Ban, FileBarChart, type LucideIcon,
 } from "lucide-react";
 import { GabeAvatar } from "@/components/mascot";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
@@ -27,7 +27,10 @@ import {
   PersonaCard, introPriceShort, personaNames,
 } from "@/components/call-assistant-marketing";
 import { PLANS } from "@shared/plans";
-import { CALL_ASSISTANT_NUMBER_RULES, SALES_REP_LABEL, callAssistantPricing, callAssistantYearlyNote, formatUsd } from "@shared/plan-copy";
+import {
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, SALES_REP_LABEL, callAssistantMinuteRule, callAssistantPricing, callAssistantSpamAllowanceLine,
+  callAssistantTierAdvice, callAssistantYearlyNote, formatUsd,
+} from "@shared/plan-copy";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { ROUTE_META } from "@shared/route-meta";
 
@@ -82,7 +85,7 @@ const AFTER_CALL: string[] = [
   "A real lead becomes a client in your CRM, plus a pipeline project if you want one, with \"Call Assistant\" as the lead source.",
   "Your team hears about it the way it hears about every new lead: in the app, by email or by text, as each person has set it up.",
   "Emergencies, existing customers and \"I want a person\" go by text or email to the teammate you choose, with reminders until someone replies.",
-  "Spam calls ping nobody. They show under Calls → Spam, where you can block or unblock a number.",
+  "Spam calls ping nobody. They show under Calls → Spam blocked, where you can block or unblock a number, and in a weekly spam report email.",
 ];
 
 function faqs(): { q: string; a: string }[] {
@@ -123,6 +126,18 @@ function faqs(): { q: string; a: string }[] {
     {
       q: "Is there a yearly price?",
       a: `Yes: ${callAssistantYearlyNote()}.`,
+    },
+    {
+      q: "What counts as a minute?",
+      a: `${callAssistantMinuteRule()} Each tier includes its minutes every calendar month; above them it's ${p.overagePerMinute} a minute, on your next invoice.`,
+    },
+    {
+      q: "Do spam calls use my minutes?",
+      a: `Not for the first ${p.freeSpamCalls} each month: ${callAssistantSpamAllowanceLine()}. Calls from a blocked number are rejected before they're answered and never cost a minute. ${CALL_ASSISTANT_SPAM.report}`,
+    },
+    {
+      q: "Which tier do I need?",
+      a: callAssistantTierAdvice(),
     },
     {
       q: "What won't the assistant do?",
@@ -191,8 +206,9 @@ export default function CallAssistantLandingPage() {
                 {salesCta(BTN_OUTLINE, "button-ca-sales-hero")}
               </div>
               <p className="mt-5 text-[15px] text-mkt-ink-soft" data-testid="text-ca-hero-price">
-                <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr.
-                {" "}<a href="#pricing" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">See what's included</a>
+                Solo: <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr.
+                {" "}Crew and Fleet for busier phones.
+                {" "}<a href="#pricing" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">Compare the three tiers</a>
               </p>
             </div>
 
@@ -208,6 +224,46 @@ export default function CallAssistantLandingPage() {
             </div>
           </div>
           <div className="mkt-ruler" aria-hidden />
+        </section>
+
+        {/* Spam: the owner's lead promise (2026-10-02). Only what the code does: CALL_ASSISTANT_SPAM in shared/plan-copy.ts. */}
+        <section id="spam" className="py-16 lg:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-16" data-testid="section-ca-spam">
+          <div className="max-w-7xl mx-auto relative overflow-hidden rounded-[28px] bg-mkt-panel text-mkt-panel-ink">
+            <div className="mkt-hazard h-2.5" aria-hidden />
+            <div className="absolute inset-0 top-2.5 mkt-grid-paper-panel [mask-image:linear-gradient(to_bottom,black_0%,transparent_95%)]" aria-hidden />
+            <div className="relative grid lg:grid-cols-12 gap-8 lg:gap-12 p-7 sm:p-10 lg:p-14">
+              <div className="lg:col-span-5">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">
+                  <ShieldBan className="h-4 w-4" aria-hidden /> Spam filter, built in
+                </p>
+                <h2 className="font-display font-semibold text-[1.85rem] sm:text-[2.6rem] lg:text-[3rem] leading-[1.05] tracking-[-0.02em] mt-4" data-testid="text-ca-spam-headline">
+                  {CALL_ASSISTANT_SPAM.headline}
+                </h2>
+                <p className="mt-5 text-[16px] leading-relaxed opacity-85">{CALL_ASSISTANT_SPAM.lead}</p>
+                <p className="mt-6 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl border border-[color:color-mix(in_srgb,var(--mkt-panel-ink)_42%,transparent)] px-4 py-3" data-testid="text-ca-spam-free">
+                  <span className="font-display font-semibold text-[1.9rem] leading-none">{price.freeSpamCalls}</span>{" "}
+                  <span className="text-[14px] opacity-90">spam calls a month never count toward your minutes, on every tier</span>
+                </p>
+              </div>
+              <ol className="lg:col-span-7 grid gap-px bg-[color:color-mix(in_srgb,var(--mkt-panel-ink)_16%,transparent)] rounded-2xl overflow-hidden self-start">
+                {([
+                  { icon: ShieldBan, title: "Screened on every call", body: CALL_ASSISTANT_SPAM.screen },
+                  { icon: Ban, title: "Caught twice, blocked before it rings", body: CALL_ASSISTANT_SPAM.block },
+                  { icon: FileBarChart, title: "Every one in your spam report", body: CALL_ASSISTANT_SPAM.report },
+                ] as const).map((step, i) => (
+                  <li key={step.title} className="bg-mkt-panel p-6 sm:p-7 flex gap-4" data-testid={`item-ca-spam-${i + 1}`}>
+                    <span className="h-10 w-10 shrink-0 rounded-lg border border-[color:color-mix(in_srgb,var(--mkt-panel-ink)_42%,transparent)] flex items-center justify-center">
+                      <step.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-display font-semibold text-[1.25rem] leading-tight">{step.title}</h3>
+                      <p className="mt-1.5 text-[14.5px] leading-relaxed opacity-80">{step.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
         </section>
 
         {/* How it works */}
@@ -334,32 +390,53 @@ export default function CallAssistantLandingPage() {
 
         {/* Pricing */}
         <section id="pricing" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-y border-mkt-rule scroll-mt-16" data-testid="section-ca-pricing">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <div className="text-center">
               <Kicker n="05" className="justify-center">Pricing</Kicker>
-              <h2 className={H2}>Launch <em className="text-mkt-orange-ink">Pricing</em></h2>
+              <h2 className={H2}>Three Tiers. <em className="text-mkt-orange-ink">Pick Your Call Volume.</em></h2>
             </div>
-            <div className="mt-12 bg-mkt-card border border-mkt-rule rounded-2xl overflow-hidden grid md:grid-cols-12" data-testid="card-ca-pricing">
-              <div className="md:col-span-5 p-7 lg:p-9 border-b md:border-b-0 md:border-r border-mkt-rule">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h3 className="font-display font-semibold text-[1.35rem] text-mkt-ink">{price.name}</h3>
-                  <ComingSoonTag />
+            <p className="mt-5 text-center text-[16px] text-mkt-ink-soft max-w-2xl mx-auto" data-testid="text-call-assistant-price">
+              Three tiers, one per account. Solo starts at {introPriceShort()}.
+            </p>
+            <div className="mt-10 grid md:grid-cols-3 gap-5" data-testid="card-ca-pricing">
+              {price.tiers.map((t, i) => (
+                <div
+                  key={t.tier}
+                  className={`relative bg-mkt-card border rounded-2xl p-7 flex flex-col ${i === 1 ? "border-mkt-ink" : "border-mkt-rule"}`}
+                  data-testid={`card-ca-tier-${t.tier}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h3 className="font-display font-semibold text-[1.5rem] text-mkt-ink">{t.name}</h3>
+                    <ComingSoonTag />
+                  </div>
+                  <div className="mt-4 font-display font-semibold text-[2.8rem] leading-none text-mkt-ink" data-testid={`text-ca-tier-price-${t.tier}`}>
+                    {t.intro ?? t.monthly}<span className="font-sans text-base font-medium text-mkt-muted ml-1">/mo</span>
+                  </div>
+                  <p className="mt-2 text-[14px] text-mkt-ink-soft min-h-[2.6em]" data-testid={`text-ca-tier-terms-${t.tier}`}>
+                    {t.intro ? `for your first ${t.introMonths} months, then ${t.monthly}/mo — or ${t.annual}/yr` : `or ${t.annual}/yr`}
+                  </p>
+                  <ul className="mt-5 pt-5 border-t border-mkt-rule space-y-2.5 text-[15px] text-mkt-ink">
+                    <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> {t.minutes} call minutes a month</li>
+                    <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> {t.numbersLabel} in the state you choose</li>
+                    <li className="flex gap-3 text-mkt-ink-soft"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Fits {t.estimatedCalls} (estimate)</li>
+                  </ul>
                 </div>
-                <div className="mt-5 font-display font-semibold text-[3.4rem] leading-none text-mkt-ink">
-                  {price.intro}<span className="font-sans text-base font-medium text-mkt-muted ml-1">/mo</span>
-                </div>
-                <p className="mt-4 text-[15px] text-mkt-ink-soft leading-relaxed" data-testid="text-call-assistant-price">
-                  {introPriceShort()}. Includes {price.includedNumbers} number and {price.includedMinutes} minutes; extra numbers {price.extraNumber}/mo.
-                </p>
-              </div>
-              <div className="md:col-span-7 p-7 lg:p-9">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">What's included</p>
+              ))}
+            </div>
+            <div className="mt-5 bg-mkt-card border border-mkt-rule rounded-2xl p-7 grid md:grid-cols-12 gap-6" data-testid="card-ca-every-tier">
+              <div className="md:col-span-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">On every tier</p>
                 <ul className="mt-4 space-y-3 text-[15px] text-mkt-ink">
-                  <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> {price.includedNumbers} local number in the state you choose</li>
-                  <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> {price.includedMinutes} call minutes a month, then {price.overagePerMinute} a minute</li>
+                  <li className="flex gap-3"><ShieldBan className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> <span><strong className="font-semibold">{price.freeSpamCalls} spam calls a month free</strong>: they never count toward your minutes</span></li>
+                  <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Then {price.overagePerMinute} a minute above your included minutes</li>
                   <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Extra local numbers {price.extraNumber}/mo each</li>
+                </ul>
+              </div>
+              <div className="md:col-span-7">
+                <ul className="space-y-3 text-[15px] text-mkt-ink">
                   <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Every voice, the Agent Studio, the Simulator and the call log</li>
                   <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Forward as many of your existing numbers as you like</li>
+                  <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Move between tiers any time; the difference is prorated</li>
                 </ul>
                 <p className="mt-6 pt-5 border-t border-mkt-rule text-[14px] text-mkt-ink-soft leading-relaxed" data-testid="text-ca-plans">
                   An add-on for the{" "}
@@ -411,7 +488,7 @@ export default function CallAssistantLandingPage() {
               Let Every Call Be Answered
             </h2>
             <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
-              {introPriceShort()}. An add-on for the {price.plans} plans, with every call in your CRM.
+              Solo from {introPriceShort()}; Crew and Fleet for busier phones. Spam screened on every call. An add-on for the {price.plans} plans, with every call in your CRM.
             </p>
             <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               {primaryCta("cta")}

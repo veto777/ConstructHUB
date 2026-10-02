@@ -31,7 +31,7 @@ import { isPlatformAdminEmail } from "./admin";
 import { forgetDashboard } from "./dashboard/cache";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
-  ADDON_MODULES, isAddonModule, moduleName, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_ASSISTANT_INCLUDED_NUMBERS,
+  ADDON_MODULES, isAddonModule, moduleName, ADDON_MODULE_UNLOCKED_BY, callAssistantIncluded,
   ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, storedPlanKey,
   type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
   type AddonModuleKey, type AnyModuleKey,
@@ -89,8 +89,7 @@ export function addonModulesFor(plan: PlanKey | null, addons: Partial<Record<Add
   const out = {} as Record<AddonModuleKey, boolean>;
   const running = ADDON_MODULE_RUN_STATUSES.includes(status ?? "");
   for (const key of ADDON_MODULE_KEYS) {
-    const addon = ADDON_MODULES[key];
-    out[key] = admin || (running && !!plan && (addons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan));
+    out[key] = admin || (running && !!plan && ADDON_MODULE_UNLOCKED_BY[key].some((addon) => (addons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan)));
   }
   return out;
 }
@@ -107,8 +106,7 @@ export function addonModulesPausedFor(storedPlan: string | null | undefined, sto
   const plan = storedPlanKey(storedPlan);
   const needsPayment = PAYMENT_NEEDED_STATUSES.includes(status ?? "");
   for (const key of ADDON_MODULE_KEYS) {
-    const addon = ADDON_MODULES[key];
-    out[key] = !admin && needsPayment && !!plan && (storedAddons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan);
+    out[key] = !admin && needsPayment && !!plan && ADDON_MODULE_UNLOCKED_BY[key].some((addon) => (storedAddons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan));
   }
   return out;
 }
@@ -119,20 +117,20 @@ export function moduleEnabled(ent: Pick<Entitlements, "modules" | "addonModules"
 }
 
 /**
- * The Call Assistant allowance the subscription buys: numbers = one per
- * call_assistant unit plus every call_number unit; minutes per month = the
- * included minutes per call_assistant unit. Platform admins get one unit's
- * worth (they run the product, they do not get unlimited carrier numbers).
+ * The Call Assistant allowance the subscription buys: numbers = the held
+ * tier's numbers (shared/plans.ts CALL_ASSISTANT_TIERS) plus every call_number
+ * unit; minutes per month = the tier's included minutes. Platform admins get
+ * one unit's worth (they run the product, they do not get unlimited carrier numbers).
  */
 export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number } {
   // A paused add-on (payment needed) still shows what it bought: its numbers are held, not released.
   const paused = !ent.addonModules.callAssistant && ent.addonModulesPaused?.callAssistant === true;
   if (!ent.addonModules.callAssistant && !paused) return { numbers: 0, minutes: 0 };
   const addons = paused ? ent.storedAddons ?? {} : ent.addons;
-  const units = Math.max(ent.isPlatformAdmin ? 1 : 0, addons.call_assistant ?? 0);
+  const included = callAssistantIncluded(ent.isPlatformAdmin && !callAssistantIncluded(addons).tier ? { call_assistant: 1 } : addons);
   return {
-    numbers: units * CALL_ASSISTANT_INCLUDED_NUMBERS + (addons.call_number ?? 0),
-    minutes: units * CALL_ASSISTANT_INCLUDED_MINUTES,
+    numbers: included.numbers + (addons.call_number ?? 0),
+    minutes: included.minutes,
   };
 }
 

@@ -8,12 +8,12 @@ import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sen
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 import {
   PLANS as PRICE_BOOK, PLAN_KEYS, ADDON_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
-  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS,
+  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS, CALL_ASSISTANT_TIER_ADDONS,
 } from "@shared/plans";
 import { stripe, PaymentsNotConfiguredError } from "./billing/client";
 import { describeSubscription } from "./billing/prices";
 import {
-  BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities, checkAddonsForPlan,
+  BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities, checkAddonsForPlan, mergeAddonRequest,
   checkoutLineItems, subscriptionChange, type PlanOrder,
 } from "./billing/order";
 import {
@@ -355,8 +355,9 @@ export function registerStripeRoutes(app: Express) {
           throw new BillingRequestError(409,
             "Your subscription is on an older plan. Switch to a current plan first (Change plan), then add add-ons.", "legacy_plan");
         }
+        // Asking for another Call Assistant tier is a switch: the held one goes in the same (prorated) update.
         const addons = Object.fromEntries(
-          Object.entries({ ...current.addons, ...requested }).filter(([, qty]) => (qty ?? 0) > 0));
+          Object.entries(mergeAddonRequest(current.addons, requested)).filter(([, qty]) => (qty ?? 0) > 0));
         checkAddonsForPlan(current.plan, addons);
         const order: PlanOrder = {
           plan: current.plan,
@@ -378,7 +379,9 @@ export function registerStripeRoutes(app: Express) {
    * The Call Assistant numbers a change would stop and release, for the
    * confirm step before it (owner, 2026-10-02: the number is part of the
    * service and is not kept). ?cancel=1 = the subscription ends;
-   * ?call_assistant=N&call_number=M = the new add-on quantities.
+   * ?call_assistant=N&call_number=M = the new add-on quantities; a Call
+   * Assistant tier key with 1 (?call_assistant_crew=1) = a switch to that
+   * tier (a downgrade keeps fewer numbers: the newest extras go first).
    * → { numbers: [{ phoneNumber, orgName }] } (only the account's own orgs).
    */
   app.get("/api/stripe/addons/release-preview", async (req: Request, res: Response) => {
@@ -386,7 +389,7 @@ export function registerStripeRoutes(app: Express) {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       const addons: Record<string, number> = {};
-      for (const key of ["call_assistant", "call_number"] as const) {
+      for (const key of [...CALL_ASSISTANT_TIER_ADDONS, "call_number"] as const) {
         const raw = req.query[key];
         if (typeof raw !== "string" || raw === "") continue;
         const n = Number(raw);

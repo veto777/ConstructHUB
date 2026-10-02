@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { ADDONS, PLANS, type AddonKey, type BillingInterval, type PlanKey, type PlanLimits } from "@shared/plans";
+import { ADDONS, PLANS, CALL_ASSISTANT_FREE_SPAM_CALLS, type AddonKey, type BillingInterval, type PlanKey, type PlanLimits } from "@shared/plans";
+import { CallAssistantTierPicker } from "@/components/call-assistant-tiers";
 import {
   AGENCY_INCLUDED_LOCATIONS, addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
 } from "@/lib/pricing-display";
@@ -55,9 +56,11 @@ type VoiceStatusLite = {
   /** Bought, but paused until a payment goes through (server/voice/billing.ts). */
   paused?: boolean;
   allowance: { numbers: number; minutes: number };
-  pricing: { includedMinutes: number; overageCentsPerMinute: number };
+  pricing: { includedMinutes: number; overageCentsPerMinute: number; freeSpamCalls?: number };
+  /** The held Call Assistant tier (server/voice/billing.ts). */
+  tier?: { key: string; addon: string; name: string } | null;
   numberAllowance?: { used: number };
-  usage: { minutes: number; overageMinutes: number; overageCents: number } | null;
+  usage: { minutes: number; overageMinutes: number; overageCents: number; spamCallsThisMonth?: number } | null;
 };
 
 const countText = (v: number) => (v < 0 ? "Unlimited (fair use)" : v === 0 ? "Not included" : formatCount(v));
@@ -135,6 +138,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const interval: BillingInterval = view.interval ?? "month";
   // Add-ons change a Stripe subscription on a current plan; a legacy plan keeps its old price until it switches in Pricing.
   const editable = view.changesInPlace && !view.isLegacy;
+  const pendingAddon = addonMutation.isPending ? addonMutation.variables?.addon : null;
   const resets = entitlements.resetsAt ? new Date(entitlements.resetsAt) : null;
   const apiPlan = apiKeys.data?.plan;
 
@@ -253,7 +257,22 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
             : overage
             ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} at ${formatUsd(vs!.pricing.overageCentsPerMinute)}/min, on your next invoice.`
             : `Every started minute of an answered call counts; blocked spam costs nothing. Above the included minutes: ${formatUsd(vs?.pricing.overageCentsPerMinute ?? 0)}/min.`,
-          addon: "call_assistant",
+          action: (
+            <div className="w-full space-y-2" data-testid="row-limit-call-assistant-tier">
+              <p className="text-xs text-muted-foreground">
+                {vs?.tier ? `Your tier: ${vs.tier.name}.` : "Pick a tier."} Every tier: {formatCount(vs?.pricing.freeSpamCalls ?? CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls a month never count toward your minutes.
+                {vs?.usage?.spamCallsThisMonth ? ` ${formatCount(vs.usage.spamCallsThisMonth)} spam calls blocked this month.` : ""}
+              </p>
+              <CallAssistantTierPicker
+                compact
+                addons={subscription?.addons as Partial<Record<AddonKey, number>> | undefined}
+                interval={interval}
+                editable={editable && !addonChange.checking}
+                pending={pendingAddon}
+                onSwitch={(addon) => void addonChange.request({ addon, quantity: 1 }, 0)}
+              />
+            </div>
+          ),
         },
         {
           key: "callAssistantNumbers",
@@ -262,7 +281,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           excluded: !on,
           used: !on ? null : vs!.numberAllowance ? vs!.numberAllowance.used : undefined,
           ceiling: on && numbers > 0 ? numbers : undefined,
-          hint: "One local number comes with each AI Call Assistant; buy and release them in CRM → Call Assistant → Numbers.",
+          hint: "Solo includes 1 local number, Crew 3 and Fleet 5; buy and release them in CRM → Call Assistant → Numbers.",
           addon: on ? "call_number" : undefined,
         },
       ],
@@ -293,8 +312,6 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
       ],
     });
   }
-
-  const pendingAddon = addonMutation.isPending ? addonMutation.variables?.addon : null;
 
   return (
     <div className="space-y-6" data-testid="section-limits">

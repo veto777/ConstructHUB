@@ -606,6 +606,69 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     expect(mocks.update).toHaveBeenCalledTimes(1);
   });
 
+  it("Call Assistant tiers: switching is an add-on change on the same subscription — the held tier goes, prorated; never two tiers", async () => {
+    const tiers = ["call_assistant", "call_assistant_crew", "call_assistant_fleet", "call_number"] as const;
+    // While the tiers are in preview the route refuses them and Stripe is never called.
+    await seedProSubscription();
+    mocks.rows.push([liveRow()]);
+    const refused = await request("/api/stripe/addons", { addon: "call_assistant_crew", quantity: 1 });
+    expect(refused.code).toBe(409);
+    expect(refused.body.message).toMatch(/isn't available yet/);
+    expect(mocks.update).not.toHaveBeenCalled();
+
+    const saved = tiers.map((k) => ADDONS[k].preview);
+    try {
+      for (const k of tiers) delete ADDONS[k].preview;
+      // Pro + Solo (the original call_assistant key) + one extra number.
+      const sub = await seedProSubscription();
+      await request("/api/stripe/create-checkout", { plan: "pro", addons: { call_assistant_fleet: 1, call_assistant: 1 } }).then((r) => {
+        // Two tiers in one order are refused, not guessed.
+        expect(r.code).toBe(400);
+        expect(r.body.message).toMatch(/can't both be on one subscription/);
+      });
+      mocks.pricesCreate.mockImplementation(async (params: any) => {
+        const id = `price_${params.lookup_key}`;
+        mocks.prices.set(id, { id, ...params });
+        return { id };
+      });
+      const soloPrice = "price_chub_v1_addon_call_assistant_month_24900";
+      mocks.prices.set(soloPrice, { id: soloPrice, lookup_key: "chub_v1_addon_call_assistant_month_24900", unit_amount: 24900, currency: "usd", recurring: { interval: "month" }, metadata: { chub_kind: "addon", chub_key: "call_assistant", chub_interval: "month" } });
+      sub.items.data.push({ ...item("si_solo", soloPrice, 1, { kind: "addon", key: "call_assistant" }), current_period_end: 1893456000 });
+
+      // Upgrade: Solo → Crew in one update, prorated and invoiced now.
+      mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant: 1 } })]);
+      const up = await request("/api/stripe/addons", { addon: "call_assistant_crew", quantity: 1 });
+      expect(up.code).toBe(200);
+      expect(mocks.update).toHaveBeenCalledTimes(1);
+      const params = mocks.update.mock.calls[0][1];
+      expect(params.proration_behavior).toBe("always_invoice");
+      expect(params.items).toEqual([
+        { id: "si_solo", deleted: true },
+        { price: "price_chub_v1_addon_call_assistant_crew_month_44900", quantity: 1 },
+      ]);
+      // No intro on Crew (the intro is Solo's, first time only).
+      expect(params.items.some((i: any) => i.discounts)).toBe(false);
+      expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant_crew: 1 });
+      // The release decision runs after the change (a downgrade's extra numbers go there).
+      expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
+
+      // Downgrade: Crew → Solo — the Solo intro is NOT granted again on a switch.
+      mocks.current = await mocks.update.mock.results[0].value;
+      mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant_crew: 1 } })]);
+      const down = await request("/api/stripe/addons", { addons: { call_assistant: 1 } });
+      expect(down.code).toBe(200);
+      const downParams = mocks.update.mock.calls[1][1];
+      expect(downParams.items).toEqual([
+        { price: soloPrice, quantity: 1 },
+        { id: "si_new_1", deleted: true },
+      ]);
+      expect(downParams.items.some((i: any) => i.discounts)).toBe(false);
+      expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant: 1 });
+    } finally {
+      tiers.forEach((k, i) => { ADDONS[k].preview = saved[i]; });
+    }
+  });
+
   it("add-ons: one add-on as { addon, quantity } (the Settings card's body) works like { addons }", async () => {
     await seedProSubscription();
     mocks.rows.push([liveRow()]);

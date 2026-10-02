@@ -11,6 +11,15 @@
  * are OVERAGE, billed per minute (CALL_MINUTE_OVERAGE_CENTS) on the owner's
  * next Stripe invoice.
  *
+ * Spam is free up to a point (owner, 2026-10-02: "all plans cover 500 spam
+ * calls that aren't charged"): the minutes of a call classified spam
+ * (outcome `spam`) are recorded as spam_free_minutes, NOT as minutes, for the
+ * first CALL_ASSISTANT_FREE_SPAM_CALLS such calls of the org's calendar
+ * month (UTC); above that they count like any call. A `blocked` call (a
+ * number already blocked, rejected before answering) costs 0 minutes and
+ * never uses the allowance. `minutes` is therefore the BILLABLE minutes: what
+ * the included allowance and the overage are measured against.
+ *
  * Overage reaches Stripe as an invoice item on the subscription's customer
  * (`stripe.invoiceItems.create` with `pricing.price` = a one-time Price found
  * by lookup key, the server/billing/prices.ts pattern). stripe-node 20 has no
@@ -26,7 +35,7 @@ import { pool } from "../db";
 import { getEntitlements, callAssistantAllowance } from "../entitlements";
 import { stripe as stripeClient, stripeConfigured } from "../billing/client";
 import { hasLiveStripeSubscription } from "../billing/sync";
-import { ACCESS_STATUSES, ADDONS, CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
+import { ACCESS_STATUSES, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_NAME, CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
 import type { VoiceUsageRow } from "@shared/schema";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
@@ -47,9 +56,18 @@ export const isBlockedOutcome = (outcome: string | null | undefined) => outcome 
 export type VoiceUsageSummary = {
   month: string;
   calls: number;
+  /** Billable minutes (free spam minutes excluded). */
   minutes: number;
+  /** Answered calls classified spam. */
   spamCalls: number;
+  /** Calls from blocked numbers, rejected before answering (0 minutes). */
   blockedCalls: number;
+  /** spamCalls + blockedCalls — "spam calls this month". */
+  spamCallsThisMonth: number;
+  /** Spam calls whose minutes were not counted (at most freeSpamCallsLimit). */
+  freeSpamCalls: number;
+  freeSpamMinutes: number;
+  freeSpamCallsLimit: number;
   includedMinutes: number;
   remainingMinutes: number;
   overageMinutes: number;
@@ -70,6 +88,10 @@ export function summarizeVoiceUsage(row: Partial<VoiceUsageRow> | null | undefin
     minutes,
     spamCalls: Number(row?.spamCalls ?? 0),
     blockedCalls: Number(row?.blockedCalls ?? 0),
+    spamCallsThisMonth: Number(row?.spamCalls ?? 0) + Number(row?.blockedCalls ?? 0),
+    freeSpamCalls: Number(row?.spamFreeCalls ?? 0),
+    freeSpamMinutes: Number(row?.spamFreeMinutes ?? 0),
+    freeSpamCallsLimit: CALL_ASSISTANT_FREE_SPAM_CALLS,
     includedMinutes: included,
     remainingMinutes: Math.max(0, included - minutes),
     overageMinutes: overage,
@@ -84,6 +106,7 @@ function rowFrom(r: any): VoiceUsageRow {
   return {
     id: Number(r.id), orgId: r.org_id, accountUserId: Number(r.account_user_id), month: r.month,
     calls: Number(r.calls), minutes: Number(r.minutes), spamCalls: Number(r.spam_calls), blockedCalls: Number(r.blocked_calls),
+    spamFreeCalls: Number(r.spam_free_calls ?? 0), spamFreeMinutes: Number(r.spam_free_minutes ?? 0),
     includedMinutes: r.included_minutes === null ? null : Number(r.included_minutes),
     overageMinutes: Number(r.overage_minutes), overageReportedMinutes: Number(r.overage_reported_minutes),
     overageReportedAt: r.overage_reported_at, stripeUsageRecordId: r.stripe_usage_record_id, updatedAt: r.updated_at,
@@ -105,29 +128,43 @@ export type RecordUsageInput = {
 
 /**
  * Count one finished call on the account's month (atomic upsert). The
- * included-minutes snapshot only ever grows within a month (a second
- * call_assistant unit bought mid-month raises it; a cancellation never
- * lowers what was already granted). Returns the month's row after the call.
+ * included-minutes snapshot only ever grows within a month (a bigger tier
+ * bought mid-month raises it; a downgrade or cancellation never lowers what
+ * was already granted). A spam call with minutes is free while the month's
+ * spam_free_calls is under `freeSpamCalls` (CALL_ASSISTANT_FREE_SPAM_CALLS):
+ * the decision is made against the row as locked by the upsert, so two calls
+ * finishing together never both take the 500th free slot. Returns the
+ * month's row after the call.
  */
-export async function recordVoiceCallUsage(input: RecordUsageInput, q: Queryable = pool): Promise<VoiceUsageRow> {
+export async function recordVoiceCallUsage(input: RecordUsageInput, q: Queryable = pool, freeSpamCalls = CALL_ASSISTANT_FREE_SPAM_CALLS): Promise<VoiceUsageRow> {
   const month = voiceMonthKey(input.at ?? new Date());
   const blocked = isBlockedOutcome(input.outcome);
+  const spam = isSpamOutcome(input.outcome);
   const minutes = blocked ? 0 : (input.billedMinutes ?? billedMinutesFor(input.durationSeconds));
   const included = callAssistantAllowance(await getEntitlements(input.accountUserId)).minutes;
+  // $5 = spam (1/0), $8 = the free spam-call allowance. A spam call with no minutes uses none of it.
+  const waiveNew = `($5::int = 1 AND $4::int > 0 AND $8::int > 0)`;
+  const waive = `($5::int = 1 AND $4::int > 0 AND voice_usage.spam_free_calls < $8::int)`;
   const { rows: [r] } = await q.query(
-    `INSERT INTO voice_usage (org_id, account_user_id, month, calls, minutes, spam_calls, blocked_calls, included_minutes, overage_minutes, updated_at)
-     VALUES ($1, $2, $3, 1, $4::int, $5::int, $6::int, $7::int, GREATEST(0, $4::int - $7::int), now())
+    `INSERT INTO voice_usage (org_id, account_user_id, month, calls, minutes, spam_calls, blocked_calls, included_minutes, overage_minutes,
+                              spam_free_calls, spam_free_minutes, updated_at)
+     VALUES ($1, $2, $3, 1, CASE WHEN ${waiveNew} THEN 0 ELSE $4::int END, $5::int, $6::int, $7::int,
+             GREATEST(0, (CASE WHEN ${waiveNew} THEN 0 ELSE $4::int END) - $7::int),
+             CASE WHEN ${waiveNew} THEN 1 ELSE 0 END, CASE WHEN ${waiveNew} THEN $4::int ELSE 0 END, now())
      ON CONFLICT (org_id, month) DO UPDATE SET
        account_user_id = EXCLUDED.account_user_id,
        calls = voice_usage.calls + 1,
-       minutes = voice_usage.minutes + EXCLUDED.minutes,
+       minutes = voice_usage.minutes + (CASE WHEN ${waive} THEN 0 ELSE $4::int END),
        spam_calls = voice_usage.spam_calls + EXCLUDED.spam_calls,
        blocked_calls = voice_usage.blocked_calls + EXCLUDED.blocked_calls,
+       spam_free_calls = voice_usage.spam_free_calls + (CASE WHEN ${waive} THEN 1 ELSE 0 END),
+       spam_free_minutes = voice_usage.spam_free_minutes + (CASE WHEN ${waive} THEN $4::int ELSE 0 END),
        included_minutes = GREATEST(COALESCE(voice_usage.included_minutes, 0), EXCLUDED.included_minutes),
-       overage_minutes = GREATEST(0, voice_usage.minutes + EXCLUDED.minutes - GREATEST(COALESCE(voice_usage.included_minutes, 0), EXCLUDED.included_minutes)),
+       overage_minutes = GREATEST(0, voice_usage.minutes + (CASE WHEN ${waive} THEN 0 ELSE $4::int END)
+                                     - GREATEST(COALESCE(voice_usage.included_minutes, 0), EXCLUDED.included_minutes)),
        updated_at = now()
      RETURNING *`,
-    [input.orgId, input.accountUserId, month, minutes, isSpamOutcome(input.outcome) ? 1 : 0, blocked ? 1 : 0, included],
+    [input.orgId, input.accountUserId, month, minutes, spam ? 1 : 0, blocked ? 1 : 0, included, Math.max(0, Math.floor(freeSpamCalls))],
   );
   return rowFrom(r);
 }
@@ -183,7 +220,7 @@ async function resolveOveragePriceId(stripe: StripeForOverage): Promise<string> 
         unit_amount: CALL_MINUTE_OVERAGE_CENTS,
         lookup_key: lookupKey,
         transfer_lookup_key: true,
-        product_data: { name: `ConstructHUB add-on — ${ADDONS.call_assistant.name} minutes over the included allowance` },
+        product_data: { name: `ConstructHUB add-on — ${CALL_ASSISTANT_NAME} minutes over the included allowance` },
         metadata: { chub_kind: "meter", chub_key: "call_minutes", chub_interval: "once" },
       },
       { idempotencyKey: `chub-price-${lookupKey}` },
@@ -233,7 +270,7 @@ export async function reportVoiceOverage(orgId: string, month: string, deps: Ove
   const upTo = row.overageReportedMinutes + delta;
   const annual = sub.billingInterval === "year";
   const key = `chub-voice-overage-${orgId}-${month}-${upTo}`;
-  const description = `${ADDONS.call_assistant.name}: ${delta} minute${delta === 1 ? "" : "s"} over the ${row.includedMinutes ?? 0} included in ${month}`;
+  const description = `${CALL_ASSISTANT_NAME}: ${delta} minute${delta === 1 ? "" : "s"} over the ${row.includedMinutes ?? 0} included in ${month}`;
   const item = await stripe.invoiceItems.create(
     {
       customer: sub.stripeCustomerId,

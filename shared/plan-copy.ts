@@ -6,8 +6,9 @@
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
   TRIAL_DAYS, SALES_THRESHOLD_CENTS, MODULE_NAMES, ANNUAL_MONTHS, planForModule, showsPrice,
-  CALL_ASSISTANT_INCLUDED_MINUTES, CALL_ASSISTANT_INCLUDED_NUMBERS, CALL_MINUTE_OVERAGE_CENTS,
-  type Plan, type PlanKey, type ModuleKey,
+  CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL,
+  CALL_MINUTE_OVERAGE_CENTS,
+  type Plan, type PlanKey, type ModuleKey, type CallAssistantTier, type CallAssistantTierKey, type AddonKey,
 } from "./plans";
 
 /** "Talk to a sales rep" — the label for anything at or above SALES_THRESHOLD_CENTS. */
@@ -99,7 +100,7 @@ export function addonLines(): string[] {
   return Object.values(ADDONS).map((addon) => {
     const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
     const on = joinNames(addon.availableOn.map((key) => PLANS[key].name));
-    const intro = addon.key === "call_assistant" ? ` Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).` : "";
+    const intro = addon.introMonthlyCents ? ` Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).` : "";
     // A `preview` add-on is listed but refused at checkout (shared/plans.ts), so say so.
     const preview = addon.preview ? " Coming soon: listed, not for sale yet." : "";
     return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}${intro}${preview}`;
@@ -109,71 +110,125 @@ export function addonLines(): string[] {
 // ── AI Call Assistant ────────────────────────────────────────────────────────
 
 /**
- * AI Call Assistant launch pricing (owner, 2026-10-02): "$99 a month for the
- * first 3 months", then the add-on's regular monthly price — or the annual
- * price ("annually price can be $1999"), which has no intro. Every surface
- * says all three: "$99/mo for your first 3 months, then $249/mo — or
- * $1,999/yr". The annual price is an add-on's own annual price, so it shows
- * even though it is above the sales threshold (add-on and plan annual prices
- * are exempt, like the plans' own annual prices).
+ * AI Call Assistant pricing — three tiers (owner, 2026-10-02), every figure
+ * from the price book (shared/plans.ts CALL_ASSISTANT_TIERS, the same table
+ * the add-ons, Stripe prices and entitlements are built from):
  *
- * The figures live in the price book (shared/plans.ts ADDONS.call_assistant
- * introMonthlyCents / introMonths) — the same fields the Stripe intro coupon is
- * built from (server/billing/intro.ts) — so the copy can never promise a price
- * checkout doesn't charge. Every surface renders through the helpers below:
- * the landing page, /call-assistant, the pricing page, the CRM Overview and
- * Gabe's knowledge.
+ *   Solo  — the launch intro "$99 a month for the first 3 months" (monthly
+ *           billing only), then its monthly price — or its own yearly price;
+ *   Crew, Fleet — more minutes and numbers, no intro;
+ *   every tier — the same overage per minute, extra numbers, and
+ *           CALL_ASSISTANT_FREE_SPAM_CALLS spam calls a month that never count.
+ *
+ * Yearly prices are add-on annual prices, so they show even above the sales
+ * threshold (like the plans' own annual prices). Every surface renders through
+ * the helpers below: the landing page, /call-assistant, the pricing page, the
+ * CRM Overview, Settings and Gabe's knowledge.
  */
+const SOLO = CALL_ASSISTANT_TIERS[0];
+
+/** The Solo tier's launch intro (the only intro; monthly billing, first time the service is added). */
 export const CALL_ASSISTANT_INTRO: { readonly monthlyCents: number; readonly months: number } = {
-  monthlyCents: ADDONS.call_assistant.introMonthlyCents ?? ADDONS.call_assistant.monthlyCents,
-  months: ADDONS.call_assistant.introMonths ?? 0,
+  monthlyCents: SOLO.introMonthlyCents ?? SOLO.monthlyCents,
+  months: SOLO.introMonths ?? 0,
 };
 
-/** "Pro, Growth and Agency" — the plans the add-on is sold on. */
-export const CALL_ASSISTANT_PLANS = joinNames(ADDONS.call_assistant.availableOn.map((key) => PLANS[key].name));
+/** "Pro, Growth and Agency" — the plans the tiers are sold on. */
+export const CALL_ASSISTANT_PLANS = joinNames(ADDONS[SOLO.addon].availableOn.map((key) => PLANS[key].name));
 
-/** Every Call Assistant price fact, formatted, for page copy ("$99", 3, "$249", …). */
+const count = (n: number) => n.toLocaleString("en-US");
+const numbersLabel = (n: number) => `${n} local number${n === 1 ? "" : "s"}`;
+/** Calls a month the tier's minutes cover at the assumed average call length — an estimate, rounded. */
+const estimatedCalls = (t: CallAssistantTier) => Math.round(t.includedMinutes / CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL / 50) * 50;
+
+export type CallAssistantTierFacts = {
+  tier: CallAssistantTierKey;
+  addon: AddonKey;
+  /** "Solo". */
+  name: string;
+  /** "AI Call Assistant — Solo" (the add-on's name). */
+  fullName: string;
+  monthly: string;
+  annual: string;
+  monthlyCents: number;
+  annualCents: number;
+  /** Solo only: "$99" for the first `introMonths` months on monthly billing. */
+  intro: string | null;
+  introMonths: number | null;
+  minutes: string;
+  includedMinutes: number;
+  numbers: number;
+  numbersLabel: string;
+  /** "about 1,000 calls a month" at CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL. */
+  estimatedCalls: string;
+};
+
+/** Every tier, cheapest first, formatted. */
+export function callAssistantTiers(): CallAssistantTierFacts[] {
+  return CALL_ASSISTANT_TIERS.map((t) => ({
+    tier: t.tier, addon: t.addon, name: t.name, fullName: ADDONS[t.addon].name,
+    monthly: formatUsd(t.monthlyCents), annual: formatUsd(t.annualCents), monthlyCents: t.monthlyCents, annualCents: t.annualCents,
+    intro: t.introMonthlyCents ? formatUsd(t.introMonthlyCents) : null, introMonths: t.introMonthlyCents ? t.introMonths ?? null : null,
+    minutes: count(t.includedMinutes), includedMinutes: t.includedMinutes,
+    numbers: t.includedNumbers, numbersLabel: numbersLabel(t.includedNumbers),
+    estimatedCalls: `about ${count(estimatedCalls(t))} calls a month`,
+  }));
+}
+
+/** Every Call Assistant price fact, formatted, for page copy. `intro`/`regular`/`annual` are Solo's (the entry tier). */
 export function callAssistantPricing() {
-  const addon = ADDONS.call_assistant;
+  const solo = ADDONS[SOLO.addon];
   return {
-    name: addon.name,
+    name: CALL_ASSISTANT_NAME,
     intro: formatUsd(CALL_ASSISTANT_INTRO.monthlyCents),
     introMonths: CALL_ASSISTANT_INTRO.months,
-    regular: formatUsd(addon.monthlyCents),
-    /** The annual price (no intro on annual billing). */
-    annual: formatUsd(addon.annualCents),
-    includedNumbers: CALL_ASSISTANT_INCLUDED_NUMBERS,
-    includedMinutes: CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US"),
+    /** Solo's monthly price after the intro. */
+    regular: formatUsd(solo.monthlyCents),
+    /** Solo's annual price (no intro on annual billing). */
+    annual: formatUsd(solo.annualCents),
+    /** Solo's numbers and minutes. */
+    includedNumbers: SOLO.includedNumbers,
+    includedMinutes: count(SOLO.includedMinutes),
     overagePerMinute: formatUsd(CALL_MINUTE_OVERAGE_CENTS),
     extraNumber: formatUsd(ADDONS.call_number.monthlyCents),
+    /** "500" — spam calls a month that never count toward minutes, every tier. */
+    freeSpamCalls: count(CALL_ASSISTANT_FREE_SPAM_CALLS),
     plans: CALL_ASSISTANT_PLANS,
-    planKeys: addon.availableOn,
+    planKeys: solo.availableOn,
+    tiers: callAssistantTiers(),
     /** Listed but not for sale yet (the numbers+billing lane drops the flag at launch). */
-    comingSoon: addon.preview === true,
+    comingSoon: CALL_ASSISTANT_TIERS.every((t) => ADDONS[t.addon].preview === true),
   };
 }
 
-/** "$99/month for your first 3 months, then $249/month — or $1,999/year". */
+/** "$99/month for your first 3 months, then $249/month — or $1,999/year" — Solo's launch price. */
 export function callAssistantIntroLine(): string {
   const p = callAssistantPricing();
   return `${p.intro}/month for your first ${p.introMonths} months, then ${p.regular}/month — or ${p.annual}/year`;
 }
 
-/** "$99/mo for your first 3 months, then $249/mo — or $1,999/yr" — the short form next to a price (pricing table, CRM Overview). */
+/** "$99/mo for your first 3 months, then $249/mo — or $1,999/yr" — Solo's launch price, the short form next to a price. */
 export function callAssistantIntroShort(): string {
   const p = callAssistantPricing();
   return `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`;
 }
 
+/** "Solo $249/month or $1,999/year (2,000 minutes and 1 local number), Crew … and Fleet …". */
+export function callAssistantTiersLine(): string {
+  return joinNames(callAssistantTiers().map((t) => `${t.name} ${t.monthly}/month or ${t.annual}/year (${t.minutes} minutes a month and ${t.numbersLabel})`));
+}
+
 /**
- * "$1,999/yr when your plan is billed yearly (add-ons follow your plan's
- * billing); the $99/mo intro for your first 3 months is on monthly billing" —
- * add-ons always ride on the plan's interval (server/billing/order.ts), so the
- * yearly price is never a choice for the add-on alone.
+ * "Yearly: Solo $1,999/yr, Crew $3,599/yr and Fleet $6,399/yr when your plan
+ * is billed yearly (add-ons follow your plan's billing); the $99/mo intro for
+ * your first 3 months is Solo on monthly billing" — add-ons always ride on the
+ * plan's interval (server/billing/order.ts), so yearly is never a choice for
+ * the add-on alone.
  */
 export function callAssistantYearlyNote(): string {
   const p = callAssistantPricing();
-  return `${p.annual}/yr when your plan is billed yearly (add-ons follow your plan's billing); the ${p.intro}/mo intro for your first ${p.introMonths} months is on monthly billing`;
+  const yearly = joinNames(p.tiers.map((t) => `${t.name} ${t.annual}/yr`));
+  return `${yearly} when your plan is billed yearly (add-ons follow your plan's billing); the ${p.intro}/mo intro for your first ${p.introMonths} months is ${SOLO.name} on monthly billing`;
 }
 
 /**
@@ -189,10 +244,45 @@ export const CALL_ASSISTANT_NUMBER_RULES = {
   payment: "If a payment fails, the assistant pauses until the card is updated in Settings → Billing; the number is held while the payment is retried.",
 } as const;
 
-/** "1 local number and 500 call minutes a month, then $0.15 a minute; extra numbers $5/month each". */
+/**
+ * The spam filter, in the words every surface uses (owner, 2026-10-02: "they
+ * don't ever have to answer spam … our system blocks spam calls and reports
+ * them"). Only what the code does: the assistant screens each call it answers
+ * (server/voice/internal-calls.ts), a spam call notifies nobody and files no
+ * lead, a number with two near-certain spam strikes is rejected before the
+ * call is answered (server/voice/spam.ts SPAM_STRIKES_TO_BLOCK, the engine's
+ * <Reject/>), every one is listed in the Calls tab's spam view and the weekly
+ * spam report (server/voice/spam-report.ts), and up to
+ * CALL_ASSISTANT_FREE_SPAM_CALLS a month never count toward minutes.
+ */
+export const CALL_ASSISTANT_SPAM = {
+  headline: "You never answer a spam call again",
+  lead: "Your assistant answers every call you forward to it and asks what the call is about, so the spam stops with it, not with you.",
+  screen: "Telemarketers, robocalls and cold sales pitches are flagged as spam: they never ring through to you, never create a lead and never send anyone a notification.",
+  block: "A number caught twice is blocked: its next calls are rejected before they're answered, so they never reach you or your assistant.",
+  report: "Every spam call and blocked number lands in your spam report under Calls → Spam blocked, with one click to unblock a number we got wrong, and a weekly email tells you how many we blocked.",
+} as const;
+
+/** "500 spam calls a month never count toward your minutes, on every tier." */
+export function callAssistantSpamAllowanceLine(): string {
+  return `${count(CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls a month never count toward your minutes, on every tier`;
+}
+
+/** "Every tier: then $0.10 a minute; extra numbers $5/month each; 500 spam calls a month never count toward your minutes". */
 export function callAssistantIncludesLine(): string {
   const p = callAssistantPricing();
-  return `${p.includedNumbers} local number${p.includedNumbers === 1 ? "" : "s"} and ${p.includedMinutes} call minutes a month, then ${p.overagePerMinute} a minute; extra numbers ${p.extraNumber}/month each`;
+  return `minutes above a tier's included ones are ${p.overagePerMinute} a minute; extra numbers are ${p.extraNumber}/month each; and ${callAssistantSpamAllowanceLine()}`;
+}
+
+/** What counts as a minute — for the FAQ and Gabe. */
+export function callAssistantMinuteRule(): string {
+  return "Every started minute of a call the assistant answers counts, the way phone carriers bill. Calls from a blocked number are rejected before answering and use no minutes.";
+}
+
+/** Which tier fits, as estimates (calls of about CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL minutes). */
+export function callAssistantTierAdvice(): string {
+  const tiers = callAssistantTiers();
+  return `At about ${CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL} minutes a call, ${joinNames(tiers.map((t) => `${t.name} covers ${t.estimatedCalls}`))}. These are estimates: your calls may run shorter or longer, and you can move between tiers any time in Settings → Billing.`;
 }
 
 /**

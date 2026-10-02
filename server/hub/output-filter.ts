@@ -7,7 +7,7 @@
  *
  * Pure: no DB, no request, no model.
  */
-import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS, type PlanKey } from "@shared/plans";
+import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS, CALL_ASSISTANT_TIERS, type PlanKey } from "@shared/plans";
 import { hubLinkFor } from "@shared/hub-links";
 import { CALL_ASSISTANT_INTRO } from "@shared/plan-copy";
 import { DFY_CATALOG, COURSE_BUNDLE } from "../catalog";
@@ -73,7 +73,8 @@ const TENANT_CLAIM = /\b(uses?|using|used|rel(y|ies) on|(is|are) on|signed up|cu
 // O10
 const PLAN_NAMES = PLAN_KEYS.map((k) => PLANS[k].name);
 const PLAN_WORD_OK = new Set([
-  ...PLAN_NAMES, "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
+  // The AI Call Assistant's tiers ("the Solo tier") are sold names too (shared/plans.ts CALL_ASSISTANT_TIERS).
+  ...PLAN_NAMES, ...CALL_ASSISTANT_TIERS.map((t) => t.name), "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
   "Yearly", "Pricing", "A", "An", "One", "Our", "My", "Their", "Current", "New", "Same", "Right", "Cheapest", "Higher",
   "Lower", "Bigger", "Larger", "Smaller", "Other", "Different", "Cloudflare", "Blotato", "Google", "Stripe",
   "ConstructHUB", "ConstructHub", "Change", "Choose", "Switch", "Pick", "Select", "Compare", "Upgrade", "Downgrade", "Cancel",

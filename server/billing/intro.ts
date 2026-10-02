@@ -1,6 +1,7 @@
 /**
- * Add-on introductory prices — today only the AI Call Assistant (owner,
- * 2026-10-02: "$99 a month for the first 3 months", then the regular price).
+ * Add-on introductory prices — today only the AI Call Assistant's Solo tier
+ * (owner, 2026-10-02: "$99 a month for the first 3 months", then the regular
+ * price). Crew and Fleet have no intro; moving between tiers never grants it.
  *
  * The price book carries the figures (shared/plans.ts `introMonthlyCents`,
  * `introMonths`); this module turns them into a Stripe coupon and decides who
@@ -139,6 +140,9 @@ export async function introsForOrder(
   const out: { addon: AddonKey; couponId: string }[] = [];
   for (const addon of ADDON_KEYS) {
     if (!introFor(addon, interval) || (before[addon] ?? 0) > 0 || (after[addon] ?? 0) <= 0) continue;
+    // A switch between Call Assistant tiers (Crew → Solo) is not "first added": the intro is for a new customer of the service.
+    const group = ADDONS[addon].exclusiveGroup;
+    if (group && ADDON_KEYS.some((k) => ADDONS[k].exclusiveGroup === group && (before[k] ?? 0) > 0)) continue;
     if (!(await introEligible(stripe, userId, addon, q))) continue;
     const couponId = await resolveIntroCoupon(stripe, addon, interval);
     if (couponId) out.push({ addon, couponId });

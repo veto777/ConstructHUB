@@ -23,6 +23,7 @@ import { registerVoiceSimulatorRoutes } from "./simulator";
 import { registerVoiceCallRoutes } from "./calls";
 import { startVoiceOverageWorker } from "./billing-usage";
 import { startVoiceNumberReleaseWorker } from "./number-release";
+import { startVoiceSpamReportWorker } from "./spam-report";
 
 export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   // engine → app
@@ -39,4 +40,7 @@ export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   // Numbers of ended subscriptions / removed add-ons → released on SignalWire once eligible
   // (on in production unless VOICE_NUMBER_RELEASE_WORKER_ENABLED=false; number-release.ts).
   startVoiceNumberReleaseWorker();
+  // Weekly "we blocked N spam calls for you" email + bell, per org with spam that week
+  // (on in production unless VOICE_SPAM_REPORT_WORKER_ENABLED=false; spam-report.ts).
+  startVoiceSpamReportWorker();
 }

@@ -6,9 +6,10 @@
  *    keep a customer from leaving."
  *
  * So when the subscription ENDS (Stripe deleted it, or its status is canceled /
- * unpaid / incomplete_expired, or a trial grant ran out) or the call_assistant
- * add-on is removed, every number the org holds is released on SignalWire; when
- * the call_number add-on quantity drops below what the org holds, the NEWEST
+ * unpaid / incomplete_expired, or a trial grant ran out) or the Call Assistant
+ * tier is removed, every number the org holds is released on SignalWire; when
+ * a smaller tier (Fleet → Crew → Solo) or a lower call_number add-on quantity
+ * pays for fewer numbers than the org holds, the NEWEST
  * extra numbers go the same way (the oldest — normally the included one — is
  * kept). A failed payment (past_due) never releases anything: the assistant is
  * paused (server/entitlements.ts ADDON_MODULE_RUN_STATUSES) and the number is
@@ -60,8 +61,10 @@ import { accountSubscriptionRow, activePlanKey, grantExpired, parseAddons } from
 import { isPlatformAdminEmail } from "../admin";
 import { recordActivity } from "../crm/activity";
 import {
-  ACCESS_STATUSES, ADDONS, CALL_ASSISTANT_INCLUDED_NUMBERS, CALL_NUMBER_MIN_DAYS, NUMBER_RELEASE_STATUSES,
+  ACCESS_STATUSES, ADDONS, CALL_ASSISTANT_NAME, CALL_NUMBER_MIN_DAYS, NUMBER_RELEASE_STATUSES, callAssistantIncluded,
+  type AddonKey,
 } from "@shared/plans";
+import { mergeAddonRequest } from "../billing/order";
 // Type only: the carrier code (./numbers → ./proxy) loads lazily, so the Stripe
 // webhook that imports this module does not pull in the voice routes.
 import type { NumbersMock } from "./numbers";
@@ -86,8 +89,8 @@ export function releaseIsFinal(row: { status?: string | null; release_reason?: s
 /** "…because the subscription ended" — the owner-facing why. */
 export function releaseReasonText(reason: string | null | undefined): string {
   switch (reason) {
-    case "addon_removed": return `the ${ADDONS.call_assistant.name} add-on was removed`;
-    case "over_allowance": return `the subscription no longer pays for it (fewer ${ADDONS.call_number.name} add-ons)`;
+    case "addon_removed": return `the ${CALL_ASSISTANT_NAME} add-on was removed`;
+    case "over_allowance": return `the subscription no longer pays for it (a smaller ${CALL_ASSISTANT_NAME} tier or fewer ${ADDONS.call_number.name} add-ons)`;
     case "payment_failed": return "the subscription's payment was not recovered";
     default: return "the subscription ended";
   }
@@ -112,8 +115,9 @@ type SubscriptionLike = {
  *     grant → keep 0, "subscription_ended" — except `unpaid` (Stripe stopped
  *     retrying a failed payment) → keep 0, "payment_failed", which a fixed
  *     card can still undo;
- *   - active / trialing / past_due → keep what the add-ons pay for (one per
- *     call_assistant unit + every call_number unit); none → "addon_removed";
+ *   - active / trialing / past_due → keep what the add-ons pay for (the
+ *     held tier's numbers — Solo 1, Crew 3, Fleet 5 — + every call_number
+ *     unit, so a downgrade releases the newest extras); no tier → "addon_removed";
  *   - anything else (incomplete, paused, a row we can't read) → null: hold,
  *     never guess a release.
  */
@@ -127,9 +131,10 @@ export function numbersKeptFor(row: SubscriptionLike | null | undefined, admin: 
   const plan = activePlanKey(row, now);
   if (!plan) return null;
   const addons = parseAddons(row.addons);
-  const units = ADDONS.call_assistant.availableOn.includes(plan) ? addons.call_assistant ?? 0 : 0;
-  if (units <= 0) return { keep: 0, reason: "addon_removed" };
-  return { keep: units * CALL_ASSISTANT_INCLUDED_NUMBERS + (addons.call_number ?? 0), reason: "over_allowance" };
+  // The held tier (Solo 1, Crew 3, Fleet 5 numbers) plus every extra number; a tier the plan doesn't sell counts as none.
+  const { tier, numbers } = callAssistantIncluded(addons);
+  if (!tier || !ADDONS[tier.addon].availableOn.includes(plan)) return { keep: 0, reason: "addon_removed" };
+  return { keep: numbers + (addons.call_number ?? 0), reason: "over_allowance" };
 }
 
 export type ReleaseDeps = {
@@ -212,7 +217,7 @@ export async function scheduleOrgReleases(org: { id: string; name?: string }, de
           notices.push({
             phone: r.phone_number, at: eligible,
             title: `Your Call Assistant number ${r.phone_number} stopped answering because ${releaseReasonText(decision.reason)}`,
-            body: `The number is part of the ${ADDONS.call_assistant.name} service, so it is released ${when}. Your own business numbers were never moved: turn off forwarding with your carrier and calls ring through to you as before.`,
+            body: `The number is part of the ${CALL_ASSISTANT_NAME} service, so it is released ${when}. Your own business numbers were never moved: turn off forwarding with your carrier and calls ring through to you as before.`,
           });
         }
       } else if (final && r.release_reason !== decision.reason && !releaseIsFinal(r)) {
@@ -282,7 +287,7 @@ export async function previewCallNumberReleases(userId: number, change: { cancel
   const admin = isPlatformAdminEmail(row?.email);
   const decision: NumberKeep | null = admin ? null
     : change.cancel ? { keep: 0, reason: "subscription_ended" }
-    : numbersKeptFor(row ? { ...row, addons: { ...parseAddons(row.addons), ...(change.addons ?? {}) } } : null, false);
+    : numbersKeptFor(row ? { ...row, addons: mergeAddonRequest(parseAddons(row.addons), (change.addons ?? {}) as Partial<Record<AddonKey, number>>) } : null, false);
   if (!decision) return [];
   const out: ReleasePreview = [];
   for (const org of orgs) {
@@ -349,7 +354,7 @@ export async function releaseDueCallNumbers(opts: ReleaseDeps & { orgIds?: strin
       recordActivity({ orgId: notice.orgId, actorLabel: "ConstructHUB billing", action: "call.number_released", entityType: "voice_number", meta: { phone: notice.phone, reason: notice.reason } });
       await notifyOwners(notice.orgId,
         `Your Call Assistant number ${notice.phone} was released because ${why}`,
-        `The number is part of the ${ADDONS.call_assistant.name} service and has gone back to the carrier. Your own business numbers were never moved: turn off forwarding to ${notice.phone} with your carrier and calls ring through to you as before.`);
+        `The number is part of the ${CALL_ASSISTANT_NAME} service and has gone back to the carrier. Your own business numbers were never moved: turn off forwarding to ${notice.phone} with your carrier and calls ring through to you as before.`);
     }
   }
   return out;

@@ -7,8 +7,11 @@ import {
 import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
-  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote,
+  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote,
+  callAssistantTiers, callAssistantTiersLine, callAssistantTierAdvice, callAssistantSpamAllowanceLine, callAssistantIncludesLine, callAssistantMinuteRule,
 } from "@shared/plan-copy";
+import { CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
+import { SPAM_STRIKES_TO_BLOCK } from "./voice/spam";
 import { knowledgeBook, priceBookCents } from "./hub/knowledge";
 import { filterOutput } from "./hub/output-filter";
 
@@ -93,12 +96,57 @@ describe("AI Call Assistant launch price", () => {
     const p = callAssistantPricing();
     expect(p.annual).toBe("$1,999");
     // Add-ons follow the plan's billing interval (server/billing/order.ts): yearly is not a choice for the add-on alone.
-    expect(callAssistantYearlyNote()).toBe("$1,999/yr when your plan is billed yearly (add-ons follow your plan's billing); the $99/mo intro for your first 3 months is on monthly billing");
+    expect(callAssistantYearlyNote()).toBe("Solo $1,999/yr, Crew $3,599/yr and Fleet $6,399/yr when your plan is billed yearly (add-ons follow your plan's billing); the $99/mo intro for your first 3 months is Solo on monthly billing");
     expect(p.extraNumber).toBe(formatUsd(ADDONS.call_number.monthlyCents));
     expect(p.comingSoon).toBe(ADDONS.call_assistant.preview === true);
     expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).`);
     expect(knowledgeBook().pack).toContain(callAssistantIntroLine());
-    expect(knowledgeBook().pack).toContain("The intro price is for monthly billing");
+    expect(knowledgeBook().pack).toContain("The intro price is Solo on monthly billing");
+  });
+
+  it("three tiers, every figure from the price book (owner, 2026-10-02)", () => {
+    const tiers = callAssistantTiers();
+    expect(tiers.map((t) => [t.name, t.monthly, t.annual, t.minutes, t.numbersLabel, t.intro])).toEqual([
+      ["Solo", "$249", "$1,999", "2,000", "1 local number", "$99"],
+      ["Crew", "$449", "$3,599", "5,000", "3 local numbers", null],
+      ["Fleet", "$799", "$6,399", "12,000", "5 local numbers", null],
+    ]);
+    expect(tiers.map((t) => t.estimatedCalls)).toEqual(["about 1,000 calls a month", "about 2,500 calls a month", "about 6,000 calls a month"]);
+    expect(callAssistantTiersLine()).toBe("Solo $249/month or $1,999/year (2,000 minutes a month and 1 local number), Crew $449/month or $3,599/year (5,000 minutes a month and 3 local numbers) and Fleet $799/month or $6,399/year (12,000 minutes a month and 5 local numbers)");
+    expect(callAssistantTierAdvice()).toMatch(/^At about 2 minutes a call, Solo covers about 1,000 calls a month, Crew covers about 2,500 calls a month and Fleet covers about 6,000 calls a month\. These are estimates/);
+    const p = callAssistantPricing();
+    expect([p.overagePerMinute, p.extraNumber, p.freeSpamCalls]).toEqual(["$0.10", "$5", "500"]);
+    expect(callAssistantSpamAllowanceLine()).toBe("500 spam calls a month never count toward your minutes, on every tier");
+    expect(callAssistantIncludesLine()).toBe("minutes above a tier's included ones are $0.10 a minute; extra numbers are $5/month each; and 500 spam calls a month never count toward your minutes, on every tier");
+    expect(callAssistantMinuteRule()).toMatch(/every started minute/i);
+    // Every tier is in the Hub's knowledge and in the add-on lines it quotes.
+    const pack = knowledgeBook().pack;
+    expect(pack).toContain(callAssistantTiersLine());
+    expect(pack).toContain(callAssistantTierAdvice());
+    expect(pack).toContain(CALL_ASSISTANT_SPAM.block);
+    for (const t of CALL_ASSISTANT_TIERS) {
+      expect(addonLines().some((l) => l.startsWith(`${ADDONS[t.addon].name} — ${formatUsd(t.monthlyCents)}/month or ${formatUsd(t.annualCents)}/year`))).toBe(true);
+      expect(priceBookCents().has(t.monthlyCents) && priceBookCents().has(t.annualCents)).toBe(true);
+    }
+    expect(priceBookCents().has(CALL_MINUTE_OVERAGE_CENTS)).toBe(true);
+    // Gabe may name a tier and quote its price.
+    expect(filterReply("The Crew tier is $449/month with 5,000 minutes; Fleet is $799/month.").ok).toBe(true);
+    expect(filterReply("The Fleet tier costs $6,399/year on yearly billing.").ok).toBe(true);
+    expect(filterReply("The Crew tier is $399/month.").ok).toBe(false);
+  });
+
+  it("the spam promise only says what the code does", () => {
+    // "A number caught twice is blocked" is server/voice/spam.ts's rule.
+    expect(SPAM_STRIKES_TO_BLOCK).toBe(2);
+    expect(CALL_ASSISTANT_SPAM.block).toMatch(/caught twice is blocked/);
+    expect(CALL_ASSISTANT_SPAM.headline).toBe("You never answer a spam call again");
+    expect(CALL_ASSISTANT_SPAM.report).toMatch(/weekly email/);
+    expect(CALL_ASSISTANT_FREE_SPAM_CALLS).toBe(500);
+    // Never a claim the product doesn't make (reporting to carriers or regulators, "guaranteed").
+    for (const line of Object.values(CALL_ASSISTANT_SPAM)) expect(line).not.toMatch(/FTC|FCC|carrier report|guarantee|100%/i);
+    const page = fs.readFileSync(path.join(root, "client/src/pages/call-assistant-landing.tsx"), "utf8");
+    for (const key of ["headline", "lead", "screen", "block", "report"] as const) expect(page).toContain(`CALL_ASSISTANT_SPAM.${key}`);
+    for (const q of ["What counts as a minute?", "Do spam calls use my minutes?", "Which tier do I need?"]) expect(page).toContain(q);
   });
 
   it("$1,999/yr is an add-on annual price, so it shows despite the $1,000 sales threshold", () => {
@@ -132,12 +180,18 @@ describe("AI Call Assistant launch price", () => {
     "client/src/pages/landing.tsx", "client/src/pages/call-assistant-landing.tsx",
     "client/src/components/call-assistant-marketing.tsx", "client/src/pages/pricing.tsx",
     "client/src/pages/crm-call-assistant/overview.tsx", "client/src/pages/crm-call-assistant/index.tsx",
-    "client/src/pages/crm-call-assistant/numbers.tsx",
-  ])("%s types no Call Assistant price (it renders them from the price book)", (file) => {
+    "client/src/pages/crm-call-assistant/numbers.tsx", "client/src/pages/crm-call-assistant/calls.tsx",
+    "client/src/components/call-assistant-tiers.tsx", "client/src/pages/settings/plan-billing.tsx", "client/src/pages/settings/limits-usage.tsx",
+  ])("%s types no Call Assistant price, minutes or spam allowance (it renders them from the price book)", (file) => {
     const src = fs.readFileSync(path.join(root, file), "utf8");
-    for (const cents of [CALL_ASSISTANT_INTRO.monthlyCents, ADDONS.call_assistant.monthlyCents, ADDONS.call_assistant.annualCents, ADDONS.call_number.monthlyCents]) {
-      expect(src).not.toMatch(new RegExp(`\\${formatUsd(cents).replace(".", "\\.")}(?![\\d,])`));
-    }
+    const cents = [
+      CALL_ASSISTANT_INTRO.monthlyCents, ADDONS.call_number.monthlyCents, CALL_MINUTE_OVERAGE_CENTS,
+      ...CALL_ASSISTANT_TIERS.flatMap((t) => [t.monthlyCents, t.annualCents]),
+    ];
+    for (const c of cents) expect(src).not.toMatch(new RegExp(`\\${formatUsd(c).replace(".", "\\.")}(?![\\d,])`));
+    // Tier minutes and the free spam calls, typed as copy ("2,000 minutes", "500 spam calls").
+    for (const t of CALL_ASSISTANT_TIERS) expect(src).not.toMatch(new RegExp(`\\b${t.includedMinutes.toLocaleString("en-US")} (call )?min`));
+    expect(src).not.toMatch(new RegExp(`\\b${CALL_ASSISTANT_FREE_SPAM_CALLS} spam`));
   });
 });
 

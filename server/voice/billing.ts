@@ -3,8 +3,10 @@
  * (SPEC.md § CRM API → Overview / Usage). OWNER: numbers+billing lane.
  *
  * Fixed by the architect:
- *   - the add-on block in shared/plans.ts (call_assistant / call_number,
- *     CALL_ASSISTANT_INCLUDED_MINUTES, CALL_MINUTE_OVERAGE_CENTS) — the lane
+ *   - the add-on block in shared/plans.ts (the three tiers in
+ *     CALL_ASSISTANT_TIERS — call_assistant = Solo, call_assistant_crew,
+ *     call_assistant_fleet — call_number, CALL_MINUTE_OVERAGE_CENTS,
+ *     CALL_ASSISTANT_FREE_SPAM_CALLS) — the lane
  *     owns it from here on, and removes `preview` only when the owner confirms;
  *   - voice_usage is the meter (server/voice/schema.ts): minutes per org per
  *     month, included snapshot, overage billed to Stripe (billing-usage.ts);
@@ -22,7 +24,10 @@ import { db } from "../db";
 import { voiceProfiles } from "@shared/schema";
 import { voiceContext, type GetUser } from "./context";
 import { moduleEnabled, modulePaused, BILLING_HREF } from "../entitlements";
-import { ADDONS, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
+import {
+  ADDONS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_MINUTE_OVERAGE_CENTS, CALL_NUMBER_MIN_DAYS,
+  callAssistantTierOf,
+} from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
 import { listOrgNumbers, numberView, numberAllowance, countsAgainstAllowance, numbersMockEnabled } from "./numbers";
@@ -70,17 +75,31 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
     const enabled = moduleEnabled(v.ent, "callAssistant");
     const paused = modulePaused(v.ent, "callAssistant");
     res.setHeader("Cache-Control", "no-store");
+    // A paused add-on keeps showing what it bought (the stored row).
+    const heldAddons = Object.keys(v.ent.addons).length ? v.ent.addons : v.ent.storedAddons;
+    const tier = callAssistantTierOf(heldAddons);
+    const entry = ADDONS[tier?.addon ?? "call_assistant"];
     const base = {
       enabled,
       paused,
       pausedReason: paused ? ("payment_needed" as const) : null,
       billingHref: BILLING_HREF,
       subscriptionStatus: v.ent.subscriptionStatus,
-      addon: { key: ADDONS.call_assistant.key, name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
+      // `addon` is the held tier's add-on (Solo when none is held: the one a prompt offers).
+      addon: { key: entry.key, name: CALL_ASSISTANT_NAME, preview: entry.preview === true, availableOn: entry.availableOn, monthlyCents: entry.monthlyCents, annualCents: entry.annualCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
+      /** The held tier (null without one — a platform admin runs on Solo's allowance without holding it). */
+      tier: tier ? { key: tier.tier, addon: tier.addon, name: tier.name } : null,
+      tiers: CALL_ASSISTANT_TIERS.map((t) => ({
+        key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents,
+        includedMinutes: t.includedMinutes, includedNumbers: t.includedNumbers, preview: ADDONS[t.addon].preview === true,
+      })),
       plan: v.ent.accessPlan,
       allowance: v.allowance,
-      units: { callAssistant: v.ent.addons.call_assistant ?? 0, callNumber: v.ent.addons.call_number ?? 0 },
-      pricing: { includedMinutes: CALL_ASSISTANT_INCLUDED_MINUTES, overageCentsPerMinute: CALL_MINUTE_OVERAGE_CENTS, numberMinDays: CALL_NUMBER_MIN_DAYS },
+      units: { callAssistant: tier ? 1 : 0, tier: tier?.tier ?? null, callNumber: heldAddons.call_number ?? 0 },
+      pricing: {
+        includedMinutes: tier?.includedMinutes ?? CALL_ASSISTANT_TIERS[0].includedMinutes, overageCentsPerMinute: CALL_MINUTE_OVERAGE_CENTS,
+        numberMinDays: CALL_NUMBER_MIN_DAYS, freeSpamCalls: CALL_ASSISTANT_FREE_SPAM_CALLS,
+      },
       // The engine's internal address never goes to the browser; only whether it answers.
       engine: { configured: voiceInternalConfigured(), ...(await probeEngine()) } satisfies EngineStatus,
       numbersProvider: { configured: numbersMockEnabled() || signalwireConfig() !== null, mock: numbersMockEnabled() },

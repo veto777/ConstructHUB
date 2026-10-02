@@ -444,18 +444,20 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   it("the Overview status and the usage route carry the numbers and this month's minutes", async () => {
     const status = await api("/api/crm/voice/status", pro);
     expect(status.status).toBe(200);
-    expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 500 }, units: { callAssistant: 1, callNumber: 1 }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
+    expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 2000 }, units: { callAssistant: 1, tier: "solo", callNumber: 1 }, tier: { key: "solo", addon: "call_assistant", name: "Solo" }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
+    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers])).toEqual([["solo", 2000, 1], ["crew", 5000, 3], ["fleet", 12000, 5]]);
+    expect(status.body.pricing).toMatchObject({ includedMinutes: 2000, overageCentsPerMinute: 10, freeSpamCalls: 500 });
     // The engine is probed, not assumed; its internal address never reaches the browser.
     expect(status.body.engine).toMatchObject({ reachable: false, models: false });
     expect(status.body.engine).not.toHaveProperty("url");
     expect(status.body.engine).not.toHaveProperty("publicBase");
     expect(status.body.numbers.map((n: any) => n.status)).toEqual(["active"]);
     const month = new Date().toISOString().slice(0, 7);
-    expect(status.body.usage).toMatchObject({ month, calls: 0, minutes: 0, includedMinutes: 500, remainingMinutes: 500, overageMinutes: 0, overageCentsPerMinute: 15 });
-    await db.query("insert into voice_usage(org_id,account_user_id,month,calls,minutes,included_minutes,overage_minutes) values($1,$2,$3,4,520,500,20)", [pro.org, pro.id, month]);
+    expect(status.body.usage).toMatchObject({ month, calls: 0, minutes: 0, includedMinutes: 2000, remainingMinutes: 2000, overageMinutes: 0, overageCentsPerMinute: 10, spamCallsThisMonth: 0, freeSpamCallsLimit: 500 });
+    await db.query("insert into voice_usage(org_id,account_user_id,month,calls,minutes,included_minutes,overage_minutes,spam_calls,blocked_calls,spam_free_calls,spam_free_minutes) values($1,$2,$3,4,2020,2000,20,2,1,2,3)", [pro.org, pro.id, month]);
     const usage = await api("/api/crm/voice/usage", pro);
     expect(usage.status).toBe(200);
-    expect(usage.body).toMatchObject({ month, calls: 4, minutes: 520, includedMinutes: 500, remainingMinutes: 0, overageMinutes: 20, overageCents: 300, allowance: { minutes: 500 } });
+    expect(usage.body).toMatchObject({ month, calls: 4, minutes: 2020, includedMinutes: 2000, remainingMinutes: 0, overageMinutes: 20, overageCents: 200, allowance: { minutes: 2000 }, spamCallsThisMonth: 3, freeSpamCalls: 2, freeSpamMinutes: 3 });
     expect(usage.body.history).toHaveLength(1);
     expect((await api("/api/crm/voice/usage?month=2026-13", pro)).status).toBe(400);
     expect((await api("/api/crm/voice/usage?month=2025-01", pro)).body).toMatchObject({ month: "2025-01", minutes: 0 });

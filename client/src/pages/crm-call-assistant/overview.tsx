@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Activity, ArrowRight, Hash, Phone, PhoneCall, Sparkles, Timer } from "lucide-react";
+import { Activity, ArrowRight, Hash, Phone, PhoneCall, ShieldBan, Sparkles, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState, MetricCard, StatusPill } from "@/components/crm-ui";
 import { prettyPhone } from "@/lib/voice-studio";
-import { CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
-import { callAssistantIntroShort } from "@shared/plan-copy";
+import { CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
+import { callAssistantIntroShort, callAssistantTiers, formatUsd } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
 import { CallAssistantPausedBanner } from "./paused-banner";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
@@ -53,10 +53,16 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
     : { text: "Try a test conversation", href: "/crm/call-assistant?tab=simulator", testid: "link-overview-next-simulator" };
 
   const paymentPaused = !status.enabled && status.paused === true;
+  const tiers = callAssistantTiers();
+  const heldTier = status.tier ? tiers.find((t) => t.tier === status.tier!.key) ?? null : null;
+  const heldIndex = heldTier ? tiers.indexOf(heldTier) : -1;
+  const spamThisMonth = status.usage?.spamCallsThisMonth ?? 0;
+  const freeSpamUsed = status.usage?.freeSpamCalls ?? 0;
+  const freeSpamLimit = status.usage?.freeSpamCallsLimit ?? status.pricing.freeSpamCalls ?? CALL_ASSISTANT_FREE_SPAM_CALLS;
   return (
     <div data-testid="panel-call-assistant-overview" className="pt-4 space-y-4">
       {paymentPaused && <CallAssistantPausedBanner status={status} />}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MetricCard icon={Sparkles} label="Assistant" testid="metric-overview-assistant"
           value={paymentPaused
             ? <StatusPill tone="warning" className="text-sm">paused</StatusPill>
@@ -65,9 +71,45 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
         <MetricCard icon={Hash} label="Numbers" value={numbers.length} testid="metric-overview-numbers"
           context={`${status.allowance.numbers} included with your add-on`} href="/crm/call-assistant?tab=numbers" />
         <MetricCard icon={Timer} label="Minutes this month" value={used.toLocaleString("en-US")} testid="metric-overview-minutes"
-          context={`of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over at $${(CALL_MINUTE_OVERAGE_CENTS / 100).toFixed(2)}/min` : ""}`} />
+          context={`of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over at ${formatUsd(status.pricing.overageCentsPerMinute ?? CALL_MINUTE_OVERAGE_CENTS)}/min` : ""}`} />
         <MetricCard icon={PhoneCall} label="Calls this month" value={status.usage?.calls ?? 0} testid="metric-overview-calls" href="/crm/call-assistant?tab=calls" />
+        <MetricCard icon={ShieldBan} label="Spam blocked this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
+          context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/crm/call-assistant?tab=calls&view=spam" />
       </div>
+
+      <Card data-testid="card-overview-tier">
+        <CardContent className="p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Your tier</div>
+              <div className="font-semibold" data-testid="text-overview-tier">
+                {heldTier ? `${heldTier.name} — ${heldTier.minutes} minutes and ${heldTier.numbersLabel} a month` : "No tier on this account"}
+              </div>
+            </div>
+            {status.canManage !== false && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/settings?tab=billing" data-testid="link-overview-change-tier">{heldTier ? "Change tier" : "Choose a tier"} <ArrowRight className="h-4 w-4 ml-1" /></Link>
+              </Button>
+            )}
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-3 text-sm" data-testid="list-overview-tiers">
+            {tiers.map((t, i) => (
+              <li key={t.tier} className={`rounded-md border px-3 py-2 ${t === heldTier ? "border-primary/60 bg-primary/5" : ""}`} data-testid={`row-overview-tier-${t.tier}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{t.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t === heldTier ? "Current" : heldIndex < 0 ? "" : i > heldIndex ? "Upgrade" : "Downgrade"}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">{t.monthly}/mo · {t.minutes} min · {t.numbersLabel}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            Change tiers any time in Settings → Billing; the difference is prorated. A smaller tier keeps fewer numbers, and you see which ones stop answering before you confirm.
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -78,11 +120,11 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
             </div>
             <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />
             <p className="text-xs text-muted-foreground">
-              {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. Spam calls count only until the assistant hangs up; blocked numbers are rejected before answering and cost nothing.
+              {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. The first {freeSpamLimit.toLocaleString("en-US")} spam calls each month never count toward your minutes; blocked numbers are rejected before answering and cost nothing.
               {status.addon.preview ? " Pricing is being finalized." : ""}
             </p>
             <p className="text-xs" data-testid="text-overview-price">
-              <span className="font-medium">{status.addon.name}:</span> {callAssistantIntroShort()} (the intro price is for monthly billing and applies once, when the add-on is first added).
+              <span className="font-medium">{status.addon.name}:</span> Solo {callAssistantIntroShort()} (the intro price is for monthly billing and applies once, when the add-on is first added).
             </p>
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">{status.addon.name}</Badge>

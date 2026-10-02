@@ -614,13 +614,15 @@ For contractors who'd rather have the work done for them. Every one of these is 
 
 An AI receptionist for the contractor's own phone line. It answers every call, day or night, collects the lead the way the contractor wants, files it in the CRM and gets urgent calls to the right person. Page: [AI Call Assistant](/call-assistant). In the CRM it lives under **Call Assistant** (tabs: Overview, Numbers, Agent Studio, Simulator, Calls).
 
-**Price and availability:** {{CALL_ASSISTANT_INTRO_LINE}}. The intro price is for monthly billing; yearly billing is the yearly price from the start. It includes {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own. {{CALL_ASSISTANT_AVAILABILITY}}
+**Price and availability:** three tiers, one per account: {{CALL_ASSISTANT_TIERS_LINE}}. Solo's launch price is {{CALL_ASSISTANT_INTRO_LINE}}. The intro price is Solo on monthly billing; yearly billing is the yearly price from the start, and Crew and Fleet have no intro. On every tier, {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own; the contractor can move between tiers any time in Settings → Billing (the difference is prorated, and a smaller tier keeps fewer numbers). {{CALL_ASSISTANT_AVAILABILITY}}
+
+**Which tier:** {{CALL_ASSISTANT_TIER_ADVICE}} **What counts as a minute:** {{CALL_ASSISTANT_MINUTE_RULE}}
 
 **Voices:** the contractor picks a name and voice for the assistant: {{CALL_ASSISTANT_PERSONAS}}, and can change the greeting. (The phone voice named Gabe is one of those choices; it is not this website helper.) It speaks English today.
 
 **Getting a phone number:**
 1. CRM → **Call Assistant** → **Numbers** → pick a state, and optionally an area code or a city.
-2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. One number is included with the add-on; each extra number is its own add-on (a second location or a tracking line).
+2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. Solo includes 1 number, Crew 3 and Fleet 5; each extra number is its own add-on (a second location or a tracking line).
 3. Keep your existing numbers: forward them to the new number from your phone carrier (for example only when you don't answer, after hours, or always). Nothing is ported, so your numbers stay yours. The Numbers tab shows how to set up forwarding with common carriers.
 
 **If you cancel or a payment fails:** {{CALL_ASSISTANT_RULE_OWN_NUMBERS}} {{CALL_ASSISTANT_RULE_CANCEL}} {{CALL_ASSISTANT_RULE_PAYMENT}}
@@ -629,7 +631,7 @@ An AI receptionist for the contractor's own phone line. It answers every call, d
 
 **After the call:** a real lead becomes a client in the CRM (and a pipeline project if the contractor chooses), tagged with the source "Call Assistant", and the office is notified the same way as other new leads. Emergencies, existing customers and "I want to talk to a person" are texted or emailed to the teammate the contractor picked, with reminders until someone replies. The assistant never gives out a teammate's number.
 
-**Spam:** telemarketers and robocalls are screened and send no notifications. A number flagged as spam twice is blocked before the call is answered; the contractor can unblock it under Calls → Spam.
+**Spam — you never answer a spam call again:** {{CALL_ASSISTANT_SPAM_SCREEN}} {{CALL_ASSISTANT_SPAM_BLOCK}} {{CALL_ASSISTANT_SPAM_REPORT}} The weekly email can be turned off under CRM → Settings → Notifications ("Weekly spam report"). {{CALL_ASSISTANT_SPAM_FREE}}.
 
 **Call log:** every call is listed under **Calls** with its outcome, a summary, the full transcript and the recording.
 

@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { apiErrorCode } from "@/lib/plan-errors";
-import { ADDONS, type AddonKey } from "@shared/plans";
+import { ADDONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIER_ADDONS, callAssistantTierForAddon, type AddonKey } from "@shared/plans";
 import { CALL_ASSISTANT_NUMBER_RULES } from "@shared/plan-copy";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -65,7 +65,8 @@ export function useBillingActions() {
       (await apiRequest("POST", "/api/stripe/addons", { addons: { [v.addon]: v.quantity } })).json(),
     onSuccess: (_data, v) => {
       refreshBilling();
-      toast({ title: "Add-ons updated", description: `${ADDONS[v.addon].name}: ${v.quantity}` });
+      const tier = callAssistantTierForAddon(v.addon);
+      toast({ title: "Add-ons updated", description: tier && v.quantity > 0 ? `${CALL_ASSISTANT_NAME}: now on ${tier.name}` : `${ADDONS[v.addon].name}: ${v.quantity}` });
     },
     onError: (err, v) => showError("Couldn't update add-ons", `${ADDONS[v.addon].name} × ${v.quantity}`)(err),
   });
@@ -73,8 +74,8 @@ export function useBillingActions() {
   return { portal, addon, showError, salesTopic, setSalesTopic, refreshBilling };
 }
 
-/** Add-ons whose reduction releases Call Assistant numbers (server/voice/number-release.ts). */
-const NUMBER_ADDONS: readonly AddonKey[] = ["call_assistant", "call_number"];
+/** Add-ons whose reduction (or, for a tier, a switch to a smaller one) releases Call Assistant numbers (server/voice/number-release.ts). */
+const NUMBER_ADDONS: readonly AddonKey[] = [...CALL_ASSISTANT_TIER_ADDONS, "call_number"];
 type AddonChange = { addon: AddonKey; quantity: number };
 type NumberPreview = { phoneNumber: string; orgName: string }[];
 
@@ -102,7 +103,10 @@ export function useAddonChange(addon: ReturnType<typeof useBillingActions>["addo
   const [checking, setChecking] = useState(false);
 
   async function request(change: AddonChange, current: number) {
-    if (change.quantity >= current || !NUMBER_ADDONS.includes(change.addon)) { addon.mutate(change); return; }
+    // Moving to another Call Assistant tier is a switch (the server drops the held tier in the same update):
+    // a smaller tier keeps fewer numbers, so it is checked like a reduction.
+    const tierSwitch = CALL_ASSISTANT_TIER_ADDONS.includes(change.addon) && change.quantity > 0;
+    if (!tierSwitch && (change.quantity >= current || !NUMBER_ADDONS.includes(change.addon))) { addon.mutate(change); return; }
     setChecking(true);
     const numbers = await fetchNumberReleasePreview(`${change.addon}=${change.quantity}`);
     setChecking(false);
@@ -111,12 +115,17 @@ export function useAddonChange(addon: ReturnType<typeof useBillingActions>["addo
     setConfirm({ change, numbers });
   }
 
-  const removingAssistant = confirm?.change.addon === "call_assistant" && confirm.change.quantity === 0;
+  const removingAssistant = !!confirm && CALL_ASSISTANT_TIER_ADDONS.includes(confirm.change.addon) && confirm.change.quantity === 0;
+  const toTier = confirm && confirm.change.quantity > 0 ? callAssistantTierForAddon(confirm.change.addon) : null;
   const dialog = (
     <AlertDialog open={!!confirm} onOpenChange={(open) => { if (!open) setConfirm(null); }}>
       <AlertDialogContent data-testid="dialog-addon-number-release">
         <AlertDialogHeader>
-          <AlertDialogTitle>{removingAssistant ? `Remove the ${ADDONS.call_assistant.name}?` : "Give up a Call Assistant number?"}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {removingAssistant ? `Remove the ${CALL_ASSISTANT_NAME}?`
+              : toTier ? `Move to ${toTier.name}? It includes ${toTier.includedNumbers} number${toTier.includedNumbers === 1 ? "" : "s"}`
+              : "Give up a Call Assistant number?"}
+          </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-2 text-sm text-muted-foreground">
               {confirm?.numbers?.length ? (

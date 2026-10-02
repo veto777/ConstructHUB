@@ -29,7 +29,7 @@ import type { Express, Response } from "express";
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { voiceNumbers, type VoiceNumberRow } from "@shared/schema";
-import { ADDONS, CALL_NUMBER_MIN_DAYS, PLANS } from "@shared/plans";
+import { ADDONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIERS, CALL_NUMBER_MIN_DAYS, PLANS, callAssistantTierOf } from "@shared/plans";
 import { sendLimitReached, sendModulePaymentNeeded } from "../entitlements";
 import { releaseReasonText, releaseIsFinal, FINAL_RELEASE_REASONS } from "./number-release";
 import { voiceContext, type GetUser, type VoiceContext } from "./context";
@@ -143,7 +143,7 @@ export async function heldNumberCount(orgId: string, tx: { select: typeof db.sel
   return Number(row?.n ?? 0);
 }
 
-/** The numbers the add-on itself includes (units × 1); every one above that is a call_number unit. */
+/** The numbers the tier itself includes (Solo 1, Crew 3, Fleet 5); every one above that is a call_number unit. */
 function includedNumbers(v: VoiceContext): number {
   return Math.max(0, v.allowance.numbers - (v.ent.addons.call_number ?? 0));
 }
@@ -161,14 +161,17 @@ function limitBody(v: VoiceContext, held: number) {
   const plan = v.ent.accessPlan ? PLANS[v.ent.accessPlan].name : "your";
   const sells = !!v.ent.accessPlan && ADDONS.call_number.availableOn.includes(v.ent.accessPlan);
   const n = v.allowance.numbers;
+  const tier = callAssistantTierOf(v.ent.addons);
+  const tierName = tier?.name ?? null;
+  const bigger = tier ? CALL_ASSISTANT_TIERS.find((t) => t.includedNumbers > tier.includedNumbers) ?? null : null;
   return {
     feature: "voiceNumbers",
     limit: n,
     used: held,
     upgradePlan: null,
     addon: sells ? ("call_number" as const) : null,
-    message: `Your ${ADDONS.call_assistant.name} add-on includes ${n} number${n === 1 ? "" : "s"} and all ${n === 1 ? "of it is" : "are"} in use.` +
-      (sells ? ` To add another, add the ${ADDONS.call_number.name} add-on in Settings → Billing (${(ADDONS.call_number.monthlyCents / 100).toFixed(2).replace(/\.00$/, "")} dollars a month each).` : ` The ${plan} plan cannot add more.`),
+    message: `Your ${CALL_ASSISTANT_NAME}${tierName ? ` ${tierName} tier` : ""} includes ${n} number${n === 1 ? "" : "s"} and all ${n === 1 ? "of it is" : "are"} in use.` +
+      (sells ? ` To add another, add the ${ADDONS.call_number.name} add-on in Settings → Billing (${(ADDONS.call_number.monthlyCents / 100).toFixed(2).replace(/\.00$/, "")} dollars a month each)${bigger ? `, or move to ${bigger.name} (${bigger.includedNumbers} numbers included)` : ""}.` : ` The ${plan} plan cannot add more.`),
   };
 }
 
