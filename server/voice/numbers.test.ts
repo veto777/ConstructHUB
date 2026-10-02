@@ -445,7 +445,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     const status = await api("/api/crm/voice/status", pro);
     expect(status.status).toBe(200);
     expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 2000 }, units: { callAssistant: 1, tier: "solo", callNumber: 1 }, tier: { key: "solo", addon: "call_assistant", name: "Solo" }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
-    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers])).toEqual([["solo", 2000, 1], ["crew", 5000, 3], ["fleet", 12000, 5]]);
+    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers])).toEqual([["solo", 2000, 1], ["crew", 5000, 5], ["fleet", 12000, 20]]);
     expect(status.body.pricing).toMatchObject({ includedMinutes: 2000, overageCentsPerMinute: 10, freeSpamCalls: 500 });
     // The engine is probed, not assumed; its internal address never reaches the browser.
     expect(status.body.engine).toMatchObject({ reachable: false, models: false });

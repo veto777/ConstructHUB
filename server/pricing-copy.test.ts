@@ -109,17 +109,17 @@ describe("AI Call Assistant launch price", () => {
     const tiers = callAssistantTiers();
     expect(tiers.map((t) => [t.name, t.monthly, t.annual, t.minutes, t.numbersLabel, t.intro])).toEqual([
       ["Solo", "$249", "$1,999", "2,000", "1 local number", "$99"],
-      ["Crew", "$449", "$3,599", "5,000", "3 local numbers", null],
-      ["Fleet", "$799", "$6,399", "12,000", "5 local numbers", null],
+      ["Crew", "$449", "$3,599", "5,000", "5 local numbers", null],
+      ["Fleet", "$799", "$6,399", "12,000", "20 local numbers", null],
     ]);
     expect(tiers.map((t) => t.estimatedCalls)).toEqual(["about 1,000 calls a month", "about 2,500 calls a month", "about 6,000 calls a month"]);
-    expect(callAssistantTiersLine()).toBe("Solo $249/month or $1,999/year (2,000 minutes a month and 1 local number), Crew $449/month or $3,599/year (5,000 minutes a month and 3 local numbers) and Fleet $799/month or $6,399/year (12,000 minutes a month and 5 local numbers)");
+    expect(callAssistantTiersLine()).toBe("Solo $249/month or $1,999/year (2,000 minutes a month and 1 local number), Crew $449/month or $3,599/year (5,000 minutes a month and 5 local numbers) and Fleet $799/month or $6,399/year (12,000 minutes a month and 20 local numbers)");
     expect(callAssistantTierAdvice()).toMatch(/^At about 2 minutes a call, Solo covers about 1,000 calls a month, Crew covers about 2,500 calls a month and Fleet covers about 6,000 calls a month\. These are estimates/);
     const p = callAssistantPricing();
     expect([p.overagePerMinute, p.extraNumber, p.freeSpamCalls]).toEqual(["$0.10", "$5", "500"]);
     expect(callAssistantSpamAllowanceLine()).toBe("the first 500 spam calls each month never count toward your minutes, on every tier");
     // Tier numbers come from the price book, on Limits & usage and in Gabe's knowledge alike.
-    expect(callAssistantTierNumbersLine()).toBe("Solo includes 1 local number, Crew 3 and Fleet 5");
+    expect(callAssistantTierNumbersLine()).toBe("Solo includes 1 local number, Crew 5 and Fleet 20");
     expect(callAssistantIncludesLine()).toBe("minutes above a tier's included ones are $0.10 a minute; extra numbers are $5/month each; and the first 500 spam calls each month never count toward your minutes, on every tier");
     expect(callAssistantMinuteRule()).toMatch(/every started minute/i);
     // Every tier is in the Hub's knowledge and in the add-on lines it quotes.

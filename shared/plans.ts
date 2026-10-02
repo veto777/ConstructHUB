@@ -262,8 +262,8 @@ export type CallAssistantTier = {
 /** Cheapest first. The order is the upgrade order. */
 export const CALL_ASSISTANT_TIERS: readonly CallAssistantTier[] = [
   { tier: "solo", addon: "call_assistant", name: "Solo", monthlyCents: 24900, annualCents: 199900, includedMinutes: 2000, includedNumbers: 1, introMonthlyCents: 9900, introMonths: 3 },
-  { tier: "crew", addon: "call_assistant_crew", name: "Crew", monthlyCents: 44900, annualCents: 359900, includedMinutes: 5000, includedNumbers: 3 },
-  { tier: "fleet", addon: "call_assistant_fleet", name: "Fleet", monthlyCents: 79900, annualCents: 639900, includedMinutes: 12000, includedNumbers: 5 },
+  { tier: "crew", addon: "call_assistant_crew", name: "Crew", monthlyCents: 44900, annualCents: 359900, includedMinutes: 5000, includedNumbers: 5 },
+  { tier: "fleet", addon: "call_assistant_fleet", name: "Fleet", monthlyCents: 79900, annualCents: 639900, includedMinutes: 12000, includedNumbers: 20 },
 ];
 export const CALL_ASSISTANT_TIER_ADDONS: readonly AddonKey[] = CALL_ASSISTANT_TIERS.map((t) => t.addon);
 /** The product's name; each tier's add-on is "<this> — <tier name>". */

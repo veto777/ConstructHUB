@@ -97,12 +97,12 @@ describe("entitlements: the callAssistant add-on module", () => {
     const allowance = (addons: Record<string, number>, isPlatformAdmin = false) =>
       callAssistantAllowance({ addonModules: { callAssistant: true }, addons, isPlatformAdmin });
     expect(allowance({ call_assistant: 1, call_number: 3 })).toEqual({ numbers: 1 + 3, minutes: 2000 });
-    expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 3, minutes: 5000 });
-    expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 6, minutes: 12_000 });
+    expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 5, minutes: 5000 });
+    expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 21, minutes: 12_000 });
     expect(callAssistantAllowance({ addonModules: { callAssistant: false }, addons: { call_assistant: 2 }, isPlatformAdmin: false })).toEqual({ numbers: 0, minutes: 0 });
     expect(allowance({}, true)).toEqual({ numbers: 1, minutes: 2000 });
     // An admin who holds a tier gets that tier.
-    expect(allowance({ call_assistant_fleet: 1 }, true)).toEqual({ numbers: 5, minutes: 12_000 });
+    expect(allowance({ call_assistant_fleet: 1 }, true)).toEqual({ numbers: 20, minutes: 12_000 });
   });
 
   it("getEntitlements reports addonModules beside modules, and legacy Platinum has no add-on", async () => {

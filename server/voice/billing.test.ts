@@ -25,8 +25,8 @@ describe("Call Assistant price book: three tiers (owner, 2026-10-02)", () => {
   it("Solo / Crew / Fleet: prices, yearly prices, minutes, numbers; 10¢ overage and 500 free spam calls on every tier", () => {
     expect(CALL_ASSISTANT_TIERS.map((t) => [t.tier, t.addon, t.monthlyCents, t.annualCents, t.includedMinutes, t.includedNumbers])).toEqual([
       ["solo", "call_assistant", 24_900, 199_900, 2_000, 1],
-      ["crew", "call_assistant_crew", 44_900, 359_900, 5_000, 3],
-      ["fleet", "call_assistant_fleet", 79_900, 639_900, 12_000, 5],
+      ["crew", "call_assistant_crew", 44_900, 359_900, 5_000, 5],
+      ["fleet", "call_assistant_fleet", 79_900, 639_900, 12_000, 20],
     ]);
     // Owner: "yes we can charge 10 cents" … "all plans cover 500 spam calls that aren't charged".
     expect(CALL_MINUTE_OVERAGE_CENTS).toBe(10);
@@ -59,7 +59,7 @@ describe("Call Assistant price book: three tiers (owner, 2026-10-02)", () => {
     expect(callAssistantTierOf({ call_assistant: 1 })?.tier).toBe("solo");
     expect(callAssistantTierOf({ call_assistant_crew: 1, call_number: 2 })?.tier).toBe("crew");
     expect(callAssistantTierOf({ call_number: 2 })).toBeNull();
-    expect(callAssistantIncluded({ call_assistant_fleet: 1 })).toMatchObject({ numbers: 5, minutes: 12_000 });
+    expect(callAssistantIncluded({ call_assistant_fleet: 1 })).toMatchObject({ numbers: 20, minutes: 12_000 });
     expect(callAssistantIncluded({})).toMatchObject({ tier: null, numbers: 0, minutes: 0 });
     expect(callAssistantTier("crew").name).toBe("Crew");
   });
