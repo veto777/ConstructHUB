@@ -141,6 +141,41 @@ const page: FeaturePage = {
       a: "They don't change anything for you: you make each change in ConstructHUB, Google Ads, Cloudflare or your registrar. They are our recommendations, not a promise of results, and not legal or tax advice. Provider screens change; when they differ, the walkthroughs point you to the provider's current help.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the Google Ads advice is
+  // server/google-ads-guide-content.ts (Search Partners off, "Presence" location option, specific keywords, IP
+  // exclusions); the section text served only after a purchase is server/routes.ts /api/google-ads-guide/:slug
+  // (403 otherwise, titles public); the LSA advice is client/src/pages/lsa-guide.tsx SECTIONS (services, "Other",
+  // counties, 24-hour ads, message leads); the walkthrough warnings are client/src/pages/guides.tsx (drafts, retry
+  // duplicates, Lockdown, share links, opening a notice) and site-connection-guide.tsx (48 hours, email records).
+  inDepth: {
+    heading: { title: "Google Ads and LSA Guides for ", em: "Contractors" },
+    paragraphs: [
+      "Guides is where ConstructHUB keeps its how-to material for contractors who run their own marketing. The " +
+        "playbooks are opinionated on purpose: they say what we would do in your account and why, so you can decide " +
+        "for yourself. The setup walkthroughs are the opposite, plain instructions that use the same button names you " +
+        "see on screen.",
+      "The Google Ads guide for contractors is built around one idea: pay only for clicks from people who could " +
+        "hire you. It recommends switching off Search Partners, choosing the location option that targets people in " +
+        "or regularly in your service area instead of the broader default, using specific keywords rather than broad " +
+        "match, and building an IP exclusion list from the visits Click Guard records on your site, reviewed before " +
+        "you block anyone. The overview and the section " +
+        "titles are public. The text of each section is sent only to accounts with a Master Class purchase, and that " +
+        "check happens on our server, not just on the page.",
+      "The Local Services Ads guide is free to read, with no account. Its advice is about the settings that decide " +
+        "which leads you pay for: check only the services you actually do and leave the catch-all Other category " +
+        "unchecked, choose service areas by county so there are no gaps, keep the ad showing around the clock even " +
+        "if you return late calls in the morning, and think twice before turning on message leads.",
+      "The setup walkthroughs also say what a button does not do, which is where most setup mistakes happen. A " +
+        "generated review reply is a draft until it is published. Retrying a Google post whose result is uncertain " +
+        "can publish it twice, so check Google first. Profile Guard's Lockdown restores changes but can't stop an " +
+        "edit at Google. A Site Scan share link can be read by anyone who has it. Opening a security notice doesn't " +
+        "disconnect anything. The site connection guide warns you to keep your email records before you switch " +
+        "nameservers, and that the switch can take up to 48 hours.",
+      "None of the guides change anything for you, and none of them promise rankings, leads or a lower cost per " +
+        "click. Google and Cloudflare change their screens from time to time; when a screen doesn't match, the " +
+        "walkthroughs point you to the provider's current help.",
+    ],
+  },
   related: ["masterClass", "clickGuard", "cloudflare"],
   app: { href: "/guides", surface: "app", label: "Open Guides" },
   tryIt: { label: "Read the free LSA guide", href: "/lsa-guide" },
@@ -150,9 +185,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Start Reading" },
   },
   seo: {
-    title: "Guides — Google Ads, LSA and Setup Playbooks | ConstructHUB",
+    title: "Google Ads & LSA Guides for Contractors | ConstructHUB",
     description:
-      "Google Ads and LSA playbooks for contractors, state licensing guides, and step-by-step walkthroughs for Cloudflare, Search Console and ConstructHUB's tools.",
+      "Google Ads and Local Services Ads playbooks for contractors, state licensing guides, and step-by-step setup guides for Cloudflare and Search Console.",
   },
   sources: [
     "client/src/pages/guides.tsx",
@@ -165,6 +200,7 @@ const page: FeaturePage = {
     "client/src/pages/master-class.tsx",
     "client/src/App.tsx",
     "server/routes.ts",
+    "server/google-ads-guide-content.ts",
     "server/data/state-guides.json",
     "server/state-guides-schema.ts",
     "shared/dashboard.ts",

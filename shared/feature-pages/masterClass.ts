@@ -136,6 +136,41 @@ const page: FeaturePage = {
       a: "It's a course, not legal, tax or licensing advice, and it doesn't file anything for you. Requirements change, so confirm them with the state agency before you file. It doesn't promise rankings, leads or results.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the order of the course and what each state
+  // guide records are server/data/state-guides.json (its fields) and master-class.tsx (the State Guide tab, AgencyTile);
+  // the local/trade licensing notes are the licensing_notes of the 18 states with licensing_required false; the link
+  // policy is scripts/verify-state-guides.ts checkAgencyUrl() and AgencyTile (dead/none → web search, unconfirmed
+  // labelled, "Link checked" date); the free overview is the overview tab (license lists, Quick State Comparison);
+  // the sales-rep sale is server/catalog.ts isSalesOnly + server/stripe.ts create-course-checkout; the purchase on the
+  // account is course_purchases.user_id (shared/schema.ts) read by /api/course-purchases (server/routes.ts).
+  inDepth: {
+    heading: { title: "Starting a Construction Company, ", em: "State by State" },
+    paragraphs: [
+      "The Master Class is a contractor business course for people who know the trade and want the business side set " +
+        "up right. It follows the order a new company usually goes in: form the business with your state, get " +
+        "licensed where the state requires it, sort out insurance, workers' comp, taxes and payroll, then build the " +
+        "website and local search presence that bring in calls.",
+      "Contractor license requirements differ from state to state, so the course keeps one guide for each of the 50 " +
+        "states. A guide names the state's business filing office, its workers' comp agency, its tax agency and, where " +
+        "the state licenses contractors, its licensing board. It records whether a statewide contractor license is " +
+        "required, whether a contractor bond is required and the general contractor bond amount on file, how workers' comp is bought " +
+        "there (private insurers, a state fund, or either), whether sales tax applies to labor, whether the state " +
+        "charges a business and occupation (B&O) tax, and the business entity types you can form. Where there is no " +
+        "statewide license, the licensing notes point to the trade licenses and city or county rules that may still apply.",
+      "Agency websites move, so every agency link goes through a link check. A link counts as verified only when the " +
+        "page loads, names the state and is about that agency's work: business filings, licensing, workers' comp or " +
+        "taxes. When a government site blocks the check or the result is unclear, the link stays and is labelled " +
+        "unconfirmed. A link that is gone, such as a missing page, a dead domain or a parked site, is removed, and the " +
+        "tile searches the web for the agency instead. No agency address is ever guessed, and each tile shows the date " +
+        "its link was last checked.",
+      "Before you buy, the free overview shows which states require a state contractor license and a side-by-side " +
+        "table of every state's license, workers' comp, sales tax on labor, B&O tax, bond and filing office. The " +
+        "modules and the complete bundle are quoted by a sales rep rather than checked out online, and a purchase is " +
+        "recorded on your ConstructHUB account, so the sections it unlocks open wherever you sign in.",
+      "The course is education, not legal, tax or licensing advice, and nothing is filed for you. Rules and fees " +
+        "change, so confirm the current requirements with the agency itself before you file, apply or pay.",
+    ],
+  },
   related: ["guides", "gbp", "siteScan"],
   app: { href: "/master-class", surface: "app", label: "Open the Master Class" },
   tryIt: { label: "Read the free course overview", href: "/master-class" },
@@ -145,9 +180,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Enroll" },
   },
   seo: {
-    title: "Master Class — Contractor Business Course | ConstructHUB",
+    title: "Start a Construction Company — Master Class | ConstructHUB",
     description:
-      "A course on the business side of contracting: forming your company, licensing in all 50 states, your website and local search, plus the Google Ads guide.",
+      "A contractor business course: forming your company, contractor license requirements in all 50 states, insurance, taxes, your website and local SEO.",
   },
   legacyPath: "/master-class-landing",
   sources: [

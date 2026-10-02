@@ -88,6 +88,43 @@ const AFTER_CALL: string[] = [
   "Spam calls forwarded to your assistant ping nobody. They show under Calls → Spam blocked, where you can block or unblock a number, and in a weekly spam report email.",
 ];
 
+/**
+ * The page's "In Depth" band: the long-form explanation every marketing page carries for ranking
+ * (shared/feature-pages/WRITING-GUIDE.md → "The In Depth section"), in the feature pages'
+ * InDepthSection layout. Every claim is in the code, not the copy: forwarding modes (STEPS above);
+ * "what the call is about" first, the CRM caller line, never reading the digits:
+ * server/voice/prompt-compiler.ts (SPAM SCREENING, prefill hints, callerLine); the default intake order and
+ * the email read-back: shared/voice-profile.ts DEFAULT_INTAKE_QUESTIONS; the out-of-area line and
+ * "take the lead anyway": voice-profile.ts outOfArea/outOfAreaLine; escalations by text or email:
+ * server/voice/escalations.ts; spam notifies nobody, two strikes block, a blocked number is rejected
+ * before it is answered: server/voice/spam.ts; the CRM client, the "Call Assistant" lead source and the
+ * existing client matched by phone: server/voice/leads.ts (callAssistantLeadSourceId, findCustomerByPhone);
+ * the hang-up safety net: voice/brain.py _should_force_submit/force_submit, server/voice/brain.ts.
+ * No prices here (they come from the price book, above).
+ */
+const IN_DEPTH: string[] = [
+  "The AI Call Assistant is an AI answering service for contractors, built into the ConstructHUB CRM. You forward " +
+    "your existing lines to its local number, when you don't answer, after hours or always, and it picks up under " +
+    "the name and voice you chose. Its job is the call you would otherwise miss: find out what the caller needs, " +
+    "take down a real job the way you set it up, and get it to the right person.",
+  "Every call starts the same way: the greeting, your recording notice if it's on, and a question about what the " +
+    "call is for, before it collects anything. That first answer is what separates a homeowner with a leak from a " +
+    "sales pitch. For a real job it follows your intake questions from the Agent Studio. Out of the box that is the " +
+    "work needed, the property address and city, a first name, whether the number they're calling from is the best " +
+    "one to reach them (it never reads the digits aloud), an email for the estimate, read back once, and the best " +
+    "time to call back. When the number already belongs to a client in your CRM, it confirms the name and email on " +
+    "file instead of asking again.",
+  "Not every call is a lead, and the assistant sorts them. A caller outside your service area hears your " +
+    "out-of-area line, unless you've told it to take the lead anyway. An emergency, an existing customer or a caller " +
+    "who asks for a person goes to the teammate you chose, by text or email. A sales pitch or a robocall is marked " +
+    "as spam and notifies nobody, and a number marked as spam twice with high confidence is blocked, so its next " +
+    "call is rejected before it's answered.",
+  "When the call ends, a real lead becomes a client in your CRM with Call Assistant as the lead source, or is " +
+    "added to the client who already has that phone number, and the call log keeps the summary, transcript and " +
+    "recording. If a caller hangs up before the details were submitted but had given a callback number and said " +
+    "what they need, the lead is still filed from the transcript, so a dropped call doesn't mean a lost job.",
+];
+
 function faqs(): { q: string; a: string }[] {
   const p = callAssistantPricing();
   const list = [
@@ -492,6 +529,17 @@ export default function CallAssistantLandingPage() {
                   <p className="pb-6 -mt-1 text-[15.5px] text-mkt-ink-soft leading-relaxed">{item.a}</p>
                 </details>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* In depth: the long-form explanation (IN_DEPTH), as on every feature page */}
+        <section id="in-depth" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-t border-mkt-rule scroll-mt-16" data-testid="section-ca-in-depth">
+          <div className="max-w-3xl mx-auto">
+            <Kicker n="07">In Depth</Kicker>
+            <h2 className={H2}>An AI Answering Service for <em className="text-mkt-orange-ink">Contractors</em></h2>
+            <div className="mt-8 space-y-5 text-[16.5px] text-mkt-ink-soft leading-[1.75]" data-testid="text-ca-in-depth">
+              {IN_DEPTH.map((para) => <p key={para}>{para}</p>)}
             </div>
           </div>
         </section>
