@@ -6,7 +6,8 @@ import SocialMediaPage from "@/pages/social-media";
 import GuidesPage from "@/pages/guides";
 import SiteScanPage, { FreeSiteScanPage, SharedSiteScanPage } from "@/pages/site-scan";
 import { Switch, Route, useLocation, Link } from "wouter";
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -223,35 +224,69 @@ function DashboardRouter() {
   );
 }
 
+/**
+ * The signed-out tool pages and the CRM legal pages have no masthead of their
+ * own: the site's ribbon (Features ▾, Done-For-You ▾, Plans, Results, Coverage,
+ * sign in) goes above them, as on every other public page (owner, 2026-10-02:
+ * "make sure every page keeps the menu details in the ribbon"). Defined once at
+ * module scope so a re-render never remounts the page. Left out on purpose: the
+ * pages a contractor's own customer opens (/review/<token>, /contract/sign/<token>).
+ */
+function withRibbon(Page: ComponentType<any>): ComponentType<any> {
+  function RibbonedPage(props: any) {
+    const [location] = useLocation();
+    return (
+      <>
+        <PublicPageHeader next={`${location}${window.location.search}`} />
+        <Page {...props} />
+      </>
+    );
+  }
+  return RibbonedPage;
+}
+
+const Ribboned = {
+  DatabasesPage: withRibbon(DatabasesPage),
+  PropertyPage: withRibbon(PropertyPage),
+  PhotosPage: withRibbon(PhotosPage),
+  GoogleAdsPage: withRibbon(GoogleAdsPage),
+  AdsManagerPage: withRibbon(AdsManagerPage),
+  GoogleAdsGuideSectionPage: withRibbon(GoogleAdsGuideSectionPage),
+  IpTrackerPage: withRibbon(IpTrackerPage),
+  VpnShieldPage: withRibbon(VpnShieldPage),
+  CrmTermsPage: withRibbon(CrmTermsPage),
+  CrmPrivacyPage: withRibbon(CrmPrivacyPage),
+};
+
 function PublicRouter() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/databases" component={DatabasesPage} />
-      <Route path="/property" component={PropertyPage} />
-      <Route path="/photos" component={PhotosPage} />
+      <Route path="/databases" component={Ribboned.DatabasesPage} />
+      <Route path="/property" component={Ribboned.PropertyPage} />
+      <Route path="/photos" component={Ribboned.PhotosPage} />
       <Route path="/pricing" component={PricingPage} />
       {/* Signed-out visitors get the free public scan; the full tool needs an account. */}
       <Route path="/site-scan" component={FreeSiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
-      <Route path="/google-ads" component={GoogleAdsPage} />
-      <Route path="/ads-manager" component={AdsManagerPage} />
+      <Route path="/google-ads" component={Ribboned.GoogleAdsPage} />
+      <Route path="/ads-manager" component={Ribboned.AdsManagerPage} />
       <Route path="/google-ads-landing" component={GoogleAdsLanding} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
-      <Route path="/google-ads-guide/:section" component={GoogleAdsGuideSectionPage} />
+      <Route path="/google-ads-guide/:section" component={Ribboned.GoogleAdsGuideSectionPage} />
       <Route path="/google-ad-fraud" component={GoogleAdFraudPage} />
       <Route path="/lsa-guide" component={LsaGuidePage} />
-      <Route path="/ip-tracker" component={IpTrackerPage} />
+      <Route path="/ip-tracker" component={Ribboned.IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/features" component={FeaturesCataloguePage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
       <Route path="/done-for-you" component={DfyCataloguePage} />
       <Route path="/done-for-you/:slug" component={DfyPageRoute} />
-      <Route path="/vpn-shield" component={VpnShieldPage} />
+      <Route path="/vpn-shield" component={Ribboned.VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/developers" component={DevelopersPage} />
       <Route path="/permits-landing" component={PermitsLanding} />
@@ -260,8 +295,8 @@ function PublicRouter() {
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
       <Route path="/contract/sign/:token" component={ContractSignPage} />
-      <Route path="/crm-terms" component={CrmTermsPage} />
-      <Route path="/crm-privacy" component={CrmPrivacyPage} />
+      <Route path="/crm-terms" component={Ribboned.CrmTermsPage} />
+      <Route path="/crm-privacy" component={Ribboned.CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/landing" component={LandingPage} />

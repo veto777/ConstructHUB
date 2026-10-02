@@ -138,11 +138,24 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   });
 }
 
+/**
+ * The public pages outside the sitemap keep the ribbon too (owner, 2026-10-02:
+ * "make sure every page keeps the menu details in the ribbon"): sign in / sign
+ * up, the free tools a signed-out visitor can open, the CRM legal pages, the
+ * Google Ads guide's sections and the 404. Not the pages a contractor's own
+ * customer opens (/review/<token>, /contract/sign/<token>).
+ */
+const OTHER_PUBLIC_PAGES = [
+  "/free-site-scan", "/site-scan", "/auth", "/auth?mode=signup", "/developers", "/crm-app", "/master-class",
+  "/databases", "/property", "/photos", "/google-ads", "/ads-manager", "/ip-tracker", "/vpn-shield",
+  "/google-ads-guide/no-such-section", "/crm-terms", "/crm-privacy", "/no-such-page",
+];
+
 test.describe("the ribbon, 1440px", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test("every public page carries the ribbon with both dropdowns", async ({ page }) => {
-    for (const route of [...MARKETING_ROUTES, "/free-site-scan"]) {
+    for (const route of [...MARKETING_ROUTES, ...OTHER_PUBLIC_PAGES]) {
       await open(page, `${SIGNED_OUT}${route}`);
       const bar = page.getByTestId("site-nav-links");
       await expect(bar, route).toBeVisible();
@@ -241,7 +254,7 @@ test.describe("the ribbon, 390px", () => {
   });
 
   test("every public page keeps the menu button", async ({ page }) => {
-    for (const route of ["/", "/features", "/done-for-you", "/pricing", "/privacy", "/terms", "/google-business", "/lsa-guide"]) {
+    for (const route of ["/", "/features", "/done-for-you", "/pricing", "/privacy", "/terms", "/google-business", "/lsa-guide", "/auth", "/databases", "/google-ads", "/crm-terms"]) {
       await open(page, `${SIGNED_OUT}${route}`);
       await expect(page.getByTestId("button-landing-menu"), route).toBeVisible();
       expect(await overflow(page), route).toBeLessThanOrEqual(1);
