@@ -151,6 +151,37 @@ const page: FeaturePage = {
       a: "It doesn't create or verify Business Profiles on Google, and unlinking a location only stops syncing in ConstructHUB; the listing stays on Google. The workspace is for your team: clients don't get a login to it.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // onboarding (contact email, business name + address or Place ID, the Manager instructions, ownership kept, no client
+  // sign-in, invitation detected and accepted): server/agency/onboarding.ts onboardingInput, instructions, the worker; strict
+  // matching (Place ID, else name AND address): onboarding.ts matchesRequest; reminders after 3 and 6 days: onboarding.ts
+  // worker query; 30-day expiry: server/agency/schema.ts; auto-accept + unassigned: onboarding.ts auto_accept_all; bulk
+  // actions, page or all matching, retries with growing waits, a rate limit waits an hour: server/agency/jobs.ts bulkInput,
+  // the job runner; the owner's plan covers members: server/agency/access.ts workspaceEntitled; roles + client access:
+  // server/agency/routes.ts PUT /team; shared seats: server/crm/tenancy.ts getOwnerSeatUsage.
+  inDepth: {
+    heading: { title: "Managing Client Google Profiles, ", em: "Explained" },
+    paragraphs: [
+      "The Agency workspace is for agencies that manage Google Business Profiles for many clients. Onboarding works " +
+        "through Google's own access settings. You add a client with their contact email and the business name, with its " +
+        "address or Google Place ID. ConstructHUB emails the client steps to add your agency's Google account as a " +
+        "Manager on their profile; they keep ownership and never sign in to ConstructHUB. It then watches your connected " +
+        "agency account for the matching invitation, accepts it and links the location to that client.",
+      "Matching is strict on purpose. With a Place ID, only that exact listing matches. Without one, the business name " +
+        "and the address must both match, because a name alone isn't enough for a chain with many locations. The client " +
+        "gets reminders after three and six days, and the request expires after 30. With auto-accept on, every invitation " +
+        "to your agency account is accepted, and one that matches no request stays unassigned rather than guessed onto a " +
+        "client.",
+      "Bulk actions run in the background. Select locations on a page, or everything that matches your filters, and " +
+        "queue a sync, a link or unlink, a client assignment, Profile Guard's mode, AI review reply settings, a batch of " +
+        "posts or photos, or Site Scans. Each location is its own job in the Jobs log. A temporary Google error is " +
+        "retried a few times with growing waits, a Google rate limit waits an hour, and anything that still fails shows " +
+        "its error.",
+      "Team access follows the workspace owner's plan, so team members need their own ConstructHUB login but no plan of " +
+        "their own. Seats are shared with your CRM team, and each person's role and client list decide what they can see " +
+        "and change.",
+    ],
+  },
   related: ["gbp", "profileGuard", "siteScan"],
   app: { href: "/agency", surface: "app", label: "Open the Agency workspace" },
   headings: {
@@ -158,9 +189,9 @@ const page: FeaturePage = {
     cards: { title: "What the Workspace ", em: "Gives You" },
   },
   seo: {
-    title: "Agency Workspace — Manage Client Google Profiles | ConstructHUB",
+    title: "Google Business Profile Manager for Agencies | ConstructHUB",
     description:
-      "Client workspaces, team roles with client-by-client access, email onboarding for Google Business Profiles, and bulk actions across many locations.",
+      "Manage clients' Google Business Profiles from one agency workspace: email onboarding, team roles with client-by-client access, and bulk actions.",
   },
   sources: [
     "client/src/pages/agency.tsx",

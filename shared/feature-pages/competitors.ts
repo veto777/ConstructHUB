@@ -149,6 +149,35 @@ const page: FeaturePage = {
       a: "It doesn't show competitors' ads, ad spend, search rankings or private account data, and it doesn't watch the market between scans. Each scan is a snapshot of public listings on the day you run it.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // the search: server/competitor-provider.ts competitorPlaces (geocode, "<trade> in <location>" text search, up to 3 pages,
+  // kept inside the radius, `complete`); the per-listing details and the incomplete note: server/routes.ts runCompetitorScan;
+  // the review breakdown and the BS Meter signals (name keywords, perfect/high rating with many reviews, missing street
+  // address, long name, stock phrases, generic wording, capped at 100, the zero-score caveat):
+  // server/competitor-analysis.ts analyzeReviews / analyzeBsScore; the refund: server/routes.ts POST /api/competitors/scans.
+  inDepth: {
+    heading: { title: "How a Competitor Scan ", em: "Works" },
+    paragraphs: [
+      "Competitor Intel is local competitor analysis built from public data. A scan finds your city or address on the " +
+        "map, then runs the kind of search a customer would type, your trade in your town, against Google's public " +
+        "business listings. It reads up to three pages of results and keeps only the businesses whose map location falls " +
+        "inside the radius you picked. If a later page of results fails to load, the businesses already found are kept " +
+        "and the scan says the list may be incomplete.",
+      "For each business it then asks Google for the listing's phone number, website and the reviews Google returns " +
+        "with the listing. That is a small sample, not every review the business has, and everything about reviews is " +
+        "read from that sample: how many are positive or negative, how many reviewers have a profile photo, and how many " +
+        "use generic wording or repeat stock phrases.",
+      "The BS Meter adds points for signals worth a second look and lists every reason: a business name stuffed with " +
+        "ranking words like best or near me, a perfect rating across many reviews, a missing street address (which a " +
+        "service-area business may leave off on purpose), a very long name, and a review sample full of stock phrases or " +
+        "generic praise. The score tops out at 100. It is a heuristic for sizing up your market, not a verdict, and a " +
+        "score of zero doesn't prove the reviews are genuine either.",
+      "Use it to see how many businesses Google shows for your trade around a town, how their ratings and review counts " +
+        "compare with your own Google Business Profile, and which ones have a website. Each scan is a snapshot saved to " +
+        "your account. It doesn't track rankings or ads between scans, and a scan that fails is given back to your " +
+        "monthly allowance.",
+    ],
+  },
   related: ["rankingGrid", "reviews", "gbp"],
   app: { href: "/competitors", surface: "app" },
   headings: {
@@ -157,9 +186,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Run a Scan" },
   },
   seo: {
-    title: "Competitor Intel — Local Market Research | ConstructHUB",
+    title: "Local Competitor Analysis for Contractors | ConstructHUB",
     description:
-      "See the businesses Google lists for your trade within 10 to 100 miles: ratings, review counts, phones and websites, plus a careful look at each review sample.",
+      "See the businesses Google lists for your trade within 10 to 100 miles: ratings, review counts, phones and websites, and a careful look at their reviews.",
   },
   legacyPath: "/competitors-landing",
   flag: "SHOW_COMPETITOR_INTEL",

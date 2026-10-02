@@ -138,6 +138,44 @@ const page: FeaturePage = {
       a: "No. It shows what each government portal publishes, and only for the portals it can search. It doesn't add permits from other sources, and it doesn't send you alerts about new permits.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // the live search: server/routes.ts POST /api/search (searchable = governmentLinksAvailable && canScrapeGovernmentPortal,
+  // saved results in scope, quota only when something is searchable), server/scraper.ts startLiveSearch (MAX_CONCURRENT = 4,
+  // the address-only portal answered from saved results, liveSearchOutcome 'Not searched'); the six search types:
+  // client/src/pages/search.tsx; the directory checks: scripts/build-permit-portals.ts PERMIT_HINT,
+  // server/government-url-check.ts classifyGovernmentPage, server/government-link-policy.ts classifySourceListedLink,
+  // shared/government-links.ts governmentLinkNotice, client/src/pages/databases.tsx "Find permit portal".
+  inDepth: {
+    heading: { title: "How a Building Permit Search ", em: "Works" },
+    paragraphs: [
+      "Building permit records live on county and city websites, and every one has its own search screen. Permit " +
+        "Database Search runs your search on those government permit portals for you. Pick a state and a county or city, " +
+        "or search every portal it can reach, choose what you are searching by, and it queries up to four portals at a " +
+        "time and puts what they return in one list. Permits already saved from earlier searches of the portals in your " +
+        "area show straight away while the live search runs.",
+      "A portal is searched live only when two things are true: its link comes from a real source and is still usable, " +
+        "and there is a working search connection for the system that portal runs on. Many counties don't meet both yet, " +
+        "so coverage varies by area. When nothing in your area can be searched, the page says so and nothing is counted " +
+        "against your monthly allowance.",
+      "Each portal accepts the searches its own system supports. Some portals only search by address; for those, a " +
+        "search by name or company checks the permits already saved from that portal instead, and the portal's status " +
+        "line says so. A portal that times out, changes its pages or puts a sign-in in the way shows as not searched, " +
+        "with the reason, never as zero results.",
+      "The Database Directory is the other half of a permit lookup. It lists US counties and cities with each " +
+        "jurisdiction's official permit portal where one is on record. A portal link has to load and look like a permit " +
+        "page, not a city's general homepage, before it is published. A dead link, a parked domain or a page-not-found is " +
+        "dropped; a source-listed link that the check couldn't confirm stays visible with its last check date. Where no " +
+        "portal is on record you get a web search for that county's permit office, never a guessed address.",
+    ],
+    bulletsIntro: "A permit search can look for:",
+    bullets: [
+      "A street address",
+      "A keyword, such as a type of work",
+      "An applicant's name or a company name",
+      "A contractor license number",
+      "A permit number",
+    ],
+  },
   related: ["property", "competitors", "crm"],
   app: { href: "/search", surface: "app" },
   tryIt: { label: "Browse the Database Directory", href: "/databases" },
@@ -147,9 +185,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Search" },
   },
   seo: {
-    title: "Permit Database Search for Contractors | ConstructHUB",
+    title: "Building Permit Search for Contractors | ConstructHUB",
     description:
-      "Search supported government permit portals by address, permit number, name or license, and browse US county and city permit offices with checked portal links.",
+      "Search building permits on supported county and city portals by address, permit number, name or license, and find official permit offices across the US.",
   },
   legacyPath: "/permits-landing",
   sources: [
@@ -165,6 +203,9 @@ const page: FeaturePage = {
     "scripts/build-permit-portals.ts",
     "server/data/permit-portals.json",
     "shared/plans.ts",
+    "server/storage.ts",
+    "server/government-url-check.ts",
+    "server/government-link-policy.ts",
   ],
 };
 

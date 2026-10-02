@@ -113,6 +113,34 @@ const page: FeaturePage = {
       a: "A link that failed our check is hidden and replaced by a web search for that county's property records. A link we couldn't confirm stays visible with its last check date, so you know to double-check it.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // the office list and what it keeps: scripts/scrape-netronline.ts (header: name, phone, link only; null when unlisted),
+  // server/netr-office.ts isAssessmentOffice; the link tiers: scripts/verify-links.ts verifyAppraisers,
+  // server/government-link-policy.ts classifySourceListedLink, server/government-url-check.ts classifyGovernmentPage;
+  // the notice and the fallback search: shared/government-links.ts governmentLinkNotice, client/src/pages/property.tsx;
+  // the permit-result deep link: client/src/pages/search.tsx Property lookup → /property?countyId=.
+  inDepth: {
+    heading: { title: "Where County Property Records ", em: "Live" },
+    paragraphs: [
+      "Property records in the US are kept county by county, by an assessor, a property appraiser or a similar office, " +
+        "and each county publishes them on its own website. Property Records is a directory of those offices, so before " +
+        "you price a job you can find who keeps the records for that county, the link to their records site and their " +
+        "phone number.",
+      "The office list is built from NETR Online's public records directory. For each county it keeps the offices that " +
+        "handle property assessment, such as an assessor, property appraiser, auditor or tax commissioner, and leaves out " +
+        "recorders, clerks and mapping offices. It stores only what the source lists: the office name, its phone and its " +
+        "online link. A value the source doesn't list stays blank; nothing is filled in by guesswork.",
+      "Every published link is checked by loading the page. A link that opens a records page for that county is marked " +
+        "verified. A source-listed link the check couldn't confirm, because the site blocked the check or the answer was " +
+        "unclear, stays visible marked not auto-verified, with the date it was last checked. A dead link, one that " +
+        "doesn't resolve, returns page-not-found, is a parked domain or only lands on a generic homepage, is removed, and " +
+        "that office shows a Find property records web search instead.",
+      "The directory points you to the county's own site. It doesn't pull owner names, assessed values or sales into " +
+        "ConstructHUB, and what you can look up depends on what each county publishes. It also works as the next step " +
+        "from a building permit: the Property lookup link on a permit search result opens the directory filtered to that " +
+        "permit's county, so you can check the property record before you bid.",
+    ],
+  },
   related: ["permits", "crm", "crmLeads"],
   app: { href: "/property", surface: "app" },
   tryIt: { label: "Browse the directory now", href: "/property" },
@@ -121,7 +149,7 @@ const page: FeaturePage = {
     cards: { title: "What the Directory ", em: "Gives You" },
   },
   seo: {
-    title: "Property Records — County Assessor Directory | ConstructHUB",
+    title: "County Assessor & Property Records Lookup | ConstructHUB",
     description:
       "Find the county assessor or property appraiser office for US counties, with checked links to its official records site and its phone number. Free.",
   },
@@ -136,6 +164,9 @@ const page: FeaturePage = {
     "scripts/verify-links.ts",
     "shared/government-links.ts",
     "shared/dashboard.ts",
+    "server/netr-office.ts",
+    "server/government-link-policy.ts",
+    "server/government-url-check.ts",
   ],
 };
 

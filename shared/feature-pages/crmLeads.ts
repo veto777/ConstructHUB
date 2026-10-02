@@ -130,6 +130,35 @@ const page: FeaturePage = {
       a: "They could only send you enquiries, never read anything. Rotate the link in Integrations and every old copy and embed stops working.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
+  // the stage groups: shared/schema.ts CRM_PROJECT_STAGE_META; the automatic moves: server/crm/portal.ts (send → Proposal
+  // Sent, approve → Approved); the form fields (name + email or phone, optional address and message), source + tag, owner
+  // email, honeypot and per-IP limit answered like a real lead, rotation: server/crm/lead-capture.ts header, leadSchema,
+  // the public POST; cadence 7/14 days, followed-up-now, the Needs attention rollup, assigned-only: server/crm/follow-ups.ts
+  // header; first-open notice, repeat open → maybeAlertReengagement once a day, 30-minute dedupe: server/crm/portal.ts
+  // public estimate GET, VIEW_DEDUPE_MIN; text where texting is on: server/crm/sms.ts.
+  inDepth: {
+    heading: { title: "Contractor Lead Tracking, ", em: "Explained" },
+    paragraphs: [
+      "Leads & follow-ups is lead tracking for contractors inside ConstructHub CRM. Every job is a card on one pipeline " +
+        "board, with stages grouped into prospect, sales, production, billing and closed. Move a card by dragging it or " +
+        "by picking its stage, and two moves happen on their own: sending an estimate puts the job in Proposal Sent, and " +
+        "the client's approval puts it in Approved.",
+      "The website lead form is a contact form for your own site. Paste the embed code or link straight to the form. A " +
+        "visitor leaves a name and an email or phone, plus an optional address and message, and the enquiry becomes a " +
+        "client in your CRM with the Website lead source and a website-lead tag, while you get an email. Spam bots that " +
+        "fill in a hidden field, and anyone sending too many enquiries from one connection, get the same polite answer as " +
+        "a real visitor, but nothing lands in your CRM. Rotating the link stops every old copy.",
+      "Follow-ups are reminders for you, not automatic messages. Give a client a weekly or every-two-weeks cadence; " +
+        "marking the call done starts the count again from today. The Needs attention card on your CRM home collects the " +
+        "follow-ups that are due, leads from the last two weeks and leads with no estimate yet. A team member who can't " +
+        "see every job sees only the leads they manage.",
+      "The estimate alert tells you when a client is reading. The first time a client opens a sent estimate, whoever " +
+        "sent it hears about it. If the client comes back to an estimate they haven't answered yet, the sender gets a " +
+        "good-time-to-call alert, at most once a day per estimate: in the app and by email, and by text where your plan " +
+        "includes texting. A refresh within half an hour from the same place doesn't count as coming back.",
+    ],
+  },
   related: ["crm", "callAssistant", "texting"],
   app: { href: "/crm/pipeline", surface: "portal", label: "Open the pipeline" },
   headings: {
@@ -137,9 +166,9 @@ const page: FeaturePage = {
     cards: { title: "What Keeps Leads ", em: "Warm" },
   },
   seo: {
-    title: "Leads & Follow-ups — Contractor Lead Pipeline | ConstructHUB",
+    title: "Contractor Lead Tracking & Follow-Ups | ConstructHUB",
     description:
-      "A lead-to-paid pipeline board, a website lead form, weekly follow-up reminders, and an alert when a client re-opens your estimate.",
+      "Track every lead from enquiry to paid on one board, bring website enquiries into your CRM, get follow-up reminders, and know when a client re-opens a bid.",
   },
   sources: [
     "client/src/pages/crm-pipeline.tsx",
