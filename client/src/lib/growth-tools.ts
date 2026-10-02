@@ -136,7 +136,7 @@ export const UPCOMING_TOOLS: ToolShowcase[] = [
     description: "An AI receptionist on your own local number answers 24/7 in a voice and name you pick, asks what the caller needs, the address, a name, a good email and the best time to call, then files the lead in your CRM. Emergencies and \"I want a person\" page the right teammate by text; telemarketers get screened. Every call is logged with a summary, transcript and recording.",
     whyItMatters: "A missed call is a job that goes to the next contractor on the list. Most calls come in while you are on a roof or in a crawlspace; this answers them the way your best office manager would, and you read the lead before you call back.",
     icon: Phone,
-    url: "/crm-app",
+    url: "/call-assistant",
     stats: "Add-on · coming soon",
   },
 ];

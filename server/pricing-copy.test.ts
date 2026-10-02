@@ -7,6 +7,7 @@ import {
 import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
+  CALL_ASSISTANT_INTRO, callAssistantIntroLine, callAssistantPricing,
 } from "@shared/plan-copy";
 import { knowledgeBook } from "./hub/knowledge";
 import { hardRulesText } from "./hub/prompt";
@@ -70,6 +71,31 @@ describe("plan copy helpers", () => {
     expect(lines).toHaveLength(Object.keys(ADDONS).length);
     for (const addon of Object.values(ADDONS)) {
       expect(lines.some((l) => l.startsWith(`${addon.name} — ${formatUsd(addon.monthlyCents)}/month`))).toBe(true);
+    }
+  });
+});
+
+describe("AI Call Assistant launch price", () => {
+  const root = path.resolve(import.meta.dirname, "..");
+
+  it("is one constant, then the price book's regular price", () => {
+    expect(callAssistantIntroLine()).toBe(
+      `${formatUsd(CALL_ASSISTANT_INTRO.monthlyCents)}/month for your first ${CALL_ASSISTANT_INTRO.months} months, then ${formatUsd(ADDONS.call_assistant.monthlyCents)}/month`,
+    );
+    const p = callAssistantPricing();
+    expect(p.extraNumber).toBe(formatUsd(ADDONS.call_number.monthlyCents));
+    expect(p.comingSoon).toBe(ADDONS.call_assistant.preview === true);
+    expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`Launch price: ${callAssistantIntroLine()}.`);
+    expect(knowledgeBook().pack).toContain(callAssistantIntroLine());
+  });
+
+  it.each([
+    "client/src/pages/landing.tsx", "client/src/pages/call-assistant-landing.tsx",
+    "client/src/components/call-assistant-marketing.tsx", "client/src/pages/pricing.tsx",
+  ])("%s types no Call Assistant price (it renders them from the price book)", (file) => {
+    const src = fs.readFileSync(path.join(root, file), "utf8");
+    for (const cents of [CALL_ASSISTANT_INTRO.monthlyCents, ADDONS.call_assistant.monthlyCents, ADDONS.call_number.monthlyCents]) {
+      expect(src).not.toMatch(new RegExp(`\\${formatUsd(cents).replace(".", "\\.")}(?![\\d,])`));
     }
   });
 });
@@ -142,7 +168,7 @@ describe("page copy outside /pricing", () => {
   const PAGES = [
     "home", "landing", "permits-landing", "competitors-landing", "google-ads-landing", "master-class",
     "master-class-landing", "reinstatement", "terms-of-use", "privacy-policy", "crm-gateway", "crm-legal",
-    "competitors", "google-ads-guide",
+    "competitors", "google-ads-guide", "call-assistant-landing",
   ].map((p) => `client/src/pages/${p}.tsx`);
   const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
@@ -155,7 +181,7 @@ describe("page copy outside /pricing", () => {
     expect(src).not.toMatch(/["'](gold|platinum)["']/);
   });
 
-  it.each(["landing", "master-class-landing", "terms-of-use"])(
+  it.each(["landing", "master-class-landing", "terms-of-use", "call-assistant-landing"])(
     "%s prints no literal price at or above the sales threshold",
     (page) => {
       const src = read(`client/src/pages/${page}.tsx`);

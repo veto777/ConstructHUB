@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 // Small server surfaces of the price book: the sitemap and the retired
 // single-tool pricing page, the sales-inquiry subject, and the plan copy that
 // must match the limits it describes.
-import { buildSitemap, PUBLIC_ROUTES, RETIRED_ROUTES } from "./static";
+import fs from "fs";
+import path from "path";
+import { buildSitemap, PUBLIC_ROUTES, RETIRED_ROUTES, withRouteMeta } from "./static";
+import { ROUTE_META } from "@shared/route-meta";
 import { salesInquirySubject } from "./catalog";
 import { PLANS, PLAN_KEYS, gridCreditCost } from "@shared/plans";
 
@@ -12,6 +15,19 @@ describe("sitemap and retired pages", () => {
     expect(buildSitemap()).not.toContain("individual-pricing");
     expect(buildSitemap()).toContain("/pricing</loc>");
     expect(RETIRED_ROUTES["/individual-pricing"]).toBe("/pricing#add-ons");
+  });
+
+  it("lists /call-assistant and serves it with its own title and description", () => {
+    expect(buildSitemap()).toContain("/call-assistant</loc>");
+    const indexHtml = fs.readFileSync(path.resolve(import.meta.dirname, "../client/index.html"), "utf8");
+    const html = withRouteMeta(indexHtml, "/call-assistant");
+    const meta = ROUTE_META["/call-assistant"];
+    expect(html).toContain(`<title>${meta.title}</title>`);
+    expect(html).toContain(`<meta name="description" content="${meta.description}" />`);
+    expect(html).toContain(`<meta property="og:title" content="${meta.title}" />`);
+    expect(html).toContain(`<meta property="og:description" content="${meta.description}" />`);
+    // Every other page keeps index.html's defaults.
+    expect(withRouteMeta(indexHtml, "/pricing")).toBe(indexHtml);
   });
 });
 

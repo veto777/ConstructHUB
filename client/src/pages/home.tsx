@@ -63,7 +63,7 @@ function FloatingParticles({ color = "#d4d4d8" }: { color?: string }) {
 /** One toolkit card. An upcoming tool is the same card without the "go there" affordances. */
 function ToolCard({ tool, upcoming = false }: { tool: ToolShowcase; upcoming?: boolean }) {
   return (
-    <Card className={`group border-border/50 transition-all ${upcoming ? "border-dashed" : "hover:border-border hover:shadow-md cursor-pointer"}`}>
+    <Card className={`group border-border/50 transition-all ${upcoming ? "border-dashed hover:border-border cursor-pointer" : "hover:border-border hover:shadow-md cursor-pointer"}`}>
       <CardContent className="p-0">
         <div className="flex flex-col lg:flex-row">
           <div className="flex-1 p-6 space-y-3">
@@ -169,9 +169,10 @@ export default function HomePage() {
           </div>
           <div className="space-y-5">
             {UPCOMING_TOOLS.map((tool, index) => (
-              <div key={tool.title} data-testid={`card-upcoming-tool-${index}`}>
+              // Not usable yet, but its feature page explains it (the Call Assistant → /call-assistant).
+              <Link key={tool.title} href={tool.url} className="block no-underline" data-testid={`card-upcoming-tool-${index}`}>
                 <ToolCard tool={tool} upcoming />
-              </div>
+              </Link>
             ))}
           </div>
         </div>

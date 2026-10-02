@@ -5,7 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
@@ -47,6 +47,19 @@ function SocialMediaIcon({ className }: { className?: string }) {
       <path d="M15 26.5l2.2 7.5h3.6l-1.8-7.5z" fill="#3F4650" />
       <rect x="29" y="14.5" width="3" height="19" rx="1.5" fill="#3F4650" />
       <path d="M35 19.5c1.6 1.2 2.5 2.8 2.5 4.5s-.9 3.3-2.5 4.5" stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A white handset on the orange disc (lucide's Phone glyph, centred). */
+function CallAssistantIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#F1592F" />
+      <g transform="translate(12 12)">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#fff" />
+      </g>
+      <path d="M29.5 13.5a8 8 0 0 1 5 5M28.8 17.3a4 4 0 0 1 1.9 1.9" stroke="#3F4650" strokeWidth="2" fill="none" strokeLinecap="round" />
     </svg>
   );
 }
@@ -256,6 +269,9 @@ const googleGroups: NavGroup[] = [
 const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", icon: Star, logoComponent: GoogleGIcon, badge: "best" as BadgeType };
 
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
+  // The AI Call Assistant lives in the CRM (portal /crm/call-assistant). The /crm-app gateway has
+  // no "next" hand-off to a CRM page, so the entry opens the feature page, which leads on to the CRM.
+  { title: "Call Assistant", url: "/call-assistant", icon: Phone, logoComponent: CallAssistantIcon, badge: "new" },
   { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },
   { title: "Site Scan", url: "/site-scan", icon: Search, logoComponent: SiteScanIcon },
   { title: "Cloudflare", url: "/cloudflare", icon: Cloud, logoComponent: CloudflareIcon },
