@@ -11,13 +11,12 @@
  * Every heading, paragraph, number, link, href and data-testid from the
  * previous version survives; e2e specs depend on the testids.
  */
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CHLogo } from "@/components/ch-logo";
 import { CartSheet } from "@/components/cart-sheet";
-import { StandingGator } from "@/components/mascot";
 import { Settings } from "lucide-react";
 import {
   ArrowRight, Search, Camera, Users,
@@ -50,34 +49,82 @@ const BTN_LG = "h-12 px-6 text-base";
 
 const WELCOME_LINE = "Welcome in — let's build your business.";
 
-function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
+/** The hero gator: 335x512 for 1x screens, 671x1024 for 2x. `sizes` tracks the
+ *  width he renders at per breakpoint (see the hero), so 2x screens pick the 1024 file. */
+const HERO_GATOR = "/mascot/gator-standing-512.v1.webp";
+const HERO_GATOR_2X = "/mascot/gator-standing-1024.v1.webp";
+const HERO_GATOR_SIZES = "(min-width: 1024px) 328px, (min-width: 768px) 270px, (min-width: 640px) 170px, (min-width: 375px) 144px, 128px";
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !started.current) {
-          started.current = true;
-          const start = Date.now();
-          const tick = () => {
-            const elapsed = Date.now() - start;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setCount(Math.floor(eased * end));
-            if (progress < 1) requestAnimationFrame(tick);
-          };
-          tick();
-        }
-      },
-      { threshold: 0.5 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
+/**
+ * A stat that counts up once when it scrolls into view. The real number is
+ * authoritative: it is what renders by default, for reduced motion, while the
+ * element is off screen, if the tab is hidden, and the moment the animation
+ * ends (a timer backs up requestAnimationFrame, which background tabs pause).
+ * Screen readers only ever get the real number.
+ */
+function CountUp({ end, suffix = "", duration = 1600 }: { end: number; suffix?: string; duration?: number }) {
+  const [count, setCount] = useState(end);
+  const ref = useRef<HTMLSpanElement>(null);
+  const done = useRef(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!el || done.current || reduce || typeof IntersectionObserver === "undefined") {
+      setCount(end);
+      return;
+    }
+    let raf = 0;
+    let timer = 0;
+    let running = false;
+    const finish = () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      running = false;
+      done.current = true;
+      setCount(end);
+      observer.disconnect();
+    };
+    const run = () => {
+      running = true;
+      setCount(0);
+      const start = performance.now();
+      const tick = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        if (progress >= 1) return finish();
+        setCount(Math.floor((1 - Math.pow(1 - progress, 3)) * end));
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      timer = window.setTimeout(finish, duration + 100);
+    };
+    // It starts as soon as any of it is on screen, so the real number is never
+    // readable before it drops to 0; scrolled away mid-count, it snaps to the end.
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !running && !done.current) run();
+      else if (!entry.isIntersecting && running) finish();
+    });
+    // Already on screen at mount: start from 0 before the first paint.
+    const box = el.getBoundingClientRect();
+    if (box.height > 0 && box.top < window.innerHeight && box.bottom > 0) run();
+    observer.observe(el);
+    const onHide = () => { if (document.hidden && running) finish(); };
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onHide);
+    };
   }, [end, duration]);
 
-  return <span ref={ref}>{count.toLocaleString("en-US")}{suffix}</span>;
+  const real = `${end.toLocaleString("en-US")}${suffix}`;
+  return (
+    <span ref={ref}>
+      <span aria-hidden="true">{count.toLocaleString("en-US")}{suffix}</span>
+      <span className="sr-only">{real}</span>
+    </span>
+  );
 }
 
 /** Section kicker: a short orange rule, an index number and small caps. */
@@ -141,7 +188,7 @@ const services = [
 
 /** Done-for-you card recipes (the three cards are written out so their testids stay literal). */
 const DFY_CARD = "group bg-mkt-card border border-mkt-rule rounded-2xl p-7 hover:border-mkt-ink transition-colors";
-const DFY_ICON = "h-11 w-11 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink mb-6 group-hover:border-mkt-orange group-hover:text-mkt-orange-ink transition-colors";
+const DFY_ICON = "h-11 w-11 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink mb-6 group-hover:border-mkt-orange group-hover:text-mkt-orange transition-colors";
 const DFY_TITLE = "font-display font-semibold text-[1.35rem] leading-tight text-mkt-ink";
 const DFY_BODY = "text-[15px] text-mkt-ink-soft leading-relaxed mt-2.5";
 const DFY_SALES = "mt-5 inline-flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-mkt-orange-ink";
@@ -237,32 +284,29 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero — the gator is the cover star, standing on a tape-measure rule. */}
+      {/* Hero — the gator is the cover star, standing on a tape-measure rule.
+          Phones: he stands beside the headline (the copy wrapper is
+          display:contents there, so its children join the hero grid);
+          tablets and desktops: his own column, on the rule. */}
       <section className="relative z-10">
         <div className="absolute inset-0 mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,black_45%,transparent_100%)]" aria-hidden />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-end">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 md:pt-0 grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_1fr] gap-x-3 sm:gap-x-6 md:grid-cols-12 md:grid-rows-none md:gap-x-8 md:items-end">
 
           {/* Copy */}
-          <div className="lg:col-span-7 pt-10 sm:pt-14 lg:pt-20 pb-12 lg:pb-16">
+          <div className="contents md:block md:col-span-7 md:pt-14 lg:pt-20 md:pb-12 lg:pb-16">
             <Kicker n="" className="animate-in">Your Complete Business-Building Platform</Kicker>
             <h1 className="font-display mt-5 text-mkt-ink animate-in-delay-1">
-              <span className="block italic font-medium text-mkt-orange-ink text-2xl sm:text-3xl leading-tight mb-2">Construct<span className="font-bold not-italic">HUB</span> —</span>
-              <span className="block font-semibold text-[2.6rem] leading-[1.02] sm:text-[3.4rem] lg:text-[4.1rem] xl:text-[4.5rem] tracking-[-0.02em]">
-                Build Your Business <span className="mkt-marker">From the Ground&nbsp;Up</span>
+              <span className="block italic font-medium text-mkt-orange text-[clamp(1rem,calc(12vw-1.375rem),1.5rem)] sm:text-3xl leading-tight mb-2">Construct<span className="font-bold not-italic">HUB</span> —</span>
+              <span className="block font-semibold text-[clamp(1.75rem,calc(19vw-2rem),2.6rem)] min-[375px]:text-[clamp(1.75rem,calc(19vw-2.25rem),2.6rem)] min-[480px]:text-[clamp(2.6rem,9vw,3.4rem)] leading-[1.04] sm:text-[3.4rem] md:text-[3.1rem] lg:text-[4.1rem] xl:text-[4.5rem] tracking-[-0.02em]">
+                Build Your Business <span className="mkt-marker">From&nbsp;the Ground&nbsp;Up</span>
               </span>
             </h1>
 
-            {/* Phone/tablet: the gator floats beside the paragraph so the CTAs stay close to the fold. */}
-            <div className="lg:hidden float-right ml-4 mb-2 mt-5 w-[150px] md:w-[210px] relative animate-in-delay-2" aria-hidden>
-              <p className="mkt-bubble px-3 py-2 text-[13px] md:text-[16px] leading-snug">{WELCOME_LINE}</p>
-              <StandingGator height={190} className="mx-auto mt-4 md:!h-[280px]" />
-            </div>
-
-            <p className="mt-6 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] leading-relaxed animate-in-delay-2">
+            <p className="col-span-2 mt-6 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] leading-relaxed animate-in-delay-2">
               Whether you're starting from scratch or scaling an existing operation — we provide every tool, resource, and service you need. From LLC formation and licensing to GMB optimization and SEO domination. And if you don't want to do it yourself, we'll build your entire business for you.
             </p>
 
-            <div className="clear-both mt-8 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 animate-in-delay-3">
+            <div className="col-span-2 mt-8 max-w-[17.5rem] sm:max-w-none flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 animate-in-delay-3">
               <Link href="/auth?mode=signup" data-testid="link-hero-signup" className={`${BTN_PRIMARY} ${BTN_LG}`}>
                 Create Your Account <ArrowRight className="h-4 w-4" />
               </Link>
@@ -270,24 +314,36 @@ export default function LandingPage() {
                 <Package className="h-4 w-4" /> Done-For-You Services
               </Link>
             </div>
-            <p className="mt-4 text-[15px] text-mkt-ink-soft animate-in-delay-3">
+            <p className="col-span-2 mt-4 text-[15px] text-mkt-ink-soft animate-in-delay-3">
               Not ready to sign up?{" "}
               <Link href="/free-site-scan" className="inline-block whitespace-nowrap font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">Free 60-second website scan</Link>
             </p>
 
-            <ul className="mt-9 flex flex-wrap gap-x-6 gap-y-2 text-[14px] text-mkt-ink-soft animate-in-delay-4">
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> No card needed to sign up</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> Setup in minutes</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> Cancel anytime</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> Turnkey business building available</li>
+            <ul className="col-span-2 mt-9 mb-12 md:mb-0 flex flex-wrap gap-x-6 gap-y-2 text-[14px] text-mkt-ink-soft animate-in-delay-4">
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> No card needed to sign up</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> Setup in minutes</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> Cancel anytime</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> Turnkey business building available</li>
             </ul>
           </div>
 
-          {/* Desktop: the cover — a navy panel, the welcome bubble, and the gator standing on the rule. */}
-          <div className="hidden lg:block lg:col-span-5 relative self-end h-[600px] animate-in-delay-2" aria-hidden>
-            <div className="absolute right-0 top-14 w-[350px] h-[456px] rounded-[32px] bg-mkt-panel mkt-grid-paper-panel" />
-            <p className="absolute left-0 top-0 w-[232px] mkt-bubble px-5 py-3 text-[19px] leading-snug -rotate-2 z-20">{WELCOME_LINE}</p>
-            <StandingGator height={500} className="absolute bottom-0 left-[58px] z-10 translate-y-[3px]" />
+          {/* The cover — the welcome bubble and the gator; on tablets and
+              desktops a navy panel behind him and the rule under his boots. */}
+          <div className="relative row-start-1 row-span-2 col-start-2 w-[128px] min-[375px]:w-[144px] sm:w-[170px] md:row-span-1 md:col-start-8 md:col-span-5 md:w-auto md:self-end md:h-[560px] lg:h-[600px] animate-in-delay-2" aria-hidden>
+            <div className="hidden md:block absolute right-0 top-[64px] w-[220px] h-[420px] rounded-[28px] lg:top-14 lg:w-[350px] lg:h-[456px] lg:rounded-[32px] bg-mkt-panel mkt-grid-paper-panel" />
+            <p className="mkt-bubble relative z-20 px-3 py-2 text-[13px] leading-snug -rotate-2 md:absolute md:left-0 md:top-0 md:w-[200px] md:px-4 md:text-[16px] lg:w-[232px] lg:px-5 lg:py-3 lg:text-[19px]">{WELCOME_LINE}</p>
+            <img
+              src={HERO_GATOR}
+              srcSet={`${HERO_GATOR} 335w, ${HERO_GATOR_2X} 671w`}
+              sizes={HERO_GATOR_SIZES}
+              width={671}
+              height={1024}
+              alt=""
+              draggable={false}
+              decoding="async"
+              className="relative z-10 mt-4 w-full h-auto select-none pointer-events-none md:absolute md:mt-0 md:bottom-0 md:left-0 md:w-[270px] md:translate-y-[3px] lg:left-[58px] lg:w-[328px]"
+              data-testid="img-hero-gator"
+            />
           </div>
         </div>
         <div className="mkt-ruler" aria-hidden />
@@ -317,7 +373,7 @@ export default function LandingPage() {
             <div className="lg:col-span-7">
               <Kicker n="01">What We Do</Kicker>
               <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
-                Everything You Need to Start, Build &amp; <em className="text-mkt-orange-ink">Dominate</em>
+                Everything You Need to Start, Build &amp; <em className="text-mkt-orange">Dominate</em>
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
@@ -333,7 +389,7 @@ export default function LandingPage() {
                 data-testid={`card-service-${i}`}
               >
                 <div className="flex items-start justify-between mb-6">
-                  <div className="h-11 w-11 rounded-lg border border-mkt-rule bg-mkt-card flex items-center justify-center text-mkt-ink group-hover:border-mkt-orange group-hover:text-mkt-orange-ink transition-colors">
+                  <div className="h-11 w-11 rounded-lg border border-mkt-rule bg-mkt-card flex items-center justify-center text-mkt-ink group-hover:border-mkt-orange group-hover:text-mkt-orange transition-colors">
                     <svc.icon className="h-5 w-5" strokeWidth={1.75} />
                   </div>
                   <span className="font-display italic text-mkt-muted text-lg leading-none">{String(i + 1).padStart(2, "0")}</span>
@@ -363,7 +419,7 @@ export default function LandingPage() {
             <div className="lg:col-span-7">
               <Kicker n="02">Turnkey Solutions</Kicker>
               <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
-                Don't Want to Do It Yourself? <em className="text-mkt-orange-ink">We'll Build It For You.</em>
+                Don't Want to Do It Yourself? <em className="text-mkt-orange">We'll Build It For You.</em>
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
@@ -419,7 +475,7 @@ export default function LandingPage() {
             <div className="lg:col-span-7">
               <Kicker n="03">Plans</Kicker>
               <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
-                One Plan for Every <em className="text-mkt-orange-ink">Stage</em>
+                One Plan for Every <em className="text-mkt-orange">Stage</em>
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
@@ -466,7 +522,7 @@ export default function LandingPage() {
           <div className="text-center">
             <Kicker n="04" className="justify-center">Coverage</Kicker>
             <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
-              Nationwide <em className="text-mkt-orange-ink">Coverage</em>
+              Nationwide <em className="text-mkt-orange">Coverage</em>
             </h2>
             <p className="mt-5 text-[17px] text-mkt-ink-soft leading-relaxed max-w-2xl mx-auto" data-testid="text-coverage-summary">
               {counts ? `${formatCount(counts.total)} county and city jurisdictions` : "County and city jurisdictions"} listed
@@ -477,7 +533,7 @@ export default function LandingPage() {
           <ul className="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-8 border-t border-mkt-rule">
             {COVERAGE_STATES.map((state) => (
               <li key={state} className="flex items-center gap-2.5 py-3 border-b border-dotted border-mkt-rule text-[15px] text-mkt-ink">
-                <CheckCircle2 className="h-4 w-4 text-mkt-orange-ink shrink-0" /> {state}
+                <CheckCircle2 className="h-4 w-4 text-mkt-orange shrink-0" /> {state}
               </li>
             ))}
           </ul>

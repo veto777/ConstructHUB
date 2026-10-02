@@ -932,6 +932,12 @@
  *
  * The --mkt-* colours are plain hex/rgba (no opacity modifiers); every one
  * flips under .dark below, so the page needs no dark: twins for them.
+ *
+ * One orange: the brand #F97316 (--mkt-orange) for buttons, rules, icons,
+ * the marker and the large display accents. Small orange text on the light
+ * paper uses --mkt-orange-ink, the same hue and saturation darkened to 35%
+ * lightness so it passes WCAG AA (4.76:1 on paper-2, 5.2:1 on paper); on
+ * the dark paper the brand orange itself passes, so there it IS #F97316.
  */
 .mkt-editorial {
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
@@ -947,7 +953,7 @@
   --mkt-grid: rgba(27, 37, 65, 0.075);
   --mkt-orange: #F97316;
   --mkt-orange-hover: #E4640A;
-  --mkt-orange-ink: #C2410C;
+  --mkt-orange-ink: #AE4A04;
   --mkt-orange-soft: rgba(249, 115, 22, 0.22);
   --mkt-navy: #1E2A4A;
   --mkt-navy-ink: #F4EFE6;
@@ -972,7 +978,7 @@
   --mkt-grid: rgba(242, 237, 228, 0.06);
   --mkt-orange: #F97316;
   --mkt-orange-hover: #FB8A3C;
-  --mkt-orange-ink: #FB923C;
+  --mkt-orange-ink: #F97316;
   --mkt-orange-soft: rgba(249, 115, 22, 0.32);
   --mkt-navy: #0D1324;
   --mkt-navy-ink: #F4EFE6;
@@ -1028,11 +1034,11 @@
 }
 
 /* Marker highlight: a hand-drawn orange swipe behind one key phrase. Drawn as
-   a background so it sits behind the glyphs and, with box-decoration-break:
-   clone, repeats on every line the phrase wraps onto. */
+   a background of the span itself (no padding, no negative margin), so it
+   spans exactly the phrase's own box and sits behind the glyphs; with
+   box-decoration-break: clone each line the phrase wraps onto gets its own
+   whole swipe, ending where that line's words end. */
 .mkt-marker {
-  padding: 0 0.08em;
-  margin: 0 -0.08em;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 40' preserveAspectRatio='none'%3E%3Cpath d='M8 23 C 60 12, 118 30, 176 19 S 258 13, 292 21' fill='none' stroke='%23F97316' stroke-width='19' stroke-linecap='round' opacity='0.42'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-size: 100% 0.62em;
