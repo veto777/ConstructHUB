@@ -691,6 +691,20 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
       return res.send(smsLamlReply("ConstructHub account alerts. Help: support@constructhub.us or portal.constructhub.us. Msg&data rates may apply. Reply STOP to opt out."));
     }
 
+    // ── lane: calls+crm — Call Assistant escalation replies (after STOP/START/HELP, never before) ──
+    // Any other text from a number that holds an open escalation (of the org
+    // that sends from the `To` number) confirms it ("OK") or, after the
+    // next-day follow-up, closes it ("DONE"); the sender gets a one-line ack.
+    // A failure here is logged and the carrier still gets its normal reply.
+    try {
+      const { confirmEscalationByReply } = await import("../voice/escalations");
+      const touched = await confirmEscalationByReply(from, String(req.body?.Body ?? ""), req.body?.To ?? null);
+      if (touched > 0) return res.send(smsLamlReply("Got it, thanks."));
+    } catch (e: any) {
+      console.error("[sms] escalation reply hook failed:", e?.message || e);
+    }
+    // ── end lane: calls+crm ──
+
     return res.send(smsLamlReply());
   });
 

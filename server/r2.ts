@@ -58,3 +58,16 @@ export function isR2Key(url: string): boolean {
 export function getR2Url(key: string): string {
   return `/api/files/${key}`;
 }
+
+// ── Call Assistant recordings (calls+crm lane, docs/call-assistant/LANES.md) ──
+// Fixed-key put: recordings live at voice/<orgId>/<callSid>.wav so a re-upload
+// of the same call overwrites instead of orphaning a second object.
+export function r2Configured(): boolean {
+  return !!(process.env.R2_ENDPOINT && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY);
+}
+
+export async function putToR2Key(key: string, body: Buffer, contentType: string): Promise<string> {
+  if (!/^[A-Za-z0-9_\-./]+$/.test(key) || key.includes("..")) throw new Error("Invalid R2 key");
+  await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: contentType }));
+  return key;
+}
