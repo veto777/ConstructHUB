@@ -60,6 +60,10 @@
 - **E3 — observation (audio)**: Whisper heard "call me, bye" as "call me by" on the synthetic call
   (`goodbye_mid_intake`); the canned brain still submitted, but a live model + GOODBYE_RE would not see a
   goodbye. Consider accepting a trailing "by." in the goodbye regex.
+- **E4 — observation (audio)**: after a spam goodbye ("We're not interested… Goodbye."), a robocall that keeps
+  talking inside the 1.5 s hang-up grace cancels the hang-up ("caller is speaking") and gets one more turn
+  (spam_press1, spam_google_listing). Harmless (outcome spam, no notification) but a spam call should hang up
+  regardless of caller speech.
 - **Ownership overlap — engine branch**: `voice/engine` added `voice/sim.py`, `voice/tests/profiles/sample.json`
   and `voice/tests/scripts/*.txt` (harness-owned paths). The harness `voice/sim.py` is CLI-compatible
   (`--profile`, `--script` with `(silence)` rows, `--caller`, `--timezone`, `--json`) and adds `--scenario`,
@@ -74,8 +78,14 @@
   through the reference policy (+1 audio-only skip), mutation tests fail as they should, mocked endpoint path.
 - Python, engine brain (`VOICE_ENGINE_DIR=~/ConstructHUB-voice-engine/voice`, its WIP working copy at
   2026-10-02 03:4x): 32/34 pass, 2 xfail (E1); parser 32/32 cases agree with `voice/decision.py`.
-- Audio, in-process engine (engine lane's WIP code, real Silero + Whisper large-v3-turbo + Kokoro on the GPU,
-  canned decisions): see the commit message / final report for the scorecard of the scenarios run.
+- Audio, `fake_signalwire.py --in-process --canned` (engine lane's WIP code, real Silero VAD + Whisper
+  large-v3-turbo + Kokoro on the tower GPU, caller voice am_puck, fake internal API): **8/9 pass** —
+  whisper_filtered (the CallRail whisper never reached the transcript), routine_lead (email read back once,
+  digits never spoken), silence_hangup, spam_press1, blocked_second_call (two spam_google_listing preludes →
+  the engine's real webhook answered `<Reject reason="rejected"/>`), goodbye_mid_intake, caller_hangs_up_mid_call
+  (forced submit), are_you_a_bot; **repair_request fails = E1 reproduced on the media path** (the engine said
+  goodbye and held the line 10 s). Turn latency (caller stops → first assistant audio) 0.55–0.78 s with the
+  canned brain; recordings uploaded on every call.
 
 ## Not tested (honest list)
 
