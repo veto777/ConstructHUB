@@ -119,8 +119,15 @@ export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUs
 /** A recent identity check (Google or password re-verification, server/account-security.ts) for this user. */
 function recentAuthPassed(req: any): boolean {
   const v = req.session?.recentAuth, id = req.user?.id;
-  return !!v && !!id && v.userId === id && v.at <= Date.now() && Date.now() - v.at < RECENT_AUTH_MS;
+  return !!v && !!id && v.userId === id && v.at <= Date.now() && Date.now() - v.at < ADMIN_RECENT_AUTH_MS;
 }
+
+/**
+ * How long one identity check (Google sign-in, an emailed code, a password) covers admin actions in that browser
+ * session. Owner, 2026-10-02: the 12-hour window kept stopping him mid-task to create a trial invite. Account
+ * security changes still use RECENT_AUTH_MS (12 h).
+ */
+export const ADMIN_RECENT_AUTH_MS = Math.max(RECENT_AUTH_MS, 30 * 24 * 60 * 60 * 1000);
 
 /**
  * The admin second factor: the admin passphrase OR a recent identity check (owner, 2026-10-02 — signed in as

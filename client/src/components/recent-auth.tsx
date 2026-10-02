@@ -69,14 +69,14 @@ export function RecentAuthModal() {
   };
   return <Dialog open={!!challenge} onOpenChange={open=>{if(!open)close();}}><DialogContent onCloseAutoFocus={e=>{const el=returnFocus.current;returnFocus.current=null;if(el?.isConnected){e.preventDefault();el.focus();}}}><DialogHeader><DialogTitle>Verify your identity</DialogTitle><DialogDescription data-testid="text-reauth-reason">{forGbp
       ?"To connect Google Business Profile, confirm it's you first. Google's sign-in opens next."
-      :"To change security settings or other sensitive account details, confirm it's you first."} Verification lasts 12 hours.</DialogDescription></DialogHeader>
+      :"A quick security check on your own account, so nobody else can act as you. Nothing is sent to anyone else, and your action continues as soon as you confirm."}</DialogDescription></DialogHeader>
     {method && <form className="space-y-4" onSubmit={async e=>{e.preventDefault();if(needsCode)return;setBusy(true);setError('');try{await apiRequest('POST','/api/auth/reauth',{value});challenge?.resolve();setChallenge(null);}catch(e){setError(apiErrorMessage(e));}finally{setBusy(false);}}}>
       {method==='email' && google && <div className="space-y-2">
         <Button type="button" className="w-full" disabled={busy} onClick={continueWithGoogle} data-testid="button-reauth-google">Continue with Google</Button>
         <p className="text-xs text-muted-foreground text-center">or use an emailed code</p>
       </div>}
       {method==='email' && <div className="space-y-2">
-        <p className="text-sm" data-testid="text-reauth-email-status">{sent?`We emailed a 6-digit code to ${sentTo||accountEmail||'your account email'}. It expires in 10 minutes.`:`We will email a 6-digit code to ${accountEmail||'your account email address'}.`}</p>
+        <p className="text-sm" data-testid="text-reauth-email-status">{sent?`We emailed a 6-digit code to your own email, ${sentTo||accountEmail||'the one on your account'}. It expires in 10 minutes.`:`We will email a 6-digit code to your own email, ${accountEmail||'the one on your account'}.`}</p>
         <Button type="button" variant="outline" disabled={busy} onClick={sendCode} data-testid="button-reauth-send-code">{sent?'Code sent — resend':'Email a verification code'}</Button>
       </div>}
       <label className="block">{method==='password'?'Current password':method==='totp'?'Authenticator code':'Email code'}<Input autoFocus={!needsCode} disabled={needsCode} aria-label="Verification" type={method==='password'?'password':'text'} inputMode={method==='password'?undefined:'numeric'} autoComplete={method==='password'?'current-password':'one-time-code'} placeholder={needsCode?'Send the code first':undefined} value={value} onChange={e=>setValue(e.target.value)} maxLength={256}/></label>

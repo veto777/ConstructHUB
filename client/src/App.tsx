@@ -1,5 +1,6 @@
 import AgencyPage from "@/pages/agency";
 import GoogleProfilePage from "@/pages/google-profile";
+import InvitePage from "@/pages/invite";
 import { CloudflarePage, SearchConsolePage } from "@/pages/site-connections";
 import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
@@ -168,6 +169,7 @@ function DashboardRouter() {
       <Route path="/agency" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
       <Route path="/google-profile" component={GoogleProfilePage} />
+      <Route path="/invite/:code" component={InvitePage} />
       <Route path="/domains" component={DomainsPage} />
       <Route path="/mail-alerts" component={MailAlertsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
@@ -276,6 +278,7 @@ function PublicRouter() {
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/invite/:code" component={InvitePage} />
       <Route path="/databases" component={Ribboned.DatabasesPage} />
       <Route path="/property" component={Ribboned.PropertyPage} />
       <Route path="/photos" component={Ribboned.PhotosPage} />

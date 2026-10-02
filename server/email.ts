@@ -491,8 +491,16 @@ ${unsubHtml}
 /** Trial codes grant the legacy "platinum" row, whose entitlements are the Agency plan's. */
 export const TRIAL_CODE_PLAN_NAME = PLANS[LEGACY_PLAN_MAP.platinum].name;
 
-export async function sendTrialInviteEmail(to: string, recipientName: string, code: string, trialDays: number, baseUrl: string) {
-  const settingsUrl = `${baseUrl}/settings`;
+/** The one-click invite link: /invite/<code> signs the person in (or up) and activates the trial. */
+export function trialInviteUrl(baseUrl: string, code: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/invite/${encodeURIComponent(code)}`;
+}
+
+const escHtml = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+export async function sendTrialInviteEmail(to: string, recipientNameRaw: string, code: string, trialDays: number, baseUrl: string) {
+  const inviteUrl = trialInviteUrl(baseUrl, code);
+  const recipientName = escHtml(recipientNameRaw.replace(/[\r\n]+/g, " ").slice(0, 120));
   const isUnlimited = trialDays <= 0;
   const durationText = isUnlimited ? "unlimited" : `${trialDays}-day`;
 
@@ -504,21 +512,14 @@ export async function sendTrialInviteEmail(to: string, recipientName: string, co
       "X-Priority": "3",
       "Importance": "Normal",
     },
-    text: `Hi ${recipientName},\n\nYou've been invited to try ConstructHUB with ${isUnlimited ? "an unlimited free trial" : `a ${trialDays}-day free trial`} of our ${TRIAL_CODE_PLAN_NAME} plan.\n\nYour trial code: ${code}\n\nTo activate:\n1. Sign up or log in at ${baseUrl}\n2. Go to Settings > Account\n3. Enter your code: ${code}\n\nThis gives you every tool in the ${TRIAL_CODE_PLAN_NAME} plan, including permit search, Google Business tools, Click Guard, IP Tracker, and more.\n\nThank you,\nConstructHUB Team`,
+    text: `Hi ${recipientNameRaw},\n\nYou've been invited to try ConstructHUB with ${isUnlimited ? "an unlimited free trial" : `a ${trialDays}-day free trial`} of our ${TRIAL_CODE_PLAN_NAME} plan.\n\nAccept your invite: ${inviteUrl}\nSign in or create your account there and the trial starts right away.\n\nYour invite code, if you ever need it: ${code} (Settings > Account > Trial code)\n\nThis gives you every tool in the ${TRIAL_CODE_PLAN_NAME} plan, including permit search, Google Business tools, Click Guard, IP Tracker, and more.\n\nThank you,\nConstructHUB Team`,
     html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;">
 <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
 <p style="color:#111827;font-size:15px;line-height:1.7;margin:0 0 16px;">Hi ${recipientName},</p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 12px;">You've been invited to try <strong>ConstructHUB</strong> with ${isUnlimited ? `<strong>unlimited free access</strong>` : `a <strong>${trialDays}-day free trial</strong>`} of our ${TRIAL_CODE_PLAN_NAME} plan.</p>
-<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">Your trial code:</p>
-<div style="background:#f3f4f6;border:2px dashed #d1d5db;border-radius:8px;padding:16px;text-align:center;margin:0 0 20px;">
-<code style="font-size:20px;font-weight:700;letter-spacing:2px;color:#111827;">${code}</code>
-</div>
-<p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 8px;font-weight:600;">To activate:</p>
-<ol style="color:#374151;font-size:14px;line-height:2;margin:0 0 20px;padding-left:20px;">
-<li>Sign up or log in at <a href="${baseUrl}" style="color:#F97316;text-decoration:none;font-weight:600;">constructhub.us</a></li>
-<li>Go to Settings → Account</li>
-<li>Enter your code above</li>
-</ol>
+<p style="margin:0 0 20px;text-align:center;"><a href="${inviteUrl}" style="display:inline-block;background:#F97316;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:8px;">Accept your invite</a></p>
+<p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 16px;">Sign in or create your account on the page that opens, and your trial starts right away.</p>
+<p style="color:#6b7280;font-size:13px;line-height:1.7;margin:0 0 20px;">Your invite code, if you ever need it: <code style="font-weight:700;letter-spacing:1px;color:#111827;">${code}</code> (Settings → Account → Trial code).</p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">This gives you every tool in the ${TRIAL_CODE_PLAN_NAME} plan, including permit search, Google Business tools, Click Guard, IP Tracker, and more.</p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 4px;">Thank you,</p>
 <p style="color:#111827;font-size:15px;line-height:1.7;margin:0;font-weight:600;">ConstructHUB Team</p>

@@ -36,7 +36,7 @@ import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { db, pool } from "./db";
 import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, reviewTemplates, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
-import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, sendWithFallback, trySend } from "./email";
+import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, trialInviteUrl, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { isPlatformAdmin as isAdmin } from "./admin";
@@ -5577,16 +5577,19 @@ function main() {
         revokedAt: null,
       });
 
+      const inviteUrl = trialInviteUrl(getBaseUrl(req), code);
+      let emailed = false;
       if (recipientEmail) {
         try {
-          const baseUrl = getBaseUrl(req);
-          await sendTrialInviteEmail(recipientEmail, recipientName || "there", code, isUnlimited ? -1 : days, baseUrl);
+          await sendTrialInviteEmail(recipientEmail, recipientName || "there", code, isUnlimited ? -1 : days, getBaseUrl(req));
+          emailed = true;
         } catch (emailErr) {
           console.error("Failed to send trial invite email:", emailErr);
         }
       }
 
-      res.json(betaCode);
+      // `emailed` is the truth about the invite email: the form never says "emailed" when it wasn't.
+      res.json({ ...betaCode, inviteUrl, emailed });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to generate code" });
     }

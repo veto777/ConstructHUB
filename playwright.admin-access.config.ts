@@ -15,7 +15,7 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "admin-access.spec.ts",
+  testMatch: ["admin-access.spec.ts", "trial-invite.spec.ts"],
   workers: 1,
   timeout: 180_000,
   expect: { timeout: 20_000 },

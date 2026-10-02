@@ -492,6 +492,9 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("routes on the real
       expect(r.status, String(trialDays)).toBe(200);
       codes.push(r.body.id);
       expect(r.body.trialDays).toBe(trialDays);
+      // the one-click invite link (owner 2026-10-02); no recipient → nothing emailed, and the answer says so
+      expect(r.body.inviteUrl).toMatch(new RegExp(`/invite/${r.body.code}$`));
+      expect(r.body.emailed).toBe(false);
       if (trialDays) expect(near(r.body.expiresAt, Date.now() + trialDays * DAY, 60_000)).toBe(true);
       else expect(new Date(r.body.expiresAt).getUTCFullYear()).toBe(2099);
     }

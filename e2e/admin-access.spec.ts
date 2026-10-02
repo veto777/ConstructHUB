@@ -167,9 +167,9 @@ test("Settings trial codes: 1–1000 days", async ({ page }) => {
   await expect(page.getByTestId("button-generate-trial")).toBeDisabled();
   await page.getByTestId("button-trial-days-1000").click();
   await expect(page.getByTestId("text-trial-days")).toHaveText("1,000 days");
-  await expect(page.getByTestId("button-generate-trial")).toHaveText("Create 1,000-Day Trial");
+  await expect(page.getByTestId("button-generate-trial")).toHaveText("Create 1,000-Day Trial Invite Link");
   await page.getByTestId("button-generate-trial").click();
-  await expect(page.getByText(/Trial Code Created/).first()).toBeVisible();
+  await expect(page.getByText(/Invite link created/).first()).toBeVisible();
   const [code] = await q<{ id: number; trial_days: number }>(
     "select id, trial_days from beta_access_codes where created_by_user_id = 1 and created_at >= $1 order by id desc limit 1", [startedAt]);
   expect(code.trial_days).toBe(1000);

@@ -745,11 +745,17 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
     },
     onSuccess: async (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/beta-codes"] });
-      const emailMsg = recipientEmail.trim() ? ` and emailed to ${recipientEmail}` : "";
-      const copied = await copyToClipboard(data.code);
-      toast(copied
-        ? { title: "Trial Code Created & Copied!", description: `Code: ${data.code}${emailMsg}` }
-        : { title: "Trial Code Created", description: `Code: ${data.code}${emailMsg}. It couldn't be copied automatically; select it in the list below to copy it.` });
+      const to = recipientEmail.trim();
+      const link: string = typeof data.inviteUrl === "string" ? data.inviteUrl : data.code;
+      const copied = await copyToClipboard(link);
+      const copiedMsg = copied ? " The invite link is copied, so you can also text it." : "";
+      if (to && data.emailed) {
+        toast({ title: `Invite emailed to ${recipientName.trim() || to}`, description: `They click "Accept your invite", sign in or sign up, and the trial starts. Code ${data.code}.${copiedMsg}` });
+      } else if (to) {
+        toast({ title: "Invite created, but the email didn't send", description: `Send them this link yourself: ${link}${copied ? " (copied)" : ""}`, variant: "destructive" });
+      } else {
+        toast({ title: "Invite link created", description: `Send this link: ${link}${copied ? " (copied)" : ""}. Opening it signs them in and starts the trial.` });
+      }
       setRecipientEmail("");
       setRecipientName("");
       setShowCreateForm(false);
@@ -773,9 +779,11 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
     },
   });
 
+  // The invite link, not the bare code: opening it signs the person in (or up) and starts the trial.
   const copyCode = async (code: string) => {
-    if (await copyToClipboard(code)) toast({ title: "Code copied to clipboard" });
-    else toast({ title: "Couldn't copy the code", description: `Your browser blocked clipboard access. Select the code (${code}) and copy it manually.`, variant: "destructive" });
+    const link = `${window.location.origin}/invite/${encodeURIComponent(code)}`;
+    if (await copyToClipboard(link)) toast({ title: "Invite link copied", description: "Send it by text or email. Opening it starts the trial." });
+    else toast({ title: "Couldn't copy the link", description: `Your browser blocked clipboard access. Send this link: ${link}`, variant: "destructive" });
   };
 
   const getTimeRemaining = (expiresAt: string) => {
@@ -946,7 +954,7 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
                 {recipientEmail.trim() && (
                   <p className="text-xs text-violet-600 dark:text-violet-400 flex items-center gap-1">
                     <Mail className="h-3 w-3" />
-                    Trial code will be emailed automatically
+                    They get an invite email with an "Accept your invite" button. One click, sign in or sign up, and the trial starts.
                   </p>
                 )}
                 <Button
@@ -955,7 +963,7 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
                   className="w-full bg-violet-600 hover:bg-violet-700 text-white"
                   data-testid="button-generate-trial"
                 >
-                  {generateMutation.isPending ? "Creating..." : `Create ${unlimited ? "Unlimited " : trialDaysOk ? `${trialDays.toLocaleString("en-US")}-Day ` : ""}Trial${recipientEmail.trim() ? " & Send Email" : ""}`}
+                  {generateMutation.isPending ? "Creating..." : `${recipientEmail.trim() ? "Email" : "Create"} ${unlimited ? "Unlimited " : trialDaysOk ? `${trialDays.toLocaleString("en-US")}-Day ` : ""}Trial Invite${recipientEmail.trim() ? "" : " Link"}`}
                 </Button>
               </div>
             )}
@@ -980,7 +988,7 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-sm font-semibold tracking-wider" data-testid={`text-beta-code-${c.id}`}>{c.code}</code>
-                          <button type="button" onClick={() => copyCode(c.code)} aria-label={`Copy code ${c.code}`} className="text-muted-foreground hover:text-foreground" data-testid={`button-copy-code-${c.id}`}>
+                          <button type="button" onClick={() => copyCode(c.code)} aria-label={`Copy invite link for ${c.code}`} className="text-muted-foreground hover:text-foreground" data-testid={`button-copy-code-${c.id}`}>
                             <Copy className="h-3.5 w-3.5" />
                           </button>
                           <Badge variant="outline" className="text-xs">{c.trialDays === 0 ? "∞" : `${c.trialDays || 2}d`}</Badge>

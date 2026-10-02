@@ -28,7 +28,7 @@ test('owner previews a snapshot, reauthenticates, changes guard mode, approves/r
   await page.getByLabel('Guard mode').selectOption('notify');await page.getByRole('button',{name:'Preview current Google values'}).click();await expect(page.getByText('Approved name',{exact:true})).toBeVisible();
   await expect(page.getByText('Google-only accounts need an authenticator or password configured in Settings.',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();
-  await expect(page.getByRole('dialog')).toContainText('Verification lasts 12 hours');
+  await expect(page.getByRole('dialog')).toContainText('Nothing is sent to anyone else');
   await page.getByRole('button',{name:'Email a verification code'}).click();
   await page.getByLabel('Verification',{exact:true}).fill('123456');
   await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.getByText('Current mode: notify.',{exact:false})).toBeVisible();
