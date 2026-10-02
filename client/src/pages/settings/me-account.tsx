@@ -718,6 +718,7 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
       queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Trial activated", description: data.message });
     },
     onError: (err: any) => {

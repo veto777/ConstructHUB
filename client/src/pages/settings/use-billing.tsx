@@ -29,6 +29,7 @@ export function refreshBilling() {
   void queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription"] });
   void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
   void queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
+  void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
 }
 
 export function useBillingActions() {

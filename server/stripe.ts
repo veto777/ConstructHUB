@@ -29,6 +29,7 @@ import {
 import { fulfilOneTimePurchase } from "./billing/fulfilment";
 import { stripeConfigured } from "./billing/client";
 import { onStripeBillingEvent } from "./account/billing-emails";
+import { forgetDashboard } from "./dashboard/cache";
 
 export { PaymentsNotConfiguredError };
 
@@ -300,7 +301,7 @@ export function registerStripeRoutes(app: Express) {
       if (!(await recentAuthOk(req, res))) return;
 
       await billingSchemaReady();
-      res.json(await withBillingLock(user.id, async () => {
+      const changed = await withBillingLock(user.id, async () => {
         const { row, sub, current } = await liveSubscription(user.id);
         const order = parsePlanOrder(req.body ?? {}, {
           interval: current.interval,
@@ -308,7 +309,10 @@ export function registerStripeRoutes(app: Express) {
           agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
         });
         return applyToSubscription(user.id, row, sub, current, order);
-      }));
+      });
+      // The plan (and its locks) changed in place: the dashboard rebuilds on the next load.
+      forgetDashboard(user.id);
+      res.json(changed);
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -331,7 +335,7 @@ export function registerStripeRoutes(app: Express) {
       if (!(await recentAuthOk(req, res))) return;
 
       await billingSchemaReady();
-      res.json(await withBillingLock(user.id, async () => {
+      const changed = await withBillingLock(user.id, async () => {
         const { row, sub, current } = await liveSubscription(user.id);
         if (!current.plan || !current.interval) {
           throw new BillingRequestError(409,
@@ -347,7 +351,10 @@ export function registerStripeRoutes(app: Express) {
           agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
         };
         return applyToSubscription(user.id, row, sub, current, order);
-      }));
+      });
+      // Add-ons change allowances (texts, sites): the dashboard rebuilds on the next load.
+      forgetDashboard(user.id);
+      res.json(changed);
     } catch (err: any) {
       sendStripeError(res, err);
     }
@@ -734,6 +741,8 @@ export function registerStripeRoutes(app: Express) {
         throw handlerErr;
       }
 
+      // Whatever the event changed (plan, status, renewal, invoices), the dashboard rebuilds.
+      forgetDashboard(eventUserId);
       if (event.id && eventUserId) {
         await attributeBillingEvent(event.id, eventUserId).catch((e: any) => console.error("[billing] could not attribute event:", e?.message || e));
       }

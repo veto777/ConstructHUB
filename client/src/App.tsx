@@ -602,7 +602,8 @@ function AppContent() {
             <div className="flex-1">
               <DashboardRouter />
             </div>
-            <footer className="border-t border-border/30 py-3 px-4 text-center text-xs text-muted-foreground" data-testid="footer-dashboard">
+            {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
+            <footer className="border-t border-border/30 pt-3 pb-20 sm:pb-3 px-4 text-center text-xs text-muted-foreground" data-testid="footer-dashboard">
               <a href="mailto:support@constructhub.us" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-email">support@constructhub.us</a>
               <span className="mx-2 text-border">&middot;</span>
               <a href="/terms" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-terms">Terms</a>
