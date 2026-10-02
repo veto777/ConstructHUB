@@ -498,6 +498,8 @@ The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstat
 
 **Invoices:** convert an approved estimate into an invoice, send it with a secure payment link, record payments and give receipts (marked PAID IN FULL when settled). Filter by status to chase overdue invoices.
 
+**AI Call Assistant (add-on, coming soon — not for sale yet):** an AI receptionist on the contractor's own local number. It answers 24/7 in a voice and name the contractor picks (it says it is a virtual assistant when asked), asks what the caller needs, the property address, a first name, confirms the callback number, asks for a good email and the best time to call, then files the lead in the CRM (Clients + Pipeline) and notifies the office. Emergencies, existing customers and "I want a person" are texted or emailed to the teammate the contractor chose, with reminders until they reply. Telemarketers are screened and a repeat spam number is blocked before it is answered. Every call is logged under CRM → **Call Assistant** with outcome, summary, transcript and recording. The contractor sets it up in the **Agent Studio** (company, services and what it doesn't do, service area by county, credibility, offers, policies, persona and greeting, the questions to ask, FAQ, escalations, lead delivery) and can try it in a text **Simulator** before going live; existing phone lines are forwarded to the new number, so nothing is ported. Price and availability: see the add-ons in section 3; until it is for sale, say it is coming and do not promise a date.
+
 **Payments:**
 1. CRM → **Payments** → connect your own Stripe account (Stripe Connect). Money goes straight to your Stripe account; ConstructHUB never holds it.
 2. In Settings choose card, bank transfer (ACH) or both, optionally make large payments ACH-only above an amount you set, and optionally pass the card fee to the client as a clearly labeled line. The page shows Stripe's standard processing rates.
@@ -592,6 +594,7 @@ For contractors who'd rather have the work done for them. Every one of these is 
 - **Is Blotato included?** No. It's a separate subscription you buy from Blotato.
 - **Which plan should I pick?** One profile and the basics: the cheapest plan. Click-fraud protection, Competitor Intel, texting and auto-published AI replies: the plans listed for those features in section 3. Several locations and a bigger team: the plan with more locations and seats. An agency managing many clients: {{AGENCY_PLAN}}. Compare them on Pricing → Compare plans.
 - **Who else uses ConstructHUB?** That isn't something you can share. Talk about features instead.
+- **Can ConstructHUB answer my phone?** The AI Call Assistant add-on (section 24) is coming soon and is not for sale yet; it answers calls on a local number, files the lead in the CRM and pages the right person. No launch date is promised.
 
 ## 29. Glossary
 

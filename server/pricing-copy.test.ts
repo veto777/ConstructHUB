@@ -104,9 +104,14 @@ describe("AI assistant prompts use the price book", () => {
   }
 
   it("hub assistant quotes no service at or above the sales threshold", () => {
-    // The only amounts of $1,000 or more it may state are annual plan prices
-    // and the threshold itself ("priced at $1,000 or more").
-    const planAnnual = new Set([...PLAN_KEYS.map((k) => PLANS[k].annualCents), SALES_THRESHOLD_CENTS]);
+    // The only amounts of $1,000 or more it may state are annual plan and
+    // add-on prices (10 × a listed monthly price) and the threshold itself
+    // ("priced at $1,000 or more").
+    const planAnnual = new Set([
+      ...PLAN_KEYS.map((k) => PLANS[k].annualCents),
+      ...Object.values(ADDONS).map((a) => a.annualCents),
+      SALES_THRESHOLD_CENTS,
+    ]);
     const text = HUB_TEXT;
     const overThreshold = dollarAmounts(text).filter((c) => c >= SALES_THRESHOLD_CENTS && !planAnnual.has(c));
     expect(overThreshold.map(formatUsd)).toEqual([]);

@@ -255,7 +255,7 @@ export async function registerRoutes(
           plan: ent.plan, storedPlan: ent.storedPlan, accessPlan: ent.accessPlan,
           planName: ent.accessPlan ? PLANS[ent.accessPlan].name : null,
           isPlatformAdmin: ent.isPlatformAdmin, grantEndsAt: ent.grantEndsAt,
-          limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addons: ent.addons,
+          limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, addons: ent.addons,
           locations: { used: locations, limit: ent.allowances?.locations ?? 0 },
           usage, resetsAt: resetsAt(),
         });
@@ -372,6 +372,18 @@ export async function registerRoutes(
     registerAnalyticsRoutes(app, getDevUser);
   } catch (e: any) {
     console.error("Failed to initialize CRM module:", e?.message || e);
+  }
+
+  // AI Call Assistant (docs/call-assistant/SPEC.md): org-scoped voice tables,
+  // the CRM routes under /api/crm/voice/* and the engine's internal API under
+  // /api/voice-internal/*. The engine itself is the Python service in voice/.
+  try {
+    const { ensureVoiceSchema } = await import("./voice/schema");
+    await ensureVoiceSchema();
+    const { registerVoiceRoutes } = await import("./voice");
+    registerVoiceRoutes(app, getDevUser);
+  } catch (e: any) {
+    console.error("Failed to initialize the Call Assistant module:", e?.message || e);
   }
 
   // Google Local Services Ads (multi-tenant LSA lead system).

@@ -5,7 +5,7 @@
  */
 import {
   Search, Database, Building2, Camera, Eye, Grid3X3, Shield,
-  ShieldOff, Fingerprint, Crosshair, GraduationCap, Megaphone,
+  ShieldOff, Fingerprint, Crosshair, GraduationCap, Megaphone, Phone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
@@ -123,3 +123,20 @@ const TOOLS: ToolShowcase[] = [
 export const GROWTH_TOOLS: ToolShowcase[] = TOOLS.filter(
   (tool) => SHOW_COMPETITOR_INTEL || tool.title !== "Competitor Intelligence",
 );
+
+/**
+ * Tools announced but not shipped. Shown on the home dashboard under their
+ * own "Coming soon" heading and NEVER counted in "N Pro Tools" — a tool that
+ * can't be used yet is not built in. Move an entry into TOOLS when it ships.
+ */
+export const UPCOMING_TOOLS: ToolShowcase[] = [
+  {
+    title: "AI Call Assistant",
+    tagline: "Every call answered, every lead filed",
+    description: "An AI receptionist on your own local number answers 24/7 in a voice and name you pick, asks what the caller needs, the address, a name, a good email and the best time to call, then files the lead in your CRM. Emergencies and \"I want a person\" page the right teammate by text; telemarketers get screened. Every call is logged with a summary, transcript and recording.",
+    whyItMatters: "A missed call is a job that goes to the next contractor on the list. Most calls come in while you are on a roof or in a crawlspace; this answers them the way your best office manager would, and you read the lead before you call back.",
+    icon: Phone,
+    url: "/crm-app",
+    stats: "Add-on · coming soon",
+  },
+];

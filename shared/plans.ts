@@ -190,7 +190,7 @@ export function agencyMonthlyCents(locations: number): number | null {
   return cents;
 }
 
-export type AddonKey = "extra_location" | "extra_seat" | "protected_site" | "texting_number" | "competitor_pack";
+export type AddonKey = "extra_location" | "extra_seat" | "protected_site" | "texting_number" | "competitor_pack" | "call_assistant" | "call_number";
 export type Addon = {
   key: AddonKey;
   name: string;
@@ -206,6 +206,14 @@ export type Addon = {
    * texting gate is the plan's own.
    */
   grants: Partial<Record<CountLimitKey, number>>;
+  /**
+   * Listed on the pricing page as "coming soon" and refused at checkout
+   * (server/billing/order.ts) until the owner confirms the price and the
+   * feature ships. Drop the flag to start selling it.
+   */
+  preview?: boolean;
+  /** An add-on that only makes sense on top of another one (call_number needs call_assistant). */
+  requires?: AddonKey;
 };
 export const ADDONS: Record<AddonKey, Addon> = {
   extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location (10+ locations: Agency).", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "pro", "growth"], grants: { locations: 1 } },
@@ -213,7 +221,46 @@ export const ADDONS: Record<AddonKey, Addon> = {
   protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["pro", "growth", "agency"], grants: { protectedSites: 1 } },
   texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier: 500 texts / month, then $0.02 each.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"], grants: { competitorScans: 10 } },
+  // ── Call Assistant (docs/call-assistant/SPEC.md) ─────────────────────────
+  // PLACEHOLDER PRICING — the owner has not confirmed these numbers. Both
+  // add-ons stay `preview` (listed, not sellable) until they do. Owned by the
+  // numbers+billing lane after the skeleton (docs/call-assistant/LANES.md).
+  call_assistant: {
+    key: "call_assistant", name: "AI Call Assistant",
+    description: "An AI receptionist that answers your phone 24/7, fills in the lead for your CRM and texts the right person. Includes 1 local number and 500 call minutes / month, then $0.15 / minute.",
+    monthlyCents: 24900, annualCents: 249000, availableOn: ["pro", "growth", "agency"], grants: {}, preview: true,
+  },
+  call_number: {
+    key: "call_number", name: "Extra Call Assistant number",
+    description: "One more local number for the AI Call Assistant (a second location or a tracking line).",
+    monthlyCents: 500, annualCents: 5000, availableOn: ["pro", "growth", "agency"], grants: {}, preview: true, requires: "call_assistant",
+  },
 };
+
+/** Call Assistant allowance per `call_assistant` unit (PLACEHOLDER — owner to confirm). */
+export const CALL_ASSISTANT_INCLUDED_MINUTES = 500;
+export const CALL_ASSISTANT_INCLUDED_NUMBERS = 1;
+/** Metered minutes above the included allowance, in cents per minute (PLACEHOLDER). */
+export const CALL_MINUTE_OVERAGE_CENTS = 15;
+/** SignalWire keeps a purchased number for at least this long before it can be released. */
+export const CALL_NUMBER_MIN_DAYS = 14;
+
+/**
+ * Modules unlocked by BUYING an add-on rather than by the plan alone. The plan
+ * only decides whether the add-on is for sale (`availableOn`); the entitlement
+ * (server/entitlements.ts `addonModules`) is on when the add-on is on the
+ * subscription. `requireModule("callAssistant")` gates the routes.
+ */
+export type AddonModuleKey = "callAssistant";
+export const ADDON_MODULES: Record<AddonModuleKey, AddonKey> = { callAssistant: "call_assistant" };
+export const ADDON_MODULE_NAMES: Record<AddonModuleKey, string> = { callAssistant: "AI Call Assistant" };
+/** A plan-level module or an add-on module — what requireModule accepts. */
+export type AnyModuleKey = ModuleKey | AddonModuleKey;
+export const isAddonModule = (module: AnyModuleKey): module is AddonModuleKey => module in ADDON_MODULES;
+/** The human name of any module, for upgrade prompts. */
+export function moduleName(module: AnyModuleKey): string {
+  return isAddonModule(module) ? ADDON_MODULE_NAMES[module] : MODULE_NAMES[module];
+}
 
 export const TRIAL_DAYS = 1;
 /** GBP Reinstatement service, per project (one price for the page, the cards and the Hub assistant). */
@@ -249,8 +296,12 @@ export function effectivePlanKey(sub: { plan?: string | null; status?: string | 
   return LEGACY_PLAN_MAP[sub.plan] ?? null;
 }
 
-/** The cheapest plan that includes a module (for upgrade prompts). */
-export function planForModule(module: ModuleKey): PlanKey {
+/**
+ * The cheapest plan that includes a module (for upgrade prompts). For an
+ * add-on module it is the cheapest plan the add-on is sold on.
+ */
+export function planForModule(module: AnyModuleKey): PlanKey {
+  if (isAddonModule(module)) return ADDONS[ADDON_MODULES[module]].availableOn[0] ?? "agency";
   return PLAN_KEYS.find((k) => PLANS[k].modules[module]) ?? "agency";
 }
 

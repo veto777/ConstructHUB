@@ -116,6 +116,13 @@ const services = [
     title: "Contractor CRM",
     description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — included with every plan.",
   },
+  {
+    icon: Phone,
+    title: "AI Call Assistant (coming soon)",
+    description: "An AI receptionist on your own local number answers 24/7, asks the right questions, files the lead in your CRM and pages the right person for emergencies. Every call logged with transcript and recording. Sold as an add-on.",
+    gradient: "from-orange-500/20 to-amber-500/20",
+    border: "border-orange-500/20",
+  },
 ];
 
 const COVERAGE_STATES = [

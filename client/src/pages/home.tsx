@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Database, Zap, Globe, Target, MapPin, ChevronRight, Crown, Award,
 } from "lucide-react";
-import { GROWTH_TOOLS } from "@/lib/growth-tools";
+import { GROWTH_TOOLS, UPCOMING_TOOLS, type ToolShowcase } from "@/lib/growth-tools";
 import { formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
 import { PLANS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, STARTING_MONTHLY_CENTS, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
@@ -58,6 +58,48 @@ function FloatingParticles({ color = "#d4d4d8" }: { color?: string }) {
     return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
   }, [color]);
   return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />;
+}
+
+/** One toolkit card. An upcoming tool is the same card without the "go there" affordances. */
+function ToolCard({ tool, upcoming = false }: { tool: ToolShowcase; upcoming?: boolean }) {
+  return (
+    <Card className={`group border-border/50 transition-all ${upcoming ? "border-dashed" : "hover:border-border hover:shadow-md cursor-pointer"}`}>
+      <CardContent className="p-0">
+        <div className="flex flex-col lg:flex-row">
+          <div className="flex-1 p-6 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-muted border border-border/50">
+                <tool.icon className="w-6 h-6 text-[#4A6CF7]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-lg font-bold">{tool.title}</h3>
+                  {tool.stats && (
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                      {tool.stats}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm font-semibold text-[#4A6CF7]">{tool.tagline}</p>
+              </div>
+              {!upcoming && <ChevronRight className="w-5 h-5 text-muted-foreground/40 group-hover:text-foreground transition-colors shrink-0 mt-1 hidden sm:block" />}
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">{tool.description}</p>
+          </div>
+
+          <div className="lg:w-[380px] shrink-0 p-5 lg:p-6 border-t lg:border-t-0 lg:border-l border-border/30 bg-muted/30 rounded-b-xl lg:rounded-b-none lg:rounded-r-xl">
+            <div className="flex items-start gap-2">
+              <Target className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" />
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Why This Is a Game Changer</span>
+                <p className="text-sm mt-1 leading-relaxed">{tool.whyItMatters}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function HomePage() {
@@ -112,48 +154,28 @@ export default function HomePage() {
         <div className="space-y-5">
           {GROWTH_TOOLS.map((tool, index) => (
             <Link key={tool.title} href={tool.url} className="block no-underline" data-testid={`card-tool-${index}`}>
-            <Card
-              className="group border-border/50 hover:border-border transition-all hover:shadow-md cursor-pointer"
-            >
-              <CardContent className="p-0">
-                <div className="flex flex-col lg:flex-row">
-                  <div className="flex-1 p-6 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-muted border border-border/50">
-                        <tool.icon className="w-6 h-6 text-[#4A6CF7]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-lg font-bold">{tool.title}</h3>
-                          {tool.stats && (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                              {tool.stats}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm font-semibold text-[#4A6CF7]">{tool.tagline}</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground/40 group-hover:text-foreground transition-colors shrink-0 mt-1 hidden sm:block" />
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{tool.description}</p>
-                  </div>
-
-                  <div className="lg:w-[380px] shrink-0 p-5 lg:p-6 border-t lg:border-t-0 lg:border-l border-border/30 bg-muted/30 rounded-b-xl lg:rounded-b-none lg:rounded-r-xl">
-                    <div className="flex items-start gap-2">
-                      <Target className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" />
-                      <div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Why This Is a Game Changer</span>
-                        <p className="text-sm mt-1 leading-relaxed">{tool.whyItMatters}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <ToolCard tool={tool} />
             </Link>
           ))}
         </div>
       </div>
+
+      {UPCOMING_TOOLS.length > 0 && (
+        <div className="space-y-6 relative z-10" data-testid="section-upcoming-tools">
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <h2 className="text-xl font-bold whitespace-nowrap" data-testid="text-upcoming-heading">Coming Soon</h2>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <div className="space-y-5">
+            {UPCOMING_TOOLS.map((tool, index) => (
+              <div key={tool.title} data-testid={`card-upcoming-tool-${index}`}>
+                <ToolCard tool={tool} upcoming />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Card className="border-border/50 relative z-10" data-testid="card-bottom-cta">
         <CardContent className="p-8 text-center space-y-4">

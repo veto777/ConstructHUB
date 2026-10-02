@@ -60,6 +60,7 @@ import CrmJoinPage from "@/pages/crm-join";
 import CrmHomePage from "@/pages/crm-home";
 import CrmSchedulePage from "@/pages/crm-schedule";
 import CrmInboxPage from "@/pages/crm-inbox";
+import CrmCallAssistantPage from "@/pages/crm-call-assistant";
 import CrmClientsPage from "@/pages/crm-clients";
 import CrmClientPage from "@/pages/crm-client";
 import CrmPaymentsPage from "@/pages/crm-payments";
@@ -301,6 +302,7 @@ function PortalRouter() {
       <Route path="/crm/clients/:id" component={CrmClientPage} />
       <Route path="/crm/schedule" component={CrmSchedulePage} />
       <Route path="/crm/inbox" component={CrmInboxPage} />
+      <Route path="/crm/call-assistant" component={CrmCallAssistantPage} />
       <Route path="/crm/pipeline" component={CrmPipelinePage} />
       <Route path="/crm/estimates/new" component={CrmEstimateNewPage} />
       <Route path="/crm/estimates/:id" component={CrmEstimateDetailPage} />
@@ -497,6 +499,7 @@ function AppContent() {
       location.startsWith("/crm/clients") ? "Clients" :
       location.startsWith("/crm/schedule") ? "Schedule" :
       location.startsWith("/crm/inbox") ? "Messages" :
+      location.startsWith("/crm/call-assistant") ? "Call Assistant" :
       location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
       location.startsWith("/crm/pricebook") ? "Price book" :
       location.startsWith("/crm/estimates") ? "Estimates" :

@@ -37,3 +37,12 @@ playwright-report/
 
 # Business documents (EIN, filings) — never commit, never push to GitHub.
 private/
+
+# Call Assistant engine (voice/): its own env + venv + models + recordings
+voice/.env
+voice/.venv/
+voice/recordings/
+voice/models/
+voice/__pycache__/
+voice/**/__pycache__/
+client/public/voice/samples/*.wav

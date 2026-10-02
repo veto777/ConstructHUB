@@ -12,6 +12,11 @@ import { registerInboundMail } from "./mail-alerts/inbound";
 registerInboundMail(app);
 import { registerPrivateIntegrationParsers } from "./domains/private-http";
 registerPrivateIntegrationParsers(app);
+// SignalWire reaches the Call Assistant engine (voice/, on the tower GPU)
+// through this app: /voice/* is proxied raw — before any body parser — to
+// VOICE_ENGINE_URL, including the media-stream WebSocket upgrade.
+import { registerVoiceProxy } from "./voice/proxy";
+registerVoiceProxy(app, httpServer);
 // An account API key (chub_…) authenticates ONLY /api/v1: anywhere else it is
 // refused before any parser or handler runs (the AI routes included).
 import { isPublicApiPath, rejectApiKeysOutsidePublicApi } from "./public-api/guard";
