@@ -9,6 +9,18 @@
  * delegation (requestAccess) only turns the pages the owner shares with them
  * from "locked" into an "Open" link (aggregate.ts → DELEGATED_TILES).
  *
+ * Per-user preferences (prefs.ts, shared/dashboard-prefs.ts), all session
+ * routes scoped to the signed-in user; the writes need JSON and an Origin that
+ * is one of our hosts (the same rule as the Hub's POSTs):
+ *   PUT    /api/dashboard/layout                 save tile order/visibility, sections, grouping
+ *   DELETE /api/dashboard/layout                 back to the default
+ *   PUT    /api/dashboard/dismissals             clear or snooze "Needs you today" items ({ items, scope })
+ *   DELETE /api/dashboard/dismissals[/:key]      restore one, or every cleared item (?scope=)
+ * `scope` is the payload's CRM org: a CRM item's clear holds in that org only.
+ * A layout change forgets the user's cached dashboard. Cleared items are
+ * applied to every answer, cached or not, from a fresh read: clearing never
+ * waits on the cache.
+ *
  * ?fresh=1 (the Refresh button) skips the cache at most once every 10 s per
  * user. ?fixture=full|new|noplan answers the skeleton's SAMPLE payload
  * (`fixture: true`) for client-shape tests — development only, never in
@@ -16,17 +28,68 @@
  */
 import type { Express, Request, Response } from "express";
 import type { DashboardPayload } from "@shared/dashboard";
-import { buildDashboardFixture, DASHBOARD_FIXTURE_SCENARIOS, type DashboardFixtureScenario } from "./fixture";
+import {
+  DASHBOARD_DISMISS_KEY_RE, defaultDashboardLayout, isDefaultDashboardLayout,
+  parseDashboardLayoutInput, parseDismissInput, parseDismissScope, splitAttention,
+} from "@shared/dashboard-prefs";
+import { applyLayoutToFixture, buildDashboardFixture, DASHBOARD_FIXTURE_SCENARIOS, type DashboardFixtureScenario } from "./fixture";
 import { buildDashboard, type BuiltDashboard } from "./aggregate";
-import { dashboardCache } from "./cache";
+import { dashboardCache, forgetDashboard } from "./cache";
 import { requestAccess } from "../agency/routes";
+import { originOk } from "../hub/access";
 import { dq } from "./pool";
+import {
+  deleteDashboardDismissals, forgetStaleDismissals, readDashboardDismissals, readDashboardLayout, resetDashboardLayout,
+  saveDashboardDismissals, saveDashboardLayout,
+} from "./prefs";
 
 type GetUser = (req: Request, res: Response) => { id: number; displayName?: string | null } | null;
 
 export { dashboardCache };
 /** One build per cache key at a time: concurrent loads share it. */
 const inflight = new Map<string, Promise<BuiltDashboard>>();
+
+/** A saved layout: drop the cached answers and any build that started under the old one. */
+function forgetLayout(userId: number): void {
+  forgetDashboard(userId);
+  const prefix = `${userId}:`;
+  for (const key of Array.from(inflight.keys())) if (key.startsWith(prefix)) inflight.delete(key);
+}
+
+/**
+ * The answer as this user sees it now: the cleared/snoozed items taken out of
+ * "Needs you today" (read fresh, so the cache never shows a cleared item).
+ * Dismissals that no longer hold (the value changed, the snooze ended, the
+ * item left a source that answered in full) are forgotten: those exact rows only.
+ */
+async function withDismissals(userId: number, payload: DashboardPayload): Promise<DashboardPayload> {
+  const now = new Date();
+  const { attention, cleared, stale } = splitAttention(payload.attention, await readDashboardDismissals(userId), now, {
+    scope: payload.scope, answered: payload.answered, builtAt: new Date(payload.generatedAt),
+  });
+  if (stale.length) {
+    forgetStaleDismissals(userId, stale).catch((err) => console.error("[dashboard] dismissal cleanup failed:", err instanceof Error ? err.message : err));
+  }
+  return { ...payload, attention, cleared };
+}
+
+/** ?scope= on a restore: absent → every row; present → as seen in that CRM org; malformed → null (400). */
+function restoreScope(req: Request): string | undefined | null {
+  if (req.query.scope === undefined) return undefined;
+  return parseDismissScope(req.query.scope) ?? null;
+}
+
+/** State-changing requests: our own pages only (Origin), JSON bodies where there is one. */
+function writeGuard(req: Request, res: Response, body: boolean): boolean {
+  if (body && !req.is("application/json")) { res.status(415).json({ message: "Send JSON." }); return false; }
+  if (!originOk(req)) { res.status(403).json({ message: "Forbidden" }); return false; }
+  return true;
+}
+
+const failed = (res: Response, what: string) => (err: unknown) => {
+  console.error(`[dashboard] ${what} failed:`, err instanceof Error ? err.message : err);
+  if (!res.headersSent) res.status(500).json({ message: "Could not save that. Please try again." });
+};
 
 export function registerDashboardRoutes(app: Express, getUser: GetUser): void {
   app.get("/api/dashboard", async (req, res) => {
@@ -38,7 +101,8 @@ export function registerDashboardRoutes(app: Express, getUser: GetUser): void {
     const asked = req.query.fixture;
     if (asked !== undefined && process.env.NODE_ENV !== "production") {
       const scenario = DASHBOARD_FIXTURE_SCENARIOS.includes(String(asked) as DashboardFixtureScenario) ? String(asked) as DashboardFixtureScenario : "full";
-      return void res.json(buildDashboardFixture(scenario, { displayName: user.displayName }));
+      const sample = applyLayoutToFixture(buildDashboardFixture(scenario, { displayName: user.displayName }), await readDashboardLayout(user.id));
+      return void res.json(await withDismissals(user.id, sample));
     }
 
     const activeOrgId: string | null = (req as any).session?.activeOrgId ?? null;
@@ -48,7 +112,7 @@ export function registerDashboardRoutes(app: Express, getUser: GetUser): void {
     const fresh = req.query.fresh === "1" || req.query.fresh === "true";
     if (!fresh || !dashboardCache.allowFresh(user.id)) {
       const hit = dashboardCache.get(user.id, scope);
-      if (hit) return void res.json({ ...hit, cached: true } satisfies DashboardPayload);
+      if (hit) return void res.json(await withDismissals(user.id, { ...hit, cached: true } satisfies DashboardPayload));
     }
 
     const key = dashboardCache.keyOf(user.id, scope);
@@ -60,11 +124,75 @@ export function registerDashboardRoutes(app: Express, getUser: GetUser): void {
       }
       const built = await build;
       if (built.cacheable) dashboardCache.set(user.id, scope, built.payload);
-      res.json(built.payload);
+      res.json(await withDismissals(user.id, built.payload));
     } catch (err) {
       console.error("[dashboard] build failed:", err instanceof Error ? err.message : err);
       if (!res.headersSent) res.status(500).json({ message: "Could not load your dashboard. Please try again." });
     }
+  });
+
+  // ── Layout ──────────────────────────────────────────────────────────────
+  app.put("/api/dashboard/layout", async (req, res) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    if (!writeGuard(req, res, true)) return;
+    const parsed = parseDashboardLayoutInput(req.body?.layout);
+    if (!parsed.ok) return void res.status(400).json({ message: parsed.message });
+    try {
+      // The default layout is stored as no row at all.
+      if (isDefaultDashboardLayout(parsed.layout)) await resetDashboardLayout(user.id);
+      else await saveDashboardLayout(user.id, parsed.layout);
+      forgetLayout(user.id);
+      res.json({ layout: parsed.layout });
+    } catch (err) { failed(res, "layout save")(err); }
+  });
+
+  app.delete("/api/dashboard/layout", async (req, res) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    if (!writeGuard(req, res, false)) return;
+    try {
+      await resetDashboardLayout(user.id);
+      forgetLayout(user.id);
+      res.json({ layout: defaultDashboardLayout() });
+    } catch (err) { failed(res, "layout reset")(err); }
+  });
+
+  // ── Cleared / snoozed "Needs you today" items ───────────────────────────
+  app.put("/api/dashboard/dismissals", async (req, res) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    if (!writeGuard(req, res, true)) return;
+    const parsed = parseDismissInput(req.body, new Date());
+    if (!parsed.ok) return void res.status(400).json({ message: parsed.message });
+    try {
+      await saveDashboardDismissals(user.id, parsed.items);
+      res.json({ ok: true, cleared: parsed.items.length });
+    } catch (err) { failed(res, "dismissal save")(err); }
+  });
+
+  app.delete("/api/dashboard/dismissals", async (req, res) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    if (!writeGuard(req, res, false)) return;
+    const scope = restoreScope(req);
+    if (scope === null) return void res.status(400).json({ message: "Unknown scope." });
+    try {
+      res.json({ ok: true, restored: await deleteDashboardDismissals(user.id, null, scope) });
+    } catch (err) { failed(res, "dismissal restore")(err); }
+  });
+
+  app.delete("/api/dashboard/dismissals/:key", async (req, res) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    if (!writeGuard(req, res, false)) return;
+    const key = String(req.params.key);
+    if (!DASHBOARD_DISMISS_KEY_RE.test(key)) return void res.status(400).json({ message: "Unknown item." });
+    const scope = restoreScope(req);
+    if (scope === null) return void res.status(400).json({ message: "Unknown scope." });
+    try {
+      res.json({ ok: true, restored: await deleteDashboardDismissals(user.id, [key], scope) });
+    } catch (err) { failed(res, "dismissal restore")(err); }
   });
 }
 

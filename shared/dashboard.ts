@@ -9,6 +9,7 @@
  * estimated, never sample data outside `fixture: true`.
  */
 import type { AddonKey, ModuleKey, PlanKey } from "./plans";
+import type { DashboardClearedItem, DashboardHiddenTile, DashboardLayout } from "./dashboard-prefs";
 
 // ---------------------------------------------------------------------------
 // Groups and tiles
@@ -271,12 +272,41 @@ export type DashboardPayload = {
   /** True only for the skeleton's sample payload; the client shows a "Sample data" badge. */
   fixture: boolean;
   account: DashboardAccount;
-  /** Every tile in DASHBOARD_TILES order (flagged-off tiles included; the client drops them). */
+  /**
+   * Every tile the user shows, in their layout's order (DASHBOARD_TILES order
+   * by default). Flagged-off tiles included; the client drops them. Tiles the
+   * user hid leave this list (they are in `hiddenTiles`), but are still
+   * computed for "Needs you today".
+   */
   tiles: DashboardTile[];
+  /**
+   * "Needs you today" (dashboardAttention over every tile, shown or hidden,
+   * + `account`), minus the items the user cleared or snoozed. Computed by the server.
+   */
+  attention: DashboardAttentionItem[];
+  /** Cleared or snoozed items that still hold (same value, snooze not over): "Show cleared (N)". */
+  cleared: DashboardClearedItem[];
+  /** The user's layout (shared/dashboard-prefs.ts), complete and valid; the default when never customized. */
+  layout: DashboardLayout;
+  /** Tiles the user hid: plan access only, no numbers (the Customize sheet lists them). */
+  hiddenTiles: DashboardHiddenTile[];
   /** Getting-started steps that apply to this plan; the card hides when every one is done. */
   checklist: DashboardChecklistItem[];
   /** Newest first, at most 12. */
   recent: DashboardRecentItem[];
+  /**
+   * Optional (added with clear/snooze). The CRM org the CRM items (crm.*,
+   * crmLeads.*, crmSchedule.*, texting.*) describe: clearing one of them holds
+   * in this org only. Absent when no CRM org was read.
+   */
+  scope?: string;
+  /**
+   * Optional (added with clear/snooze). The item sources that answered in full
+   * on this build (tile keys with status ok/empty, "usage", "notifications",
+   * "billing"): an item missing from one of these is really gone, so its old
+   * clear is forgotten. Absent on the sample payload.
+   */
+  answered?: string[];
 };
 
 /** Per-tile time budget on the server. */
