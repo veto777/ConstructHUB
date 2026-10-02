@@ -5,7 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Bug,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
@@ -401,6 +401,13 @@ export function AppSidebar() {
     queryKey: ["/api/agency/me"],
     enabled: !!user,
   });
+  // The issue desk's badge: issues nobody has looked at yet (403 until the admin sign-in passes — then no count).
+  const { data: issueSummary } = useQuery<{ new: number; fixReady: number }>({
+    queryKey: ["/api/admin/issues/summary"],
+    enabled: user?.isPlatformAdmin === true,
+    refetchInterval: 60_000,
+  });
+  const newIssues = issueSummary?.new ?? 0;
   const planBadgeFor: PlanBadgeFor = (url) => {
     const module = MODULE_BY_URL[url];
     if (!module || !user) return null;
@@ -523,6 +530,26 @@ export function AppSidebar() {
                       <KeyRound className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Access grants</span>
                       <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* The issue desk: captured failures and Claude's reports on them; the count is issues still new. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/issues"}>
+                    <Link href="/admin/issues" data-testid="link-nav-admin-issues" className="flex items-center gap-2 w-full">
+                      <Bug className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-red-500" />
+                      <span>Issues</span>
+                      <span className="ml-auto flex shrink-0 items-center gap-1">
+                        {newIssues > 0 && (
+                          <span className="min-w-[1.25rem] rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums text-primary-foreground"
+                            aria-label={`${newIssues} new`} data-testid="badge-nav-issues-new">
+                            {newIssues > 99 ? "99+" : newIssues}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
+                      </span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

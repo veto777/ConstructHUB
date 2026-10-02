@@ -20,6 +20,7 @@ import { oauthBaseUrl } from '../site-context';
 import { GBP_SCOPE, GoogleError, METRICS } from './client';
 import { grantStatus, saveGrant, purgeGoogleData } from './grants';
 import { discoverAll, importLocations, syncLocation, reply, publicError, autoLinkAndSync, unlinkLocation } from './service';
+import { recordFailure } from '../ops/issues';
 declare module 'express-session' { interface SessionData { gbpOAuth?: {state:string;userId:number;expires:number;redirect:string} } }
 export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, options: { http?: typeof fetch; afterConnect?: (userId: number, subject: string) => Promise<unknown> } = {}) {
   app.use(['/api/gbp/connect', '/api/gbp/disconnect'], rateLimit('google-connections',10,30));
@@ -52,7 +53,7 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
       await saveGrant(userId,who,tokens);
       await connectionAlert(req,userId,'google.connected',who);
       // Fill the Locations pages without further clicks; failures show per location in sync status.
-      void (options.afterConnect ?? (async(userId:number,subject:string)=>{await pool.query(`INSERT INTO agency_poll_grants(user_id,subject,next_at,refresh_requested) VALUES($1,$2,now(),true) ON CONFLICT(user_id,subject) DO UPDATE SET next_at=now(),refresh_requested=true`,[userId,subject]);}))(userId,who.sub).catch(()=>console.error('GBP discovery queue failed'));
+      void (options.afterConnect ?? (async(userId:number,subject:string)=>{await pool.query(`INSERT INTO agency_poll_grants(user_id,subject,next_at,refresh_requested) VALUES($1,$2,now(),true) ON CONFLICT(user_id,subject) DO UPDATE SET next_at=now(),refresh_requested=true`,[userId,subject]);}))(userId,who.sub).catch((e)=>{console.error('GBP discovery queue failed');void recordFailure('job','GBP discovery queue',e);});
       res.redirect('/locations?gbp=connected');
     }catch {res.redirect('/locations?gbp=consent-failed');}
   });

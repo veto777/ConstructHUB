@@ -10,6 +10,7 @@ import { logActivity } from "../account-events";
 import { GMAIL_QUERY, classifyMail, parseMail } from "./classify";
 import { storeMatched, purgeExpiredMail, hash } from "./service";
 import { z } from "zod";
+import { recordFailure } from "../ops/issues";
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 declare module "express-session" {
   interface SessionData {
@@ -332,8 +333,9 @@ export function startMailWorker() {
     busy = true;
     try {
       await runMailWorker();
-    } catch {
+    } catch (e) {
       console.error("[mail-alerts] Cleanup/sync cycle failed");
+      void recordFailure("job", "Mail Alerts cleanup/sync cycle", e);
     } finally {
       busy = false;
     }

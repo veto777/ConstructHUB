@@ -19,6 +19,7 @@ import { db } from "../db";
 import { lsaLeads, lsaAccounts, lsaConnections, type LsaConnection, type LsaAccount } from "@shared/schema";
 import { and, eq, count, inArray, sql } from "drizzle-orm";
 import { storage } from "../storage";
+import { recordFailure } from "../ops/issues";
 
 const CUSTOMER_CLIENT_QUERY = `
   SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.status, customer_client.level
@@ -498,6 +499,7 @@ export async function runRotatingSync(): Promise<void> {
     }
   } catch (e: any) {
     console.error("LSA rotating sync error:", e?.message || String(e));
+    void recordFailure("job", "LSA rotating sync", e);
   } finally {
     rotationRunning = false;
   }

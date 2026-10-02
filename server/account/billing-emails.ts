@@ -43,6 +43,7 @@ import {
 import { describeSubscription, roleOfPrice, agencyLocationTiers, tieredAmountCents } from "../billing/prices";
 import { subscriptionPeriodEnd, cancellationOf } from "../billing/sync";
 import { COURSE_BUNDLE } from "../catalog";
+import { recordFailure, recordIssue } from "../ops/issues";
 import {
   welcomeEmail, subscriptionStartedEmail, receiptEmail, paymentFailedEmail, planChangedEmail,
   cancellationScheduledEmail, cancellationRevertedEmail, subscriptionEndedEmail, purchaseReceiptEmail,
@@ -274,6 +275,11 @@ export async function drainEmailOutbox(limit = 25): Promise<OutboxDrain> {
     if (unsendable) {
       await pool.query(`UPDATE email_log SET status = 'failed', next_attempt_at = NULL, last_error = $2 WHERE id = $1`, [row.id, unsendable]);
       console.error(`[email] outbox: ${label} cannot be sent — ${unsendable}; marked failed`);
+      void recordIssue({
+        source: "job", severity: "warning", key: `email outbox failed|${row.kind}|${unsendable}`,
+        title: `Email outbox: a ${row.kind} email cannot be sent (${unsendable})`,
+        detail: { emailLogId: Number(row.id), kind: row.kind, attempts: row.attempts, reason: unsendable },
+      });
       out.failed++;
       continue;
     }
@@ -287,6 +293,7 @@ export async function drainEmailOutbox(limit = 25): Promise<OutboxDrain> {
       if (row.attempts >= EMAIL_MAX_ATTEMPTS) {
         await pool.query(`UPDATE email_log SET status = 'failed', next_attempt_at = NULL, last_error = $2 WHERE id = $1`, [row.id, error]);
         console.error(`[email] outbox: ${label} failed again (${error}) — giving up after ${row.attempts} attempts; the row keeps the message for an operator`);
+        void recordFailure("job", `Email outbox (${row.kind}, gave up after ${row.attempts} attempts)`, err, { emailLogId: Number(row.id), kind: row.kind, attempts: row.attempts });
         out.failed++;
       } else {
         const delay = retryDelayMs(row.attempts);
@@ -320,6 +327,7 @@ export function startEmailOutboxDrainer(opts: { intervalMs?: number; firstRunMs?
       if (n.sent || n.deferred || n.failed) console.log(`[email] outbox drain: ${n.sent} sent, ${n.deferred} deferred, ${n.failed} failed`);
     } catch (err) {
       console.error(`[email] outbox drain failed: ${errorText(err)}`);
+      void recordFailure("job", "Email outbox drain", err);
     } finally {
       running = false;
     }

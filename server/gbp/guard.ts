@@ -5,6 +5,7 @@ import { GoogleClient, GoogleError } from './client';
 import { clientFor, ownedLocation, withLocationLock, publicError } from './service';
 import { getEntitlements } from '../entitlements';
 import { PLANS, PLAN_KEYS } from '@shared/plans';
+import { recordFailure } from '../ops/issues';
 
 export const GUARD_FIELDS = ['title','phoneNumbers','websiteUri','storefrontAddress','categories','profile.description','regularHours','specialHours','serviceArea','openInfo.openingDate','openInfo.status'] as const;
 export type GuardField = typeof GUARD_FIELDS[number];
@@ -184,5 +185,5 @@ export async function runGuardWorker(check=checkGuard,onlyUser?:number) {
 }
 export function startGuardWorker() {
   if(process.env.GBP_SYNC_DISABLED==='true')return;
-  const timer=setInterval(()=>void runGuardWorker().catch(()=>console.error('Profile Guard worker failed')),60_000);timer.unref();return timer;
+  const timer=setInterval(()=>void runGuardWorker().catch((e)=>{console.error('Profile Guard worker failed');void recordFailure('job','Profile Guard worker tick',e);}),60_000);timer.unref();return timer;
 }

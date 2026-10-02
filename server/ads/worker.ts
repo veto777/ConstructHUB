@@ -8,6 +8,7 @@ import { readState, buildPlan, protectionInput, fingerprint, appliedDocument, ty
 import { auditAccount } from './audit';
 import { getEntitlements } from '../entitlements';
 import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
+import { recordFailure } from '../ops/issues';
 /** Queued Ads work runs only while the owner's plan includes the module; nothing is sent to Google otherwise. */
 const adsAllowed=async(user:number)=>(await getEntitlements(user)).modules.adsManager;
 export const ADS_PLAN_PAUSED=`Not run: ${MODULE_NAMES.adsManager} is included with the ${PLANS[planForModule('adsManager')].name} plan.`;
@@ -181,6 +182,6 @@ export async function scheduleLinkPolls(onlyUser?:number) {
 export function startAdsWorker() {
   if(process.env.GOOGLE_ADS_WORKER_ENABLED!=='true') return;
   let busy=false;
-  const timer=setInterval(async()=>{if(busy)return;busy=true;try{await scheduleLinkPolls();await runAdsWorker();}catch{console.error('[ads] worker tick failed');}finally{busy=false;}},1000);
+  const timer=setInterval(async()=>{if(busy)return;busy=true;try{await scheduleLinkPolls();await runAdsWorker();}catch(e){console.error('[ads] worker tick failed');void recordFailure('job','Ads worker tick',e);}finally{busy=false;}},1000);
   timer.unref();return timer;
 }

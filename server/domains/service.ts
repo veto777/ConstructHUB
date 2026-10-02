@@ -19,6 +19,7 @@ import { dnsSnapshot, verify, normalize } from "./dns";
 import { websiteHealth, type Health } from "./health";
 import { getEntitlements } from "../entitlements";
 import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
+import { recordFailure } from "../ops/issues";
 /** Queued domain work and daily monitoring run only while the owner's plan includes the module. */
 export const domainsAllowed = async (user: number) =>
   (await getEntitlements(user)).modules.domainsMailAlerts;
@@ -653,8 +654,9 @@ export function startDomainWorker() {
     try {
       await scheduleMonitors();
       await runDomainWorker();
-    } catch {
+    } catch (e) {
       console.error("[domains] Worker cycle failed");
+      void recordFailure("job", "Domains worker cycle", e);
     } finally {
       busy = false;
     }

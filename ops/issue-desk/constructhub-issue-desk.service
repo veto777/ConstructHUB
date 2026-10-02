@@ -1,0 +1,22 @@
+# ConstructHUB issue desk — one run: claim new app issues, let Claude inspect them
+# in the scratch worktree ~/ConstructHUB-issue-desk, post the reports back.
+# Never deploys, pushes or restarts anything. docs/ops/ISSUE-DESK.md
+#   install:  see docs/ops/ISSUE-DESK.md → Install (systemd --user, the tower)
+#   run now:  systemctl --user start constructhub-issue-desk.service
+#   logs:     journalctl --user -u constructhub-issue-desk -f
+[Unit]
+Description=ConstructHUB issue desk: hand new app issues to Claude for inspection (no deploys)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/ConstructHUB
+ExecStart=/bin/bash %h/ConstructHUB/ops/issue-desk/run.sh
+# Node 20 (npm run check, vitest) and the claude CLI.
+Environment=PATH=%h/.nvm/versions/node/v20.19.6/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# A run is capped at ISSUE_DESK_TIMEOUT_MIN (60) inside run.sh; this is the outer bound.
+TimeoutStartSec=75min
+# Nothing in a run may gain privileges (no sudo, even from code a test executes).
+NoNewPrivileges=yes
+Nice=10

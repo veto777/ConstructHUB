@@ -18,6 +18,7 @@ import { sendWithFallback } from "../email";
 import { logActivity, notifyUser } from "../account-events";
 import { getEntitlements } from "../entitlements";
 import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
+import { recordFailure } from "../ops/issues";
 /** Queued Cloudflare and Search Console work runs only while the owner's plan includes the module. */
 const edgeAllowed = async (user: number) =>
   (await getEntitlements(user)).modules.cloudflareSearchConsole;
@@ -332,8 +333,9 @@ export function startEdgeWorker() {
         last = Date.now();
       }
       await runEdgeJob();
-    } catch {
+    } catch (e) {
       console.error("[edge-search] worker failed");
+      void recordFailure("job", "Edge search worker tick", e);
     } finally {
       busy = false;
     }

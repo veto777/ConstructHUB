@@ -33,6 +33,9 @@ app.use(["/api/cloudflare", "/api/gsc"], credentialBody);
 
 // Bound public AI/photo JSON before the general parser; Stripe raw-body stays intact.
 app.use(["/api/site-assistant", "/api/ads-consultant", "/api/review", "/api/photos", "/api/gmb/review-response"], express.json({ limit: "32kb" }));
+// The browser's error reports (issue desk): small, anonymous, capped before the big parser below.
+import { CLIENT_ERROR_PATH, CLIENT_ERROR_BODY_LIMIT } from "./ops/client-errors";
+app.use(CLIENT_ERROR_PATH, express.json({ limit: CLIENT_ERROR_BODY_LIMIT }));
 app.use("/api/ads", express.json({ limit: "512kb" }));
 app.use(
   express.json({
@@ -56,6 +59,10 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// The issue desk: a 500 a route answered by itself is recorded when the response finishes.
+import { watchHandledFailures, recordUnhandledError, recordProcessFailure } from "./ops/server-errors";
+app.use(watchHandledFailures);
+
 app.use((req, res, next) => {
   const start = Date.now();
   const isSiteScan = req.path.startsWith("/api/agency") || req.path.startsWith("/api/sitescan") || req.path.startsWith("/api/admin/sitescan");
@@ -78,7 +85,9 @@ app.use((req, res, next) => {
       if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")
         && !path.startsWith("/api/v1") && !path.startsWith("/api/account/api-keys")
         // Call Assistant: transcripts, summaries and caller details never reach the request log
-        && !path.startsWith("/api/crm/voice") && !path.startsWith("/api/voice-internal")) {
+        && !path.startsWith("/api/crm/voice") && !path.startsWith("/api/voice-internal")
+        // Issue desk: captured failures and Claude's reports stay out of the request log too
+        && !path.startsWith("/api/admin/issues") && !path.startsWith("/api/ops-internal") && !path.startsWith("/api/ops/")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
@@ -91,10 +100,12 @@ app.use((req, res, next) => {
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
+  recordProcessFailure("uncaughtException", err);
 });
 
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled Rejection:", reason);
+  recordProcessFailure("unhandledRejection", reason);
 });
 
 (async () => {
@@ -117,6 +128,8 @@ process.on("unhandledRejection", (reason) => {
       const message = err.message || "Internal Server Error";
 
       console.error("Internal Server Error:", err);
+      // The issue desk: any 5xx that reached this handler (route + method + error identity).
+      recordUnhandledError(req, res, err, status);
 
       if (res.headersSent) {
         return next(err);

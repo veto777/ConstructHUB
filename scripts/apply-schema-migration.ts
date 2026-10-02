@@ -19,6 +19,7 @@ import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
 import { VOICE_SCHEMA_BACKFILL, VOICE_SCHEMA_DDL } from "../server/voice/schema";
 import { DASHBOARD_PREFS_DDL } from "../server/dashboard/prefs";
 import { ACCESS_GRANTS_DDL } from "../server/access-grants-schema";
+import { OPS_ISSUES_DDL } from "../server/ops/schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -62,6 +63,9 @@ const STATEMENTS = [
   // Admin access grants (/admin/access): who gave which account which plan,
   // for how long, and who revoked it (server/access-grants.ts also runs these at boot).
   ...ACCESS_GRANTS_DDL,
+  // The issue desk: one row per captured failure (server/ops/schema.ts; boot
+  // and recordIssue's first write also run these).
+  ...OPS_ISSUES_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

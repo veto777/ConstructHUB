@@ -1,7 +1,11 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { queryClient } from "./lib/queryClient";
+import { installClientErrorReporting } from "./lib/report-client-errors";
 import "./index.css";
+
+// Uncaught errors and unhandled rejections reach the issue desk (/admin/issues).
+installClientErrorReporting();
 
 const container = document.getElementById("root")!;
 const mount = () => createRoot(container).render(<App />);

@@ -15,6 +15,7 @@ import { pageSpeed, businessSchema } from "./providers";
 import { safeFetch } from "./http";
 import { enrichFindings, fixesFor, reconcileFixes } from "./guidance";
 import { robotsRules } from "./robots";
+import { recordFailure } from "../ops/issues";
 export async function profileFor(user: number, id?: number) {
   const {
     rows: [p],
@@ -386,8 +387,9 @@ export function startSiteScanWorker() {
     try {
       await runSchedules();
       await runSiteScanWorker();
-    } catch {
+    } catch (e) {
       console.error("Site Scan worker tick failed");
+      void recordFailure("job", "Site Scan worker tick", e);
     } finally {
       busy = false;
     }

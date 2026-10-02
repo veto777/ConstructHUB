@@ -63,6 +63,7 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
 import { storeGeneratedPdf, storeGeneratedFile } from "./attachments";
 import { oauthBaseUrl } from "../site-context";
+import { recordFailure } from "../ops/issues";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -1174,6 +1175,7 @@ export async function runDueHoverSyncs(now: Date = new Date()): Promise<void> {
     } catch (e: any) {
       // Never crash the app over a sync; the card surfaces lastError.
       console.error(`[hover] auto-sync org ${org.id} failed:`, String(e?.message || e).slice(0, 200));
+      void recordFailure("job", "HOVER auto-sync", e, { orgId: org.id }, "warning");
     } finally {
       hoverSyncRunning.delete(org.id);
     }
@@ -1184,7 +1186,10 @@ export function startHoverScheduler(): void {
   if (hoverSchedulerStarted) return;
   hoverSchedulerStarted = true;
   const timer = setInterval(() => {
-    runDueHoverSyncs().catch((e) => console.error("[hover] scheduler tick failed:", e?.message || e));
+    runDueHoverSyncs().catch((e) => {
+      console.error("[hover] scheduler tick failed:", e?.message || e);
+      void recordFailure("job", "HOVER sync scheduler tick", e);
+    });
   }, HOVER_TICK_MS);
   timer.unref();
 }

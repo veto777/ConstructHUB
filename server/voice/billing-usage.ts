@@ -44,6 +44,7 @@ import { stripe as stripeClient, stripeConfigured } from "../billing/client";
 import { hasLiveStripeSubscription } from "../billing/sync";
 import { ACCESS_STATUSES, CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_NAME } from "@shared/plans";
 import type { VoiceUsageRow } from "@shared/schema";
+import { recordFailure } from "../ops/issues";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 
@@ -449,6 +450,7 @@ export async function reportAllVoiceOverage(month?: string, deps: OverageDeps = 
     } catch (e: any) {
       skipped.error = (skipped.error ?? 0) + 1;
       console.error(`[voice-usage] overage report failed for org ${r.org_id} ${target}:`, e?.message || e);
+      void recordFailure("job", "Call Assistant overage billing (one org)", e, { orgId: r.org_id, month: target });
     }
   }
   return { month: target, orgs, reportedMinutes, reportedCents, skipped };
@@ -490,6 +492,7 @@ export function startVoiceOverageWorker(): void {
       if (out.orgs || Object.keys(out.skipped).length) console.log(`[voice-usage] overage ${out.month}: billed ${out.reportedMinutes} min ($${(out.reportedCents / 100).toFixed(2)}) for ${out.orgs} org(s); skipped ${JSON.stringify(out.skipped)}`);
     } catch (e: any) {
       console.error("[voice-usage] overage sweep failed:", e?.message || e);
+      void recordFailure("job", "Call Assistant overage billing sweep", e);
     } finally { running = false; }
   };
   setTimeout(run, SWEEP_FIRST_DELAY_MS).unref();

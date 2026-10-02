@@ -33,6 +33,7 @@ import { recordActivity } from "../crm/activity";
 import { sendWithFallback } from "../email";
 import { prettyPhone, leadFactsFrom } from "./leads";
 import { loadOrgVoiceContext, type OrgVoiceContext } from "./org-profile";
+import { recordFailure } from "../ops/issues";
 
 export const KIND_LABELS: Record<EscalationKind, string> = {
   human: "Asked for a person",
@@ -183,7 +184,10 @@ async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: stri
     subject: `🚨 ${title}`,
     html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><p style="white-space:pre-wrap">${esc(defaultEscalationBody(facts).replace(/\nReply OK.*$/, ""))}</p>` +
       `<p>The call, transcript and recording are under Call Assistant → Calls.</p></div>`,
-  } as any).catch((e: any) => console.error("[voice] owner alert email failed:", e?.message || e));
+  } as any).catch((e: any) => {
+    console.error("[voice] owner alert email failed:", e?.message || e);
+    void recordFailure("call_assistant", "Call Assistant owner alert email", e, { callId: call.id, orgId: ctx.org.id });
+  });
 }
 
 export type RaiseResult = { escalationId: number | null; sent: boolean; fallback: boolean; recipientName: string | null; duplicate: boolean };
@@ -209,7 +213,10 @@ export async function raiseEscalation(args: {
     // call has since given a name or an address the first message lacked, the stored body (what reminders
     // resend) is rebuilt and one "details added" message goes out.
     await addEscalationDetails(ctx, call, kind, facts, rule, existing ?? null)
-      .catch((e: any) => console.error("[voice] escalation details update failed:", e?.message || e));
+      .catch((e: any) => {
+        console.error("[voice] escalation details update failed:", e?.message || e);
+        void recordFailure("call_assistant", "Call Assistant escalation details update", e, { callId: call.id, orgId: ctx.org.id, kind });
+      });
     return existing
       ? { escalationId: existing.id, sent: true, fallback: false, recipientName: existing.recipientName, duplicate: true }
       : { escalationId: null, sent: true, fallback: true, recipientName: null, duplicate: true };
@@ -242,7 +249,10 @@ export async function raiseEscalation(args: {
   // No rule (or an unusable recipient) → the owners; urgent/human always also reach the owners.
   let ownersNotified = false;
   if ((!result.escalationId && ctx.profile.escalations.fallbackToOwner) || kind === "urgent" || kind === "human") {
-    await notifyOwners(ctx, call, kind, facts).catch((e: any) => console.error("[voice] owner alert failed:", e?.message || e));
+    await notifyOwners(ctx, call, kind, facts).catch((e: any) => {
+      console.error("[voice] owner alert failed:", e?.message || e);
+      void recordFailure("call_assistant", "Call Assistant owner alert", e, { callId: call.id, orgId: ctx.org.id, kind });
+    });
     result.fallback = true;
     result.sent = true;
     ownersNotified = true;
@@ -461,6 +471,7 @@ export async function tickVoiceEscalations(now = new Date()): Promise<TickReport
     } catch (e: any) {
       report.errors++;
       console.error(`[voice] escalation #${row.id} tick failed:`, e?.message || e);
+      void recordFailure("job", "Call escalation reminder", e, { escalationId: row.id, orgId: row.orgId });
     }
   }
   return report;
@@ -474,7 +485,10 @@ export function startVoiceEscalationWorker(): boolean {
   if (process.env.VOICE_ESCALATION_WORKER_ENABLED !== "true") return false;
   const run = () => tickVoiceEscalations().then((r) => {
     if (r.reminded || r.followedUp || r.closed || r.errors) console.log(`[voice] escalations: ${JSON.stringify(r)}`);
-  }).catch((e: any) => console.error("[voice] escalation worker failed:", e?.message || e));
+  }).catch((e: any) => {
+    console.error("[voice] escalation worker failed:", e?.message || e);
+    void recordFailure("job", "Call escalation reminder worker", e);
+  });
   worker = setInterval(run, WORKER_INTERVAL_MS);
   worker.unref();
   setTimeout(run, 15_000).unref();

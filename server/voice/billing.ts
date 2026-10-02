@@ -30,6 +30,9 @@ import {
 } from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
+import { recordEngineHealth } from "../ops/call-assistant";
+
+const engineHost = () => { try { return new URL(voiceEngineUrl()).host; } catch { return "unknown"; } };
 import { listOrgNumbers, numberView, numberAllowance, countsAgainstAllowance, numbersMockEnabled } from "./numbers";
 import { signalwireConfig } from "./numbers-signalwire";
 import { releaseIsFinal } from "./number-release";
@@ -46,19 +49,46 @@ export function probeEngine(now = Date.now()): Promise<Omit<EngineStatus, "confi
   if (engineProbe && now - engineProbe.at < ENGINE_PROBE_TTL_MS) return engineProbe.value;
   const value = (async () => {
     const checkedAt = new Date(now).toISOString();
+    let status: Omit<EngineStatus, "configured">;
     try {
       const r = await fetch(`${voiceEngineUrl()}/health`, { signal: AbortSignal.timeout(2500) });
-      if (!r.ok) return { reachable: false, models: false, checkedAt };
-      const j = (await r.json().catch(() => null)) as { ok?: boolean; models?: boolean } | null;
-      return { reachable: j?.ok === true, models: j?.models === true, checkedAt };
+      if (!r.ok) status = { reachable: false, models: false, checkedAt };
+      else {
+        const j = (await r.json().catch(() => null)) as { ok?: boolean; models?: boolean } | null;
+        status = { reachable: j?.ok === true, models: j?.models === true, checkedAt };
+      }
     } catch {
-      return { reachable: false, models: false, checkedAt };
+      status = { reachable: false, models: false, checkedAt };
     }
+    // The issue desk hears about an engine this app is wired to (secret set) that is down or model-less.
+    if (voiceInternalConfigured()) recordEngineHealth(status, engineHost());
+    return status;
   })();
   engineProbe = { at: now, value };
   return value;
 }
 export function resetEngineProbe(): void { engineProbe = null; }
+
+/**
+ * Production: probe the engine every 5 minutes while any number is active, so
+ * an outage reaches the issue desk even when nobody opens the Call Assistant
+ * page (the probe records it — see probeEngine). Off elsewhere unless
+ * VOICE_ENGINE_WATCH=1. Never throws; the timer is unref'd.
+ */
+export function startEngineHealthWatch(intervalMs = 5 * 60_000): ReturnType<typeof setInterval> | null {
+  if (process.env.NODE_ENV !== "production" && process.env.VOICE_ENGINE_WATCH !== "1") return null;
+  const tick = async () => {
+    try {
+      if (!voiceInternalConfigured()) return;
+      const { pool } = await import("../db");
+      const { rows } = await pool.query("SELECT 1 FROM voice_numbers WHERE status = 'active' LIMIT 1");
+      if (rows.length) await probeEngine();
+    } catch { /* the next tick tries again */ }
+  };
+  const timer = setInterval(() => { void tick(); }, intervalMs);
+  timer.unref();
+  return timer;
+}
 
 export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): void {
   /**

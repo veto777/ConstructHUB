@@ -22,6 +22,7 @@
  */
 import type Stripe from "stripe";
 import type { BillingInvoiceRow, BillingPurchaseRow } from "./ledger";
+import { recordFailure } from "../ops/issues";
 
 type InvoicePayload = {
   userId: number;
@@ -98,10 +99,12 @@ export class BillingEventBus {
         if (result && typeof (result as Promise<void>).then === "function") {
           settled.push((result as Promise<void>).catch((e: any) => {
             console.error(`[billing-events] ${kind} listener failed:`, e?.message || e);
+            void recordFailure("job", `Billing event listener (${kind})`, e);
           }));
         }
       } catch (e: any) {
         console.error(`[billing-events] ${kind} listener threw:`, e?.message || e);
+        void recordFailure("job", `Billing event listener (${kind})`, e);
       }
     }
     return Promise.all(settled).then(() => undefined);

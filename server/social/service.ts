@@ -24,6 +24,7 @@ export {
 };
 import { aiModel } from "../ai-config";
 import { AiAnswerError, aiClient, aiComplete, NO_TOOLS_RULE, type ChatClient } from "../ai-output";
+import { recordFailure } from "../ops/issues";
 export async function connect(
   userId: number,
   key: string,
@@ -544,9 +545,10 @@ export function startSocialWorker() {
   if (process.env.SOCIAL_WORKER_DISABLED === "true") return;
   const timer = setInterval(
     () =>
-      void runSocialWorker().catch(() =>
-        console.error("Social worker tick failed"),
-      ),
+      void runSocialWorker().catch((e) => {
+        console.error("Social worker tick failed");
+        void recordFailure("job", "Social worker tick", e);
+      }),
     15000,
   );
   timer.unref();
