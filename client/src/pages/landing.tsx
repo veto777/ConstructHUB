@@ -7,10 +7,10 @@ import { CartSheet } from "@/components/cart-sheet";
 import { Settings } from "lucide-react";
 import {
   ArrowRight, Search, Camera, Users,
-  MapPin, CheckCircle2,
-  Eye, Globe, LayoutDashboard, GraduationCap,
-  Grid3X3, ShieldAlert, Crosshair, Briefcase,
-  Megaphone, Package,
+  MapPin, Check, CheckCircle2,
+  Eye, LayoutDashboard, GraduationCap,
+  Grid3X3, ShieldAlert, Crosshair,
+  Package,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
@@ -33,8 +33,12 @@ const SECTION_LINKS = [
   { href: "#coverage", label: "Coverage" },
 ] as const;
 
-/** The owner's hard-hat gator at full size (335x512); the hero shows him big. */
+/** The owner's hard-hat gator: 335x512 for 1x screens, 671x1024 for 2x. The
+ *  hero renders him at most 327px wide (500px tall at xl), and `sizes` tracks
+ *  the rendered width per breakpoint so 2x screens pick the 1024 file. */
 const HERO_GATOR = "/mascot/gator-standing-512.v1.webp";
+const HERO_GATOR_2X = "/mascot/gator-standing-1024.v1.webp";
+const HERO_GATOR_SIZES = "(min-width: 1280px) 327px, (min-width: 1024px) 301px, (min-width: 640px) 170px, 144px";
 
 function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
   const [count, setCount] = useState(0);
@@ -149,17 +153,35 @@ function IconBox({ icon: Icon }: { icon: IconType }) {
   );
 }
 
-/** One done-for-you service; every one of them is quoted by a sales rep. */
-function DfyCard({ icon, title, description, "data-testid": testId }: { icon: IconType; title: string; description: string; "data-testid": string }) {
+/** One done-for-you service as a numbered punch-list row (01 / 02 / 03, the
+ *  sales-rep label on the right); every one of them is quoted by a sales rep. */
+function DfyRow({ number, title, description, "data-testid": testId }: { number: string; title: string; description: string; "data-testid": string }) {
   return (
-    <div className="mk-card p-6 lg:p-7 flex flex-col transition-colors hover:border-[#F97316]" data-testid={testId}>
-      <IconBox icon={icon} />
-      <h3 className="mk-head text-[1.375rem] mt-5">{title}</h3>
-      <p className="mt-2 text-[15px] leading-relaxed mk-muted flex-1">{description}</p>
-      <span className="mt-5 inline-flex items-center gap-1.5 font-display font-semibold uppercase tracking-[0.1em] text-sm text-[color:var(--mk-orange-ink)]" data-testid="text-dfy-sales">
+    <div
+      className="mk-grid-cell grid grid-cols-[auto_minmax(0,1fr)] md:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 sm:gap-x-6 gap-y-3 px-5 py-5 sm:px-7 sm:py-6"
+      data-testid={testId}
+    >
+      <span className="mk-display text-3xl sm:text-4xl leading-none text-[#F97316] w-9 sm:w-12 self-start sm:self-center">{number}</span>
+      <div className="min-w-0">
+        <h3 className="mk-head text-[1.25rem] sm:text-[1.375rem]">{title}</h3>
+        <p className="mt-1 text-[15px] leading-relaxed mk-muted">{description}</p>
+      </div>
+      <span
+        className="col-start-2 md:col-start-auto inline-flex items-center gap-1.5 whitespace-nowrap font-display font-semibold uppercase tracking-[0.1em] text-sm text-[color:var(--mk-orange-ink)]"
+        data-testid="text-dfy-sales"
+      >
         {SALES_REP_LABEL} <ArrowRight className="h-3.5 w-3.5" />
       </span>
     </div>
+  );
+}
+
+/** Orange checkbox for the hero punch list. */
+function PunchCheck() {
+  return (
+    <span aria-hidden="true" className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[3px] bg-[#F97316]">
+      <Check className="h-3 w-3 text-[#141b2d]" strokeWidth={3.5} />
+    </span>
   );
 }
 
@@ -236,10 +258,13 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero: navy band, blueprint grid, the gator front and centre. */}
+      {/* Hero: navy band, blueprint grid, the gator front and centre. The band's
+          large-screen padding is sized so his boots and the hazard tape are on
+          the first screen at 1440x900 while the CTAs stay above the fold at
+          1366x768. */}
       <section className="mk-blueprint relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px] lg:gap-x-10">
-          <div className="pt-6 pb-14 sm:pt-10 lg:pt-20 lg:pb-24">
+          <div className="pt-6 pb-14 sm:pt-10 lg:pt-14 lg:pb-14">
             <p className="mk-eyebrow !text-[#F97316] animate-in">Your Complete Business-Building Platform</p>
             <h1 className="mk-display mt-5 text-white text-[2.5rem] sm:text-6xl lg:text-[3.75rem] xl:text-[5.5rem] animate-in-delay-1">
               <span className="block normal-case text-[#F97316] text-[0.5em] tracking-[0.02em] mb-2">ConstructHUB &mdash;</span>
@@ -249,42 +274,58 @@ export default function LandingPage() {
             <p className="mt-6 text-base sm:text-lg text-white/75 max-w-xl leading-relaxed animate-in-delay-2">
               Whether you're starting from scratch or scaling an existing operation — we provide every tool, resource, and service you need. From LLC formation and licensing to GMB optimization and SEO domination. And if you don't want to do it yourself, we'll build your entire business for you.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4 animate-in-delay-3">
+            {/* Phones: Gabe's fixed launcher sits bottom-right, so below `sm`
+                the CTA stack stops short of that column (pr-16) instead of
+                running under it. */}
+            <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4 pr-16 sm:pr-0 animate-in-delay-3">
               <Link href="/auth?mode=signup" className="mk-btn mk-btn-primary w-full sm:w-auto" data-testid="link-hero-signup">
                 Create Your Account <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href={SALES_HREF} className="mk-btn mk-btn-ghost w-full sm:w-auto" data-testid="link-hero-dfy">
                 <Package className="h-4 w-4" /> Done-For-You Services
               </Link>
-              <Link href="/free-site-scan" className="font-semibold text-white underline underline-offset-[6px] decoration-2 decoration-[#F97316] hover:text-[#F97316] transition-colors">
-                Free 60-second website scan
-              </Link>
+              <p className="basis-full text-sm text-white/70">
+                Not ready to sign up?{" "}
+                <Link href="/free-site-scan" className="inline-block font-semibold text-white underline underline-offset-[6px] decoration-2 decoration-[#F97316] hover:text-[#F97316] transition-colors">
+                  Free 60-second website scan
+                </Link>
+              </p>
             </div>
-            <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2.5 text-sm text-white/70 animate-in-delay-4">
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> No card needed to sign up</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> Setup in minutes</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> Cancel anytime</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> Turnkey business building available</li>
+            {/* Punch list: two columns of orange checkboxes. */}
+            <ul className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 max-w-xl text-sm text-white/75 animate-in-delay-4">
+              <li className="flex items-center gap-2.5"><PunchCheck /> No card needed to sign up</li>
+              <li className="flex items-center gap-2.5"><PunchCheck /> Setup in minutes</li>
+              <li className="flex items-center gap-2.5"><PunchCheck /> Cancel anytime</li>
+              <li className="flex items-center gap-2.5"><PunchCheck /> Turnkey business building available</li>
             </ul>
           </div>
 
           {/* The gator. Phones: beside his greeting, above the copy. Desktop:
-              right column, greeting overhead, boots over the band's edge. */}
-          <div className="order-first lg:order-none relative z-20 flex items-center gap-4 pt-8 lg:pt-10 lg:flex-col lg:items-center lg:justify-end lg:self-end lg:-mb-9">
-            <img
-              src={HERO_GATOR}
-              alt="The ConstructHUB gator in a hard hat and hi-vis vest, arms crossed"
-              width={335}
-              height={512}
-              draggable={false}
-              decoding="async"
-              fetchPriority="high"
-              className="h-[220px] sm:h-[260px] lg:h-[460px] xl:h-[500px] w-auto shrink-0 select-none lg:order-last drop-shadow-[0_24px_24px_rgba(0,0,0,0.45)] animate-in-delay-1"
-              data-testid="img-hero-gator"
-            />
-            <p className="mk-bubble max-w-[220px] lg:max-w-none lg:mb-5 lg:-rotate-2 animate-in-delay-2">
-              Welcome in — let&rsquo;s build your business.
-            </p>
+              right column, greeting overhead, boots over the band's edge. The
+              lean-in and the sticker tilt live on wrappers: fadeSlideIn fills
+              `transform`, which would otherwise cancel a rotate on the same
+              element. */}
+          <div className="order-first lg:order-none relative z-20 flex items-center gap-4 pt-8 lg:pt-10 lg:flex-col lg:items-center lg:justify-end lg:self-end lg:-mb-6">
+            <div className="shrink-0 lg:order-last origin-bottom lg:-rotate-2">
+              <img
+                src={HERO_GATOR}
+                srcSet={`${HERO_GATOR} 335w, ${HERO_GATOR_2X} 671w`}
+                sizes={HERO_GATOR_SIZES}
+                alt="The ConstructHUB gator in a hard hat and hi-vis vest, arms crossed"
+                width={335}
+                height={512}
+                draggable={false}
+                decoding="async"
+                fetchPriority="high"
+                className="h-[220px] sm:h-[260px] lg:h-[460px] xl:h-[500px] w-auto select-none drop-shadow-[0_24px_24px_rgba(0,0,0,0.45)] animate-in-delay-1"
+                data-testid="img-hero-gator"
+              />
+            </div>
+            <div className="-rotate-3 lg:mb-5">
+              <p className="mk-bubble max-w-[220px] lg:max-w-none animate-in-delay-2">
+                Welcome in — let&rsquo;s build your business.
+              </p>
+            </div>
           </div>
         </div>
         <div className="mk-hazard" aria-hidden="true" />
@@ -322,11 +363,12 @@ export default function LandingPage() {
           >
             Everything You Need to Start, Build &amp; <span className="text-[#F97316]">Dominate</span>
           </SectionHeading>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* One hairline grid: 1px rules between cells, no gaps, no shadows. */}
+          <div className="mk-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {services.filter((svc) => SHOW_COMPETITOR_INTEL || svc.title !== "Competitor Intelligence").map((svc, i) => (
               <div
                 key={svc.title}
-                className={`mk-card group relative p-6 lg:p-7 flex flex-col transition-colors hover:border-[#F97316] animate-in-delay-${Math.min(i + 1, 5)}`}
+                className={`mk-grid-cell group relative p-6 lg:p-7 flex flex-col animate-in-delay-${Math.min(i + 1, 5)}`}
                 data-testid={`card-service-${i}`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -351,10 +393,11 @@ export default function LandingPage() {
           >
             Don't Want to Do It Yourself? <span className="text-[#F97316]">We'll Build It For You.</span>
           </SectionHeading>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <DfyCard icon={Briefcase} title="Business Formation & Filing" description="LLC, licensing paperwork, bonding, insurance processing, tax registration" data-testid="card-dfy-formation" />
-            <DfyCard icon={Globe} title="GMB & Website Setup" description="Full Google Business Profile, professional website, content" data-testid="card-dfy-gmb" />
-            <DfyCard icon={Megaphone} title="SEO & Ad Campaigns" description="Local SEO, Google Ads, LSA setup, citation building" data-testid="card-dfy-seo" />
+          {/* Numbered punch-list panel; the bundle band below sells all three at once. */}
+          <div className="mk-grid grid grid-cols-1 mb-4">
+            <DfyRow number="01" title="Business Formation & Filing" description="LLC, licensing paperwork, bonding, insurance processing, tax registration" data-testid="card-dfy-formation" />
+            <DfyRow number="02" title="GMB & Website Setup" description="Full Google Business Profile, professional website, content" data-testid="card-dfy-gmb" />
+            <DfyRow number="03" title="SEO & Ad Campaigns" description="Local SEO, Google Ads, LSA setup, citation building" data-testid="card-dfy-seo" />
           </div>
           <div className="mk-navy rounded-[6px] overflow-hidden border border-transparent dark:border-white/10" data-testid="card-dfy-bundle">
             <div className="mk-hazard" aria-hidden="true" />
@@ -430,36 +473,42 @@ export default function LandingPage() {
           >
             Nationwide <span className="text-[#F97316]">Coverage</span>
           </SectionHeading>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+          {/* Dotted-rule list, four columns across: a checklist, not chips. */}
+          <ul className="grid grid-cols-2 md:grid-cols-4 gap-x-8 border-t border-dotted border-[color:var(--mk-line-strong)]">
             {COVERAGE_STATES.map((state) => (
-              <div key={state} className="mk-card flex items-center gap-2 px-3 py-2.5 text-sm font-medium">
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#F97316] shrink-0" /> {state}
-              </div>
+              <li key={state} className="flex items-center gap-2.5 py-3 text-[15px] font-medium border-b border-dotted border-[color:var(--mk-line-strong)]">
+                <CheckCircle2 className="h-4 w-4 text-[#F97316] shrink-0" /> {state}
+              </li>
             ))}
-          </div>
+          </ul>
           <p className="mt-4 text-xs mk-muted">All 50 states + DC listed &mdash; portal links shown only once checked</p>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="mk-blueprint py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-10 items-center">
-          <div>
-            <CHLogo height={80} className="mb-6" />
-            <h2 className="mk-display text-5xl sm:text-6xl lg:text-7xl">
-              Ready to Build Your Business?
-            </h2>
-            <p className="mt-5 text-white/70 max-w-xl text-base lg:text-lg leading-relaxed">
-              Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row lg:flex-col items-stretch gap-3 sm:gap-4 lg:min-w-[280px]">
-            <Link href="/auth?mode=signup" className="mk-btn mk-btn-primary" data-testid="link-cta-signup">
-              Create Your Account <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link href={SALES_HREF} className="mk-btn mk-btn-ghost" data-testid="link-cta-consulting">
-              {SALES_REP_LABEL}
-            </Link>
+      {/* Final CTA: a split block — the pitch on navy, the two paths on orange. */}
+      <section className="pb-20 lg:pb-28">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] rounded-[6px] overflow-hidden border border-transparent dark:border-white/10">
+            <div className="mk-blueprint p-7 sm:p-10 lg:p-14">
+              <CHLogo height={72} className="mb-6" />
+              <h2 className="mk-display text-5xl sm:text-6xl lg:text-7xl">
+                Ready to Build Your Business?
+              </h2>
+              <p className="mt-5 text-white/70 max-w-xl text-base lg:text-lg leading-relaxed">
+                Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
+              </p>
+            </div>
+            <div className="bg-[#F97316] text-[#141b2d] p-7 sm:p-10 lg:p-14 flex flex-col justify-center">
+              <p className="font-display font-semibold uppercase tracking-[0.16em] text-sm">Pick your path</p>
+              <div className="mt-5 flex flex-col items-stretch gap-3 sm:gap-4">
+                <Link href="/auth?mode=signup" className="mk-btn mk-btn-navy" data-testid="link-cta-signup">
+                  Create Your Account <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href={SALES_HREF} className="mk-btn mk-btn-navy-outline" data-testid="link-cta-consulting">
+                  {SALES_REP_LABEL}
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>
