@@ -200,6 +200,264 @@
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/*
+ * ── Marketing site: "Bold trades" ───────────────────────────────────────────
+ * The landing page and the public header/footer wear their own type and
+ * palette: Barlow Condensed for display, DM Sans for body, navy + one orange
+ * accent, warm off-white page. Scoped behind the `mk` root class so the CRM
+ * and dashboard keep Inter and the app tokens. Radix portals (sheets, menus)
+ * render outside the scope and keep the app font on purpose.
+ */
+.mk {
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Barlow Condensed', 'Oswald', 'Arial Narrow', Impact, sans-serif;
+  --mk-navy: #141b2d;
+  --mk-navy-2: #1b2440;
+  --mk-navy-line: rgba(255, 255, 255, 0.09);
+  --mk-orange: #F97316;
+  --mk-orange-deep: #ea6a0c;
+  --mk-orange-ink: #c2410c;
+  --mk-bg: #f5f1ea;
+  --mk-surface: #fffdf9;
+  --mk-ink: #141b2d;
+  --mk-muted: #5c6474;
+  --mk-line: #e1d9cb;
+  --mk-line-strong: #c9bfae;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  background-color: var(--mk-bg);
+  color: var(--mk-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dark .mk {
+  --mk-bg: #0e1322;
+  --mk-surface: #161d31;
+  --mk-ink: #eef0f5;
+  --mk-muted: #a3abbd;
+  --mk-line: rgba(255, 255, 255, 0.1);
+  --mk-line-strong: rgba(255, 255, 255, 0.22);
+  --mk-orange-ink: #fb923c;
+}
+
+.mk h1, .mk h2, .mk h3, .mk h4 {
+  letter-spacing: 0;
+  font-feature-settings: normal;
+}
+
+/* Display type: heavy condensed caps, tight leading. */
+.mk-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 0.92;
+  letter-spacing: 0.005em;
+}
+
+/* Section titles in the same voice, a notch lighter. */
+.mk-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 0.95;
+  letter-spacing: 0.005em;
+}
+
+/* Card/plan headings: condensed but not shouting. */
+.mk-head {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
+
+/* Numbered eyebrow above every section title: "01 — What we do". */
+.mk-eyebrow {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: var(--mk-orange-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mk-eyebrow::before {
+  content: "";
+  width: 1.75rem;
+  height: 2px;
+  background: var(--mk-orange);
+  flex: none;
+}
+
+@media (max-width: 639px) {
+  .mk-eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+  }
+  .mk-eyebrow::before { width: 1.25rem; }
+}
+
+.mk-muted { color: var(--mk-muted); }
+
+.mk-card {
+  background-color: var(--mk-surface);
+  border: 1px solid var(--mk-line);
+  border-radius: 6px;
+}
+
+.mk-rule { border-color: var(--mk-line); }
+
+/* Navy band with a faint blueprint grid. */
+.mk-navy {
+  background-color: var(--mk-navy);
+  color: #fff;
+}
+
+.mk-blueprint {
+  background-color: var(--mk-navy);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: center top;
+  color: #fff;
+}
+
+/* Hazard tape: used twice on the page, never more. */
+.mk-hazard {
+  height: 10px;
+  background: repeating-linear-gradient(135deg, var(--mk-orange) 0 16px, var(--mk-navy) 16px 32px);
+}
+
+/* Ruler ticks: a measuring-tape edge along the stats strip. */
+.mk-ticks {
+  height: 12px;
+  background-image:
+    repeating-linear-gradient(90deg, var(--mk-line-strong) 0 1px, transparent 1px 12px),
+    repeating-linear-gradient(90deg, var(--mk-line-strong) 0 1px, transparent 1px 60px);
+  background-size: 100% 5px, 100% 12px;
+  background-repeat: repeat-x;
+  background-position: left bottom, left bottom;
+}
+
+/* Buttons: squared-off, condensed caps, hi-vis orange with navy ink. */
+.mk-btn {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 1.0625rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 3.25rem;
+  padding: 0 1.5rem;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.mk-btn:active { transform: translateY(1px); }
+
+.mk-btn-sm {
+  height: 2.5rem;
+  padding: 0 1rem;
+  font-size: 0.9375rem;
+}
+
+.mk-btn-primary {
+  background-color: var(--mk-orange);
+  border-color: var(--mk-orange);
+  color: var(--mk-navy);
+}
+
+.mk-btn-primary:hover {
+  background-color: var(--mk-orange-deep);
+  border-color: var(--mk-orange-deep);
+}
+
+/* Outline on a navy band. */
+.mk-btn-ghost {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.mk-btn-ghost:hover {
+  border-color: #fff;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Outline on the warm page. */
+.mk-btn-outline {
+  border-color: var(--mk-ink);
+  color: var(--mk-ink);
+}
+
+.mk-btn-outline:hover { background-color: rgba(20, 27, 45, 0.06); }
+.dark .mk-btn-outline:hover { background-color: rgba(255, 255, 255, 0.08); }
+
+/* Nav links: condensed caps. */
+.mk-navlink {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.9375rem;
+}
+
+/* The gator's speech bubble. Tail points left on phones (he stands beside
+   the bubble) and down on large screens (he stands under it). */
+.mk-bubble {
+  position: relative;
+  background: #fff;
+  color: var(--mk-navy);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.1;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
+}
+
+.mk-bubble::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  left: -10px;
+  top: 50%;
+  margin-top: -8px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 10px solid #fff;
+}
+
+@media (min-width: 1024px) {
+  .mk-bubble {
+    font-size: 1.5rem;
+    padding: 0.875rem 1.25rem;
+  }
+  .mk-bubble::after {
+    left: auto;
+    top: auto;
+    margin-top: 0;
+    right: 56px;
+    bottom: -11px;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 12px solid #fff;
+    border-bottom: 0;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

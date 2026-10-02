@@ -86,6 +86,8 @@ export default {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        // Marketing display face (Barlow Condensed); set by the `mk` root class in index.css.
+        display: ["var(--font-display)"],
       },
       keyframes: {
         "accordion-down": {

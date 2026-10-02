@@ -1,18 +1,15 @@
 import { useRef, useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { CHLogo } from "@/components/ch-logo";
 import { CartSheet } from "@/components/cart-sheet";
 import { Settings } from "lucide-react";
 import {
-  ArrowRight, Search, Camera, BarChart3, Users, Zap,
-  MapPin, Phone, Building2, CheckCircle2,
+  ArrowRight, Search, Camera, Users,
+  MapPin, CheckCircle2,
   Eye, Globe, LayoutDashboard, GraduationCap,
-  Grid3X3, ShieldAlert, Crosshair, Link2, Monitor, Briefcase,
+  Grid3X3, ShieldAlert, Crosshair, Briefcase,
   Megaphone, Package,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
@@ -22,6 +19,13 @@ import { LandingMobileMenu } from "@/components/landing-mobile-menu";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 
+/*
+ * "Bold trades" marketing design: Barlow Condensed display type, DM Sans
+ * body, navy band + one orange accent, warm off-white page. The type and
+ * palette tokens live behind the `mk` root class in index.css so the CRM and
+ * dashboard keep their own look.
+ */
+
 const SECTION_LINKS = [
   { href: "#services", label: "Services" },
   { href: "#plans", label: "Plans" },
@@ -29,107 +33,8 @@ const SECTION_LINKS = [
   { href: "#coverage", label: "Coverage" },
 ] as const;
 
-function AnimatedBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animationId: number;
-    let particles: Array<{
-      x: number; y: number; vx: number; vy: number;
-      size: number; opacity: number; hue: number;
-    }> = [];
-
-    let isDark = document.documentElement.classList.contains('dark');
-
-    const observer = new MutationObserver(() => {
-      isDark = document.documentElement.classList.contains('dark');
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    for (let i = 0; i < 80; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        size: Math.random() * 3 + 1,
-        opacity: Math.random() * 0.4 + 0.1,
-        hue: Math.random() > 0.5 ? 228 : 28,
-      });
-    }
-
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const opacityMultiplier = isDark ? 1 : 0.3;
-
-      particles.forEach((p, i) => {
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${p.hue}, 91%, 63%, ${p.opacity * opacityMultiplier})`;
-        ctx.fill();
-
-        particles.forEach((p2, j) => {
-          if (j <= i) return;
-          const dx = p.x - p2.x;
-          const dy = p.y - p2.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 150) {
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `hsla(228, 91%, 63%, ${0.06 * (1 - dist / 150) * opacityMultiplier})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        });
-      });
-
-      animationId = requestAnimationFrame(animate);
-    };
-
-    animate();
-    return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", resize);
-      observer.disconnect();
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 z-0 pointer-events-none dark:block"
-      style={{ background: "transparent" }}
-    />
-  );
-}
-
-function FloatingOrbs() {
-  return (
-    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-      <div className="landing-orb landing-orb-1" />
-      <div className="landing-orb landing-orb-2" />
-      <div className="landing-orb landing-orb-3" />
-    </div>
-  );
-}
+/** The owner's hard-hat gator at full size (335x512); the hero shows him big. */
+const HERO_GATOR = "/mascot/gator-standing-512.v1.webp";
 
 function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
   const [count, setCount] = useState(0);
@@ -166,70 +71,97 @@ const services = [
     icon: Search,
     title: "Nationwide Permit Search",
     description: "Find the permit office for any county or city we list in all 50 states and DC, and search the government portals we support by address, contractor, or company name.",
-    gradient: "from-orange-500/20 to-amber-500/20",
-    border: "border-orange-500/20",
   },
   {
     icon: Camera,
     title: "SEO Photo Optimizer",
     description: "Watermark, rename, geotag and describe your job photos in one batch. Google strips EXIF on upload, so geotags don't promise a ranking benefit.",
-    gradient: "from-blue-500/20 to-indigo-500/20",
-    border: "border-blue-500/20",
   },
   {
     icon: Eye,
     title: "GMB Monitor",
     description: "Check your Google Business listings against Google on demand and keep a history of every change a check finds. Includes AI Review Response Generator.",
-    gradient: "from-purple-500/20 to-violet-500/20",
-    border: "border-purple-500/20",
   },
   {
     icon: Grid3X3,
     title: "GMB Ranking Grid",
     description: "Visualize exactly where you rank on Google Maps across your service area. Monitor local keyword performance with a geographic heatmap grid.",
-    gradient: "from-emerald-500/20 to-teal-500/20",
-    border: "border-emerald-500/20",
   },
   {
     icon: MapPin,
     title: "GMB Locations Manager",
     description: "Manage all your business locations with Semrush-style GBP analytics — search/maps views, interactions, phone calls, and citation campaign tracking.",
-    gradient: "from-pink-500/20 to-rose-500/20",
-    border: "border-pink-500/20",
   },
   {
     icon: ShieldAlert,
     title: "GBP Reinstatement",
     description: "Suspended Google Business Profile? Our reinstatement service handles soft and hard suspensions with a proven 4-step recovery process.",
-    gradient: "from-red-500/20 to-orange-500/20",
-    border: "border-red-500/20",
   },
   {
     icon: Crosshair,
     title: "Competitor Intelligence",
     description: "Analyze competitors in your market. Track their permit activity, ranking positions, and business moves so you always stay one step ahead.",
-    gradient: "from-amber-500/20 to-yellow-500/20",
-    border: "border-amber-500/20",
   },
   {
     icon: GraduationCap,
     title: "Master Class",
     description: "Complete state-by-state guide to starting a construction business — LLC formation, licensing, bonding, insurance, plus website & SEO training.",
-    gradient: "from-indigo-500/20 to-blue-500/20",
-    border: "border-indigo-500/20",
   },
   {
     icon: Users,
     title: "Contractor CRM",
     description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — included with every plan.",
-    gradient: "from-cyan-500/20 to-sky-500/20",
-    border: "border-cyan-500/20",
   },
+];
+
+const COVERAGE_STATES = [
+  "Washington", "Florida", "California", "Texas",
+  "New York", "Illinois", "Pennsylvania", "Ohio",
+  "Georgia", "North Carolina", "Michigan", "Arizona",
+  "Colorado", "Virginia", "Oregon", "Nevada",
+  "Tennessee", "New Jersey", "Massachusetts", "Indiana",
 ];
 
 // Testimonials were removed: the three 5-star quotes came in with the Replit
 // import (the same one whose government data was fabricated) and nobody could
 // vouch for them. Add quotes back only with a real, consenting customer.
+
+/** Numbered eyebrow + condensed title that opens every section below the hero. */
+function SectionHeading({ number, eyebrow, children, lede }: { number: string; eyebrow: string; children: React.ReactNode; lede?: React.ReactNode }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] lg:items-end mb-10 lg:mb-14">
+      <div>
+        <p className="mk-eyebrow">{number} &mdash; {eyebrow}</p>
+        <h2 className="mk-title mt-4 text-[2.5rem] leading-[0.95] sm:text-5xl lg:text-6xl text-balance">{children}</h2>
+      </div>
+      {lede && <div className="mk-muted text-base lg:text-lg leading-relaxed lg:pb-1 lg:max-w-md lg:justify-self-end">{lede}</div>}
+    </div>
+  );
+}
+
+type IconType = React.ComponentType<{ className?: string }>;
+
+function IconBox({ icon: Icon }: { icon: IconType }) {
+  return (
+    <div className="h-11 w-11 rounded-[4px] bg-[#141b2d] text-[#F97316] dark:bg-[#232c45] flex items-center justify-center shrink-0">
+      <Icon className="h-5 w-5" />
+    </div>
+  );
+}
+
+/** One done-for-you service; every one of them is quoted by a sales rep. */
+function DfyCard({ icon, title, description, "data-testid": testId }: { icon: IconType; title: string; description: string; "data-testid": string }) {
+  return (
+    <div className="mk-card p-6 lg:p-7 flex flex-col transition-colors hover:border-[#F97316]" data-testid={testId}>
+      <IconBox icon={icon} />
+      <h3 className="mk-head text-[1.375rem] mt-5">{title}</h3>
+      <p className="mt-2 text-[15px] leading-relaxed mk-muted flex-1">{description}</p>
+      <span className="mt-5 inline-flex items-center gap-1.5 font-display font-semibold uppercase tracking-[0.1em] text-sm text-[color:var(--mk-orange-ink)]" data-testid="text-dfy-sales">
+        {SALES_REP_LABEL} <ArrowRight className="h-3.5 w-3.5" />
+      </span>
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const [navVisible, setNavVisible] = useState(true);
@@ -265,20 +197,17 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#1a2035] text-foreground dark:text-white overflow-x-clip">
-      <AnimatedBackground />
-      <FloatingOrbs />
-
+    <div className="mk min-h-screen overflow-x-clip">
       {/* Nav */}
-      <nav className={`sticky top-0 z-50 transition-all duration-300 bg-[#1e2a4a] backdrop-blur-xl border-b border-white/5 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      <nav className={`sticky top-0 z-50 transition-transform duration-300 mk-navy border-b border-white/10 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <CHLogo height={40} />
-          <div className="hidden md:flex items-center gap-6 text-sm text-white/70">
+          <div className="hidden md:flex items-center gap-7 text-white/75">
             {SECTION_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
+              <a key={link.href} href={link.href} className="mk-navlink hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
             ))}
           </div>
-          <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex items-center gap-1 sm:gap-2">
             {user && (
               <Link href="/settings">
                 <button className="hidden sm:inline-flex items-center justify-center rounded-md h-9 w-9 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
@@ -289,22 +218,16 @@ export default function LandingPage() {
             <div className="text-white"><CartSheet /></div>
             <div className="text-white hidden sm:block"><ThemeToggle /></div>
             {user ? (
-              <Link href="/" data-testid="link-nav-dashboard">
-                <Button size="sm" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white shadow-lg shadow-blue-500/25">
-                  <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> Dashboard
-                </Button>
+              <Link href="/" className="mk-btn mk-btn-primary mk-btn-sm" data-testid="link-nav-dashboard">
+                <LayoutDashboard className="h-4 w-4" /> Dashboard
               </Link>
             ) : (
               <>
-                <Link href="/auth" className="hidden sm:block" data-testid="link-nav-signin">
-                  <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10" size="sm">
-                    Sign In
-                  </Button>
+                <Link href="/auth" className="hidden sm:inline-flex mk-navlink text-white/80 hover:text-white px-3 py-2 transition-colors" data-testid="link-nav-signin">
+                  Sign In
                 </Link>
-                <Link href="/auth?mode=signup" data-testid="link-nav-getstarted">
-                  <Button size="sm" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white shadow-lg shadow-blue-500/25">
-                    Get Started <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                  </Button>
+                <Link href="/auth?mode=signup" className="mk-btn mk-btn-primary mk-btn-sm" data-testid="link-nav-getstarted">
+                  Get Started <ArrowRight className="h-4 w-4" />
                 </Link>
               </>
             )}
@@ -313,290 +236,247 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="relative z-10 pt-16 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto text-center">
-          <div className="animate-in">
-            <Badge className="mb-6 bg-blue-500/10 text-blue-400 border-blue-500/20 px-4 py-1.5 text-sm">
-              <Zap className="h-3.5 w-3.5 mr-1.5" /> Your Complete Business-Building Platform
-            </Badge>
+      {/* Hero: navy band, blueprint grid, the gator front and centre. */}
+      <section className="mk-blueprint relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px] lg:gap-x-10">
+          <div className="pt-6 pb-14 sm:pt-10 lg:pt-20 lg:pb-24">
+            <p className="mk-eyebrow !text-[#F97316] animate-in">Your Complete Business-Building Platform</p>
+            <h1 className="mk-display mt-5 text-white text-[2.5rem] sm:text-6xl lg:text-[3.75rem] xl:text-[5.5rem] animate-in-delay-1">
+              <span className="block normal-case text-[#F97316] text-[0.5em] tracking-[0.02em] mb-2">ConstructHUB &mdash;</span>
+              <span className="block">Build Your Business</span>
+              <span className="block">From the Ground Up</span>
+            </h1>
+            <p className="mt-6 text-base sm:text-lg text-white/75 max-w-xl leading-relaxed animate-in-delay-2">
+              Whether you're starting from scratch or scaling an existing operation — we provide every tool, resource, and service you need. From LLC formation and licensing to GMB optimization and SEO domination. And if you don't want to do it yourself, we'll build your entire business for you.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4 animate-in-delay-3">
+              <Link href="/auth?mode=signup" className="mk-btn mk-btn-primary w-full sm:w-auto" data-testid="link-hero-signup">
+                Create Your Account <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href={SALES_HREF} className="mk-btn mk-btn-ghost w-full sm:w-auto" data-testid="link-hero-dfy">
+                <Package className="h-4 w-4" /> Done-For-You Services
+              </Link>
+              <Link href="/free-site-scan" className="font-semibold text-white underline underline-offset-[6px] decoration-2 decoration-[#F97316] hover:text-[#F97316] transition-colors">
+                Free 60-second website scan
+              </Link>
+            </div>
+            <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2.5 text-sm text-white/70 animate-in-delay-4">
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> No card needed to sign up</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> Setup in minutes</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> Cancel anytime</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#F97316]" /> Turnkey business building available</li>
+            </ul>
           </div>
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] animate-in-delay-1">
-            <span className="bg-gradient-to-r from-foreground via-foreground to-foreground/60 dark:from-white dark:via-white dark:to-white/60 bg-clip-text text-transparent">
-              Construct<span className="font-extrabold">HUB</span> —
-            </span>
-            <br />
-            <span className="bg-gradient-to-r from-[#4A6CF7] via-[#6B8CFF] to-[#F07C22] bg-clip-text text-transparent">
-              Build Your Business From the Ground Up
-            </span>
-          </h1>
-          <p className="mt-6 text-lg sm:text-xl text-muted-foreground dark:text-white/50 max-w-2xl mx-auto leading-relaxed animate-in-delay-2">
-            Whether you're starting from scratch or scaling an existing operation — we provide every tool, resource, and service you need. From LLC formation and licensing to GMB optimization and SEO domination. And if you don't want to do it yourself, we'll build your entire business for you.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-in-delay-3">
-            <Link href="/auth?mode=signup" data-testid="link-hero-signup">
-              <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-8 h-12 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
-                Create Your Account <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-            <Link href="/free-site-scan" className="underline font-semibold">Free 60-second website scan</Link>
-            <Link href={SALES_HREF} data-testid="link-hero-dfy">
-              <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 px-8 h-12 text-base">
-                <Package className="h-4 w-4 mr-2" /> Done-For-You Services
-              </Button>
-            </Link>
-          </div>
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground dark:text-white/40 animate-in-delay-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> No card needed to sign up
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Setup in minutes
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Cancel anytime
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-orange-400" /> Turnkey business building available
-            </div>
+
+          {/* The gator. Phones: beside his greeting, above the copy. Desktop:
+              right column, greeting overhead, boots over the band's edge. */}
+          <div className="order-first lg:order-none relative z-20 flex items-center gap-4 pt-8 lg:pt-10 lg:flex-col lg:items-center lg:justify-end lg:self-end lg:-mb-9">
+            <img
+              src={HERO_GATOR}
+              alt="The ConstructHUB gator in a hard hat and hi-vis vest, arms crossed"
+              width={335}
+              height={512}
+              draggable={false}
+              decoding="async"
+              fetchPriority="high"
+              className="h-[220px] sm:h-[260px] lg:h-[460px] xl:h-[500px] w-auto shrink-0 select-none lg:order-last drop-shadow-[0_24px_24px_rgba(0,0,0,0.45)] animate-in-delay-1"
+              data-testid="img-hero-gator"
+            />
+            <p className="mk-bubble max-w-[220px] lg:max-w-none lg:mb-5 lg:-rotate-2 animate-in-delay-2">
+              Welcome in — let&rsquo;s build your business.
+            </p>
           </div>
         </div>
+        <div className="mk-hazard" aria-hidden="true" />
       </section>
 
-      {/* Stats */}
-      <section id="stats" className="relative z-10 py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
-          {stats.map((stat, i) => (
-            <Card key={stat.label} className={`bg-muted/50 dark:bg-white/[0.03] border-border dark:border-white/[0.06] p-6 text-center backdrop-blur-sm animate-in-delay-${i + 1}`}>
-              <div className="text-3xl sm:text-4xl font-extrabold text-foreground dark:text-white">
-                {typeof stat.value === "number" ? <CountUp end={stat.value} suffix={stat.suffix} /> : "—"}
+      {/* Stats: a measuring strip under the hero. */}
+      <section id="stats" className="relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 lg:pt-20 pb-10 lg:pb-12">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-10">
+            {stats.map((stat, i) => (
+              <div
+                key={stat.label}
+                className={`px-4 sm:px-6 lg:px-8 border-[color:var(--mk-line-strong)] [&:nth-child(even)]:border-l lg:border-l lg:first:border-l-0 animate-in-delay-${i + 1}`}
+              >
+                <div className="mk-display text-[2.75rem] sm:text-6xl lg:text-7xl">
+                  {typeof stat.value === "number" ? <CountUp end={stat.value} suffix={stat.suffix} /> : "—"}
+                </div>
+                <p className="mt-3 font-display font-semibold uppercase tracking-[0.14em] text-xs sm:text-sm mk-muted">{stat.label}</p>
               </div>
-              <p className="text-sm text-muted-foreground dark:text-white/50 mt-1">{stat.label}</p>
-            </Card>
-          ))}
+            ))}
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mk-ticks" aria-hidden="true" />
         </div>
       </section>
 
       {/* Services */}
-      <section id="services" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <Badge className="mb-4 bg-muted dark:bg-white/5 text-muted-foreground dark:text-white/60 border-border dark:border-white/10">What We Do</Badge>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Everything You Need to Start, Build &
-              <span className="bg-gradient-to-r from-[#4A6CF7] to-[#6B8CFF] bg-clip-text text-transparent"> Dominate</span>
-            </h2>
-            <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-xl mx-auto">
-              From forming your LLC to ranking #1 on Google Maps — a full suite of tools and services built by contractors who scaled from solo operators to hundreds of employees.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <section id="services" className="py-20 lg:py-28">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionHeading
+            number="01"
+            eyebrow="What We Do"
+            lede="From forming your LLC to ranking #1 on Google Maps — a full suite of tools and services built by contractors who scaled from solo operators to hundreds of employees."
+          >
+            Everything You Need to Start, Build &amp; <span className="text-[#F97316]">Dominate</span>
+          </SectionHeading>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {services.filter((svc) => SHOW_COMPETITOR_INTEL || svc.title !== "Competitor Intelligence").map((svc, i) => (
-              <Card
+              <div
                 key={svc.title}
-                className={`group bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] hover:border-border dark:hover:border-white/[0.12] p-6 transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm animate-in-delay-${Math.min(i + 1, 5)}`}
+                className={`mk-card group relative p-6 lg:p-7 flex flex-col transition-colors hover:border-[#F97316] animate-in-delay-${Math.min(i + 1, 5)}`}
                 data-testid={`card-service-${i}`}
               >
-                <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${svc.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <svc.icon className="h-5 w-5 text-foreground dark:text-white" />
+                <div className="flex items-start justify-between gap-4">
+                  <IconBox icon={svc.icon} />
+                  <span className="font-display font-semibold text-sm tracking-[0.14em] mk-muted pt-1">{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{svc.title}</h3>
-                <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed">{svc.description}</p>
-              </Card>
+                <h3 className="mk-head text-[1.375rem] mt-5">{svc.title}</h3>
+                <p className="mt-2 text-[15px] leading-relaxed mk-muted">{svc.description}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
       {/* Done-For-You */}
-      <section id="done-for-you" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <Badge className="mb-4 bg-orange-500/10 text-orange-400 border-orange-500/20">Turnkey Solutions</Badge>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Don't Want to Do It Yourself?
-              <span className="bg-gradient-to-r from-[#F07C22] to-[#FFB347] bg-clip-text text-transparent"> We'll Build It For You.</span>
-            </h2>
-            <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-2xl mx-auto">
-              Our turnkey system handles everything — from filing your LLC to launching your marketing. We process all paperwork, set up your online presence, and get you ready to take jobs. The only thing we can't do is take your licensing exams for you.
-            </p>
+      <section id="done-for-you" className="pb-20 lg:pb-28">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionHeading
+            number="02"
+            eyebrow="Turnkey Solutions"
+            lede="Our turnkey system handles everything — from filing your LLC to launching your marketing. We process all paperwork, set up your online presence, and get you ready to take jobs. The only thing we can't do is take your licensing exams for you."
+          >
+            Don't Want to Do It Yourself? <span className="text-[#F97316]">We'll Build It For You.</span>
+          </SectionHeading>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <DfyCard icon={Briefcase} title="Business Formation & Filing" description="LLC, licensing paperwork, bonding, insurance processing, tax registration" data-testid="card-dfy-formation" />
+            <DfyCard icon={Globe} title="GMB & Website Setup" description="Full Google Business Profile, professional website, content" data-testid="card-dfy-gmb" />
+            <DfyCard icon={Megaphone} title="SEO & Ad Campaigns" description="Local SEO, Google Ads, LSA setup, citation building" data-testid="card-dfy-seo" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-            <Card className="group bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] hover:border-border dark:hover:border-white/[0.12] p-6 transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm" data-testid="card-dfy-formation">
-              <div className="flex items-start gap-4">
-                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Briefcase className="h-5 w-5 text-foreground dark:text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-lg font-semibold">Business Formation & Filing</h3>
-                    <span className="text-sm font-semibold text-[#4A6CF7]" data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">LLC, licensing paperwork, bonding, insurance processing, tax registration</p>
-                </div>
+          <div className="mk-navy rounded-[6px] overflow-hidden border border-transparent dark:border-white/10" data-testid="card-dfy-bundle">
+            <div className="mk-hazard" aria-hidden="true" />
+            <div className="p-7 sm:p-10 lg:p-12 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-8 items-center">
+              <div>
+                <h3 className="mk-display text-4xl sm:text-5xl lg:text-6xl">Complete Business Build</h3>
+                <p className="mt-4 text-white/70 max-w-xl text-base lg:text-lg leading-relaxed">
+                  Everything above as one package. Paid upfront. 4-6 months from start to finish. Excludes licensing exams and prerequisites.
+                </p>
               </div>
-            </Card>
-            <Card className="group bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] hover:border-border dark:hover:border-white/[0.12] p-6 transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm" data-testid="card-dfy-gmb">
-              <div className="flex items-start gap-4">
-                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Globe className="h-5 w-5 text-foreground dark:text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-lg font-semibold">GMB & Website Setup</h3>
-                    <span className="text-sm font-semibold text-[#4A6CF7]" data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">Full Google Business Profile, professional website, content</p>
-                </div>
-              </div>
-            </Card>
-            <Card className="group bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] hover:border-border dark:hover:border-white/[0.12] p-6 transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm" data-testid="card-dfy-seo">
-              <div className="flex items-start gap-4">
-                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-purple-500/20 to-violet-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Megaphone className="h-5 w-5 text-foreground dark:text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-lg font-semibold">SEO & Ad Campaigns</h3>
-                    <span className="text-sm font-semibold text-[#4A6CF7]" data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground dark:text-white/40 leading-relaxed mt-2">Local SEO, Google Ads, LSA setup, citation building</p>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <Card className="relative bg-gradient-to-br from-[#4A6CF7]/10 via-muted/50 dark:via-[#1a1f3a]/50 to-[#F07C22]/10 border-border dark:border-white/[0.08] p-8 backdrop-blur-sm text-center" data-testid="card-dfy-bundle">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#4A6CF7]/5 to-[#F07C22]/5 animate-pulse" style={{ animationDuration: "4s" }} />
-            <div className="relative z-10">
-              <div className="flex items-center justify-center gap-3 mb-3 flex-wrap">
-                <h3 className="text-2xl sm:text-3xl font-extrabold">Complete Business Build</h3>
-              </div>
-              <p className="text-muted-foreground dark:text-white/40 max-w-xl mx-auto mb-6">
-                Everything above as one package. Paid upfront. 4-6 months from start to finish. Excludes licensing exams and prerequisites.
-              </p>
-              <Link href={SALES_HREF} data-testid="link-dfy-pricing">
-                <Button size="lg" className="bg-[#F07C22] hover:bg-[#E06B15] text-white px-8 shadow-lg shadow-orange-500/25">
-                  {SALES_REP_LABEL} <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+              <Link href={SALES_HREF} className="mk-btn mk-btn-primary w-full sm:w-auto" data-testid="link-dfy-pricing">
+                {SALES_REP_LABEL} <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-          </Card>
+          </div>
         </div>
       </section>
 
       {/* Plans — every number comes from the price book (shared/plans.ts). */}
-      <section id="plans" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8" data-testid="section-plans">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-10">
-            <Badge className="mb-4 bg-blue-500/10 text-blue-400 border-blue-500/20">Plans</Badge>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              One Plan for Every
-              <span className="bg-gradient-to-r from-[#4A6CF7] to-[#6B8CFF] bg-clip-text text-transparent"> Stage</span>
-            </h2>
-            <p className="mt-4 text-muted-foreground dark:text-white/40 max-w-2xl mx-auto">
-              Every plan starts with a {TRIAL_LABEL} and includes the CRM. Pay monthly, or yearly at 10 times the monthly price.
-            </p>
-          </div>
+      <section id="plans" className="pb-20 lg:pb-28" data-testid="section-plans">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionHeading
+            number="03"
+            eyebrow="Plans"
+            lede={<>Every plan starts with a {TRIAL_LABEL} and includes the CRM. Pay monthly, or yearly at 10 times the monthly price.</>}
+          >
+            One Plan for Every <span className="text-[#F97316]">Stage</span>
+          </SectionHeading>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {PLAN_KEYS.map((key) => (
-              <Card key={key} className="bg-muted/50 dark:bg-white/[0.02] border-border dark:border-white/[0.06] p-5 backdrop-blur-sm" data-testid={`card-plan-${key}`}>
-                <h3 className="text-lg font-semibold">{PLANS[key].name}</h3>
-                <div className="mt-1 text-3xl font-extrabold text-foreground dark:text-white">
-                  {formatUsd(PLANS[key].monthlyCents)}<span className="text-sm font-normal text-muted-foreground dark:text-white/40">/month</span>
+              <div key={key} className="mk-card p-6 flex flex-col" data-testid={`card-plan-${key}`}>
+                <h3 className="font-display font-semibold uppercase tracking-[0.12em] text-base">{PLANS[key].name}</h3>
+                <div className="mt-3 flex items-baseline gap-1.5">
+                  <span className="mk-display text-5xl">{formatUsd(PLANS[key].monthlyCents)}</span>
+                  <span className="text-sm mk-muted">/month</span>
                 </div>
-                <p className="text-sm text-muted-foreground dark:text-white/40 mt-2 leading-relaxed">{PLANS[key].tagline}</p>
+                <p className="mt-3 text-[15px] leading-relaxed mk-muted">{PLANS[key].tagline}</p>
                 {key === "agency" && (
-                  <p className="text-xs text-muted-foreground dark:text-white/50 mt-2" data-testid="text-agency-locations">
+                  <p className="mt-3 text-xs mk-muted border-t pt-3 mk-rule" data-testid="text-agency-locations">
                     {PLANS.agency.limits.locations} locations included, then per-location pricing.
                   </p>
                 )}
-              </Card>
+              </div>
             ))}
           </div>
-          <p className="mt-6 text-center text-sm text-muted-foreground dark:text-white/50" data-testid="text-agency-modules">
+          <p className="mt-6 text-sm mk-muted" data-testid="text-agency-modules">
             Only the {PLANS.agency.name} plan includes the {joinNames(AGENCY_ONLY_MODULES)}.
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/pricing" data-testid="link-plans-pricing">
-              <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-8 shadow-lg shadow-blue-500/25">
-                See Plans &amp; Pricing <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+          <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            <Link href="/pricing" className="mk-btn mk-btn-primary" data-testid="link-plans-pricing">
+              See Plans &amp; Pricing <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href={SALES_HREF} data-testid="link-plans-sales">
-              <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 px-8">
-                {SALES_REP_LABEL}
-              </Button>
+            <Link href={SALES_HREF} className="mk-btn mk-btn-outline" data-testid="link-plans-sales">
+              {SALES_REP_LABEL}
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Coverage Map */}
-      <section id="coverage" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl font-extrabold tracking-tight mb-3">
-            Nationwide <span className="text-[#4A6CF7]">Coverage</span>
-          </h2>
-          <p className="text-muted-foreground dark:text-white/40 mb-10 max-w-xl mx-auto" data-testid="text-coverage-summary">
-            {counts ? `${formatCount(counts.total)} county and city jurisdictions` : "County and city jurisdictions"} listed
-            across all 50 states and DC{hasVerified ? `, ${formatCount(counts!.verifiedPortals!)} with a verified permit portal link` : ""}.
-            Every portal link we show is checked, and links we could not confirm are labeled.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {[
-              "Washington", "Florida", "California", "Texas",
-              "New York", "Illinois", "Pennsylvania", "Ohio",
-              "Georgia", "North Carolina", "Michigan", "Arizona",
-              "Colorado", "Virginia", "Oregon", "Nevada",
-              "Tennessee", "New Jersey", "Massachusetts", "Indiana",
-            ].map(state => (
-              <div key={state} className="flex items-center gap-2 bg-muted/50 dark:bg-white/[0.02] border border-border dark:border-white/[0.06] rounded-lg px-3 py-2.5 text-sm text-muted-foreground dark:text-white/50">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> {state}
+      {/* Coverage */}
+      <section id="coverage" className="pb-20 lg:pb-28">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionHeading
+            number="04"
+            eyebrow="Coverage"
+            lede={
+              <span data-testid="text-coverage-summary">
+                {counts ? `${formatCount(counts.total)} county and city jurisdictions` : "County and city jurisdictions"} listed
+                across all 50 states and DC{hasVerified ? `, ${formatCount(counts!.verifiedPortals!)} with a verified permit portal link` : ""}.
+                Every portal link we show is checked, and links we could not confirm are labeled.
+              </span>
+            }
+          >
+            Nationwide <span className="text-[#F97316]">Coverage</span>
+          </SectionHeading>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+            {COVERAGE_STATES.map((state) => (
+              <div key={state} className="mk-card flex items-center gap-2 px-3 py-2.5 text-sm font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#F97316] shrink-0" /> {state}
               </div>
             ))}
           </div>
-          <p className="mt-4 text-xs text-muted-foreground/50 dark:text-white/25">All 50 states + DC listed &mdash; portal links shown only once checked</p>
+          <p className="mt-4 text-xs mk-muted">All 50 states + DC listed &mdash; portal links shown only once checked</p>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="relative z-10 py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto text-center">
-          <CHLogo height={80} className="mx-auto mb-6" />
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
-            Ready to Build Your Business?
-          </h2>
-          <p className="text-muted-foreground dark:text-white/40 mb-8 max-w-lg mx-auto">
-            Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/auth?mode=signup" data-testid="link-cta-signup">
-              <Button size="lg" className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white px-10 h-13 text-base shadow-2xl shadow-blue-500/30 landing-glow-btn">
-                Create Your Account <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+      <section className="mk-blueprint py-20 lg:py-28">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-10 items-center">
+          <div>
+            <CHLogo height={80} className="mb-6" />
+            <h2 className="mk-display text-5xl sm:text-6xl lg:text-7xl">
+              Ready to Build Your Business?
+            </h2>
+            <p className="mt-5 text-white/70 max-w-xl text-base lg:text-lg leading-relaxed">
+              Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row lg:flex-col items-stretch gap-3 sm:gap-4 lg:min-w-[280px]">
+            <Link href="/auth?mode=signup" className="mk-btn mk-btn-primary" data-testid="link-cta-signup">
+              Create Your Account <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href={SALES_HREF} data-testid="link-cta-consulting">
-              <Button size="lg" variant="outline" className="border-border dark:border-white/20 text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 px-8 h-13 text-base">
-                {SALES_REP_LABEL}
-              </Button>
+            <Link href={SALES_HREF} className="mk-btn mk-btn-ghost" data-testid="link-cta-consulting">
+              {SALES_REP_LABEL}
             </Link>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/[0.05] py-10 px-4 sm:px-6 lg:px-8 bg-[#1e2a4a]">
-        <div className="max-w-6xl mx-auto">
+      <footer className="mk-navy border-t border-white/10 py-10 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <CHLogo height={30} className="opacity-60" />
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-white/40">
-              <a href="mailto:support@constructhub.us" className="hover:text-white/70 transition-colors" data-testid="link-footer-email">support@constructhub.us</a>
-              <span className="text-white/20">|</span>
-              <a href="/terms" className="hover:text-white/70 transition-colors" data-testid="link-footer-terms">Terms of Use</a>
-              <span className="text-white/20">|</span>
-              <a href="/privacy" className="hover:text-white/70 transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
+            <CHLogo height={30} className="opacity-70" />
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-white/55">
+              <a href="mailto:support@constructhub.us" className="hover:text-white transition-colors" data-testid="link-footer-email">support@constructhub.us</a>
+              <span className="text-white/25">|</span>
+              <a href="/terms" className="hover:text-white transition-colors" data-testid="link-footer-terms">Terms of Use</a>
+              <span className="text-white/25">|</span>
+              <a href="/privacy" className="hover:text-white transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
             </div>
-            <p className="text-xs text-white/20">{copyrightNotice()}</p>
+            <p className="text-xs text-white/35">{copyrightNotice()}</p>
           </div>
         </div>
       </footer>
