@@ -1,0 +1,3 @@
+# A repair request: must be declined with the handyman referral, no lead, and the call must NOT be hung up on.
+Hi, I've got a couple of pieces of siding that blew off in the wind, can you fix them?
+Oh okay. No, that's all I needed. Bye.
