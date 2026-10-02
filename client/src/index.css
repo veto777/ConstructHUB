@@ -311,6 +311,20 @@
 
 .mk-rule { border-color: var(--mk-line); }
 
+/* Hairline grid: one 1px rule between cells, no gaps, no shadows. The wrapper
+   draws the top/left edges, every cell draws its right/bottom edge, so any
+   cell count and any column count closes cleanly. */
+.mk-grid {
+  border-top: 1px solid var(--mk-line-strong);
+  border-left: 1px solid var(--mk-line-strong);
+}
+
+.mk-grid-cell {
+  background-color: var(--mk-surface);
+  border-right: 1px solid var(--mk-line-strong);
+  border-bottom: 1px solid var(--mk-line-strong);
+}
+
 /* Navy band with a faint blueprint grid. */
 .mk-navy {
   background-color: var(--mk-navy);
@@ -402,6 +416,25 @@
 
 .mk-btn-outline:hover { background-color: rgba(20, 27, 45, 0.06); }
 .dark .mk-btn-outline:hover { background-color: rgba(255, 255, 255, 0.08); }
+
+/* Navy on the orange panel (the final CTA's "pick your path" half). */
+.mk-btn-navy {
+  background-color: var(--mk-navy);
+  border-color: var(--mk-navy);
+  color: #fff;
+}
+
+.mk-btn-navy:hover {
+  background-color: var(--mk-navy-2);
+  border-color: var(--mk-navy-2);
+}
+
+.mk-btn-navy-outline {
+  border-color: var(--mk-navy);
+  color: var(--mk-navy);
+}
+
+.mk-btn-navy-outline:hover { background-color: rgba(20, 27, 45, 0.1); }
 
 /* Nav links: condensed caps. */
 .mk-navlink {
