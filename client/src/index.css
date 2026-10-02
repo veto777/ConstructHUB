@@ -1076,3 +1076,126 @@
   border-bottom: 2px solid var(--mkt-ink);
   transform: rotate(45deg);
 }
+
+/*
+ * ── shadcn controls inside the editorial theme ──────────────────────────────
+ * Opt-in with `mkt-shadcn` next to `mkt-editorial` (the auth page, /pricing,
+ * the legal pages, /developers, /crm-app). It re-points the app's shadcn
+ * tokens (HSL triplets, see :root above) at the editorial palette, so an
+ * <Input>, <Button>, <Badge> or <Card> on those pages wears the cream paper,
+ * the hairlines and the ONE brand orange instead of the app's white + purple.
+ * Each *-border is re-declared too: :root resolves them once from --primary
+ * etc., and descendants inherit the resolved colour, not the formula.
+ * Dialogs and toasts render in a portal outside the scope and keep the app look.
+ */
+.mkt-shadcn {
+  --background: 38 58% 96.3%;
+  --foreground: 224 41% 18%;
+  --card: 40 100% 98.8%;
+  --card-foreground: 224 41% 18%;
+  --card-border: 36 14% 84%;
+  --border: 36 14% 84%;
+  --input: 33 12% 74%;
+  --popover: 40 100% 98.8%;
+  --popover-foreground: 224 41% 18%;
+  --popover-border: 36 14% 84%;
+  --primary: 25 95% 53.1%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 40 43% 91.8%;
+  --secondary-foreground: 224 41% 18%;
+  --muted: 40 43% 91.8%;
+  --muted-foreground: 225 17% 40%;
+  --accent: 40 43% 91.8%;
+  --accent-foreground: 224 41% 18%;
+  --ring: 25 95% 53.1%;
+  --primary-border: hsl(25 92% 47%);
+  --secondary-border: hsl(36 20% 82%);
+  --muted-border: hsl(36 20% 82%);
+  --accent-border: hsl(36 20% 82%);
+  --button-outline: rgba(27, 37, 65, 0.3);
+  --badge-outline: rgba(27, 37, 65, 0.16);
+  --shadow-sm: none;
+}
+.dark .mkt-shadcn {
+  --button-outline: rgba(242, 237, 228, 0.3);
+  --badge-outline: rgba(242, 237, 228, 0.16);
+  --background: 222 43% 12.4%;
+  --foreground: 39 35% 92.2%;
+  --card: 224 41% 17.8%;
+  --card-foreground: 39 35% 92.2%;
+  --card-border: 222 16% 25%;
+  --border: 222 16% 25%;
+  --input: 224 9% 35%;
+  --popover: 224 41% 17.8%;
+  --popover-foreground: 39 35% 92.2%;
+  --popover-border: 222 16% 25%;
+  --primary: 25 95% 53.1%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 223 39% 15.5%;
+  --secondary-foreground: 39 35% 92.2%;
+  --muted: 223 39% 15.5%;
+  --muted-foreground: 223 17% 66.5%;
+  --accent: 223 39% 20%;
+  --accent-foreground: 39 35% 92.2%;
+  --ring: 25 95% 53.1%;
+  --primary-border: hsl(25 95% 60%);
+  --secondary-border: hsl(222 16% 28%);
+  --muted-border: hsl(222 16% 28%);
+  --accent-border: hsl(222 16% 28%);
+}
+
+/*
+ * ── Long-form legal text (Terms, Privacy) ───────────────────────────────────
+ * The legal pages keep their wording and markup; this scope gives it the
+ * editorial reading type: Fraunces section heads, a 17px Plus Jakarta body at
+ * a comfortable measure, orange list markers and orange-ink links. The
+ * selectors outrank the pages' own utility classes (one class + one element).
+ */
+.mkt-legal {
+  font-size: 16.5px;
+  line-height: 1.75;
+  color: var(--mkt-ink-soft);
+}
+.mkt-legal section {
+  scroll-margin-top: 5rem;
+  padding-top: 2.25rem;
+  margin: 0;
+  border-top: 1px solid var(--mkt-rule);
+}
+.mkt-legal section + section { margin-top: 2.25rem; }
+.mkt-legal h2 {
+  font-family: var(--font-display);
+  font-feature-settings: normal;
+  font-weight: 600;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  letter-spacing: -0.012em;
+  color: var(--mkt-ink);
+  margin-bottom: 1rem;
+}
+.mkt-legal h3 {
+  font-family: var(--font-display);
+  font-feature-settings: normal;
+  font-weight: 600;
+  font-size: 1.2rem;
+  line-height: 1.3;
+  letter-spacing: -0.008em;
+  color: var(--mkt-ink);
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.mkt-legal strong { color: var(--mkt-ink); font-weight: 600; }
+.mkt-legal ul { padding-left: 1.4rem; }
+.mkt-legal li { padding-left: 0.25rem; }
+.mkt-legal li + li { margin-top: 0.4rem; }
+.mkt-legal li::marker { color: var(--mkt-orange); }
+.mkt-legal a {
+  color: var(--mkt-orange-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--mkt-orange-soft);
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+.mkt-legal a:hover { text-decoration-color: var(--mkt-orange); }

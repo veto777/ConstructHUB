@@ -16,7 +16,8 @@ import { STATE_GUIDES_LINK_STATUS_DDL } from "../server/state-guides-schema";
 import { ensureDocNumberUniqueIndexes } from "../server/crm/doc-number";
 import { BILLING_SUBSCRIPTION_DDL, FULFILMENT_DDL, BILLING_INTRO_DDL } from "../server/billing/schema";
 import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
-import { VOICE_SCHEMA_DDL } from "../server/voice/schema";
+import { VOICE_SCHEMA_BACKFILL, VOICE_SCHEMA_DDL } from "../server/voice/schema";
+import { DASHBOARD_PREFS_DDL } from "../server/dashboard/prefs";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -47,11 +48,16 @@ const STATEMENTS = [
   // voice_calls / voice_escalations / voice_spam / voice_usage
   // (server/voice/schema.ts also runs these at boot).
   ...VOICE_SCHEMA_DDL,
+  // …and its idempotent backfill (per-tier overage buckets for rows metered at the old single 10¢ rate).
+  ...VOICE_SCHEMA_BACKFILL,
   // Dashboard (server/dashboard/tiles/protect.ts): Click Guard, IP Tracker and
   // VPN Shield read visits per tracked site and time window on every home load.
   `CREATE INDEX IF NOT EXISTS click_visits_domain_visited_idx ON click_visits (domain_id, visited_at)`,
   `CREATE INDEX IF NOT EXISTS vpn_visits_domain_visited_idx ON vpn_visits (domain_id, visited_at)`,
   `CREATE INDEX IF NOT EXISTS tracked_domains_user_idx ON tracked_domains (user_id)`,
+  // Dashboard preferences: the saved layout and cleared "Needs you today" items
+  // (server/dashboard/prefs.ts also runs these at boot).
+  ...DASHBOARD_PREFS_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

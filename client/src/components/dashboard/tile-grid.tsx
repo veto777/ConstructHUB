@@ -1,5 +1,7 @@
-import { ArrowRight, ArrowUpRight, LayoutGrid, Lock } from "lucide-react";
+import { ArrowRight, ArrowUpRight, LayoutGrid, Lock, SlidersHorizontal } from "lucide-react";
 import { DASHBOARD_GROUPS, type DashboardGroupKey, type DashboardTile, type DashboardTileKey } from "@shared/dashboard";
+import { DASHBOARD_CRM_CARD_TILES, dashboardGroupsInOrder } from "@shared/dashboard-prefs";
+import { Button } from "@/components/ui/button";
 import { featureIntroPath } from "@shared/feature-pages";
 import { MODULE_NAMES, PLANS } from "@shared/plans";
 import { DashboardTileCard } from "./dashboard-tile";
@@ -9,7 +11,7 @@ import { TILE_ICONS } from "./tile-icons";
 export const GRID_COLS = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
 
 /** Rendered by CrmSnapshotCard above the grid, never as grid tiles. */
-export const CRM_CARD_TILES: ReadonlySet<DashboardTileKey> = new Set(["crm", "crmLeads", "crmSchedule"]);
+export const CRM_CARD_TILES: ReadonlySet<DashboardTileKey> = DASHBOARD_CRM_CARD_TILES;
 
 /**
  * A group's locked tiles, as one compact row: icon, name and the plan that
@@ -17,7 +19,7 @@ export const CRM_CARD_TILES: ReadonlySet<DashboardTileKey> = new Set(["crm", "cr
  * Each chip keeps `tile-<key>` / data-status="locked" and shows no numbers;
  * it links to the feature's intro page (/features/<slug>) to see what it does.
  */
-function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey; tiles: DashboardTile[]; spaced: boolean }) {
+function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all"; tiles: DashboardTile[]; spaced: boolean }) {
   const labelId = `dashboard-locked-${group}`;
   return (
     <div
@@ -80,12 +82,51 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey; tiles: 
   );
 }
 
-/** Every tile under its group heading, groups in DASHBOARD_GROUPS order; locked tiles fold into one row per group. */
-export function TileGrid({ tiles }: { tiles: DashboardTile[] }) {
+/**
+ * The tools, in the user's order (the server sends `tiles` already sorted by
+ * their layout). Grouped: each group under its heading, groups in the order
+ * their first tile comes; locked tiles fold into one row per group. One list
+ * (`keepGroups` off): a single grid in the user's order, locked tiles in one
+ * row under it.
+ */
+export function TileGrid({ tiles, keepGroups = true, onCustomize }: { tiles: DashboardTile[]; keepGroups?: boolean; onCustomize?: () => void }) {
+  const gridTiles = tiles.filter((t) => !CRM_CARD_TILES.has(t.key));
+  if (!gridTiles.length) {
+    return (
+      <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed px-4 py-5 sm:flex-row sm:items-center sm:justify-between" data-testid="text-dashboard-tiles-empty">
+        <p className="text-sm text-muted-foreground">You've hidden every tool from your dashboard. They're all still in the menu.</p>
+        {onCustomize && (
+          <Button variant="outline" size="sm" className="min-h-10 sm:min-h-8" onClick={onCustomize}>
+            <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Choose tools
+          </Button>
+        )}
+      </div>
+    );
+  }
+  if (!keepGroups) {
+    const open = gridTiles.filter((t) => t.status !== "locked");
+    const locked = gridTiles.filter((t) => t.status === "locked");
+    return (
+      <section aria-labelledby="dashboard-group-all" data-testid="section-dashboard-all">
+        <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h2 id="dashboard-group-all" className="text-sm font-semibold">Your tools</h2>
+          <p className="text-sm text-muted-foreground">In your order.</p>
+        </div>
+        {open.length > 0 && (
+          <div className={GRID_COLS}>
+            {open.map((tile) => <DashboardTileCard key={tile.key} tile={tile} />)}
+          </div>
+        )}
+        {locked.length > 0 && <LockedRow group="all" tiles={locked} spaced={open.length > 0} />}
+      </section>
+    );
+  }
+  const byKey = new Map(gridTiles.map((t) => [t.key, t]));
   return (
     <div className="space-y-8">
-      {DASHBOARD_GROUPS.map((group) => {
-        const inGroup = tiles.filter((t) => t.group === group.key && !CRM_CARD_TILES.has(t.key));
+      {dashboardGroupsInOrder(gridTiles.map((t) => t.key)).map(({ key, tiles: keys }) => {
+        const group = DASHBOARD_GROUPS.find((g) => g.key === key)!;
+        const inGroup = keys.map((k) => byKey.get(k)!).filter(Boolean);
         if (!inGroup.length) return null;
         const open = inGroup.filter((t) => t.status !== "locked");
         const locked = inGroup.filter((t) => t.status === "locked");

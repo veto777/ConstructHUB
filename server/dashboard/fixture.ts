@@ -12,10 +12,11 @@
  */
 import { PLANS, type PlanKey, type PlanLimits, type PlanModules } from "@shared/plans";
 import {
-  DASHBOARD_TILES,
-  type DashboardChecklistItem, type DashboardMetric, type DashboardPayload, type DashboardRecentItem,
+  DASHBOARD_TILES, dashboardAttention,
+  type DashboardAccount, type DashboardChecklistItem, type DashboardMetric, type DashboardPayload, type DashboardRecentItem,
   type DashboardTile, type DashboardTileKey, type DashboardUsage,
 } from "@shared/dashboard";
+import { defaultDashboardLayout, splitDashboardTiles, type DashboardLayout } from "@shared/dashboard-prefs";
 import { cheapestPlanAllowing, tileAccess } from "./access";
 import { CTA_START, COMING_SOON_MESSAGE, lockedMessage } from "./copy";
 
@@ -161,25 +162,45 @@ export function buildDashboardFixture(
   const hasCrmOrg = scenario !== "noplan";
   const displayName = user.displayName?.trim() || null;
   const recent = recentFor(now, scenario);
+  const account: DashboardAccount = {
+    firstName: displayName ? displayName.split(/\s+/)[0] : null,
+    displayName,
+    plan,
+    planName: plan ? PLANS[plan].name : null,
+    status: plan ? (scenario === "new" ? "trialing" : "active") : "none",
+    isPlatformAdmin: false,
+    trialEndsAt: scenario === "new" ? new Date(now.getTime() + DAY).toISOString() : null,
+    renewsAt: scenario === "full" ? new Date(now.getTime() + 17 * DAY).toISOString() : null,
+    usage: usageFor(plan, scenario),
+    resetsAt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString(),
+    unreadNotifications: recent.filter((r) => r.unread).length,
+  };
+  const tiles = DASHBOARD_TILES.map((def) => tileFor(scenario, def, now, plan, modules, hasCrmOrg));
   return {
     generatedAt: now.toISOString(),
     cached: false,
     fixture: true,
-    account: {
-      firstName: displayName ? displayName.split(/\s+/)[0] : null,
-      displayName,
-      plan,
-      planName: plan ? PLANS[plan].name : null,
-      status: plan ? (scenario === "new" ? "trialing" : "active") : "none",
-      isPlatformAdmin: false,
-      trialEndsAt: scenario === "new" ? new Date(now.getTime() + DAY).toISOString() : null,
-      renewsAt: scenario === "full" ? new Date(now.getTime() + 17 * DAY).toISOString() : null,
-      usage: usageFor(plan, scenario),
-      resetsAt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString(),
-      unreadNotifications: recent.filter((r) => r.unread).length,
-    },
-    tiles: DASHBOARD_TILES.map((def) => tileFor(scenario, def, now, plan, modules, hasCrmOrg)),
+    account,
+    tiles,
+    attention: dashboardAttention(tiles, account),
+    cleared: [],
+    layout: defaultDashboardLayout(),
+    hiddenTiles: [],
     checklist: checklistFor(plan, scenario),
     recent,
+  };
+}
+
+/**
+ * The sample payload under a user's saved layout, so the Customize sheet can
+ * be exercised against the sample scenarios too.
+ */
+export function applyLayoutToFixture(payload: DashboardPayload, layout: DashboardLayout): DashboardPayload {
+  // As the real build does: hidden tiles leave the grid, their alerts stay.
+  return {
+    ...payload,
+    ...splitDashboardTiles(payload.tiles, layout),
+    attention: dashboardAttention(payload.tiles, payload.account),
+    layout,
   };
 }

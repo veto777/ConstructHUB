@@ -192,6 +192,15 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
   // minutes (billing-usage.ts recordVoiceCallUsage). `minutes` stays the billable total.
   `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS spam_free_calls integer NOT NULL DEFAULT 0`,
   `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS spam_free_minutes integer NOT NULL DEFAULT 0`,
+  // Per-tier overage (owner, 2026-10-02: "for the crew and fleet the cost per
+  // minute is 5 not 10 cents"): each call's overage minutes are kept in the
+  // bucket of the rate in force when it was recorded ({"10": 30, "5": 120}),
+  // and billed per bucket (billing-usage.ts), so a mid-month tier switch bills
+  // every call at its own tier's rate. overage_cents_per_minute = the rate in
+  // force at the month's latest call (like included_minutes).
+  `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS overage_rate_minutes jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS overage_reported_rate_minutes jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS overage_cents_per_minute integer`,
   // The weekly spam report (spam-report.ts): one claimed row per org per week
   // (Monday, UTC) — the claim is what makes the email + bell exactly once.
   `CREATE TABLE IF NOT EXISTS voice_spam_reports (
@@ -214,6 +223,18 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
   // ── end lane: calls+crm ──
 ];
 
+/**
+ * One-off data fixes that follow the DDL (idempotent, run after it). Rows
+ * metered before per-tier rates had one rate for every tier, 10 cents: their
+ * overage goes into that bucket (only rows with overage and no bucket yet).
+ */
+export const VOICE_SCHEMA_BACKFILL: readonly string[] = [
+  `UPDATE voice_usage SET overage_rate_minutes = jsonb_build_object('10', overage_minutes),
+     overage_reported_rate_minutes = jsonb_build_object('10', overage_reported_minutes),
+     overage_cents_per_minute = COALESCE(overage_cents_per_minute, 10)
+   WHERE overage_minutes > 0 AND overage_rate_minutes = '{}'::jsonb`,
+];
+
 export const VOICE_TABLES: readonly string[] = [
   "voice_profiles", "voice_profile_versions", "voice_numbers", "voice_calls", "voice_escalations", "voice_spam", "voice_usage",
   "voice_spam_reports",
@@ -225,4 +246,5 @@ type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: 
 export async function ensureVoiceSchema(q?: Queryable): Promise<void> {
   const client = q ?? (await import("../db")).pool;
   for (const statement of VOICE_SCHEMA_DDL) await client.query(statement);
+  for (const statement of VOICE_SCHEMA_BACKFILL) await client.query(statement);
 }

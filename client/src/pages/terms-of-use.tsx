@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
-import { PublicPageHeader } from "@/components/public-page-chrome";
+import { LegalPage } from "@/components/legal-page";
 import { ADDONS, PLANS, PLAN_KEYS } from "@shared/plans";
 import {
   AGENCY_ONLY_MODULES, CRM_SEATS_LINE, SALES_REP_LABEL, SALES_THRESHOLD_LABEL, TRIAL_LABEL,
@@ -16,16 +16,16 @@ export default function TermsOfUsePage() {
   }, []);
 
   return (
-    <>
-    <PublicPageHeader next="/terms" />
-    <div className="min-h-screen bg-background text-foreground" data-testid="page-terms-of-use">
-      <div className="max-w-3xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
-        <a href="/" className="text-primary hover:underline text-sm" data-testid="link-back-home">Back to Home</a>
-
-        <h1 className="text-3xl font-bold mt-6 mb-2" data-testid="heading-terms-title">Terms of Use</h1>
-        <p className="text-sm text-muted-foreground mb-8" data-testid="text-effective-date">Last updated: {LAST_UPDATED}</p>
-
-        <div className="space-y-8 text-sm leading-relaxed">
+    <LegalPage
+      path="/terms"
+      pageTestId="page-terms-of-use"
+      title="Terms of Use"
+      titleTestId="heading-terms-title"
+      date={<>Last updated: {LAST_UPDATED}</>}
+      dateTestId="text-effective-date"
+      footer={copyrightNotice()}
+    >
+        <div>
           <section data-testid="section-introduction">
             <h2 className="text-xl font-semibold mb-3">1. Introduction</h2>
             <p>Welcome to ConstructHUB ("we," "us," or "our"), operated at constructhub.us. These Terms of Use ("Terms") govern your access to and use of our website, platform, tools, services, and content. By creating an account or using any part of ConstructHUB, you agree to be bound by these Terms. If you do not agree, do not use the platform.</p>
@@ -228,12 +228,6 @@ export default function TermsOfUsePage() {
             </p>
           </section>
         </div>
-
-        <div className="mt-10 pt-6 border-t border-border text-xs text-muted-foreground" data-testid="text-copyright">
-          {copyrightNotice()}
-        </div>
-      </div>
-    </div>
-    </>
+    </LegalPage>
   );
 }

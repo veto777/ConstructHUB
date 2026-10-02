@@ -124,6 +124,11 @@ describe("the release decision (pure)", () => {
     expect(numbersKeptFor(sub("active", { call_number: 2 }), false)).toEqual({ keep: 0, reason: "addon_removed" });
     // A plan that doesn't sell the add-on pays for no number.
     expect(numbersKeptFor(sub("active", { call_assistant: 1 }, { plan: "starter" }), false)).toEqual({ keep: 0, reason: "addon_removed" });
+    // Lite includes 1 number, like Solo: a Fleet → Lite downgrade keeps 1 (plus extras); past_due holds; a cancel keeps none.
+    expect(numbersKeptFor(sub("active", { call_assistant_lite: 1 }), false)).toEqual({ keep: 1, reason: "over_allowance" });
+    expect(numbersKeptFor(sub("active", { call_assistant_lite: 1, call_number: 1 }), false)).toEqual({ keep: 2, reason: "over_allowance" });
+    expect(numbersKeptFor(sub("past_due", { call_assistant_lite: 1 }), false)).toEqual({ keep: 1, reason: "over_allowance" });
+    expect(numbersKeptFor(sub("canceled", { call_assistant_lite: 1 }), false)).toEqual({ keep: 0, reason: "subscription_ended" });
     expect(releaseReasonText("subscription_ended")).toBe("the subscription ended");
     expect(releaseReasonText("payment_failed")).toBe("the subscription's payment was not recovered");
   });
@@ -458,5 +463,19 @@ describe("the off switch and the Billing preview", () => {
     expect(s2).toMatchObject({ decision: { keep: 5, reason: "over_allowance" }, restored: 4 });
     expect((await row(held[4].phone)).status).toBe("active");
     expect((await row(held[5].phone)).status).toBe("releasing");
+  });
+
+  it("Fleet → Lite keeps the oldest number and schedules the rest (not final); a Lite cancel releases them all", async () => {
+    const a = await account({ status: "active", addons: { call_assistant_fleet: 1 } });
+    const held = [];
+    for (const age of [70, 60, 3]) held.push(await number(a.orgId, age));
+    expect((await previewCallNumberReleases(a.userId, { addons: { call_assistant_lite: 1 } })).map((n) => n.phoneNumber)).toEqual(held.slice(1).map((n) => n.phone));
+    await setSub(a.userId, { addons: { call_assistant_lite: 1 } });
+    expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ decision: { keep: 1, reason: "over_allowance" }, scheduled: 2 });
+    expect((await row(held[0].phone)).status).toBe("active");
+    for (const n of held.slice(1)) expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "over_allowance" });
+    await setSub(a.userId, { status: "canceled", addons: { call_assistant_lite: 1 } });
+    expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ decision: { keep: 0, reason: "subscription_ended" } });
+    expect(await row(held[0].phone)).toMatchObject({ release_reason: "subscription_ended" });
   });
 });

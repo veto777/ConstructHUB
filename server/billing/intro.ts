@@ -1,7 +1,7 @@
 /**
  * Add-on introductory prices — today only the AI Call Assistant's Solo tier
  * (owner, 2026-10-02: "$99 a month for the first 3 months", then the regular
- * price). Crew and Fleet have no intro; moving between tiers never grants it.
+ * price). Lite, Crew and Fleet have no intro; moving between tiers never grants it.
  *
  * The price book carries the figures (shared/plans.ts `introMonthlyCents`,
  * `introMonths`); this module turns them into a Stripe coupon and decides who
@@ -140,11 +140,11 @@ export const INTRO_USED_BY_SIBLING = "none:held_sibling";
 
 /**
  * The intro is for a new customer of the service: an account that holds a
- * sibling of an intro-bearing add-on (Crew or Fleet, same exclusiveGroup as
+ * sibling of an intro-bearing add-on (Lite, Crew or Fleet, same exclusiveGroup as
  * Solo) on a live subscription has used the Solo intro up, even though it
  * never received a coupon. Recorded as a billing_addon_intros row with no
  * coupon and the subscription as `ref`, so removing the tier and adding Solo
- * in a later request, or a new subscription after cancelling Crew, gets no
+ * in a later request, or a new subscription after cancelling Lite or Crew, gets no
  * intro. Called after every subscription write (server/stripe.ts). A real
  * grant is never overwritten; a pending checkout grant (cs_…) is replaced,
  * since the subscription now proves the account is a customer. Returns the
@@ -177,7 +177,7 @@ export async function introsForOrder(
   const out: { addon: AddonKey; couponId: string }[] = [];
   for (const addon of ADDON_KEYS) {
     if (!introFor(addon, interval) || (before[addon] ?? 0) > 0 || (after[addon] ?? 0) <= 0) continue;
-    // A switch between Call Assistant tiers (Crew → Solo) is not "first added": the intro is for a new customer of the service.
+    // A switch between Call Assistant tiers (Lite or Crew → Solo) is not "first added": the intro is for a new customer of the service.
     const group = ADDONS[addon].exclusiveGroup;
     if (group && ADDON_KEYS.some((k) => ADDONS[k].exclusiveGroup === group && (before[k] ?? 0) > 0)) continue;
     if (!(await introEligible(stripe, userId, addon, q))) continue;

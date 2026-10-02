@@ -1,10 +1,11 @@
 /**
- * The AI Call Assistant's three tiers (Solo / Crew / Fleet) in the app's own
+ * The AI Call Assistant's four tiers (Lite / Solo / Crew / Fleet) in the app's own
  * (shadcn) look: the pricing page's add-on area and Settings. Every figure is
  * the price book's (shared/plans.ts CALL_ASSISTANT_TIERS through
  * shared/plan-copy.ts callAssistantTiers) — nothing here types a price.
  *
- *   CallAssistantTierCards — three cards, the interval the page shows
+ *   CallAssistantTierCards — four cards (4-up on desktop, 2-up on tablets,
+ *     stacked on phones), the interval the page shows
  *   CallAssistantTierPicker — the held tier and a switch to each other one
  *     (Settings → Billing and Limits & usage). A switch goes through the
  *     shared add-on flow (use-billing.tsx useAddonChange): a smaller tier that
@@ -19,16 +20,19 @@ import { callAssistantPricing, callAssistantTiers, formatUsd } from "@shared/pla
 
 const suffix = (interval: BillingInterval) => (interval === "year" ? "/yr" : "/mo");
 
-/** Three tier cards for the pricing page (`interval` follows the page's monthly/yearly toggle). */
+/** "Popular" ring: the tier with the intro (Solo). */
+const featured = (t: { intro: string | null }) => t.intro !== null;
+
+/** Four tier cards for the pricing page (`interval` follows the page's monthly/yearly toggle). */
 export function CallAssistantTierCards({ interval, className }: { interval: BillingInterval; className?: string }) {
   const p = callAssistantPricing();
   return (
     <div className={cn("space-y-3", className)} data-testid="section-call-assistant-tiers">
-      <div className="grid gap-3 md:grid-cols-3">
-        {p.tiers.map((t, i) => (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {p.tiers.map((t) => (
           <div
             key={t.tier}
-            className={cn("relative rounded-xl border bg-card p-4 flex flex-col", i === 1 && "ring-2 ring-[#F97316]/40 border-[#F97316]/40")}
+            className={cn("relative rounded-xl border bg-card p-4 flex flex-col", featured(t) && "ring-2 ring-[#F97316]/40 border-[#F97316]/40")}
             data-testid={`card-call-assistant-tier-${t.tier}`}
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -50,6 +54,10 @@ export function CallAssistantTierCards({ interval, className }: { interval: Bill
               <li className="flex gap-2"><Check className="h-4 w-4 mt-0.5 text-[#F97316] shrink-0" aria-hidden="true" /> {t.minutes} call minutes a month</li>
               <li className="flex gap-2"><Check className="h-4 w-4 mt-0.5 text-[#F97316] shrink-0" aria-hidden="true" /> {t.numbersLabel} included</li>
               <li className="flex gap-2 text-muted-foreground"><Check className="h-4 w-4 mt-0.5 text-[#F97316] shrink-0" aria-hidden="true" /> Fits {t.estimatedCalls} (estimate)</li>
+              <li className="flex flex-wrap items-center gap-x-2 gap-y-1" data-testid={`text-call-assistant-tier-overage-${t.tier}`}>
+                <Check className="h-4 w-4 text-[#F97316] shrink-0" aria-hidden="true" /> {t.overageShort}/min over
+                {t.lowerOverage && <Badge variant="secondary" className="text-[10px] font-semibold" data-testid={`badge-call-assistant-tier-lower-overage-${t.tier}`}>Lower overage</Badge>}
+              </li>
             </ul>
           </div>
         ))}
@@ -58,7 +66,7 @@ export function CallAssistantTierCards({ interval, className }: { interval: Bill
         <ShieldBan className="h-4 w-4 mt-0.5 text-[#F97316] shrink-0" aria-hidden="true" />
         <span>
           <span className="font-semibold">Every tier:</span> the first {p.freeSpamCalls} spam calls each month are free (they never count toward your minutes); spam is screened and repeat spammers are blocked before they're answered.
-          Above the included minutes, {p.overagePerMinute}/minute. Extra local numbers {p.extraNumber}/mo each. Add-on for the {p.plans} plans.
+          Above the included minutes, {p.overageLine}. Extra local numbers {p.extraNumber}/mo each. Add-on for the {p.plans} plans.
         </span>
       </div>
     </div>
@@ -84,7 +92,7 @@ export function CallAssistantTierPicker({ addons, interval, editable, pending, o
   const held = callAssistantTierOf(addons ?? {});
   const heldIndex = held ? CALL_ASSISTANT_TIERS.findIndex((t) => t.tier === held.tier) : -1;
   return (
-    <div className={cn("grid gap-2", compact ? "sm:grid-cols-3" : "md:grid-cols-3")} data-testid="picker-call-assistant-tier">
+    <div className={cn("grid gap-2 sm:grid-cols-2", compact ? "xl:grid-cols-4" : "lg:grid-cols-4")} data-testid="picker-call-assistant-tier">
       {callAssistantTiers().map((t, i) => {
         const current = held?.tier === t.tier;
         const label = current ? "Current tier" : !held ? `Choose ${t.name}` : i > heldIndex ? `Upgrade to ${t.name}` : `Move to ${t.name}`;
@@ -98,7 +106,7 @@ export function CallAssistantTierPicker({ addons, interval, editable, pending, o
               <span className="font-semibold text-sm">{t.name}</span>
               <span className="text-sm font-semibold tabular-nums">{formatUsd(interval === "year" ? t.annualCents : t.monthlyCents)}{suffix(interval)}</span>
             </div>
-            <p className="text-xs text-muted-foreground">{t.minutes} minutes / month · {t.numbersLabel}</p>
+            <p className="text-xs text-muted-foreground">{t.minutes} minutes / month · {t.numbersLabel} · {t.overageShort}/min over</p>
             <Button
               size="sm"
               variant={current ? "secondary" : "outline"}
@@ -113,7 +121,7 @@ export function CallAssistantTierPicker({ addons, interval, editable, pending, o
         );
       })}
       {p.comingSoon && (
-        <p className={cn("text-xs text-muted-foreground", compact ? "sm:col-span-3" : "md:col-span-3")} data-testid="text-call-assistant-tier-preview">
+        <p className="text-xs text-muted-foreground sm:col-span-full" data-testid="text-call-assistant-tier-preview">
           Coming soon: listed, not for sale yet.
         </p>
       )}

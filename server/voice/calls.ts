@@ -173,7 +173,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const month = voiceMonthKey();
     const [ledger, usage] = await Promise.all([listSpamLedger(v.ctx.org.id), getVoiceUsageRow(v.ctx.org.id, month)]);
     const entries = ledger.map(presentSpamRow);
-    const u = summarizeVoiceUsage(usage, month, v.allowance.minutes);
+    const u = summarizeVoiceUsage(usage, month, v.allowance.minutes, v.allowance.overageCentsPerMinute);
     sendUnlogged(res, {
       entries,
       blocked: entries.filter((e) => e.blocked).length,
