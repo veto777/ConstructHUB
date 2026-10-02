@@ -28,7 +28,7 @@ export type HubMascotProps = {
   label?: string;
 };
 
-const ORANGE = "#F1592F";
+const ORANGE = "#F97316"; // the marketing orange (index.css --primary 25 95% 53%)
 const CREAM = "#FFF1E6";
 
 const CSS = `

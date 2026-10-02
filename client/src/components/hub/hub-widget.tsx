@@ -317,7 +317,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           </button>
           <p className="pr-5 font-semibold">Welcome aboard!</p>
           <p className="mt-1 text-muted-foreground">I'm Gabe. Want a hand setting things up?</p>
-          <button type="button" onClick={() => openPanel(true)} className="mt-2 rounded-full bg-orange-700 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-800" data-testid="hub-welcome-open">
+          <button type="button" onClick={() => openPanel(true)} className="mt-2 rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-600" data-testid="hub-welcome-open">
             Show me around
           </button>
         </div>
@@ -341,7 +341,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
         >
           <HubMascot size={56} decorative />
           {welcomePending && (
-            <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-orange-600" data-testid="hub-welcome-dot" />
+            <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-orange-500" data-testid="hub-welcome-dot" />
           )}
         </button>
       )}
@@ -364,7 +364,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           )}
           data-testid="hub-panel"
         >
-          <div className="flex items-center gap-3 bg-gradient-to-r from-[#C2410C] to-[#9A3412] px-3 py-2.5 text-white">
+          <div className="flex items-center gap-3 bg-gradient-to-r from-[#F97316] to-[#EA6A0C] px-3 py-2.5 text-white">
             <div className="shrink-0 rounded-full bg-white/10 p-0.5" data-testid="hub-header-mascot" data-state={mascotState}>
               <HubMascot size={48} state={mascotState} label={busy ? "Gabe is thinking" : "Gabe"} />
             </div>
@@ -395,7 +395,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                     // A long unbroken string (a pasted URL) wraps instead of running out of the panel.
                     "min-w-0 max-w-[92%] break-words rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
                     m.role === "user"
-                      ? "whitespace-pre-wrap rounded-tr-sm bg-orange-700 text-white"
+                      ? "whitespace-pre-wrap rounded-tr-sm bg-orange-500 text-white"
                       : m.tone === "error"
                         ? "rounded-tl-sm border border-amber-500/40 bg-amber-50 text-amber-950 dark:bg-amber-950/40 dark:text-amber-100"
                         : "rounded-tl-sm border bg-muted/50",
@@ -424,7 +424,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
             {offline ? (
               <div className="pt-1" data-testid="hub-offline">
                 <button type="button" onClick={() => void refetch()}
-                  className="rounded-full border bg-background px-3 py-1.5 text-xs font-medium hover:border-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                  className="rounded-full border bg-background px-3 py-1.5 text-xs font-medium hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/40"
                   data-testid="hub-retry">
                   Try again
                 </button>
@@ -436,13 +436,13 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                 {chips.map((p) => (
                   // aria-disabled, not disabled: a disabled button drops keyboard focus to <body> (askPreset ignores taps while busy).
                   <button key={p.id} type="button" data-hub-chip aria-disabled={busy || undefined} onClick={() => askPreset(p.id, p.label)}
-                    className="rounded-full border bg-background px-3 py-1.5 text-left text-xs font-medium hover:border-orange-600 hover:bg-orange-50 aria-disabled:cursor-wait aria-disabled:opacity-50 dark:hover:bg-orange-950/40"
+                    className="rounded-full border bg-background px-3 py-1.5 text-left text-xs font-medium hover:border-orange-500 hover:bg-orange-50 aria-disabled:cursor-wait aria-disabled:opacity-50 dark:hover:bg-orange-950/40"
                     data-testid={`hub-chip-${p.id}`}>
                     {p.label}
                   </button>
                 ))}
                 <button type="button" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-1.5 text-xs font-medium text-orange-700 hover:underline dark:text-orange-300"
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-1.5 text-xs font-medium text-orange-600 hover:underline dark:text-orange-300"
                   data-testid="hub-more">
                   {showMore ? <>Fewer <ChevronUp className="h-3 w-3" /></> : <>More questions <ChevronDown className="h-3 w-3" /></>}
                 </button>
@@ -469,7 +469,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                   data-testid="hub-input"
                 />
                 <button type="submit" disabled={busy || !input.trim()} aria-label="Send"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-700 text-white hover:bg-orange-800 disabled:opacity-50"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
                   data-testid="hub-send">
                   <Send className="h-4 w-4" />
                 </button>
@@ -480,7 +480,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
               <div className="flex items-center justify-between gap-3" data-testid="hub-signup-cta">
                 <p className="text-xs text-muted-foreground">Create a free account to ask Gabe anything.</p>
                 <Link href="/auth" onClick={() => setOpen(false)}
-                  className="shrink-0 rounded-full bg-orange-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-800"
+                  className="shrink-0 rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
                   data-testid="hub-signup-link">
                   Create account
                 </Link>
