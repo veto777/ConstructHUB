@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import { ADDONS, PLANS, PLAN_KEYS } from "@shared/plans";
 import {
   AGENCY_ONLY_MODULES, CRM_SEATS_LINE, SALES_REP_LABEL, SALES_THRESHOLD_LABEL, TRIAL_LABEL,
@@ -15,6 +16,8 @@ export default function TermsOfUsePage() {
   }, []);
 
   return (
+    <>
+    <PublicPageHeader next="/terms" />
     <div className="min-h-screen bg-background text-foreground" data-testid="page-terms-of-use">
       <div className="max-w-3xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
         <a href="/" className="text-primary hover:underline text-sm" data-testid="link-back-home">Back to Home</a>
@@ -231,5 +234,6 @@ export default function TermsOfUsePage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

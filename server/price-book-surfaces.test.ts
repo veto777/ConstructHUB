@@ -26,8 +26,10 @@ describe("sitemap and retired pages", () => {
     expect(html).toContain(`<meta name="description" content="${meta.description}" />`);
     expect(html).toContain(`<meta property="og:title" content="${meta.title}" />`);
     expect(html).toContain(`<meta property="og:description" content="${meta.description}" />`);
-    // Every other page keeps index.html's defaults.
-    expect(withRouteMeta(indexHtml, "/pricing")).toBe(indexHtml);
+    // /pricing has its own too now (every marketing page does, shared/route-meta.ts);
+    // a page without an entry — the signed-in tools — keeps index.html's defaults.
+    expect(withRouteMeta(indexHtml, "/pricing")).toContain(`<title>${ROUTE_META["/pricing"].title.replace(/&/g, "&amp;")}</title>`);
+    expect(withRouteMeta(indexHtml, "/search")).toBe(indexHtml);
   });
 });
 

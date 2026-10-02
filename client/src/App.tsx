@@ -51,6 +51,7 @@ import LsaGuidePage from "@/pages/lsa-guide";
 import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
+import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
 import AdminFeaturePagesPage from "@/pages/admin-feature-pages";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
@@ -100,6 +101,8 @@ import MediaLibraryPage from "@/pages/media-library";
 import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
+import { useSeoHead } from "@/lib/seo-head";
+import { ROUTE_META } from "@shared/route-meta";
 
 /**
  * The old one-off landing pages, retired into /features/<slug>: the old URLs
@@ -184,6 +187,9 @@ function DashboardRouter() {
       {/* Every feature's intro page (shared/feature-pages), inside the app frame when signed in. */}
       <Route path="/features" component={FeaturesCataloguePage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
+      {/* Every done-for-you service's page (shared/dfy-pages), inside the app frame when signed in. */}
+      <Route path="/done-for-you" component={DfyCataloguePage} />
+      <Route path="/done-for-you/:slug" component={DfyPageRoute} />
       {/* Platform admins: every feature page, its status and links (the API answers 403 to anyone else). */}
       <Route path="/admin/feature-pages" component={AdminFeaturePagesPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
@@ -243,6 +249,8 @@ function PublicRouter() {
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/features" component={FeaturesCataloguePage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
+      <Route path="/done-for-you" component={DfyCataloguePage} />
+      <Route path="/done-for-you/:slug" component={DfyPageRoute} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/developers" component={DevelopersPage} />
@@ -287,9 +295,10 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/admin/feature-pages"];
-/** Feature intro pages title themselves from their content (seo.title). */
-const isSelfTitled = (location: string) => SELF_TITLED.includes(location) || location.startsWith("/features/");
+const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages"];
+/** Feature and service pages title themselves from their content (seo.title). */
+const isSelfTitled = (location: string) =>
+  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
 const PAGE_TITLES: Record<string, string> = {
   "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
   "/schedules": "Scrape Schedules", "/history": "Search History", "/photos": "Photo Optimizer",
@@ -434,9 +443,15 @@ function AppContent() {
   // effects, so self-titled pages are skipped rather than overwritten).
   useEffect(() => {
     if (portal || clientPortal || isSelfTitled(location)) return;
+    // A marketing page's title is the one the server wrote into its HTML (shared/route-meta.ts).
+    const meta = ROUTE_META[location];
+    if (meta) { document.title = meta.title; return; }
     const key = Object.keys(PAGE_TITLES).find(p => location === p || location.startsWith(`${p}/`));
     document.title = key ? `${PAGE_TITLES[key]} | ConstructHUB` : DEFAULT_TITLE;
   }, [location, portal, clientPortal]);
+
+  // Canonical link, Open Graph / Twitter tags and JSON-LD follow the page (lib/seo-head.ts); never on the portals.
+  useSeoHead(location, !portal && !clientPortal);
 
   if (location === "/free-site-scan") return <FreeSiteScanPage />;
   if (location.startsWith("/site-scan/report/")) return <SharedSiteScanPage />;

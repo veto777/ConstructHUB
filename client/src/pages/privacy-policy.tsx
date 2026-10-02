@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 
 export default function PrivacyPolicyPage() {
   useEffect(() => {
@@ -7,6 +8,8 @@ export default function PrivacyPolicyPage() {
   }, []);
 
   return (
+    <>
+    <PublicPageHeader next="/privacy" />
     <div className="min-h-screen bg-background text-foreground" data-testid="page-privacy-policy">
       <div className="max-w-3xl mx-auto px-4 py-10">
         <a href="/" className="text-primary hover:underline text-sm" data-testid="link-back-home">Back to Home</a>
@@ -338,5 +341,6 @@ export default function PrivacyPolicyPage() {
         </p>
       </div>
     </div>
+    </>
   );
 }

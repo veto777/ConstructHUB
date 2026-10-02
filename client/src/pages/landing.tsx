@@ -31,6 +31,7 @@ import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUs
 import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
 import { callAssistantPricing } from "@shared/plan-copy";
 import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
+import { DFY_PATH, dfyPageByKey, dfyPagePath } from "@shared/dfy-pages";
 
 
 /** Button recipes — anchors styled as buttons (no <button> nested in <a>). */
@@ -195,12 +196,19 @@ const services = [
   },
 ];
 
+/** A done-for-you card's own page (shared/dfy-pages), by registry key. */
+const dfyHref = (key: string) => {
+  const page = dfyPageByKey(key);
+  return page ? dfyPagePath(page) : DFY_PATH;
+};
+
 /** Done-for-you card recipes (the three cards are written out so their testids stay literal). */
 const DFY_CARD = "group bg-mkt-card border border-mkt-rule rounded-2xl p-7 hover:border-mkt-ink transition-colors";
 const DFY_ICON = "h-11 w-11 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink mb-6 group-hover:border-mkt-orange group-hover:text-mkt-orange transition-colors";
 const DFY_TITLE = "font-display font-semibold text-[1.35rem] leading-tight text-mkt-ink";
 const DFY_BODY = "text-[15px] text-mkt-ink-soft leading-relaxed mt-2.5";
 const DFY_SALES = "mt-5 inline-flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-mkt-orange-ink";
+const DFY_LINK = "mt-3 flex w-fit items-center gap-1.5 text-[14px] font-semibold text-mkt-orange-ink hover:underline underline-offset-4";
 
 const COVERAGE_STATES = [
   "Washington", "Florida", "California", "Texas",
@@ -286,7 +294,7 @@ export default function LandingPage() {
               <Link href="/auth?mode=signup" data-testid="link-hero-signup" className={`${BTN_PRIMARY} ${BTN_LG}`}>
                 Create Your Account <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href={SALES_HREF} data-testid="link-hero-dfy" className={`${BTN_OUTLINE} ${BTN_LG}`}>
+              <Link href={DFY_PATH} data-testid="link-hero-dfy" className={`${BTN_OUTLINE} ${BTN_LG}`}>
                 <Package className="h-4 w-4" /> Done-For-You Services
               </Link>
             </div>
@@ -417,18 +425,21 @@ export default function LandingPage() {
               <h3 className={DFY_TITLE}>Business Formation &amp; Filing</h3>
               <p className={DFY_BODY}>LLC, licensing paperwork, bonding, insurance processing, tax registration</p>
               <span className={DFY_SALES} data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
+              <Link href={dfyHref("formation")} className={DFY_LINK} data-testid="link-dfy-formation">What's included <ArrowRight className="h-3.5 w-3.5" /></Link>
             </div>
             <div className={DFY_CARD} data-testid="card-dfy-gmb">
               <div className={DFY_ICON}><Globe className="h-5 w-5" strokeWidth={1.75} /></div>
               <h3 className={DFY_TITLE}>GMB &amp; Website Setup</h3>
               <p className={DFY_BODY}>Full Google Business Profile, professional website, content</p>
               <span className={DFY_SALES} data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
+              <Link href={dfyHref("gmbWebsite")} className={DFY_LINK} data-testid="link-dfy-gmb">What's included <ArrowRight className="h-3.5 w-3.5" /></Link>
             </div>
             <div className={DFY_CARD} data-testid="card-dfy-seo">
               <div className={DFY_ICON}><Megaphone className="h-5 w-5" strokeWidth={1.75} /></div>
               <h3 className={DFY_TITLE}>SEO &amp; Ad Campaigns</h3>
               <p className={DFY_BODY}>Local SEO, Google Ads, LSA setup, citation building</p>
               <span className={DFY_SALES} data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
+              <Link href={dfyHref("seoAds")} className={DFY_LINK} data-testid="link-dfy-seo">What's included <ArrowRight className="h-3.5 w-3.5" /></Link>
             </div>
           </div>
 
@@ -442,9 +453,12 @@ export default function LandingPage() {
                   Everything above as one package. Paid upfront. 4-6 months from start to finish. Excludes licensing exams and prerequisites.
                 </p>
               </div>
-              <div className="lg:col-span-4 lg:justify-self-end">
+              <div className="lg:col-span-4 lg:justify-self-end flex flex-col items-stretch sm:items-start lg:items-end gap-3">
                 <Link href={SALES_HREF} data-testid="link-dfy-pricing" className={`${BTN_PRIMARY} ${BTN_LG} w-full sm:w-auto`}>
                   {SALES_REP_LABEL} <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href={dfyHref("businessBuild")} data-testid="link-dfy-bundle" className="inline-flex items-center justify-center gap-1.5 text-[15px] font-semibold underline decoration-2 decoration-mkt-orange underline-offset-4">
+                  What's in the build <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             </div>

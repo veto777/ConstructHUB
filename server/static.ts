@@ -8,40 +8,26 @@ import {
   isClientHost,
   requestHost,
 } from "./site-context";
-import { ROUTE_META } from "@shared/route-meta";
-import { FEATURES_PATH, READY_FEATURE_PAGES, featurePagePath } from "@shared/feature-pages";
+import { MARKETING_ROUTES, canonicalPath } from "@shared/seo";
+import { withRouteMeta, withSeoHead } from "./seo-html";
+
+export { withRouteMeta, withSeoHead };
 
 const CANONICAL_HOST = PRIMARY_DOMAIN;
 const BASE = `https://${CANONICAL_HOST}`;
 
-// Public, indexable routes (marketing + legal). App/dashboard routes are
+// Public, indexable routes: every marketing page (shared/seo.ts — the same
+// list the build prerenders), plus the sign-in page. App/dashboard routes are
 // deliberately excluded — they render behind auth and shouldn't be indexed.
-// Feature intro pages join once written: a stub (status "stub") is not listed.
-// The retired one-off landing pages (/google-ads-landing, …) only redirect to
-// their /features page, so they are not listed.
-export const PUBLIC_ROUTES = [
-  "/",
-  "/pricing",
-  "/call-assistant",
-  FEATURES_PATH,
-  ...READY_FEATURE_PAGES.map(featurePagePath),
-  "/google-ads-guide",
-  "/google-ad-fraud",
-  "/lsa-guide",
-  "/google-business",
-  "/privacy",
-  "/terms",
-  "/auth",
-];
+// Feature and service pages join once written: a stub (status "stub") is not
+// listed. The retired one-off landing pages (/google-ads-landing, …) only
+// redirect to their /features page, so they are not listed.
+export const PUBLIC_ROUTES: readonly string[] = [...MARKETING_ROUTES, "/auth"];
 
-/** Normalize a request path for the canonical tag: no query, no trailing
- * slash (except root), collapse to root on anything weird. */
-function canonicalPath(reqPath: string): string {
-  let p = (reqPath || "/").split("?")[0];
-  if (p.length > 1 && p.endsWith("/")) p = p.replace(/\/+$/, "");
-  if (!p.startsWith("/") || p.includes("..")) p = "/";
-  return p;
-}
+/** Where the build writes the prerendered pages (script/prerender.ts), under dist/public. */
+export const PRERENDER_DIR = "prerender";
+/** The build's lastmod dates for the sitemap (script/build.ts), next to dist/index.cjs. */
+export const SEO_MANIFEST = "seo-manifest.json";
 
 /**
  * Retired pages and where they live now (301, so search engines move the old
@@ -52,36 +38,64 @@ export const RETIRED_ROUTES: Record<string, string> = {
   "/individual-pricing": "/pricing#add-ons",
 };
 
-const escapeAttr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
 /**
- * The page's own <title>, meta description and Open Graph title/description
- * (shared/route-meta.ts) written into the HTML served for that path, so a
- * crawler that runs no JavaScript still sees them. Paths without an entry
- * keep index.html's defaults.
+ * The sitemap: every public route with its <lastmod> — the build's date for
+ * that page (the last commit of its content file), else `fallbackDate`.
  */
-export function withRouteMeta(html: string, path: string): string {
-  const meta = ROUTE_META[path];
-  if (!meta) return html;
-  const title = escapeAttr(meta.title);
-  const description = escapeAttr(meta.description);
-  // Function replacers: a "$" in the copy is text, never a replacement pattern.
-  return html
-    .replace(/<title>[^<]*<\/title>/i, () => `<title>${title}</title>`)
-    .replace(/(<meta name="description" content=")[^"]*(")/i, (_, open, close) => `${open}${description}${close}`)
-    .replace(/(<meta property="og:title" content=")[^"]*(")/i, (_, open, close) => `${open}${title}${close}`)
-    .replace(/(<meta property="og:description" content=")[^"]*(")/i, (_, open, close) => `${open}${description}${close}`);
-}
-
-export function buildSitemap(): string {
+export function buildSitemap(lastmod: Readonly<Record<string, string>> = {}, fallbackDate = new Date().toISOString().slice(0, 10)): string {
   const urls = PUBLIC_ROUTES.map(
-    (r) => `  <url><loc>${BASE}${r === "/" ? "/" : r}</loc></url>`,
+    (r) => `  <url><loc>${BASE}${r}</loc><lastmod>${lastmod[r] ?? fallbackDate}</lastmod></url>`,
   ).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
+/** The hashed bundles a build's index.html loads (/assets/index-….js, /assets/index-….css). */
+const assetRefs = (html: string) => [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+
+/**
+ * The prerendered pages under `distPath`/prerender: "/features/site-scan" →
+ * the HTML in prerender/features/site-scan/index.html. Only marketing routes,
+ * so a stray file can never be served for another path, and only snapshots of
+ * THIS build: the deploy copies dist/ without deleting old files, so a page the
+ * latest build failed to prerender may still have an older snapshot on disk —
+ * one pointing at bundles that no longer exist. A snapshot must load every
+ * bundle the current index.html loads, or the shell serves that page. Empty
+ * when the build shipped without them (the prerender step is allowed to fail).
+ */
+export function loadPrerenderedPages(distPath: string, indexHtml?: string): Map<string, string> {
+  const pages = new Map<string, string>();
+  const dir = path.join(distPath, PRERENDER_DIR);
+  if (!fs.existsSync(dir)) return pages;
+  let current: string[] = [];
+  try {
+    current = assetRefs(indexHtml ?? fs.readFileSync(path.join(distPath, "index.html"), "utf-8"));
+  } catch { /* no index.html: nothing to match against */ }
+  for (const route of MARKETING_ROUTES) {
+    const file = path.join(dir, route === "/" ? "" : route.slice(1), "index.html");
+    try {
+      const html = fs.readFileSync(file, "utf-8");
+      if (!html.includes('data-prerendered="')) continue;
+      if (!current.every((ref) => html.includes(`"${ref}"`))) continue;
+      pages.set(route, html);
+    } catch { /* not prerendered: the shell serves it */ }
+  }
+  return pages;
+}
+
+function readLastmod(distRoot: string): Record<string, string> {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(distRoot, SEO_MANIFEST), "utf-8"));
+    return manifest && typeof manifest.lastmod === "object" ? manifest.lastmod : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Signed in (a session the auth middleware recognised)? Then the page is the app frame, not the marketing snapshot. */
+const isSignedIn = (req: express.Request) =>
+  typeof (req as any).isAuthenticated === "function" ? !!(req as any).isAuthenticated() : !!(req as any).user;
+
+export function serveStatic(app: Express, distPath = path.resolve(__dirname, "public")) {
   if (!fs.existsSync(distPath)) {
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
@@ -89,7 +103,12 @@ export function serveStatic(app: Express) {
   }
 
   const indexHtml = fs.readFileSync(path.resolve(distPath, "index.html"), "utf-8");
-  const sitemapXml = buildSitemap();
+  // The pages the build prerendered (full HTML for every visitor who is not
+  // signed in — crawler or person alike, never by user agent) and the build's
+  // lastmod dates; the build date stands in for a page without one.
+  const prerendered = loadPrerenderedPages(distPath, indexHtml);
+  const builtOn = fs.statSync(path.resolve(distPath, "index.html")).mtime.toISOString().slice(0, 10);
+  const sitemapXml = buildSitemap(readLastmod(path.resolve(distPath, "..")), builtOn);
 
   // Every marketing domain serves the SAME content — constructhub.app is not a
   // redirect to constructhub.us, it is the site. Duplicate-content risk is
@@ -129,6 +148,9 @@ export function serveStatic(app: Express) {
     res.type("application/xml").send(sitemapXml);
   });
 
+  // The prerendered files are served only at their page's own URL (below), never as /prerender/….
+  app.use(`/${PRERENDER_DIR}`, (_req, res) => { res.status(404).type("text/plain").send("Not found"); });
+
   app.use(express.static(distPath, { index: false }));
 
   // Fall through to index.html with a per-path canonical injected, so every
@@ -146,11 +168,10 @@ export function serveStatic(app: Express) {
       return res.type("html").send(html);
     }
     const pagePath = canonicalPath(req.originalUrl);
-    const canonical = `${BASE}${pagePath}`;
-    const html = withRouteMeta(indexHtml, pagePath).replace(
-      /<\/title>/i,
-      `</title>\n    <link rel="canonical" href="${canonical}" />`,
-    );
-    res.type("html").send(html);
+    // The HTML depends on the session cookie (snapshot signed out, shell signed in).
+    res.setHeader("Vary", "Cookie");
+    const snapshot = prerendered.get(pagePath);
+    if (snapshot && !isSignedIn(req)) return res.type("html").send(snapshot);
+    res.type("html").send(withSeoHead(indexHtml, pagePath, { origin: BASE }));
   });
 }

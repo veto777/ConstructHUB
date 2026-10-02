@@ -52,6 +52,17 @@ or "Name County, ST"). Counties/cities from `seed-all-counties.ts` / `seed-all-c
 `npm test` (vitest — CRM server unit + money-path integration tests; integration tests need the dev server) ·
 `npm run db:push` (drizzle — but prefer `apply-schema-migration.ts`, see above).
 
+## Marketing pages ship prerendered (SEO)
+`npm run build` ends by prerendering every public marketing page (`shared/seo.ts` `MARKETING_ROUTES`:
+home, /features + every ready /features/<slug>, /call-assistant, /done-for-you + every
+/done-for-you/<slug>, /pricing, /reinstatement, legal pages, guides) with playwright-core's
+chromium-headless-shell into `dist/public/prerender/`, plus sitemap lastmod dates in
+`dist/seo-manifest.json` (`script/prerender.ts`, `script/build.ts`). No DB or secrets needed; a failure
+prints a loud warning and the build still succeeds (`SKIP_PRERENDER=1` skips it). `server/static.ts`
+serves a snapshot to every signed-out visitor (never by user agent) and the SPA shell when signed in;
+every marketing page gets its title/description/canonical/OG/JSON-LD from `shared/route-meta.ts` +
+`shared/seo.ts`. A new public page = a `ROUTE_META` entry + a `MARKETING_ROUTES` entry (the vitest checks both).
+
 ## Security (from the code review — keep these intact)
 Stripe webhook verifies the raw body + fails closed; cart prices resolved server-side
 (`server/catalog.ts`); no hardcoded session secret; auth dev-bypass gated on `DEV_AUTH_BYPASS_USER1`

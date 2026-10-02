@@ -1,7 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
 /**
- * Feature intro pages (/features, /features/<slug>, /admin/feature-pages).
+ * Feature intro pages (/features, /features/<slug>, /admin/feature-pages), and
+ * the marketing foundation (e2e/marketing-seo.spec.ts: /done-for-you pages, the
+ * ribbon's dropdowns, JSON-LD — also against the built production server).
  * Runs against two already-started dev servers from the same checkout:
  *   FP_SIGNED_OUT_URL  DEV_AUTH_BYPASS_USER1=false (default http://127.0.0.1:$E2E_PORT)
  *   FP_SIGNED_IN_URL   DEV_AUTH_BYPASS_USER1=true  (the admin tests skip without it)
@@ -13,7 +15,7 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "feature-pages.spec.ts",
+  testMatch: ["feature-pages.spec.ts", "marketing-seo.spec.ts"],
   workers: 1,
   timeout: 120_000,
   expect: { timeout: 15_000 },

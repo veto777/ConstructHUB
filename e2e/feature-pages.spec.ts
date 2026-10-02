@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FEATURE_CATALOGUE, FEATURE_PAGES, featurePagePath } from "../shared/feature-pages";
+import { DFY_CATALOGUE } from "../shared/dfy-pages";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "../client/src/lib/features";
 
 /**
@@ -132,10 +133,17 @@ test.describe("platform admin (signed in)", () => {
     const errors = watchErrors(page);
     await open(page, `${SIGNED_IN}/admin/feature-pages`);
     await expect(page.getByTestId("page-admin-feature-pages")).toBeVisible();
-    await expect(page.locator('[data-testid^="row-admin-feature-"]')).toHaveCount(FEATURE_CATALOGUE.length + 1);
+    await expect(page.locator('[data-testid^="row-admin-feature-"]')).toHaveCount(FEATURE_CATALOGUE.length + DFY_CATALOGUE.length + 1);
     for (const e of FEATURE_CATALOGUE) {
       await expect(page.getByTestId(`link-admin-feature-public-${e.key}`)).toHaveAttribute("href", e.path);
     }
+    // The done-for-you services, as their own group.
+    const services = page.getByTestId("card-admin-feature-group-dfy");
+    await expect(services).toContainText("Done-For-You Services");
+    for (const e of DFY_CATALOGUE) {
+      await expect(services.getByTestId(`link-admin-feature-public-${e.key}`)).toHaveAttribute("href", e.path);
+    }
+    await expect(page.getByTestId("link-admin-dfy-catalogue")).toHaveAttribute("href", "/done-for-you");
     await expect(page.getByTestId("row-admin-feature-callAssistant")).toHaveAttribute("data-status", "external");
     await expect(page.getByTestId("link-admin-feature-public-landing")).toHaveAttribute("href", "/landing");
     // Every template page is written: no stub is left.

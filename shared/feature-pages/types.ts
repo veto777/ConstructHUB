@@ -72,22 +72,45 @@ export type FeaturePricing = (
 /** A section heading: `title` then an orange italic `em` part, as on /call-assistant ("Live in Four <em>Steps</em>"). */
 export type FeatureHeading = { title: string; em?: string; intro?: string };
 
-export type FeaturePage = {
+/**
+ * The long-form "In Depth" band near the end of a page: its own section, with
+ * a heading, 2–5 paragraphs and an optional bullet list, written to explain
+ * the feature in the words a contractor searches with (WRITING-GUIDE.md →
+ * "The In Depth section"). Same rules as every field: plain text, every claim
+ * traceable to code, no $ amounts, no stats.
+ */
+export type FeatureInDepth = {
+  /** The H2: `title` + the orange italic `em`, e.g. "Site Scan " + "in Depth". */
+  heading: FeatureHeading;
+  /** 2–5 paragraphs, 250–500 words with the bullets. */
+  paragraphs: string[];
+  /** Optional lead-in line above the bullets ("What the scan checks:"). */
+  bulletsIntro?: string;
+  /** Optional bullet list after the paragraphs. */
+  bullets?: string[];
+};
+
+/**
+ * What every template page says — a feature (/features/<slug>) or a
+ * done-for-you service (/done-for-you/<slug>, shared/dfy-pages): the hero and
+ * the sections the template renders. The two page kinds add how they are
+ * sold and where they lead (FeaturePage, DfyPage).
+ */
+export type LandingContent = {
   /** Registry key: the dashboard tile key where there is one (shared/dashboard.ts). */
   key: string;
-  /** URL segment: /features/<slug>. Kebab-case; never changes once published. */
+  /** URL segment: /features/<slug> or /done-for-you/<slug>. Kebab-case; never changes once published. */
   slug: string;
-  group: FeatureGroupKey;
   /**
    * "stub": the placeholder the template branch created — title, lede and the
    * in-app route only. "ready": written to WRITING-GUIDE.md and checked. Only
-   * ready pages are in the sitemap, and a retired landing page (`legacyPath`)
-   * redirects here only once its page is ready.
+   * ready pages are in the sitemap and prerendered, and a retired landing page
+   * (`legacyPath`) redirects here only once its page is ready.
    */
   status: "stub" | "ready";
-  /** The feature's name as the app's sidebar / page calls it. */
+  /** The feature's name as the app's sidebar / page calls it (a service: as /pricing calls it). */
   title: string;
-  /** The name in Title Case for the closing "Put … to Work" headline, when `title` is sentence case. */
+  /** The name in Title Case for the closing headline, when `title` is sentence case. */
   ctaTitle?: string;
   /** The hero's small-caps kicker, e.g. "Website audit". */
   kicker: string;
@@ -113,25 +136,31 @@ export type FeaturePage = {
   };
   /** Who it is for: 2–4 short profiles. */
   audience: { title: string; body: string }[];
-  pricing: FeaturePricing;
   /** 3–5 honest questions a buyer asks: what it needs from me, which plan, what it does NOT do. */
   faqs: { q: string; a: string }[];
+  /** Optional long-form explanation, its own band near the end of the page (FeatureInDepth). */
+  inDepth?: FeatureInDepth;
+  /** Overrides for the section headings (defaults live in the template). */
+  headings?: Partial<Record<"steps" | "cards" | "audience" | "pricing" | "faq" | "related", FeatureHeading>>;
+  /** <title> and meta description (search results, link previews). */
+  seo: { title: string; description: string };
+  /** Repo paths that back the claims on the page — where a reviewer checks them. */
+  sources: string[];
+};
+
+export type FeaturePage = LandingContent & {
+  group: FeatureGroupKey;
+  pricing: FeaturePricing;
   /** Registry keys of related features (shown as cards). */
   related: string[];
   /** The feature in the app: the "Open <feature>" button for signed-in visitors. */
   app: { href: string; surface: DashboardSurface; label?: string };
   /** A no-account way to try it (e.g. the free site scan), shown beside the sign-up button. */
   tryIt?: { label: string; href: string };
-  /** Overrides for the section headings (defaults live in the template). */
-  headings?: Partial<Record<"steps" | "cards" | "audience" | "pricing" | "faq" | "related", FeatureHeading>>;
-  /** <title> and meta description (search results, link previews). */
-  seo: { title: string; description: string };
   /** A retired marketing page this one replaces (client-side redirect once `status` is "ready"). */
   legacyPath?: string;
   /** Client feature flag that hides the page entirely (client/src/lib/features.ts). */
   flag?: "SHOW_GOOGLE_REVIEWS" | "SHOW_COMPETITOR_INTEL";
-  /** Repo paths that back the claims on the page — where a reviewer checks them. */
-  sources: string[];
 };
 
 /**

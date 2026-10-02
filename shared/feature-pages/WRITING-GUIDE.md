@@ -7,6 +7,12 @@ template, the registry (`index.ts`) or another feature's file.
 
 The reference is **`siteScan.ts`**. Copy its shape, not its words.
 
+**Done-for-you service pages** (`/done-for-you/<slug>`, content in `shared/dfy-pages/<key>.ts`) use the
+same template and follow this same guide, with two differences: a service has no in-app page (its call
+to action is "Talk to a sales rep"), and its `pricing` is `{ kind: "sales", topic }` whenever any of its
+`catalogIds` (`server/catalog.ts` `DFY_CATALOG`) is priced at the sales threshold or more — the vitest
+checks it, and the catalog price never goes into a content file.
+
 ## Which file is mine
 
 | group | keys |
@@ -104,7 +110,31 @@ never type it. `pricing.note` is one plain sentence with no `$` amounts.
 | `headings` | Optional overrides for section headings: `{ title, em }` — `em` is the orange italic part. |
 | `seo` | `title` ≤ ~60 chars ending in `| ConstructHUB`; `description` ≤ ~160 chars, factual. |
 | `legacyPath` / `flag` | Already set where they apply. Keep them. |
+| `inDepth` | Optional but wanted on every page: the long-form "In Depth" section. See below. |
 | `sources` | Every file that backs a claim on the page. The vitest checks they exist. |
+
+## The In Depth section
+
+`inDepth` is the page's own section for ranking and explanation: a band near the end of the page
+(after the FAQ) with an "In Depth" kicker, an H2 (`heading: { title, em }`), **2–5 paragraphs** and an
+optional bullet list (`bulletsIntro` + `bullets`). It is plain text in the prerendered HTML, so it is
+what a search engine reads first about the feature. The reference is `siteScan.ts`.
+
+- **250–500 words** in all (paragraphs + bullets). Long enough to explain, short enough to read.
+- **Plain contractor English.** Say what it does on the job, in the words a contractor uses; explain
+  any technical term in the same sentence ("canonical tags", "structured data").
+- **Keyword-natural.** Use the phrases a contractor would actually search, where they fit the
+  sentence: "website audit for contractors", "contractor website SEO", "SEO checklist",
+  "Google Business Profile", "click fraud protection". Use each once or twice — never a list of
+  keywords, never the same phrase in every paragraph.
+- **Every claim traceable to code**, exactly as everywhere else on the page: add a comment above
+  `inDepth` naming the files and functions behind it, and list them in `sources`.
+- **No stats, no promises, no competitor names.** No percentages, no "saves hours", nothing that
+  promises rankings, leads or revenue; name no other software product, agency or marketplace. Naming
+  the platform a customer already uses (a site builder, Google) is fine.
+- **Don't repeat the cards.** The cards say what you get; In Depth explains how it works, what it
+  checks or decides, what it needs, and where its limits are.
+- No `$` amounts (the vitest rejects them here too).
 
 ## Before you set `status: "ready"`
 
@@ -112,5 +142,6 @@ never type it. `pricing.note` is one plain sentence with no `$` amounts.
 - [ ] Every sentence has a source; nothing promises rankings, revenue or results.
 - [ ] No `$` amounts, no stats, no testimonials, no competitor names, no customer data.
 - [ ] 3–5 steps, 3–5 FAQs (needs-from-me, plan, does-not-do), 2–4 audience profiles.
+- [ ] `inDepth`, if written: 2–5 paragraphs, 250–500 words, every claim with a source.
 - [ ] The page reads well at 390 px (long words in the H1 can wrap; keep the swipe short).
 - [ ] Look at it: `/features/<slug>` signed out (public header) and signed in (sidebar).

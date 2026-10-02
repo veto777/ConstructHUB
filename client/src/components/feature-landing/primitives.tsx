@@ -55,10 +55,16 @@ export function useDocumentTitle(title: string) {
  * Start a page at its top when it is entered by an in-app link. Signed out the
  * window scrolls; signed in the app frame's <main> does — and a SPA navigation
  * keeps either offset, so a card clicked far down /features would otherwise
- * open the next page far down too. A URL with a #fragment is left alone.
+ * open the next page far down too. A URL with a #fragment is left alone, and
+ * so is the page the browser loaded: it already starts at the top, and a
+ * prerendered page may have been scrolled before the app took over.
  */
+const loadedPath = typeof window === "undefined" ? "" : window.location.pathname;
+let navigated = false;
 export function useStartAtTop(key: string) {
   useEffect(() => {
+    if (!navigated && window.location.pathname === loadedPath) return;
+    navigated = true;
     if (window.location.hash) return;
     window.scrollTo(0, 0);
     document.querySelector("main")?.scrollTo(0, 0);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,6 +203,8 @@ export default function LsaGuidePage() {
   };
 
   return (
+    <>
+    <PublicPageHeader next="/lsa-guide" />
     <div className="h-full overflow-y-auto bg-background text-foreground overflow-x-hidden">
       <section className="pt-12 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto space-y-8">
@@ -456,5 +459,6 @@ export default function LsaGuidePage() {
         </div>
       </section>
     </div>
+    </>
   );
 }
