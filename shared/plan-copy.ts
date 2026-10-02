@@ -6,6 +6,7 @@
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
   TRIAL_DAYS, SALES_THRESHOLD_CENTS, MODULE_NAMES, ANNUAL_MONTHS, planForModule, showsPrice,
+  CALL_ASSISTANT_INCLUDED_MINUTES, CALL_ASSISTANT_INCLUDED_NUMBERS, CALL_MINUTE_OVERAGE_CENTS,
   type Plan, type PlanKey, type ModuleKey,
 } from "./plans";
 
@@ -98,8 +99,73 @@ export function addonLines(): string[] {
   return Object.values(ADDONS).map((addon) => {
     const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
     const on = joinNames(addon.availableOn.map((key) => PLANS[key].name));
-    return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}`;
+    const intro = addon.key === "call_assistant" ? ` Launch price: ${callAssistantIntroLine()}.` : "";
+    // A `preview` add-on is listed but refused at checkout (shared/plans.ts), so say so.
+    const preview = addon.preview ? " Coming soon: listed, not for sale yet." : "";
+    return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}${intro}${preview}`;
   });
+}
+
+// ── AI Call Assistant ────────────────────────────────────────────────────────
+
+/**
+ * AI Call Assistant launch pricing (owner, 2026-10-02): "$99 a month for the
+ * first 3 months", then the add-on's regular monthly price.
+ *
+ * THE ONLY PLACE the intro figures live. Everything else — the regular price,
+ * the included number and minutes, the overage rate, the extra-number price
+ * and whether it is for sale yet — is read from the price book
+ * (shared/plans.ts ADDONS.call_assistant / call_number and the CALL_*
+ * constants). When the price book grows its own intro fields
+ * (introMonthlyCents / introMonths on the add-on), point this constant at
+ * them and every surface follows: the landing page, /call-assistant, the
+ * pricing page and Gabe's knowledge all render through the helpers below.
+ */
+export const CALL_ASSISTANT_INTRO: { readonly monthlyCents: number; readonly months: number } = { monthlyCents: 9900, months: 3 };
+
+/** "Pro, Growth and Agency" — the plans the add-on is sold on. */
+export const CALL_ASSISTANT_PLANS = joinNames(ADDONS.call_assistant.availableOn.map((key) => PLANS[key].name));
+
+/** Every Call Assistant price fact, formatted, for page copy ("$99", 3, "$249", …). */
+export function callAssistantPricing() {
+  const addon = ADDONS.call_assistant;
+  return {
+    name: addon.name,
+    intro: formatUsd(CALL_ASSISTANT_INTRO.monthlyCents),
+    introMonths: CALL_ASSISTANT_INTRO.months,
+    regular: formatUsd(addon.monthlyCents),
+    includedNumbers: CALL_ASSISTANT_INCLUDED_NUMBERS,
+    includedMinutes: CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US"),
+    overagePerMinute: formatUsd(CALL_MINUTE_OVERAGE_CENTS),
+    extraNumber: formatUsd(ADDONS.call_number.monthlyCents),
+    plans: CALL_ASSISTANT_PLANS,
+    planKeys: addon.availableOn,
+    /** Listed but not for sale yet (the numbers+billing lane drops the flag at launch). */
+    comingSoon: addon.preview === true,
+  };
+}
+
+/** "$99/month for your first 3 months, then $249/month". */
+export function callAssistantIntroLine(): string {
+  const p = callAssistantPricing();
+  return `${p.intro}/month for your first ${p.introMonths} months, then ${p.regular}/month`;
+}
+
+/** "1 local number and 500 call minutes a month, then $0.15 a minute; extra numbers $5/month each". */
+export function callAssistantIncludesLine(): string {
+  const p = callAssistantPricing();
+  return `${p.includedNumbers} local number${p.includedNumbers === 1 ? "" : "s"} and ${p.includedMinutes} call minutes a month, then ${p.overagePerMinute} a minute; extra numbers ${p.extraNumber}/month each`;
+}
+
+/**
+ * Whether the add-on can be bought today, in Gabe's words. The price book's
+ * `preview` flag decides, so the knowledge pack and the preset answers stay
+ * honest without a copy change.
+ */
+export function callAssistantAvailabilityLine(): string {
+  return callAssistantPricing().comingSoon
+    ? "It is coming soon: it is listed on Pricing but is not for sale yet, and there is no launch date to give. Create an account now and add it from Settings → Billing once it is live."
+    : `Add it from Settings → Billing on the ${CALL_ASSISTANT_PLANS} plans.`;
 }
 
 /** Competitor Intel is on every plan with a monthly scan allowance. */

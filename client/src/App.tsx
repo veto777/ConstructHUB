@@ -53,6 +53,7 @@ import GoogleAdsLandingPage from "@/pages/google-ads-landing";
 import PermitsLandingPage from "@/pages/permits-landing";
 import CompetitorsLandingPage from "@/pages/competitors-landing";
 import MasterClassLandingPage from "@/pages/master-class-landing";
+import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
 import CrmTeamPage from "@/pages/crm-team";
@@ -168,6 +169,8 @@ function DashboardRouter() {
       <Route path="/lsa-leads" component={LsaLeadsPage} />
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
+      {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
+      <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
@@ -222,6 +225,7 @@ function PublicRouter() {
       <Route path="/lsa-guide" component={LsaGuidePage} />
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
+      <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/developers" component={DevelopersPage} />
@@ -279,6 +283,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
   "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews",
   "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
+  "/call-assistant": "AI Call Assistant",
 };
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
@@ -597,7 +602,8 @@ function AppContent() {
             <div className="flex-1">
               <DashboardRouter />
             </div>
-            <footer className="border-t border-border/30 py-3 px-4 text-center text-xs text-muted-foreground" data-testid="footer-dashboard">
+            {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
+            <footer className="border-t border-border/30 pt-3 pb-20 sm:pb-3 px-4 text-center text-xs text-muted-foreground" data-testid="footer-dashboard">
               <a href="mailto:support@constructhub.us" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-email">support@constructhub.us</a>
               <span className="mx-2 text-border">&middot;</span>
               <a href="/terms" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-terms">Terms</a>

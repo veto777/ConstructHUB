@@ -25,5 +25,9 @@ export async function ensureGrowthSchema() {
     CREATE INDEX IF NOT EXISTS ranking_grid_owner_idx ON ranking_grid_scans(user_id);
     ALTER TABLE search_queries ADD COLUMN IF NOT EXISTS user_id integer;
     CREATE INDEX IF NOT EXISTS search_queries_owner_idx ON search_queries(user_id);
+    -- The dashboard reads visits per tracked site and time window on every home load.
+    CREATE INDEX IF NOT EXISTS click_visits_domain_visited_idx ON click_visits (domain_id, visited_at);
+    CREATE INDEX IF NOT EXISTS vpn_visits_domain_visited_idx ON vpn_visits (domain_id, visited_at);
+    CREATE INDEX IF NOT EXISTS tracked_domains_user_idx ON tracked_domains (user_id);
   `);
 }

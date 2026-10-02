@@ -54,6 +54,7 @@ import { registerCrmInboxRoutes } from "./inbox";
 import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
+import { forgetDashboard } from "../dashboard/cache";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
 
 type GetUser = (req: any, res: any) => any;
@@ -799,6 +800,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       : { row: await update() };
     if ("refused" in outcome) return res.status(402).json(outcome.refused);
     const { row } = outcome;
+    // Role, status and division change what this seat's dashboard may show.
+    forgetDashboard(target.userId);
 
     // Owner's "account changed" notice when a member edits their OWN profile
     // through the team route — field names only. An admin editing someone
@@ -845,6 +848,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       .set({ status: "disabled", updatedAt: new Date() })
       .where(eq(crmMembers.id, target.id))
       .returning();
+    // A disabled seat must not keep seeing the org's numbers from the dashboard cache.
+    forgetDashboard(target.userId);
 
     // A disabled member must not be able to walk back in through a still-live
     // invite link — revoke any pending invitations for the same email.

@@ -40,7 +40,7 @@ decision loop), `voice/decision.py` (JSON validation/cleanup/retry/fallback), `v
 `voice/personas.json` (verify voice ids, swap missing, write the list; render samples to
 `client/public/voice/samples/<id>.mp3` — those files are yours), `voice/requirements.txt`, `voice/README.md`,
 `voice/.env.example`. Interfaces you must honour: SPEC §4 (decision protocol), §5 (internal API — you call
-it), §7 (your endpoints). Do NOT read `~/alpine/voice/.env`; do not restart `alpine-voice*`; the only
+it), §7 (your endpoints). Do NOT read the Alpine receptionist's environment file; do not restart `alpine-voice*`; the only
 phone number you may ever dial in a test is the harness's synthetic caller (no real calls to anyone).
 
 ## Lane: numbers+billing — SignalWire numbers and money

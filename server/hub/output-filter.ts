@@ -9,6 +9,7 @@
  */
 import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS, type PlanKey } from "@shared/plans";
 import { hubLinkFor } from "@shared/hub-links";
+import { CALL_ASSISTANT_INTRO } from "@shared/plan-copy";
 import { DFY_CATALOG, COURSE_BUNDLE } from "../catalog";
 import {
   cleanText, HOST_SOURCE, OWN_HOST_RE, BRACKET_DOT_RE, SPELLED_DOMAIN_RE, EMAIL_OBFUSCATED_RE, EMAIL_SPACED_RE,
@@ -245,9 +246,9 @@ const BOUND_AFTER = new RegExp(String.raw`${AMOUNT}\s*${UNIT}?\s*(?:for|on) (?:t
 const BOTH_ALL = /\b(both|all( of them| three| four)?)\b[^.$]{0,25}\$|\$[^.]{0,25}\b(both|all)\b|\b(are|cost|costs|run|priced at) (both|all)\b/i;
 /** The sentence is about an add-on, a location band, the texting setup fee or reinstatement. */
 const ADDON_CUE = /\b(add-?ons?|addon|extra (locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number)\b/i;
-/** Add-on, band and service amounts (never a plan's own price). */
+/** Add-on, band and service amounts (never a plan's own price), including the Call Assistant's launch price. */
 const ADDON_CENTS: ReadonlySet<number> = (() => {
-  const cents = new Set<number>([GBP_REINSTATEMENT_CENTS]);
+  const cents = new Set<number>([GBP_REINSTATEMENT_CENTS, CALL_ASSISTANT_INTRO.monthlyCents]);
   for (const addon of Object.values(ADDONS)) {
     cents.add(addon.monthlyCents); cents.add(addon.annualCents);
     if (addon.setupCents) cents.add(addon.setupCents);

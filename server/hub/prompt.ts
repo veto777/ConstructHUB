@@ -10,7 +10,7 @@
  */
 import { randomBytes, createHash } from "node:crypto";
 import { AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS, PLAN_KEYS } from "@shared/plans";
-import { planPriceLine, SALES_HREF, SALES_REP_LABEL, SALES_THRESHOLD_LABEL } from "@shared/plan-copy";
+import { callAssistantIntroLine, callAssistantPricing, planPriceLine, SALES_HREF, SALES_REP_LABEL, SALES_THRESHOLD_LABEL } from "@shared/plan-copy";
 import { HUB_LINKS, HUB_PAGES, type PageKey } from "@shared/hub-links";
 import { HUB_PRESETS, type PresetId } from "@shared/hub-presets";
 import { forModel } from "./prefilter";
@@ -116,6 +116,8 @@ const PRESET_NOTES: Partial<Record<PresetId, string>> = {
   "agency": `Say the ${PLANS.agency.name} plan includes ${PLANS.agency.limits.locations} locations, give the per-location bands exactly as KNOWLEDGE words them, and say that above ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations it is quoted by a sales rep.`,
   "done-for-you": `Say "${SALES_REP_LABEL}" and link [${SALES_REP_LABEL}](${SALES_HREF}).`,
   "click-fraud": "Say that the IP exclusions come from a Google Ads script the user pastes into their own Google Ads account, that these signals don't prove fraud, and that no savings are guaranteed. Never promise savings.",
+  "call-assistant": `Give the launch price exactly as KNOWLEDGE words it ("${callAssistantIntroLine()}")${callAssistantPricing().comingSoon ? " and say it is coming soon and not for sale yet" : ""}. Link [AI Call Assistant](/call-assistant).`,
+  "call-number": `Say the number is picked by state in the CRM under Call Assistant → Numbers, and that existing numbers are kept by forwarding them from the phone carrier${callAssistantPricing().comingSoon ? "; say the add-on is coming soon and not for sale yet" : ""}. Link [AI Call Assistant](/call-assistant).`,
 };
 
 /** Messages for a preset answer: server-owned question, public links only, cached for everyone. */

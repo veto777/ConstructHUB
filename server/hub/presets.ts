@@ -13,13 +13,18 @@ import { AGENCY_SELF_SERVE_MAX_LOCATIONS, ANNUAL_MONTHS, PLANS, PLAN_KEYS } from
 import {
   planPriceLine, agencyBandsLine, joinNames, planNamesWhere, AGENCY_ONLY_MODULES, CRM_SEATS_LINE,
   PROTECTED_SITE_PLANS, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL,
+  CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantIncludesLine, callAssistantIntroLine, callAssistantPricing,
 } from "@shared/plan-copy";
 import { HUB_PRESETS, PRESET_IDS, type PresetId } from "@shared/hub-presets";
+import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 
 export interface PresetStore {
   get(presetId: PresetId, hash: string): Promise<string | null>;
   put(presetId: PresetId, hash: string, answer: string): Promise<void>;
 }
+
+/** "Janice, Gabe, Sofia, Maya, Marcus or Ethan". */
+const PERSONA_NAMES = VOICE_PERSONA_LIST.map((p) => p.name).join(", ").replace(/, ([^,]+)$/, " or $1");
 
 const planLines = () => PLAN_KEYS.map((k) => `- **${PLANS[k].name}**: ${planPriceLine(k)}. ${PLANS[k].tagline}`).join("\n");
 
@@ -54,8 +59,14 @@ export function templateAnswer(presetId: PresetId): string {
       return "The **free 60-second website scan** needs no account: enter a website and email to see scores and up to five findings, then verify your email to unlock the quick-scan report of up to 11 pages. The full **Site Scan**, included with every plan, checks technical and content issues, Google PageSpeed performance, how your site matches your Google Business Profile and AI search readiness, then lists what to fix in priority order. [Try the free scan](/free-site-scan).";
     case "master-class":
       return `The **Master Class** is a step-by-step course on starting and growing a construction business, with 50 state-by-state guides and checklists. Its four modules are Business Formation & Licensing, GMB Setup & Optimization, Website & Online Presence, and SEO & Directory Domination. The overview is free to read, and any Master Class purchase also unlocks the full Google Ads Guide. It is not included in any plan; modules are quoted by a sales rep: [${SALES_REP_LABEL}](${SALES_HREF}).`;
+    case "call-assistant":
+      return `The **AI Call Assistant** is an AI receptionist for your business line. It answers every call on a local number, day or night, in a woman's or man's voice you pick (${PERSONA_NAMES}). It asks the questions you set in the **Agent Studio**, files each real lead in the ConstructHub CRM with a summary, transcript and recording, texts or emails the teammate you choose for emergencies, and screens spam calls.\nLaunch price: ${callAssistantIntroLine()}, including ${callAssistantIncludesLine()}. It is an add-on to the ${CALL_ASSISTANT_PLANS} plans. ${callAssistantAvailabilityLine()} See [AI Call Assistant](/call-assistant).`;
+    case "call-number":
+      return `1. The **AI Call Assistant** is an add-on to the ${CALL_ASSISTANT_PLANS} plans. ${callAssistantAvailabilityLine()}\n2. In the CRM, open **Call Assistant** → **Numbers**, pick a state (and an area code or city if you like) and choose a local number. ConstructHUB buys it for you. ${callAssistantPricing().includedNumbers} number comes with the add-on; extra numbers are ${callAssistantPricing().extraNumber}/month each.\n3. Keep your existing numbers: forward them to the new number from your phone carrier, only when you don't answer, after hours or always. Nothing is ported, and the Numbers tab shows how for common carriers.\nSee [AI Call Assistant](/call-assistant).`;
   }
 }
+
+const COMING_SOON = /\bcoming soon\b|\bnot (yet )?for sale\b/i;
 
 /** A model answer is cached only if it states these facts exactly (on top of passing the output filter). */
 export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
@@ -69,6 +80,13 @@ export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
       return answer.includes(SALES_REP_LABEL) && answer.includes(SALES_HREF);
     case "agency":
       return /\bAgency\b/.test(answer) && new RegExp(`\\b${PLANS.agency.limits.locations}\\b`).test(answer) && new RegExp(`\\b${AGENCY_SELF_SERVE_MAX_LOCATIONS}\\b`).test(answer) && /sales rep/i.test(answer);
+    case "call-assistant": {
+      // The launch price as the pack words it, and "coming soon" while the price book says so.
+      const p = callAssistantPricing();
+      return answer.includes(`${p.intro}/month`) && answer.includes(p.regular) && (!p.comingSoon || COMING_SOON.test(answer));
+    }
+    case "call-number":
+      return /\bstate\b/i.test(answer) && /\bforward/i.test(answer) && (!callAssistantPricing().comingSoon || COMING_SOON.test(answer));
     case "click-fraud":
       // The pack's honest limits, and the step people miss: the exclusions come from a script the user pastes into Google Ads.
       return /\b(don'?t|do not|doesn'?t|does not|can'?t|cannot) prove fraud\b|\bno savings (are|is) guaranteed\b/i.test(answer)

@@ -19,6 +19,25 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🏠 2026-10-02 — new landing (design B), signed-in dashboard, Call Assistant marketing (deployed 08:35 UTC)
+- **Landing** (owner picked design B of three): Fraunces display + Plus Jakarta Sans body on cream paper, scoped by
+  `.mkt-editorial` (client/src/index.css) so the app keeps Inter; hard-hat gator hero (srcSet 512/1024) on a navy grid
+  panel; ONE orange — #F97316 for large accents/buttons, #AE4A04 (same hue, darker) for small text so it passes AA.
+  Runner-up branch `design/c` kept; `design/a` was live for an hour, then replaced.
+- **Signed-in home = dashboard** (client/src/pages/home.tsx + client/src/components/dashboard/**; GET /api/dashboard in
+  server/dashboard/**, contract shared/dashboard.ts, spec docs/dashboard/SPEC.md): 29 tiles in 5 groups, each computed
+  separately on a read-only pool with a 3 s limit, gates from getEntitlements applied before any query, 60 s per-user
+  cache (cleared on plan/add-on/webhook changes; ?fresh=1 throttled), "Needs you today", CRM snapshot (read-only org
+  lookup — never creates an org), getting-started checklist, recent activity. Indexes for the protect tiles run at boot
+  (ensureGrowthSchema). server/crm/follow-ups.ts fix: "leads without an estimate" was over-counted above 2,000 estimates.
+- **AI Call Assistant marketing** is live while the product is being built: /call-assistant, landing section, pricing
+  line (CALL_ASSISTANT_INTRO in shared/plan-copy.ts: $99/mo × 3 months, then the price-book rate), "Call Assistant · NEW"
+  in both sidebars, Gabe knowledge §30. The add-on is `preview: true` in shared/plans.ts → checkout refuses it (409,
+  nothing charged), the CRM tab says "Coming soon", /voice/* answers 503. The voice_* tables exist (empty).
+  Open owner questions: does the intro apply to annual billing; what happens to a bought number on cancel.
+- Test env gotcha: the dev email sink tmp/email-outbox.jsonl hit Node's 512 MB string limit and failed 21 tests at
+  read; it was trimmed to its last 2,000 lines. Trim it again if sink-reading tests fail with "Cannot create a string".
+
 ## 🐊 2026-10-01 — Gabe (Hub assistant) + the standing-gator mascot (deployed 2026-10-02 03:56 UTC)
 - **Mascots** are the owner's artwork in client/public/mascot/ (checkerboard/noisy alpha cut out in-session;
   sources kept in the session scratchpad). `client/src/components/mascot.tsx`: `StandingGator` (hard hat + vest,

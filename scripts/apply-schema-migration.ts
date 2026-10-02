@@ -44,6 +44,11 @@ const STATEMENTS = [
   // voice_calls / voice_escalations / voice_spam / voice_usage
   // (server/voice/schema.ts also runs these at boot).
   ...VOICE_SCHEMA_DDL,
+  // Dashboard (server/dashboard/tiles/protect.ts): Click Guard, IP Tracker and
+  // VPN Shield read visits per tracked site and time window on every home load.
+  `CREATE INDEX IF NOT EXISTS click_visits_domain_visited_idx ON click_visits (domain_id, visited_at)`,
+  `CREATE INDEX IF NOT EXISTS vpn_visits_domain_visited_idx ON vpn_visits (domain_id, visited_at)`,
+  `CREATE INDEX IF NOT EXISTS tracked_domains_user_idx ON tracked_domains (user_id)`,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

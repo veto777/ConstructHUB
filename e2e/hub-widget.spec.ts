@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { PRESET_IDS, PRIMARY_PRESETS } from "../shared/hub-presets";
 
 /**
  * Gabe — the corner assistant (the Hub widget). Run with playwright.hub.config.ts (two servers:
@@ -28,9 +29,9 @@ test.describe("signed out", () => {
     await expect(launcher).toBeVisible();
     await expect(launcher).toHaveAccessibleName("Ask Gabe, your ConstructHUB guide");
     const panel = await openHub(page);
-    await expect(panel.locator("[data-hub-chip]")).toHaveCount(8);
+    await expect(panel.locator("[data-hub-chip]")).toHaveCount(PRIMARY_PRESETS.length);
     await panel.getByTestId("hub-more").click();
-    await expect(panel.locator("[data-hub-chip]")).toHaveCount(14);
+    await expect(panel.locator("[data-hub-chip]")).toHaveCount(PRESET_IDS.length);
     await expect(panel.getByTestId("hub-input")).toHaveCount(0);
     await expect(panel.getByTestId("hub-signup-cta")).toContainText("Create a free account to ask Gabe anything");
     await expect(panel.getByTestId("hub-signup-link")).toHaveAttribute("href", "/auth");

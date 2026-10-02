@@ -81,11 +81,34 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        // Marketing "editorial" palette — the variables live on .mkt-editorial
+        // (client/src/index.css) and flip under .dark, so these need no dark: twins.
+        mkt: {
+          paper: "var(--mkt-paper)",
+          "paper-2": "var(--mkt-paper-2)",
+          card: "var(--mkt-card)",
+          ink: "var(--mkt-ink)",
+          "ink-soft": "var(--mkt-ink-soft)",
+          muted: "var(--mkt-muted)",
+          rule: "var(--mkt-rule)",
+          "rule-soft": "var(--mkt-rule-soft)",
+          orange: "var(--mkt-orange)",
+          "orange-hover": "var(--mkt-orange-hover)",
+          "orange-ink": "var(--mkt-orange-ink)",
+          "orange-soft": "var(--mkt-orange-soft)",
+          navy: "var(--mkt-navy)",
+          "navy-ink": "var(--mkt-navy-ink)",
+          "navy-muted": "var(--mkt-navy-muted)",
+          "navy-rule": "var(--mkt-navy-rule)",
+          panel: "var(--mkt-panel)",
+          "panel-ink": "var(--mkt-panel-ink)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        display: ["var(--font-display)"],
       },
       keyframes: {
         "accordion-down": {

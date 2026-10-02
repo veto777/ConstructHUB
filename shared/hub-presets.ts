@@ -10,7 +10,7 @@
 
 export const PRESET_IDS = [
   "pricing", "which-plan", "trial", "features", "get-started", "crm", "agency", "done-for-you",
-  "permits", "google-profile", "reviews", "click-fraud", "site-scan", "master-class",
+  "permits", "google-profile", "reviews", "click-fraud", "site-scan", "master-class", "call-assistant", "call-number",
 ] as const;
 export type PresetId = (typeof PRESET_IDS)[number];
 
@@ -31,6 +31,8 @@ export const HUB_PRESETS: Record<PresetId, HubPreset> = {
   "click-fraud": { id: "click-fraud", label: "Click-fraud protection", question: "How does Click Guard protect my Google Ads from click fraud, and which plans include it?", sections: [15] },
   "site-scan": { id: "site-scan", label: "Free website scan", question: "What does the free website scan check, and what does the full Site Scan add?", sections: [12] },
   "master-class": { id: "master-class", label: "The Master Class", question: "What is the Master Class and what does it cover?", sections: [26] },
+  "call-assistant": { id: "call-assistant", label: "What is the AI Call Assistant?", question: "What is the AI Call Assistant, what does it do on a call, and what does it cost?", sections: [30] },
+  "call-number": { id: "call-number", label: "How do I get a phone number?", question: "How do I get a phone number for the AI Call Assistant, and can I keep my existing numbers?", sections: [30] },
 };
 
 /** The chips shown first; the rest sit behind "More questions". */

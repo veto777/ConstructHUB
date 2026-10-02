@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
+import { callAssistantIntroLine } from "@shared/plan-copy";
 
 const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; chip: string; button: string; check: string }> = {
   starter: {
@@ -114,6 +115,9 @@ export default function PricingPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success")) {
+      // A new plan: anything cached in this tab from before checkout is stale.
+      void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "You're subscribed", description: "Welcome to ConstructHUB. Your plan, renewal date and add-ons are in Settings → Billing." });
     } else if (params.get("canceled")) {
       toast({ title: "Checkout canceled", description: "No charges were made." });
@@ -175,6 +179,8 @@ export default function PricingPage() {
       void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       // The Agency workspace (and its sidebar lock) follows the plan through /api/agency/me.
       void queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
+      // The signed-in home shows the plan, its meters and its locks.
+      void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Plan changed", description: `You're now on ${PLANS[r.plan].name}, billed ${intervalWord(r.interval)}.` });
     },
     onError: (err, r) => { setConfirm(null); handlePlanError("Couldn't change your plan", r, err); },
@@ -578,6 +584,12 @@ export default function PricingPage() {
                           {addon.preview && <Badge variant="outline" className="text-[10px]" data-testid={`badge-addon-preview-${k}`}>Coming soon</Badge>}
                         </p>
                         <p className="text-xs text-muted-foreground">{addon.description}</p>
+                        {k === "call_assistant" && (
+                          <p className="text-xs mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-semibold text-[#C2410C] dark:text-[#FB923C]" data-testid="text-addon-intro-call_assistant">Launch price: {callAssistantIntroLine()}</span>
+                            <Link href="/call-assistant" className="font-medium underline underline-offset-2 hover:text-[#C2410C] dark:hover:text-[#FB923C]" data-testid="link-addon-call-assistant">How it works →</Link>
+                          </p>
+                        )}
                         <p className="sm:hidden text-xs text-muted-foreground mt-1">On {addonPlanNames(addon)}</p>
                       </td>
                       <td className="p-3 align-top text-right whitespace-nowrap" data-testid={`text-addon-price-${k}`}>
