@@ -23,7 +23,9 @@ import { pool } from "./db";
 import { isPlatformAdminEmail } from "./admin";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
+  ADDON_MODULES, isAddonModule, moduleName, CALL_ASSISTANT_INCLUDED_MINUTES, CALL_ASSISTANT_INCLUDED_NUMBERS,
   type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
+  type AddonModuleKey, type AnyModuleKey,
 } from "@shared/plans";
 
 export type Entitlements = {
@@ -38,6 +40,12 @@ export type Entitlements = {
   /** limits plus purchased add-ons sold on that plan: what every gate checks. */
   allowances: PlanLimits | null;
   modules: PlanModules;
+  /**
+   * Modules an add-on unlocks (shared/plans.ts ADDON_MODULES): on when the
+   * add-on is on the subscription and the plan sells it. Platform admins get
+   * them all, like the plan modules.
+   */
+  addonModules: Record<AddonModuleKey, boolean>;
   addons: Partial<Record<AddonKey, number>>;
   isPlatformAdmin: boolean;
   /** End of a Stripe-less grant (trial code); null for Stripe-managed or open-ended rows. */
@@ -46,6 +54,37 @@ export type Entitlements = {
 
 const ALL_MODULES: PlanModules = { agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true };
 const NO_MODULES: PlanModules = { agencyWorkspace: false, adsManager: false, cloudflareSearchConsole: false, domainsMailAlerts: false };
+const ADDON_MODULE_KEYS = Object.keys(ADDON_MODULES) as AddonModuleKey[];
+
+/** Which add-on modules a plan + add-on set unlocks (every one for platform admins). */
+export function addonModulesFor(plan: PlanKey | null, addons: Partial<Record<AddonKey, number>>, admin = false): Record<AddonModuleKey, boolean> {
+  const out = {} as Record<AddonModuleKey, boolean>;
+  for (const key of ADDON_MODULE_KEYS) {
+    const addon = ADDON_MODULES[key];
+    out[key] = admin || (!!plan && (addons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan));
+  }
+  return out;
+}
+
+/** Is a plan-level or add-on module on for these entitlements? */
+export function moduleEnabled(ent: Pick<Entitlements, "modules" | "addonModules">, module: AnyModuleKey): boolean {
+  return isAddonModule(module) ? ent.addonModules[module] : ent.modules[module];
+}
+
+/**
+ * The Call Assistant allowance the subscription buys: numbers = one per
+ * call_assistant unit plus every call_number unit; minutes per month = the
+ * included minutes per call_assistant unit. Platform admins get one unit's
+ * worth (they run the product, they do not get unlimited carrier numbers).
+ */
+export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin">): { numbers: number; minutes: number } {
+  if (!ent.addonModules.callAssistant) return { numbers: 0, minutes: 0 };
+  const units = Math.max(ent.isPlatformAdmin ? 1 : 0, ent.addons.call_assistant ?? 0);
+  return {
+    numbers: units * CALL_ASSISTANT_INCLUDED_NUMBERS + (ent.addons.call_number ?? 0),
+    minutes: units * CALL_ASSISTANT_INCLUDED_MINUTES,
+  };
+}
 
 /** The most complete plan: what platform admins run with. */
 export const TOP_PLAN: PlanKey = PLAN_KEYS[PLAN_KEYS.length - 1];
@@ -136,6 +175,7 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
     limits: accessPlan ? PLANS[accessPlan].limits : null,
     allowances: accessPlan ? allowancesFor(accessPlan, admin ? {} : addons) : null,
     modules: admin ? ALL_MODULES : plan ? PLANS[plan].modules : NO_MODULES,
+    addonModules: addonModulesFor(plan, addons, admin),
     addons,
     isPlatformAdmin: admin,
     grantEndsAt: plan && grantEnd ? grantEnd : null,
@@ -360,9 +400,9 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
   }
 }
 
-/** Does the account's plan (or platform-admin access) include this module? */
-export async function hasModule(userId: number, module: ModuleKey): Promise<boolean> {
-  return (await getEntitlements(userId)).modules[module];
+/** Does the account's plan (or platform-admin access, or a purchased add-on) include this module? */
+export async function hasModule(userId: number, module: AnyModuleKey): Promise<boolean> {
+  return moduleEnabled(await getEntitlements(userId), module);
 }
 
 /**
@@ -392,15 +432,31 @@ export async function usersWithModule(userIds: readonly number[], module: Module
 export const planPausedMessage = (module: ModuleKey) =>
   `Not run: ${MODULE_NAMES[module]} is included with the ${PLANS[planForModule(module)].name} plan.`;
 
+/**
+ * The 402 for a module the account lacks. A plan module names the plan that
+ * includes it; an add-on module names the add-on and where to buy it (the
+ * body carries `addon` so the client can link Settings → Billing).
+ */
+export function sendModuleRequired(res: Response, module: AnyModuleKey) {
+  if (!isAddonModule(module)) return sendPlanRequired(res, planForModule(module), MODULE_NAMES[module]);
+  const addon = ADDON_MODULES[module];
+  const on = ADDONS[addon].availableOn.map((k) => PLANS[k].name);
+  const plans = on.length > 1 ? `${on.slice(0, -1).join(", ")} and ${on[on.length - 1]}` : on[0] ?? "";
+  return sendPlanRequired(res, planForModule(module), moduleName(module), {
+    addon,
+    message: `${moduleName(module)} is an add-on for the ${plans} plans. Add it in Settings → Billing to use it.`,
+  });
+}
+
 /** Express middleware for a whole module's routes. Expects req.user (session auth). */
-export function requireModule(module: ModuleKey) {
+export function requireModule(module: AnyModuleKey) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
     if (!user?.id) return res.status(401).json({ message: "Not authenticated" });
     try {
       const ent = await getEntitlements(user.id);
-      if (ent.modules[module]) return next();
-      return sendPlanRequired(res, planForModule(module), MODULE_NAMES[module]);
+      if (moduleEnabled(ent, module)) return next();
+      return sendModuleRequired(res, module);
     } catch (e) {
       next(e);
     }

@@ -84,6 +84,15 @@ export function checkAddonsForPlan(plan: PlanKey, addons: AddonQuantities): void
       else if (key === "extra_location" && plan === "agency") why = " Agency is billed by location count instead.";
       throw new BillingRequestError(400, `${ADDONS[key].name} isn't available on the ${name} plan.${why}`, "addon_unavailable");
     }
+    // A preview add-on is listed on the pricing page but not for sale yet
+    // (shared/plans.ts `preview`): nothing is charged for it.
+    if (ADDONS[key].preview) {
+      throw new BillingRequestError(409, `${ADDONS[key].name} isn't available yet. Nothing was charged.`, "addon_unavailable");
+    }
+    const needs = ADDONS[key].requires;
+    if (needs && (addons[needs] ?? 0) <= 0) {
+      throw new BillingRequestError(400, `${ADDONS[key].name} needs the ${ADDONS[needs].name} add-on on the same subscription.`, "addon_unavailable");
+    }
     if (key === "extra_location" && quantity > maxExtraLocations(plan)) {
       const max = maxExtraLocations(plan);
       throw new BillingRequestError(400,

@@ -103,7 +103,7 @@ const SECTION_KEYWORDS: Record<number, RegExp> = {
   21: /\b(domains?|dns|registrar|mail alerts?|forwarding|gmail)\b/,
   22: /\b(agency|agencies|clients? workspace|white[- ]label|bulk actions?|onboarding)\b/,
   23: /\b(reinstat\w*|suspend\w*|suspension)\b/,
-  24: /\b(crm|estimates?|invoices?|payments?|stripe|price ?book|pipeline|projects?|schedule|calendar|messages?|team|roles?|seats?|texting|texts?|sms|hover|import|backups?|divisions?|client portal|clients?)\b/,
+  24: /\b(crm|estimates?|invoices?|payments?|stripe|price ?book|pipeline|projects?|schedule|calendar|messages?|team|roles?|seats?|texting|texts?|sms|hover|import|backups?|divisions?|client portal|clients?|call assistant|receptionist|answer(?:s|ing)? (?:the|my) phone|phone calls?|voicemail)\b/,
   25: /\b(notifications?|2fa|two[- ]factor|security|password|sign[- ]?in|log ?in|account activity|delete (my )?account|recovery codes?)\b/,
   26: /\b(master ?class|course|modules?|llc|licens\w*|bond\w*|insurance|state[- ]by[- ]state)\b/,
   27: /\b(done[- ]for[- ]you|dfy|sales rep|talk to (a )?sales|seo (program|package)s?|website build|business formation|complete business build|custom work|quote)\b/,

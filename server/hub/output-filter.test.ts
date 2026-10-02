@@ -53,7 +53,9 @@ describe("red-team model outputs", () => {
   });
 
   it("RT44 / RT46 / RT48: any amount outside the price book is blocked (O8)", () => {
-    blocked("Pro is $5/month for you.", "O8");
+    // $5 is a price-book amount (the Extra Call Assistant number add-on) and would be O9: $6 is outside it.
+    blocked("Pro is $6/month for you.", "O8");
+    blocked("Pro is $5/month for you.", "O9");
     blocked("The Complete Business Build is $29,999.", "O8");
     blocked("Agency for 137 locations would be $1,684/month.", "O8");
     blocked("It's about $5k for the build.", "O8");
@@ -432,8 +434,8 @@ describe("Gabe's own fixed text passes its own filter", () => {
 describe("formatting can't hide what a visitor reads (checks run on the delivered text, bold removed too)", () => {
   it("a price split by markdown, emoji, invisible characters, combining marks or extra spaces is still checked (O8)", () => {
     for (const reply of [
-      "Pro is $**5**/month.", "Pro is $_5_/month.", "Pro is $`5`/month.", "Pro is $\u{1F600}5/month.", "Pro is $  5/month.",
-      "Pro is $­5/month.", "Pro is $\u{E0020}5/month.", "Pro is $̲ 5/month.", "Pro is $⠀5/month.",
+      "Pro is $**6**/month.", "Pro is $_6_/month.", "Pro is $`6`/month.", "Pro is $\u{1F600}6/month.", "Pro is $  6/month.",
+      "Pro is $­6/month.", "Pro is $\u{E0020}6/month.", "Pro is $̲ 6/month.", "Pro is $⠀6/month.",
     ]) blocked(reply, "O8");
   });
 

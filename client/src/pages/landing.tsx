@@ -225,6 +225,13 @@ const services = [
     gradient: "from-cyan-500/20 to-sky-500/20",
     border: "border-cyan-500/20",
   },
+  {
+    icon: Phone,
+    title: "AI Call Assistant (coming soon)",
+    description: "An AI receptionist on your own local number answers 24/7, asks the right questions, files the lead in your CRM and pages the right person for emergencies. Every call logged with transcript and recording. Sold as an add-on.",
+    gradient: "from-orange-500/20 to-amber-500/20",
+    border: "border-orange-500/20",
+  },
 ];
 
 // Testimonials were removed: the three 5-star quotes came in with the Replit
