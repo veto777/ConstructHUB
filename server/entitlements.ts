@@ -202,7 +202,7 @@ export const ADDON_GRANTS: Record<AddonKey, Partial<Record<CountLimit, number>>>
  * the norm; if there are several, one with access wins, then the newest.
  * `$1` is the user id (or ids, with ANY), `$2` ACCESS_STATUSES.
  */
-const SUBSCRIPTION_ORDER = "ORDER BY (x.status = ANY($2::text[])) DESC, x.id DESC LIMIT 1";
+export const SUBSCRIPTION_ORDER = "ORDER BY (x.status = ANY($2::text[])) DESC, x.id DESC LIMIT 1";
 
 type SubscriptionRow = {
   plan?: string | null;
@@ -396,6 +396,13 @@ export const inUse = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "i
 export const TRIAL_CODE_PLAN: PlanKey = "agency";
 /** Stripe subscription statuses that have ended: the row may be replaced by a trial. */
 const STRIPE_ENDED = new Set(["canceled", "incomplete_expired", "inactive"]);
+/**
+ * A Stripe subscription that is not over (paying, trialing, or waiting on a
+ * payment): a trial code or an admin grant must never replace it.
+ */
+export function liveStripeSubscription(sub: { stripe_subscription_id?: string | null; status?: string | null } | null | undefined): boolean {
+  return !!sub?.stripe_subscription_id && !STRIPE_ENDED.has(sub.status ?? "");
+}
 const OPEN_ENDED_TRIAL = new Date("2099-12-31T23:59:59Z");
 
 /**
@@ -416,7 +423,7 @@ export async function redeemTrialCode(userId: number, code: { id: number; trialD
     const { rows: [sub] } = await c.query(
       `SELECT * FROM subscriptions x WHERE x.user_id=$1 ${SUBSCRIPTION_ORDER}`, [userId, ACCESS_STATUSES]);
     const refuse = async (refused: string, status: 400 | 409) => { await c.query("ROLLBACK"); return { refused, status }; };
-    if (sub?.stripe_subscription_id && !STRIPE_ENDED.has(sub.status)) {
+    if (liveStripeSubscription(sub)) {
       return await refuse("Your account already has a paid plan, so a trial code can't be applied. Your plan stays as it is.", 409);
     }
     const liveGrant = !!sub && !sub.stripe_subscription_id && !!activePlanKey(sub, now);
@@ -481,7 +488,8 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
       `SELECT * FROM subscriptions x WHERE x.user_id=$1 ${SUBSCRIPTION_ORDER}`, [userId, ACCESS_STATUSES]);
     const grantEnd = sub && !sub.stripe_subscription_id && sub.current_period_end != null && ["trialing", "active"].includes(sub.status)
       ? new Date(sub.current_period_end) : null;
-    if (!grantEnd || grantEnd <= now || grantEnd.getTime() > ownEnd.getTime() + TRIAL_END_SLACK_MS) {
+    if (!grantEnd || grantEnd <= now || grantEnd.getTime() > ownEnd.getTime() + TRIAL_END_SLACK_MS
+        || await adminGrantHolds(c, sub, now)) {
       await c.query("ROLLBACK");
       return "unchanged";
     }
@@ -509,6 +517,22 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
   } finally {
     c.release();
   }
+}
+
+/**
+ * Is this subscription row the one a live admin access grant wrote
+ * (server/access-grants.ts)? Then it is the admin's grant, not a trial code's
+ * trial, and revoking a code leaves it alone. False where the grants table
+ * does not exist yet.
+ */
+async function adminGrantHolds(c: { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> }, sub: { id: number; plan: string; current_period_end: Date | string }, now: Date): Promise<boolean> {
+  const { rows: [t] } = await c.query("SELECT to_regclass('admin_access_grants') IS NOT NULL AS present");
+  if (!t?.present) return false;
+  const { rows: [g] } = await c.query(
+    `SELECT 1 FROM admin_access_grants WHERE subscription_id=$1 AND plan=$2 AND revoked_at IS NULL AND replaced_at IS NULL
+        AND ends_at > $3 AND abs(extract(epoch FROM ends_at - $4::timestamptz)) < 1 LIMIT 1`,
+    [sub.id, sub.plan, now, new Date(sub.current_period_end)]);
+  return !!g;
 }
 
 /** Does the account's plan (or platform-admin access, or a purchased add-on) include this module? */

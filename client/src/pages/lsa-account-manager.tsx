@@ -1231,6 +1231,8 @@ function AuditLogTab() {
       campaign_enable: "Enabled Campaign",
       campaign_settings_change: "Renamed Campaign",
       dispute_lead: "Disputed Lead",
+      access_grant: "Granted Access",
+      access_grant_revoke: "Revoked Access",
     };
     return labels[action] || action;
   };
@@ -1238,7 +1240,8 @@ function AuditLogTab() {
   const actionColor = (action: string) => {
     if (action === "campaign_pause") return "bg-amber-500/10 text-amber-500 border-amber-500/20";
     if (action === "campaign_enable") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
-    if (action === "dispute_lead") return "bg-red-500/10 text-red-500 border-red-500/20";
+    if (action === "dispute_lead" || action === "access_grant_revoke") return "bg-red-500/10 text-red-500 border-red-500/20";
+    if (action === "access_grant") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
     return "bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/20";
   };
 

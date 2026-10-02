@@ -19,6 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { PLANS, effectivePlanKey } from "@shared/plans";
+import { ACCESS_GRANT_MAX_DAYS, ACCESS_GRANT_MIN_DAYS, ACCESS_GRANT_QUICK_DAYS, validGrantDays } from "@shared/access-grants";
+import { requestRecentAuth } from "@/components/recent-auth";
 import { copyToClipboard, LoadingCard } from "./shared";
 import type { SettingsSectionProps, SettingsUser } from "./types";
 
@@ -686,7 +688,10 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
 function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
   const { toast } = useToast();
   const [betaCode, setBetaCode] = useState("");
-  const [trialDays, setTrialDays] = useState(7);
+  // 1–1000 days (owner, 2026-10-02), typed or picked; the server checks the same bounds.
+  const [trialDaysText, setTrialDaysText] = useState("7");
+  const trialDays = /^\d+$/.test(trialDaysText.trim()) ? Number(trialDaysText.trim()) : NaN;
+  const trialDaysOk = validGrantDays(trialDays);
   const [unlimited, setUnlimited] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientName, setRecipientName] = useState("");
@@ -701,10 +706,13 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
   // A trial code grants the Agency plan (older grants were stored as the legacy key that maps to it).
   const trialPlanName = PLANS[effectivePlanKey({ plan: betaStatus?.plan, status: "active" }) ?? "agency"].name;
 
-  const { data: generatedCodes } = useQuery<any[]>({
+  const { data: generatedCodes, error: codesError, refetch: refetchCodes } = useQuery<any[]>({
     queryKey: ["/api/beta-codes"],
     enabled: isAdmin,
   });
+  // Production's admin second factor (403 reauth): the list waits for an identity check; the buttons
+  // go through apiRequest, which opens the verify-identity dialog and retries by itself.
+  const codesNeedGate = /^403:/.test(String((codesError as Error | null)?.message ?? "")) && /"reauth":\s*true/.test(String((codesError as Error).message));
 
   const redeemMutation = useMutation({
     mutationFn: async () => {
@@ -774,7 +782,8 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
     const diff = new Date(expiresAt).getTime() - Date.now();
     if (diff <= 0) return "Expired";
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (days > 365) return "Unlimited Access";
+    // "Until revoked" codes end in 2099; a long code (up to 1000 days) still counts down.
+    if (new Date(expiresAt).getUTCFullYear() >= 2099) return "Unlimited Access";
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     if (days > 0) return `${days}d ${hours}h remaining`;
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -874,18 +883,40 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
                     </label>
                   </div>
                   {!unlimited && (
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min={1}
-                        max={14}
-                        value={trialDays}
-                        onChange={e => setTrialDays(parseInt(e.target.value))}
-                        className="flex-1 accent-violet-600"
-                        aria-label="Trial length in days"
-                        data-testid="input-trial-days-slider"
-                      />
-                      <span className="text-sm font-bold text-violet-600 dark:text-violet-400 w-16 text-right" data-testid="text-trial-days">{trialDays} day{trialDays > 1 ? "s" : ""}</span>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min={ACCESS_GRANT_MIN_DAYS}
+                          max={ACCESS_GRANT_MAX_DAYS}
+                          step={1}
+                          value={trialDaysText}
+                          onChange={e => setTrialDaysText(e.target.value)}
+                          aria-label={`Trial length in days (${ACCESS_GRANT_MIN_DAYS}–${ACCESS_GRANT_MAX_DAYS})`}
+                          aria-invalid={!trialDaysOk}
+                          className="w-28"
+                          data-testid="input-trial-days"
+                        />
+                        <span className={`text-sm font-bold ${trialDaysOk ? "text-violet-600 dark:text-violet-400" : "text-destructive"}`} data-testid="text-trial-days">
+                          {trialDaysOk ? `${trialDays.toLocaleString("en-US")} day${trialDays > 1 ? "s" : ""}` : `${ACCESS_GRANT_MIN_DAYS}–${ACCESS_GRANT_MAX_DAYS.toLocaleString("en-US")} days`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick picks">
+                        {ACCESS_GRANT_QUICK_DAYS.map(n => (
+                          <Button
+                            key={n}
+                            type="button"
+                            size="sm"
+                            variant={trialDays === n ? "default" : "outline"}
+                            className="h-7 px-2.5 text-xs"
+                            onClick={() => setTrialDaysText(String(n))}
+                            data-testid={`button-trial-days-${n}`}
+                          >
+                            {n === 365 ? "1 year" : n === 1000 ? "1,000 days" : `${n} days`}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -920,16 +951,23 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
                 )}
                 <Button
                   onClick={() => generateMutation.mutate()}
-                  disabled={generateMutation.isPending}
+                  disabled={generateMutation.isPending || (!unlimited && !trialDaysOk)}
                   className="w-full bg-violet-600 hover:bg-violet-700 text-white"
                   data-testid="button-generate-trial"
                 >
-                  {generateMutation.isPending ? "Creating..." : `Create ${unlimited ? "Unlimited" : `${trialDays}-Day`} Trial${recipientEmail.trim() ? " & Send Email" : ""}`}
+                  {generateMutation.isPending ? "Creating..." : `Create ${unlimited ? "Unlimited " : trialDaysOk ? `${trialDays.toLocaleString("en-US")}-Day ` : ""}Trial${recipientEmail.trim() ? " & Send Email" : ""}`}
                 </Button>
               </div>
             )}
 
-            {generatedCodes && generatedCodes.length > 0 ? (
+            {codesNeedGate ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-3" data-testid="text-trial-codes-gate">
+                <p className="text-sm text-muted-foreground">Verify it's you to see and manage trial codes.</p>
+                <Button size="sm" variant="outline" onClick={() => { requestRecentAuth().then(() => refetchCodes(), () => {}); }} data-testid="button-trial-codes-verify">
+                  Verify identity
+                </Button>
+              </div>
+            ) : generatedCodes && generatedCodes.length > 0 ? (
               <div className="space-y-2">
                 {generatedCodes.map((c: any) => {
                   const status = getCodeStatus(c);

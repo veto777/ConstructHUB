@@ -41,6 +41,7 @@ import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed, ADMIN_REAUTH_BODY } from "./crm/admin";
+import { trialCodeDays, ACCESS_GRANT_MIN_DAYS, ACCESS_GRANT_MAX_DAYS } from "@shared/access-grants";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -281,6 +282,10 @@ export async function registerRoutes(
   // The admins' index of the feature intro pages (/admin/feature-pages).
   const { registerFeaturePageRoutes } = await import("./feature-pages");
   registerFeaturePageRoutes(app);
+  // Platform admins give an account a plan for 1–1000 days, and revoke it (/admin/access).
+  const { ensureAccessGrantsSchema, registerAccessGrantRoutes } = await import("./access-grants");
+  await ensureAccessGrantsSchema();
+  registerAccessGrantRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
   const { ensureAgencySchema } = await import("./agency/schema");
@@ -5540,8 +5545,12 @@ function main() {
       }
 
       const { trialDays, recipientEmail, recipientName } = req.body || {};
-      const isUnlimited = trialDays === 0;
-      const days = isUnlimited ? 0 : Math.min(14, Math.max(1, trialDays || 2));
+      // 1–1000 days (owner, 2026-10-02 — it was capped at 14), or 0 for "until revoked".
+      const days = trialCodeDays(trialDays);
+      if (days === null) {
+        return res.status(400).json({ message: `Trial length must be a whole number of days from ${ACCESS_GRANT_MIN_DAYS} to ${ACCESS_GRANT_MAX_DAYS}, or unlimited.` });
+      }
+      const isUnlimited = days === 0;
       const code = "TRIAL-" + randomUUID().slice(0, 8).toUpperCase();
       const expiresAt = isUnlimited ? new Date("2099-12-31T23:59:59Z") : new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 

@@ -81,6 +81,7 @@ import { pageMetaFor } from "@shared/route-meta";
 // Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
 // on demand, so the marketing pages (and every signed-out visitor) don't download them.
 const AdminFeaturePagesPage = lazy(() => import("@/pages/admin-feature-pages"));
+const AdminAccessPage = lazy(() => import("@/pages/admin-access"));
 const CrmTeamPage = lazy(() => import("@/pages/crm-team"));
 const CrmJoinPage = lazy(() => import("@/pages/crm-join"));
 const CrmHomePage = lazy(() => import("@/pages/crm-home"));
@@ -199,6 +200,8 @@ function DashboardRouter() {
       <Route path="/done-for-you/:slug" component={DfyPageRoute} />
       {/* Platform admins: every feature page, its status and links (the API answers 403 to anyone else). */}
       <Route path="/admin/feature-pages" component={AdminFeaturePagesPage} />
+      {/* Platform admins: give an account a plan for 1–1000 days, extend or revoke it (the API answers 403 to anyone else). */}
+      <Route path="/admin/access" component={AdminAccessPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLanding} />}
@@ -318,7 +321,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/guides", "/cloudflare", "/search-console", "/lsa-leads", "/lsa-account-manager", "/settings",
-  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/admin/feature-pages",
+  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/admin/feature-pages", "/admin/access",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -337,7 +340,7 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages"];
+const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access"];
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
   SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
