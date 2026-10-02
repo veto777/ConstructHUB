@@ -43,13 +43,13 @@ flock -n 9 || { log "another run holds $LOCK — skipping this one"; exit 0; }
 [ "$(stat -c %a "$ENV_FILE")" = 600 ] || die "$ENV_FILE must be mode 600 (chmod 600 $ENV_FILE)"
 ISSUE_DESK_SECRET=""; ISSUE_DESK_APP_URL="http://100.76.165.33:8110"; ISSUE_DESK_MAX_BUDGET_USD="10"
 ISSUE_DESK_MODEL=""; ISSUE_DESK_TEST_DATABASE_URL=""; ISSUE_DESK_WORKTREE="$HOME/ConstructHUB-issue-desk"
-ISSUE_DESK_TIMEOUT_MIN="60"; ISSUE_DESK_CLAUDE_CONFIG_DIR="$HOME/.claude-accountB"
+ISSUE_DESK_TIMEOUT_MIN="60"; ISSUE_DESK_CLAUDE_CONFIG_DIR="$HOME/.claude-accountB"; ISSUE_DESK_MAX_RUNS_PER_DAY="6"
 while IFS= read -r line; do
   [[ "$line" =~ ^(ISSUE_DESK_[A-Z_]+)=(.*)$ ]] || continue
   key="${BASH_REMATCH[1]}"; val="${BASH_REMATCH[2]}"
   val="${val%\"}"; val="${val#\"}"; val="${val%\'}"; val="${val#\'}"
   case "$key" in
-    ISSUE_DESK_SECRET|ISSUE_DESK_APP_URL|ISSUE_DESK_MAX_BUDGET_USD|ISSUE_DESK_MODEL|ISSUE_DESK_TEST_DATABASE_URL|ISSUE_DESK_WORKTREE|ISSUE_DESK_TIMEOUT_MIN|ISSUE_DESK_CLAUDE_CONFIG_DIR)
+    ISSUE_DESK_SECRET|ISSUE_DESK_APP_URL|ISSUE_DESK_MAX_BUDGET_USD|ISSUE_DESK_MODEL|ISSUE_DESK_TEST_DATABASE_URL|ISSUE_DESK_WORKTREE|ISSUE_DESK_TIMEOUT_MIN|ISSUE_DESK_CLAUDE_CONFIG_DIR|ISSUE_DESK_MAX_RUNS_PER_DAY)
       printf -v "$key" '%s' "$val" ;;
   esac
 done < "$ENV_FILE"
@@ -57,9 +57,20 @@ done < "$ENV_FILE"
 APP_URL="${ISSUE_DESK_APP_URL%/}"
 [[ "$ISSUE_DESK_MAX_BUDGET_USD" =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "ISSUE_DESK_MAX_BUDGET_USD must be a number"
 [[ "$ISSUE_DESK_TIMEOUT_MIN" =~ ^[0-9]+$ ]] || die "ISSUE_DESK_TIMEOUT_MIN must be whole minutes"
+[[ "$ISSUE_DESK_MAX_RUNS_PER_DAY" =~ ^[0-9]+$ ]] || die "ISSUE_DESK_MAX_RUNS_PER_DAY must be a whole number"
 WT="$ISSUE_DESK_WORKTREE"
 
 mkdir -p "$STATE_DIR"
+# Daily cap on Claude runs: they draw on the same Claude account as everything else on the tower. Over the cap,
+# new issues stay "new" (unclaimed) and the first run tomorrow takes them.
+find "$STATE_DIR" -maxdepth 1 -name 'runs-*' -mtime +7 -delete 2>/dev/null || true
+DAY_FILE="$STATE_DIR/runs-$(date +%F)"
+RUNS_TODAY="$(cat "$DAY_FILE" 2>/dev/null || echo 0)"
+[[ "$RUNS_TODAY" =~ ^[0-9]+$ ]] || RUNS_TODAY=0
+if [ "$DRY_RUN" != 1 ] && [ -z "$FAKE_OUTPUT" ] && [ "$RUNS_TODAY" -ge "$ISSUE_DESK_MAX_RUNS_PER_DAY" ]; then
+  log "daily cap reached ($RUNS_TODAY of $ISSUE_DESK_MAX_RUNS_PER_DAY Claude runs today): new issues wait for tomorrow"
+  exit 0
+fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 # The bearer travels in a header file (curl -H @file), never on a command line.
@@ -137,6 +148,8 @@ if [ "$DRY_RUN" = 1 ]; then
   echo "== then POST each report to $APP_URL/api/ops-internal/issues/<id>/report and $APP_URL/api/ops-internal/runs/$RUN_ID/complete =="
   exit 0
 fi
+
+[ -z "$FAKE_OUTPUT" ] && echo $((RUNS_TODAY + 1)) > "$DAY_FILE"
 
 # ── 2. refresh the worktree to the local main ──────────────────────────────────
 git -C "$REPO" worktree prune
