@@ -61,6 +61,9 @@ SHORT_OK = {"yes", "no", "okay", "ok", "okay goodbye", "goodbye", "bye", "bye by
 HALLUCINATIONS = {"you", "thank you", "thanks", "bye", "goodbye", "thank you for watching", "thanks for watching", "okay", "so", "um", "uh", "hmm", "the", "yeah"}
 GENERIC_UNKNOWN = "I'm sorry, this number isn't set up to take calls right now. Goodbye."
 GENERIC_DOWN = "I'm sorry, we can't take your call right now. Please try again in a few minutes. Goodbye."
+# "Hello?" / "are you there?" repeated is a caller who can't hear us — always answer it, never treat it as a
+# stale duplicate (Alpine 2026-10-02).
+HELLO_RE = re.compile(r"^(hello|hi|hey|are you there|can you hear me|anyone there|is anybody there)\b", re.I)
 SIM_TTL_S = 30 * 60
 SIM_MAX_SESSIONS = 200
 PENDING_TTL_S = 120
@@ -614,7 +617,7 @@ class Call:
         # The same words again within a few seconds is the queued copy of what we just answered (Alpine
         # 2026-10-02: "Bellingham." answered twice) — not a new turn. A real repeat later still counts.
         norm = " ".join(re.sub(r"[.,!?]", " ", text.lower()).split())
-        if norm == self.last_caller_norm and time.time() - self.last_caller_at < 8.0:
+        if norm == self.last_caller_norm and time.time() - self.last_caller_at < 8.0 and not HELLO_RE.match(norm):
             log.info("ignored duplicate caller text: %s", said(text))
             return None
         self.last_caller_norm, self.last_caller_at = norm, time.time()
@@ -979,7 +982,13 @@ async def tts_preview(req: web.Request) -> web.Response:
 
 # ── app ─────────────────────────────────────────────────────────────────────────────────────────────────
 
+def _log_task_crash(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+    exc = context.get("exception")
+    log.error("background task crashed: %s", context.get("message", ""), exc_info=exc if isinstance(exc, BaseException) else None)
+
+
 async def on_startup(app: web.Application) -> None:
+    asyncio.get_running_loop().set_exception_handler(_log_task_crash)
     global stt, tts, PERSONAS
     log.info("settings: %s", json.dumps(settings.describe()))
     if app.get(CLIENT) is None:
