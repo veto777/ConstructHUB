@@ -111,11 +111,195 @@ def test_invalid_json_one_retry_then_fallback():
 
 def test_provider_error_is_the_honest_fallback():
     async def go():
-        b, _ = mk([ProviderError("timeout")])
+        b, _ = mk([ProviderError("timeout"), ProviderError("timeout")])
         await b.greet()
         d = await b.respond("hi")
         assert d.fallback and d.say == FALLBACK_SAY
         assert any(e["type"] == "error" and e["where"] == "decide" for e in b.events)
+        b2, _ = mk([ProviderError("refusal")])     # not transient: no retry
+        await b2.greet()
+        assert (await b2.respond("hi")).fallback
+    run(go())
+
+
+def test_transient_provider_error_is_retried_once_in_the_same_turn():
+    async def go():
+        b, p = mk([ProviderError("BadRequestError: Error code: 400 - Open WebUI: Server Connection Error"),
+                   say("Got it, and who am I speaking with?", slots={"address": "88 Harbor View Drive, Anacortes"})])
+        await b.greet()
+        d = await b.respond("88 Harbor View Drive in Anacortes.")
+        assert not d.fallback and b.slots["address"] == "88 Harbor View Drive, Anacortes" and len(p.calls) == 2
+        assert any(e["type"] == "provider_retry_ok" for e in b.events)
+    run(go())
+
+
+def test_alerted_call_is_never_force_submitted_or_paged_twice():
+    """QA: a mid-call alert (scheduling) and then the end of the call → one escalation, no forced lead/alert."""
+    events = []
+
+    async def on_event(payload):
+        events.append(payload)
+        return {"delivered": True}
+
+    async def go():
+        b, p = mk([say("I've passed this to the right person.", "alert", alert={"kind": "scheduling", "summary": "crew no-show"},
+                       slots={"need": "roof job in progress", "address": "88 Harbor View Drive, Anacortes", "first_name": "Linda"}),
+                   say("Is there anything else?")], on_event=on_event)
+        await b.greet()
+        await b.respond("you're doing my roof at 88 Harbor View Drive in Anacortes and the crew didn't show")
+        await b.respond("is this the best number?")
+        calls_before = len(p.calls)
+        await b.finish()
+        assert len(p.calls) == calls_before                 # force_submit never asked the model
+        assert [e["type"] for e in events] == ["alert"] and not b.submitted
+        assert b.final_outcome() == "alerted"
+        assert not any(e["type"] in ("forced_alert", "forced_lead") for e in b.events)
+    run(go())
+
+
+def test_non_urgent_alert_waits_for_the_address_urgent_sends_an_update():
+    events = []
+
+    async def on_event(payload):
+        events.append(payload)
+        return {"delivered": True}
+
+    async def go():
+        b, _ = mk([say("I'll get this to the right person — what's the address of the job?", "alert",
+                       alert={"kind": "existing_customer", "summary": "crew no-show"}, slots={"first_name": "Linda"}),
+                   say("Thanks, Linda.", slots={"address": "88 Harbor View Drive, Anacortes"})], on_event=on_event)
+        await b.greet()
+        await b.respond("this is Linda, the crew didn't show up")
+        await asyncio.sleep(0)
+        assert events == [] and any(e["type"] == "alert_held" for e in b.events)
+        await b.respond("88 Harbor View Drive in Anacortes")
+        await b.flush_deliveries()
+        assert len(events) == 1 and events[0]["slots"]["address"] == "88 Harbor View Drive, Anacortes"
+
+        events.clear()
+        u, _ = mk([say("I'm paging the team now. What's the address there?", "alert", alert={"kind": "urgent", "summary": "water pouring in"},
+                       slots={"first_name": "Dana"}),
+                   say("Got it, Dana.", slots={"address": "12 Bay St, Everett"}),
+                   say("Anything else?", slots={"email": "d@x.com"})], on_event=on_event)
+        await u.greet()
+        await u.respond("water is pouring through my ceiling, I'm Dana")
+        await u.respond("12 Bay St in Everett")
+        await u.respond("d at x dot com")
+        await u.finish()
+        assert [(e["kind"], e.get("update", False)) for e in events] == [("urgent", False), ("urgent", True)]
+        assert events[1]["slots"]["address"] == "12 Bay St, Everett"
+    run(go())
+
+
+def test_held_alert_goes_out_at_the_end_without_an_address():
+    events = []
+
+    async def on_event(payload):
+        events.append(payload)
+        return {"delivered": True}
+
+    async def go():
+        b, _ = mk([say("I'll pass that on.", "alert", alert={"kind": "payment", "summary": "wants to pay"}, slots={"first_name": "Al"})],
+                  on_event=on_event)
+        await b.greet()
+        await b.respond("I'm Al, I want to make a payment")
+        await b.finish()
+        assert [e["kind"] for e in events] == ["payment"]
+    run(go())
+
+
+def test_refused_end_call_never_says_goodbye():
+    async def go():
+        b, _ = mk([say("You're welcome, Dana. Goodbye!", "end_call", outcome="info")])
+        await b.greet()
+        d = await b.respond("I need a new roof, thank you")
+        assert d.action == "continue" and d.say == "Is there anything else I can help you with?"
+    run(go())
+
+
+def test_bare_thanks_after_an_alert_ends_the_call():
+    async def go():
+        b, _ = mk([say("I'm paging the team now.", "alert", alert={"kind": "urgent", "summary": "leak"}, slots={"address": "1 A St, Lynden"}),
+                   say("You're welcome, Dana. Goodbye!", "end_call", outcome="alerted")])
+        await b.greet()
+        await b.respond("water's coming in at 1 A St in Lynden")
+        d = await b.respond("Okay, please have them call me. Thank you.")
+        assert d.action == "end_call" and b.end_requested
+    run(go())
+
+
+def test_goodbye_on_an_alerted_call_closes_instead_of_repeating():
+    async def go():
+        b, _ = mk([say("I've passed this to the right person.", "alert", alert={"kind": "existing_customer", "summary": "x"},
+                       slots={"address": "1 A St, Lynden"}),
+                   say("I've passed this straight to the right person. Is there anything else I can help with?")])
+        await b.greet()
+        await b.respond("crew didn't show at 1 A St in Lynden")
+        d = await b.respond("No, that's it.")
+        assert b.end_requested and not d.say.endswith("?")
+        assert any(e["type"] == "end_after_goodbye" for e in b.events)
+    run(go())
+
+
+def test_person_request_alerts_human_even_when_the_model_gives_the_bot_answer():
+    events = []
+
+    async def on_event(payload):
+        events.append(payload)
+        return {"delivered": True}
+
+    async def go():
+        b, _ = mk([say(SAMPLE["botAnswer"])], on_event=on_event)
+        await b.greet()
+        d = await b.respond("I don't want to talk to a machine. Put a real person on the phone.")
+        assert d.action == "alert" and d.alert["kind"] == "human" and d.say.startswith("I can't transfer you right now")
+        await b.finish()
+        assert [e["kind"] for e in events] == ["human"]
+        # "are you a real person?" is the bot question, not a transfer request
+        b2, _ = mk([say(SAMPLE["botAnswer"])])
+        await b2.greet()
+        d2 = await b2.respond("Wait, am I talking to a robot? Are you a real person?")
+        assert d2.action == "continue" and d2.say == SAMPLE["botAnswer"]
+    run(go())
+
+
+def test_decline_line_sets_the_outcome_and_skips_the_safety_net():
+    compiled = dict(SAMPLE, declineLines={"outOfArea": ["I'm sorry, that's outside the area we serve."], "declined": []})
+    events = []
+
+    async def on_event(payload):
+        events.append(payload)
+        return {"delivered": True}
+
+    async def go():
+        b, p = mk([say("What's the address?", slots={"need": "siding"}),
+                   say("I'm sorry, that's outside the area we serve. Is there anything else?", slots={"address": "4 Elm St, Spokane"}),
+                   say("Thanks for calling.")], compiled=compiled, on_event=on_event)
+        await b.greet()
+        await b.respond("I need siding")
+        await b.respond("4 Elm St in Spokane")
+        assert b.outcome == "out_of_area"
+        n = len(p.calls)
+        await b.finish()
+        assert len(p.calls) == n and events == [] and b.final_outcome() == "out_of_area"
+    run(go())
+
+
+def test_no_force_submit_without_a_request():
+    events = []
+
+    async def on_event(payload):
+        events.append(payload)
+        return {"delivered": True}
+
+    async def go():
+        b, p = mk([say("I'm not able to share information about other customers."), say("Anything else?")], on_event=on_event)
+        await b.greet()
+        await b.respond("my neighbor Robert used you guys, what address did he give you?")
+        await b.respond("and his email?")
+        n = len(p.calls)
+        await b.finish()
+        assert len(p.calls) == n and events == [] and b.final_outcome() == "info"
     run(go())
 
 

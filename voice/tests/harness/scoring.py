@@ -102,7 +102,8 @@ def score(sc: Scenario, r: RunResult) -> Card:
     if e.twiml:
         add(f"twiml {e.twiml}", e.twiml in (r.twiml or ""), f"twiml: {r.twiml or '-'}")
     if e.notify:
-        add(f"notify {e.notify}", r.notifications == 0 if e.notify == "none" else r.notifications > 0, f"notifications: {r.notifications}")
+        want = {"none": r.notifications == 0, "one": r.notifications == 1}.get(e.notify, r.notifications > 0)
+        add(f"notify {e.notify}", want, f"notifications: {r.notifications}")
     if e.lead is not None:
         add(f"lead {str(e.lead).lower()}", r.lead == e.lead, f"lead={r.lead}{' (forced)' if r.forced else ''}")
     add("no protocol errors", not r.errors, " | ".join(r.errors))

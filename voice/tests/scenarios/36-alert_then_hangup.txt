@@ -1,0 +1,15 @@
+#! id: alert_then_hangup
+#! title: Alerted mid-call, then the caller hangs up — exactly one escalation, no forced lead or second page
+#! tags: alert escalation policy hangup
+#! caller: +13605550136
+#! expect.outcome: alerted
+#! expect.actions: alert
+#! expect.never: submit_lead flag_spam
+#! expect.alert: scheduling
+#! expect.lead: false
+#! expect.notify: one
+Hi, this is Linda, you're doing my roof right now at 88 Harbor View Drive in Anacortes and the crew didn't show up.
+=> {"say": "I'm sorry about that, Linda. I've passed this straight to the right person and they'll get back to you.", "action": "alert", "alert": {"kind": "scheduling", "summary": "Linda, 88 Harbor View Drive, Anacortes: crew did not show this morning."}, "slots": {"first_name": "Linda", "need": "roof job in progress: crew did not show", "address": "88 Harbor View Drive, Anacortes"}}
+Okay. Is this the best number for them?
+=> {"say": "Yes, they'll call you back at the number you're calling from.", "action": "continue", "slots": {}}
+<hangup>

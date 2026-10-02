@@ -62,6 +62,7 @@ HALLUCINATIONS = {"you", "thank you", "thanks", "bye", "goodbye", "thank you for
 GENERIC_UNKNOWN = "I'm sorry, this number isn't set up to take calls right now. Goodbye."
 GENERIC_DOWN = "I'm sorry, we can't take your call right now. Please try again in a few minutes. Goodbye."
 SIM_TTL_S = 30 * 60
+SIM_MAX_SESSIONS = 200
 PENDING_TTL_S = 120
 
 CLIENT = web.AppKey("client", AppClient)
@@ -73,7 +74,10 @@ tts: TTS | None = None
 PERSONAS: dict[str, Any] = {"verified": False, "personas": []}
 ACTIVE: set["Call"] = set()
 SIM_SESSIONS: dict[str, dict[str, Any]] = {}
-PENDING_PROFILES: dict[str, tuple[float, CallProfile]] = {}   # callSid → profile fetched at the webhook
+# callSid → (time, profile, stream token, from, to) minted at the verified webhook. The public /media socket only
+# runs a call that presents the token from the <Stream> it was handed (QA: forged streams poisoned the spam ledger,
+# filed leads and burned minutes); one use, then it is gone.
+PENDING_PROFILES: dict[str, tuple[float, CallProfile, str, str, str]] = {}
 GREET_CACHE: dict[str, bytes] = {}
 STARTED = datetime.now(timezone.utc)
 
@@ -158,6 +162,17 @@ async def call_is_real(call_sid: str, to: str) -> bool:
     return bool(j) and j.get("status") in ("queued", "ringing", "in-progress") and _last10(j.get("to")) == _last10(to)
 
 
+def said(text: str) -> str:
+    """What a caller said, for the journal: the words only with VOICE_LOG_TRANSCRIPTS=1, else just the length."""
+    return text if settings.log_transcripts else f"<{len(text or '')} chars>"
+
+
+def mask(n: str | None) -> str:
+    """A caller number in the journal: last four digits only (SPEC §17 — no PII in logs beyond the CRM's)."""
+    d = "".join(c for c in (n or "") if c.isdigit())
+    return f"…{d[-4:]}" if d else "unknown"
+
+
 def e164(n: str) -> str:
     d = "".join(c for c in (n or "") if c.isdigit())
     if n.startswith("+") and d:
@@ -174,6 +189,9 @@ def e164(n: str) -> str:
 async def signalwire_voice(req: web.Request) -> web.Response:
     form = {k: str(v) for k, v in (await req.post()).items()}
     call_sid, frm, to = form.get("CallSid", ""), e164(form.get("From", "")), e164(form.get("To", ""))
+    if not SID_RE.match(call_sid):
+        log.warning("rejected webhook with a malformed CallSid from %s", req.remote)
+        return web.Response(status=400, text="bad CallSid")
     if not valid_signature(req, form):
         if await call_is_real(call_sid, to):
             log.info("webhook accepted via SignalWire call lookup (%s)", call_sid)
@@ -193,19 +211,24 @@ async def signalwire_voice(req: web.Request) -> web.Response:
         log.error("profile fetch failed for %s: %s", call_sid, e)
         return twiml(f"<Say>{xml_escape(GENERIC_DOWN)}</Say><Hangup/>")
     if (profile.caller or {}).get("blocked"):
-        log.info("blocked spammer %s -> %s (%s)", frm, to, call_sid)
+        log.info("blocked spammer %s -> %s (%s)", mask(frm), to, call_sid)
         asyncio.create_task(report_blocked(app, profile, call_sid, frm, to))
         return twiml('<Reject reason="rejected"/>')
+    if len(ACTIVE) >= settings.max_active_calls:
+        log.warning("call %s refused: %d active calls (cap %d)", call_sid, len(ACTIVE), settings.max_active_calls)
+        return twiml(f"<Say>{xml_escape(GENERIC_DOWN)}</Say><Hangup/>")
     now = time.time()
-    for k, (t, _) in list(PENDING_PROFILES.items()):
-        if now - t > PENDING_TTL_S:
+    for k, entry in list(PENDING_PROFILES.items()):
+        if now - entry[0] > PENDING_TTL_S:
             PENDING_PROFILES.pop(k, None)
-    PENDING_PROFILES[call_sid] = (now, profile)
-    log.info("incoming call %s -> %s (%s) org=%s persona=%s", frm, to, call_sid, profile.org.get("name"), (profile.compiled.get("persona") or {}).get("id"))
+    token = secrets.token_urlsafe(24)
+    PENDING_PROFILES[call_sid] = (now, profile, token, frm, to)
+    log.info("incoming call %s -> %s (%s) org=%s persona=%s", mask(frm), to, call_sid, profile.org.get("name"), (profile.compiled.get("persona") or {}).get("id"))
     # <Hangup/> after the stream: when the engine closes the media socket the call ends, whatever happened before
     return twiml(f'<Connect><Stream url="{xml_escape(settings.media_ws_url)}">'
                  f'<Parameter name="from" value="{xml_escape(frm)}"/><Parameter name="to" value="{xml_escape(to)}"/>'
-                 f'<Parameter name="callSid" value="{xml_escape(call_sid)}"/></Stream></Connect><Hangup/>')
+                 f'<Parameter name="callSid" value="{xml_escape(call_sid)}"/><Parameter name="token" value="{xml_escape(token)}"/>'
+                 f'</Stream></Connect><Hangup/>')
 
 
 async def report_blocked(app: AppClient, profile: CallProfile, call_sid: str, frm: str, to: str) -> None:
@@ -374,24 +397,40 @@ class Call:
 
     # ── lifecycle ───────────────────────────────────────────────────────────────────────────────────
 
-    async def on_start(self, start: dict[str, Any]) -> None:
-        self.sid, self.call_sid = start["streamSid"], start.get("callSid") or (start.get("customParameters") or {}).get("callSid")
+    async def on_start(self, start: dict[str, Any]) -> bool:
+        """Authenticate the stream, then set the call up. False (socket closed) when the stream is not a call we
+        answered: /media is public, so caller id, number and CallSid from the client are never trusted on their own."""
+        if self.brain is not None:
+            return True   # a second "start" on the same socket changes nothing
         cp = start.get("customParameters") or {}
-        self.frm, self.to = e164(cp.get("from", "")), e164(cp.get("to", ""))
-        pending = PENDING_PROFILES.pop(self.call_sid or "", None)
-        if pending:
-            self.profile = pending[1]
+        self.sid = str(start.get("streamSid") or "")
+        self.call_sid = str(start.get("callSid") or cp.get("callSid") or "")
+        if not SID_RE.match(self.call_sid):
+            log.warning("media stream refused: malformed CallSid")
+            await self.ws.close()
+            return False
+        pending = PENDING_PROFILES.get(self.call_sid)
+        token = str(cp.get("token") or "")
+        if pending and token and hmac.compare_digest(pending[2], token):
+            PENDING_PROFILES.pop(self.call_sid, None)
+            self.profile, self.frm, self.to = pending[1], pending[3], pending[4]   # the webhook's (signed) numbers
         else:
+            # No (or a wrong) token: only a CallSid our SignalWire project knows as live, to this number, may run.
+            self.frm, self.to = e164(str(cp.get("from", ""))), e164(str(cp.get("to", "")))
+            if pending or not await call_is_real(self.call_sid, self.to):
+                log.warning("media stream refused: no valid stream token for %s", self.call_sid)
+                await self.ws.close()
+                return False
             try:
-                self.profile = await self.app.profile(self.to, self.frm, self.call_sid or "")
+                self.profile = await self.app.profile(self.to, self.frm, self.call_sid)
             except Exception as e:  # noqa: BLE001
                 log.error("stream %s without a profile (%s); hanging up", self.call_sid, e)
                 await self.ws.close()
-                return
+                return False
             if (self.profile.caller or {}).get("blocked"):
                 log.info("blocked caller on a stream with no webhook profile (%s); hanging up", self.call_sid)
                 await self.ws.close()
-                return
+                return False
         p = self.profile
         c = p.compiled
         timings = c.get("timings") or {}
@@ -416,9 +455,10 @@ class Call:
                                      "model": self.brain.model_name, "persona": (c.get("persona") or {}).get("id", ""),
                                      "profileVersion": p.version})
         g = await self.brain.greet()
-        log.info("call %s org=%s from=%s voice=%s mediaFormat=%s", sid, p.org.get("name"), self.frm, self.voice, start.get("mediaFormat"))
+        log.info("call %s org=%s from=%s voice=%s mediaFormat=%s", sid, p.org.get("name"), mask(self.frm), self.voice, start.get("mediaFormat"))
         self.last_ai_text = g
         self.greet_task = asyncio.create_task(self.greet_after_delay(g))
+        return True
 
     async def greet_after_delay(self, g: str) -> None:
         """Forwarded/bridged calls: the audio path isn't fully open at 'start'. Wait, drop bridge noise, then greet."""
@@ -557,27 +597,31 @@ class Call:
         if self.last_ai_text:
             kept = self.strip_echo(text)
             if not kept:
-                log.info("ignored echo of our own voice: %s", text)
+                log.info("ignored echo of our own voice: %s", said(text))
                 return
             if kept != text:
-                log.info("stripped echo: %r -> %r", text, kept)
+                log.info("stripped echo: %r -> %r", said(text), said(kept))
             text = kept
         if overlapped and len(text.split()) < 3 and norm not in SHORT_OK:
-            log.info("ignored short fragment heard over our own voice: %s", text)
+            log.info("ignored short fragment heard over our own voice: %s", said(text))
             return
         if time.time() - self.started < WHISPER_WINDOW_S and WHISPER_RE.search(text.strip()):
-            log.info("ignored call-whisper announcement: %s", text)
+            log.info("ignored call-whisper announcement: %s", said(text))
             return
         await self.wait_played()   # still finishing a sentence? answer after it, not over it
         if self.watch_task:
             self.watch_task.cancel()
-        log.info("caller %s: %s", self.call_sid, text)
+        if settings.log_transcripts:
+            log.info("caller %s: %s", self.call_sid, text)
+        else:
+            log.info("caller %s: %d chars", self.call_sid, len(text))
         await self._respond(text, silence=False)
 
     async def _respond(self, text: str, silence: bool) -> None:
         t_brain = time.time()
         d = await self.brain.respond(text, silence=silence)
-        log.info("ai %s: %s [%s] (stt %.1fs, brain %.1fs)", self.call_sid, d.say, d.action, 0.0 if silence else self.stt_s, time.time() - t_brain)
+        log.info("ai %s: %s [%s] (stt %.1fs, brain %.1fs)", self.call_sid, d.say if settings.log_transcripts else f"{len(d.say)} chars", d.action,
+                 0.0 if silence else self.stt_s, time.time() - t_brain)
         if d.say:
             await self.say(d.say)
         if self.brain.end_requested:
@@ -726,6 +770,10 @@ async def media_ws(req: web.Request) -> web.WebSocketResponse:
         log.error("media stream refused: models not loaded")
         await ws.close()
         return ws
+    if len(ACTIVE) >= settings.max_active_calls:
+        log.warning("media stream refused: %d active calls (cap %d)", len(ACTIVE), settings.max_active_calls)
+        await ws.close()
+        return ws
     call = Call(ws, req.app[CLIENT], req.app.get(PROVIDER))
     ACTIVE.add(call)
     try:
@@ -738,7 +786,10 @@ async def media_ws(req: web.Request) -> web.WebSocketResponse:
                 continue
             e = ev.get("event")
             if e == "start":
-                await call.on_start(ev["start"])
+                if not await call.on_start(ev.get("start") or {}):
+                    break
+            elif call.brain is None:
+                continue   # nothing but "start" counts before the stream is authenticated
             elif e == "media":
                 if ev["media"].get("track", "inbound") == "inbound":
                     await call.on_media(ev["media"]["payload"])
@@ -813,6 +864,8 @@ async def sim_session(req: web.Request) -> web.Response:
     if not compiled.get("systemPrompt"):
         return web.json_response({"code": "bad_request", "message": "compiled profile required"}, status=400)
     _sim_gc()
+    if len(SIM_SESSIONS) >= SIM_MAX_SESSIONS:
+        return web.json_response({"code": "busy", "message": "too many simulator sessions"}, status=503)
     sid = secrets.token_urlsafe(12)
     # simulator calls never reach the CRM: events are recorded on the brain only (dry run)
     brain = Brain(compiled, body.get("callerNumber") or "+15555550100", on_event=None, timezone=body.get("timezone"), provider=req.app.get(PROVIDER),
@@ -825,7 +878,7 @@ async def sim_session(req: web.Request) -> web.Response:
 async def sim_turn(req: web.Request) -> web.Response:
     body = await req.json()
     s = SIM_SESSIONS.get(body.get("sessionId") or "")
-    if not s:
+    if not s or s.get("orgId") != body.get("orgId"):   # a session belongs to the org that opened it
         return web.json_response({"code": "unknown_session"}, status=404)
     brain: Brain = s["brain"]
     if brain.end_requested:
@@ -844,7 +897,17 @@ async def sim_turn(req: web.Request) -> web.Response:
 
 
 async def sim_delete(req: web.Request) -> web.Response:
-    s = SIM_SESSIONS.pop(req.match_info["id"], None)
+    org = req.query.get("orgId")
+    try:
+        body = await req.json() if req.can_read_body else {}
+    except ValueError:
+        body = {}
+    org = org or (body or {}).get("orgId")
+    s = SIM_SESSIONS.get(req.match_info["id"])
+    if s and s.get("orgId") != org:
+        s = None
+    if s:
+        SIM_SESSIONS.pop(req.match_info["id"], None)
     if not s:
         return web.json_response({"ended": True, "summary": "", "report": None})
     brain: Brain = s["brain"]
@@ -927,6 +990,11 @@ def make_app(load_models: bool = True, client: AppClient | None = None, provider
 
 
 if __name__ == "__main__":
+    problems = settings.startup_problems()
+    if problems:
+        for msg in problems:
+            log.error("refusing to start: %s", msg)
+        raise SystemExit(2)
     # On stop (deploys/restarts) keep serving active calls for up to 10 minutes before exiting (the unit's
     # TimeoutStopSec matches). Never restart during a live call: deploy/restart-when-idle.sh.
     web.run_app(make_app(), host=list(settings.bind), port=settings.port, access_log=None, shutdown_timeout=600)

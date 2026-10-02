@@ -99,6 +99,8 @@ export function applyDecision(s: CallState, d: Decision, compiled: CompiledProfi
       if (!s.spamFlagged) {
         s.submitted = true;
         if (!s.leadDelivered) { s.leadDelivered = true; s.notifications += 1; s.events.push({ t, type: "lead" }); }
+        // the engine's end_after_goodbye: the caller said goodbye and the model submitted with a closing line
+        if (isGoodbye(s.lastCallerText, s.lastAssistantSay) && !d.say.trim().endsWith("?")) { endedNow = true; s.endReason = "goodbye"; }
       } else s.events.push({ t, type: "lead_suppressed", detail: "spam" });
       break;
     case "alert":

@@ -61,7 +61,7 @@ export function score(sc: Scenario, run: RunOutcome): ScoreCard {
   if (e.alert) for (const k of e.alert) add(`alert ${k}`, s.alerts.some((a) => a.kind === k), `alerts: ${s.alerts.map((a) => a.kind).join(",") || "-"}`);
   if (e.spamMin !== undefined) add(`spam_min ${e.spamMin}`, (s.spam?.confidence ?? 0) >= e.spamMin, `spam: ${s.spam ? `${s.spam.confidence} ${s.spam.reason}` : "-"}`);
   if (e.twiml) add(`twiml ${e.twiml}`, (run.twiml ?? "").includes(e.twiml), `twiml: ${run.twiml ?? "-"}`);
-  if (e.notify) add(`notify ${e.notify}`, e.notify === "none" ? s.notifications === 0 : s.notifications > 0, `notifications: ${s.notifications}`);
+  if (e.notify) add(`notify ${e.notify}`, e.notify === "none" ? s.notifications === 0 : e.notify === "one" ? s.notifications === 1 : s.notifications > 0, `notifications: ${s.notifications}`);
   if (e.lead !== undefined) add(`lead ${e.lead}`, s.leadDelivered === e.lead, `leadDelivered=${s.leadDelivered}${s.forcedSubmit ? " (forced)" : ""}`);
   add("no protocol errors", run.errors.length === 0, run.errors.join(" | "));
 

@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import base64
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -52,6 +53,8 @@ async def main(a: argparse.Namespace) -> int:
         print("webhook:", r.status_code, r.text[:200])
         if "<Stream" not in r.text:
             return 1
+        m = re.search(r'<Parameter name="token" value="([^"]+)"/>', r.text)
+        token = m.group(1) if m else ""
 
     ws_url = a.engine.replace("http://", "ws://") + "/media"
     heard: list[np.ndarray] = []
@@ -61,7 +64,7 @@ async def main(a: argparse.Namespace) -> int:
         await ws.send_str(json.dumps({"event": "connected", "protocol": "Call", "version": "1.0.0"}))
         await ws.send_str(json.dumps({"event": "start", "start": {"streamSid": "MZ-e2e", "callSid": call_sid,
                                                                   "mediaFormat": {"encoding": "audio/x-mulaw", "sampleRate": 8000},
-                                                                  "customParameters": {"from": CALLER, "to": LIVE, "callSid": call_sid}}}))
+                                                                  "customParameters": {"from": CALLER, "to": LIVE, "callSid": call_sid, "token": token}}}))
         t0 = time.time()
 
         async def reader():

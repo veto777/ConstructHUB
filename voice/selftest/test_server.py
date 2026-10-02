@@ -6,10 +6,12 @@ import copy
 import hashlib
 import hmac
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 import pytest
+import aiohttp
 from aiohttp.test_utils import TestClient, TestServer
 
 import audio
@@ -24,6 +26,19 @@ SIGNING_KEY = TEST_ENV["SIGNALWIRE_SIGNING_KEY"]
 FWD = {"X-Forwarded-Proto": "https", "X-Forwarded-Host": "constructhub.us", "X-Forwarded-Prefix": "/voice"}
 AUTH = {"Authorization": f"Bearer {SECRET}"}
 SAMPLE = json.loads((Path(__file__).resolve().parents[1] / "tests" / "profiles" / "sample.json").read_text(encoding="utf-8"))
+
+
+def stream_token(twiml_text: str) -> str:
+    m = re.search(r'<Parameter name="token" value="([^"]+)"/>', twiml_text)
+    assert m, twiml_text
+    return m.group(1)
+
+
+async def answer(tc, sid: str, frm: str = "+13605550123") -> str:
+    """The signed webhook SignalWire sends first; returns the stream token the <Stream> carries."""
+    form = webhook_form(sid=sid, frm=frm)
+    r = await tc.post("/signalwire/voice", data=form, headers={**FWD, "X-Twilio-Signature": sign("/signalwire/voice", form)})
+    return stream_token(await r.text())
 
 
 def sign(path: str, form: dict) -> str:
@@ -138,6 +153,7 @@ def test_webhook_live_number_connects_stream(monkeypatch):
         prof = [x for x in mock[LOG] if x["path"].endswith("/profile")][0]
         assert prof["query"] == {"to": LIVE, "from": "+13605550123", "callSid": "CA-test-0001"}
         assert "CA-test-0001" in server.PENDING_PROFILES
+        assert server.PENDING_PROFILES["CA-test-0001"][2] == stream_token(body)
         server.PENDING_PROFILES.clear()
         await stop(tc, ms)
     run(go())
@@ -153,7 +169,7 @@ def test_webhook_unknown_paused_blocked_and_models_down(monkeypatch):
 
         st, body = await post(webhook_form(to="+13605550199", sid="CA-unknown"))
         assert st == 200 and "<Say>" in body and "<Hangup/>" in body and "<Stream" not in body
-        st, body = await post(webhook_form(to=PAUSED, sid="CA-paused"))
+        st, body = await post(webhook_form(to=PAUSED, sid="CA-paused-01"))
         assert "closed right now" in body and "<Hangup/>" in body
         st, body = await post(webhook_form(frm=BLOCKED_CALLER, sid="CA-blocked"))
         assert '<Reject reason="rejected"/>' in body and "<Stream" not in body
@@ -164,7 +180,7 @@ def test_webhook_unknown_paused_blocked_and_models_down(monkeypatch):
             await asyncio.sleep(0.02)
         assert puts[0]["body"]["outcome"] == "blocked" and puts[0]["body"]["durationSeconds"] == 0
         monkeypatch.setattr(server, "stt", None)
-        st, body = await post(webhook_form(sid="CA-down"))
+        st, body = await post(webhook_form(sid="CA-down-0001"))
         assert "can't take your call right now" in body and "<Stream" not in body
         await stop(tc, ms)
     run(go())
@@ -200,23 +216,27 @@ def test_sim_session_turn_delete(monkeypatch):
         j = await r.json()
         sid = j["sessionId"]
         assert j["greeting"] == SAMPLE["greeting"] and j["compiledVersion"] == 1 and j["persona"]["voice"] == "af_heart"
-        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "new roof please"}, headers=AUTH)
+        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "new roof please", "orgId": "org-other"}, headers=AUTH)
+        assert r.status == 404                      # another org's session is not found
+        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "new roof please", "orgId": "org-test"}, headers=AUTH)
         j = await r.json()
         assert j["say"] == "What's the address?" and j["ended"] is False and j["slots"]["phone"] == "+15555550100"
-        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "1 Main St Ferndale, I'm Ann"}, headers=AUTH)
+        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "1 Main St Ferndale, I'm Ann", "orgId": "org-test"}, headers=AUTH)
         j = await r.json()
         assert j["action"] == "submit_lead" and any(e["type"] == "lead" for e in j["events"])
-        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "no that's all, bye"}, headers=AUTH)
+        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "no that's all, bye", "orgId": "org-test"}, headers=AUTH)
         j = await r.json()
         assert j["ended"] is True and j["outcome"] == "lead_submitted"
-        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "hello?"}, headers=AUTH)
+        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "hello?", "orgId": "org-test"}, headers=AUTH)
         assert r.status == 409
-        r = await tc.delete(f"/sim/session/{sid}", headers=AUTH)
+        r = await tc.delete(f"/sim/session/{sid}?orgId=org-other", headers=AUTH)
+        assert (await r.json())["report"] is None and sid in server.SIM_SESSIONS   # not that org's to end
+        r = await tc.delete(f"/sim/session/{sid}?orgId=org-test", headers=AUTH)
         j = await r.json()
         assert j["ended"] is True and j["report"]["outcome"] == "lead_submitted" and j["summary"]
         # the simulator never reaches the CRM
         assert not [x for x in mock[LOG] if "/calls" in x["path"]]
-        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "x"}, headers=AUTH)
+        r = await tc.post("/sim/turn", json={"sessionId": sid, "text": "x", "orgId": "org-test"}, headers=AUTH)
         assert r.status == 404
         await stop(tc, ms)
     run(go())
@@ -254,13 +274,11 @@ def test_media_call_end_to_end(monkeypatch):
     async def go():
         tc, mock, ms = await start(compiled=compiled, provider=prov, monkeypatch=monkeypatch)
         server.stt.queue[:] = ["I need new siding at 1420 Alabama Street in Bellingham, this is Mike.", "Okay, thanks, bye."]
-        form = webhook_form(sid="CA-media-1")
-        r = await tc.post("/signalwire/voice", data=form, headers={**FWD, "X-Twilio-Signature": sign("/signalwire/voice", form)})
-        assert "<Stream" in await r.text()
+        token = await answer(tc, "CA-media-1")
         ws = await tc.ws_connect("/media")
         await ws.send_str(json.dumps({"event": "connected", "protocol": "Call", "version": "1.0.0"}))
         await ws.send_str(json.dumps({"event": "start", "start": {"streamSid": "MZ1", "callSid": "CA-media-1", "mediaFormat": {"encoding": "audio/x-mulaw"},
-                                                                  "customParameters": {"from": "+13605550123", "to": LIVE, "callSid": "CA-media-1"}}}))
+                                                                  "customParameters": {"from": "+13605550123", "to": LIVE, "callSid": "CA-media-1", "token": token}}}))
         got = {"media": 0, "mark": 0, "first_media_at": None}
         closed = asyncio.Event()
 
@@ -327,9 +345,10 @@ def test_media_call_caller_hangs_up_mid_intake_forces_submit(monkeypatch):
     async def go():
         tc, mock, ms = await start(compiled=compiled, provider=prov, monkeypatch=monkeypatch)
         server.stt.queue[:] = ["I want eight new windows.", "500 Grand Ave in Mount Vernon."]
-        ws = await tc.ws_connect("/media")   # no webhook first: the stream fetches its own profile
+        token = await answer(tc, "CA-media-2")
+        ws = await tc.ws_connect("/media")
         await ws.send_str(json.dumps({"event": "start", "start": {"streamSid": "MZ2", "callSid": "CA-media-2",
-                                                                  "customParameters": {"from": "+13605550123", "to": LIVE, "callSid": "CA-media-2"}}}))
+                                                                  "customParameters": {"from": "+13605550123", "to": LIVE, "callSid": "CA-media-2", "token": token}}}))
 
         async def frames(payload, seconds):
             for _ in range(int(seconds / FRAME_S)):
@@ -401,9 +420,10 @@ def test_barge_in_clears_playback_but_never_during_the_greeting(monkeypatch):
         tc, mock, ms = await start(compiled=compiled, provider=prov, monkeypatch=monkeypatch)
         monkeypatch.setattr(server, "tts", LongTTS())
         server.stt.queue[:] = ["What do you do?", "Wait, one more thing."]
+        token = await answer(tc, "CA-barge-01")
         ws = await tc.ws_connect("/media")
-        await ws.send_str(json.dumps({"event": "start", "start": {"streamSid": "MZ3", "callSid": "CA-barge",
-                                                                  "customParameters": {"from": "+13605550123", "to": LIVE, "callSid": "CA-barge"}}}))
+        await ws.send_str(json.dumps({"event": "start", "start": {"streamSid": "MZ3", "callSid": "CA-barge-01",
+                                                                  "customParameters": {"from": "+13605550123", "to": LIVE, "callSid": "CA-barge-01", "token": token}}}))
         clears = []
 
         async def reader():
@@ -450,3 +470,40 @@ def test_persona_samples_are_served_publicly(monkeypatch):
             assert r.status == 404, bad
         await stop(tc, ms)
     run(go())
+
+
+def test_forged_media_streams_are_refused(monkeypatch):
+    """QA: /media is public. A stream without the token from a verified webhook never fetches a profile, never
+    reports a call, and a token works once, for its own CallSid only."""
+    async def go():
+        tc, mock, ms = await start(monkeypatch=monkeypatch)
+
+        async def stream(call_sid, token=None, frm="+12065550199"):
+            ws = await tc.ws_connect("/media")
+            cp = {"from": frm, "to": LIVE, "callSid": call_sid, **({"token": token} if token else {})}
+            await ws.send_str(json.dumps({"event": "start", "start": {"streamSid": "MZf", "callSid": call_sid, "customParameters": cp}}))
+            msg = await ws.receive(timeout=3)
+            closed = msg.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSING)
+            await ws.close()
+            return closed
+
+        assert await stream("CAforged0001")                         # no webhook, no token, unknown to SignalWire
+        assert await stream("../profile")                            # malformed CallSid
+        token = await answer(tc, "CA-real-0001")
+        assert await stream("CA-real-0001", "wrong-token")           # wrong token
+        assert "CA-real-0001" in server.PENDING_PROFILES             # …and the real one is still waiting
+        assert await stream("CA-other-001", token)                   # the token is bound to its CallSid
+        profile_calls = [x for x in mock[LOG] if x["path"].endswith("/profile")]
+        assert len(profile_calls) == 1 and profile_calls[0]["query"]["callSid"] == "CA-real-0001"   # only the webhook asked
+        assert not [x for x in mock[LOG] if "/calls" in x["path"]]
+        server.PENDING_PROFILES.clear()
+        server.ACTIVE.clear()
+        await stop(tc, ms)
+    run(go())
+
+
+def test_skip_signature_only_on_loopback():
+    from config import Settings
+    assert Settings(skip_signature=True, bind=("127.0.0.1",)).startup_problems() == []
+    assert Settings(skip_signature=True, bind=("127.0.0.1", "100.90.145.13")).startup_problems()
+    assert Settings(skip_signature=False, bind=("100.90.145.13",)).startup_problems() == []

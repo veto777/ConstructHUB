@@ -21,7 +21,8 @@ Two ways to run it (both need the engine's venv: torch, kokoro, faster-whisper, 
 
 Options: --no-marks (default: SignalWire sends no mark events; --marks echoes them like Twilio) · --echo 0.3
 (feed the assistant's audio back at this gain — handset echo) · --noise 0.01 (line noise) · --webhook (POST
-/signalwire/voice first, like SignalWire; needs VOICE_SKIP_SIGNATURE=1 on the engine) · --stt (transcribe what
+/signalwire/voice first is now always done — the engine refuses a stream without the webhook's token; this flag only
+prints the TwiML; needs VOICE_SKIP_SIGNATURE=1 on a loopback-only engine) · --stt (transcribe what
 the assistant said, for the console) · --out DIR (WAVs of both legs) · --voice am_puck (the caller's voice).
 
 Never dials anyone: there is no PSTN here, only a WebSocket to an engine on this machine."""
@@ -32,6 +33,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import secrets
 import sys
 import time
@@ -102,7 +104,7 @@ class Caller:
             x = x + np.pad(e, (0, max(0, FRAME - len(e))))[:FRAME]
         return self.audio.mulaw_encode(x)
 
-    async def run(self, sc: Scenario, engine: str, call_sid: str) -> tuple[bool, str]:
+    async def run(self, sc: Scenario, engine: str, call_sid: str, token: str = "") -> tuple[bool, str]:
         """Plays the scenario. Returns (call ended — by the engine or a caller hang-up, end_reason)."""
         import aiohttp
         ws_url = engine.replace("http://", "ws://").replace("https://", "wss://").rstrip("/") + "/media"
@@ -179,7 +181,7 @@ class Caller:
             await send({"event": "start", "sequenceNumber": "1", "streamSid": sid, "start": {
                 "streamSid": sid, "callSid": call_sid, "tracks": ["inbound"],
                 "mediaFormat": {"encoding": "audio/x-mulaw", "sampleRate": 8000, "channels": 1},
-                "customParameters": {"from": sc.caller, "to": TO_NUMBER, "callSid": call_sid}}})
+                "customParameters": {"from": sc.caller, "to": TO_NUMBER, "callSid": call_sid, "token": token}}})
             rx = asyncio.create_task(receiver())
 
             # CallRail-style whispers are heard in the first seconds, before/while the greeting is due
@@ -350,20 +352,28 @@ async def call_one(a, sc: Scenario, engine: str, fake: FakeApp, switch: SwitchPr
     call_sid = "CAfake" + secrets.token_hex(13)
     print(f"\n══ {sc.id} ══ {sc.title}{'  (prelude)' if quiet else ''}")
     switch.current = CannedProvider(sc)
-    twiml = None
+    # Always the webhook first, like SignalWire: the engine only runs a /media stream that presents the token
+    # from the <Stream> it handed out (needs VOICE_SKIP_SIGNATURE=1 on a loopback-only dev engine).
+    twiml = await post_webhook(engine, sc, call_sid)
     if a.webhook or sc.mode == "webhook":
-        twiml = await post_webhook(engine, sc, call_sid)
         print(f"WEBHOOK → {twiml[:160]}")
-        if "<Connect" not in twiml:
-            r = result_from_report(await fake.wait_report(call_sid, 10), [], ended_by_engine=True, end_reason="pre-answer", twiml=twiml)
-            r.errors = [e for e in r.errors if "no end-of-call report" not in e]   # a rejected call may report blocked or nothing
-            r.outcome = r.outcome or ("blocked" if "<Reject" in twiml else None)
-            return score(sc, r)
+    if "<Connect" not in twiml:
+        r = result_from_report(await fake.wait_report(call_sid, 10), [], ended_by_engine=True, end_reason="pre-answer", twiml=twiml)
+        r.errors = [e for e in r.errors if "no end-of-call report" not in e]   # a rejected call may report blocked or nothing
+        r.outcome = r.outcome or ("blocked" if "<Reject" in twiml else None)
+        return score(sc, r)
+    m = re.search(r'<Parameter name="token" value="([^"]+)"/>', twiml)
     caller = Caller(a, audio, tts, stt, compiled)
     t0 = time.time()
-    ended, reason = await caller.run(sc, engine, call_sid)
+    ended, reason = await caller.run(sc, engine, call_sid, m.group(1) if m else "")
     report = await fake.wait_report(call_sid, 60)
     rec = fake.calls.get(call_sid)
+    # the recording is uploaded after the end report: wait for it before scoring (and before the next call)
+    for _ in range(100):
+        if not report or (rec and rec.recording_bytes > 0):
+            break
+        await asyncio.sleep(0.1)
+        rec = fake.calls.get(call_sid)
     r = result_from_report(report, rec.events if rec else [], ended_by_engine=ended, end_reason=reason, twiml=twiml)
     if a.out:
         caller.save(Path(a.out), call_sid)

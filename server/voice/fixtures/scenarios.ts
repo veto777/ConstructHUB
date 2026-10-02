@@ -59,7 +59,7 @@ export type Scenario = {
     alert?: string[];
     spamMin?: number;
     twiml?: string;
-    notify?: "none" | "some";
+    notify?: "none" | "one" | "some";
     lead?: boolean;
   };
 };
@@ -128,7 +128,7 @@ export function parseScenario(text: string, file = "<inline>"): Scenario {
         case "expect.alert": sc.expect.alert = words(value); break;
         case "expect.spam_min": sc.expect.spamMin = Number(value); break;
         case "expect.twiml": sc.expect.twiml = value; break;
-        case "expect.notify": sc.expect.notify = value as "none" | "some"; break;
+        case "expect.notify": sc.expect.notify = value as "none" | "one" | "some"; break;
         case "expect.lead": sc.expect.lead = value === "true"; break;
         default: throw new Error(`${file}: unknown directive "${key}"`);
       }
