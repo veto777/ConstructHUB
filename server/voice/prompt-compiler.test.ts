@@ -262,3 +262,24 @@ describe("formatters", () => {
     expect(joinAnd(["a"])).toBe("a");
   });
 });
+
+describe("owner call rules (2026-10-02)", () => {
+  const prompt = compileVoiceProfile(richProfile(), 1, NOW).systemPrompt;
+
+  it("asks for the spelling of an unusual or foreign name and reads it back", () => {
+    expect(prompt).toContain("Could you spell that for me?");
+    expect(prompt).toMatch(/never treat an unusual name as a reason to doubt the caller/);
+  });
+
+  it("never ends the call once the caller said they need work, except on their goodbye", () => {
+    expect(prompt).toContain("ONCE THE CALLER HAS SAID THEY NEED WORK DONE, NEVER END THE CALL except on their own goodbye");
+    expect(prompt).toContain("A CALLER WHO ASKED FOR WORK ON A PROPERTY IS A CUSTOMER, NOT SPAM");
+  });
+
+  it("answers 'is <name> available?' with not sure, and keeps the line for estimate requests only", () => {
+    expect(prompt).toContain("\"I'm not sure. This line is only for estimate requests.\"");
+    expect(prompt).toMatch(/Never confirm or deny that the person works here/);
+    expect(prompt).toContain("THIS LINE IS ONLY FOR ESTIMATE REQUESTS");
+    expect(prompt).toContain("don't take a message");
+  });
+});

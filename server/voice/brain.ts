@@ -107,6 +107,11 @@ const THANKS_DONE = /^\s*(?:(?:ok(?:ay)?|alright|great|perfect|sounds good|oh|no
  * the prompt: asking for the owner without a project is also the classic spam opener. */
 export const PERSON_REQUEST = /\b(?:(?:talk|speak)\s+(?:to|with)|put|get|give|transfer\s+me\s+to|connect\s+me\s+(?:to|with)|(?:want|need)(?:\s+to\s+(?:talk|speak)\s+(?:to|with))?)\s+(?:me\s+)?(?:(?:a|an|the|some)\s+)?(?:(?:real|live|actual)\s+)?(?:person|human(?: being)?|representative|live agent|somebody real|someone real)\b|\btransfer me\b/i;
 export const TRANSFER_SAY = "I can't transfer you right now, but I'll alert the team so someone calls you back.";
+// A caller who asked for work is a customer, never spam (owner 2026-10-02: a misheard name got a real caller flagged
+// and hung up on). Same patterns as WORK_REQUEST_RE / SALES_PITCH_RE in voice/brain.py.
+export const WORK_REQUEST = /\b(?:estimates?|quotes?|bids?|siding|roof(?:s|ing)?|windows?|doors?|decks?|gutters?|paint(?:ing)?|fenc(?:e|es|ing)|remodel(?:ing)?|kitchen|bath(?:room)?s?|floor(?:s|ing)?|concrete|driveway|replace(?:ment|d)?|install(?:ation|ed)?|repairs?|leak(?:s|ing)?|my (?:house|home|property))\b/i;
+export const SALES_PITCH = /press (?:one|1)|google (?:business )?(?:listing|profile|verification)|verify your (?:business|listing)|opt out|recorded (?:message|line)|directory|\bseo\b|marketing|advertis|merchant|business loan|funding|(?:more|exclusive|qualified) (?:leads|jobs|customers)|grow your business|we (?:can )?help (?:contractors|businesses|companies)/i;
+export const WORK_FOLLOWUP_SAY = "Sorry about that. What's the address of the property?";
 /** Provider failures worth one quiet retry inside the same turn (voice/brain.py TRANSIENT_RE). */
 const TRANSIENT = /connect|timeout|timed out|temporar|unavailable|overloaded|bad gateway|gateway|\b5\d\d\b|internal ?server|rate.?limit|429/i;
 /** Caller lines that look like protocol JSON are wrapped so the model reads them as speech. */
@@ -199,7 +204,11 @@ export class Brain {
   private stamp() { return this.now().toISOString(); }
   private log(role: TranscriptTurn["role"], text: string) { this.transcript.push({ role, text, t: this.stamp() }); }
   private event(type: string, extra: Partial<BrainEvent> = {}) { const e: BrainEvent = { t: this.stamp(), type, ...extra }; this.events.push(e); return e; }
-  get callerTurns() { return this.transcript.filter((t) => t.role === "caller").length; }
+  private askedForWork(): boolean {
+    const said = this.transcript.filter((e) => e.role === "caller").map((e) => e.text).join(" ");
+    return WORK_REQUEST.test(said) && !SALES_PITCH.test(said);
+  }
+    get callerTurns() { return this.transcript.filter((t) => t.role === "caller").length; }
   private lastSay(): string | undefined { for (let i = this.transcript.length - 1; i >= 0; i--) if (this.transcript[i].role === "assistant") return this.transcript[i].text; return undefined; }
 
   /** The greeting (spoken by the engine before the first caller turn). */
@@ -289,6 +298,13 @@ export class Brain {
         out.alert = { kind: "human", summary: "The caller asked to speak with a person." };
         this.event("person_requested");
       }
+    }
+    if (out.action === "flag_spam" && out.spam && out.spam.confidence >= t.flagAt && this.askedForWork()) {
+      this.event("spam_refused_work_request", { decision: { spam: out.spam } });
+      out.action = "continue";
+      delete out.spam;
+      if (out.outcome === "spam") delete out.outcome;
+      if (!out.say || FAREWELL.test(out.say) || /not interested/i.test(out.say)) out.say = this.hasAddress() ? ANYTHING_ELSE_SAY : WORK_FOLLOWUP_SAY;
     }
     if (out.action === "flag_spam" && out.spam) {
       this.spam = out.spam;

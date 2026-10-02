@@ -51,6 +51,17 @@ DECLINE_OUTCOMES = ("declined", "out_of_area", "spam", "alerted", "blocked", "vo
 # "goodbye", then silence, then "are you still there?" (QA: emergency_after_hours / gutters_only). Mirrors brain.ts.
 FAREWELL_RE = re.compile(r"\b(good-?bye|bye|have a (?:great|good|nice|wonderful) (?:day|one|night|evening)|take care|we'll be in touch)\b", re.I)
 ANYTHING_ELSE_SAY = "Is there anything else I can help you with?"
+# A caller who asked for work is a customer, never spam (owner 2026-10-02: Whisper heard his name as "DocuSign
+# Account", the assistant flagged spam at 0.85 and hung up on him). Mirrors WORK_REQUEST / SALES_PITCH in brain.ts.
+WORK_REQUEST_RE = re.compile(
+    r"\b(?:estimates?|quotes?|bids?|siding|roof(?:s|ing)?|windows?|doors?|decks?|gutters?|paint(?:ing)?|fenc(?:e|es|ing)|"
+    r"remodel(?:ing)?|kitchen|bath(?:room)?s?|floor(?:s|ing)?|concrete|driveway|replace(?:ment|d)?|install(?:ation|ed)?|repairs?|"
+    r"leak(?:s|ing)?|my (?:house|home|property))\b", re.I)
+SALES_PITCH_RE = re.compile(
+    r"press (?:one|1)|google (?:business )?(?:listing|profile|verification)|verify your (?:business|listing)|opt out|"
+    r"recorded (?:message|line)|directory|\bseo\b|marketing|advertis|merchant|business loan|funding|"
+    r"(?:more|exclusive|qualified) (?:leads|jobs|customers)|grow your business|we (?:can )?help (?:contractors|businesses|companies)", re.I)
+WORK_FOLLOWUP_SAY = "Sorry about that. What's the address of the property?"
 # A bare thanks once the request was submitted, declined or passed to a person is the caller wrapping up.
 THANKS_DONE_RE = re.compile(
     r"^\s*(?:(?:ok(?:ay)?|alright|great|perfect|sounds good|oh|no|nope|nah)[\s,.!]+)*(?:please have (?:them|someone) call me[\s,.!]*)?"
@@ -139,6 +150,9 @@ class Brain:
         # state
         self.messages: list[dict[str, str]] = []
         self.transcript: list[dict[str, str]] = []
+        # caller words the engine heard but deliberately did not answer (a lone early "bye", a fragment over our
+        # voice, a repeat, speech still queued at hang-up): kept for the office, never sent to the model
+        self.unanswered: list[dict[str, str]] = []
         self.events: list[dict[str, Any]] = []
         self.slots: dict[str, str] = {}
         self.submitted = False
@@ -334,6 +348,26 @@ class Brain:
         self.slots, self.last_say, self.turns = u["slots"], u["last_say"], u["turns"]
         return u["text"]
 
+    def note_unanswered(self, text: str, reason: str) -> None:
+        if text and len(self.unanswered) < 200:
+            self.unanswered.append({"role": "system", "text": f"Caller said (not answered: {reason}): {text}", "t": self._now()})
+            self._event("unanswered", reason=reason)
+
+    def full_transcript(self) -> list[dict[str, str]]:
+        """Everything that was said, in order: the conversation plus the caller words that went unanswered."""
+        if not self.unanswered:
+            return list(self.transcript)
+        return sorted(self.transcript + self.unanswered, key=lambda e: e.get("t", ""))[:2000]
+
+    def caller_has_spoken(self) -> bool:
+        return any(e["role"] == "caller" for e in self.transcript)
+
+    def cancel_end(self, reason: str) -> None:
+        """The caller is still talking: keep the line open (the engine answers what they said)."""
+        if self.end_requested and not self.spam:
+            self.end_requested = False
+            self._event("end_cancelled", reason=reason)
+
     def _caller_said_goodbye(self, text: str) -> bool:
         if GOODBYE_RE.search(text):
             return True
@@ -344,6 +378,10 @@ class Brain:
 
     def _wrapped_up(self) -> bool:
         return self.submitted or self.alerted or (self.outcome or "") in DECLINE_OUTCOMES
+
+    def _asked_for_work(self) -> bool:
+        said = " ".join(e["text"] for e in self.transcript if e["role"] == "caller")
+        return bool(WORK_REQUEST_RE.search(said)) and not SALES_PITCH_RE.search(said)
 
     def _has_address(self) -> bool:
         return any((self.slots.get(k) or "").strip() for k in self.address_keys)
@@ -427,6 +465,14 @@ class Brain:
                 d.alert = {"kind": "human", "summary": "The caller asked to speak with a person."}
                 self._event("person_requested")
 
+        if d.action == "flag_spam" and d.spam and d.spam["confidence"] >= self.flag_at and self._asked_for_work():
+            # the caller asked for work in their own words and nothing sounds like a pitch or a robocall: a customer
+            self._event("spam_refused_work_request", **d.spam)
+            d.action, d.spam = "continue", None
+            if d.outcome == "spam":
+                d.outcome = None
+            if not d.say or FAREWELL_RE.search(d.say) or re.search(r"not interested", d.say, re.I):
+                d.say = ANYTHING_ELSE_SAY if self._has_address() else WORK_FOLLOWUP_SAY
         if d.action == "flag_spam" and d.spam:
             if d.spam["confidence"] >= self.flag_at:
                 self.spam = d.spam
@@ -643,14 +689,20 @@ class Brain:
         return "info"
 
     async def summary(self) -> str:
-        if len(self.transcript) <= 1:
+        lines = self.full_transcript()
+        if len(lines) <= 1:
             return ""
         try:
             provider = self._provider()
-            convo = "\n".join(f"{t['role']}: {t['text']}" for t in self.transcript)
+            ai = f"{self.assistant.upper()} (AI receptionist)"
+            label = {"caller": "CALLER", "assistant": ai, "system": "NOTE"}
+            convo = "\n".join(f"{label.get(e['role'], 'NOTE')}: {e['text']}" for e in lines)
             raw = await asyncio.wait_for(provider.text(
-                "Summarize this phone call for the office in one or two plain sentences (who called, what they wanted, what happened). "
-                "Plain text only: no heading, no markdown, no preamble, no JSON.\n\n" + convo, max_tokens=160), 20)
+                f"Summarize this phone call for the office in one or two plain sentences: who called, what they wanted, "
+                f"what happened. {ai} is our answering assistant, never the caller. Report exactly what the CALLER said, "
+                f"including words marked 'not answered'. If the caller gave no name, say so; never invent one. "
+                f"Recorded outcome: {self.final_outcome()}. Plain text only: no heading, no markdown, no preamble, no JSON."
+                f"\n\n" + convo, max_tokens=160), 20)
             s = re.sub(r"<[^>]+>", "", raw or "").strip().strip('"')
             return " ".join(s.split())[:600]
         except Exception as e:  # noqa: BLE001
@@ -672,7 +724,7 @@ class Brain:
             "durationSeconds": max(0, dur),
             "outcome": self.final_outcome(),
             "summary": await self.summary(),
-            "transcript": list(self.transcript),
+            "transcript": self.full_transcript(),
             "slots": dict(self.slots),
             "events": list(self.events),
             "caller": self.caller_fields(),

@@ -64,6 +64,10 @@ GENERIC_DOWN = "I'm sorry, we can't take your call right now. Please try again i
 # "Hello?" / "are you there?" repeated is a caller who can't hear us — always answer it, never treat it as a
 # stale duplicate (Alpine 2026-10-02).
 HELLO_RE = re.compile(r"^(hello|hi|hey|are you there|can you hear me|anyone there|is anybody there)\b", re.I)
+# A lone "bye" before the caller has said anything else, or in the first seconds of a call, is almost always Whisper
+# mishearing "hi" on 8 kHz audio (Alpine 2026-10-02: "Hi, hi, I need an estimate…" → "Bye." → hung up at 16 s).
+LONE_BYE_RE = re.compile(r"^(?:(?:ok(?:ay)?|oh|alright|um+|uh+|well)\s+)*(?:good ?bye|bye(?: bye)?)(?:\s+(?:now|then))?$", re.I)
+EARLY_BYE_WINDOW_S = 25.0
 SIM_TTL_S = 30 * 60
 SIM_MAX_SESSIONS = 200
 PENDING_TTL_S = 120
@@ -610,6 +614,12 @@ class Call:
             text = kept
         if overlapped and len(text.split()) < 3 and norm not in SHORT_OK:
             log.info("ignored short fragment heard over our own voice: %s", said(text))
+            self.brain.note_unanswered(text, "short fragment while the assistant was speaking")
+            return None
+        if LONE_BYE_RE.match(" ".join(re.sub(r"[.,!?]", " ", text.lower()).split())) \
+                and (time.time() - self.started < EARLY_BYE_WINDOW_S or not self.brain.caller_has_spoken()):
+            log.info("ignored a lone goodbye this early in the call (likely a misheard hello): %s", said(text))
+            self.brain.note_unanswered(text, "a lone goodbye this early is usually a misheard hello")
             return None
         if time.time() - self.started < WHISPER_WINDOW_S and WHISPER_RE.search(text.strip()):
             log.info("ignored call-whisper announcement: %s", said(text))
@@ -619,6 +629,7 @@ class Call:
         norm = " ".join(re.sub(r"[.,!?]", " ", text.lower()).split())
         if norm == self.last_caller_norm and time.time() - self.last_caller_at < 8.0 and not HELLO_RE.match(norm):
             log.info("ignored duplicate caller text: %s", said(text))
+            self.brain.note_unanswered(text, "repeat of what was just answered")
             return None
         self.last_caller_norm, self.last_caller_at = norm, time.time()
         return text
@@ -665,13 +676,36 @@ class Call:
                         return await self._respond(f"{prev} {more}".strip(), silence=False, retracted=True)
                     self.pending = [audio_in]   # not retractable: say this reply, then answer the rest
                     self.last_caller_norm = ""   # ...and let the duplicate guard hear it again
+            # About to say goodbye, but the caller already said more: answer that instead of hanging up on them
+            # (Alpine 2026-10-02: a misheard first fragment ended the call and the rest of the sentence was dropped).
+            more = await self._queued_speech_before_hangup()
+            if more:
+                return await self._respond(more, silence=False, retracted=True)
         if d.say:
             await self.say(d.say)
         if self.brain.end_requested:
             await self.wait_played()
             await asyncio.sleep(1.5)            # grace: let a last word land before the line drops
+            more = await self._queued_speech_before_hangup()
+            if more:
+                return await self._respond(more, silence=False, retracted=True)
             if self.brain.end_requested and (not self.speaking or self.brain.spam):
                 await self.close()
+
+    async def _queued_speech_before_hangup(self) -> str | None:
+        """A hang-up is pending but the caller's speech is queued: hear it. Real words cancel the hang-up and are
+        returned for an answer; echo, phantoms or nothing → None and the hang-up goes ahead. Spam always hangs up."""
+        if not (self.brain.end_requested and self.pending and not self.brain.spam and not self.closing):
+            return None
+        await self.wait_caller_quiet(4.0)
+        audio_in = np.concatenate(self.pending)
+        self.pending = []
+        more = await self._hear(audio_in, False)
+        if not more:
+            return None
+        self.brain.cancel_end("caller_kept_talking")
+        log.info("hang-up cancelled: the caller kept talking (%d chars); answering them", len(more))
+        return more
 
     async def silence_watch(self) -> None:
         await asyncio.sleep(self.silence_prompt_s)
@@ -779,6 +813,14 @@ class Call:
             self.turn_task.cancel()   # torn down mid-turn (caller hung up); never cancel ourselves
         self._stop_tasks()
         sid = self.call_sid or self.sid or "unknown"
+        if self.pending and stt:   # the caller was still talking when the line dropped: keep their words
+            try:
+                tail = await asyncio.wait_for(asyncio.to_thread(stt.transcribe, np.concatenate(self.pending), self.vocab), 20)
+                if tail and tail.strip():
+                    self.brain.note_unanswered(tail.strip(), "still speaking when the call ended")
+            except Exception as ex:  # noqa: BLE001
+                log.warning("transcribing queued speech at hang-up failed: %s", ex)
+            self.pending = []
         try:
             await asyncio.wait_for(self.brain.finish(), 30)
         except Exception as e:  # noqa: BLE001

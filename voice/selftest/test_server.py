@@ -313,7 +313,7 @@ def test_media_call_end_to_end(monkeypatch):
         for _ in range(200):                      # bookkeeping happens AFTER the hang-up
             puts = [x for x in mock[LOG] if x["method"] == "PUT" and x["path"].endswith("/calls/CA-media-1")]
             recs = [x for x in mock[LOG] if x["path"].endswith("/recordings/CA-media-1")]
-            if puts and recs:
+            if puts and recs and not server.ACTIVE:   # the call leaves ACTIVE only after the upload returns
                 break
             await asyncio.sleep(0.05)
         started = [x for x in mock[LOG] if x["method"] == "POST" and x["path"].endswith("/calls")][0]["body"]
@@ -507,3 +507,136 @@ def test_skip_signature_only_on_loopback():
     assert Settings(skip_signature=True, bind=("127.0.0.1",)).startup_problems() == []
     assert Settings(skip_signature=True, bind=("127.0.0.1", "100.90.145.13")).startup_problems()
     assert Settings(skip_signature=False, bind=("100.90.145.13",)).startup_problems() == []
+
+
+# ── early "bye" and queued speech before a hang-up (Alpine 2026-10-02: "Hi" heard as "Bye." ended the call and the
+#    rest of the caller's sentence was dropped) ─────────────────────────────────────────────────────────────────────
+
+from decision import Decision
+
+
+class _Brain:
+    """Just enough of brain.Brain for Call._hear / Call._respond."""
+
+    def __init__(self, replies=()):
+        self.replies = list(replies)
+        self.heard = []
+        self.transcript = []
+        self.end_requested = False
+        self.spam = None
+        self.cancelled = []
+
+    def caller_has_spoken(self):
+        return any(e["role"] == "caller" for e in self.transcript)
+
+    def notes(self):
+        return [e["text"] for e in self.transcript if e["role"] == "system"]
+
+    def cancel_end(self, reason):
+        self.end_requested = False
+        self.cancelled.append(reason)
+
+    def retract_last_reply(self):
+        return None
+
+    def note_unanswered(self, text, reason):
+        self.transcript.append({"role": "system", "text": f"Caller said (not answered: {reason}): {text}"})
+
+    async def respond(self, text, silence=False):
+        self.heard.append(text)
+        self.transcript.append({"role": "caller", "text": text})
+        d = self.replies.pop(0)
+        if d.action == "end_call":
+            self.end_requested = True
+        return d
+
+
+def _talking_call(monkeypatch, brain, heard):
+    c = _call()
+    c.brain = brain
+    c.vocab = ""
+    fake = FakeSTT()
+    fake.queue[:] = list(heard)
+    monkeypatch.setattr(server, "stt", fake)
+    said, closed = [], []
+
+    async def say(text):
+        said.append(text)
+
+    async def nothing(*a, **k):
+        return None
+
+    async def close():
+        closed.append(True)
+
+    c.say, c.wait_played, c.close = say, nothing, close
+    monkeypatch.setattr(server.asyncio, "sleep", nothing)
+    return c, said, closed
+
+
+def _speech(seconds=1.0):
+    n = int(seconds * 8000)
+    return (8000 * np.sin(np.arange(n) * 2 * np.pi * 300 / 8000)).astype(np.int16)
+
+
+def test_a_lone_bye_early_in_the_call_is_ignored(monkeypatch):
+    c, _, _ = _talking_call(monkeypatch, _Brain(), ["Bye.", "Okay, bye.", "Bye, I need an estimate for a new roof."])
+    assert run(c._hear(_speech(3.5), False)) is None                  # misheard "hi" at the start of the call
+    assert run(c._hear(_speech(3.5), False)) is None
+    assert run(c._hear(_speech(3.5), False)) == "Bye, I need an estimate for a new roof."   # more than a goodbye
+    assert len(c.brain.notes()) == 2 and "Bye." in c.brain.notes()[0]   # kept for the office, just not answered
+
+
+def test_a_lone_bye_counts_once_the_caller_has_talked_and_the_call_is_older(monkeypatch):
+    b = _Brain()
+    b.transcript.append({"role": "caller", "text": "I need a new roof."})
+    c, _, _ = _talking_call(monkeypatch, b, ["Okay, bye."])
+    c.started -= 60
+    assert run(c._hear(_speech(3.5), False)) == "Okay, bye."
+
+
+def test_queued_speech_cancels_the_hang_up_and_is_answered(monkeypatch):
+    b = _Brain([Decision(say="Goodbye!", action="end_call", outcome="hangup", slots={}),
+                Decision(say="We only do full replacements. Is it a new roof you need?", action="continue", slots={})])
+    c, said, closed = _talking_call(monkeypatch, b, ["I need to get an estimate for repairs, is that something you do?"])
+    c.started -= 60
+    c.pending = [_speech(3.5)]                                      # the rest of the sentence, queued mid-turn
+    run(c._respond("Bye.", silence=False))
+    assert said == ["We only do full replacements. Is it a new roof you need?"]   # never "Goodbye!"
+    assert closed == [] and not b.end_requested and b.cancelled == ["caller_kept_talking"]
+    assert b.heard[-1].startswith("I need to get an estimate")
+
+
+def test_speech_queued_during_the_goodbye_grace_is_answered_not_dropped(monkeypatch):
+    b = _Brain([Decision(say="Thanks for calling, goodbye.", action="end_call", outcome="hangup", slots={}),
+                Decision(say="Sure, what's the address?", action="continue", slots={})])
+    c, said, closed = _talking_call(monkeypatch, b, ["Wait, one more thing, can you come out Tuesday?"])
+    c.started -= 60
+    real_say = c.say
+
+    async def say_then_caller_talks(text):
+        await real_say(text)
+        if len(said) == 1:
+            c.pending = [_speech(3.0)]                              # the caller speaks over the goodbye
+    c.say = say_then_caller_talks
+    run(c._respond("That's all.", silence=False))
+    assert said == ["Thanks for calling, goodbye.", "Sure, what's the address?"] and closed == []
+
+
+def test_spam_still_hangs_up_whatever_is_queued(monkeypatch):
+    b = _Brain([Decision(say="We're not interested, goodbye.", action="end_call", outcome="hangup", slots={})])
+    b.spam = {"confidence": 0.99}
+    c, said, closed = _talking_call(monkeypatch, b, ["Press one to lower your rate."])
+    c.started -= 60
+    c.pending = [_speech(3.0)]
+    run(c._respond("This is your final notice.", silence=False))
+    assert said == ["We're not interested, goodbye."] and closed == [True]
+
+
+def test_echo_or_silence_in_the_queue_does_not_keep_a_finished_call_open(monkeypatch):
+    b = _Brain([Decision(say="Thanks for calling, goodbye.", action="end_call", outcome="hangup", slots={})])
+    c, said, closed = _talking_call(monkeypatch, b, [""])
+    c.started -= 60
+    c.pending = [_speech(1.0)]
+    run(c._respond("That's all, thanks.", silence=False))
+    assert said == ["Thanks for calling, goodbye."] and closed == [True] and b.end_requested

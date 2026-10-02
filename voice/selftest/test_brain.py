@@ -522,3 +522,51 @@ def test_retract_refuses_anything_with_side_effects():
         await b.respond("Dana, 1 Main St Bellingham, siding")
         assert b.retract_last_reply() is None             # a submitted lead is never taken back
     run(go())
+
+
+# ── every caller word reaches the office (owner 2026-10-02: "keep track of every call, and every interaction") ──
+
+def test_unanswered_caller_words_are_in_the_report_and_the_summary_labels_who_spoke():
+    async def go():
+        b, p = mk([say("Sure, what's the address?")])
+        prompts = []
+
+        async def text(prompt, max_tokens=200, temperature=0.2):
+            prompts.append(prompt)
+            return "Caller asked for a roof estimate."
+        p.text = text
+        await b.greet()
+        b.note_unanswered("Bye.", "a lone goodbye this early is usually a misheard hello")
+        await b.respond("I need an estimate for a new roof.")
+        r = await b.report()
+        texts = [t["text"] for t in r["transcript"]]
+        assert any("not answered" in t and "Bye." in t for t in texts)
+        assert "I need an estimate for a new roof." in texts
+        assert b.caller_turns() == 1                      # a note is not a caller turn
+        assert "CALLER: I need an estimate" in prompts[-1] and "(AI receptionist)" in prompts[-1]
+        assert "never the caller" in prompts[-1] and "never invent" in prompts[-1]
+    run(go())
+
+
+# ── a caller who asked for work is a customer (owner 2026-10-02: "DocuSign Account" got him flagged and hung up on) ──
+
+def test_spam_flag_is_refused_once_the_caller_asked_for_work():
+    async def go():
+        b, _ = mk([say("Sure, can I get your name?"),
+                   {"say": "We're not interested, thank you — goodbye.", "action": "flag_spam",
+                    "spam": {"confidence": 0.85, "reason": "caller gave a company name"}}])
+        await b.respond("Hi, I need an estimate for new siding on my house.")
+        d = await b.respond("DocuSign Account.")
+        assert d.action == "continue" and not b.spam and not b.end_requested
+        assert d.say == "Sorry about that. What's the address of the property?"
+        assert any(e["type"] == "spam_refused_work_request" for e in b.events)
+    run(go())
+
+
+def test_a_pitch_that_mentions_estimates_is_still_spam():
+    async def go():
+        b, _ = mk([{"say": "We're not interested, thank you — goodbye.", "action": "flag_spam",
+                    "spam": {"confidence": 0.97, "reason": "lead-gen pitch"}}])
+        d = await b.respond("We send roofing contractors more qualified leads and estimates every week.")
+        assert d.action == "flag_spam" and b.spam and b.end_requested
+    run(go())

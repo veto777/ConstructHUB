@@ -276,6 +276,28 @@ describe("Brain turns", () => {
     expect(b.submitted).toBe(false);
   });
 
+  it("a caller who asked for work is never flagged as spam over a misheard name (owner 2026-10-02)", async () => {
+    const { b } = brain([
+      J({ say: "Sure, can I get your name?", action: "continue" }),
+      J({ say: "We're not interested, thank you — goodbye.", action: "flag_spam", spam: { confidence: 0.85, reason: "caller gave a company name" } }),
+      J({ say: "", action: "end_call", outcome: "spam" }),
+    ]);
+    await b.respond("Hi, I need an estimate for new siding on my house.");
+    const t = await b.respond("DocuSign Account.");
+    expect(t.action).toBe("continue");
+    expect(t.say).toBe("Sorry about that. What's the address of the property?");
+    expect(t.events.map((e) => e.type)).toContain("spam_refused_work_request");
+    expect(await b.respond("hello?")).toMatchObject({ ended: false });   // and no hang-up on the next turn either
+  });
+
+  it("a pitch that mentions estimates is still spam", async () => {
+    const { b } = brain([
+      J({ say: "We're not interested, thank you — goodbye.", action: "flag_spam", spam: { confidence: 0.97, reason: "lead-gen pitch" } }),
+    ]);
+    const t = await b.respond("We send roofing contractors more qualified leads and estimates every week.");
+    expect(t.action).toBe("flag_spam");
+  });
+
   it("an alert without a kind is invalid (retry, then the fallback line); with one it is, and a call with only an alert ends as alerted", async () => {
     const { b } = brain([
       J({ say: "Let me get your details.", action: "alert" }),
