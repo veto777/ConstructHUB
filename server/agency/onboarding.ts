@@ -126,8 +126,14 @@ export async function runOnboardingWorker(make=clientFor,send=sendWithFallback,o
     for(let i=0;i<10;i++){
       const {rows:[g]}=await c.query(`UPDATE agency_poll_grants SET next_at=now()+interval '5 minutes' WHERE (user_id,subject)=(SELECT p.user_id,p.subject FROM agency_poll_grants p JOIN gbp_grants g ON g.user_id=p.user_id AND g.google_subject=p.subject AND NOT g.reconnect_required WHERE next_at<=now() AND ($1::int IS NULL OR p.user_id=$1) ORDER BY next_at LIMIT 1) RETURNING *`,only);
       if(!g)break;
+      // Discovering the account's OWN Business Profiles (what "Import from GBP" lists) is for every connected
+      // account, not just the Agency workspace — it used to sit behind the plan check below, so a non-Agency
+      // account's profiles were never listed (owner, 2026-10-02: "make sure the profile is accessible").
+      if(g.refresh_requested){
+        try{await refreshDiscovery(g.user_id,g.subject,make);await c.query('UPDATE agency_poll_grants SET refresh_requested=false WHERE user_id=$1 AND subject=$2',[g.user_id,g.subject]);}
+        catch{console.error('GBP profile discovery failed; retrying next tick');}
+      }
       if(!await allowed(g.user_id)){await c.query("UPDATE agency_poll_grants SET next_at=now()+interval '1 hour' WHERE user_id=$1 AND subject=$2",[g.user_id,g.subject]);continue;}
-      if(g.refresh_requested){await refreshDiscovery(g.user_id,g.subject,make);await c.query('UPDATE agency_poll_grants SET refresh_requested=false WHERE user_id=$1 AND subject=$2',[g.user_id,g.subject]);}
       await pollInvitations(g.user_id,g.subject,make);break;
     }
   }finally{if(locked)await c.query('SELECT pg_advisory_unlock(7163,1)');c.release();}
