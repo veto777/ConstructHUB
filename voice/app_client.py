@@ -96,8 +96,8 @@ class AppClient:
     async def upload_recording(self, call_sid: str, wav_path: Path) -> dict[str, Any]:
         """POST /recordings/:sid with the WAV body; the app stores it in R2."""
         try:
-            with open(wav_path, "rb") as f:
-                r = await self._c.post(f"{BASE}/recordings/{call_sid}", content=f, headers={"Content-Type": "audio/wav"}, timeout=120.0)
+            body = wav_path.read_bytes()   # ≤ 40 MB by contract; an AsyncClient cannot stream a sync file object
+            r = await self._c.post(f"{BASE}/recordings/{call_sid}", content=body, headers={"Content-Type": "audio/wav"}, timeout=120.0)
             r.raise_for_status()
             return r.json()
         except Exception as e:  # noqa: BLE001
