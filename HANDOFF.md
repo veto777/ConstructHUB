@@ -19,6 +19,29 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## ☎️ 2026-10-02 — AI Call Assistant built and deployed in admin preview (10:10 UTC)
+- **Shape:** SignalWire → `https://constructhub.us/voice/*` (vb11 app, server/voice/proxy.ts, HTTP + WS) → tailnet →
+  **tower** engine `constructhub-voice.service` (user unit, `/home/veto/ConstructHUB/voice`, venv `voice/.venv`,
+  `127.0.0.1:8152` + `100.90.145.13:8152`; Silero VAD + faster-whisper large-v3-turbo + Kokoro, all on the RTX PRO 6000
+  next to alpine-voice — they share nothing). Engine ↔ app: `/api/voice-internal/*` over the tailnet
+  (`VOICE_APP_URL=http://100.76.165.33:8110`), bearer `VOICE_INTERNAL_SECRET` (same value in voice/.env and the live
+  .env). Brain: ConstructHUB's TruthCoder (`truthcode-api` via `http://100.76.165.33:8250/api`, JSON decision protocol).
+  Full design: docs/call-assistant/SPEC.md · ops: docs/call-assistant/RUNBOOK.md.
+- **Never restart the engine with systemctl** — `bash voice/deploy/restart-when-idle.sh` (waits for activeCalls 0).
+  Health: `bash voice/deploy/healthcheck.sh https://constructhub.us` (local / tailnet / proxy).
+- **Product:** CRM → Call Assistant: Overview, Numbers (buy by state via SignalWire LaML, 14-day release rule),
+  Agent Studio (wizard + advanced editor, compiled-prompt preview, versions, publish), Simulator, Calls (transcript,
+  recording, outcome, spam ledger). Personas Janice/Gabe/Sofia/Maya/Marcus/Ethan. Calls → CRM client + project +
+  activity + notifications; escalations by SMS/email with reminders; two-strike spam block pre-answer; minutes metered
+  (voice_usage) with an overage job; two-party-consent states force the recording notice; lapsed orgs get 423 "paused".
+- **Status: admin preview.** `call_assistant` / `call_number` are still `preview: true` in shared/plans.ts → nobody can
+  buy it (409), the public pages say "Coming soon". Platform admins get the module + 1 number + 500 min to test.
+  Launch = flip `preview` off after a real call through the carrier and a real Stripe intro-coupon purchase.
+- Verified live: engine models loaded, health OK through the proxy, internal API 401 without the secret, forged
+  webhook 400, media socket without a token 400. **Not yet exercised on production:** a real carrier call, R2 upload of
+  a recording, the Stripe intro coupon. QA fixed 46 findings (incl. unauthenticated media WS, lapsed orgs still served).
+- Open owner questions: intro on annual billing; number on cancel (release vs hold).
+
 ## 🏠 2026-10-02 — new landing (design B), signed-in dashboard, Call Assistant marketing (deployed 08:35 UTC)
 - **Landing** (owner picked design B of three): Fraunces display + Plus Jakarta Sans body on cream paper, scoped by
   `.mkt-editorial` (client/src/index.css) so the app keeps Inter; hard-hat gator hero (srcSet 512/1024) on a navy grid
