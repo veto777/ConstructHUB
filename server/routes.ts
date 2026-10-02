@@ -273,6 +273,9 @@ export async function registerRoutes(
   const { ensureAccountEventsSchema, registerAccountEventRoutes } = await import("./account-events");
   await ensureAccountEventsSchema();
   registerAccountEventRoutes(app, getDevUser);
+  // Signed-in home dashboard (docs/dashboard/SPEC.md): one per-user aggregate.
+  const { registerDashboardRoutes } = await import("./dashboard");
+  registerDashboardRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
   const { ensureAgencySchema } = await import("./agency/schema");
