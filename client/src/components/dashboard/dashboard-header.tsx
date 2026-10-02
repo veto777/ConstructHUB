@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { CreditCard, LayoutGrid, RefreshCw } from "lucide-react";
+import { CreditCard, LayoutGrid, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { ADMIN_FEATURE_PAGES_PATH } from "@shared/feature-pages";
 import type { DashboardAccount } from "@shared/dashboard";
 import { Badge, badgeVariants } from "@/components/ui/badge";
@@ -65,13 +65,15 @@ function useMinuteClock(resetKey: string): Date {
 }
 
 export function DashboardHeader({
-  account, generatedAt, fixture, refreshing, onRefresh,
+  account, generatedAt, fixture, refreshing, onRefresh, onCustomize,
 }: {
   account: DashboardAccount;
   generatedAt: string;
   fixture: boolean;
   refreshing: boolean;
   onRefresh: () => void;
+  /** Opens "Customize dashboard" (tiles, order, sections). */
+  onCustomize?: () => void;
 }) {
   const now = useMinuteClock(generatedAt);
   // The server's clock can run a little ahead of this one: "Updated" is never in the future.
@@ -116,6 +118,18 @@ export function DashboardHeader({
               <Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">
                 <CreditCard className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Manage plan
               </Link>
+            </Button>
+          )}
+          {onCustomize && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-10 sm:min-h-8"
+              onClick={onCustomize}
+              aria-haspopup="dialog"
+              data-testid="button-dashboard-customize"
+            >
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Customize
             </Button>
           )}
           <Button

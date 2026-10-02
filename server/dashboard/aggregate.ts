@@ -12,7 +12,7 @@
  */
 import { PLANS } from "@shared/plans";
 import {
-  DASHBOARD_TILES, DASHBOARD_TILE_TIMEOUT_MS,
+  DASHBOARD_TILES, DASHBOARD_TILE_TIMEOUT_MS, dashboardAttention,
   type DashboardAccount, type DashboardLink, type DashboardPayload, type DashboardTile, type DashboardTileDef, type DashboardTileKey,
 } from "@shared/dashboard";
 import { getEntitlements } from "../entitlements";
@@ -25,6 +25,8 @@ import { buildChecklist } from "./checklist";
 import { buildRecent } from "./recent";
 import { CTA_START, COMING_SOON_MESSAGE, failedMessage, lockedMessage, timeoutMessage } from "./copy";
 import { tileSource, type TileOutcome, type TileSources } from "./tiles";
+import { sortByDashboardLayout, type DashboardHiddenTile, type DashboardLayout } from "@shared/dashboard-prefs";
+import { readDashboardLayout } from "./prefs";
 
 export class DashboardTimeout extends Error {
   constructor(what: string, ms: number) { super(`${what} took longer than ${ms} ms`); this.name = "DashboardTimeout"; }
@@ -68,11 +70,13 @@ export type BuildDashboardOptions = {
   log?: (line: string) => void;
   /** The agency workspace this session works in (a teammate's verified delegation), if any. */
   workspace?: { ownerId: number; ownerName: string | null } | null;
+  /** The user's layout; read from dashboard_prefs when absent (tests pass one). */
+  layout?: DashboardLayout;
 };
 
 export type BuiltDashboard = {
   payload: DashboardPayload;
-  /** False when the account header failed: such an answer is never cached. */
+  /** False when the account header or the saved layout failed: such an answer is never cached. */
   cacheable: boolean;
 };
 
@@ -85,7 +89,11 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
   const fail = (what: string) => (err: unknown) => log(`[dashboard] ${what} failed: ${errText(err)}`);
 
   // Throws → the route answers 500: without entitlements no gate is known.
-  const ent = await getEntitlements(userId, now);
+  let layoutFailed = false;
+  const [ent, layout] = await Promise.all([
+    getEntitlements(userId, now),
+    opts.layout ? Promise.resolve(opts.layout) : readDashboardLayout(userId, (line) => { layoutFailed = true; log(line); }),
+  ]);
 
   let crm: OrgContext | null = null;
   let crmFailed = false;
@@ -99,16 +107,29 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
   const ctx = makeContext(userId, ent, crm, now);
   const access = { accessPlan: ent.accessPlan, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, hasCrmOrg: crmFailed || !!crm };
 
-  const tilesP = Promise.all(DASHBOARD_TILES.map((def) => computeTile(def, ctx, access, {
+  // Tiles the user hid are never computed (no queries): only whether the plan includes them.
+  const hidden = new Set(layout.hidden);
+  const shown = sortByDashboardLayout(DASHBOARD_TILES.filter((d) => !hidden.has(d.key)), layout);
+  const hiddenTiles: DashboardHiddenTile[] = DASHBOARD_TILES.filter((d) => hidden.has(d.key)).map((def) => {
+    const a = tileAccess(def, access);
+    return {
+      key: def.key, entitled: a.entitled,
+      ...(a.requiredPlan && !a.entitled ? { requiredPlan: a.requiredPlan } : {}),
+      ...(a.comingSoon ? { comingSoon: true } : {}),
+    };
+  });
+  const tilesP = Promise.all(shown.map((def) => computeTile(def, ctx, access, {
     budget, crmFailed, sources: opts.sources, workspace: opts.workspace ?? null, onError: (e) => fail(`tile ${def.key}`)(e),
   })));
 
+  // Sections the user turned off are not read either (Gabe's nudge reads the checklist).
+  const wantChecklist = layout.sections.checklist || layout.sections.gabe;
   const [header, usage, unread, checklist, recent] = await Promise.allSettled([
     withTimeout(accountHeader(ctx), budget, "account"),
     withTimeout(accountUsage(ctx), budget, "usage"),
     withTimeout(unreadNotifications(userId), budget, "notifications"),
-    withTimeout(buildChecklist(ctx, (k, e) => fail(`checklist ${k}`)(e)), budget, "checklist"),
-    withTimeout(buildRecent(ctx, (k, e) => fail(`recent ${k}`)(e)), budget, "recent"),
+    wantChecklist ? withTimeout(buildChecklist(ctx, (k, e) => fail(`checklist ${k}`)(e)), budget, "checklist") : Promise.resolve([]),
+    layout.sections.recent ? withTimeout(buildRecent(ctx, (k, e) => fail(`recent ${k}`)(e)), budget, "recent") : Promise.resolve([]),
   ]);
   if (header.status === "rejected") fail("account")(header.reason);
   if (usage.status === "rejected") fail("usage")(usage.reason);
@@ -128,17 +149,24 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
     unreadNotifications: unread.status === "fulfilled" ? unread.value : 0,
   };
 
+  const tiles = await tilesP;
   return {
     payload: {
       generatedAt: now.toISOString(),
       cached: false,
       fixture: false,
       account,
-      tiles: await tilesP,
+      tiles,
+      // Every item; the route takes out what the user cleared (fresh on every answer, cached or not).
+      attention: dashboardAttention(tiles, account),
+      cleared: [],
+      layout,
+      hiddenTiles,
       checklist: checklist.status === "fulfilled" ? checklist.value : [],
       recent: recent.status === "fulfilled" ? recent.value : [],
     },
-    cacheable: header.status === "fulfilled",
+    // A default layout standing in for an unreadable saved one is never kept either.
+    cacheable: header.status === "fulfilled" && !layoutFailed,
   };
 }
 

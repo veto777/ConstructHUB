@@ -2456,6 +2456,23 @@ export const reviewReferralSettings = pgTable("review_referral_settings", {
   offer: text("offer").notNull().default(""),
 });
 
+// ── Signed-in dashboard preferences (server/dashboard/prefs.ts) ─────────────
+// Created idempotently by ensureDashboardPrefsSchema (boot + the migration script).
+/** One row per user who customized the dashboard: the layout (shared/dashboard-prefs.ts DashboardLayout). */
+export const dashboardPrefs = pgTable("dashboard_prefs", {
+  userId: integer("user_id").primaryKey(),
+  layout: jsonb("layout").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+/** One row per cleared/snoozed "Needs you today" item: hidden while the item still has `itemValue` (and until `snoozedUntil`). */
+export const dashboardDismissals = pgTable("dashboard_dismissals", {
+  userId: integer("user_id").notNull(),
+  itemKey: text("item_key").notNull(),
+  itemValue: text("item_value").notNull(),
+  snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.itemKey] })]);
+
 // ── Account: billing records, transactional-email log, public API keys ──────
 // Created idempotently by server/account/schema.ts (boot + the migration
 // script); the drizzle definitions let other modules read and write them.

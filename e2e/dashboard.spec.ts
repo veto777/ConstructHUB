@@ -13,7 +13,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { E2E_BASE_URL } from "./helpers";
-import { DASHBOARD_GROUPS, DASHBOARD_TILES, dashboardAttention, type DashboardPayload } from "../shared/dashboard";
+import { DASHBOARD_GROUPS, DASHBOARD_TILES, type DashboardPayload } from "../shared/dashboard";
 
 /** Shown inside the CRM card (money, then leads / follow-ups / visits), never as grid tiles. */
 const CRM_CARD = new Set(["crm", "crmLeads", "crmSchedule"]);
@@ -36,6 +36,13 @@ async function shot(page: Page, name: string) {
   await page.setViewportSize(vp);
 }
 
+/** Just what is on screen (a fixed sheet, a card scrolled into view). */
+async function viewShot(page: Page, name: string) {
+  if (!SHOTS) return;
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${SHOTS}/${name}.png` });
+}
+
 /** Point the client's GET /api/dashboard at a fixture scenario (the skeleton's ?fixture= switch). */
 async function useScenario(page: Page, scenario: "full" | "new" | "noplan") {
   await page.route(/\/api\/dashboard(\?.*)?$/, async (route) => {
@@ -56,6 +63,13 @@ async function openDashboard(page: Page) {
 
 const tile = (page: Page, key: string) => page.getByTestId(`tile-${key}`);
 
+/** The bypass user's saved layout and cleared items back to none (writes need our Origin). */
+async function resetPrefs(page: Page) {
+  const headers = { origin: E2E_BASE_URL };
+  expect((await page.request.delete("/api/dashboard/layout", { headers })).ok()).toBeTruthy();
+  expect((await page.request.delete("/api/dashboard/dismissals", { headers })).ok()).toBeTruthy();
+}
+
 /** The real payload for the signed-in (bypass) user — same 60 s server cache the page reads. */
 async function realPayload(page: Page): Promise<DashboardPayload> {
   const res = await page.request.get("/api/dashboard");
@@ -68,6 +82,8 @@ async function realPayload(page: Page): Promise<DashboardPayload> {
 const nf = new Intl.NumberFormat("en-US");
 
 test.describe("signed-in dashboard: real aggregate", () => {
+  test.beforeEach(async ({ page }) => { await resetPrefs(page); });
+
   test("prints the account's own payload: statuses, metrics, usage, checklist, recent", async ({ page }) => {
     const body = await realPayload(page);
     await openDashboard(page);
@@ -79,7 +95,8 @@ test.describe("signed-in dashboard: real aggregate", () => {
     }
 
     // Needs you today: exactly the warn/bad items the payload carries, at the top of the page.
-    const attention = dashboardAttention(body.tiles, body.account);
+    const attention = body.attention;
+    expect(body.cleared).toEqual([]);
     const needs = page.getByTestId("card-dashboard-needs");
     await expect(needs).toHaveAttribute("data-count", String(attention.length));
     for (const item of attention) await expect(needs.getByTestId(`needs-${item.key}`)).toBeVisible();
@@ -190,6 +207,8 @@ test.describe("signed-in dashboard: real aggregate", () => {
 });
 
 test.describe("signed-in dashboard: sample scenarios", () => {
+  test.beforeEach(async ({ page }) => { await resetPrefs(page); });
+
   test("renders every group and tile status, never the old marketing home", async ({ page }) => {
     await useScenario(page, "full");
     await openDashboard(page);
@@ -418,5 +437,237 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     await shot(page, "dashboard-1440-dark");
     await page.setViewportSize({ width: 390, height: 844 });
     await shot(page, "dashboard-390-dark");
+  });
+});
+
+// ── Clearing "Needs you today" and customizing the dashboard ───────────────
+// Saved on the account (server-side), so every check reloads the page. The
+// sample scenario keeps the items fixed; the bypass user's own prefs apply to it.
+
+const needs = (page: Page) => page.getByTestId("card-dashboard-needs");
+
+test.describe("signed-in dashboard: clear tasks and customize", () => {
+  test.describe.configure({ mode: "serial" });
+  test.beforeEach(async ({ page }) => { await resetPrefs(page); });
+  test.afterAll(async ({ request }) => {
+    const headers = { origin: E2E_BASE_URL };
+    await request.delete("/api/dashboard/layout", { headers });
+    await request.delete("/api/dashboard/dismissals", { headers });
+  });
+
+  test("Done clears an item, it stays cleared after a reload, and Show cleared restores it", async ({ page }) => {
+    await useScenario(page, "full");
+    await openDashboard(page);
+    const card = needs(page);
+    const count = Number(await card.getAttribute("data-count"));
+    expect(count).toBeGreaterThan(2);
+    await expect(card.getByTestId("button-needs-show-cleared")).toHaveCount(0);
+
+    // Keyboard: the Done button is a real button; focus lands on the next item afterwards.
+    await card.getByTestId("button-needs-done-reviews.unanswered").focus();
+    await expect(card.getByTestId("button-needs-done-reviews.unanswered")).toHaveAccessibleName("Done: Awaiting reply (Google Reviews)");
+    await page.keyboard.press("Enter");
+    await expect(card.getByTestId("needs-reviews.unanswered")).toHaveCount(0);
+    await expect(card).toHaveAttribute("data-count", String(count - 1));
+    await expect(page.locator(":focus")).toHaveAttribute("data-testid", /^link-needs-/);
+    await expect(page.getByTestId("text-needs-live")).toContainText("Cleared “Awaiting reply”");
+
+    await page.reload();
+    await expect(needs(page)).toHaveAttribute("data-count", String(count - 1));
+    await expect(needs(page).getByTestId("needs-reviews.unanswered")).toHaveCount(0);
+    const toggle = needs(page).getByTestId("button-needs-show-cleared");
+    await expect(toggle).toHaveText("Show cleared (1)");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const row = needs(page).getByTestId("cleared-reviews.unanswered");
+    await expect(row).toContainText("Done · comes back if the number changes");
+    await shot(page, "controls-cleared-1440");
+    await row.getByRole("button", { name: "Restore Awaiting reply (Google Reviews)" }).click();
+    await expect(needs(page).getByTestId("needs-reviews.unanswered")).toBeVisible();
+    await expect(needs(page)).toHaveAttribute("data-count", String(count));
+    await page.reload();
+    await expect(needs(page).getByTestId("needs-reviews.unanswered")).toBeVisible();
+    await expect(needs(page).getByTestId("button-needs-show-cleared")).toHaveCount(0);
+  });
+
+  test("Snooze hides an item until tomorrow; Clear all and Restore all", async ({ page }) => {
+    await useScenario(page, "full");
+    await openDashboard(page);
+    const count = Number(await needs(page).getAttribute("data-count"));
+    await needs(page).getByTestId("button-needs-snooze-clickGuard.suspicious30d").click();
+    await page.getByTestId("menu-needs-snooze-tomorrow-clickGuard.suspicious30d").click();
+    await expect(needs(page).getByTestId("needs-clickGuard.suspicious30d")).toHaveCount(0);
+
+    await page.reload();
+    await expect(needs(page)).toHaveAttribute("data-count", String(count - 1));
+    await needs(page).getByTestId("button-needs-show-cleared").click();
+    const row = needs(page).getByTestId("cleared-clickGuard.suspicious30d");
+    await expect(row).toHaveAttribute("data-snoozed", "true");
+    await expect(row).toContainText("Snoozed until");
+
+    // The server agrees: a snooze ending tomorrow at 8 am.
+    const body = (await (await page.request.get("/api/dashboard?fixture=full")).json()) as DashboardPayload;
+    const snoozed = body.cleared.find((c) => c.key === "clickGuard.suspicious30d")!;
+    const until = new Date(snoozed.until!);
+    expect(until.getTime()).toBeGreaterThan(Date.now());
+    expect(until.getTime() - Date.now()).toBeLessThan(2 * 86_400_000);
+
+    await needs(page).getByTestId("button-needs-clear-all").click();
+    await expect(needs(page)).toHaveAttribute("data-count", "0");
+    await expect(needs(page)).toContainText("Nothing needs you today.");
+    await page.reload();
+    await expect(needs(page)).toHaveAttribute("data-count", "0");
+    await expect(needs(page).getByTestId("button-needs-show-cleared")).toHaveText(`Show cleared (${count})`);
+    await needs(page).getByTestId("button-needs-show-cleared").click();
+    await expect(needs(page).getByTestId("list-needs-cleared").locator("li")).toHaveCount(count);
+    await needs(page).getByTestId("button-needs-restore-all").click();
+    await expect(needs(page)).toHaveAttribute("data-count", String(count));
+    await page.reload();
+    await expect(needs(page)).toHaveAttribute("data-count", String(count));
+  });
+
+  test("Customize: hide a tool, move one to the top, save; it persists; Reset to default", async ({ page }) => {
+    await useScenario(page, "full");
+    await openDashboard(page);
+    await page.getByTestId("button-dashboard-customize").click();
+    const sheet = page.getByTestId("sheet-customize-dashboard");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("heading", { name: "Customize dashboard" })).toBeVisible();
+    // Every catalogue tool but the CRM card's three is listed, each with a checkbox; locked ones say so.
+    for (const def of DASHBOARD_TILES.filter((d) => !CRM_CARD.has(d.key))) {
+      await expect(sheet.getByTestId(`customize-tile-${def.key}`)).toBeVisible();
+    }
+    await expect(sheet.getByTestId("badge-customize-locked-cloudflare")).toContainText("Agency plan");
+    await expect.poll(async () => (await sheet.boundingBox())!.x).toBeLessThanOrEqual(1440 - 447);
+    await viewShot(page, "controls-customize-1440");
+
+    await sheet.getByTestId("checkbox-customize-reviews").click();
+    await expect(sheet.getByTestId("customize-tile-reviews")).toHaveAttribute("data-hidden", "true");
+    // Keyboard reorder: focus the grip, Home moves Site Scan to the top of its group.
+    await sheet.getByTestId("handle-customize-siteScan").focus();
+    await page.keyboard.press("Home");
+    await expect(sheet.getByTestId("customize-group-grow").locator("li").first()).toHaveAttribute("data-testid", "customize-tile-siteScan");
+    await expect(page.getByTestId("text-customize-live")).toContainText("Site Scan moved to position 1");
+    // Arrow buttons: Win jobs up to the first group.
+    for (let i = 0; i < 2; i++) await sheet.getByTestId("button-customize-group-up-win").click();
+    // Sections: no recent activity.
+    await sheet.getByTestId("checkbox-customize-section-recent").click();
+    await sheet.getByTestId("button-customize-save").click();
+    await expect(sheet).toHaveCount(0);
+
+    const check = async () => {
+      await expect(tile(page, "reviews")).toHaveCount(0);
+      await expect(page.getByTestId("section-dashboard-grow").locator('[data-testid^="tile-"][data-status]').first()).toHaveAttribute("data-testid", "tile-siteScan");
+      const win = (await page.getByTestId("section-dashboard-win").boundingBox())!;
+      const grow = (await page.getByTestId("section-dashboard-grow").boundingBox())!;
+      expect(win.y).toBeLessThan(grow.y);
+      await expect(page.getByTestId("list-dashboard-recent")).toHaveCount(0);
+      await expect(page.getByTestId("text-dashboard-recent-empty")).toHaveCount(0);
+    };
+    await check();
+    await page.reload();
+    await expect(page.getByTestId("text-dashboard-greeting")).toBeVisible();
+    await check();
+
+    // One list in exactly my order: Permits first, ahead of everything.
+    await page.getByTestId("button-dashboard-customize").click();
+    await expect(sheet.getByTestId("customize-tile-reviews")).toHaveAttribute("data-hidden", "true");
+    await sheet.getByTestId("switch-customize-keep-groups").click();
+    await sheet.getByTestId("handle-customize-property").focus();
+    await page.keyboard.press("Home");
+    await sheet.getByTestId("button-customize-down-property").click();
+    await sheet.getByTestId("button-customize-up-property").click();
+    await sheet.getByTestId("button-customize-save").click();
+    await page.reload();
+    const all = page.getByTestId("section-dashboard-all");
+    await expect(all).toBeVisible();
+    await expect(page.getByTestId("section-dashboard-grow")).toHaveCount(0);
+    await expect(all.locator('[data-testid^="tile-"][data-status]').first()).toHaveAttribute("data-testid", "tile-property");
+
+    // Cancel discards; Reset to default + Save brings the default back.
+    await page.getByTestId("button-dashboard-customize").click();
+    await sheet.getByTestId("button-customize-select-none").click();
+    await expect(sheet.getByTestId("text-customize-count")).toContainText(/^0 of/);
+    await sheet.getByTestId("button-customize-cancel").click();
+    await expect(all.locator('[data-testid^="tile-"][data-status]').first()).toHaveAttribute("data-testid", "tile-property");
+    await page.getByTestId("button-dashboard-customize").click();
+    await sheet.getByTestId("button-customize-reset").click();
+    await expect(sheet.getByTestId("customize-tile-reviews")).toHaveAttribute("data-hidden", "false");
+    await expect(sheet.getByTestId("button-customize-reset")).toBeDisabled();
+    await sheet.getByTestId("button-customize-save").click();
+    await page.reload();
+    await expect(tile(page, "reviews")).toBeVisible();
+    await expect(page.getByTestId("section-dashboard-grow").locator('[data-testid^="tile-"][data-status]').first()).toHaveAttribute("data-testid", "tile-gbp");
+    await expect(page.getByTestId("list-dashboard-recent")).toBeVisible();
+    const res = await page.request.get("/api/dashboard?fixture=full");
+    const body = (await res.json()) as DashboardPayload;
+    expect(body.layout.hidden).toEqual([]);
+    expect(body.layout.keepGroups).toBe(true);
+  });
+
+  test("Customize: drag a tool by its grip", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1400 });
+    await useScenario(page, "full");
+    await openDashboard(page);
+    await page.getByTestId("button-dashboard-customize").click();
+    const sheet = page.getByTestId("sheet-customize-dashboard");
+    await sheet.getByTestId("customize-tile-media").scrollIntoViewIfNeeded();
+    await expect(sheet.getByTestId("handle-customize-gbp")).toBeInViewport();
+    await expect(sheet.getByTestId("handle-customize-media")).toBeInViewport();
+    const from = (await sheet.getByTestId("handle-customize-media").boundingBox())!;
+    const to = (await sheet.getByTestId("handle-customize-gbp").boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 20; i++) await page.mouse.move(from.x + from.width / 2, from.y + (to.y - from.y - 12) * (i / 20) + from.height / 2);
+    await page.mouse.up();
+    await expect(sheet.getByTestId("customize-group-grow").locator("li").first()).toHaveAttribute("data-testid", "customize-tile-media");
+    await sheet.getByTestId("button-customize-save").click();
+    await page.reload();
+    await expect(page.getByTestId("section-dashboard-grow").locator('[data-testid^="tile-"][data-status]').first()).toHaveAttribute("data-testid", "tile-media");
+  });
+
+  test("hiding every tool leaves a way back", async ({ page }) => {
+    await useScenario(page, "full");
+    await openDashboard(page);
+    await page.getByTestId("button-dashboard-customize").click();
+    await page.getByTestId("button-customize-select-none").click();
+    await page.getByTestId("button-customize-save").click();
+    await expect(page.getByTestId("text-dashboard-tiles-empty")).toBeVisible();
+    await page.getByTestId("text-dashboard-tiles-empty").getByRole("button", { name: "Choose tools" }).click();
+    await expect(page.getByTestId("sheet-customize-dashboard")).toBeVisible();
+  });
+
+  test("390px: the controls fit, the sheet fills the screen, no horizontal scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await useScenario(page, "full");
+    await openDashboard(page);
+    const done = needs(page).getByTestId("button-needs-done-reviews.unanswered");
+    const box = (await done.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(40);
+    expect(box.height).toBeGreaterThanOrEqual(40);
+    await done.click();
+    await needs(page).getByTestId("button-needs-show-cleared").click();
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector("main")!;
+      return Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, main.scrollWidth - main.clientWidth);
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
+    // The "Cleared …" toast has said its piece: out of the pictures.
+    for (const close of await page.locator("[toast-close]").all()) await close.click().catch(() => {});
+    await needs(page).getByTestId("list-needs-cleared").scrollIntoViewIfNeeded();
+    await viewShot(page, "controls-cleared-390");
+
+    await page.getByTestId("button-dashboard-customize").click();
+    const sheet = page.getByTestId("sheet-customize-dashboard");
+    await expect(sheet).toBeVisible();
+    // Slides in: settle first.
+    await expect.poll(async () => (await sheet.boundingBox())!.x).toBeLessThanOrEqual(1);
+    expect((await sheet.boundingBox())!.width).toBeGreaterThanOrEqual(389);
+    const sheetOverflow = await sheet.evaluate((el) => Array.from(el.querySelectorAll("*")).some((c) => c.getBoundingClientRect().right > window.innerWidth + 1));
+    expect(sheetOverflow).toBe(false);
+    await expect(page.getByTestId("button-customize-save")).toBeInViewport();
+    await viewShot(page, "controls-customize-390");
+    await sheet.getByTestId("customize-group-protect").scrollIntoViewIfNeeded();
+    await viewShot(page, "controls-customize-390-scrolled");
   });
 });

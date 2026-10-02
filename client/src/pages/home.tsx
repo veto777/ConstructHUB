@@ -4,12 +4,12 @@
  * The marketing landing is a different page (landing.tsx); this one lives in
  * the app shell, in the app's own look.
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TriangleAlert, RefreshCw } from "lucide-react";
 import {
-  DASHBOARD_CLIENT_STALE_MS, DASHBOARD_TILES, dashboardAttention,
-  type DashboardChecklistItem, type DashboardPayload, type DashboardTile, type DashboardTileDef,
+  DASHBOARD_CLIENT_STALE_MS, DASHBOARD_TILES,
+  type DashboardAttentionItem, type DashboardChecklistItem, type DashboardPayload, type DashboardTile, type DashboardTileDef, type DashboardTileKey,
 } from "@shared/dashboard";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { useToast } from "@/hooks/use-toast";
@@ -23,8 +23,8 @@ import { TileGrid } from "@/components/dashboard/tile-grid";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { GabeNudge } from "@/components/dashboard/gabe-nudge";
 import { DashboardSkeleton } from "@/components/dashboard/skeletons";
-
-const QUERY_KEY = ["/api/dashboard"] as const;
+import { CustomizeDashboard } from "@/components/dashboard/customize-dashboard";
+import { DASHBOARD_QUERY_KEY as QUERY_KEY } from "@/components/dashboard/use-dashboard-prefs";
 
 const FLAGS: Record<NonNullable<DashboardTileDef["flag"]>, boolean> = {
   SHOW_GOOGLE_REVIEWS,
@@ -32,9 +32,12 @@ const FLAGS: Record<NonNullable<DashboardTileDef["flag"]>, boolean> = {
 };
 const FLAG_BY_TILE = new Map(DASHBOARD_TILES.map((d) => [d.key, d.flag] as const));
 
+const flagOff = (key: DashboardTileKey) => { const flag = FLAG_BY_TILE.get(key); return !!flag && !FLAGS[flag]; };
 /** Tiles behind a client feature flag are always sent; drop them while the flag is off. */
-const visibleTiles = (tiles: DashboardTile[]) =>
-  tiles.filter((t) => { const flag = FLAG_BY_TILE.get(t.key); return !flag || FLAGS[flag]; });
+const visibleTiles = (tiles: DashboardTile[]) => tiles.filter((t) => !flagOff(t.key));
+/** …and the action items they raised ("<tileKey>.<metric>"). */
+const visibleAttention = <T extends DashboardAttentionItem>(items: T[]) =>
+  items.filter((i) => !flagOff(i.key.split(".")[0] as DashboardTileKey));
 const visibleChecklist = (items: DashboardChecklistItem[]) =>
   items.filter((i) => i.key !== "requestReviews" || SHOW_GOOGLE_REVIEWS);
 
@@ -47,6 +50,8 @@ export default function HomePage() {
     refetchOnWindowFocus: true,
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [customizing, setCustomizing] = useState(false);
+  const openCustomize = useCallback(() => setCustomizing(true), []);
 
   // Refresh skips the server's 60 s cache and writes the answer into the same query.
   const refresh = async () => {
@@ -84,7 +89,9 @@ export default function HomePage() {
     const checklist = visibleChecklist(data.checklist);
     const byKey = (key: string) => tiles.find((t) => t.key === key);
     const crm = byKey("crm");
-    // Action first: what needs you, then the CRM's money and day, then setup, meters and every tool.
+    const show = data.layout.sections;
+    // Action first: what needs you, then the CRM's money and day, then setup, meters and every tool
+    // (each section and tool as the user set them in "Customize dashboard").
     body = (
       <div className="space-y-6">
         <DashboardHeader
@@ -93,16 +100,20 @@ export default function HomePage() {
           fixture={data.fixture}
           refreshing={refreshing}
           onRefresh={refresh}
+          onCustomize={openCustomize}
         />
-        <NeedsToday items={dashboardAttention(tiles, data.account)} />
-        {crm && <CrmSnapshotCard tile={crm} leads={byKey("crmLeads")} schedule={byKey("crmSchedule")} />}
-        <ChecklistCard items={checklist} />
-        <UsageCard account={data.account} />
-        <div className="pt-2"><TileGrid tiles={tiles} /></div>
-        <div className="grid gap-4 pt-2 lg:grid-cols-3">
-          <div className="min-w-0 lg:col-span-2"><RecentActivity items={data.recent} /></div>
-          <div className="min-w-0"><GabeNudge checklist={checklist} /></div>
-        </div>
+        {show.needs && <NeedsToday items={visibleAttention(data.attention)} cleared={visibleAttention(data.cleared)} />}
+        {show.crm && crm && <CrmSnapshotCard tile={crm} leads={byKey("crmLeads")} schedule={byKey("crmSchedule")} />}
+        {show.checklist && <ChecklistCard items={checklist} />}
+        {show.usage && <UsageCard account={data.account} />}
+        <div className="pt-2"><TileGrid tiles={tiles} keepGroups={data.layout.keepGroups} onCustomize={openCustomize} /></div>
+        {(show.recent || show.gabe) && (
+          <div className="grid gap-4 pt-2 lg:grid-cols-3">
+            {show.recent && <div className={`min-w-0 ${show.gabe ? "lg:col-span-2" : "lg:col-span-3"}`}><RecentActivity items={data.recent} /></div>}
+            {show.gabe && <div className={`min-w-0 ${show.recent ? "" : "lg:col-span-3"}`}><GabeNudge checklist={checklist} /></div>}
+          </div>
+        )}
+        <CustomizeDashboard open={customizing} onOpenChange={setCustomizing} data={data} flagOff={flagOff} />
       </div>
     );
   }

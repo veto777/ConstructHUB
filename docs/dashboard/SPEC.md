@@ -446,6 +446,35 @@ widget and prefills the question.
 
 ---
 
+## 4b. Per-user controls: clearing "Needs you today" and Customize (2026-10-02)
+
+Owner: "lets make a way to clear these tasks" and "add a settings function that lets you
+add all the features and make them in your order. Have checkboxes, etc."
+
+- **Stored server-side per user** (`server/dashboard/prefs.ts`, rules in
+  `shared/dashboard-prefs.ts`): `dashboard_prefs` (one layout row; none = default) and
+  `dashboard_dismissals` (item key + the value it had + optional snooze end). Idempotent DDL
+  at boot and in `scripts/apply-schema-migration.ts`; mirrored in `shared/schema.ts`.
+- **Clearing**: each item has Done (×) and Snooze (until tomorrow 8 am / for a week, viewer's
+  clock); "Clear all"; "Show cleared (N)" lists them with Restore / Restore all, and a toast
+  offers Undo. A cleared item stays hidden while its signature (value, plus limit for a meter:
+  `"3"`, `"12/10"`) is unchanged and its snooze has not ended; any change brings it back and
+  the stale row is deleted. The payload now carries `attention` (computed on the server) and
+  `cleared`; dismissals are applied to every answer, cached or not, from a fresh read.
+- **Customize** (header button → sheet): every catalogue tool with a checkbox and its place
+  (drag the grip via framer-motion `Reorder`, arrow buttons, or ↑ ↓ Home End on the grip),
+  "Keep groups" (groups ordered too) or one list, Select all / none, section toggles (Needs
+  you today, CRM snapshot, Getting started, Plan usage, Recent activity, Ask Gabe), Reset to
+  default, Save / Cancel. The CRM card's three tiles are the "CRM snapshot" section.
+  Hidden tiles are **not computed** (`hiddenTiles` carries plan access only), and their alerts
+  leave Needs you today; a locked tile can be shown or hidden, never unlocked. Recent
+  activity / the checklist are not read when their sections (and Gabe's) are off.
+- **Routes** (session, user-scoped; writes need JSON + an Origin that is one of our hosts):
+  `PUT|DELETE /api/dashboard/layout`, `PUT /api/dashboard/dismissals`,
+  `DELETE /api/dashboard/dismissals[/:key]`. Saving a layout forgets the user's cached answer
+  (and any in-flight build). Caps: 100 keys per list, 50 items per clear, 100 cleared rows per
+  user, snooze ≤ 31 days; unknown tile/section keys are ignored.
+
 ## 5. File ownership (lanes)
 
 | lane | owns | may touch (extract-only / one-liners) |
