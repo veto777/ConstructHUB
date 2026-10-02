@@ -15,10 +15,11 @@ export const protectTiles: TileSources = {
     const [r] = await dq(
       `SELECT (SELECT count(*)::int FROM click_visits WHERE domain_id = ANY($1::int[]) AND is_suspicious AND visited_at > now() - interval '30 days') suspicious,
               (SELECT count(*)::int FROM blocked_ips WHERE domain_id = ANY($1::int[]) AND is_active) blocked`, [ids]);
+    // What Click Guard caught leads; the site quota is the header's meter, so it comes last.
     return ok([
-      metric("sites", "Sites protected", ids.length, "count", { limit: ctx.ent.allowances?.protectedSites }),
       metric("suspicious30d", "Suspicious clicks (30 days)", int(r.suspicious), "count", { tone: watch(int(r.suspicious)) }),
       metric("blockedIps", "IPs excluded", int(r.blocked), "count"),
+      metric("sites", "Sites protected", ids.length, "count", { limit: ctx.ent.allowances?.protectedSites }),
     ]);
   },
 

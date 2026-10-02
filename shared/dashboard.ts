@@ -19,7 +19,7 @@ export const DASHBOARD_GROUPS: readonly { key: DashboardGroupKey; label: string;
   { key: "grow", label: "Grow", blurb: "Your Google profiles, reviews, posts and website." },
   { key: "protect", label: "Protect", blurb: "Click fraud, VPN traffic, Cloudflare and your domains." },
   { key: "win", label: "Win jobs", blurb: "Permits, property records, competitors and ads." },
-  { key: "run", label: "Run the business", blurb: "CRM, schedule, texting and your team." },
+  { key: "run", label: "Run the business", blurb: "Texting, call answering and your team. Your CRM numbers are at the top." },
   { key: "learn", label: "Learn", blurb: "Master Class, guides and services." },
 ];
 
@@ -54,6 +54,12 @@ export type DashboardGate =
   | { kind: "module"; module: ModuleKey }
   /** Membership of a CRM org (the CRM is included with every plan). */
   | { kind: "crm" }
+  /**
+   * A CRM feature metered on the org OWNER's plan (texting): a member of an org
+   * gets past the gate and the source reads the owner's plan; without an org,
+   * the viewer's own allowance for `limit` decides.
+   */
+  | { kind: "crmAllowance"; limit: "teamTextSegments" }
   /** An add-on not sold yet: the tile is always "coming_soon" in this build. */
   | { kind: "addon"; addon: AddonKey | "call_assistant"; requiredPlan: PlanKey };
 
@@ -79,10 +85,10 @@ export type DashboardTileDef = {
  */
 export const DASHBOARD_TILES: readonly DashboardTileDef[] = [
   // ── Grow ─────────────────────────────────────────────────────────────────
-  { key: "gbp", group: "grow", title: "Google Business Profile", description: "Connect Google and link the locations you manage.", href: "/locations", surface: "app", gate: { kind: "plan" } },
+  { key: "gbp", group: "grow", title: "Google Business Profile", description: "Connect Google and link the locations you manage.", href: "/locations", surface: "app", gate: { kind: "plan" }, links: [{ label: "GMB Edit Monitor", href: "/gmb-monitor", surface: "app" }] },
   { key: "reviews", group: "grow", title: "Google Reviews", description: "Your rating, new reviews and the ones still waiting on a reply.", href: "/google-reviews", surface: "app", gate: { kind: "plan" }, flag: "SHOW_GOOGLE_REVIEWS" },
-  { key: "profileGuard", group: "grow", title: "Profile Guard", description: "Alerts when someone edits your Google profile.", href: "/gmb-monitor", surface: "app", gate: { kind: "plan" } },
-  { key: "rankingGrid", group: "grow", title: "Ranking Grid", description: "Where you rank on the map, street by street.", href: "/ranking-grid", surface: "app", gate: { kind: "plan" } },
+  { key: "profileGuard", group: "grow", title: "Profile Guard", description: "Alerts when someone edits your Google profile. Turn it on per location in Locations.", href: "/locations", surface: "app", gate: { kind: "plan" } },
+  { key: "rankingGrid", group: "grow", title: "GMB Ranking Grid", description: "Where you rank on the map, street by street.", href: "/ranking-grid", surface: "app", gate: { kind: "plan" } },
   { key: "gbpContent", group: "grow", title: "Posts & Photos", description: "Scheduled Google posts and photo uploads.", href: "/gbp-content", surface: "app", gate: { kind: "plan" } },
   { key: "social", group: "grow", title: "Social Media", description: "Posts queued and published across your social accounts.", href: "/social-media", surface: "app", gate: { kind: "none" } },
   { key: "siteScan", group: "grow", title: "Site Scan", description: "SEO and speed score for your website.", href: "/site-scan", surface: "app", gate: { kind: "plan" } },
@@ -96,22 +102,22 @@ export const DASHBOARD_TILES: readonly DashboardTileDef[] = [
   { key: "domains", group: "protect", title: "Domains", description: "Expiry, auto-renew and DNS checks on your domains.", href: "/domains", surface: "app", gate: { kind: "module", module: "domainsMailAlerts" } },
   { key: "mailAlerts", group: "protect", title: "Mail alerts", description: "Provider alert emails, matched to your clients.", href: "/mail-alerts", surface: "app", gate: { kind: "module", module: "domainsMailAlerts" } },
   // ── Win jobs ─────────────────────────────────────────────────────────────
-  { key: "permits", group: "win", title: "Permit Search", description: "Search building permits by county or city.", href: "/search", surface: "app", gate: { kind: "plan" }, links: [{ label: "Search history", href: "/history", surface: "app" }, { label: "Database directory", href: "/databases", surface: "app" }] },
-  { key: "property", group: "win", title: "Property Records", description: "County appraiser offices for owner and parcel lookups.", href: "/property", surface: "app", gate: { kind: "none" } },
+  { key: "permits", group: "win", title: "Search Permits", description: "Search building permits by county or city.", href: "/search", surface: "app", gate: { kind: "plan" }, links: [{ label: "Search history", href: "/history", surface: "app" }, { label: "Database directory", href: "/databases", surface: "app" }] },
+  { key: "property", group: "win", title: "Property Records", description: "Owner and parcel lookups through county appraiser offices, sourced from NETR Online.", href: "/property", surface: "app", gate: { kind: "none" } },
   { key: "competitors", group: "win", title: "Competitor Intel", description: "Benchmark your profile against local competitors.", href: "/competitors", surface: "app", gate: { kind: "allowance", limit: "competitorScans" }, flag: "SHOW_COMPETITOR_INTEL" },
-  { key: "adsManager", group: "win", title: "Google Ads & LSA manager", description: "Client ad accounts, audits and protections.", href: "/ads-manager", surface: "app", gate: { kind: "module", module: "adsManager" } },
+  { key: "adsManager", group: "win", title: "Agency Ads & LSA", description: "Client ad accounts, audits and protections.", href: "/ads-manager", surface: "app", gate: { kind: "module", module: "adsManager" } },
   { key: "lsaLeads", group: "win", title: "LSA Leads", description: "Local Services leads, disputes and Telegram alerts.", href: "/lsa-leads", surface: "app", gate: { kind: "none" } },
   // ── Run the business ─────────────────────────────────────────────────────
   { key: "crm", group: "run", title: "ConstructHub CRM", description: "Estimates, jobs, invoices and your pipeline.", href: "/crm", surface: "portal", gate: { kind: "crm" } },
   { key: "crmSchedule", group: "run", title: "Schedule", description: "Appointments and crew visits.", href: "/crm/schedule", surface: "portal", gate: { kind: "crm" } },
   { key: "crmLeads", group: "run", title: "Leads & follow-ups", description: "New leads and the follow-ups that are due.", href: "/crm/pipeline", surface: "portal", gate: { kind: "crm" } },
-  { key: "texting", group: "run", title: "Texting", description: "Team alerts and client texts from your CRM.", href: "/crm/settings", surface: "portal", gate: { kind: "allowance", limit: "teamTextSegments" } },
+  { key: "texting", group: "run", title: "Texting", description: "Team alerts and client texts from your CRM.", href: "/crm/settings", surface: "portal", gate: { kind: "crmAllowance", limit: "teamTextSegments" } },
   { key: "callAssistant", group: "run", title: "AI Call Assistant", description: "An assistant that answers your calls 24/7 and files the lead in your CRM.", href: "/pricing#add-ons", surface: "app", gate: { kind: "addon", addon: "call_assistant", requiredPlan: "pro" } },
   { key: "agency", group: "run", title: "Agency workspace", description: "Client workspaces, team roles and bulk actions.", href: "/agency", surface: "app", gate: { kind: "module", module: "agencyWorkspace" } },
   // ── Learn ────────────────────────────────────────────────────────────────
   { key: "masterClass", group: "learn", title: "Master Class", description: "The contractor marketing course.", href: "/master-class", surface: "app", gate: { kind: "none" } },
   { key: "guides", group: "learn", title: "Guides", description: "Google Ads, Local Services and state licensing guides.", href: "/guides", surface: "app", gate: { kind: "none" }, links: [{ label: "Google Ads guide", href: "/google-ads-guide", surface: "app" }, { label: "LSA guide", href: "/lsa-guide", surface: "app" }, { label: "Ad fraud", href: "/google-ad-fraud", surface: "app" }] },
-  { key: "reinstatement", group: "learn", title: "Profile reinstatement", description: "Suspended Google profile? We handle the appeal.", href: "/reinstatement", surface: "app", gate: { kind: "none" } },
+  { key: "reinstatement", group: "learn", title: "Reinstatement", description: "Suspended Google profile? We handle the appeal.", href: "/reinstatement", surface: "app", gate: { kind: "none" } },
 ];
 
 export const DASHBOARD_TILE_KEYS: readonly DashboardTileKey[] = DASHBOARD_TILES.map((t) => t.key);
@@ -279,3 +285,63 @@ export const DASHBOARD_TILE_TIMEOUT_MS = 3000;
 export const DASHBOARD_CACHE_MS = 60_000;
 /** Client staleTime / refetch cadence for GET /api/dashboard. */
 export const DASHBOARD_CLIENT_STALE_MS = 60_000;
+
+// ---------------------------------------------------------------------------
+// "Needs you today"
+
+/** One thing on the page that wants action, pulled to the top of the dashboard. */
+export type DashboardAttentionItem = {
+  /** Stable: "<tileKey>.<metricKey>", "usage.<key>", "notifications" or "billing". */
+  key: string;
+  /** Where it comes from, for the small label ("Click Guard", "Plan usage"). */
+  source: string;
+  label: string;
+  value: DashboardMetric["value"];
+  format: DashboardMetricFormat;
+  limit?: number;
+  hint?: string;
+  tone: "warn" | "bad";
+  href: string;
+  surface: DashboardSurface;
+};
+
+/**
+ * The action list: every metric the server already marked "warn" or "bad" on a
+ * tile that answered, the usage meters at or over their limit, unread alerts
+ * and a past-due plan. Nothing new is measured here; "bad" comes first, then
+ * page order. Pass the tiles the client shows (feature flags applied).
+ */
+export function dashboardAttention(tiles: readonly DashboardTile[], account: DashboardAccount): DashboardAttentionItem[] {
+  const out: DashboardAttentionItem[] = [];
+  if (account.status === "past_due") {
+    out.push({ key: "billing", source: "Billing", label: "Payment past due", value: account.planName, format: "text", tone: "bad", href: "/settings?tab=billing", surface: "app" });
+  }
+  // Leads and schedule are shown with the CRM card: their links go to their own CRM pages.
+  for (const t of tiles) {
+    if (t.status !== "ok") continue;
+    for (const m of t.metrics) {
+      if (m.tone !== "warn" && m.tone !== "bad") continue;
+      out.push({
+        key: `${t.key}.${m.key}`, source: t.title, label: m.label, value: m.value, format: m.format,
+        ...(m.limit !== undefined ? { limit: m.limit } : {}), ...(m.hint ? { hint: m.hint } : {}),
+        tone: m.tone, href: t.cta?.href ?? t.href, surface: t.cta?.surface ?? t.surface,
+      });
+    }
+  }
+  for (const u of account.usage) {
+    if (u.limit <= 0) continue;
+    // A standing count AT its limit is just "all in use"; only over it needs a decision.
+    const over = u.period === "count" ? u.used > u.limit : u.used >= u.limit;
+    if (!over) continue;
+    out.push({
+      key: `usage.${u.key}`, source: "Plan usage", label: u.label, value: u.used, format: "count", limit: u.limit,
+      hint: u.period === "count" ? "Over your plan's limit" : "Limit reached this month",
+      tone: u.period === "count" ? "warn" : "bad",
+      href: u.href, surface: u.surface ?? (u.href.startsWith("/crm/") || u.href === "/crm" ? "portal" : "app"),
+    });
+  }
+  if (account.unreadNotifications > 0) {
+    out.push({ key: "notifications", source: "Alerts", label: "Unread alerts", value: account.unreadNotifications, format: "count", tone: "warn", href: "/settings?tab=notifications", surface: "app" });
+  }
+  return [...out.filter((i) => i.tone === "bad"), ...out.filter((i) => i.tone === "warn")];
+}

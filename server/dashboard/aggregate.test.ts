@@ -58,6 +58,32 @@ describe("dashboard cache", () => {
   });
 });
 
+describe("dashboard cache: forgetting a user", () => {
+  const at = (ms: number) => ({ generatedAt: new Date(ms).toISOString() } as unknown as DashboardPayload);
+
+  it("drops every entry of that user (every pinned org) and nobody else's", () => {
+    let t = 1_000;
+    const c = createDashboardCache({ clock: () => t });
+    c.set(1, null, at(1_000)); c.set(1, "org-2", at(1_000)); c.set(2, null, at(1_000));
+    t = 2_000;
+    c.clearUser(1);
+    expect(c.get(1, null)).toBeNull();
+    expect(c.get(1, "org-2")).toBeNull();
+    expect(c.get(2, null)).not.toBeNull();
+  });
+
+  it("never stores a build that started before the forget (a plan change mid-build)", () => {
+    let t = 2_000;
+    const c = createDashboardCache({ clock: () => t });
+    c.clearUser(1);
+    c.set(1, null, at(1_500));
+    expect(c.get(1, null)).toBeNull();
+    t = 2_500;
+    c.set(1, null, at(2_500));
+    expect(c.get(1, null)?.generatedAt).toBe(new Date(2_500).toISOString());
+  });
+});
+
 describe("withTimeout", () => {
   it("rejects a promise that never settles with DashboardTimeout", async () => {
     await expect(withTimeout(new Promise(() => {}), 20, "x")).rejects.toBeInstanceOf(DashboardTimeout);
@@ -101,7 +127,7 @@ describe("buildDashboard (development database)", () => {
     expect(p.cached).toBe(false);
     expect(p.tiles.map((t) => t.key)).toEqual([...DASHBOARD_TILE_KEYS]);
     for (const t of p.tiles) {
-      if (t.status === "ok" && !["guides", "reinstatement"].includes(t.key)) expect(t.metrics.length).toBeGreaterThan(0);
+      if (t.status === "ok" && !["guides", "reinstatement", "property"].includes(t.key)) expect(t.metrics.length).toBeGreaterThan(0);
       if (t.status !== "ok") expect(t.metrics).toEqual([]);
       expect(t.cta?.href ?? t.href).toMatch(/^\//);
     }
@@ -166,7 +192,9 @@ describe("buildDashboard (development database)", () => {
     expect(tile(p, "siteScan").status).toBe("empty");
     // The permit meter is meaningful from day one.
     expect(tile(p, "permits").status).toBe("ok");
-    expect(tile(p, "permits").metrics[0]).toMatchObject({ key: "searches", value: 0, limit: l.permitSearches });
+    // Activity leads; the month's quota (also the header's meter) comes last.
+    expect(tile(p, "permits").metrics.map((m) => m.key)).toEqual(["searches7d", "lastSearch", "searches"]);
+    expect(tile(p, "permits").metrics[2]).toMatchObject({ key: "searches", value: 0, limit: l.permitSearches });
     expect(p.checklist.map((c) => c.key)).toEqual(["connectGoogle", "addLocation", "turnOnGuard", "runSiteScan", "requestReviews", "setUpCrm", "inviteTeammate"]);
   });
 
@@ -182,7 +210,12 @@ describe("buildDashboard (development database)", () => {
     expect(p.account.usage.find((u) => u.key === "crmSeats")).toMatchObject({ surface: "portal" });
 
     expect(value(p, "gbp", "locations")).toBe(2);
-    expect(tile(p, "gbp").metrics[0].limit).toBe(AGENCY_SELF_SERVE_MAX_LOCATIONS);
+    expect(tile(p, "gbp").metrics.find((m) => m.key === "locations")?.limit).toBe(AGENCY_SELF_SERVE_MAX_LOCATIONS);
+    // Results lead the tiles; quotas the header already meters come last.
+    expect(tile(p, "gbp").metrics[0].key).toBe("googleAccounts");
+    expect(tile(p, "clickGuard").metrics.map((m) => m.key)).toEqual(["suspicious30d", "blockedIps", "sites"]);
+    expect(tile(p, "rankingGrid").metrics[0].key).toBe("averageRank");
+    expect(p.account.usage.find((u) => u.key === "texts")?.label).toBe("Texts");
     expect(value(p, "gbp", "googleAccounts")).toBe(1);
     // 5★, 4★, 3★ (the Google-deleted 1★ excluded): 4.0 average, one this week, one unanswered.
     expect(value(p, "reviews", "rating")).toBe(4);
@@ -190,6 +223,13 @@ describe("buildDashboard (development database)", () => {
     expect(value(p, "reviews", "unanswered")).toBe(1);
     expect(value(p, "profileGuard", "guarded")).toBe(1);
     expect(value(p, "profileGuard", "pending")).toBe(1);
+    // Profile Guard lives on the location's page, not the older GMB Edit Monitor.
+    expect(tile(p, "profileGuard").cta).toMatchObject({ label: "Review edits", href: expect.stringMatching(/^\/locations\?location=\d+&tab=guard$/) });
+    expect(p.checklist.find((c) => c.key === "turnOnGuard")?.href).toBe("/locations");
+    // Property Records is a link, never a platform-wide count shown as the account's.
+    expect(tile(p, "property")).toMatchObject({ status: "ok", metrics: [], cta: { label: "Look up a property", href: "/property" } });
+    expect(tile(p, "texting")).toMatchObject({ status: "ok", entitled: true });
+    expect(tile(p, "texting").metrics[0].key).toBe("clientTexting");
     expect(value(p, "rankingGrid", "averageRank")).toBe("3.4");
     expect(tile(p, "siteScan").metrics[0]).toMatchObject({ key: "score", value: 72, tone: "warn" });
     expect(value(p, "clickGuard", "sites")).toBe(1);
@@ -257,6 +297,75 @@ describe("buildDashboard (development database)", () => {
     expect(tile(tm, "gbp").status).toBe("locked");
     expect(tm.recent).toEqual([]);
   });
+
+  it("Reviews: requests sent but no review imported yet lead the tile, and say how reviews get here", async () => {
+    await pool.query(
+      `INSERT INTO review_requests(user_id, client_name, client_email, google_profile_url, token, created_at)
+       VALUES ($1,'A','a@example.invalid','https://g.page/x',$2, now() - interval '2 days'),
+              ($1,'B','b@example.invalid','https://g.page/x',$3, now() - interval '60 days')`,
+      [s.starter, `rr-${Date.now()}-1`, `rr-${Date.now()}-2`]);
+    try {
+      const { payload: p } = await buildDashboard(s.starter, { log: quiet });
+      expect(tile(p, "reviews")).toMatchObject({ status: "ok", cta: { label: "Connect Google to import reviews", href: "/locations" } });
+      expect(tile(p, "reviews").metrics.map((m) => [m.key, m.value])).toEqual([["requestsSent", 2], ["requests30d", 1]]);
+    } finally {
+      await pool.query("DELETE FROM review_requests WHERE user_id=$1", [s.starter]);
+    }
+  });
+
+  it("Texting follows the CRM org owner's plan: a crew seat without a plan of its own is in", async () => {
+    await pool.query(
+      `INSERT INTO crm_members(org_id, user_id, email, role, status) VALUES($1,$2,$3,'field','active')`,
+      [s.agencyOrg, s.teammate, `crew-${Date.now()}@example.invalid`]);
+    try {
+      const { payload: p } = await buildDashboard(s.teammate, { log: quiet });
+      expect(p.account.plan).toBeNull();
+      expect(tile(p, "texting")).toMatchObject({ status: "ok", entitled: true });
+      // The texts are metered on the owner's allowance: a crew seat sees on/off, not the count.
+      expect(tile(p, "texting").metrics.map((m) => m.key)).toEqual(["clientTexting"]);
+    } finally {
+      await pool.query("DELETE FROM crm_members WHERE org_id=$1 AND user_id=$2", [s.agencyOrg, s.teammate]);
+    }
+  });
+
+  it("an agency teammate in the owner's workspace gets 'Open' for the shared pages, never a plan upsell or the owner's numbers", async () => {
+    const { payload: p } = await buildDashboard(s.teammate, { workspace: { ownerId: s.agency, ownerName: "Dana Agency" }, log: quiet });
+    for (const key of ["gbp", "reviews", "profileGuard", "siteScan"] as const) {
+      const t = tile(p, key);
+      expect(t).toMatchObject({ status: "empty", entitled: false, metrics: [], cta: { label: "Open", href: t.href } });
+      expect(t.requiredPlan).toBeUndefined();
+      expect(t.message).toContain("Dana Agency's workspace");
+    }
+    // Pages the workspace doesn't share stay locked.
+    expect(tile(p, "cloudflare").status).toBe("locked");
+    expect(tile(p, "rankingGrid").status).toBe("locked");
+  });
+
+  it("leads without an estimate: every covering estimate counts, past 2,000 estimates in the org", async () => {
+    const q = (text: string, params: unknown[] = []) => pool.query(text, params).then((r) => r.rows);
+    const [u] = await q("INSERT INTO users(email, display_name, email_verified) VALUES($1,'Lee Leads',true) RETURNING id", [`dash-leads-${Date.now()}@example.invalid`]);
+    s.users.push(u.id);
+    const [org] = await q("INSERT INTO crm_orgs(name, owner_user_id) VALUES('Dash leads co',$1) RETURNING id", [u.id]);
+    await q("INSERT INTO crm_members(org_id, user_id, email, role, status) VALUES($1,$2,$3,'owner','active')", [org.id, u.id, `owner-leads-${u.id}@example.invalid`]);
+    const customer = async (name: string) =>
+      (await q("INSERT INTO crm_customers(org_id, display_name, portal_token) VALUES($1,$2,$3) RETURNING id", [org.id, name, `pt-${name}-${u.id}-${Date.now()}`]))[0].id as string;
+    const busy = await customer("Busy"), byCustomer = await customer("ByCustomer"), byProject = await customer("ByProject"), bare = await customer("Bare");
+    // 2,100 estimates for an unrelated client first, then the two that cover leads.
+    await q(`INSERT INTO crm_estimates(org_id, customer_id, status, total_cents, public_token)
+             SELECT $1, $2, 'sent', 100, 'pt-bulk-' || $3 || '-' || g FROM generate_series(1, 2100) g`, [org.id, busy, u.id]);
+    const lead = async (customerId: string) =>
+      (await q("INSERT INTO crm_projects(org_id, customer_id, name, status) VALUES($1,$2,'Lead','lead') RETURNING id", [org.id, customerId]))[0].id as string;
+    await lead(byCustomer);
+    const projectLead = await lead(byProject);
+    await lead(bare);
+    await q("INSERT INTO crm_estimates(org_id, customer_id, status, total_cents, public_token) VALUES($1,$2,'draft',100,$3)", [org.id, byCustomer, `pt-c-${u.id}`]);
+    // Points at the lead's project (the client on it is another one).
+    await q("INSERT INTO crm_estimates(org_id, customer_id, project_id, status, total_cents, public_token) VALUES($1,$2,$3,'draft',100,$4)", [org.id, busy, projectLead, `pt-p-${u.id}`]);
+
+    const { payload: p } = await buildDashboard(u.id, { log: quiet });
+    expect(value(p, "crmLeads", "needEstimate")).toBe(1);
+    expect(tile(p, "crmLeads").metrics.find((m) => m.key === "needEstimate")?.tone).toBe("warn");
+  }, 30_000);
 
   it("a source that throws is one error tile; the rest still answer", async () => {
     const baseline = (await buildDashboard(s.agency, { log: quiet })).payload;

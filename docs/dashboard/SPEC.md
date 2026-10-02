@@ -203,6 +203,7 @@ const settled = await Promise.allSettled(DASHBOARD_TILES.map(def => withTimeout(
 - A cached answer is returned with `cached: true` and its original `generatedAt`.
 - Never cache an answer whose `account` failed. Errored tiles may be cached for the TTL, since retrying a broken source every second is worse.
 - `?fresh=1` bypasses the cache at most once every 10 s per user. The Refresh button uses it, and anything sooner gets the cached answer.
+- A change to what the account may see calls `forgetDashboard(userId)` (server/dashboard/cache.ts): change-plan, add-ons, every Stripe webhook that names an account, trial-code redeem/revoke, and a CRM seat updated or disabled. A build that started before the forget is answered but not stored. The key also carries a verified agency workspace (`…@<ownerId>`).
 
 ### 3.4 CRM context, read-only (no org creation)
 
@@ -334,6 +335,8 @@ All tiles use the same rule: when a feature has never been used (no grant, no ro
 - When `fixture: true`, show a small "Sample data" badge next to the greeting (`badge-dashboard-fixture`).
 
 ### 4.3 Layout (inside the existing app shell: `AppSidebar` plus the header with `SidebarTrigger`, the notification bell and the theme toggle)
+
+> **QA round (2026-10-02) — current order:** header → **Needs you today** (`dashboardAttention()` in shared/dashboard.ts: warn/bad metrics of answering tiles, meters over their limit, unread alerts, a past-due plan; one calm line when empty) → **CRM card** (money, then follow-ups / new leads / leads without an estimate / visits from the `crmLeads` and `crmSchedule` tiles, which have no grid tile) → checklist (the first open step is "Next step", the page's only solid button) → **Plan usage** card → grid (locked tiles fold into one row per group with a single "See plans") → recent + Gabe. Tile headlines show results; quotas the usage card meters come last. The diagram below is the original plan.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐

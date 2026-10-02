@@ -13,7 +13,7 @@
 import { PLANS } from "@shared/plans";
 import {
   DASHBOARD_TILES, DASHBOARD_TILE_TIMEOUT_MS,
-  type DashboardAccount, type DashboardPayload, type DashboardTile, type DashboardTileDef, type DashboardTileKey,
+  type DashboardAccount, type DashboardLink, type DashboardPayload, type DashboardTile, type DashboardTileDef, type DashboardTileKey,
 } from "@shared/dashboard";
 import { getEntitlements } from "../entitlements";
 import type { OrgContext } from "../crm/tenancy";
@@ -43,6 +43,19 @@ const CRM_TILES: ReadonlySet<DashboardTileKey> = new Set(["crm", "crmSchedule", 
 /** Link tiles with nothing to count. */
 const LINK_TILE_CTA: Partial<Record<DashboardTileKey, string>> = { guides: "Browse guides", reinstatement: "Get help" };
 
+/** Platform-admin pages with no tile of their own, shown on the nearest tile for admins only. */
+const ADMIN_LINKS: Partial<Record<DashboardTileKey, DashboardLink[]>> = {
+  permits: [{ label: "Scrape Schedules", href: "/schedules", surface: "app" }],
+  adsManager: [{ label: "Account Manager", href: "/lsa-account-manager", surface: "app" }],
+};
+
+/**
+ * Pages the agency access middleware (server/agency/middleware.ts) serves to a
+ * teammate under the workspace owner's plan. On the teammate's own dashboard
+ * these are never "locked" (they already use them), and never the owner's numbers.
+ */
+const DELEGATED_TILES: ReadonlySet<DashboardTileKey> = new Set(["gbp", "reviews", "profileGuard", "siteScan"]);
+
 export type BuildDashboardOptions = {
   /** req.session.activeOrgId — the pinned CRM org, if any. */
   activeOrgId?: string | null;
@@ -53,6 +66,8 @@ export type BuildDashboardOptions = {
   sources?: TileSources;
   /** One line per failed source; never the user's data. */
   log?: (line: string) => void;
+  /** The agency workspace this session works in (a teammate's verified delegation), if any. */
+  workspace?: { ownerId: number; ownerName: string | null } | null;
 };
 
 export type BuiltDashboard = {
@@ -84,7 +99,9 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
   const ctx = makeContext(userId, ent, crm, now);
   const access = { accessPlan: ent.accessPlan, allowances: ent.allowances, modules: ent.modules, hasCrmOrg: crmFailed || !!crm };
 
-  const tilesP = Promise.all(DASHBOARD_TILES.map((def) => computeTile(def, ctx, access, { budget, crmFailed, sources: opts.sources, onError: (e) => fail(`tile ${def.key}`)(e) })));
+  const tilesP = Promise.all(DASHBOARD_TILES.map((def) => computeTile(def, ctx, access, {
+    budget, crmFailed, sources: opts.sources, workspace: opts.workspace ?? null, onError: (e) => fail(`tile ${def.key}`)(e),
+  })));
 
   const [header, usage, unread, checklist, recent] = await Promise.allSettled([
     withTimeout(accountHeader(ctx), budget, "account"),
@@ -129,20 +146,28 @@ async function computeTile(
   def: DashboardTileDef,
   ctx: DashboardContext,
   accessInput: Parameters<typeof tileAccess>[1],
-  opts: { budget: number; crmFailed: boolean; sources?: TileSources; onError: (err: unknown) => void },
+  opts: { budget: number; crmFailed: boolean; sources?: TileSources; workspace: BuildDashboardOptions["workspace"]; onError: (err: unknown) => void },
 ): Promise<DashboardTile> {
   const access = tileAccess(def, accessInput);
   const page = { href: def.href, surface: def.surface };
+  const links = [...(def.links ?? []), ...(ctx.ent.isPlatformAdmin ? ADMIN_LINKS[def.key] ?? [] : [])];
   const base: DashboardTile = {
     key: def.key, group: def.group, title: def.title, description: def.description, href: def.href, surface: def.surface,
     entitled: access.entitled, status: "ok", metrics: [], updatedAt: ctx.now.toISOString(),
-    ...(def.links ? { links: [...def.links] } : {}),
+    ...(links.length ? { links } : {}),
     ...(access.requiredPlan && !access.entitled ? { requiredPlan: access.requiredPlan } : {}),
     ...(access.module ? { module: access.module } : {}),
     ...(access.addon ? { addon: access.addon } : {}),
   };
   if (access.comingSoon) {
     return { ...base, status: "coming_soon", message: COMING_SOON_MESSAGE, cta: { label: "See add-ons", href: "/pricing#add-ons", surface: "app" } };
+  }
+  if (!access.entitled && opts.workspace && DELEGATED_TILES.has(def.key)) {
+    // A teammate in the owner's workspace already uses this page under the owner's plan:
+    // no upsell, and no numbers (they would be the owner's).
+    const { requiredPlan: _plan, ...rest } = base;
+    const owner = opts.workspace.ownerName ? `${opts.workspace.ownerName}'s` : "the agency";
+    return { ...rest, status: "empty", message: `You're working in ${owner} workspace. Open it to see the numbers there.`, cta: { label: "Open", ...page } };
   }
   if (!access.entitled) {
     return { ...base, status: "locked", message: lockedMessage(access.requiredPlan), cta: { label: "See plans", href: "/pricing", surface: "app" } };
@@ -163,6 +188,13 @@ async function computeTile(
     };
   }
 
+  if (outcome.status === "locked") {
+    return {
+      ...base, entitled: false, status: "locked", requiredPlan: outcome.requiredPlan,
+      message: outcome.message ?? lockedMessage(outcome.requiredPlan),
+      cta: { label: "See plans", href: "/pricing", surface: "app" },
+    };
+  }
   if (outcome.status === "empty") {
     return {
       ...base, status: "empty",

@@ -16,7 +16,7 @@ import {
   type DashboardChecklistItem, type DashboardMetric, type DashboardPayload, type DashboardRecentItem,
   type DashboardTile, type DashboardTileKey, type DashboardUsage,
 } from "@shared/dashboard";
-import { tileAccess } from "./access";
+import { cheapestPlanAllowing, tileAccess } from "./access";
 import { CTA_START, COMING_SOON_MESSAGE, lockedMessage } from "./copy";
 
 export type DashboardFixtureScenario = "full" | "new" | "noplan";
@@ -33,18 +33,17 @@ const HOUR = 3_600_000, DAY = 24 * HOUR;
 /** Sample metrics for a set-up account. */
 function fullMetrics(key: DashboardTileKey, now: Date, limits: PlanLimits): DashboardMetric[] {
   switch (key) {
-    case "gbp": return [m("locations", "Locations linked", 2, "count", { limit: limits.locations }), m("googleAccounts", "Google accounts", 1, "count"), m("syncIssues", "Sync issues", 0, "count", { tone: "good" })];
+    case "gbp": return [m("googleAccounts", "Google accounts", 1, "count"), m("syncIssues", "Sync issues", 0, "count", { tone: "good" }), m("locations", "Locations linked", 2, "count", { limit: limits.locations })];
     case "reviews": return [m("rating", "Average rating", 4.7, "rating"), m("newThisWeek", "New this week", 3, "count", { tone: "good" }), m("unanswered", "Awaiting reply", 2, "count", { tone: "warn" })];
-    case "profileGuard": return [m("guarded", "Locations guarded", 2, "count", { limit: limits.locations }), m("pending", "Edits to review", 1, "count", { tone: "warn" }), m("lastCheck", "Last check", ago(now, 12 * 60_000), "datetime")];
-    case "rankingGrid": return [m("credits", "Credits used", 6, "count", { limit: limits.gridCredits, hint: "this month" }), m("lastScan", "Last grid", ago(now, 3 * DAY), "datetime")];
+    case "profileGuard": return [m("pending", "Edits to review", 1, "count", { tone: "warn" }), m("guarded", "Locations guarded", 2, "count"), m("lastCheck", "Last check", ago(now, 12 * 60_000), "datetime")];
+    case "rankingGrid": return [m("averageRank", "Average rank (last grid)", "4.2", "text"), m("lastScan", "Last grid", ago(now, 3 * DAY), "datetime"), m("credits", "Credits used", 6, "count", { limit: limits.gridCredits, hint: "this month" })];
     case "gbpContent": return [m("scheduled", "Scheduled", 5, "count"), m("published30d", "Published (30 days)", 9, "count"), m("attention", "Need attention", 0, "count", { tone: "good" })];
     case "siteScan": return [m("score", "Last score", 82, "score", { tone: "good" }), m("scans", "Scans used", 2, "count", { limit: limits.siteScans, hint: "this month" }), m("lastScan", "Last scan", ago(now, 5 * DAY), "datetime")];
-    case "clickGuard": return [m("sites", "Sites protected", 1, "count", { limit: limits.protectedSites }), m("suspicious30d", "Suspicious clicks (30 days)", 17, "count", { tone: "warn" }), m("blockedIps", "IPs excluded", 9, "count")];
+    case "clickGuard": return [m("suspicious30d", "Suspicious clicks (30 days)", 17, "count", { tone: "warn" }), m("blockedIps", "IPs excluded", 9, "count"), m("sites", "Sites protected", 1, "count", { limit: limits.protectedSites })];
     case "ipTracker": return [m("visits7d", "Visits (7 days)", 412, "count"), m("unique7d", "Unique visitors", 268, "count")];
     case "vpnShield": return [m("blocked30d", "VPN visits blocked (30 days)", 23, "count"), m("uniqueIps30d", "Unique IPs", 19, "count")];
-    case "permits": return [m("searches", "Searches used", 41, "count", { limit: limits.permitSearches, hint: "this month" }), m("searches7d", "Searches (7 days)", 12, "count"), m("lastSearch", "Last search", ago(now, 2 * HOUR), "datetime")];
-    case "property": return [m("counties", "Counties with an appraiser office", null, "count", { hint: "Sample: the real count comes from the directory" })];
-    case "competitors": return [m("scans", "Scans used", 3, "count", { limit: limits.competitorScans, hint: "this month" }), m("lastScan", "Last scan", ago(now, 9 * DAY), "datetime"), m("found", "Competitors found", 14, "count")];
+    case "permits": return [m("searches7d", "Searches (7 days)", 12, "count"), m("lastSearch", "Last search", ago(now, 2 * HOUR), "datetime"), m("searches", "Searches used", 41, "count", { limit: limits.permitSearches, hint: "this month" })];
+    case "competitors": return [m("found", "Competitors found", 14, "count", { hint: "last scan" }), m("lastScan", "Last scan", ago(now, 9 * DAY), "datetime"), m("scans", "Scans used", 3, "count", { limit: limits.competitorScans, hint: "this month" })];
     case "lsaLeads": return [m("leads30d", "Leads (30 days)", 11, "count"), m("disputes", "Disputes pending", 1, "count", { tone: "warn" }), m("lastSync", "Last sync", ago(now, 40 * 60_000), "datetime")];
     case "crm": return [
       m("pipeline", "Pipeline value", 18_450_000, "cents", { hint: "7 open projects" }),
@@ -54,16 +53,16 @@ function fullMetrics(key: DashboardTileKey, now: Date, limits: PlanLimits): Dash
       m("unscheduled", "Sold, not scheduled", 2, "count", { tone: "warn" }),
       m("clients", "Active clients", 38, "count"),
     ];
-    case "crmSchedule": return [m("today", "Today", 2, "count"), m("week", "This week", 9, "count")];
-    case "crmLeads": return [m("newLeads7d", "New leads (7 days)", 5, "count", { tone: "good" }), m("followUpsDue", "Follow-ups due", 3, "count", { tone: "warn" })];
-    case "texting": return [m("segments", "Texts used", 214, "count", { limit: limits.teamTextSegments, hint: "this month" }), m("number", "Client texting", "On", "text", { tone: "good" })];
+    case "crmSchedule": return [m("today", "Today", 2, "count"), m("week", "Next 7 days", 9, "count")];
+    case "crmLeads": return [m("newLeads7d", "New leads (7 days)", 5, "count", { tone: "good" }), m("followUpsDue", "Follow-ups due", 3, "count", { tone: "warn" }), m("needEstimate", "Leads without an estimate", 4, "count", { tone: "warn" })];
+    case "texting": return [m("clientTexting", "Client texting", "On", "text", { tone: "good" }), m("segments", "Texts used", 214, "count", { limit: limits.teamTextSegments, hint: "this month" })];
     case "masterClass": return [m("owned", "Modules unlocked", 0, "count", { hint: "of 12" })];
     default: return [];
   }
 }
 
 /** Tiles that are just links (no per-account numbers) still render as "ok". */
-const LINK_ONLY: ReadonlySet<DashboardTileKey> = new Set(["guides", "reinstatement"]);
+const LINK_ONLY: ReadonlySet<DashboardTileKey> = new Set(["guides", "reinstatement", "property"]);
 
 
 function tileFor(scenario: DashboardFixtureScenario, def: (typeof DASHBOARD_TILES)[number], now: Date, plan: PlanKey | null, modules: PlanModules, hasCrmOrg: boolean): DashboardTile {
@@ -83,6 +82,12 @@ function tileFor(scenario: DashboardFixtureScenario, def: (typeof DASHBOARD_TILE
   if (!access.entitled) {
     return { ...base, status: "locked", message: lockedMessage(access.requiredPlan), cta: { label: "See plans", href: "/pricing", surface: "app" } };
   }
+  // Texting follows the CRM org owner's plan: an org on a plan without texting is locked by the source.
+  if (def.key === "texting" && limits && limits.teamTextSegments === 0) {
+    const requiredPlan = cheapestPlanAllowing("teamTextSegments");
+    return { ...base, entitled: false, requiredPlan, status: "locked", message: lockedMessage(requiredPlan), cta: { label: "See plans", href: "/pricing", surface: "app" } };
+  }
+  if (def.key === "property") return { ...base, cta: { label: "Look up a property", href: def.href, surface: def.surface } };
   if (LINK_ONLY.has(def.key)) return base;
   const start = { label: CTA_START[def.key] ?? "Open", href: def.href, surface: def.surface };
   if (scenario === "full") {
@@ -93,8 +98,9 @@ function tileFor(scenario: DashboardFixtureScenario, def: (typeof DASHBOARD_TILE
     return { ...base, metrics, cta: { label: def.key === "crm" ? "Open the CRM" : "Open", href: def.href, surface: def.surface } };
   }
   // new / noplan: nothing set up yet. Permit searches and property records still show their meter.
-  if (def.key === "permits" && limits) return { ...base, metrics: [m("searches", "Searches used", 0, "count", { limit: limits.permitSearches, hint: "this month" })], cta: start };
-  if (def.key === "property") return { ...base, metrics: fullMetrics("property", now, PLANS.starter.limits), cta: { label: "Look up a property", href: def.href, surface: def.surface } };
+  if (def.key === "permits" && limits) {
+    return { ...base, metrics: [m("searches7d", "Searches (7 days)", 0, "count"), m("lastSearch", "Last search", null, "datetime"), m("searches", "Searches used", 0, "count", { limit: limits.permitSearches, hint: "this month" })], cta: start };
+  }
   return { ...base, status: "empty", message: def.description, cta: start };
 }
 
@@ -107,7 +113,7 @@ function usageFor(plan: PlanKey | null, scenario: DashboardFixtureScenario): Das
     { key: "rankings", label: "Ranking-grid credits", used: full ? 6 : 0, limit: l.gridCredits, period: "monthly", href: "/ranking-grid" },
     { key: "siteScans", label: "Site Scans", used: full ? 2 : 0, limit: l.siteScans, period: "monthly", href: "/site-scan" },
     { key: "competitorScans", label: "Competitor scans", used: full ? 3 : 0, limit: l.competitorScans, period: "monthly", href: "/competitors" },
-    { key: "texts", label: "Text segments", used: full ? 214 : 0, limit: l.teamTextSegments, period: "monthly", href: "/settings?tab=billing" },
+    { key: "texts", label: "Texts", used: full ? 214 : 0, limit: l.teamTextSegments, period: "monthly", href: "/settings?tab=billing" },
     { key: "locations", label: "Locations", used: full ? 2 : 0, limit: l.locations, period: "count", href: "/locations" },
     { key: "protectedSites", label: "Protected websites", used: full ? 1 : 0, limit: l.protectedSites, period: "count", href: "/google-ads" },
     { key: "crmSeats", label: "CRM seats", used: full ? 4 : 1, limit: l.crmSeats, period: "count", href: "/crm/team?tab=team", surface: "portal" },
@@ -121,7 +127,7 @@ function checklistFor(plan: PlanKey | null, scenario: DashboardFixtureScenario):
   const items: (DashboardChecklistItem & { applies: boolean })[] = [
     { key: "connectGoogle", label: "Connect Google", description: "Link the Google account that manages your Business Profile.", done: full, href: "/locations", surface: "app", applies: true },
     { key: "addLocation", label: "Add a location", description: "Pick the business locations you want to manage here.", done: full, href: "/locations", surface: "app", applies: true },
-    { key: "turnOnGuard", label: "Turn on Profile Guard", description: "Get an alert when someone edits your Google profile.", done: full, href: "/gmb-monitor", surface: "app", applies: !!plan },
+    { key: "turnOnGuard", label: "Turn on Profile Guard", description: "Open a location in Locations and turn on its Profile Guard: an alert when someone edits your Google profile.", done: full, href: "/locations", surface: "app", applies: !!plan },
     { key: "runSiteScan", label: "Run a Site Scan", description: "See what's holding your website back in Google.", done: full, href: "/site-scan", surface: "app", applies: !!plan },
     { key: "requestReviews", label: "Ask for a review", description: "Send your last happy customer a review request.", done: false, href: "/google-reviews", surface: "app", applies: true },
     { key: "protectWebsite", label: "Protect your website", description: "Add Click Guard to the site your ads point at.", done: full, href: "/google-ads", surface: "app", applies: !!l && l.protectedSites !== 0 },
@@ -139,7 +145,7 @@ function recentFor(now: Date, scenario: DashboardFixtureScenario): DashboardRece
   return [
     { id: "n:sample-2", at: ago(now, 20 * 60_000), source: "notification", title: "New 5-star review", body: "A new review is waiting on a reply.", href: "/google-reviews", surface: "app", severity: "info", unread: true },
     { id: "c:sample-3", at: ago(now, 2 * HOUR), source: "crm", title: "A client approved (signed) estimate 1042", href: "/crm/estimates", surface: "portal", severity: "info" },
-    { id: "n:sample-4", at: ago(now, 6 * HOUR), source: "notification", title: "Profile Guard caught an edit", body: "Someone suggested a new phone number for a location.", href: "/gmb-monitor", surface: "app", severity: "warning", unread: true },
+    { id: "n:sample-4", at: ago(now, 6 * HOUR), source: "notification", title: "Profile Guard caught an edit", body: "Someone suggested a new phone number for a location.", href: "/locations", surface: "app", severity: "warning", unread: true },
     { id: "c:sample-5", at: ago(now, DAY), source: "crm", title: "A client paid $2,400.00 by CARD", href: "/crm/payments", surface: "portal", severity: "info" },
     { id: "n:sample-6", at: ago(now, 2 * DAY), source: "notification", title: "Site Scan finished", body: "Score 82.", href: "/site-scan", surface: "app", severity: "info" },
   ];

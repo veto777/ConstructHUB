@@ -48,9 +48,14 @@ function PlanChip({ account }: { account: DashboardAccount }) {
   );
 }
 
-/** Re-render once a minute so "Updated 3 min ago" and the greeting stay true while the tab sits open. */
-function useMinuteClock(): Date {
+/**
+ * Re-render once a minute so "Updated 3 min ago" and the greeting stay true
+ * while the tab sits open, and re-read the clock whenever new data lands
+ * (`resetKey`): a payload newer than the last tick is "just now", never "in a moment".
+ */
+function useMinuteClock(resetKey: string): Date {
   const [now, setNow] = useState(() => new Date());
+  useEffect(() => { setNow(new Date()); }, [resetKey]);
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(t);
@@ -67,17 +72,19 @@ export function DashboardHeader({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
-  const now = useMinuteClock();
+  const now = useMinuteClock(generatedAt);
+  // The server's clock can run a little ahead of this one: "Updated" is never in the future.
+  const updatedNow = new Date(Math.max(now.getTime(), Date.parse(generatedAt) || 0));
   const greeting = `${greetingFor(now)}${account.firstName ? `, ${account.firstName}` : ""}`;
   const meta: string[] = [];
   if (account.status === "active" && account.renewsAt) meta.push(`Renews ${shortDate(account.renewsAt, now)}`);
   // A Stripe plan set to cancel: renewsAt is null and endsAt says when it stops.
   else if (account.endsAt) meta.push(`Plan ends ${shortDate(account.endsAt, now)}`);
   if (account.usage.some((u) => u.period === "monthly")) meta.push(`Usage resets ${shortDate(account.resetsAt, now, true)}`);
-  meta.push(`Updated ${relativeTime(generatedAt, now)}`);
+  meta.push(`Updated ${relativeTime(generatedAt, updatedNow)}`);
 
   return (
-    <div className="space-y-4">
+    <div>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -116,13 +123,17 @@ export function DashboardHeader({
           </Button>
         </div>
       </div>
-
-      {account.usage.length > 0 && (
-        <Card className="px-4 py-3 sm:px-5 sm:py-4" role="region" aria-labelledby="dashboard-usage-title">
-          <h2 id="dashboard-usage-title" className="sr-only">Plan usage</h2>
-          <UsageStrip usage={account.usage} />
-        </Card>
-      )}
     </div>
+  );
+}
+
+/** This month's meters, in their own card (home.tsx places it below the action items). */
+export function UsageCard({ account }: { account: DashboardAccount }) {
+  if (!account.usage.length) return null;
+  return (
+    <Card className="px-4 py-3 sm:px-5 sm:py-4" role="region" aria-labelledby="dashboard-usage-title" data-testid="card-dashboard-usage">
+      <h2 id="dashboard-usage-title" className="mb-3 text-sm font-semibold">Plan usage</h2>
+      <UsageStrip usage={account.usage} />
+    </Card>
   );
 }

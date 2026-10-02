@@ -13,7 +13,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { E2E_BASE_URL } from "./helpers";
-import { DASHBOARD_GROUPS, DASHBOARD_TILES, type DashboardPayload } from "../shared/dashboard";
+import { DASHBOARD_GROUPS, DASHBOARD_TILES, dashboardAttention, type DashboardPayload } from "../shared/dashboard";
+
+/** Shown inside the CRM card (money, then leads / follow-ups / visits), never as grid tiles. */
+const CRM_CARD = new Set(["crm", "crmLeads", "crmSchedule"]);
 
 const SHOTS = process.env.DASHBOARD_SHOTS_DIR ?? "";
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
@@ -75,8 +78,17 @@ test.describe("signed-in dashboard: real aggregate", () => {
       await expect(page.getByTestId("badge-dashboard-plan")).toContainText(body.account.planName);
     }
 
-    // Every tile the server sent (bar the CRM card) is on the page with the server's status.
-    for (const t of body.tiles.filter((x) => x.key !== "crm")) {
+    // Needs you today: exactly the warn/bad items the payload carries, at the top of the page.
+    const attention = dashboardAttention(body.tiles, body.account);
+    const needs = page.getByTestId("card-dashboard-needs");
+    await expect(needs).toHaveAttribute("data-count", String(attention.length));
+    for (const item of attention) await expect(needs.getByTestId(`needs-${item.key}`)).toBeVisible();
+    const needsBox = (await needs.boundingBox())!;
+    const gridBox = (await page.getByTestId("section-dashboard-grow").boundingBox())!;
+    expect(needsBox.y).toBeLessThan(gridBox.y);
+
+    // Every tile the server sent (bar the CRM card's) is on the page with the server's status.
+    for (const t of body.tiles.filter((x) => !CRM_CARD.has(x.key))) {
       await expect(tile(page, t.key)).toHaveAttribute("data-status", t.status);
       if (t.status === "locked") await expect(tile(page, t.key).locator('[data-testid^="metric-"]')).toHaveCount(0);
       // Grid tiles show the hero number + two rows.
@@ -99,6 +111,14 @@ test.describe("signed-in dashboard: real aggregate", () => {
         await expect(el).toBeVisible();
         if (typeof m.value === "number" && m.format === "cents") await expect(el).toContainText(`$${nf.format(Math.round(m.value / 100))}`);
         if (typeof m.value === "number" && m.format === "count") await expect(el).toContainText(nf.format(m.value));
+      }
+      // Leads, follow-ups and visits sit in the same card, not four groups down.
+      const leads = body.tiles.find((t) => t.key === "crmLeads");
+      if (crm.status === "ok" && leads?.status === "ok") {
+        for (const key of ["followUpsDue", "newLeads7d", "needEstimate"]) {
+          const m = leads.metrics.find((x) => x.key === key)!;
+          await expect(card.getByTestId(`metric-crmLeads-${key}`)).toContainText(nf.format(m.value as number));
+        }
       }
     }
 
@@ -140,6 +160,9 @@ test.describe("signed-in dashboard: real aggregate", () => {
     expect(((await res.json()) as DashboardPayload).fixture).toBe(false);
     await expect(page.getByTestId("button-dashboard-refresh")).toBeEnabled();
     await expect(page.getByTestId("badge-dashboard-fixture")).toHaveCount(0);
+    // New data is "just now", never a time in the future.
+    await expect(page.getByTestId("text-dashboard-meta")).toContainText("Updated just now");
+    await expect(page.getByTestId("text-dashboard-meta")).not.toContainText("in a moment");
   });
 
   test("no horizontal scroll at 390px with real data", async ({ page }) => {
@@ -180,11 +203,11 @@ test.describe("signed-in dashboard: sample scenarios", () => {
       await expect(section).toBeVisible();
       await expect(section.getByRole("heading", { level: 2, name: group.label })).toBeVisible();
     }
-    // Every catalogue tile but the CRM (the snapshot card) is in the grid, each with a status.
-    for (const def of DASHBOARD_TILES.filter((d) => d.key !== "crm")) {
+    // Every catalogue tile but the CRM card's three is in the grid, each with a status.
+    for (const def of DASHBOARD_TILES.filter((d) => !CRM_CARD.has(d.key))) {
       await expect(tile(page, def.key)).toHaveAttribute("data-status", /^(ok|empty|error|locked|coming_soon)$/);
     }
-    await expect(page.locator('[data-testid^="tile-"][data-status]')).toHaveCount(DASHBOARD_TILES.length - 1);
+    await expect(page.locator('[data-testid^="tile-"][data-status]')).toHaveCount(DASHBOARD_TILES.length - CRM_CARD.size);
 
     await expect(tile(page, "cloudflare")).toHaveAttribute("data-status", "locked");
     await expect(tile(page, "callAssistant")).toHaveAttribute("data-status", "coming_soon");
@@ -204,7 +227,16 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     await expect(crm.getByTestId("metric-crm-pipeline")).toBeVisible();
     await expect(crm.getByTestId("metric-crm-openEstimates")).toBeVisible();
     await expect(page.getByTestId("link-dashboard-crm")).toHaveAttribute("href", /^https?:\/\/portal\.[^/]+\/crm$/);
-    await expect(tile(page, "crmSchedule").getByTestId("link-tile-crmSchedule")).toHaveAttribute("href", /^https?:\/\/portal\.[^/]+\/crm\/schedule$/);
+    await expect(crm.getByTestId("link-tile-crmSchedule")).toHaveAttribute("href", /^https?:\/\/portal\.[^/]+\/crm\/schedule$/);
+    await expect(crm.getByTestId("metric-crmLeads-followUpsDue")).toContainText("3");
+    await expect(crm.getByTestId("link-crm-work-crmLeads-needEstimate")).toHaveAttribute("href", /^https?:\/\/portal\.[^/]+\/crm\/pipeline$/);
+
+    // Needs you today, above everything else: the sample's warn numbers, each a link.
+    const needs = page.getByTestId("card-dashboard-needs");
+    await expect(needs.getByTestId("needs-crm.unscheduled")).toContainText("Sold, not scheduled");
+    await expect(needs.getByTestId("needs-clickGuard.suspicious30d")).toContainText("17");
+    await expect(needs.getByTestId("link-needs-reviews.unanswered")).toHaveAttribute("href", "/google-reviews");
+    expect((await needs.boundingBox())!.y).toBeLessThan((await crm.boundingBox())!.y);
 
     await expect(page.getByTestId("usage-searches")).toBeVisible();
     await expect(page.getByTestId("link-usage-searches")).toHaveAttribute("href", "/search");
@@ -217,24 +249,29 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     await shot(page, "dashboard-1440-light");
   });
 
-  test("a locked tile shows the plan_required prompt and links to the plans", async ({ page }) => {
+  test("locked tiles fold into one row per group with a single link to the plans", async ({ page }) => {
     await useScenario(page, "full");
     await openDashboard(page);
-    const cf = tile(page, "cloudflare");
+    const row = page.getByTestId("locked-row-protect");
+    const cf = row.getByTestId("tile-cloudflare");
+    await expect(cf).toHaveAttribute("data-status", "locked");
     await expect(cf.getByTestId("status-cloudflare")).toContainText("Agency");
-    await expect(cf.getByTestId("locked-cloudflare")).toContainText("Included with the Agency plan.");
-    await expect(cf.getByTestId("locked-cloudflare")).toHaveAttribute("title", /Cloudflare \+ Search Console/);
-    await expect(cf.getByTestId("link-tile-cloudflare-plans")).toHaveAttribute("href", "/pricing");
-    // A locked tile shows no numbers.
-    await expect(cf.locator('[data-testid^="metric-"]')).toHaveCount(0);
-    await cf.getByTestId("link-tile-cloudflare-plans").click();
+    await expect(cf).toHaveAttribute("title", /Cloudflare \+ Search Console is included with the Agency plan/);
+    // No numbers, and no per-tile prompt box: one "See plans" per group.
+    await expect(row.locator('[data-testid^="metric-"]')).toHaveCount(0);
+    await expect(row.locator('[data-testid^="locked-cloudflare"]')).toHaveCount(0);
+    await expect(row.getByRole("link")).toHaveCount(1);
+    await row.getByTestId("link-locked-protect-plans").click();
     await expect(page).toHaveURL(/\/pricing$/);
   });
 
   test("Refresh fetches a fresh answer and shows it", async ({ page }) => {
     await useScenario(page, "full");
     await page.route(/\/api\/dashboard\?.*fresh=1/, async (route) => {
-      const res = await route.fetch();
+      // route.fetch() skips the scenario handler: ask for the same sample, never the real account's shape.
+      const url = new URL(route.request().url());
+      url.searchParams.set("fixture", "full");
+      const res = await route.fetch({ url: url.toString() });
       const body = (await res.json()) as DashboardPayload;
       const reviews = body.tiles.find((t) => t.key === "reviews")!;
       reviews.metrics = reviews.metrics.map((m) => (m.key === "rating" ? { ...m, value: 3.2 } : m));
@@ -257,6 +294,14 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     await expect(card.getByTestId("checklist-connectGoogle")).toHaveAttribute("data-done", "false");
     await expect(card.locator('[data-done="true"]')).toHaveCount(0);
     await expect(card.getByTestId("link-checklist-runSiteScan")).toHaveAttribute("href", "/site-scan");
+    await expect(card.getByTestId("link-checklist-turnOnGuard")).toHaveAttribute("href", "/locations");
+    // One "start here": the first open step, and only it.
+    await expect(card.locator('[data-next="true"]')).toHaveCount(1);
+    await expect(card.getByTestId("checklist-connectGoogle")).toHaveAttribute("data-next", "true");
+    await expect(card.getByTestId("checklist-connectGoogle").getByTestId("badge-checklist-next")).toHaveText("Next step");
+    // A brand-new account: nothing on its tiles needs it yet, only the unread welcome alert.
+    await expect(page.getByTestId("card-dashboard-needs")).toHaveAttribute("data-count", "1");
+    await expect(page.getByTestId("needs-notifications")).toBeVisible();
     await expect(card.getByTestId("link-checklist-setUpCrm")).toHaveAttribute("href", /^https?:\/\/portal\.[^/]+\/crm$/);
     await expect(page.getByTestId("badge-dashboard-plan")).toContainText("trial");
     await expect(page.getByTestId("text-dashboard-gabe")).toContainText("Ask Gabe how to connect Google");

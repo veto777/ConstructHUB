@@ -1,14 +1,17 @@
+import type { PlanKey } from "@shared/plans";
 import type { DashboardLink, DashboardMetric, DashboardTileKey } from "@shared/dashboard";
 import type { DashboardContext } from "../context";
 
 /**
  * What a tile source answers. "ok" carries at least one metric (the link-only
  * tiles excepted); "empty" means entitled but never set up — no metrics, a
- * setup CTA. Throwing (or running past the budget) makes the tile "error".
+ * setup CTA; "locked" is a plan gate the source decides itself. Throwing (or running past the budget) makes the tile "error".
  */
 export type TileOutcome =
   | { status: "ok"; metrics: DashboardMetric[]; cta?: DashboardLink }
-  | { status: "empty"; cta?: DashboardLink; message?: string };
+  | { status: "empty"; cta?: DashboardLink; message?: string }
+  /** A gate only the source can decide (texting follows the CRM org owner's plan). */
+  | { status: "locked"; requiredPlan: PlanKey; message?: string };
 
 export type TileSource = (ctx: DashboardContext) => Promise<TileOutcome>;
 export type TileSources = Partial<Record<DashboardTileKey, TileSource>>;

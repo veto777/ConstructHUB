@@ -1,6 +1,6 @@
 /**
- * Win jobs: permit searches, property records (real NETR-sourced reference
- * directory), Competitor Intel, the Google Ads & LSA manager and LSA Leads.
+ * Win jobs: permit searches, property records (a link to the real
+ * NETR-sourced reference directory), Competitor Intel, the Google Ads & LSA manager and LSA Leads.
  * SPEC §3.5.
  *
  * Ads spend and clicks: ads_accounts.snapshot holds the account STRUCTURE the
@@ -11,11 +11,6 @@
 import { dq } from "../pool";
 import { EMPTY, int, iso, metric, num, ok, watch, type TileSources } from "./types";
 
-/** Counties with an active appraiser office: reference data, shared by every account. */
-const PROPERTY_CACHE_MS = 10 * 60_000;
-let propertyCache: { at: number; counties: number } | null = null;
-export const clearPropertyCache = () => { propertyCache = null; };
-
 export const winTiles: TileSources = {
   async permits(ctx) {
     const [[r], usage] = await Promise.all([
@@ -23,26 +18,17 @@ export const winTiles: TileSources = {
             FROM search_queries WHERE user_id=$1`, [ctx.userId]),
       ctx.usage(),
     ]);
-    // Always "ok": the plan's search meter is meaningful from day one.
+    // Always "ok": recent activity leads, the month's quota (also the header's meter) comes last.
     return ok([
-      metric("searches", "Searches used", usage.searches.used, "count", { limit: usage.searches.limit, hint: "this month" }),
       metric("searches7d", "Searches (7 days)", int(r.week), "count"),
       metric("lastSearch", "Last search", iso(r.last), "datetime"),
+      metric("searches", "Searches used", usage.searches.used, "count", { limit: usage.searches.limit, hint: "this month" }),
     ]);
   },
 
-  async property(ctx) {
-    const now = ctx.now.getTime();
-    if (!propertyCache || now - propertyCache.at > PROPERTY_CACHE_MS) {
-      const [r] = await dq("SELECT count(DISTINCT county_id)::int n FROM property_appraisers WHERE is_active");
-      propertyCache = { at: now, counties: int(r.n) };
-    }
-    if (!propertyCache.counties) return EMPTY;
-    return ok(
-      [metric("counties", "Counties with an appraiser office", propertyCache.counties, "count", { hint: "Sourced from NETR Online" })],
-      { label: "Look up a property", href: "/property", surface: "app" },
-    );
-  },
+  // Reference data, the same for every account: a link tile, never a platform-wide
+  // count dressed up as the account's own (the coverage fact is in its description).
+  property: async () => ok([], { label: "Look up a property", href: "/property", surface: "app" }),
 
   async competitors(ctx) {
     const [[r], usage] = await Promise.all([
@@ -54,9 +40,9 @@ export const winTiles: TileSources = {
     ]);
     if (!int(r.total)) return EMPTY;
     return ok([
-      metric("scans", "Scans used", usage.competitorScans.used, "count", { limit: usage.competitorScans.limit, hint: "this month" }),
-      metric("lastScan", "Last scan", iso(r.created_at), "datetime"),
       metric("found", "Competitors found", num(r.total_found), "count", { hint: "last scan" }),
+      metric("lastScan", "Last scan", iso(r.created_at), "datetime"),
+      metric("scans", "Scans used", usage.competitorScans.used, "count", { limit: usage.competitorScans.limit, hint: "this month" }),
     ]);
   },
 

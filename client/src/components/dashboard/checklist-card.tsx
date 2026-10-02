@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Circle, CircleCheck } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Circle, CircleCheck } from "lucide-react";
 import type { DashboardChecklistItem } from "@shared/dashboard";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { DashLink, FOCUS_RING } from "./dash-link";
 
@@ -14,6 +14,8 @@ const writeCollapsed = (v: boolean) => { try { window.localStorage.setItem(COLLA
 export function ChecklistCard({ items }: { items: DashboardChecklistItem[] }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const done = items.filter((i) => i.done).length;
+  // "Start here": the first open step is the page's one solid call to action.
+  const nextKey = items.find((i) => !i.done)?.key;
   if (!items.length || done === items.length) return null;
   const toggle = () => setCollapsed((c) => { writeCollapsed(!c); return !c; });
   const listId = "dashboard-checklist-steps";
@@ -43,31 +45,41 @@ export function ChecklistCard({ items }: { items: DashboardChecklistItem[] }) {
       </div>
       {!collapsed && (
         <ul id={listId} className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map((item) => (
-            <li key={item.key} data-testid={`checklist-${item.key}`} data-done={item.done ? "true" : "false"}>
+          {items.map((item) => {
+            const next = item.key === nextKey;
+            return (
+            <li key={item.key} data-testid={`checklist-${item.key}`} data-done={item.done ? "true" : "false"} data-next={next ? "true" : undefined}>
               <DashLink
                 href={item.href}
                 surface={item.surface}
-                className={`group flex h-full items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-accent ${FOCUS_RING}`}
+                className={`group flex h-full items-start gap-3 rounded-lg border p-3 transition-colors ${next ? "border-primary/60 bg-primary/5 hover:bg-primary/10" : "hover:bg-accent"} ${FOCUS_RING}`}
                 data-testid={`link-checklist-${item.key}`}
               >
                 {item.done ? (
-                  <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                  <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />
                 ) : (
                   <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
                 )}
                 <span className="min-w-0 flex-1">
+                  {next && <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-primary" data-testid="badge-checklist-next">Next step</span>}
                   <span className={`block text-sm font-medium ${item.done ? "text-muted-foreground line-through decoration-muted-foreground/50" : ""}`}>
                     {item.label}
-                    <span className="sr-only">{item.done ? " (done)" : " (to do)"}</span>
+                    <span className="sr-only">{item.done ? " (done)" : next ? " (next step)" : " (to do)"}</span>
                   </span>
                   {/* A finished step is one line: the open ones are what matter. */}
                   {!item.done && <span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span>}
+                  {/* Looks like the page's primary button; the whole row is the link. */}
+                  {next && (
+                    <span className={`${buttonVariants({ size: "sm" })} mt-3 min-h-9 pointer-events-none`} aria-hidden="true">
+                      Start <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </span>
+                  )}
                 </span>
-                {!item.done && <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+                {!item.done && !next && <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
               </DashLink>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </Card>

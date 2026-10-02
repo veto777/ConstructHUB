@@ -21,6 +21,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "./db";
 import { isPlatformAdminEmail } from "./admin";
+import { forgetDashboard } from "./dashboard/cache";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
   type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
@@ -292,6 +293,7 @@ export async function redeemTrialCode(userId: number, code: { id: number; trialD
       await c.query("INSERT INTO subscriptions(user_id, plan, status, current_period_end) VALUES ($1, $2, 'trialing', $3)", [userId, TRIAL_CODE_PLAN, end]);
     }
     await c.query("COMMIT");
+    forgetDashboard(userId);
     return { trialEnd: end, unlimited };
   } catch (e) {
     await c.query("ROLLBACK").catch(() => {});
@@ -351,6 +353,7 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
       outcome = "shortened";
     }
     await c.query("COMMIT");
+    if (outcome !== "unchanged") forgetDashboard(userId);
     return outcome;
   } catch (e) {
     await c.query("ROLLBACK").catch(() => {});

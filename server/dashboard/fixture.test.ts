@@ -3,7 +3,7 @@
  * shared/dashboard.ts, and tile access follows the price book.
  */
 import { describe, expect, it } from "vitest";
-import { DASHBOARD_GROUPS, DASHBOARD_TILES, DASHBOARD_TILE_KEYS } from "@shared/dashboard";
+import { DASHBOARD_GROUPS, DASHBOARD_TILES, DASHBOARD_TILE_KEYS, dashboardAttention, type DashboardAccount, type DashboardTile } from "@shared/dashboard";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { buildDashboardFixture, DASHBOARD_FIXTURE_SCENARIOS } from "./fixture";
 import { cheapestPlanAllowing, tileAccess } from "./access";
@@ -48,10 +48,13 @@ describe("tileAccess", () => {
     expect(tileAccess(def("callAssistant"), agency)).toMatchObject({ entitled: false, comingSoon: true, addon: "call_assistant" });
   });
 
-  it("lets a crew member without a plan of their own into the CRM tiles", () => {
+  it("lets a crew member without a plan of their own into the CRM tiles, texting included (the org owner's plan decides it)", () => {
     const crew = { accessPlan: null, allowances: null, modules: NONE, hasCrmOrg: true };
     expect(tileAccess(def("crm"), crew).entitled).toBe(true);
-    expect(tileAccess(def("texting"), crew).entitled).toBe(false);
+    expect(tileAccess(def("texting"), crew).entitled).toBe(true);
+    // Without an org, the viewer's own plan decides texting.
+    const starter = { accessPlan: "starter" as const, allowances: PLANS.starter.limits, modules: NONE, hasCrmOrg: false };
+    expect(tileAccess(def("texting"), starter)).toEqual({ entitled: false, requiredPlan: cheapestPlanAllowing("teamTextSegments") });
   });
 });
 
@@ -80,5 +83,45 @@ describe("sample payloads", () => {
   it("greets by first name, or not at all", () => {
     expect(buildDashboardFixture("full", { displayName: "Sam Rivera" }).account.firstName).toBe("Sam");
     expect(buildDashboardFixture("full", {}).account.firstName).toBeNull();
+  });
+});
+
+describe("dashboardAttention (Needs you today)", () => {
+  const now = new Date("2026-10-02T15:00:00Z");
+
+  it("collects the warn/bad metrics of answering tiles, bad first, each linked to its page", () => {
+    const p = buildDashboardFixture("full", {}, now);
+    const items = dashboardAttention(p.tiles, p.account);
+    const keys = items.map((i) => i.key);
+    expect(keys).toEqual(expect.arrayContaining([
+      "reviews.unanswered", "profileGuard.pending", "clickGuard.suspicious30d", "crm.unscheduled",
+      "crmLeads.followUpsDue", "crmLeads.needEstimate", "notifications",
+    ]));
+    // Only what the server marked: a "good" or untoned metric never shows up.
+    expect(keys).not.toContain("crmLeads.newLeads7d");
+    expect(keys).not.toContain("gbp.syncIssues");
+    // The failing tile (social) contributes nothing.
+    expect(keys.some((k) => k.startsWith("social."))).toBe(false);
+    const leads = items.find((i) => i.key === "crmLeads.needEstimate")!;
+    expect(leads).toMatchObject({ source: "Leads & follow-ups", value: 4, tone: "warn", href: "/crm/pipeline", surface: "portal" });
+    expect(items.find((i) => i.key === "notifications")).toMatchObject({ value: p.account.unreadNotifications, href: "/settings?tab=notifications" });
+  });
+
+  it("adds meters over their limit (a full standing count is not), a past-due plan first; nothing when all is well", () => {
+    const account: DashboardAccount = {
+      firstName: null, displayName: null, plan: "growth", planName: "Growth", status: "past_due", isPlatformAdmin: false,
+      trialEndsAt: null, renewsAt: null, resetsAt: now.toISOString(), unreadNotifications: 0,
+      usage: [
+        { key: "protectedSites", label: "Protected websites", used: 12, limit: 10, period: "count", href: "/google-ads" },
+        { key: "locations", label: "Locations", used: 5, limit: 5, period: "count", href: "/locations" },
+        { key: "searches", label: "Permit searches", used: 200, limit: 200, period: "monthly", href: "/search" },
+        { key: "rankings", label: "Ranking-grid credits", used: 3, limit: -1, period: "monthly", href: "/ranking-grid" },
+      ],
+    };
+    const items = dashboardAttention([], account);
+    expect(items.map((i) => [i.key, i.tone])).toEqual([["billing", "bad"], ["usage.searches", "bad"], ["usage.protectedSites", "warn"]]);
+    expect(items[2]).toMatchObject({ value: 12, limit: 10, hint: "Over your plan's limit" });
+    const calm: DashboardTile[] = buildDashboardFixture("new", {}, now).tiles;
+    expect(dashboardAttention(calm, { ...account, status: "active", usage: [], unreadNotifications: 0 })).toEqual([]);
   });
 });

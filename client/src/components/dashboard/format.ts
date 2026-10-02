@@ -56,12 +56,15 @@ export function meterTone(used: number, limit: number): Tone {
   return "default";
 }
 
-/** Text colour for a tone (600 light / 400 dark). The label always carries the meaning too. */
+/**
+ * Text colour for a tone (700 light / 400 dark: at least 4.5:1 on the card for
+ * small text in both themes). The label always carries the meaning too.
+ */
 export function toneText(tone: Tone | undefined): string {
   switch (tone) {
-    case "good": return "text-emerald-600 dark:text-emerald-400";
-    case "warn": return "text-amber-600 dark:text-amber-400";
-    case "bad": return "text-red-600 dark:text-red-400";
+    case "good": return "text-emerald-700 dark:text-emerald-400";
+    case "warn": return "text-amber-700 dark:text-amber-400";
+    case "bad": return "text-red-700 dark:text-red-400";
     default: return "text-foreground";
   }
 }

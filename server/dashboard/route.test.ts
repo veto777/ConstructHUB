@@ -136,8 +136,13 @@ describe("GET /api/dashboard (child server from this checkout)", () => {
     const tm = await get("/api/dashboard", await session(s!.teammate, { agencyOwner: s!.agency }));
     expect(tm.status).toBe(200);
     expect(tm.body.account.plan).toBeNull();
-    expect(tm.body.tiles.find((t) => t.key === "gbp")?.status).toBe("locked");
+    // Pages the workspace shares with them open (no "See plans" upsell), with none of the owner's numbers.
+    expect(tm.body.tiles.find((t) => t.key === "gbp")).toMatchObject({ status: "empty", metrics: [], cta: { label: "Open", href: "/locations" } });
+    expect(tm.body.tiles.find((t) => t.key === "cloudflare")?.status).toBe("locked");
     expect(tm.body.recent).toEqual([]);
+    // Without the workspace in the session, the same teammate is just their own (planless) account.
+    const own = await get("/api/dashboard", await session(s!.teammate));
+    expect(own.body.tiles.find((t) => t.key === "gbp")?.status).toBe("locked");
   });
 
   it("keeps the sample payload for client-shape tests in development only", async () => {

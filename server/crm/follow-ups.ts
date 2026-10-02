@@ -21,7 +21,7 @@ import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmEstimates, CRM_PROJECT_STAGE_META,
 } from "@shared/schema";
-import { and, desc, eq, isNull, inArray } from "drizzle-orm";
+import { and, desc, eq, isNull, inArray, or } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg } from "./divisions";
@@ -126,12 +126,20 @@ export async function crmAttentionFor(ctx: OrgContext, { cap = 10, rowLimit = 20
 
   // An estimate "covers" a lead when it points at the project OR at the
   // lead's customer (estimates created from the client page carry no
-  // projectId).
-  const estimates = await db
-    .select({ projectId: crmEstimates.projectId, customerId: crmEstimates.customerId })
-    .from(crmEstimates)
-    .where(eq(crmEstimates.orgId, orgId))
-    .limit(2000);
+  // projectId). Only estimates that can cover a visible lead are read, and
+  // all of them: a cap on the org's estimates (in no order) left real
+  // coverage out and counted covered leads as needing an estimate.
+  const leadIds = visible.map((p) => p.id);
+  const leadCustomers = Array.from(new Set(visible.map((p) => p.customerId)));
+  const estimates = leadIds.length
+    ? await db
+      .select({ projectId: crmEstimates.projectId, customerId: crmEstimates.customerId })
+      .from(crmEstimates)
+      .where(and(
+        eq(crmEstimates.orgId, orgId),
+        or(inArray(crmEstimates.projectId, leadIds), inArray(crmEstimates.customerId, leadCustomers)),
+      ))
+    : [];
   const coveredProjects = new Set(estimates.map((e) => e.projectId).filter(Boolean));
   const coveredCustomers = new Set(estimates.map((e) => e.customerId));
 

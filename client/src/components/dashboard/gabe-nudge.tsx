@@ -37,7 +37,7 @@ export function GabeNudge({ checklist }: { checklist: DashboardChecklistItem[] }
         </div>
       </div>
       <div className="mt-4">
-        <Button onClick={ask} className="min-h-10 w-full sm:w-auto" data-testid="button-dashboard-ask-gabe">
+        <Button onClick={ask} variant="outline" className="min-h-10 w-full sm:w-auto" data-testid="button-dashboard-ask-gabe">
           <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden="true" /> Ask Gabe
         </Button>
       </div>

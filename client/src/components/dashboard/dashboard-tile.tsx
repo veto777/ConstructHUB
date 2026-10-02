@@ -13,7 +13,9 @@ import { formatCount, formatMetricValue, percentOf, toneBar, toneText, DASH } fr
 const usedOf = (m: DashboardMetric): number | null => (typeof m.value === "number" ? m.value : null);
 
 /** The metric a tile leads with: label, big tabular number, then the meter or hint. */
-export function MetricHero({ tileKey, metric, size = "lg" }: { tileKey: string; metric: DashboardMetric; size?: "lg" | "md" }) {
+const HERO_SIZE = { lg: "text-3xl", md: "text-2xl", sm: "text-xl" } as const;
+
+export function MetricHero({ tileKey, metric, size = "lg" }: { tileKey: string; metric: DashboardMetric; size?: keyof typeof HERO_SIZE }) {
   const value = formatMetricValue(metric);
   const hasLimit = metric.limit !== undefined;
   const pct = hasLimit ? percentOf(usedOf(metric), metric.limit) : null;
@@ -22,7 +24,7 @@ export function MetricHero({ tileKey, metric, size = "lg" }: { tileKey: string; 
     <div className="min-w-0" data-testid={`metric-${tileKey}-${metric.key}`}>
       <dt className="text-xs font-medium text-muted-foreground leading-snug">{metric.label}</dt>
       <dd className="mt-1">
-        <span className={`flex items-baseline gap-1.5 font-semibold tabular-nums tracking-tight ${size === "lg" ? "text-3xl" : "text-2xl"} ${unknown ? "text-muted-foreground" : toneText(metric.tone)}`}>
+        <span className={`flex items-baseline gap-1.5 font-semibold tabular-nums tracking-tight ${HERO_SIZE[size]} ${unknown ? "text-muted-foreground" : toneText(metric.tone)}`}>
           <span className="truncate">{value}</span>
           {metric.format === "rating" && !unknown && <Star className="h-5 w-5 self-center fill-amber-400 text-amber-400" aria-hidden="true" />}
           {metric.format === "score" && !unknown && <span className="text-sm font-medium text-muted-foreground">/ 100</span>}
@@ -53,7 +55,7 @@ function MetricRow({ tileKey, metric }: { tileKey: string; metric: DashboardMetr
     <div className="flex items-baseline justify-between gap-3 py-1.5" data-testid={`metric-${tileKey}-${metric.key}`}>
       <dt className="min-w-0 text-sm text-muted-foreground">
         {metric.label}
-        {metric.hint && <span className="block text-xs text-muted-foreground/80">{metric.hint}</span>}
+        {metric.hint && <span className="block text-xs text-muted-foreground">{metric.hint}</span>}
       </dt>
       <dd className={`shrink-0 text-sm font-semibold tabular-nums ${unknown ? "text-muted-foreground" : toneText(metric.tone)}`}>
         {value}
@@ -149,7 +151,8 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
       {tile.status !== "locked" && (
         <div className={`mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 ${tile.status === "ok" ? "border-t pt-3" : ""}`}>
           {tile.status === "empty" ? (
-            <Button asChild size="sm" className="min-h-10 sm:min-h-8">
+            // Outline: the one solid button on the page is the checklist's next step.
+            <Button asChild size="sm" variant="outline" className="min-h-10 sm:min-h-8">
               <DashLink href={cta.href} surface={cta.surface} data-testid={`link-tile-${tile.key}`}>
                 {cta.label} <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
               </DashLink>

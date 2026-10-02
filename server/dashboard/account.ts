@@ -84,7 +84,7 @@ export async function accountUsage(ctx: DashboardContext): Promise<DashboardUsag
     { key: "rankings", label: "Ranking-grid credits", used: usage.rankings.used, limit: usage.rankings.limit, period: "monthly", href: "/ranking-grid" },
     { key: "siteScans", label: "Site Scans", used: usage.siteScans.used, limit: usage.siteScans.limit, period: "monthly", href: "/site-scan" },
     { key: "competitorScans", label: "Competitor scans", used: usage.competitorScans.used, limit: usage.competitorScans.limit, period: "monthly", href: "/competitors" },
-    { key: "texts", label: "Text segments", used: usage.texts.used, limit: usage.texts.limit, period: "monthly", href: "/settings?tab=billing" },
+    { key: "texts", label: "Texts", used: usage.texts.used, limit: usage.texts.limit, period: "monthly", href: "/settings?tab=billing" },
     { key: "locations", label: "Locations", used: locations, limit: a?.locations ?? 0, period: "count", href: "/locations" },
     { key: "protectedSites", label: "Protected websites", used: sites?.n ?? 0, limit: a?.protectedSites ?? 0, period: "count", href: "/google-ads" },
   ];

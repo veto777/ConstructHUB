@@ -46,6 +46,12 @@ export function tileAccess(def: DashboardTileDef, ent: TileAccessInput): TileAcc
       return ent.modules[gate.module]
         ? { entitled: true, module: gate.module }
         : { entitled: false, requiredPlan: planForModule(gate.module), module: gate.module };
+    case "crmAllowance": {
+      // In an org, the owner's plan decides, and the tile source reads it (orgSmsStatus).
+      if (ent.hasCrmOrg) return { entitled: true };
+      const ok = !!ent.allowances && ent.allowances[gate.limit] !== 0;
+      return ok ? { entitled: true } : { entitled: false, requiredPlan: cheapestPlanAllowing(gate.limit) };
+    }
     case "crm":
       // The CRM is included with every plan; a member of someone else's org
       // (a crew seat) has no plan of their own and still uses it.

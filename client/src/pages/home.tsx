@@ -8,14 +8,15 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TriangleAlert, RefreshCw } from "lucide-react";
 import {
-  DASHBOARD_CLIENT_STALE_MS, DASHBOARD_TILES,
+  DASHBOARD_CLIENT_STALE_MS, DASHBOARD_TILES, dashboardAttention,
   type DashboardChecklistItem, type DashboardPayload, type DashboardTile, type DashboardTileDef,
 } from "@shared/dashboard";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { DashboardHeader, UsageCard } from "@/components/dashboard/dashboard-header";
+import { NeedsToday } from "@/components/dashboard/needs-today";
 import { ChecklistCard } from "@/components/dashboard/checklist-card";
 import { CrmSnapshotCard } from "@/components/dashboard/crm-snapshot-card";
 import { TileGrid } from "@/components/dashboard/tile-grid";
@@ -81,7 +82,9 @@ export default function HomePage() {
   } else {
     const tiles = visibleTiles(data.tiles);
     const checklist = visibleChecklist(data.checklist);
-    const crm = tiles.find((t) => t.key === "crm");
+    const byKey = (key: string) => tiles.find((t) => t.key === key);
+    const crm = byKey("crm");
+    // Action first: what needs you, then the CRM's money and day, then setup, meters and every tool.
     body = (
       <div className="space-y-6">
         <DashboardHeader
@@ -91,8 +94,10 @@ export default function HomePage() {
           refreshing={refreshing}
           onRefresh={refresh}
         />
+        <NeedsToday items={dashboardAttention(tiles, data.account)} />
+        {crm && <CrmSnapshotCard tile={crm} leads={byKey("crmLeads")} schedule={byKey("crmSchedule")} />}
         <ChecklistCard items={checklist} />
-        {crm && <CrmSnapshotCard tile={crm} />}
+        <UsageCard account={data.account} />
         <div className="pt-2"><TileGrid tiles={tiles} /></div>
         <div className="grid gap-4 pt-2 lg:grid-cols-3">
           <div className="min-w-0 lg:col-span-2"><RecentActivity items={data.recent} /></div>

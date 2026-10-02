@@ -114,6 +114,9 @@ export default function PricingPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success")) {
+      // A new plan: anything cached in this tab from before checkout is stale.
+      void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "You're subscribed", description: "Welcome to ConstructHUB. Your plan, renewal date and add-ons are in Settings → Billing." });
     } else if (params.get("canceled")) {
       toast({ title: "Checkout canceled", description: "No charges were made." });
@@ -175,6 +178,8 @@ export default function PricingPage() {
       void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       // The Agency workspace (and its sidebar lock) follows the plan through /api/agency/me.
       void queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
+      // The signed-in home shows the plan, its meters and its locks.
+      void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       toast({ title: "Plan changed", description: `You're now on ${PLANS[r.plan].name}, billed ${intervalWord(r.interval)}.` });
     },
     onError: (err, r) => { setConfirm(null); handlePlanError("Couldn't change your plan", r, err); },

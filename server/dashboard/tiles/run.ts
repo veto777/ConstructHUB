@@ -12,7 +12,7 @@ import { formatUsd } from "@shared/plan-copy";
 import { crmStatsFor } from "../../crm/stats";
 import { crmAttentionFor } from "../../crm/follow-ups";
 import { objectPolicy } from "../../crm/object-access";
-import { orgSmsStatus } from "../../crm/sms";
+import { orgSmsStatus, SMS_NEEDS_PLAN, SMS_REQUIRED_PLAN } from "../../crm/sms";
 import type { OrgContext } from "../../crm/tenancy";
 import { dq } from "../pool";
 import { int, metric, ok, watch, type TileOutcome, type TileSources } from "./types";
@@ -94,20 +94,23 @@ export const runTiles: TileSources = {
     return ok([
       metric("newLeads7d", "New leads (7 days)", newLeads, "count", { tone: newLeads ? "good" : undefined, ...partial }),
       metric("followUpsDue", "Follow-ups due", a.followUpsDue.length, "count", { tone: watch(a.followUpsDue.length) }),
-      metric("needEstimate", "Leads without an estimate", a.leadsNeedingEstimate.length, "count", partial),
+      metric("needEstimate", "Leads without an estimate", a.leadsNeedingEstimate.length, "count", { tone: watch(a.leadsNeedingEstimate.length), ...partial }),
     ]);
   },
 
   async texting(ctx) {
     const crm = ctx.crm;
+    // No org: the gate let this through only on a plan with texting, so the CRM comes first.
     if (!crm) return NO_ORG;
     const [sms, usage] = await Promise.all([orgSmsStatus(crm.org), ctx.usage()]);
-    const metrics = [];
+    // Texting follows the org OWNER's plan (orgSmsEntitled), not this seat's own:
+    // a crew seat in a texting org is in, an owner on a plan without texting is not.
+    if (!sms.planAllowsSms) return { status: "locked", requiredPlan: SMS_REQUIRED_PLAN, message: SMS_NEEDS_PLAN };
+    const metrics = [metric("clientTexting", "Client texting", sms.canTextClients ? "On" : "Off", "text", { tone: sms.canTextClients ? "good" : undefined })];
     // Texts are metered on the org owner's allowance: show the count only when that's this account.
     if (crm.org.ownerUserId === ctx.userId) {
       metrics.push(metric("segments", "Texts used", usage.texts.used, "count", { limit: usage.texts.limit, hint: "this month" }));
     }
-    metrics.push(metric("clientTexting", "Client texting", sms.canTextClients ? "On" : "Off", "text", { tone: sms.canTextClients ? "good" : undefined }));
     return ok(metrics);
   },
 
