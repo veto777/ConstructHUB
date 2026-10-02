@@ -92,7 +92,7 @@ describe("dashboard layout: validation and normalising", () => {
     const all = [
       t("reviews", "empty"),                                   // a teammate's delegated page: not entitled, but it opens
       t("cloudflare", "locked", { requiredPlan: "agency" }),
-      t("callAssistant", "coming_soon"),
+      t("callAssistant", "locked", { requiredPlan: "pro", addon: "call_assistant" }), // on sale, not bought: locked like any tile
       t("siteScan", "ok", { entitled: true }),
     ];
     const { tiles, hiddenTiles } = splitDashboardTiles(all, normalizeDashboardLayout({ hidden: ["reviews", "cloudflare", "callAssistant"] }));
@@ -100,8 +100,11 @@ describe("dashboard layout: validation and normalising", () => {
     expect(hiddenTiles).toEqual([
       { key: "reviews", entitled: true },
       { key: "cloudflare", entitled: false, requiredPlan: "agency" },
-      { key: "callAssistant", entitled: true, comingSoon: true },
+      { key: "callAssistant", entitled: false, requiredPlan: "pro" },
     ]);
+    // A tile whose add-on is still `preview` ("coming_soon") isn't locked: Customize says "Coming soon" instead.
+    expect(splitDashboardTiles([t("callAssistant", "coming_soon", { addon: "call_assistant" })], normalizeDashboardLayout({ hidden: ["callAssistant"] })).hiddenTiles)
+      .toEqual([{ key: "callAssistant", entitled: true, comingSoon: true }]);
   });
 });
 
@@ -281,11 +284,12 @@ describe("dashboard prefs (development database)", () => {
     expect(p.tiles[0].key).toBe("siteScan");
     expect(called.sort()).toEqual(["reviews", "siteScan"]); // the hidden Google Reviews tile is still computed…
     expect(p.tiles.some((t) => t.key === "reviews")).toBe(false); // …but not shown
-    // Hidden tiles: access only. The agency plan includes Cloudflare and Reviews; the Call Assistant is not sold yet.
+    // Hidden tiles: access only. The agency plan includes Cloudflare and Reviews; the Call Assistant is an
+    // add-on this account hasn't bought (on sale since the launch): locked, not "coming soon".
     expect(p.hiddenTiles).toEqual(expect.arrayContaining([
       { key: "reviews", entitled: true },
       { key: "cloudflare", entitled: true },
-      expect.objectContaining({ key: "callAssistant", comingSoon: true }),
+      { key: "callAssistant", entitled: false, requiredPlan: "pro" },
     ]));
     // Its alerts stay in Needs you today (until cleared); the source counts as answered. A hidden section is not read.
     expect(p.attention.map((i) => i.key)).toContain("reviews.unanswered");

@@ -18,7 +18,7 @@ import { createHmac, randomUUID, randomInt } from "node:crypto";
 import http from "node:http";
 import net from "node:net";
 import pg from "pg";
-import { ADDONS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
+import { ADDONS, CALL_ASSISTANT_TIERS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
 
 process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_module_import";
 process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATABASE_URL ?? "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
@@ -297,11 +297,16 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
       const r = await api(path, noAddon, method, body);
       expect(r.status, `${method} ${path}`).toBe(402);
       expect(r.body).toMatchObject({ code: "plan_required", requiredPlan: "pro", addon: "call_assistant" });
+      // Launched: the 402 says how to buy it, never "not for sale".
+      expect(r.body.message).toMatch(/Add it in Settings → Billing/);
+      expect(r.body.message).not.toMatch(/available yet|not for sale|coming soon/i);
     }
     expect((await api("/api/crm/voice/numbers", null)).status).toBe(401);
     const status = await api("/api/crm/voice/status", noAddon);
     expect(status.status).toBe(200);
-    expect(status.body).toMatchObject({ enabled: false, addon: { key: "call_assistant", preview: true }, allowance: { numbers: 0, minutes: 0 }, numbers: [], usage: null });
+    // The add-on and the extra number are for sale (preview: false): the owner can buy them from here.
+    expect(status.body).toMatchObject({ enabled: false, addon: { key: "call_assistant", preview: false, extraNumber: { key: "call_number", preview: false } }, allowance: { numbers: 0, minutes: 0 }, numbers: [], usage: null });
+    expect(status.body.tiers.map((t: any) => [t.addon, t.preview])).toEqual(CALL_ASSISTANT_TIERS.map((t) => [t.addon, false]));
     expect(stub.hits).toHaveLength(0);
   });
 

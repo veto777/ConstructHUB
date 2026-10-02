@@ -608,85 +608,96 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
 
   it("Call Assistant tiers: switching is an add-on change on the same subscription — the held tier goes, prorated; never two tiers", async () => {
     const tiers = ["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet", "call_number"] as const;
-    // While the tiers are in preview the route refuses them and Stripe is never called.
+    // Launched (owner, 2026-10-02): the tiers and the extra number are for sale.
+    for (const k of tiers) expect(ADDONS[k].preview ?? false, k).toBe(false);
+    // A new Pro subscription buys a tier and an extra number in its checkout: both ride the plan as recurring items.
+    mocks.rows.push([customerRow()]);
+    const buy = await request("/api/stripe/create-checkout", { plan: "pro", addons: { call_assistant_lite: 1, call_number: 1 } });
+    expect(buy.code).toBe(200);
+    expect(lineItems().map((l) => [priceOf(l.price).metadata.chub_kind, priceOf(l.price).metadata.chub_key, l.quantity])).toEqual(expect.arrayContaining([
+      ["plan", "pro", 1], ["addon", "call_assistant_lite", 1], ["addon", "call_number", 1],
+    ]));
+    expect(JSON.parse(mocks.checkout.mock.calls[0][0].metadata.addons)).toEqual({ call_assistant_lite: 1, call_number: 1 });
+
+    // Still refused where the price book doesn't sell them, and Stripe is never called: an extra
+    // number without a tier is refused, and a Starter subscription can't add a tier.
     await seedProSubscription();
     mocks.rows.push([liveRow()]);
-    const refused = await request("/api/stripe/addons", { addon: "call_assistant_crew", quantity: 1 });
-    expect(refused.code).toBe(409);
-    expect(refused.body.message).toMatch(/isn't available yet/);
+    const noTier = await request("/api/stripe/addons", { addon: "call_number", quantity: 1 });
+    expect(noTier.code).toBe(400);
+    expect(noTier.body.message).toMatch(/needs one of these add-ons/);
+    mocks.current = subscription([item("si_plan", "price_x", 1, { kind: "plan", key: "starter" })]);
+    mocks.rows.push([liveRow({ plan: "starter" })]);
+    const starter = await request("/api/stripe/addons", { addon: "call_assistant_crew", quantity: 1 });
+    expect(starter.code).toBe(400);
+    expect(starter.body.message).toMatch(/isn't available on the Starter plan/);
     expect(mocks.update).not.toHaveBeenCalled();
 
-    const saved = tiers.map((k) => ADDONS[k].preview);
-    try {
-      for (const k of tiers) delete ADDONS[k].preview;
-      // Pro + Solo (the original call_assistant key) + one extra number.
-      const sub = await seedProSubscription();
-      await request("/api/stripe/create-checkout", { plan: "pro", addons: { call_assistant_fleet: 1, call_assistant: 1 } }).then((r) => {
-        // Two tiers in one order are refused, not guessed.
-        expect(r.code).toBe(400);
-        expect(r.body.message).toMatch(/can't both be on one subscription/);
-      });
-      mocks.pricesCreate.mockImplementation(async (params: any) => {
-        const id = `price_${params.lookup_key}`;
-        mocks.prices.set(id, { id, ...params });
-        return { id };
-      });
-      const soloPrice = "price_chub_v1_addon_call_assistant_month_24900";
-      mocks.prices.set(soloPrice, { id: soloPrice, lookup_key: "chub_v1_addon_call_assistant_month_24900", unit_amount: 24900, currency: "usd", recurring: { interval: "month" }, metadata: { chub_kind: "addon", chub_key: "call_assistant", chub_interval: "month" } });
-      sub.items.data.push({ ...item("si_solo", soloPrice, 1, { kind: "addon", key: "call_assistant" }), current_period_end: 1893456000 });
+    // Pro + Solo (the original call_assistant key) + one extra number.
+    const sub = await seedProSubscription();
+    await request("/api/stripe/create-checkout", { plan: "pro", addons: { call_assistant_fleet: 1, call_assistant: 1 } }).then((r) => {
+      // Two tiers in one order are refused, not guessed.
+      expect(r.code).toBe(400);
+      expect(r.body.message).toMatch(/can't both be on one subscription/);
+    });
+    mocks.pricesCreate.mockImplementation(async (params: any) => {
+      const id = `price_${params.lookup_key}`;
+      mocks.prices.set(id, { id, ...params });
+      return { id };
+    });
+    const soloPrice = "price_chub_v1_addon_call_assistant_month_24900";
+    mocks.prices.set(soloPrice, { id: soloPrice, lookup_key: "chub_v1_addon_call_assistant_month_24900", unit_amount: 24900, currency: "usd", recurring: { interval: "month" }, metadata: { chub_kind: "addon", chub_key: "call_assistant", chub_interval: "month" } });
+    sub.items.data.push({ ...item("si_solo", soloPrice, 1, { kind: "addon", key: "call_assistant" }), current_period_end: 1893456000 });
 
-      // Upgrade: Solo → Crew in one update, prorated and invoiced now.
-      mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant: 1 } })]);
-      const up = await request("/api/stripe/addons", { addon: "call_assistant_crew", quantity: 1 });
-      expect(up.code).toBe(200);
-      expect(mocks.update).toHaveBeenCalledTimes(1);
-      const params = mocks.update.mock.calls[0][1];
-      expect(params.proration_behavior).toBe("always_invoice");
-      expect(params.items).toEqual([
-        { id: "si_solo", deleted: true },
-        { price: "price_chub_v1_addon_call_assistant_crew_month_44900", quantity: 1 },
-      ]);
-      // No intro on Crew (the intro is Solo's, first time only).
-      expect(params.items.some((i: any) => i.discounts)).toBe(false);
-      expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant_crew: 1 });
-      // The release decision runs after the change (a downgrade's extra numbers go there).
-      expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
-      // Holding Crew uses the Solo intro up (no coupon), so dropping Crew and adding Solo later can't claim it.
-      expect(mocks.sql.filter((q) => /INSERT INTO billing_addon_intros/.test(q.text)).map((q) => q.values.slice(0, 3)))
-        .toEqual([[42, "call_assistant", "none:held_sibling"]]);
+    // Upgrade: Solo → Crew in one update, prorated and invoiced now.
+    mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant: 1 } })]);
+    const up = await request("/api/stripe/addons", { addon: "call_assistant_crew", quantity: 1 });
+    expect(up.code).toBe(200);
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    const params = mocks.update.mock.calls[0][1];
+    expect(params.proration_behavior).toBe("always_invoice");
+    expect(params.items).toEqual([
+      { id: "si_solo", deleted: true },
+      { price: "price_chub_v1_addon_call_assistant_crew_month_44900", quantity: 1 },
+    ]);
+    // No intro on Crew (the intro is Solo's, first time only).
+    expect(params.items.some((i: any) => i.discounts)).toBe(false);
+    expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant_crew: 1 });
+    // The release decision runs after the change (a downgrade's extra numbers go there).
+    expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
+    // Holding Crew uses the Solo intro up (no coupon), so dropping Crew and adding Solo later can't claim it.
+    expect(mocks.sql.filter((q) => /INSERT INTO billing_addon_intros/.test(q.text)).map((q) => q.values.slice(0, 3)))
+      .toEqual([[42, "call_assistant", "none:held_sibling"]]);
 
-      // Downgrade: Crew → Solo — the Solo intro is NOT granted again on a switch.
-      mocks.current = await mocks.update.mock.results[0].value;
-      mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant_crew: 1 } })]);
-      const down = await request("/api/stripe/addons", { addons: { call_assistant: 1 } });
-      expect(down.code).toBe(200);
-      const downParams = mocks.update.mock.calls[1][1];
-      expect(downParams.items).toEqual([
-        { price: soloPrice, quantity: 1 },
-        { id: "si_new_1", deleted: true },
-      ]);
-      expect(downParams.items.some((i: any) => i.discounts)).toBe(false);
-      expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant: 1 });
+    // Downgrade: Crew → Solo — the Solo intro is NOT granted again on a switch.
+    mocks.current = await mocks.update.mock.results[0].value;
+    mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant_crew: 1 } })]);
+    const down = await request("/api/stripe/addons", { addons: { call_assistant: 1 } });
+    expect(down.code).toBe(200);
+    const downParams = mocks.update.mock.calls[1][1];
+    expect(downParams.items).toEqual([
+      { price: soloPrice, quantity: 1 },
+      { id: "si_new_1", deleted: true },
+    ]);
+    expect(downParams.items.some((i: any) => i.discounts)).toBe(false);
+    expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant: 1 });
 
-      // Lite, the fourth tier, follows the same rules: Solo → Lite swaps the one tier item, no intro.
-      mocks.current = await mocks.update.mock.results[1].value;
-      // (The fake names new items si_new_<index>; give Solo's its own id so the fake's next new item can't collide with it.)
-      mocks.current.items.data = mocks.current.items.data.map((i: any) => (i.id === "si_new_0" ? { ...i, id: "si_solo_2" } : i));
-      const soloItem = { id: "si_solo_2" };
-      mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant: 1 } })]);
-      const lite = await request("/api/stripe/addons", { addons: { call_assistant_lite: 1 } });
-      expect(lite.code).toBe(200);
-      const liteParams = mocks.update.mock.calls[2][1];
-      expect(liteParams.items).toEqual(expect.arrayContaining([
-        { price: "price_chub_v1_addon_call_assistant_lite_month_14900", quantity: 1 },
-        { id: soloItem.id, deleted: true },
-      ]));
-      expect(liteParams.items).toHaveLength(2);
-      expect(liteParams.items.some((i: any) => i.discounts)).toBe(false);
-      expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant_lite: 1 });
-    } finally {
-      tiers.forEach((k, i) => { ADDONS[k].preview = saved[i]; });
-    }
+    // Lite, the fourth tier, follows the same rules: Solo → Lite swaps the one tier item, no intro.
+    mocks.current = await mocks.update.mock.results[1].value;
+    // (The fake names new items si_new_<index>; give Solo's its own id so the fake's next new item can't collide with it.)
+    mocks.current.items.data = mocks.current.items.data.map((i: any) => (i.id === "si_new_0" ? { ...i, id: "si_solo_2" } : i));
+    const soloItem = { id: "si_solo_2" };
+    mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant: 1 } })]);
+    const lite = await request("/api/stripe/addons", { addons: { call_assistant_lite: 1 } });
+    expect(lite.code).toBe(200);
+    const liteParams = mocks.update.mock.calls[2][1];
+    expect(liteParams.items).toEqual(expect.arrayContaining([
+      { price: "price_chub_v1_addon_call_assistant_lite_month_14900", quantity: 1 },
+      { id: soloItem.id, deleted: true },
+    ]));
+    expect(liteParams.items).toHaveLength(2);
+    expect(liteParams.items.some((i: any) => i.discounts)).toBe(false);
+    expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant_lite: 1 });
   });
 
   it("add-ons: one add-on as { addon, quantity } (the Settings card's body) works like { addons }", async () => {

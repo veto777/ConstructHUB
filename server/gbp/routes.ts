@@ -87,7 +87,14 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     const status=await grantStatus(id);if(!status.connected)throw new GoogleError('auth','Google Business Profile not connected',401);
     const f=filters.parse(req.query);
     const {rows}=await pool.query(`SELECT d.*,g.email FROM agency_discovery d JOIN gbp_grants g ON g.user_id=d.user_id AND g.google_subject=d.subject AND NOT g.reconnect_required WHERE d.user_id=$1 AND d.data->>'businessName' ILIKE $2 ORDER BY d.subject,d.account,d.location LIMIT 50 OFFSET $3`,[id,`%${f.q}%`,f.offset]);
-    res.json({accounts:status.accounts,locations:rows.map(r=>({...r.data,grantSubject:r.subject,grantEmail:r.email})),errors:[],cached:true});
+    // Nothing discovered yet (a new connection, or one made before discovery ran for every plan): ask the worker
+    // to look the account up — it runs within a minute — and say so instead of "no locations".
+    let refreshing=false;
+    if(!rows.length&&!f.q&&!f.offset){
+      const {rowCount}=await pool.query(`INSERT INTO agency_poll_grants(user_id,subject,next_at,refresh_requested) SELECT user_id,google_subject,now(),true FROM gbp_grants WHERE user_id=$1 AND NOT reconnect_required ON CONFLICT(user_id,subject) DO UPDATE SET next_at=LEAST(agency_poll_grants.next_at,now()),refresh_requested=true`,[id]);
+      refreshing=(rowCount??0)>0;
+    }
+    res.json({accounts:status.accounts,locations:rows.map(r=>({...r.data,grantSubject:r.subject,grantEmail:r.email})),errors:[],cached:true,refreshing});
   };
   route('get','/api/gbp/accounts',cached);
   route('get','/api/gbp/locations',cached);

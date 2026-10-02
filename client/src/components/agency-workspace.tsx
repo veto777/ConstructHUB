@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { STARTING_MONTHLY_CENTS, formatUsd } from '@shared/plan-copy';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, apiErrorMessage, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,9 @@ export function AgencyWorkspace(props:{onOpen?:(id:number)=>void;compact?:boolea
 }
 function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
   const f=useAgencyFilter();
+  const open=(id:number)=>onOpen?onOpen(id):window.location.assign(`/locations?location=${id}`);
+  const {data:ent}=useQuery<{accessPlan:string|null}>({queryKey:['/api/entitlements']});
+  const noPlan=!!ent&&!ent.accessPlan;
   const params=new URLSearchParams({paged:'true',q:f.q,status:f.status,offset:String(f.offset)});
   const {data,error}=useQuery<any>({queryKey:['/api/locations','paged',params.toString()],queryFn:()=>apiRequest('GET','/api/locations?'+params).then(r=>r.json())});
   const agencyPlan=PLANS[planForModule('agencyWorkspace')].name;
@@ -44,8 +48,23 @@ function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
       <select className={selectClass} aria-label="Location status" value={f.status} onChange={e=>f.setStatus(e.target.value)}>{Object.entries(statusLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
     </div>
     {error&&<p role="alert">Could not load locations.</p>}
-    <div className="overflow-auto"><table className="w-full text-sm"><thead><tr><th className="text-left p-2">Location</th><th className="text-left p-2">Address</th><th className="text-left p-2">Google link</th></tr></thead><tbody>{data?.items.map((l:any)=><tr key={l.id} className="border-t" data-testid={`own-location-${l.id}`}><td className="p-2"><button className="text-primary underline text-left" onClick={()=>onOpen?onOpen(l.id):window.location.assign(`/locations?location=${l.id}`)}>{l.businessName}</button></td><td className="p-2">{fullAddress(l)||'Not set'}</td><td className="p-2">{l.gbpLocationName?'Linked':'Not linked'}</td></tr>)}</tbody></table></div>
-    {data&&!data.items.length&&<p className="text-sm text-muted-foreground">{f.q||f.status!=='all'?'No locations match these filters.':'No locations yet.'}</p>}
+    {/* One location: its profile up front, one click away (owner 2026-10-02: "no link or button to access the account"). */}
+    {data&&data.total===1&&data.items.length===1&&!f.q&&f.status==='all'&&(()=>{const l=data.items[0];return <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-4" data-testid="own-location-single">
+      <div className="min-w-0"><p className="font-semibold truncate">{l.businessName}</p><p className="text-sm text-muted-foreground truncate">{fullAddress(l)||'Address not set'} · {l.gbpLocationName?'Linked to Google':'Not linked to Google yet'}</p></div>
+      <Button onClick={()=>open(l.id)} data-testid="button-open-single-location">Open your Business Profile</Button>
+    </div>;})()}
+    <div className="overflow-auto"><table className="w-full text-sm"><thead><tr><th className="text-left p-2">Location</th><th className="text-left p-2">Address</th><th className="text-left p-2">Google link</th><th className="p-2"><span className="sr-only">Open</span></th></tr></thead><tbody>{data?.items.map((l:any)=><tr key={l.id} className="border-t" data-testid={`own-location-${l.id}`}><td className="p-2"><button className="text-primary underline text-left" onClick={()=>open(l.id)}>{l.businessName}</button></td><td className="p-2">{fullAddress(l)||'Not set'}</td><td className="p-2">{l.gbpLocationName?'Linked':'Not linked'}</td><td className="p-2 text-right"><Button size="sm" variant="outline" onClick={()=>open(l.id)} data-testid={`button-open-location-${l.id}`}>Open</Button></td></tr>)}</tbody></table></div>
+    {data&&!data.items.length&&(f.q||f.status!=='all'
+      ? <p className="text-sm text-muted-foreground">No locations match these filters.</p>
+      : <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4" data-testid="own-locations-empty">
+          <p className="text-sm text-muted-foreground">{noPlan
+            ? `No locations yet. Connect Google and we'll find your Business Profile; importing it and opening its profile page needs a plan, from ${formatUsd(STARTING_MONTHLY_CENTS)}/month.`
+            : 'No locations yet. Bring in the Business Profile from your connected Google account, or add one by searching Google.'}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant={noPlan ? 'outline' : 'default'}><a href="/locations?import=gbp" data-testid="button-import-own-profile">{noPlan ? 'See your Google profiles' : 'Import your Business Profile'}</a></Button>
+            {noPlan && <Button asChild><a href="/pricing" data-testid="button-own-locations-see-plans">See plans</a></Button>}
+          </div>
+        </div>)}
     <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
     <p className="text-sm text-muted-foreground">Client workspaces, bulk actions across locations and CSV export are part of the {MODULE_NAMES.agencyWorkspace} on the <Link href="/pricing" className="text-primary underline">{agencyPlan} plan</Link>.</p>
   </section>;

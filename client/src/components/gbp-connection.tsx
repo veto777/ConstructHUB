@@ -120,6 +120,13 @@ export function GbpConnection({locationId,context='reviews'}:{locationId?:number
             <Badge variant={a.connected ? 'default' : 'destructive'} className="text-[10px]">{a.connected ? 'Connected' : 'Reconnect needed'}</Badge>
             <span>{a.email}</span>
             {!a.connected && <a href="/api/gbp/connect" className="text-primary underline">Reconnect</a>}
+            {/* Go to the account: its profiles here (to import or open), or its Business Profile on Google. */}
+            {a.connected && <Button asChild size="sm" variant="outline" className="h-7 text-xs" data-testid="button-view-google-profiles">
+              <a href="/locations?import=gbp">View profiles</a>
+            </Button>}
+            {a.connected && <Button asChild size="sm" variant="outline" className="h-7 text-xs" data-testid="button-open-google-business">
+              <a href={`https://business.google.com/locations?authuser=${encodeURIComponent(a.email)}`} target="_blank" rel="noopener noreferrer">Open in Google ↗</a>
+            </Button>}
             {a.subject && <Button size="sm" variant="outline" className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10" disabled={mutation.isPending} data-testid="button-disconnect-google-account"
               onClick={()=>{ if (window.confirm(`Disconnect ${a.email}? ConstructHUB's access to this Google account is revoked, its locations stop syncing, and the Google reviews and stats synced through it are removed. Your locations stay.`)) mutation.mutate({path:'/api/gbp/disconnect',body:{subject:a.subject}}); }}>Disconnect</Button>}
           </div>)}

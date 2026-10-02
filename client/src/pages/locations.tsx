@@ -1,4 +1,5 @@
 import { AgencyWorkspace, Pager, fullAddress, useAgencyFilter } from "@/components/agency-workspace";
+import { STARTING_MONTHLY_CENTS, formatUsd } from "@shared/plan-copy";
 import { LocationSearchSummary } from "./site-connections";
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection } from "@/components/gbp-connection";
@@ -69,7 +70,10 @@ export default function LocationsPage() {
   const { toast } = useToast();
   const [locationParam] = useUrlParam("location");
   const [gbpParam, setGbpParam] = useUrlParam("gbp");
-  const [addDialogOpen,setAddDialogOpen]=useState(false);
+  const [importParam,setImportParam]=useUrlParam("import");
+  const [addDialogOpen,setAddDialogOpen]=useState(importParam==="gbp");
+  // "View profiles" (Connected Google accounts) and the empty-list prompt land here with ?import=gbp.
+  useEffect(()=>{ if(importParam==="gbp") setAddDialogOpen(true); },[importParam]);
   const [notFound,setNotFound]=useState<string|null>(null);
   const {data:selectedLocation,error}=useQuery<BusinessLocation>({queryKey:["/api/locations",locationParam],enabled:!!locationParam});
   // A stale or foreign ?location= says so and returns to a clean list URL (its ?tab must not stick to the next location).
@@ -84,8 +88,8 @@ export default function LocationsPage() {
   if(locationParam&&selectedLocation)return <LocationDetail location={selectedLocation} onBack={()=>showLocation(null)} onDeleted={()=>{showLocation(null);queryClient.removeQueries({queryKey:["/api/locations",locationParam],exact:true});refreshLocationLists();}} isPremiumPlus={true}/>;
   return <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold" data-testid="text-locations-title">Business Profile Locations</h1>
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}><DialogTrigger asChild><Button data-testid="button-add-location">Add Location(s)</Button></DialogTrigger>
-        <DialogContent><DialogHeader><DialogTitle>Add Location</DialogTitle></DialogHeader><AddLocationDialog onCreated={()=>{setAddDialogOpen(false);refreshLocationLists();}}/></DialogContent></Dialog>
+      <Dialog open={addDialogOpen} onOpenChange={o=>{setAddDialogOpen(o);if(!o&&importParam)setImportParam(null);}}><DialogTrigger asChild><Button data-testid="button-add-location">Add Location(s)</Button></DialogTrigger>
+        <DialogContent><DialogHeader><DialogTitle>Add Location</DialogTitle></DialogHeader><AddLocationDialog initialTab={importParam==="gbp"?"gbp":undefined} onCreated={()=>{setAddDialogOpen(false);setImportParam(null);refreshLocationLists();}}/></DialogContent></Dialog>
     </div>
     {notFound&&<div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 p-3 text-sm" data-testid="alert-location-not-found">
       <span>Location #{notFound} was not found, or you don't have access to it.</span>
@@ -96,9 +100,14 @@ export default function LocationsPage() {
   </main>;
 }
 
-function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void; hasGbpAccess?: boolean }) {
+function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated: () => void; hasGbpAccess?: boolean; initialTab?: "gbp" }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState("search");
+  const [tab, setTab] = useState<string>(initialTab ?? "search");
+  // The connected account's profiles are being looked up (a new connection): retry until they arrive.
+  const [gbpLookup, setGbpLookup] = useState(0);
+  // Importing needs a plan: say so before they pick profiles, not after the import fails (owner, 2026-10-02).
+  const { data: ent } = useQuery<{ accessPlan: string | null }>({ queryKey: ["/api/entitlements"] });
+  const needsPlan = !!ent && !ent.accessPlan;
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -164,8 +173,15 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
       setGbpWarnings((data.errors || []).map((e: any) => `${e.account}: ${e.message}`));
       if (data.locations) {
         setGbpLocations(data.locations);
+        if (data.locations.length === 0 && data.refreshing && gbpLookup < 8) {
+          // Looked up in the background within a minute; check again shortly instead of saying "none".
+          setGbpLookup(n => n + 1);
+          setTimeout(() => { void fetchGbpLocations(); }, 12000);
+          return;
+        }
+        if (data.locations.length > 0) setGbpLookup(0);
         if (data.locations.length === 0) {
-          setGbpError("No business locations found in your Google account.");
+          setGbpError("No Business Profile locations were found in your connected Google account. If another Google login manages your listing, connect that one too.");
         }
       }
     } catch (err: any) {
@@ -203,6 +219,8 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
       return next;
     });
   };
+
+  useEffect(() => { if (initialTab === "gbp") void fetchGbpLocations(); }, []);
 
   return (
     <Tabs value={tab} onValueChange={v => { setTab(v); if (v === "gbp" && gbpLocations.length === 0 && !gbpLoading) fetchGbpLocations(); }} className="w-full">
@@ -251,10 +269,14 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
       </TabsContent>
       <TabsContent value="gbp" className="space-y-3 mt-4">
         {gbpWarnings.map(w => <p role="alert" key={w} className="text-destructive">{w}</p>)}
-        {gbpLoading && (
-          <div className="flex flex-col items-center justify-center py-8 gap-2">
+        {(gbpLoading || (gbpLookup > 0 && !gbpError && gbpLocations.length === 0)) && (
+          <div className="flex flex-col items-center justify-center py-8 gap-2" data-testid="gbp-lookup">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Loading your Google Business Profiles...</p>
+            <p className="text-sm text-muted-foreground text-center">
+              {gbpLookup > 0
+                ? "Looking up the Business Profiles in your connected Google account — this takes up to a minute."
+                : "Loading your Google Business Profiles..."}
+            </p>
           </div>
         )}
         {gbpError === "connect" && (
@@ -311,13 +333,24 @@ function AddLocationDialog({ onCreated, hasGbpAccess }: { onCreated: () => void;
                 </div>
               ))}
             </div>
-            <Button onClick={importGbpLocations} disabled={selectedGbp.size === 0} className="w-full gap-2" data-testid="button-import-gbp">
-              <Plus className="w-4 h-4" />
-              Import {selectedGbp.size > 0 ? `${selectedGbp.size} Location${selectedGbp.size !== 1 ? "s" : ""}` : "Selected"}
-            </Button>
+            {needsPlan ? (
+              <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2" data-testid="gbp-import-needs-plan">
+                <p className="text-sm">
+                  <strong>Your Google profile{gbpLocations.length !== 1 ? "s were" : " was"} found.</strong> Importing {gbpLocations.length !== 1 ? "them" : "it"} into
+                  ConstructHUB — and opening {gbpLocations.length !== 1 ? "their" : "its"} profile page with insights, reviews, posts and Profile Guard — needs a plan,
+                  from {formatUsd(STARTING_MONTHLY_CENTS)}/month.
+                </p>
+                <Button asChild className="w-full gap-2" data-testid="button-gbp-see-plans"><a href="/pricing">See plans to import</a></Button>
+              </div>
+            ) : (
+              <Button onClick={importGbpLocations} disabled={selectedGbp.size === 0} className="w-full gap-2" data-testid="button-import-gbp">
+                <Plus className="w-4 h-4" />
+                Import {selectedGbp.size > 0 ? `${selectedGbp.size} Location${selectedGbp.size !== 1 ? "s" : ""}` : "Selected"}
+              </Button>
+            )}
           </div>
         )}
-        {!gbpLoading && !gbpError && gbpLocations.length === 0 && !hasGbpAccess && (
+        {!gbpLoading && !gbpError && gbpLocations.length === 0 && gbpLookup === 0 && !hasGbpAccess && (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
             <Building2 className="w-10 h-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground text-center">Connect your Google account to import your business locations automatically.</p>

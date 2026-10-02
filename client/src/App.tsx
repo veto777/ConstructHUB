@@ -1,4 +1,5 @@
 import AgencyPage from "@/pages/agency";
+import GoogleProfilePage from "@/pages/google-profile";
 import { CloudflarePage, SearchConsolePage } from "@/pages/site-connections";
 import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
@@ -164,6 +165,7 @@ function DashboardRouter() {
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/agency" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
+      <Route path="/google-profile" component={GoogleProfilePage} />
       <Route path="/domains" component={DomainsPage} />
       <Route path="/mail-alerts" component={MailAlertsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />

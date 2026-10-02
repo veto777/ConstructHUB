@@ -285,6 +285,7 @@ class Call:
         self.out_q: asyncio.Queue = asyncio.Queue()
         self.sent_until = 0.0
         self.pending: list[np.ndarray] = []       # caller speech that arrived while a turn was in flight — never dropped
+        self.last_caller_norm, self.last_caller_at = "", 0.0   # the stale-duplicate guard (_hear)
         self.overlapped = False
         self.last_ai_text = ""
         self.stt_s = 0.0
@@ -585,28 +586,43 @@ class Call:
             self.pending = []
             self.turn_task = asyncio.create_task(self.turn(audio_in))
 
-    async def _turn(self, pcm16: np.ndarray, overlapped: bool) -> None:
+    async def _hear(self, pcm16: np.ndarray, overlapped: bool) -> str | None:
+        """Caller audio → the text worth answering, or None (silence, Whisper phantoms, our own echo, a short
+        fragment heard over our voice, a call-whisper announcement, or a stale repeat of what we just answered)."""
         if audio.rms(pcm16) < 0.004 or not self.brain:
-            return
+            return None
         t_stt = time.time()
         text = await asyncio.to_thread(stt.transcribe, pcm16, self.vocab)
         self.stt_s = time.time() - t_stt
         norm = " ".join(re.sub(r"[.,!?]", " ", text.lower()).split())
         if not norm or (norm in HALLUCINATIONS and len(pcm16) < 24000):
-            return   # Whisper's classic phantom phrases on near-silence; never let them end a call
+            return None   # Whisper's classic phantom phrases on near-silence; never let them end a call
         if self.last_ai_text:
             kept = self.strip_echo(text)
             if not kept:
                 log.info("ignored echo of our own voice: %s", said(text))
-                return
+                return None
             if kept != text:
                 log.info("stripped echo: %r -> %r", said(text), said(kept))
             text = kept
         if overlapped and len(text.split()) < 3 and norm not in SHORT_OK:
             log.info("ignored short fragment heard over our own voice: %s", said(text))
-            return
+            return None
         if time.time() - self.started < WHISPER_WINDOW_S and WHISPER_RE.search(text.strip()):
             log.info("ignored call-whisper announcement: %s", said(text))
+            return None
+        # The same words again within a few seconds is the queued copy of what we just answered (Alpine
+        # 2026-10-02: "Bellingham." answered twice) — not a new turn. A real repeat later still counts.
+        norm = " ".join(re.sub(r"[.,!?]", " ", text.lower()).split())
+        if norm == self.last_caller_norm and time.time() - self.last_caller_at < 8.0:
+            log.info("ignored duplicate caller text: %s", said(text))
+            return None
+        self.last_caller_norm, self.last_caller_at = norm, time.time()
+        return text
+
+    async def _turn(self, pcm16: np.ndarray, overlapped: bool) -> None:
+        text = await self._hear(pcm16, overlapped)
+        if not text:
             return
         await self.wait_played()   # still finishing a sentence? answer after it, not over it
         if self.watch_task:
@@ -617,11 +633,33 @@ class Call:
             log.info("caller %s: %d chars", self.call_sid, len(text))
         await self._respond(text, silence=False)
 
+    async def wait_caller_quiet(self, timeout: float = 4.0) -> None:
+        """Don't start talking while the caller is mid-sentence: wait (up to `timeout`) for their turn to end."""
+        end = time.time() + timeout
+        while self.speaking and not self.closing and time.time() < end:
+            await asyncio.sleep(0.05)
+
     async def _respond(self, text: str, silence: bool) -> None:
         t_brain = time.time()
         d = await self.brain.respond(text, silence=silence)
         log.info("ai %s: %s [%s] (stt %.1fs, brain %.1fs)", self.call_sid, d.say if settings.log_transcripts else f"{len(d.say)} chars", d.action,
                  0.0 if silence else self.stt_s, time.time() - t_brain)
+        if not silence and d.say:
+            # The caller kept talking while the reply was being thought up (Alpine 2026-10-02: answering the
+            # first fragment while they were already on the next sentence is what made the assistant talk over
+            # people). Let them finish; if they added something, take the unspoken reply back and answer it all.
+            await self.wait_caller_quiet(4.0)
+            if self.pending and d.action == "continue" and not self.closing:
+                audio_in = np.concatenate(self.pending)
+                self.pending = []
+                more = await self._hear(audio_in, False)
+                if more:
+                    prev = self.brain.retract_last_reply()
+                    if prev is not None:
+                        log.info("caller kept talking (%d chars more): answering the whole turn", len(more))
+                        return await self._respond(f"{prev} {more}".strip(), silence=False)
+                    self.pending = [audio_in]   # not retractable: say this reply, then answer the rest
+                    self.last_caller_norm = ""   # ...and let the duplicate guard hear it again
         if d.say:
             await self.say(d.say)
         if self.brain.end_requested:

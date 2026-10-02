@@ -5,7 +5,7 @@
  * own gates (requirePlan / requireModule / the allowance tests in
  * server/routes.ts); it never grants what those routes would refuse.
  */
-import { ADDON_MODULES, PLANS, PLAN_KEYS, planForModule, type ModuleKey, type PlanKey, type PlanLimits, type PlanModules, type AddonKey, type AddonModuleKey } from "@shared/plans";
+import { ADDONS, ADDON_MODULES, PLANS, PLAN_KEYS, planForModule, type ModuleKey, type PlanKey, type PlanLimits, type PlanModules, type AddonKey, type AddonModuleKey } from "@shared/plans";
 import type { DashboardTileDef } from "@shared/dashboard";
 
 /** The slice of server/entitlements.ts Entitlements a tile gate reads. */
@@ -24,7 +24,7 @@ export type TileAccess = {
   requiredPlan?: PlanKey;
   module?: ModuleKey;
   addon?: AddonKey | "call_assistant";
-  /** Not built yet: the tile is "coming_soon" whatever the plan. */
+  /** Listed but not for sale yet (a `preview` add-on): the tile is "coming_soon". */
   comingSoon?: boolean;
 };
 
@@ -63,7 +63,9 @@ export function tileAccess(def: DashboardTileDef, ent: TileAccessInput): TileAcc
       // tile opens it, as requireModule would let the account in. Otherwise "coming soon".
       const module = (Object.keys(ADDON_MODULES) as AddonModuleKey[]).find((k) => ADDON_MODULES[k] === gate.addon);
       if (module && ent.addonModules?.[module]) return { entitled: true, addon: gate.addon };
-      return { entitled: false, requiredPlan: gate.requiredPlan, addon: gate.addon, comingSoon: true };
+      // Not bought: "coming soon" only while the add-on is still `preview` in the price book;
+      // once it is for sale the tile is locked like any other and links to its page.
+      return { entitled: false, requiredPlan: gate.requiredPlan, addon: gate.addon, ...(ADDONS[gate.addon as AddonKey]?.preview ? { comingSoon: true } : {}) };
     }
   }
 }

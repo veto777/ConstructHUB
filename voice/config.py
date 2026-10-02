@@ -67,9 +67,12 @@ class Settings:
     # tuning (Alpine's proven defaults; the compiled profile can override timings per org)
     greeting_delay_s: float = _float("VOICE_GREETING_DELAY_S", 3.0)
     pace_lead_s: float = 0.8
-    barge_prob: float = 0.9
-    barge_frames: int = 20
-    barge_rms: float = 0.05
+    # Barge-in a caller can actually reach (Alpine 2026-10-02: 0.9 / 20 frames / 0.05 never fired on real
+    # handsets, so overlapping speech piled up and the assistant talked over people). Echo is still gated by
+    # echo_corr, and nothing interrupts the greeting.
+    barge_prob: float = 0.85
+    barge_frames: int = 16
+    barge_rms: float = 0.03
     echo_corr: float = 0.35
     speech_on: float = 0.5
     speech_end_frames: int = 30

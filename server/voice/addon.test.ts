@@ -35,11 +35,12 @@ const customer = (plan: string | null, extra: Record<string, unknown> = {}) =>
 beforeEach(() => { mocks.row = undefined; });
 
 describe("price book: the Call Assistant add-ons", () => {
-  it("are sold on Pro, Growth and Agency, grant no count limits, and stay in preview until the owner confirms pricing", () => {
+  it("are sold on Pro, Growth and Agency, grant no count limits, and are for sale (launched: no longer preview)", () => {
     for (const key of [...CALL_ASSISTANT_TIER_ADDONS, "call_number"] as const) {
       expect(ADDONS[key].availableOn).toEqual(["pro", "growth", "agency"]);
       expect(ADDONS[key].grants).toEqual({});
-      expect(ADDONS[key].preview).toBe(true);
+      // Owner, 2026-10-02: "the call assistant is live not coming soon".
+      expect(ADDONS[key].preview ?? false).toBe(false);
       expect(ADDONS[key].setupCents).toBeUndefined();
     }
     // Owner, 2026-10-02: "annually price can be $1999 for this service" — its own number, not 10 × monthly.
@@ -65,12 +66,38 @@ describe("price book: the Call Assistant add-ons", () => {
     for (const k of PLAN_KEYS) expect((PLANS[k].modules as any).callAssistant).toBeUndefined();
   });
 
-  it("checkout refuses a preview add-on and an extra number without the assistant", () => {
-    expect(() => checkAddonsForPlan("pro", { call_assistant: 1 })).toThrow(BillingRequestError);
-    try { checkAddonsForPlan("pro", { call_assistant: 1 }); } catch (e: any) { expect(e.status).toBe(409); expect(e.code).toBe("addon_unavailable"); }
-    expect(() => checkAddonsForPlan("starter", { call_assistant: 1 })).toThrow(/isn't available on the Starter plan/);
-    // The requires rule is checked after preview; it stays meaningful once preview is dropped.
+  it("checkout sells every tier on Pro, Growth and Agency, still refuses it on Starter, and refuses an extra number without a tier", () => {
+    const refusal = (fn: () => void): any => { try { fn(); } catch (e) { return e; } return null; };
+    for (const plan of ["pro", "growth", "agency"] as const) {
+      for (const key of CALL_ASSISTANT_TIER_ADDONS) {
+        expect(() => checkAddonsForPlan(plan, { [key]: 1 }), `${plan} + ${key}`).not.toThrow();
+        expect(() => checkAddonsForPlan(plan, { [key]: 1, call_number: 2 }), `${plan} + ${key} + 2 numbers`).not.toThrow();
+      }
+    }
+    for (const key of [...CALL_ASSISTANT_TIER_ADDONS, "call_number"] as const) {
+      const e = refusal(() => checkAddonsForPlan("starter", { [key]: 1 }));
+      expect(e, `starter + ${key}`).toBeInstanceOf(BillingRequestError);
+      expect(e).toMatchObject({ status: 400, code: "addon_unavailable" });
+      expect(e.message).toMatch(/isn't available on the Starter plan/);
+    }
+    // An extra number needs a tier on the same subscription.
+    const noTier = refusal(() => checkAddonsForPlan("pro", { call_number: 1 }));
+    expect(noTier).toBeInstanceOf(BillingRequestError);
+    expect(noTier).toMatchObject({ status: 400, code: "addon_unavailable" });
+    expect(noTier.message).toMatch(/needs one of these add-ons/);
     expect(() => checkAddonsForPlan("growth", { competitor_pack: 1 })).not.toThrow();
+    // The preview rule stays for the next listed-only add-on: a preview add-on is refused (409), nothing charged.
+    const saved = ADDONS.call_assistant.preview;
+    try {
+      ADDONS.call_assistant.preview = true;
+      const e = refusal(() => checkAddonsForPlan("pro", { call_assistant: 1 }));
+      expect(e).toBeInstanceOf(BillingRequestError);
+      expect(e).toMatchObject({ status: 409, code: "addon_unavailable" });
+      expect(e.message).toMatch(/isn't available yet/);
+    } finally {
+      if (saved === undefined) delete ADDONS.call_assistant.preview; else ADDONS.call_assistant.preview = saved;
+    }
+    expect(() => checkAddonsForPlan("pro", { call_assistant: 1 })).not.toThrow();
   });
 });
 

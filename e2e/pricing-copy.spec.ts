@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { PLANS, PLAN_KEYS } from "../shared/plans";
+import { ADDONS, PLANS, PLAN_KEYS } from "../shared/plans";
 import {
   CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, callAssistantTierAdvice,
   callAssistantYearlyNote, callAssistantOverageRule, joinNames, planPriceLine,
@@ -157,6 +157,10 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(`the first ${p.freeSpamCalls} spam calls each month are free (they never count toward your minutes)`);
   await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(`Above the included minutes, ${p.overageLine}.`);
   await expect(page.getByTestId("row-addon-call_number")).toBeVisible();
+  // "Coming soon" on the tier cards and the extra-number row only while the price book keeps them in preview (launched: none).
+  await expect(page.getByTestId("section-call-assistant-tiers").getByText("Coming soon", { exact: true })).toHaveCount(p.comingSoon ? p.tiers.length : 0);
+  await expect(page.getByTestId("text-call-assistant-tier-preview")).toHaveCount(p.comingSoon ? 1 : 0);
+  await expect(page.getByTestId("badge-addon-preview-call_number")).toHaveCount(ADDONS.call_number.preview ? 1 : 0);
   // The tiers' annual prices show on yearly billing even though they are over $1,000 (add-on annuals are exempt).
   await page.getByTestId("button-interval-year").click();
   for (const t of p.tiers) {

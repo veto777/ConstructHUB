@@ -5,7 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
@@ -237,6 +237,7 @@ const googleGroups: NavGroup[] = [
     logoComponent: GoogleBusinessIcon,
     landingUrl: "/google-business",
     children: [
+      { title: "Google Profile", url: "/google-profile", icon: Store },
       { title: "Agency", url: "/agency", icon: Users },
       { title: "Locations", url: "/locations", icon: MapPin },
       { title: "Domains", url: "/domains", icon: Globe },
