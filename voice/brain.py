@@ -38,7 +38,12 @@ GOODBYE_RE = re.compile(
     r"that(?:'s| is| would be) (?:all|it|everything)|nothing else|no(?:pe)?,? that(?:'s| is) (?:all|it)|i(?:'m| am) (?:all )?(?:done|good|set|finished)|"
     r"that(?:'ll| will) do|gotta go|(?:have|got|need) to (?:go|run)|i(?:'ll| will) let you go|that(?:'s| is) everything)\b", re.I)
 # "no" / "no thanks" answers the assistant's "anything else?"; only then does it count as a goodbye
-NO_RE = re.compile(r"^\s*(no|nope|nah|no thanks|no thank you|not (?:right )?now|i(?:'m| am) good|that(?:'s| is) it|that(?:'s| is) all)[\s.!,]*$", re.I)
+# fillers around the "no" are fine: "Okay, no, thanks." / "No, okay, thanks anyway." (harness E1; mirrors
+# NOTHING_ELSE_RE in server/voice/fixtures/call-policy.ts)
+NO_RE = re.compile(
+    r"^\s*(?:(?:ok(?:ay)?|oh|um+|uh+|well|alright|hmm)[\s,.!]+)*"
+    r"(?:no|nope|nah|not (?:right )?now|i(?:'m| am) good|that(?:'s| is) (?:it|all))\b[\s,.!]*"
+    r"(?:(?:ok(?:ay)?|that(?:'s| is) (?:all|it)|thanks?|thank you|i(?:'m| am) good|anyway|then|no)[\s,.!]*)*$", re.I)
 ANYTHING_ELSE_RE = re.compile(r"anything else|something else|help you with anything|else (?:I|we) can", re.I)
 DECLINE_OUTCOMES = ("declined", "out_of_area", "spam", "alerted", "blocked", "voicemail")
 
@@ -187,13 +192,29 @@ class Brain:
 
     # ── prompt ────────────────────────────────────────────────────────────────────────────────
 
+    def render_compiled_prompt(self, now: datetime) -> str:
+        """Fill the compiler's per-call placeholders `{{now}}` and `{{caller}}` (server/voice/prompt-compiler.ts
+        renderSystemPrompt / callerLine / spokenNow — the Simulator's TS brain renders the same text)."""
+        prompt = self.compiled.get("systemPrompt", "").rstrip()
+        if "{{now}}" in prompt:
+            prompt = prompt.replace("{{now}}", now.strftime("%A, %B %-d, %Y %-I:%M %p"))
+        if "{{caller}}" in prompt:
+            line = f"Caller ID: {spoken_number(self.caller)} (never read it aloud)." if _digits(self.caller) else "Caller ID: withheld or unknown."
+            c = self.caller_info.get("customer") or {}
+            if c.get("firstName") or c.get("email"):
+                line += (f" The CRM knows this number as {c.get('firstName') or 'an existing contact'}"
+                         + (f" (email {c['email']})" if c.get("email") else "")
+                         + " — confirm rather than re-ask, and treat them as a possible existing customer.")
+            prompt = prompt.replace("{{caller}}", line)
+        return prompt
+
     def system_prompt(self) -> str:
         """The compiled prompt plus the runtime block only the engine knows (time, caller id, slots, turn)."""
         now = datetime.now(self.tz)
         schema = self.compiled.get("decisionSchema") or decision_json_schema()
         required = [q["key"] for q in self.intake if q.get("required")]
         lines = [
-            self.compiled.get("systemPrompt", "").rstrip(),
+            self.render_compiled_prompt(now),
             "",
             "OUTPUT FORMAT (engine rule, overrides everything above about format): reply with exactly ONE JSON object and nothing else — "
             "no prose, no markdown, no tool calls, no reasoning. Schema: " + json.dumps(schema, separators=(",", ":")),
@@ -302,6 +323,10 @@ class Brain:
             else:
                 self._event("spam_ignored", **d.spam)
                 d.action = "continue"
+        elif d.action == "alert" and d.alert and self.spam:
+            # a flagged spam call notifies nobody (SPEC §4/§12; harness E2): record it, deliver nothing
+            self._event("alert_suppressed_spam", **d.alert)
+            d.action = "continue"
         elif d.action == "alert" and d.alert:
             self.alerted = True
             self.alerts.append(d.alert)

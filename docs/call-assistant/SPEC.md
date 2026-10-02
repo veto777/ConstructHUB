@@ -2,9 +2,8 @@
 
 *Architect's spec, 2026-10-02. Seven lanes build on this (ownership in `LANES.md`). Fixed decisions from the
 owner are marked **FIXED**; anything marked **PLACEHOLDER** needs the owner. The reference implementation is
-Alpine's "Janice" (`~/alpine/voice`, read-only; nothing from its `.env` is ever copied) and the owner's
-product spec in `~/alpine/seo-hub/docs/AI-RECEPTIONIST-PLAN-2026-10-01.md` → PRODUCT SPEC / ALPINE RULES /
-LAUNCH / TEXT ESCALATIONS.*
+Alpine's "Janice" (another project's voice engine, read-only; nothing from its `.env` is ever copied) and the
+owner's product spec (AI-RECEPTIONIST-PLAN-2026-10-01 → PRODUCT SPEC / ALPINE RULES / LAUNCH / TEXT ESCALATIONS).*
 
 ## 0. What it is
 
@@ -83,7 +82,7 @@ Transcript line: `{ role: "caller"|"assistant"|"system", text, t }`. Event: `{ t
 Call outcomes (`shared/voice-profile.ts CALL_OUTCOMES`): `lead_submitted · alerted · declined · out_of_area ·
 info · spam · blocked · hangup · voicemail · error · booked`.
 
-Recordings: R2 key `voice/<orgId>/<callSid>.wav` (8 kHz mono PCM WAV), uploaded by the engine through the
+Recordings: R2 key `voice/<orgId>/recordings/<callSid>.wav` (four segments, so the public three-segment `/api/files/:folder/:subfolder/:filename` route can never serve one) (8 kHz mono PCM WAV), uploaded by the engine through the
 internal API, streamed to the CRM through `/api/crm/voice/calls/:id/recording` (never a public bucket URL).
 
 ## 3. The profile (shared/voice-profile.ts — written in full; this is a summary)
@@ -317,7 +316,8 @@ at month end; the Overview shows minutes used vs included and the overage rate.
 
 janice → af_heart · gabe → am_michael · sofia → af_bella · maya → af_sarah · marcus → am_adam ·
 ethan → am_eric. Each has a sample line (`shared/voice-personas.ts`), pre-rendered to
-`client/public/voice/samples/<id>.mp3` by the engine lane; `voice/personas.json` is the engine's copy and
+`client/public/persona-samples/<id>.mp3` by the engine lane (served by the app at `/persona-samples/<id>.mp3`, outside the
+`/voice/*` engine proxy); `voice/personas.json` is the engine's copy and
 `verified` flips to true once checked.
 
 ## 16. Side ribbon and page
@@ -333,7 +333,7 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
 - Webhooks: signature (`SIGNALWIRE_SIGNING_KEY`) or CallSid lookup; `VOICE_SKIP_SIGNATURE=1` only on a dev
   box with no public webhook.
 - The engine reads only `voice/.env`; the operator copies ConstructHUB's own AI and SignalWire values in.
-  Nothing from `~/alpine/voice/.env` or any other project is ever read or copied. Never restart/stop
+  Nothing from Alpine's engine `.env` or any other project is ever read or copied. Never restart/stop
   `alpine-voice*` or touch +1 360-585-8200.
 - No PII in logs beyond what the CRM already logs; recordings only through the org-scoped route.
 - Two-party-consent states: `recordingNotice` on by default; the Studio warns when turning it off.
@@ -364,3 +364,33 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
 - Telegram alerts: the CRM has no Telegram channel; v1 uses SMS/email/in-app. Add Telegram to the CRM later?
 - Recording retention: keep WAVs in R2 indefinitely or purge after N days?
 - A cross-org spam list (a number blocked by two orgs is suspect everywhere) — v2?
+
+## 20. Folded in at integration (voice/integration, 2026-10-02)
+
+The lanes' contract extensions, recorded in `LANE-NOTES-*.md`, as merged:
+
+- **Recording key** — §2 above (calls+crm). **Persona samples** — `/persona-samples/<id>.mp3` (§15); the engine
+  also serves `/samples/<id>.mp3` for direct checks.
+- **Simulator** — `VOICE_SIM_BACKEND=app` (default: `server/voice/brain.ts` with the app's AI provider) or
+  `engine` (proxy to the engine's `/sim/*`). Silence is `{text:"(silence)", silence:true}`. Turn responses carry
+  `{ended, outcome (null mid-call), events (cumulative), turn, fallback}`; strip those before validating a Decision.
+  429 `rate_limited` above 150 simulated turns per org per hour.
+- **Decision parser** — one implementation for the app (`server/voice/decision.ts`) mirroring `voice/decision.py`;
+  `server/voice/fixtures/decision-cases.json` is the binding contract for both (over-long `say` is cut, trailing
+  commas repaired, unknown alert kind → `other`, unknown outcome dropped, empty `say` only with `end_call`).
+- **Prompt placeholders** — the compiled `systemPrompt` keeps `{{now}}` and `{{caller}}`; the engine and the
+  Simulator fill them per call, and the engine appends its OUTPUT FORMAT + RUNTIME block.
+- **Engine rules added** — fillers around a "no" after "anything else?" end the call; no alert is delivered after
+  a spam flag; a flagged spam call hangs up even if the caller keeps talking during the grace.
+- **Internal API** — `POST /calls` → `201 {callId, orgId}`; `PUT /calls/:sid` may answer `409 call_in_progress`
+  (the engine retries); a second `{type:"lead"}` event for a call updates the same client/project;
+  `GET /blocklist?to&from` (extension); `/profile` 200 adds `number.phoneNumber` and `caller.number`.
+- **Minutes** — one meter, `recordVoiceCallUsage` (`server/voice/billing-usage.ts`), called once per call under
+  the end-report claim; the month is the call's start (UTC).
+- **Numbers** — `VOICE_NUMBERS_MOCK=true` (dev/e2e only), purchase failures kept as `failed` rows, release through
+  the carrier that holds the row. Overage sweep `startVoiceOverageWorker` (production + Stripe +
+  `VOICE_OVERAGE_WORKER_ENABLED=true`), started from `registerVoiceRoutes`.
+- **Intro price** (owner, 2026-10-02) — `call_assistant` is $99/mo for the first 3 months, then the regular price:
+  a Stripe coupon (`duration: repeating`, 3 months, `amount_off` = regular − $99) applied once per customer when the
+  add-on is first added (§14 pricing stays the placeholder until the owner confirms it).
+

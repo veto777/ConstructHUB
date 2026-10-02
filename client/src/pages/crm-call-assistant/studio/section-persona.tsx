@@ -16,7 +16,7 @@ type Persona = VoiceProfile["persona"];
  * Persona — preset cards (name, gender, voice id, play sample), the
  * assistant's name, greeting, "are you a bot?" answer, recording notice and
  * style knobs. Samples come from GET /api/crm/voice/personas (sampleUrl is
- * null until the engine lane renders client/public/voice/samples/<id>.mp3).
+ * null until the engine lane renders client/public/persona-samples/<id>.mp3).
  * OWNER: studio-frontend lane.
  */
 export function PersonaSection({ value, onChange, disabled, companyName }: SectionProps<Persona> & { companyName?: string }) {

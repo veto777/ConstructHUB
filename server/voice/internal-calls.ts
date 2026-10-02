@@ -23,7 +23,6 @@ import { db } from "../db";
 import { voiceCalls, type VoiceCallRow, type VoiceTranscriptTurn, type VoiceCallEvent } from "@shared/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { CALL_OUTCOMES, ESCALATION_KINDS, type CallOutcome } from "@shared/voice-profile";
-import { getEntitlements, callAssistantAllowance } from "../entitlements";
 import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "./internal-auth";
 import { loadOrgVoiceContext, findVoiceNumber } from "./org-profile";
 import { deliverLead, notifyCallSummary } from "./leads";
@@ -283,8 +282,8 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
 
   // Minutes: exactly once per call (this function runs once per call — see the claim).
   try {
-    const ent = await getEntitlements(ctx.org.ownerUserId);
-    await meterCallUsage({ orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, billedMinutes, outcome, includedMinutes: callAssistantAllowance(ent).minutes, at: row.endedAt ?? new Date() });
+    // The month a call belongs to is its start (billing-usage.ts).
+    await meterCallUsage({ orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, billedMinutes, outcome, at: row.startedAt ?? row.endedAt ?? new Date() });
     patch.metered = billedMinutes;
   } catch (e: any) {
     console.error("[voice] usage metering failed:", e?.message || e);

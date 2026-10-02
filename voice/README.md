@@ -24,7 +24,7 @@ API. It runs on the **tower GPU** as the user unit `constructhub-voice.service`
 | `decision.py` | validation + cleanup of the model's JSON (tool-call/`<think>` stripping, one retry, honest fallback) | engine |
 | `personas.json` | verified Kokoro voice ids (mirrored in `shared/voice-personas.ts`) | engine |
 | `providers/` | `openai_compat.py` (default, TruthCoder) · `anthropic_tools.py` (optional, real tool use) | engine |
-| `render_samples.py` | verify persona voice ids + render `client/public/voice/samples/<id>.mp3` | engine |
+| `render_samples.py` | verify persona voice ids + render `client/public/persona-samples/<id>.mp3` | engine |
 | `selftest/` | the engine's own tests (`pytest selftest`: no GPU, no network) + `mock_app.py` + `e2e_media.py` (GPU smoke) | engine |
 | `sim.py` | text simulator CLI (`python sim.py --profile tests/profiles/sample.json --script tests/scripts/booking.txt`) | harness (first version by engine) |
 | `tests/` | `fake_signalwire.py` synthetic caller, scripted calls, decision-protocol unit tests | harness (sample profile + scripts by engine) |

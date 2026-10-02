@@ -14,9 +14,10 @@
  */
 import { and, desc, eq, inArray, sql, type AnyColumn } from "drizzle-orm";
 import { db } from "../db";
-import { crmOrgs, crmMembers, voiceProfiles, voiceProfileVersions, voiceNumbers, voiceSpam, crmCustomers, type VoiceProfileRow, type VoiceProfileVersionRow, type VoiceNumberRow } from "@shared/schema";
+import { crmOrgs, crmMembers, voiceProfiles, voiceProfileVersions, voiceNumbers, crmCustomers, type VoiceProfileRow, type VoiceProfileVersionRow, type VoiceNumberRow } from "@shared/schema";
 import { defaultVoiceProfile, parseVoiceProfile, type VoiceProfile, type CompiledProfile } from "@shared/voice-profile";
 import { compileVoiceProfile } from "./prompt-compiler";
+import { callerSpamStatus } from "./spam";
 
 export type VoiceProfileStatus = "draft" | "live" | "paused";
 
@@ -243,8 +244,8 @@ export function normalizeE164(raw: string | null | undefined): string | null {
 export async function callerStatus(orgId: string, from: string | null | undefined): Promise<CallerStatus> {
   const phone = normalizeE164(from);
   if (!phone) return { blocked: false, strikes: 0, customer: null };
-  const [spam] = await db.select().from(voiceSpam).where(and(eq(voiceSpam.orgId, orgId), eq(voiceSpam.phoneNumber, phone))).limit(1);
-  const blocked = !!spam?.blockedAt && (!spam.unblockedAt || spam.unblockedAt < spam.blockedAt);
+  // One source of truth for the ledger: spam.ts (calls+crm lane) writes and reads voice_spam.
+  const spam = await callerSpamStatus(orgId, phone);
   // The CRM stores phones as typed ("(813) 555-0100"), so match on the last ten digits like entities.ts/hover.ts do.
   const last10 = phone.replace(/\D/g, "").slice(-10);
   const digitsOf = (col: AnyColumn) => sql`right(regexp_replace(coalesce(${col}, ''), '[^0-9]', '', 'g'), 10)`;
@@ -254,7 +255,7 @@ export async function callerStatus(orgId: string, from: string | null | undefine
     .orderBy(desc(crmCustomers.updatedAt))
     .limit(1);
   return {
-    blocked, strikes: spam?.strikes ?? 0,
+    blocked: spam.blocked, strikes: spam.strikes,
     customer: cust ? { id: cust.id, firstName: cust.firstName || cust.displayName?.split(/\s+/)[0] || null, email: cust.email } : null,
   };
 }

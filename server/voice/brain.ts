@@ -24,10 +24,11 @@
  * JSON (no response_format, no tools — the TruthCoder gateway refuses both).
  */
 import type OpenAI from "openai";
-import { decisionSchema, type Decision, type CompiledProfile, type CallOutcome } from "@shared/voice-profile";
+import type { Decision, CompiledProfile, CallOutcome } from "@shared/voice-profile";
 import { aiClient, aiErrorTag, type ChatClient } from "../ai-output";
 import { aiModel } from "../ai-config";
 import { renderSystemPrompt, type CallerContext } from "./prompt-compiler";
+import { stripDecisionMarkup, firstJsonObject, parseJsonBlock, decisionFromObject } from "./decision";
 
 export const FALLBACK_SAY = "I'm sorry, I'm having a little trouble on my end — could you say that one more time?";
 export const RETRY_INSTRUCTION = "Reply with only the JSON object described in OUTPUT FORMAT — no prose, no markdown, no tool calls.";
@@ -37,57 +38,41 @@ export type TranscriptTurn = { role: "caller" | "assistant" | "system"; text: st
 export type BrainEvent = { t: string; type: string; decision?: Partial<Decision>; detail?: Record<string, unknown> };
 
 // ── Cleaning + parsing ───────────────────────────────────────────────────────
-
-const THINK_TAGS = "think|thinking|reasoning|reflection|analysis|scratchpad";
+// One parser for the app and the engine: ./decision.ts follows voice/decision.py and is pinned by
+// server/voice/fixtures/decision-cases.json (the binding contract, also run against the engine by pytest).
 
 /** Strip the markup an agent-style model leaks around its JSON (same families server/ai-output.ts strips). */
 export function cleanDecisionText(raw: unknown): string {
-  if (typeof raw !== "string") return "";
-  let s = raw.replace(/\r\n?/g, "\n");
-  s = s.replace(new RegExp(`<(${THINK_TAGS})>[\\s\\S]*?<\\/\\1>`, "gi"), "")
-    .replace(new RegExp(`\\[(${THINK_TAGS})\\][\\s\\S]*?\\[\\/\\1\\]`, "gi"), "");
-  const orphan = new RegExp(`<\\/(?:${THINK_TAGS})>|\\[\\/(?:${THINK_TAGS})\\]`, "gi");
-  let m: RegExpExecArray | null, end = -1;
-  while ((m = orphan.exec(s))) end = m.index + m[0].length;
-  if (end >= 0) s = s.slice(end);
-  s = s.replace(new RegExp(`(?:<(?:${THINK_TAGS})>|\\[(?:${THINK_TAGS})\\])[\\s\\S]*$`, "i"), "");
-  s = s
-    .replace(/<(tool_calls?|function_calls|tool_use|tool_response|tool_result)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
-    .replace(/<(tool_calls?|function_calls|tool_use)\b[^>]*>[\s\S]*$/i, "")
-    .replace(/<function=[^>]*>[\s\S]*?(?:<\/function>|$)/gi, "")
-    .replace(/<\/?(?:tool_calls?|function_calls|tool_use|tool_response|tool_result|function|parameter|invoke)\b[^>]*>/gi, "")
-    .replace(/```[a-z]*\n?/gi, "");
-  return s.trim();
+  return typeof raw === "string" ? stripDecisionMarkup(raw) : "";
 }
 
-/** Every balanced top-level {…} block in `s`, in order (string-aware). */
+/** Every balanced {…} block in `s`, in order (string-aware); an unbalanced "{" is skipped, like the engine. */
 export function jsonObjects(s: string): string[] {
   const out: string[] = [];
-  let depth = 0, start = -1, inStr = false;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (inStr) { if (c === "\\") i++; else if (c === '"') inStr = false; continue; }
-    if (c === '"') { if (depth > 0) inStr = true; continue; }
-    if (c === "{") { if (depth === 0) start = i; depth++; }
-    else if (c === "}" && depth > 0) { depth--; if (depth === 0 && start >= 0) { out.push(s.slice(start, i + 1)); start = -1; } }
+  let from = 0;
+  while (from < s.length) {
+    const rest = s.slice(from);
+    const block = firstJsonObject(rest);
+    if (!block) break;
+    out.push(block);
+    from += rest.indexOf(block) + block.length;
   }
   return out;
 }
 
 export type ParsedDecision = { ok: true; decision: Decision } | { ok: false; reason: "empty" | "no-json" | "invalid"; text: string };
 
-/** The first object in the reply that is a valid Decision. */
+/** The first object in the reply that is a valid Decision (the engine's repairs applied). */
 export function parseDecision(raw: unknown): ParsedDecision {
   const text = cleanDecisionText(raw);
   if (!text) return { ok: false, reason: "empty", text };
   const candidates = jsonObjects(text);
   if (!candidates.length) return { ok: false, reason: "no-json", text };
   for (const c of candidates) {
-    let v: unknown;
-    try { v = JSON.parse(c); } catch { continue; }
-    if (!v || typeof v !== "object" || !("say" in (v as object))) continue;
-    const r = decisionSchema.safeParse(v);
-    if (r.success) return { ok: true, decision: r.data };
+    const j = parseJsonBlock(c);
+    if ("error" in j) continue;
+    const r = decisionFromObject(j.obj);
+    if (r.ok) return { ok: true, decision: r.decision };
   }
   return { ok: false, reason: "invalid", text };
 }
@@ -98,7 +83,8 @@ export function parseDecision(raw: unknown): ParsedDecision {
 const GOODBYE_ANY = /\b(?:good-?bye|see ya|see you later|talk (?:to you )?later|take care|gotta go|got to go|have to go|need to go|not interested|stop calling)\b/i;
 /** Only when the utterance ENDS with it ("12 Bye Lane" or "that's it, the roof leaks" are not goodbyes). */
 const GOODBYE_END = /(?:^|[\s,.!])(?:bye(?:[\s-]bye| now)?|that'?s (?:all|it|everything)|nothing else|no,? (?:that'?s|thats) (?:all|it)|that'?ll (?:be|do) (?:it|all)|i'?m (?:all )?set|i'?m good|i'?m done|we'?re done)(?:[\s,.!]+(?:thanks|thank you)(?: so much)?)?[\s.!,]*$/i;
-const NO = /^\s*(?:no|nope|nah|no thanks|no thank you|not really|i'?m good|that'?s all|that'?s it|nothing)\b[\s.!,]*$/i;
+// fillers around the "no" are fine ("Okay, no, thanks." / "No, okay, thanks anyway.") — same rule as voice/brain.py NO_RE
+const NO = /^\s*(?:(?:ok(?:ay)?|oh|um+|uh+|well|alright|hmm)[\s,.!]+)*(?:no|nope|nah|not really|i'?m good|that'?s all|that'?s it|nothing)\b[\s,.!]*(?:(?:ok(?:ay)?|that'?s (?:all|it)|thanks?|thank you|i'?m good|anyway|then|no)[\s,.!]*)*$/i;
 const ANYTHING_ELSE = /anything else|something else|anything more|is there anything/i;
 
 export function callerSaidGoodbye(text: string): boolean {
@@ -252,7 +238,9 @@ export class Brain {
       if (out.spam.confidence < t.flagAt) { out.action = "continue"; this.spam = null; this.event("spam_below_threshold", { detail: { confidence: out.spam.confidence, flagAt: t.flagAt } }); }
     }
     if (out.action === "alert") {
-      if (out.alert) { this.alerted = true; this.event("alert", { decision: { alert: out.alert, slots: out.slots } }); }
+      // a flagged spam call notifies nobody (SPEC §4/§12; same rule as voice/brain.py)
+      if (out.alert && this.spamFlagged()) { out.action = "continue"; this.event("alert_suppressed_spam", { decision: { alert: out.alert } }); }
+      else if (out.alert) { this.alerted = true; this.event("alert", { decision: { alert: out.alert, slots: out.slots } }); }
       else { out.action = "continue"; this.event("alert_without_kind"); }
     }
     if (out.action === "submit_lead") {

@@ -6,7 +6,7 @@ Routes are unprefixed; the app proxies https://constructhub.us/voice/<route> her
   POST /signalwire/status  status callbacks (verified) → app /status
   GET  /media              the media WebSocket (8 kHz mu-law both ways) — one Call per stream
   GET  /health             {ok, models, activeCalls, …}
-  GET  /samples/{id}.mp3   the Studio's persona samples (the proxy shadows client/public/voice/samples)
+  GET  /samples/{id}.mp3   the persona samples (the app serves the same files at /persona-samples/)
   GET  /personas           bearer — the verified persona list (personas.json)
   POST /sim/session        bearer — {compiled, orgId?, callerNumber?, timezone?} → {sessionId, greeting, compiledVersion}
   POST /sim/turn           bearer — {sessionId, text, silence?} → Decision + {ended, outcome, events}
@@ -508,7 +508,9 @@ class Call:
                     if self.play_task and not self.play_task.done():
                         self.play_task.cancel()
                     log.info("barge-in by caller")
-            if self.strong_n >= settings.barge_frames and self.brain and self.brain.end_requested and not self.closing:
+            # a spam call hangs up regardless of a robocall that keeps talking (harness E4)
+            if self.strong_n >= settings.barge_frames and self.brain and self.brain.end_requested and not self.closing \
+                    and not self.brain.spam:
                 self.brain.end_requested = False   # the caller kept talking: cancel the pending hang-up
                 log.info("hang-up cancelled: caller is speaking")
         else:
@@ -581,7 +583,7 @@ class Call:
         if self.brain.end_requested:
             await self.wait_played()
             await asyncio.sleep(1.5)            # grace: let a last word land before the line drops
-            if self.brain.end_requested and not self.speaking:
+            if self.brain.end_requested and (not self.speaking or self.brain.spam):
                 await self.close()
 
     async def silence_watch(self) -> None:
@@ -767,12 +769,12 @@ async def media_ws(req: web.Request) -> web.WebSocketResponse:
     return ws
 
 
-SAMPLES_DIR = Path(__file__).resolve().parent.parent / "client" / "public" / "voice" / "samples"
+SAMPLES_DIR = Path(__file__).resolve().parent.parent / "client" / "public" / "persona-samples"
 
 
 async def persona_sample(req: web.Request) -> web.StreamResponse:
-    """Public: the Studio's persona sample MP3s. They live in client/public/voice/samples/, but the app proxies every
-    /voice/* path to this engine, so https://constructhub.us/voice/samples/<id>.mp3 lands here — serve them."""
+    """Public: the persona sample MP3s (client/public/persona-samples/). The app serves them itself at
+    /persona-samples/<id>.mp3 (outside the /voice/* proxy); this copy stays for direct engine/tailnet checks."""
     name = req.match_info["name"]
     m = re.fullmatch(r"([a-z]{2,20})\.mp3", name)
     ids = {p["id"] for p in PERSONAS.get("personas", [])}

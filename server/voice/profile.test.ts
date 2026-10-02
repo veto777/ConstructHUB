@@ -239,7 +239,7 @@ describe("simulator guard and personas", () => {
     resetPersonaCache();
     const list = personaList();
     expect(list.map((p) => [p.id, p.voice])).toEqual([["janice", "af_heart"], ["gabe", "am_michael"], ["sofia", "af_bella"], ["maya", "af_sarah"], ["marcus", "am_adam"], ["ethan", "am_eric"]]);
-    for (const p of list) expect(p.sampleUrl === null || p.sampleUrl === `/voice/samples/${p.id}.mp3` || p.sampleUrl === `/voice/samples/${p.id}.wav`).toBe(true);
+    for (const p of list) expect(p.sampleUrl === null || p.sampleUrl === `/persona-samples/${p.id}.mp3` || p.sampleUrl === `/persona-samples/${p.id}.wav`).toBe(true);
   });
 });
 

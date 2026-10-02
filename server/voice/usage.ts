@@ -1,18 +1,18 @@
 /**
  * Minutes metering hook (docs/call-assistant/SPEC.md § 2 voice_usage) —
- * OWNER: calls+crm lane (the write at the end of a call).
+ * the write at the end of a call (calls+crm lane).
  *
- * `voice_usage` is the meter the numbers+billing lane reads (Overview, overage
- * reporting to Stripe in server/voice/billing-usage.ts). This file only adds
- * what a finished call contributes: one call, its billed minutes
- * (ceil(duration/60)), the spam/blocked counters, the included-minutes
- * snapshot and the overage so far. Idempotent per call: internal-calls.ts
- * calls it exactly once, when the call row's billed_minutes is first set.
+ * Integration: the calls+crm and numbers+billing lanes each wrote a
+ * voice_usage upsert. There is now ONE meter — `recordVoiceCallUsage` in
+ * ./billing-usage.ts (the billing lane's, with the int casts, the
+ * blocked → 0 minutes rule and the "included minutes only grow within a
+ * month" snapshot). This file keeps the calls lane's call shape and forwards.
+ * Idempotent per call: internal-calls.ts calls it exactly once, under the
+ * end-report claim.
  */
-import { db } from "../db";
-import { voiceUsage } from "@shared/schema";
-import { sql } from "drizzle-orm";
-import { monthKey } from "../growth-quotas";
+import { billedMinutesFor, recordVoiceCallUsage } from "./billing-usage";
+
+export { billedMinutesFor };
 
 export type CallUsage = {
   orgId: string;
@@ -20,36 +20,10 @@ export type CallUsage = {
   accountUserId: number;
   billedMinutes: number;
   outcome: string | null;
-  /** callAssistantAllowance(ent).minutes at the time of the call. */
-  includedMinutes: number;
   at?: Date;
 };
 
-export const billedMinutesFor = (durationSeconds: number | null | undefined): number =>
-  Math.max(0, Math.ceil((Number(durationSeconds) || 0) / 60));
-
 /** Add one finished call to the org's month. Returns the month row after the write. */
-export async function meterCallUsage(u: CallUsage) {
-  const month = monthKey(u.at ?? new Date());
-  const spam = u.outcome === "spam" ? 1 : 0;
-  const blocked = u.outcome === "blocked" ? 1 : 0;
-  const [row] = await db.insert(voiceUsage).values({
-    orgId: u.orgId, accountUserId: u.accountUserId, month,
-    calls: 1, minutes: u.billedMinutes, spamCalls: spam, blockedCalls: blocked,
-    includedMinutes: u.includedMinutes,
-    overageMinutes: Math.max(0, u.billedMinutes - u.includedMinutes),
-  }).onConflictDoUpdate({
-    target: [voiceUsage.orgId, voiceUsage.month],
-    set: {
-      accountUserId: u.accountUserId,
-      calls: sql`${voiceUsage.calls} + 1`,
-      minutes: sql`${voiceUsage.minutes} + ${u.billedMinutes}`,
-      spamCalls: sql`${voiceUsage.spamCalls} + ${spam}`,
-      blockedCalls: sql`${voiceUsage.blockedCalls} + ${blocked}`,
-      includedMinutes: u.includedMinutes,
-      overageMinutes: sql`greatest(0, ${voiceUsage.minutes} + ${u.billedMinutes} - ${u.includedMinutes})`,
-      updatedAt: new Date(),
-    },
-  }).returning();
-  return row;
+export function meterCallUsage(u: CallUsage) {
+  return recordVoiceCallUsage({ orgId: u.orgId, accountUserId: u.accountUserId, outcome: u.outcome, billedMinutes: u.billedMinutes, at: u.at });
 }

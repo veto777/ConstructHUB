@@ -292,7 +292,7 @@ export async function reportAllVoiceOverage(month?: string, deps: OverageDeps = 
   return { month: target, orgs, reportedMinutes, skipped };
 }
 
-// ── The sweep worker (wired by the integrator in server/index.ts) ───────────
+// ── The sweep worker (started from registerVoiceRoutes in server/voice/index.ts) ──
 
 const SWEEP_EVERY_MS = 6 * 60 * 60_000;
 const SWEEP_FIRST_DELAY_MS = 10 * 60_000;

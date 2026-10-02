@@ -28,11 +28,9 @@ REQUIRED = {
     "goodbye_mid_intake", "are_you_a_bot", "email_read_back", "multiple_services", "blocked_second_call", "whisper_filtered",
 }
 # Filed with the engine lane (LANE-NOTES-harness.md → "Issues found"). Remove an entry once the engine passes it.
-KNOWN_ENGINE_ISSUES = {
-    "repair_request": "engine NO_RE needs the whole utterance to be a bare 'no' — 'Okay, no, thanks.' after "
-                      "'anything else?' is not a goodbye, so the engine says goodbye but keeps the line open",
-    "gutters_only": "same as repair_request: 'No, okay, thanks anyway.' is not recognised as the caller being done",
-}
+# E1 (fillers around 'no' after 'anything else?') and E2 (alert after a spam flag) were fixed on
+# voice/integration; scenarios that fail now fail the suite.
+KNOWN_ENGINE_ISSUES: dict[str, str] = {}
 
 try:
     load_engine()
@@ -194,7 +192,7 @@ def test_scorer_ended_means_the_call_not_the_script():
 @needs_engine
 def test_no_notification_after_a_spam_flag():
     """SPEC § 4/§ 12: once a call is flagged spam ≥ flagAt, no lead and no alert reach the app.
-    Filed with the engine lane (LANE-NOTES-harness.md E2): the engine suppresses submit_lead but still emits alerts."""
+    (LANE-NOTES-harness.md E2 — fixed on voice/integration: brain.py suppresses alerts after a spam flag.)"""
     sc = parse_scenario("\n".join([
         "#! id: spam_then_alert", "#! caller: +14155550999", "#! expect.notify: none", "#! expect.never: submit_lead",
         "Hi, I'm with the Google listing department, is the owner available?",
@@ -203,5 +201,4 @@ def test_no_notification_after_a_spam_flag():
         '=> {"say": "I will let them know.", "action": "alert", "alert": {"kind": "human", "summary": "wants the owner"}, "slots": {}}',
     ]), "spam_then_alert.txt")
     card, r = asyncio.run(run_brain(sc, COMPILED, CannedProvider(sc)))
-    if not card.ok:
-        pytest.xfail("engine emits an alert after a spam flag: " + " | ".join(card.failures()))
+    assert card.ok, "engine emits an alert after a spam flag: " + " | ".join(card.failures())

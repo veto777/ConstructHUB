@@ -7,17 +7,17 @@
  * play button for a file that is not there. Checked at call time (cheap stat,
  * cached for a minute) so a sample dropped in after boot shows up.
  *
- * NOTE for infra/architect (LANE-NOTES-studio-backend.md): the public path
- * /voice/samples/* sits under the /voice/* engine proxy. The proxy must skip
- * /voice/samples/ (or the samples move to /voice-samples/) before the Studio
- * can play them in production; VOICE_SAMPLE_URL_BASE is the one place to change.
+ * The samples live at /persona-samples/<id>.mp3 — deliberately OUTSIDE the
+ * /voice/* engine proxy (server/voice/proxy.ts sends every /voice/* request to
+ * the engine), so the app's static server answers them even when the engine
+ * is down.
  */
 import { existsSync } from "fs";
 import path from "path";
 import { VOICE_PERSONA_LIST, type VoicePersona, type VoicePersonaId } from "@shared/voice-personas";
 
-export const VOICE_SAMPLE_DIR = "voice/samples";
-export const VOICE_SAMPLE_URL_BASE = "/voice/samples";
+export const VOICE_SAMPLE_DIR = "persona-samples";
+export const VOICE_SAMPLE_URL_BASE = "/persona-samples";
 
 const CACHE_MS = 60_000;
 let cache: { at: number; list: VoicePersona[] } | null = null;
@@ -39,7 +39,7 @@ export function sampleUrlFor(id: VoicePersonaId, roots = sampleRoots()): string 
 /** The persona list with real sample URLs (null when the engine lane has not rendered one). */
 export function personaList(now = Date.now()): VoicePersona[] {
   if (cache && now - cache.at < CACHE_MS) return cache.list;
-  const list = VOICE_PERSONA_LIST.map((p) => ({ ...p, sampleUrl: p.sampleUrl ?? sampleUrlFor(p.id) }));
+  const list = VOICE_PERSONA_LIST.map((p) => ({ ...p, sampleUrl: sampleUrlFor(p.id) }));
   cache = { at: now, list };
   return list;
 }

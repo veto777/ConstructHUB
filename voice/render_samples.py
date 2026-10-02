@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Engine-lane tool: verify the persona voice ids against Kokoro-82M, write personas.json (verified: true), and
-render each persona's sample line to client/public/voice/samples/<id>.mp3 (the Studio's "play sample" button).
+render each persona's sample line to client/public/persona-samples/<id>.mp3 (the Studio's "play sample" button).
 
   python render_samples.py            # renders every persona
   python render_samples.py --check    # only verify the voice ids and rewrite personas.json
@@ -23,7 +23,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from speech import TTS, verify_personas  # noqa: E402
 
-SAMPLES_DIR = HERE.parent / "client" / "public" / "voice" / "samples"
+SAMPLES_DIR = HERE.parent / "client" / "public" / "persona-samples"
 
 
 def main() -> None:

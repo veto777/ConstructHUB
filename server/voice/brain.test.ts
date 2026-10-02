@@ -52,7 +52,10 @@ describe("parsing the model's reply", () => {
     expect(parseDecision("<think>hmm</think>")).toMatchObject({ ok: false, reason: "empty" });
     expect(parseDecision("What's your address?")).toMatchObject({ ok: false, reason: "no-json" });
     expect(parseDecision(J({ say: "x", action: "transfer" }))).toMatchObject({ ok: false, reason: "invalid" });
-    expect(parseDecision(J({ say: "x".repeat(401), action: "continue" }))).toMatchObject({ ok: false, reason: "invalid" });
+    // decision-cases.json (the engine's contract): over-long speech is cut, not rejected; empty say only with end_call
+    const long = parseDecision(J({ say: "x".repeat(401), action: "continue" }));
+    expect(long.ok && long.decision.say.length).toBe(400);
+    expect(parseDecision(J({ say: "", action: "continue" }))).toMatchObject({ ok: false, reason: "invalid" });
     expect(parseDecision(42)).toMatchObject({ ok: false, reason: "empty" });
   });
 
@@ -175,7 +178,7 @@ describe("Brain turns", () => {
 
     const { b } = brain([
       J({ say: "We're not interested, thank you — goodbye.", action: "flag_spam", spam: { confidence: 0.97, reason: "Google listing pitch" } }),
-      J({ say: "", action: "submit_lead", slots: { phone: "8135550100" } }),
+      J({ say: "Let me take your details.", action: "submit_lead", slots: { phone: "8135550100" } }),
       J({ say: "", action: "end_call", outcome: "info" }),
     ]);
     const t1 = await b.respond("I'm calling about your Google Business listing verification");
@@ -189,9 +192,10 @@ describe("Brain turns", () => {
     expect(b.submitted).toBe(false);
   });
 
-  it("an alert without a kind is not an alert; with one it is, and a call with only an alert ends as alerted", async () => {
+  it("an alert without a kind is invalid (retry, then the fallback line); with one it is, and a call with only an alert ends as alerted", async () => {
     const { b } = brain([
       J({ say: "Let me get your details.", action: "alert" }),
+      J({ say: "Let me get your details.", action: "alert", alert: { summary: "no kind" } }),
       J({ say: "I'll alert the team so someone calls you back.", action: "alert", alert: { kind: "human", summary: "wants the owner about an invoice" } }),
       J({ say: "Bye now.", action: "end_call", outcome: "info" }),
     ], null);
