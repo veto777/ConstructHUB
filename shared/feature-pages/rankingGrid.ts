@@ -142,6 +142,37 @@ const page: FeaturePage = {
       a: "No. The grid measures where you appear; it doesn't change anything on Google. Use it to see where to focus, then run it again to check.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the grid centered on the business's Maps
+  // coordinates, the odd sizes 3–15, spacing 0.5–20 miles and the point layout are client/src/pages/ranking-grid.tsx
+  // (selectedBusiness lat/lon, GRID_SIZES, DISTANCE_OPTIONS) + server/routes.ts POST /api/ranking-grid/scans and
+  // runRankingGridScan (Places text search with a location bias at each point, the business's position among the
+  // results returned, the top five kept per point); the colour bands and summary are ranking-grid.tsx; the credit cost
+  // and refund are shared/plans.ts gridCreditCost + server/routes.ts refundReservation.
+  inDepth: {
+    heading: { title: "A Local Rank Tracker for Google Maps, ", em: "Explained" },
+    paragraphs: [
+      "When someone searches for the work you do, Google shows a short list of local businesses with a map, and the " +
+        "order depends partly on where the person searching is. A contractor who comes up first near the shop can be " +
+        "missing a few towns over. The GMB Ranking Grid is a local rank tracker that measures that spread for one " +
+        "search phrase at a time, so you can see your Google Maps ranking across your service area instead of from " +
+        "one spot.",
+      "The grid is centered on your business's location on Google Maps. You choose its size, from 3 by 3 to 15 by 15 " +
+        "points, and the spacing between neighboring points, from half a mile to 20 miles. A 5 by 5 grid with points " +
+        "2 miles apart, for example, covers 8 miles from edge to edge. At each point the grid runs your keyword " +
+        "through Google's Places search from that spot and records where your business appears among the results " +
+        "returned. If it isn't among them, the point shows as not found.",
+      "Read the report as a map of where you are strong and where you are missing. Pins in the top 3 close to your " +
+        "address that fade to not found further out show where your reach ends for that phrase. Because the top five " +
+        "businesses at every point are kept, the report also shows which competitors come up where you don't, and " +
+        "their average and best rank across the grid. Running the same keyword again later, from your scan history, " +
+        "shows whether that picture changed.",
+      "Bigger grids run more searches, so they use more credits: one credit per 25 points, rounded up. A grid that " +
+        "fails gives its credits back. You don't connect a Google account; the grid only needs your business on " +
+        "Google Maps and a keyword. The result is a measurement taken through Google's Places search at one moment, " +
+        "not a copy of what any one person sees on their phone, so use it to compare areas and track change over " +
+        "time. The grid itself changes nothing on Google.",
+    ],
+  },
   related: ["gbp", "competitors", "siteScan"],
   app: { href: "/ranking-grid", surface: "app" },
   headings: {
@@ -150,9 +181,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Run a Grid" },
   },
   seo: {
-    title: "GMB Ranking Grid — Local Map Rank Checker | ConstructHUB",
+    title: "Google Maps Rank Checker: GMB Ranking Grid | ConstructHUB",
     description:
-      "See where your business ranks for a keyword across your service area on a map grid, with average rank, best rank and the businesses that come up most.",
+      "Check where your business ranks on Google Maps for a keyword across your service area, point by point on a grid, and see who outranks you where.",
   },
   sources: [
     "client/src/pages/ranking-grid.tsx",

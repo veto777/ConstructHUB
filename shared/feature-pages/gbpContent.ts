@@ -136,6 +136,36 @@ const page: FeaturePage = {
       a: "You get a notice, and the queue shows the error so you can fix it and retry. If Google's answer was unclear, check your profile before retrying, because a retry could publish the item twice.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the draft rules (business facts only, missing
+  // facts left out, at most three hashtags, captions describe only what is visible) are server/gbp/content.ts
+  // draftPrompt; "Learn from past updates" reading the listing's earlier posts and saving only on save is content.ts
+  // /learn + PATCH /style; the pacing and business-hours shift (re-checked at publish) are content.ts scheduleTimes +
+  // runContentWorker; the daily cap deferring to the next day, published / rejected / uncertain, no automatic re-send
+  // and the stop on a changed Google link are runContentWorker; the notices are server/notification-kinds.ts.
+  inDepth: {
+    heading: { title: "Google Business Profile Posts, ", em: "Explained" },
+    paragraphs: [
+      "Google Business Profile posts are the updates, events and offers that appear on your listing, and listing " +
+        "photos show people the work you do. Posts & Photos publishes both through the Google account you connected " +
+        "in Locations, to the listing linked there, so you never hand anyone your Google password.",
+      "AI drafts work from facts, not guesses. A post draft uses your listing's business name, description and " +
+        "services, plus your instructions, example posts and saved style notes. If your instructions ask for something " +
+        "those facts don't supply, such as a discount, a price, a rating, a phone number or a date, the draft leaves it " +
+        "out, and it uses at most three hashtags, taken from your business, services or places. A photo caption " +
+        "describes only what is visible in the photo. Learn from past updates reads the posts already on your listing " +
+        "and suggests style notes, which are kept only when you save them.",
+      "Approving a set of items queues it at the pace you chose: a first publish time and a number per day or per " +
+        "week, or an exact time for each item. With business hours on, a time that falls outside your chosen weekdays " +
+        "and opening hours moves to the next open slot in your time zone, and that's checked again right before " +
+        "publishing. A daily publishing cap keeps the pace steady; an item over it waits until the next day. The " +
+        "schedule spaces out what you approved. It doesn't write new posts on its own.",
+      "Google's answer sets each item's status. An accepted item is marked published and you get a notice; a post " +
+        "Google rejects is marked rejected so you can correct it. If a publish is interrupted, the item is marked " +
+        "uncertain and is never re-sent automatically, because a second try could post it twice: check your profile, " +
+        "then retry. If the location's Google link changes after you queued something, the item stops rather than " +
+        "publishing to a different listing.",
+    ],
+  },
   related: ["gbp", "media", "social"],
   app: { href: "/gbp-content", surface: "app" },
   headings: {
@@ -143,9 +173,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Schedule" },
   },
   seo: {
-    title: "Schedule Google Business Profile Posts and Photos | ConstructHUB",
+    title: "Google Business Profile Post Scheduler | ConstructHUB",
     description:
-      "Draft Google updates, events and offers, upload job photos and schedule them to your Google Business Profile at your pace. Nothing publishes until you approve it.",
+      "Schedule Google Business Profile posts, offers, events and job photos at your pace, with AI drafts from your own facts. Nothing publishes unapproved.",
   },
   sources: [
     "client/src/pages/gbp-content.tsx",
