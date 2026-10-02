@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { PublicPageHeader } from "@/components/public-page-chrome";
 import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -275,6 +276,9 @@ export default function AuthPage() {
   const bubble = BUBBLE[mode];
 
   return (
+    <>
+    {/* The site's ribbon, as on every public page (owner, 2026-10-02). */}
+    <PublicPageHeader next={nextParam ?? "/"} />
     <div className="mkt-editorial mkt-shadcn min-h-screen bg-mkt-paper text-mkt-ink lg:grid lg:grid-cols-12" data-testid="page-auth" data-auth-mode={mode}>
       {/* The form: cream paper with the drafting grid fading out below the masthead. */}
       <div className="relative lg:col-span-7 xl:col-span-6 flex flex-col min-h-screen">
@@ -683,6 +687,7 @@ export default function AuthPage() {
         </div>
       </aside>
     </div>
+    </>
   );
 }
 
