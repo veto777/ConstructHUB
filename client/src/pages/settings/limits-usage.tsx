@@ -49,6 +49,15 @@ type LimitRow = {
 
 type LimitGroup = { title: string; rows: LimitRow[] };
 
+/** GET /api/crm/voice/status — the subset this page reads (server/voice/billing.ts). Answers without the add-on. */
+type VoiceStatusLite = {
+  enabled: boolean;
+  allowance: { numbers: number; minutes: number };
+  pricing: { includedMinutes: number; overageCentsPerMinute: number };
+  numberAllowance?: { used: number };
+  usage: { minutes: number; overageMinutes: number; overageCents: number } | null;
+};
+
 const countText = (v: number) => (v < 0 ? "Unlimited (fair use)" : v === 0 ? "Not included" : formatCount(v));
 const perMonth = (v: number) => (v < 0 ? "Unlimited (fair use)" : v === 0 ? "Not included" : `${formatCount(v)} / mo`);
 
@@ -83,6 +92,9 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const crmMe = useQuery<{ seats?: { used: number; limit: number } }>({ queryKey: ["/api/crm/me"], enabled: !!allowances });
   const templates = useQuery<unknown[]>({ queryKey: ["/api/review-templates"], enabled: !!allowances && allowances.reviewTemplates !== 0 });
   const apiKeys = useOptionalQuery<ApiKeysPlan>("/api/account/api-keys", hasApi);
+  // Call Assistant add-on (numbers+billing lane): only where the plan can buy it.
+  const callAssistantSold = !!entitlements?.accessPlan && ADDONS.call_assistant.availableOn.includes(entitlements.accessPlan);
+  const voice = useOptionalQuery<VoiceStatusLite>("/api/crm/voice/status", callAssistantSold);
 
   if (ent.isLoading) return <LoadingCard label="Loading your limits…" />;
   if (ent.error) {
@@ -214,6 +226,42 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
     },
   ];
 
+  if (callAssistantSold) {
+    const vs = voice.data ?? null;
+    const on = vs?.enabled === true;
+    const minutes = on ? vs!.allowance.minutes : 0;
+    const numbers = on ? vs!.allowance.numbers : 0;
+    const overage = on && vs!.usage && vs!.usage.overageMinutes > 0 ? vs!.usage : null;
+    groups.push({
+      title: "AI Call Assistant",
+      rows: [
+        {
+          key: "callAssistantMinutes",
+          label: "Call Assistant minutes",
+          included: on ? perMonth(minutes) : "Add-on",
+          excluded: !on,
+          used: !on ? null : vs!.usage ? vs!.usage.minutes : 0,
+          ceiling: on && minutes > 0 ? minutes : undefined,
+          monthly: true,
+          hint: overage
+            ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} at ${formatUsd(vs!.pricing.overageCentsPerMinute)}/min, on your next invoice.`
+            : `Every started minute of an answered call counts; blocked spam costs nothing. Above the included minutes: ${formatUsd(vs?.pricing.overageCentsPerMinute ?? 0)}/min.`,
+          addon: "call_assistant",
+        },
+        {
+          key: "callAssistantNumbers",
+          label: "Call Assistant phone numbers",
+          included: on ? countText(numbers) : "Add-on",
+          excluded: !on,
+          used: !on ? null : vs!.numberAllowance ? vs!.numberAllowance.used : undefined,
+          ceiling: on && numbers > 0 ? numbers : undefined,
+          hint: "One local number comes with each AI Call Assistant; buy and release them in CRM → Call Assistant → Numbers.",
+          addon: on ? "call_number" : undefined,
+        },
+      ],
+    });
+  }
+
   if (hasApi) {
     groups.push({
       title: "API",
@@ -313,7 +361,13 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                           <div className="min-w-0 text-xs text-muted-foreground">
                             <span className="font-medium text-foreground">{addon.name}</span> · {formatUsd(addonPriceCents(addon, interval))}{intervalSuffix(interval)} each
                             {addon.setupCents ? ` + ${formatUsd(addon.setupCents)} one-time setup` : ""}
-                            {!editable && (
+                            {addon.preview && (
+                              <>
+                                {" · "}
+                                <Badge variant="outline" className="text-[10px]" data-testid={`badge-limit-addon-preview-${addon.key}`}>Coming soon</Badge>
+                              </>
+                            )}
+                            {!editable && !addon.preview && (
                               <>
                                 {" · "}
                                 <button type="button" className="underline hover:text-foreground" onClick={() => go("billing")} data-testid={`link-limit-addon-billing-${addon.key}`}>
@@ -328,7 +382,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                               variant="outline"
                               className="h-8 w-8"
                               aria-label={`Remove one ${addon.name}`}
-                              disabled={!editable || addonMutation.isPending || qty === 0}
+                              disabled={!editable || addonMutation.isPending || qty === 0 || addon.preview === true}
                               onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty - 1 })}
                               data-testid={`button-limit-addon-dec-${addon.key}`}
                             >
@@ -342,7 +396,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                               variant="outline"
                               className="h-8 w-8"
                               aria-label={`Add one ${addon.name}`}
-                              disabled={!editable || addonMutation.isPending}
+                              disabled={!editable || addonMutation.isPending || addon.preview === true}
                               onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty + 1 })}
                               data-testid={`button-limit-addon-inc-${addon.key}`}
                             >
@@ -369,10 +423,11 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   );
 }
 
-/** Exposed for tests: the limit keys this page renders, in order (every PlanLimits field plus the API pair when present). */
-export const LIMIT_ROW_KEYS: readonly (keyof PlanLimits | "apiUnitsPerMonth" | "apiRatePerMinute")[] = [
+/** Exposed for tests: the limit keys this page renders, in order (every PlanLimits field, the Call Assistant pair on plans that sell it, and the API pair when present). */
+export const LIMIT_ROW_KEYS: readonly (keyof PlanLimits | "callAssistantMinutes" | "callAssistantNumbers" | "apiUnitsPerMonth" | "apiRatePerMinute")[] = [
   "locations", "guardCadenceMinutes", "gridCredits", "reviewTemplates", "autoPublishAiReplies",
   "protectedSites", "siteScans", "competitorScans",
   "permitSearches", "crmSeats", "teamTextSegments", "clientTexting",
+  "callAssistantMinutes", "callAssistantNumbers",
   "apiUnitsPerMonth", "apiRatePerMinute",
 ];
