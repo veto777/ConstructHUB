@@ -9,10 +9,15 @@
  *     it crops cleanly in a circle.
  *
  * Each ships at three pixel sizes; the browser picks by DPR via srcSet.
+ *
+ * File names carry a version (.v1) — Cloudflare caches image URLs by
+ * extension for hours, and it once cached the SPA's HTML fallback for these
+ * paths from before they existed. A changed image gets a new version, never
+ * the same name.
  */
 
-const STANDING = { 128: "/mascot/gator-standing-128.webp", 256: "/mascot/gator-standing-256.webp", 512: "/mascot/gator-standing-512.webp" } as const;
-const GABE = { 160: "/mascot/gabe-160.webp", 320: "/mascot/gabe-320.webp", 640: "/mascot/gabe-640.webp" } as const;
+const STANDING = { 128: "/mascot/gator-standing-128.v1.webp", 256: "/mascot/gator-standing-256.v1.webp", 512: "/mascot/gator-standing-512.v1.webp" } as const;
+const GABE = { 160: "/mascot/gabe-160.v1.webp", 320: "/mascot/gabe-320.v1.webp", 640: "/mascot/gabe-640.v1.webp" } as const;
 
 /** The standing gator at a given CSS height (width follows the art's 0.655 ratio). */
 export function StandingGator({ height = 64, className = "" }: { height?: number; className?: string }) {
