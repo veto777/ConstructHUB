@@ -46,6 +46,17 @@ export type LeadFacts = {
   bestTime: string | null;
 };
 
+/** "55 Oak Lane, Bellingham, WA" with city Bellingham → "55 Oak Lane" (the CRM keeps the city in its own field). */
+export function streetOnly(address: string | null, city: string | null): string | null {
+  if (!address || !city) return address;
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  const isCity = (p: string | undefined) => !!p && p.toLowerCase() === city.toLowerCase();
+  // a trailing state/ZIP goes only when the city precedes it ("…, NE" alone may be part of the street)
+  if (parts.length > 2 && /^[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/i.test(parts[parts.length - 1]) && isCity(parts[parts.length - 2])) parts.pop();
+  if (parts.length > 1 && isCity(parts[parts.length - 1])) parts.pop();
+  return parts.join(", ");
+}
+
 export function leadFactsFrom(call: Pick<VoiceCallRow, "fromNumber" | "callerName" | "callerEmail" | "callerAddress" | "callerCity" | "serviceNeeded">, slots: Record<string, string> = {}): LeadFacts {
   const pick = (...keys: string[]) => {
     for (const k of keys) { const v = slots[k]; if (typeof v === "string" && v.trim()) return v.trim(); }
@@ -54,12 +65,13 @@ export function leadFactsFrom(call: Pick<VoiceCallRow, "fromNumber" | "callerNam
   const slotPhone = pick("phone", "callback", "callback_number");
   const phone = normalizePhone(slotPhone) ?? normalizePhone(call.fromNumber);
   const email = pick("email");
+  const city = pick("city") ?? (call.callerCity?.trim() || null);
   return {
     phone,
     name: pick("first_name", "name", "full_name") ?? (call.callerName?.trim() || null),
     email: email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.toLowerCase() : (call.callerEmail?.trim() || null),
-    address: pick("address", "street_address") ?? (call.callerAddress?.trim() || null),
-    city: pick("city") ?? (call.callerCity?.trim() || null),
+    address: streetOnly(pick("address", "street_address") ?? (call.callerAddress?.trim() || null), city),
+    city,
     need: pick("need", "service", "project") ?? (call.serviceNeeded?.trim() || null),
     bestTime: pick("best_time", "callback_time"),
   };

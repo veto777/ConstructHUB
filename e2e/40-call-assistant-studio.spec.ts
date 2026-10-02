@@ -228,7 +228,11 @@ test.describe("Call Assistant — Agent Studio", () => {
     await expect(page.getByTestId("persona-cards")).toBeVisible();
     await page.getByTestId("card-persona-gabe").click();
     await expect(page.getByTestId("card-persona-gabe")).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByTestId("button-persona-play-gabe")).toBeDisabled();
+    // The samples ship in client/public/persona-samples/ (served by the app, outside the /voice/* proxy).
+    await expect(page.getByTestId("button-persona-play-gabe")).toBeEnabled();
+    const sample = await page.request.get("/persona-samples/gabe.mp3");
+    expect(sample.status()).toBe(200);
+    expect(sample.headers()["content-type"]).toContain("audio/mpeg");
     await page.getByTestId("button-wizard-next").click();
 
     // Intake: add a custom question and move it up one.

@@ -75,6 +75,17 @@ describe("leadFactsFrom", () => {
   });
 });
 
+describe("streetOnly (integration: the engine's address slot often carries the city)", () => {
+  it("drops a trailing city (and a state/ZIP after it), never part of the street", async () => {
+    const { streetOnly } = await import("./leads");
+    expect(streetOnly("55 Oak Lane, Bellingham", "Bellingham")).toBe("55 Oak Lane");
+    expect(streetOnly("55 Oak Lane, bellingham, WA 98225", "Bellingham")).toBe("55 Oak Lane");
+    expect(streetOnly("123 4th Ave, NE", "Seattle")).toBe("123 4th Ave, NE");
+    expect(streetOnly("Bellingham", "Bellingham")).toBe("Bellingham");
+    expect(streetOnly("55 Oak Lane, Bellingham", null)).toBe("55 Oak Lane, Bellingham");
+  });
+});
+
 describe("lead delivery (real DB)", () => {
   it("findCustomerByPhone matches formatted phone and alt phone inside the org only, never archived clients", async () => {
     const phone = fakePhone(), alt = fakePhone(), archived = fakePhone();
