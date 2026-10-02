@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard, Activity,
-  Search, Mail, Copy, Check, Loader2, Rocket, Ban,
+  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, MetricCard, StatusPill, EmptyState, ErrorCard,
@@ -158,6 +158,11 @@ export default function CrmAdminPage() {
     queryKey: ["/api/admin/analytics"],
     enabled: isAdmin && gateOpen,
     refetchInterval: 60_000,
+  });
+  // Hub (the corner assistant): outcome counts only — no messages, replies or people.
+  const { data: hubStats, isError: hubStatsError } = useQuery<{ days: number; rows: { tier: string; outcome: string; reason: string; count: number }[] }>({
+    queryKey: ["/api/admin/hub-stats"],
+    enabled: isAdmin && gateOpen,
   });
   const { data: orgDetail, isError: orgDetailError } = useQuery<OrgDetail>({
     queryKey: ["/api/admin/orgs", detailOrgId],
@@ -726,6 +731,44 @@ export default function CrmAdminPage() {
                   <td className={`${crmTable.td} max-w-[220px] truncate`}>{r.path}</td>
                   <td className={`${crmTable.td} tabular-nums text-muted-foreground`}>{r.ip || "—"}</td>
                   <td className={`${crmTable.td} hidden lg:table-cell max-w-[260px] truncate text-muted-foreground`}>{r.userAgent}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Hub assistant (counts only; Hub never stores what anyone asked) ── */}
+      <div className="space-y-3" data-testid="section-admin-hub">
+        <SectionTitle icon={MessageCircle} title="Hub assistant"
+          description="Outcome counts for the corner assistant over the last 30 days. Hub keeps no messages, replies or identities." />
+        <div className={crmTable.wrapper}>
+          <table className={crmTable.table}>
+            <thead className={crmTable.thead}>
+              <tr>
+                <th className={crmTable.th}>Visitor</th>
+                <th className={crmTable.th}>Outcome</th>
+                <th className={crmTable.th}>Reason</th>
+                <th className={crmTable.thRight}>Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hubStatsError && (
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-destructive">
+                  Couldn't load Hub stats — refresh to try again.
+                </td></tr>
+              )}
+              {!hubStatsError && (hubStats?.rows ?? []).length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No Hub activity in the last 30 days.
+                </td></tr>
+              )}
+              {(hubStats?.rows ?? []).map((r) => (
+                <tr key={`${r.tier}-${r.outcome}-${r.reason}`} className={crmTable.tr}>
+                  <td className={crmTable.td}>{r.tier === "builder" ? "Signed in" : "Signed out"}</td>
+                  <td className={crmTable.td}>{r.outcome.replace(/_/g, " ")}</td>
+                  <td className={`${crmTable.td} text-muted-foreground`}>{r.reason}</td>
+                  <td className={crmTable.tdRight}>{r.count}</td>
                 </tr>
               ))}
             </tbody>

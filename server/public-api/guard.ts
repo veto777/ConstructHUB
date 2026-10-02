@@ -3,7 +3,7 @@
  * API key (`Authorization: Bearer chub_…`) authenticates ONLY the public API
  * router at /api/v1. Presenting one anywhere else — the session routes, the
  * AI routes (/api/gbp/content/:id/draft, /api/gmb/review-response,
- * /api/sitescan/jobs/:id/plan, /api/social/generate, /api/site-assistant/chat),
+ * /api/sitescan/jobs/:id/plan, /api/social/generate, /api/hub/chat),
  * /api/account/*, /api/crm/* — is answered 401 before any handler runs, even
  * on routes that are otherwise anonymous, so a key can never be mistaken for
  * a session. No imports on purpose: this file must stay AI-free and cheap.

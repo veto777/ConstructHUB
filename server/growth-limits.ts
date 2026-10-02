@@ -20,6 +20,12 @@ export async function takeBudget(key: string, limit: number, amount = 1, windowM
     WHERE growth_budgets.used+EXCLUDED.used <= $4 RETURNING used`, [key, String(period), amount, limit]);
   return result.rowCount === 1;
 }
+/** Read-only: how much of a budget the current window has used (0 when untouched). */
+export async function budgetUsed(key: string, windowMs = 600_000): Promise<number> {
+  const period = Math.floor(Date.now() / windowMs);
+  const result = await pool.query(`SELECT used FROM growth_budgets WHERE key=$1 AND period=$2`, [key, String(period)]);
+  return Number(result.rows[0]?.used ?? 0);
+}
 export function rateLimit(name: string, perUser = 20, perIp = 50, windowMs = 600_000): RequestHandler {
   return async (req, res, next) => {
     try {

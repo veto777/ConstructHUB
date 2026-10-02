@@ -20,13 +20,13 @@ import { randomUUID } from "node:crypto";
 const here = path.dirname(new URL(import.meta.url).pathname);
 const root = path.resolve(here, "../../..");
 const sources = readdirSync(here).filter((f) => /-write\.ts$/.test(f) && !f.endsWith(".test.ts")).sort();
-const FORBIDDEN_MODULES = [/^openai$/, /ai-config/, /ai-output/, /review-automation/, /sitescan\/providers/, /site-assistant/, /ads-consultant/, /sitescan\/worker/, /social\/agency/, /gbp\/content$/];
+const FORBIDDEN_MODULES = [/^openai$/, /ai-config/, /ai-output/, /review-automation/, /sitescan\/providers/, /hub\/ai/, /ads-consultant/, /sitescan\/worker/, /social\/agency/, /gbp\/content$/];
 const FORBIDDEN_NAMES = ["createDraftGenerator", "generateDraft", "generateReply", "processReplies", "generateText", "generateDue", "openAIProvider", "planBatches", "OpenAI", "aiModel", "aiVisionModel"];
 const specifiers = (code: string) => [...code.matchAll(/(?:from\s+|import\s*\()\s*["']([^"']+)["']/g)].map((m) => m[1]);
 const namedImports = (code: string) => [...code.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from/g)].flatMap((m) => m[1].split(",").map((s) => s.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]).filter(Boolean));
 
 /** An AI module, as a bare specifier (`openai`) or a resolved file path. */
-const AI_MODULE = /^openai$|\/(ai-config|ai-output|review-automation|sitescan\/providers|site-assistant|ads-consultant)(\.tsx?)?$/;
+const AI_MODULE = /^openai$|\/(ai-config|ai-output|review-automation|sitescan\/providers|hub\/ai|ads-consultant)(\.tsx?)?$/;
 /**
  * Session-side modules the write resources reuse whose own import graph
  * reaches an AI module. Since the service split (gbp/reply.ts, social/schedule.ts,
@@ -93,7 +93,7 @@ const AI_ROUTES = (job: string) => [
   ["POST", "/api/gmb/review-response", {}, "anonymous"],
   ["POST", `/api/sitescan/jobs/${job}/plan`, {}, "session"],
   ["POST", "/api/social/generate", { requestId: job }, "session"],
-  ["POST", "/api/site-assistant/chat", {}, "anonymous"],
+  ["POST", "/api/hub/chat", {}, "anonymous"],
 ] as const;
 
 async function freePort() {

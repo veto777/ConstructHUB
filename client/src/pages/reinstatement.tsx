@@ -18,6 +18,8 @@ import {
   FileCheck, MessageCircle, Clock, Building2,
 } from "lucide-react";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
+import { GBP_REINSTATEMENT_CENTS } from "@shared/plans";
+import { formatUsd } from "@shared/plan-copy";
 
 const SUSPENSION_REASONS = [
   { icon: AlertTriangle, title: "Business name keyword stuffing", desc: "Adding extra keywords or location names to your business name that don't reflect your real-world name." },
@@ -125,7 +127,7 @@ export default function ReinstatementPage() {
                   <p className="text-sm text-white/60">Business days<br />to review your case</p>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-[#4A6CF7]">$599</p>
+                  <p className="text-3xl font-bold text-[#4A6CF7]">{formatUsd(GBP_REINSTATEMENT_CENTS)}</p>
                   <p className="text-sm text-white/60">Per<br />project</p>
                 </div>
               </div>
@@ -135,7 +137,7 @@ export default function ReinstatementPage() {
               <CardContent className="p-8">
                 <h2 className="text-xl font-bold mb-1">Start your reinstatement</h2>
                 <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-bold text-[#4A6CF7]">$599</span>
+                  <span className="text-4xl font-bold text-[#4A6CF7]">{formatUsd(GBP_REINSTATEMENT_CENTS)}</span>
                   <span className="text-muted-foreground text-sm">per project</span>
                 </div>
                 <ul className="space-y-3 mb-6">

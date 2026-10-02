@@ -17,7 +17,7 @@
  *     vocabulary (../errors.ts), without leaking internals.
  *
  * NO AI RULE: nothing under server/public-api/resources reaches openai,
- * ai-config, ai-output, review-automation, sitescan/providers, site-assistant,
+ * ai-config, ai-output, review-automation, sitescan/providers, hub/ai,
  * ads-consultant or any AI generator — directly or transitively (the session
  * services reused here are the AI-free halves: gbp/reply.ts,
  * social/schedule.ts, sitescan/audit.ts). API-created content is stored

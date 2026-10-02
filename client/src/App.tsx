@@ -92,7 +92,7 @@ import GoogleReviewsPage from "@/pages/google-reviews";
 import ReviewFeedbackPage from "@/pages/review-feedback";
 import ReviewUnsubscribePage from "@/pages/review-unsubscribe";
 import AdsConsultantChat from "@/components/ads-consultant-chat";
-import SiteAssistantChat from "@/components/site-assistant-chat";
+import HubWidget from "@/components/hub/hub-widget";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsOfUsePage from "@/pages/terms-of-use";
 import { CrmTermsPage, CrmPrivacyPage } from "@/pages/crm-legal";
@@ -440,8 +440,6 @@ function AppContent() {
 
   const showAdsChat = location.startsWith("/google-ads") || location.startsWith("/google-ad-fraud");
 
-  const showSiteChat = location === "/" || location === "/landing";
-
   if (!user) {
     // On the portal, an anonymous visitor gets the sign-in screen. Never the
     // marketing site — the two are deliberately separate products.
@@ -449,7 +447,8 @@ function AppContent() {
     return (
       <>
         <PublicRouter />
-        {showSiteChat && <SiteAssistantChat />}
+        {/* Hub, the corner assistant: preset questions only for signed-out visitors (marketing pages). */}
+        <HubWidget surface="marketing" signedIn={false} />
       </>
     );
   }
@@ -528,6 +527,7 @@ function AppContent() {
             </main>
           </div>
           <CrmRibbon />
+          <HubWidget surface="portal" signedIn />
         </div>
       </SidebarProvider>
     );
@@ -537,25 +537,25 @@ function AppContent() {
     return (
       <>
         <LandingPage />
-        <SiteAssistantChat />
+        <HubWidget surface="marketing" signedIn />
       </>
     );
   }
 
   if (location === "/google-ads-landing") {
-    return <GoogleAdsLandingPage />;
+    return <><GoogleAdsLandingPage /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location === "/permits-landing") {
-    return <PermitsLandingPage />;
+    return <><PermitsLandingPage /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location === "/competitors-landing" && SHOW_COMPETITOR_INTEL) {
-    return <CompetitorsLandingPage />;
+    return <><CompetitorsLandingPage /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location === "/master-class-landing") {
-    return <MasterClassLandingPage />;
+    return <><MasterClassLandingPage /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location.startsWith("/contract/sign/")) {
@@ -606,7 +606,8 @@ function AppContent() {
           </main>
         </div>
       </div>
-      {showAdsChat && <AdsConsultantChat />}
+      {/* The Google Ads pages keep their own consultant chat; everywhere else Hub helps. */}
+      {showAdsChat ? <AdsConsultantChat /> : <HubWidget surface="growth" signedIn />}
     </SidebarProvider>
   );
 }

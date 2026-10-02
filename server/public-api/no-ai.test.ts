@@ -25,7 +25,7 @@ export const FORBIDDEN_FILES = [
   "server/gbp/review-automation.ts",
   "server/social/service.ts",
   "server/sitescan/providers.ts",
-  "server/site-assistant.ts",
+  "server/hub/ai.ts",
   "server/ads-consultant.ts",
 ];
 

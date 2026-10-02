@@ -216,6 +216,8 @@ export const ADDONS: Record<AddonKey, Addon> = {
 };
 
 export const TRIAL_DAYS = 1;
+/** GBP Reinstatement service, per project (one price for the page, the cards and the Hub assistant). */
+export const GBP_REINSTATEMENT_CENTS = 59_900;
 /** Services at or above this price show "Talk to a sales rep" instead of a price. */
 export const SALES_THRESHOLD_CENTS = 100_000;
 export const showsPrice = (cents: number) => cents < SALES_THRESHOLD_CENTS;

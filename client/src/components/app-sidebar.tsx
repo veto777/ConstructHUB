@@ -36,6 +36,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { County } from "@shared/schema";
 import { CHLogo } from "@/components/ch-logo";
+import { StandingGator } from "@/components/mascot";
 
 /** Round orange badges matching the IP Tracker / Pricing artwork. */
 function SocialMediaIcon({ className }: { className?: string }) {
@@ -409,9 +410,13 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-5 pb-6">
-        <Link href="/" className="flex flex-col cursor-pointer" data-testid="link-logo-home">
-          <CHLogo height={36} />
-          <p className="text-[10px] font-medium text-sidebar-foreground/40 tracking-wide mt-1 leading-tight" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
+        <Link href="/" className="flex items-center justify-between gap-3 cursor-pointer" data-testid="link-logo-home">
+          <span className="flex flex-col min-w-0">
+            <CHLogo height={36} />
+            <p className="text-[10px] font-medium text-sidebar-foreground/40 tracking-wide mt-1 leading-tight" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
+          </span>
+          {/* The mascot stands beside the mark on every ConstructHUB sidebar. */}
+          <StandingGator height={64} className="shrink-0 -my-2" />
         </Link>
       </SidebarHeader>
       <SidebarContent>

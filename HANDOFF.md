@@ -109,6 +109,29 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   Keys are managed at https://truthcoder.com/api-keys (named, revocable; built by Kimi in the TruthCoder project).
   This is an owner-approved cross-project coupling — record it in `~/HUB/registry.json → known_tower_couplings`.
 
+## 👷 2026-09-30 — Hub, the corner assistant (branch `hub/agent`, not deployed)
+- Replaces the old site assistant (`server/site-assistant.ts`, `site-assistant-chat.tsx` — both removed). A cartoon
+  crew member in the bottom-right corner (`client/src/components/hub/`). **Signed out** (marketing pages): 14 preset
+  question chips only, no text box; answers come from `hub_preset_answers` (generated in the background through
+  TruthCoder, cached per question + knowledge hash) or from price-book templates — a tap never calls the model.
+  **Signed in** (growth app + CRM portal): chips + free-text chat. Never on homeowner token pages, `/auth`, `/admin`,
+  the client host, or the Google Ads pages (their consultant chat stays). First signed-in visit shows a welcome bubble.
+- **No tools, no DB in the AI path**: the model sees only the rules, the public knowledge pack
+  (`server/data/hub-knowledge.md`, prices filled from `shared/plans.ts` / `plan-copy.ts`) and the visitor's redacted
+  words. Every guardrail is deterministic code in `server/hub/` (pre-filter, output filter, signed turns, budgets,
+  breaker, provider pin) — the model (abliterated) is not trusted. Spec + red-team list: `server/hub/redteam-cases.json`.
+- Endpoints: `GET /api/hub/presets`, `POST /api/hub/preset {presetId}`, `POST /api/hub/chat` (JSON + same-origin
+  `Origin` required), `GET /api/admin/hub-stats` (platform admin; also a card on /admin). Logs: one line
+  `hub: <outcome> <reason> <ms>`; `/api/hub` bodies are excluded from the request logger; `hub_stats` holds counts only.
+- Env (all optional): `HUB_AI_HOSTS` (default `127.0.0.1:8250`) + `HUB_EXPECTED_MODEL` (default `truthcode:38`) —
+  production refuses chat on any other provider; `HUB_AI_TIMEOUT_MS` (45 s cap), `HUB_GLOBAL_DAILY_CAP` (1500),
+  `HUB_MAX_CONCURRENCY` (3), `HUB_TURN_KEY` (else derived from SESSION_SECRET), `HUB_WARM_PRESETS=false` to skip warming.
+- Tests: `npx vitest run server/hub/` (unit + in-process routes with a stub model), Playwright
+  `-c playwright.hub.config.ts` (needs a bypass-on and a bypass-off dev server), live eval `scripts/hub-redteam.ts`.
+- **Owner to confirm on the TruthCoder side** (we don't change it): the "ConstructHUB" key's `truthcode:38` preset has
+  no tools, knowledge/RAG, web search or memory, and API calls are not saved as chats. A bare request reports ~600
+  extra prompt tokens, so the server appears to add its own system prompt to every call.
+
 ## 🚀 2026-09-30 — round-4 lanes + pre-launch QA (deployed 16:08 UTC)
 - **Shipped:** agency mode + email onboarding (a1), Site Scan fix guidance (a2), Google Ads/LSA manager (a3),
   Social business selector (a4), Cloudflare + Search Console (a5; Global Key is exchanged for a scoped token and

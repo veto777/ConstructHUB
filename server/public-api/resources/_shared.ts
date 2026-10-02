@@ -15,7 +15,7 @@
  *     registry uses for 401/402/429.
  *
  * NO AI: this folder never imports openai, ai-config, ai-output, content generators, review
- * automation, social generators, sitescan providers, site-assistant or ads-consultant. Reads only.
+ * automation, social generators, sitescan providers, the Hub assistant (server/hub) or ads-consultant. Reads only.
  *
  * Tenancy: own data only, or — with `?workspace=<ownerUserId>` — an agency workspace the key's user
  * is a member of (agency_members), limited to the member's assigned clients exactly like the

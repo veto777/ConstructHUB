@@ -8,7 +8,8 @@ import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
 } from "@shared/plan-copy";
-import { SITE_ASSISTANT_KNOWLEDGE, SITE_ASSISTANT_PROMPT } from "./site-assistant";
+import { knowledgeBook } from "./hub/knowledge";
+import { hardRulesText } from "./hub/prompt";
 import { ADS_CONSULTANT_KNOWLEDGE, ADS_CONSULTANT_PROMPT } from "./ads-consultant";
 import { TRIAL_CODE_PLAN_NAME } from "./email";
 import { INFO_CONTENT } from "../client/src/lib/info-content";
@@ -75,6 +76,8 @@ describe("plan copy helpers", () => {
 
 describe("AI assistant prompts use the price book", () => {
   const knowledge = pricingKnowledge();
+  // The Hub (corner assistant, server/hub) replaced the old site assistant.
+  const HUB_TEXT = `${hardRulesText()}\n${knowledgeBook().pack}`;
 
   it("lists every plan at its monthly and annual price, the trial and no free plan", () => {
     for (const key of PLAN_KEYS) {
@@ -86,7 +89,7 @@ describe("AI assistant prompts use the price book", () => {
   });
 
   for (const [name, text] of [
-    ["site assistant", `${SITE_ASSISTANT_PROMPT}\n${SITE_ASSISTANT_KNOWLEDGE}`],
+    ["hub assistant", HUB_TEXT],
     ["ads consultant", `${ADS_CONSULTANT_PROMPT}\n${ADS_CONSULTANT_KNOWLEDGE}`],
   ] as const) {
     it(`${name}: no legacy plans, invented products or guarantees`, () => {
@@ -100,11 +103,11 @@ describe("AI assistant prompts use the price book", () => {
     });
   }
 
-  it("site assistant quotes no service at or above the sales threshold", () => {
+  it("hub assistant quotes no service at or above the sales threshold", () => {
     // The only amounts of $1,000 or more it may state are annual plan prices
     // and the threshold itself ("priced at $1,000 or more").
     const planAnnual = new Set([...PLAN_KEYS.map((k) => PLANS[k].annualCents), SALES_THRESHOLD_CENTS]);
-    const text = `${SITE_ASSISTANT_PROMPT}\n${SITE_ASSISTANT_KNOWLEDGE}`;
+    const text = HUB_TEXT;
     const overThreshold = dollarAmounts(text).filter((c) => c >= SALES_THRESHOLD_CENTS && !planAnnual.has(c));
     expect(overThreshold.map(formatUsd)).toEqual([]);
     expect(text).not.toMatch(/32,864/);

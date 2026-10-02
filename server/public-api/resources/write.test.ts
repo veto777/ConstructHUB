@@ -38,7 +38,7 @@ import { startSiteScan } from "./sitescan-write";
 let owner = 0, other = 0, noPlan = 0, location = 0, unlinked = 0, otherLocation = 0, review = 0, otherReview = 0;
 let base = "", server: ReturnType<express.Express["listen"]>;
 const replyMock = vi.fn(realReply);
-const AI_ROUTES = ["/api/gbp/content/1/draft", "/api/gmb/review-response", `/api/sitescan/jobs/${randomUUID()}/plan`, "/api/social/generate", "/api/site-assistant/chat"];
+const AI_ROUTES = ["/api/gbp/content/1/draft", "/api/gmb/review-response", `/api/sitescan/jobs/${randomUUID()}/plan`, "/api/social/generate", "/api/hub/chat"];
 
 type Key = { user: number; scopes?: string[]; id?: string };
 async function call(path: string, key: Key | null, body?: unknown, method = "POST") {
