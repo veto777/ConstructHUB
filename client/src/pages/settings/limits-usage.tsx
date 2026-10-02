@@ -9,7 +9,7 @@ import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { ADDONS, PLANS, CALL_ASSISTANT_FREE_SPAM_CALLS, type AddonKey, type BillingInterval, type PlanKey, type PlanLimits } from "@shared/plans";
 import { CallAssistantTierPicker } from "@/components/call-assistant-tiers";
-import { callAssistantTierNumbersLine } from "@shared/plan-copy";
+import { callAssistantOverageLine, callAssistantTierNumbersLine } from "@shared/plan-copy";
 import {
   AGENCY_INCLUDED_LOCATIONS, addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
 } from "@/lib/pricing-display";
@@ -267,8 +267,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
             : paused
             ? "Paused: the subscription's payment didn't go through. Update your payment method in Billing and the assistant answers again; your number is held meanwhile."
             : overage
-            ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} at ${formatUsd(vs!.pricing.overageCentsPerMinute)}/min, on your next invoice.`
-            : `Every started minute of an answered call counts; blocked spam costs nothing. Above the included minutes: ${formatUsd(vs?.pricing.overageCentsPerMinute ?? 0)}/min.`,
+            ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} so far, each call at the rate of the tier it was taken on (now ${formatUsd(vs!.pricing.overageCentsPerMinute)}/min), on your next invoice.`
+            : `Every started minute of an answered call counts; blocked spam costs nothing. Above the included minutes: ${on ? `${formatUsd(vs!.pricing.overageCentsPerMinute)}/min on your tier (${callAssistantOverageLine()})` : callAssistantOverageLine()}.`,
           action: (
             <div className="w-full space-y-2" data-testid="row-limit-call-assistant-tier">
               <p className="text-xs text-muted-foreground">

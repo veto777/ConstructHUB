@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST, type VoicePersona } from "@shared/voice-personas";
-import { callAssistantPricing, callAssistantIntroShort, callAssistantSpamAllowanceLine } from "@shared/plan-copy";
+import { callAssistantPricing, callAssistantIntroShort, callAssistantSpamAllowanceLine, joinNames } from "@shared/plan-copy";
 // The editorial primitives (buttons, panel hairlines, the section kicker) live
 // in feature-landing/primitives.tsx, shared with every /features page.
 import { BTN_LG, BTN_PRIMARY, Kicker, PANEL_RULE, PANEL_RULE_STRONG } from "@/components/feature-landing/primitives";
@@ -299,9 +299,9 @@ export function CallAssistantSection() {
             </div>
             <p className="mt-1.5 text-[14px] text-mkt-ink-soft" data-testid="text-call-assistant-landing-tiers">
               {price.tiers.map((t, i) => (
-                <span key={t.tier}>{i > 0 ? (i === price.tiers.length - 1 ? " and " : ", ") : "Three tiers: "}<strong className="font-semibold text-mkt-ink">{t.name}</strong> ({t.minutes} min, {t.numbersLabel})</span>
+                <span key={t.tier}>{i > 0 ? (i === price.tiers.length - 1 ? " and " : ", ") : `Regular prices from ${price.from}/mo. ${price.tierCountWord.replace(/^./, (c) => c.toUpperCase())} tiers: `}<strong className="font-semibold text-mkt-ink">{t.name}</strong> ({t.minutes} min, {t.numbersLabel})</span>
               ))}
-              . The first {price.freeSpamCalls} spam calls each month are free on every tier. An add-on for the {price.plans} plans.
+              . {joinNames(price.tiers.filter((t) => t.lowerOverage).map((t) => t.name))} pay less per extra minute. The first {price.freeSpamCalls} spam calls each month are free on every tier. An add-on for the {price.plans} plans.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">

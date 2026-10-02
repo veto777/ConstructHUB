@@ -607,7 +607,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
   });
 
   it("Call Assistant tiers: switching is an add-on change on the same subscription — the held tier goes, prorated; never two tiers", async () => {
-    const tiers = ["call_assistant", "call_assistant_crew", "call_assistant_fleet", "call_number"] as const;
+    const tiers = ["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet", "call_number"] as const;
     // While the tiers are in preview the route refuses them and Stripe is never called.
     await seedProSubscription();
     mocks.rows.push([liveRow()]);
@@ -667,6 +667,23 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
       ]);
       expect(downParams.items.some((i: any) => i.discounts)).toBe(false);
       expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant: 1 });
+
+      // Lite, the fourth tier, follows the same rules: Solo → Lite swaps the one tier item, no intro.
+      mocks.current = await mocks.update.mock.results[1].value;
+      // (The fake names new items si_new_<index>; give Solo's its own id so the fake's next new item can't collide with it.)
+      mocks.current.items.data = mocks.current.items.data.map((i: any) => (i.id === "si_new_0" ? { ...i, id: "si_solo_2" } : i));
+      const soloItem = { id: "si_solo_2" };
+      mocks.rows.push([liveRow({ addons: { texting_number: 1, call_assistant: 1 } })]);
+      const lite = await request("/api/stripe/addons", { addons: { call_assistant_lite: 1 } });
+      expect(lite.code).toBe(200);
+      const liteParams = mocks.update.mock.calls[2][1];
+      expect(liteParams.items).toEqual(expect.arrayContaining([
+        { price: "price_chub_v1_addon_call_assistant_lite_month_14900", quantity: 1 },
+        { id: soloItem.id, deleted: true },
+      ]));
+      expect(liteParams.items).toHaveLength(2);
+      expect(liteParams.items.some((i: any) => i.discounts)).toBe(false);
+      expect(mocks.updates.at(-1).addons).toEqual({ texting_number: 1, call_assistant_lite: 1 });
     } finally {
       tiers.forEach((k, i) => { ADDONS[k].preview = saved[i]; });
     }
