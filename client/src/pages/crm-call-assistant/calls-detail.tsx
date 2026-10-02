@@ -72,6 +72,21 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
               </section>
             )}
 
+            {call.flags?.ingest && (
+              <section className="rounded-md border p-3" data-testid="section-call-ingest">
+                <h3 className="mb-1 font-medium">Answered by {personaName(call.persona || "janice")} on {call.flags.ingest.market ? `the ${call.flags.ingest.market} line` : "your own line"}</h3>
+                <ul className="space-y-0.5 text-muted-foreground">
+                  <li>Her outcome: {call.flags.ingest.outcome.replace(/_/g, " ")}</li>
+                  {call.flags.ingest.leadId && <li data-testid="text-call-ingest-lead">Estimate form #{call.flags.ingest.leadId} was filed</li>}
+                  {call.flags.ingest.escalation && (
+                    <li data-testid="text-call-ingest-escalation">
+                      Texted {call.flags.ingest.escalation.to || "the team"}{call.flags.ingest.escalation.kind ? ` (${call.flags.ingest.escalation.kind.replace(/_/g, " ")})` : ""}{call.flags.ingest.escalation.text ? `: ${call.flags.ingest.escalation.text}` : ""}
+                    </li>
+                  )}
+                </ul>
+              </section>
+            )}
+
             {call.summary && (
               <section>
                 <h3 className="mb-1 font-medium">Summary</h3>

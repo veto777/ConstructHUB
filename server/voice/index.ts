@@ -7,6 +7,7 @@
  * is registered before the session-authenticated CRM routes.
  *
  *   /api/voice-internal/*   engine → app   (internal-profile.ts, internal-calls.ts)
+ *   /api/voice-ingest/*     another receptionist's finished calls → the call log (ingest.ts; tailnet + bearer)
  *   /api/crm/voice/*        browser → app  (numbers.ts, billing.ts, profile.ts, simulator.ts, calls.ts)
  *
  * The /voice/* reverse proxy to the engine is registered separately, before
@@ -16,6 +17,7 @@ import type { Express } from "express";
 import type { GetUser } from "./context";
 import { registerVoiceInternalProfileRoutes } from "./internal-profile";
 import { registerVoiceInternalCallRoutes } from "./internal-calls";
+import { registerVoiceIngestRoutes } from "./ingest";
 import { registerVoiceNumberRoutes } from "./numbers";
 import { registerVoiceBillingRoutes } from "./billing";
 import { registerVoiceProfileRoutes } from "./profile";
@@ -29,6 +31,8 @@ export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   // engine → app
   registerVoiceInternalProfileRoutes(app);
   registerVoiceInternalCallRoutes(app);
+  // another receptionist → app (Alpine's Janice; record only, never billed)
+  registerVoiceIngestRoutes(app);
   // browser → app (every route goes through voiceContext in ./context.ts)
   registerVoiceBillingRoutes(app, getDevUser);
   registerVoiceNumberRoutes(app, getDevUser);

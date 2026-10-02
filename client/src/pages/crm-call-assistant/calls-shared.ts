@@ -73,6 +73,16 @@ export type VoiceCallDetail = VoiceCallListRow & {
   project: { id: string; name: string; status: string } | null;
   number: { id: string; label: string | null; phoneNumber: string; location: string | null } | null;
   escalations: VoiceEscalation[];
+  flags?: { ingest?: VoiceIngestInfo } & Record<string, unknown> | null;
+};
+
+/** A call another receptionist pushed into this log (server/voice/ingest.ts) — e.g. Alpine's Janice. */
+export type VoiceIngestInfo = {
+  source: string;
+  market: string | null;
+  outcome: string;
+  leadId: string | null;
+  escalation: { kind?: string | null; to?: string | null; text?: string | null } | null;
 };
 
 export type VoiceSpamEntry = {
