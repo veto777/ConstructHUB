@@ -1,0 +1,42 @@
+import {
+  MapPin, Star, Eye, Grid3X3, Camera, Megaphone, ScanSearch, Images,
+  ShieldCheck, Fingerprint, ShieldOff, Cloud, ChartColumn, Globe, Bell,
+  Search, Building, Shield, TrendingUp, PhoneCall,
+  KanbanSquare, CalendarDays, UserPlus, MessageSquare, Headset, Users,
+  GraduationCap, BookOpen, ShieldAlert,
+  type LucideIcon,
+} from "lucide-react";
+import type { DashboardTileKey } from "@shared/dashboard";
+
+/** One lucide icon per feature, the same family (and mostly the same glyph) as app-sidebar.tsx. */
+export const TILE_ICONS: Record<DashboardTileKey, LucideIcon> = {
+  gbp: MapPin,
+  reviews: Star,
+  profileGuard: Eye,
+  rankingGrid: Grid3X3,
+  gbpContent: Camera,
+  social: Megaphone,
+  siteScan: ScanSearch,
+  media: Images,
+  clickGuard: ShieldCheck,
+  ipTracker: Fingerprint,
+  vpnShield: ShieldOff,
+  cloudflare: Cloud,
+  searchConsole: ChartColumn,
+  domains: Globe,
+  mailAlerts: Bell,
+  permits: Search,
+  property: Building,
+  competitors: Shield,
+  adsManager: TrendingUp,
+  lsaLeads: PhoneCall,
+  crm: KanbanSquare,
+  crmSchedule: CalendarDays,
+  crmLeads: UserPlus,
+  texting: MessageSquare,
+  callAssistant: Headset,
+  agency: Users,
+  masterClass: GraduationCap,
+  guides: BookOpen,
+  reinstatement: ShieldAlert,
+};

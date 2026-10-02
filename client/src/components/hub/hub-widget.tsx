@@ -164,6 +164,18 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
 
+  // The dashboard's "Ask Gabe" nudge opens the panel with a question typed in; it never sends it.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const question = (e as CustomEvent<{ question?: string }>).detail?.question;
+      setOpen(true);
+      setBubble(false);
+      if (typeof question === "string" && question.trim()) setInput(question.slice(0, 500));
+    };
+    window.addEventListener("constructhub:hub-open", onOpen);
+    return () => window.removeEventListener("constructhub:hub-open", onOpen);
+  }, []);
+
   /** Keep keyboard focus inside the dialog: the text box when chat is on, else the first quick question. */
   const focusComposer = () => {
     window.setTimeout(() => {

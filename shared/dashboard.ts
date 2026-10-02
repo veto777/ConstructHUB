@@ -200,6 +200,11 @@ export type DashboardUsage = {
   /** "monthly" resets on account.resetsAt; "count" is a standing count (locations, sites, seats). */
   period: "monthly" | "count";
   href: string;
+  /**
+   * Where `href` lives (optional, frontend-lane extension). Absent = "app",
+   * except a "/crm/…" path, which the client treats as "portal" (crmSeats).
+   */
+  surface?: DashboardSurface;
 };
 
 export type DashboardAccountStatus = "active" | "trialing" | "past_due" | "none";
