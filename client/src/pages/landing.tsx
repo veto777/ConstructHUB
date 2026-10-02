@@ -1,16 +1,30 @@
+/**
+ * The marketing landing page — "editorial warmth" direction.
+ *
+ * Reads like a friendly local business guide, not a software template: warm
+ * paper background, navy ink, one orange, Fraunces for display type and Plus
+ * Jakarta Sans for everything else (both scoped by the `mkt-editorial` class,
+ * see client/src/index.css — the CRM keeps Inter). The standing gator is the
+ * cover star of the hero, standing on a tape-measure rule, with a short
+ * welcome in a speech bubble.
+ *
+ * Every heading, paragraph, number, link, href and data-testid from the
+ * previous version survives; e2e specs depend on the testids.
+ */
 import { useRef, useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CHLogo } from "@/components/ch-logo";
 import { CartSheet } from "@/components/cart-sheet";
+import { StandingGator } from "@/components/mascot";
 import { Settings } from "lucide-react";
 import {
   ArrowRight, Search, Camera, Users,
-  MapPin, Check, CheckCircle2,
-  Eye, LayoutDashboard, GraduationCap,
-  Grid3X3, ShieldAlert, Crosshair,
-  Package,
+  MapPin, CheckCircle2,
+  Eye, Globe, LayoutDashboard, GraduationCap,
+  Grid3X3, ShieldAlert, Crosshair, Briefcase,
+  Megaphone, Package,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
@@ -19,13 +33,6 @@ import { LandingMobileMenu } from "@/components/landing-mobile-menu";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 
-/*
- * "Bold trades" marketing design: Barlow Condensed display type, DM Sans
- * body, navy band + one orange accent, warm off-white page. The type and
- * palette tokens live behind the `mk` root class in index.css so the CRM and
- * dashboard keep their own look.
- */
-
 const SECTION_LINKS = [
   { href: "#services", label: "Services" },
   { href: "#plans", label: "Plans" },
@@ -33,12 +40,15 @@ const SECTION_LINKS = [
   { href: "#coverage", label: "Coverage" },
 ] as const;
 
-/** The owner's hard-hat gator: 335x512 for 1x screens, 671x1024 for 2x. The
- *  hero renders him at most 327px wide (500px tall at xl), and `sizes` tracks
- *  the rendered width per breakpoint so 2x screens pick the 1024 file. */
-const HERO_GATOR = "/mascot/gator-standing-512.v1.webp";
-const HERO_GATOR_2X = "/mascot/gator-standing-1024.v1.webp";
-const HERO_GATOR_SIZES = "(min-width: 1280px) 327px, (min-width: 1024px) 301px, (min-width: 640px) 170px, 144px";
+/** Button recipes — anchors styled as buttons (no <button> nested in <a>). */
+const BTN = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange focus-visible:ring-offset-2 focus-visible:ring-offset-mkt-paper";
+const BTN_PRIMARY = `${BTN} bg-mkt-orange text-white hover:bg-mkt-orange-hover`;
+const BTN_OUTLINE = `${BTN} border-2 border-mkt-ink text-mkt-ink hover:bg-mkt-ink hover:text-mkt-paper`;
+/** On a navy band. */
+const BTN_OUTLINE_ON_NAVY = `${BTN} border-2 border-mkt-navy-ink text-mkt-navy-ink hover:bg-mkt-navy-ink hover:text-mkt-navy`;
+const BTN_LG = "h-12 px-6 text-base";
+
+const WELCOME_LINE = "Welcome in — let's build your business.";
 
 function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
   const [count, setCount] = useState(0);
@@ -68,6 +78,17 @@ function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: 
   }, [end, duration]);
 
   return <span ref={ref}>{count.toLocaleString("en-US")}{suffix}</span>;
+}
+
+/** Section kicker: a short orange rule, an index number and small caps. */
+function Kicker({ n, children, className = "" }: { n: string; children: React.ReactNode; className?: string }) {
+  return (
+    <p className={`flex items-center gap-3 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.18em] text-mkt-orange-ink [text-wrap:balance] ${className}`}>
+      <span className="hidden sm:block h-px w-8 bg-mkt-orange shrink-0" aria-hidden />
+      {n && <span className="font-display italic normal-case tracking-normal text-[15px] text-mkt-muted">{n}</span>}
+      <span>{children}</span>
+    </p>
+  );
 }
 
 const services = [
@@ -125,6 +146,13 @@ const services = [
   },
 ];
 
+/** Done-for-you card recipes (the three cards are written out so their testids stay literal). */
+const DFY_CARD = "group bg-mkt-card border border-mkt-rule rounded-2xl p-7 hover:border-mkt-ink transition-colors";
+const DFY_ICON = "h-11 w-11 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink mb-6 group-hover:border-mkt-orange group-hover:text-mkt-orange-ink transition-colors";
+const DFY_TITLE = "font-display font-semibold text-[1.35rem] leading-tight text-mkt-ink";
+const DFY_BODY = "text-[15px] text-mkt-ink-soft leading-relaxed mt-2.5";
+const DFY_SALES = "mt-5 inline-flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-mkt-orange-ink";
+
 const COVERAGE_STATES = [
   "Washington", "Florida", "California", "Texas",
   "New York", "Illinois", "Pennsylvania", "Ohio",
@@ -136,61 +164,6 @@ const COVERAGE_STATES = [
 // Testimonials were removed: the three 5-star quotes came in with the Replit
 // import (the same one whose government data was fabricated) and nobody could
 // vouch for them. Add quotes back only with a real, consenting customer.
-
-/** Numbered eyebrow + condensed title that opens every section below the hero. */
-function SectionHeading({ number, eyebrow, children, lede }: { number: string; eyebrow: string; children: React.ReactNode; lede?: React.ReactNode }) {
-  return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] lg:items-end mb-10 lg:mb-14">
-      <div>
-        <p className="mk-eyebrow">{number} &mdash; {eyebrow}</p>
-        <h2 className="mk-title mt-4 text-[2.5rem] leading-[0.95] sm:text-5xl lg:text-6xl text-balance">{children}</h2>
-      </div>
-      {lede && <div className="mk-muted text-base lg:text-lg leading-relaxed lg:pb-1 lg:max-w-md lg:justify-self-end">{lede}</div>}
-    </div>
-  );
-}
-
-type IconType = React.ComponentType<{ className?: string }>;
-
-function IconBox({ icon: Icon }: { icon: IconType }) {
-  return (
-    <div className="h-11 w-11 rounded-[4px] bg-[#141b2d] text-[#F97316] dark:bg-[#232c45] flex items-center justify-center shrink-0">
-      <Icon className="h-5 w-5" />
-    </div>
-  );
-}
-
-/** One done-for-you service as a numbered punch-list row (01 / 02 / 03, the
- *  sales-rep label on the right); every one of them is quoted by a sales rep. */
-function DfyRow({ number, title, description, "data-testid": testId }: { number: string; title: string; description: string; "data-testid": string }) {
-  return (
-    <div
-      className="mk-grid-cell grid grid-cols-[auto_minmax(0,1fr)] md:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 sm:gap-x-6 gap-y-3 px-5 py-5 sm:px-7 sm:py-6"
-      data-testid={testId}
-    >
-      <span className="mk-display text-3xl sm:text-4xl leading-none text-[#F97316] w-9 sm:w-12 self-start sm:self-center">{number}</span>
-      <div className="min-w-0">
-        <h3 className="mk-head text-[1.25rem] sm:text-[1.375rem]">{title}</h3>
-        <p className="mt-1 text-[15px] leading-relaxed mk-muted">{description}</p>
-      </div>
-      <span
-        className="col-start-2 md:col-start-auto inline-flex items-center gap-1.5 whitespace-nowrap font-display font-semibold uppercase tracking-[0.1em] text-sm text-[color:var(--mk-orange-ink)]"
-        data-testid="text-dfy-sales"
-      >
-        {SALES_REP_LABEL} <ArrowRight className="h-3.5 w-3.5" />
-      </span>
-    </div>
-  );
-}
-
-/** Orange checkbox for the hero punch list. */
-function PunchCheck() {
-  return (
-    <span aria-hidden="true" className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[3px] bg-[#F97316]">
-      <Check className="h-3 w-3 text-[#141b2d]" strokeWidth={3.5} />
-    </span>
-  );
-}
 
 export default function LandingPage() {
   const [navVisible, setNavVisible] = useState(true);
@@ -209,6 +182,11 @@ export default function LandingPage() {
     { value: GROWTH_TOOLS.length, label: "Pro Tools Built In" },
   ];
 
+  const visibleServices = services.filter((svc) => SHOW_COMPETITOR_INTEL || svc.title !== "Competitor Intelligence");
+  // The services sit in a hairline grid, three across on desktop; an
+  // incomplete last row gets a "see every tool" cell so no cell is left blank.
+  const fillerCells = (3 - (visibleServices.length % 3)) % 3;
+
   useEffect(() => {
     const handleScroll = () => {
       const currentY = window.scrollY;
@@ -226,17 +204,18 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="mk min-h-screen overflow-x-clip">
-      {/* Nav */}
-      <nav className={`sticky top-0 z-50 transition-transform duration-300 mk-navy border-b border-white/10 ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+    <div className="mkt-editorial min-h-screen bg-mkt-paper text-mkt-ink overflow-x-clip">
+
+      {/* Nav — a navy masthead with an orange rule under it. */}
+      <nav className={`sticky top-0 z-50 transition-transform duration-300 bg-mkt-navy border-b-[3px] border-mkt-orange ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <CHLogo height={40} />
-          <div className="hidden md:flex items-center gap-7 text-white/75">
+          <div className="hidden md:flex items-center gap-5 lg:gap-7 text-[14px] lg:text-[15px] font-medium text-white/75">
             {SECTION_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="mk-navlink hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
+              <a key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
             ))}
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1 lg:gap-3">
             {user && (
               <Link href="/settings">
                 <button className="hidden sm:inline-flex items-center justify-center rounded-md h-9 w-9 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
@@ -247,16 +226,16 @@ export default function LandingPage() {
             <div className="text-white"><CartSheet /></div>
             <div className="text-white hidden sm:block"><ThemeToggle /></div>
             {user ? (
-              <Link href="/" className="mk-btn mk-btn-primary mk-btn-sm" data-testid="link-nav-dashboard">
-                <LayoutDashboard className="h-4 w-4" /> Dashboard
+              <Link href="/" data-testid="link-nav-dashboard" className={`${BTN_PRIMARY} h-9 px-4 text-sm`}>
+                <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
               </Link>
             ) : (
               <>
-                <Link href="/auth" className="hidden sm:inline-flex mk-navlink text-white/80 hover:text-white px-3 py-2 transition-colors" data-testid="link-nav-signin">
+                <Link href="/auth" className="hidden sm:inline-flex items-center whitespace-nowrap h-9 px-3 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-nav-signin">
                   Sign In
                 </Link>
-                <Link href="/auth?mode=signup" className="mk-btn mk-btn-primary mk-btn-sm" data-testid="link-nav-getstarted">
-                  Get Started <ArrowRight className="h-4 w-4" />
+                <Link href="/auth?mode=signup" data-testid="link-nav-getstarted" className={`${BTN_PRIMARY} h-9 px-4 text-sm`}>
+                  Get Started <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </>
             )}
@@ -265,199 +244,223 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero: navy band, blueprint grid, the gator front and centre. The band's
-          large-screen padding is sized so his boots and the hazard tape are on
-          the first screen at 1440x900 while the CTAs stay above the fold at
-          1366x768. */}
-      <section className="mk-blueprint relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px] lg:gap-x-10">
-          <div className="pt-6 pb-14 sm:pt-10 lg:pt-14 lg:pb-14">
-            <p className="mk-eyebrow !text-[#F97316] animate-in">Your Complete Business-Building Platform</p>
-            <h1 className="mk-display mt-5 text-white text-[2.5rem] sm:text-6xl lg:text-[3.75rem] xl:text-[5.5rem] animate-in-delay-1">
-              <span className="block normal-case text-[#F97316] text-[0.5em] tracking-[0.02em] mb-2">ConstructHUB &mdash;</span>
-              <span className="block">Build Your Business</span>
-              <span className="block">From the Ground Up</span>
+      {/* Hero — the gator is the cover star, standing on a tape-measure rule. */}
+      <section className="relative z-10">
+        <div className="absolute inset-0 mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,black_45%,transparent_100%)]" aria-hidden />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-end">
+
+          {/* Copy */}
+          <div className="lg:col-span-7 pt-10 sm:pt-14 lg:pt-20 pb-12 lg:pb-16">
+            <Kicker n="" className="animate-in">Your Complete Business-Building Platform</Kicker>
+            <h1 className="font-display mt-5 text-mkt-ink animate-in-delay-1">
+              <span className="block italic font-medium text-mkt-orange-ink text-2xl sm:text-3xl leading-tight mb-2">Construct<span className="font-bold not-italic">HUB</span> —</span>
+              <span className="block font-semibold text-[2.6rem] leading-[1.02] sm:text-[3.4rem] lg:text-[4.1rem] xl:text-[4.5rem] tracking-[-0.02em]">
+                Build Your Business <span className="mkt-marker">From the Ground&nbsp;Up</span>
+              </span>
             </h1>
-            <p className="mt-6 text-base sm:text-lg text-white/75 max-w-xl leading-relaxed animate-in-delay-2">
+
+            {/* Phone/tablet: the gator floats beside the paragraph so the CTAs stay close to the fold. */}
+            <div className="lg:hidden float-right ml-4 mb-2 mt-5 w-[150px] md:w-[210px] relative animate-in-delay-2" aria-hidden>
+              <p className="mkt-bubble px-3 py-2 text-[13px] md:text-[16px] leading-snug">{WELCOME_LINE}</p>
+              <StandingGator height={190} className="mx-auto mt-4 md:!h-[280px]" />
+            </div>
+
+            <p className="mt-6 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] leading-relaxed animate-in-delay-2">
               Whether you're starting from scratch or scaling an existing operation — we provide every tool, resource, and service you need. From LLC formation and licensing to GMB optimization and SEO domination. And if you don't want to do it yourself, we'll build your entire business for you.
             </p>
-            {/* Phones: Gabe's fixed launcher sits bottom-right, so below `sm`
-                the CTA stack stops short of that column (pr-16) instead of
-                running under it. */}
-            <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4 pr-16 sm:pr-0 animate-in-delay-3">
-              <Link href="/auth?mode=signup" className="mk-btn mk-btn-primary w-full sm:w-auto" data-testid="link-hero-signup">
+
+            <div className="clear-both mt-8 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 animate-in-delay-3">
+              <Link href="/auth?mode=signup" data-testid="link-hero-signup" className={`${BTN_PRIMARY} ${BTN_LG}`}>
                 Create Your Account <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href={SALES_HREF} className="mk-btn mk-btn-ghost w-full sm:w-auto" data-testid="link-hero-dfy">
+              <Link href={SALES_HREF} data-testid="link-hero-dfy" className={`${BTN_OUTLINE} ${BTN_LG}`}>
                 <Package className="h-4 w-4" /> Done-For-You Services
               </Link>
-              <p className="basis-full text-sm text-white/70">
-                Not ready to sign up?{" "}
-                <Link href="/free-site-scan" className="inline-block font-semibold text-white underline underline-offset-[6px] decoration-2 decoration-[#F97316] hover:text-[#F97316] transition-colors">
-                  Free 60-second website scan
-                </Link>
-              </p>
             </div>
-            {/* Punch list: two columns of orange checkboxes. */}
-            <ul className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 max-w-xl text-sm text-white/75 animate-in-delay-4">
-              <li className="flex items-center gap-2.5"><PunchCheck /> No card needed to sign up</li>
-              <li className="flex items-center gap-2.5"><PunchCheck /> Setup in minutes</li>
-              <li className="flex items-center gap-2.5"><PunchCheck /> Cancel anytime</li>
-              <li className="flex items-center gap-2.5"><PunchCheck /> Turnkey business building available</li>
+            <p className="mt-4 text-[15px] text-mkt-ink-soft animate-in-delay-3">
+              Not ready to sign up?{" "}
+              <Link href="/free-site-scan" className="inline-block whitespace-nowrap font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">Free 60-second website scan</Link>
+            </p>
+
+            <ul className="mt-9 flex flex-wrap gap-x-6 gap-y-2 text-[14px] text-mkt-ink-soft animate-in-delay-4">
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> No card needed to sign up</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> Setup in minutes</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> Cancel anytime</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange-ink" /> Turnkey business building available</li>
             </ul>
           </div>
 
-          {/* The gator. Phones: beside his greeting, above the copy. Desktop:
-              right column, greeting overhead, boots over the band's edge. The
-              lean-in and the sticker tilt live on wrappers: fadeSlideIn fills
-              `transform`, which would otherwise cancel a rotate on the same
-              element. */}
-          <div className="order-first lg:order-none relative z-20 flex items-center gap-4 pt-8 lg:pt-10 lg:flex-col lg:items-center lg:justify-end lg:self-end lg:-mb-6">
-            <div className="shrink-0 lg:order-last origin-bottom lg:-rotate-2">
-              <img
-                src={HERO_GATOR}
-                srcSet={`${HERO_GATOR} 335w, ${HERO_GATOR_2X} 671w`}
-                sizes={HERO_GATOR_SIZES}
-                alt="The ConstructHUB gator in a hard hat and hi-vis vest, arms crossed"
-                width={335}
-                height={512}
-                draggable={false}
-                decoding="async"
-                fetchPriority="high"
-                className="h-[220px] sm:h-[260px] lg:h-[460px] xl:h-[500px] w-auto select-none drop-shadow-[0_24px_24px_rgba(0,0,0,0.45)] animate-in-delay-1"
-                data-testid="img-hero-gator"
-              />
-            </div>
-            <div className="-rotate-3 lg:mb-5">
-              <p className="mk-bubble max-w-[220px] lg:max-w-none animate-in-delay-2">
-                Welcome in — let&rsquo;s build your business.
-              </p>
-            </div>
+          {/* Desktop: the cover — a navy panel, the welcome bubble, and the gator standing on the rule. */}
+          <div className="hidden lg:block lg:col-span-5 relative self-end h-[600px] animate-in-delay-2" aria-hidden>
+            <div className="absolute right-0 top-14 w-[350px] h-[456px] rounded-[32px] bg-mkt-panel mkt-grid-paper-panel" />
+            <p className="absolute left-0 top-0 w-[232px] mkt-bubble px-5 py-3 text-[19px] leading-snug -rotate-2 z-20">{WELCOME_LINE}</p>
+            <StandingGator height={500} className="absolute bottom-0 left-[58px] z-10 translate-y-[3px]" />
           </div>
         </div>
-        <div className="mk-hazard" aria-hidden="true" />
+        <div className="mkt-ruler" aria-hidden />
       </section>
 
-      {/* Stats: a measuring strip under the hero. */}
-      <section id="stats" className="relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 lg:pt-20 pb-10 lg:pb-12">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-10">
-            {stats.map((stat, i) => (
-              <div
-                key={stat.label}
-                className={`px-4 sm:px-6 lg:px-8 border-[color:var(--mk-line-strong)] [&:nth-child(even)]:border-l lg:border-l lg:first:border-l-0 animate-in-delay-${i + 1}`}
-              >
-                <div className="mk-display text-[2.75rem] sm:text-6xl lg:text-7xl">
-                  {typeof stat.value === "number" ? <CountUp end={stat.value} suffix={stat.suffix} /> : "—"}
-                </div>
-                <p className="mt-3 font-display font-semibold uppercase tracking-[0.14em] text-xs sm:text-sm mk-muted">{stat.label}</p>
+      {/* Stats — by the numbers. */}
+      <section id="stats" className="relative bg-mkt-paper-2 border-b border-mkt-rule">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat, i) => (
+            <div
+              key={stat.label}
+              className={`py-8 lg:py-10 px-4 sm:px-6 ${i % 2 === 1 ? "border-l border-mkt-rule" : ""} ${i >= 2 ? "border-t border-mkt-rule lg:border-t-0 lg:border-l" : ""}`}
+            >
+              <div className="font-display font-semibold text-[2.5rem] lg:text-[3rem] leading-none text-mkt-ink">
+                {typeof stat.value === "number" ? <CountUp end={stat.value} suffix={stat.suffix} /> : "—"}
               </div>
-            ))}
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mk-ticks" aria-hidden="true" />
+              <p className="mt-3 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.12em] sm:tracking-[0.16em] text-mkt-muted [text-wrap:balance]">{stat.label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Services */}
-      <section id="services" className="py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            number="01"
-            eyebrow="What We Do"
-            lede="From forming your LLC to ranking #1 on Google Maps — a full suite of tools and services built by contractors who scaled from solo operators to hundreds of employees."
-          >
-            Everything You Need to Start, Build &amp; <span className="text-[#F97316]">Dominate</span>
-          </SectionHeading>
-          {/* One hairline grid: 1px rules between cells, no gaps, no shadows. */}
-          <div className="mk-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {services.filter((svc) => SHOW_COMPETITOR_INTEL || svc.title !== "Competitor Intelligence").map((svc, i) => (
-              <div
+      <section id="services" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-12 lg:mb-14">
+            <div className="lg:col-span-7">
+              <Kicker n="01">What We Do</Kicker>
+              <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
+                Everything You Need to Start, Build &amp; <em className="text-mkt-orange-ink">Dominate</em>
+              </h2>
+            </div>
+            <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
+              From forming your LLC to ranking #1 on Google Maps — a full suite of tools and services built by contractors who scaled from solo operators to hundreds of employees.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-mkt-rule border border-mkt-rule rounded-2xl overflow-hidden">
+            {visibleServices.map((svc, i) => (
+              <article
                 key={svc.title}
-                className={`mk-grid-cell group relative p-6 lg:p-7 flex flex-col animate-in-delay-${Math.min(i + 1, 5)}`}
+                className="group bg-mkt-paper p-7 lg:p-8 transition-colors hover:bg-mkt-card"
                 data-testid={`card-service-${i}`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <IconBox icon={svc.icon} />
-                  <span className="font-display font-semibold text-sm tracking-[0.14em] mk-muted pt-1">{String(i + 1).padStart(2, "0")}</span>
+                <div className="flex items-start justify-between mb-6">
+                  <div className="h-11 w-11 rounded-lg border border-mkt-rule bg-mkt-card flex items-center justify-center text-mkt-ink group-hover:border-mkt-orange group-hover:text-mkt-orange-ink transition-colors">
+                    <svc.icon className="h-5 w-5" strokeWidth={1.75} />
+                  </div>
+                  <span className="font-display italic text-mkt-muted text-lg leading-none">{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <h3 className="mk-head text-[1.375rem] mt-5">{svc.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed mk-muted">{svc.description}</p>
-              </div>
+                <h3 className="font-display font-semibold text-[1.35rem] leading-tight text-mkt-ink mb-2.5">{svc.title}</h3>
+                <p className="text-[15px] text-mkt-ink-soft leading-relaxed">{svc.description}</p>
+              </article>
+            ))}
+            {Array.from({ length: fillerCells }, (_, i) => (
+              i === 0 ? (
+                <Link key="filler-cta" href="/pricing" className="hidden lg:flex bg-mkt-paper-2 p-8 flex-col justify-end hover:bg-mkt-card transition-colors">
+                  <span className="font-display italic text-xl text-mkt-ink">Every plan includes the CRM.</span>
+                  <span className="mt-2 inline-flex items-center gap-2 text-[15px] font-semibold text-mkt-orange-ink">See every tool <ArrowRight className="h-4 w-4" /></span>
+                </Link>
+              ) : (
+                <div key={`filler-${i}`} className="hidden lg:block bg-mkt-paper-2" />
+              )
             ))}
           </div>
         </div>
       </section>
 
       {/* Done-For-You */}
-      <section id="done-for-you" className="pb-20 lg:pb-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            number="02"
-            eyebrow="Turnkey Solutions"
-            lede="Our turnkey system handles everything — from filing your LLC to launching your marketing. We process all paperwork, set up your online presence, and get you ready to take jobs. The only thing we can't do is take your licensing exams for you."
-          >
-            Don't Want to Do It Yourself? <span className="text-[#F97316]">We'll Build It For You.</span>
-          </SectionHeading>
-          {/* Numbered punch-list panel; the bundle band below sells all three at once. */}
-          <div className="mk-grid grid grid-cols-1 mb-4">
-            <DfyRow number="01" title="Business Formation & Filing" description="LLC, licensing paperwork, bonding, insurance processing, tax registration" data-testid="card-dfy-formation" />
-            <DfyRow number="02" title="GMB & Website Setup" description="Full Google Business Profile, professional website, content" data-testid="card-dfy-gmb" />
-            <DfyRow number="03" title="SEO & Ad Campaigns" description="Local SEO, Google Ads, LSA setup, citation building" data-testid="card-dfy-seo" />
+      <section id="done-for-you" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-y border-mkt-rule">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-12 lg:mb-14">
+            <div className="lg:col-span-7">
+              <Kicker n="02">Turnkey Solutions</Kicker>
+              <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
+                Don't Want to Do It Yourself? <em className="text-mkt-orange-ink">We'll Build It For You.</em>
+              </h2>
+            </div>
+            <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
+              Our turnkey system handles everything — from filing your LLC to launching your marketing. We process all paperwork, set up your online presence, and get you ready to take jobs. The only thing we can't do is take your licensing exams for you.
+            </p>
           </div>
-          <div className="mk-navy rounded-[6px] overflow-hidden border border-transparent dark:border-white/10" data-testid="card-dfy-bundle">
-            <div className="mk-hazard" aria-hidden="true" />
-            <div className="p-7 sm:p-10 lg:p-12 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-8 items-center">
-              <div>
-                <h3 className="mk-display text-4xl sm:text-5xl lg:text-6xl">Complete Business Build</h3>
-                <p className="mt-4 text-white/70 max-w-xl text-base lg:text-lg leading-relaxed">
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+            <div className={DFY_CARD} data-testid="card-dfy-formation">
+              <div className={DFY_ICON}><Briefcase className="h-5 w-5" strokeWidth={1.75} /></div>
+              <h3 className={DFY_TITLE}>Business Formation &amp; Filing</h3>
+              <p className={DFY_BODY}>LLC, licensing paperwork, bonding, insurance processing, tax registration</p>
+              <span className={DFY_SALES} data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
+            </div>
+            <div className={DFY_CARD} data-testid="card-dfy-gmb">
+              <div className={DFY_ICON}><Globe className="h-5 w-5" strokeWidth={1.75} /></div>
+              <h3 className={DFY_TITLE}>GMB &amp; Website Setup</h3>
+              <p className={DFY_BODY}>Full Google Business Profile, professional website, content</p>
+              <span className={DFY_SALES} data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
+            </div>
+            <div className={DFY_CARD} data-testid="card-dfy-seo">
+              <div className={DFY_ICON}><Megaphone className="h-5 w-5" strokeWidth={1.75} /></div>
+              <h3 className={DFY_TITLE}>SEO &amp; Ad Campaigns</h3>
+              <p className={DFY_BODY}>Local SEO, Google Ads, LSA setup, citation building</p>
+              <span className={DFY_SALES} data-testid="text-dfy-sales">{SALES_REP_LABEL}</span>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-mkt-panel text-mkt-panel-ink rounded-2xl" data-testid="card-dfy-bundle">
+            <div className="mkt-hazard h-2.5" aria-hidden />
+            <div className="absolute inset-0 top-2.5 mkt-grid-paper-panel [mask-image:linear-gradient(to_right,transparent_40%,black_100%)]" aria-hidden />
+            <div className="relative p-8 lg:p-12 grid lg:grid-cols-12 gap-8 items-center">
+              <div className="lg:col-span-8">
+                <h3 className="font-display font-semibold text-[2rem] sm:text-[2.5rem] leading-[1.05] tracking-[-0.02em]">Complete Business Build</h3>
+                <p className="mt-4 text-[17px] leading-relaxed opacity-80 max-w-2xl">
                   Everything above as one package. Paid upfront. 4-6 months from start to finish. Excludes licensing exams and prerequisites.
                 </p>
               </div>
-              <Link href={SALES_HREF} className="mk-btn mk-btn-primary w-full sm:w-auto" data-testid="link-dfy-pricing">
-                {SALES_REP_LABEL} <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="lg:col-span-4 lg:justify-self-end">
+                <Link href={SALES_HREF} data-testid="link-dfy-pricing" className={`${BTN_PRIMARY} ${BTN_LG} w-full sm:w-auto`}>
+                  {SALES_REP_LABEL} <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Plans — every number comes from the price book (shared/plans.ts). */}
-      <section id="plans" className="pb-20 lg:pb-28" data-testid="section-plans">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            number="03"
-            eyebrow="Plans"
-            lede={<>Every plan starts with a {TRIAL_LABEL} and includes the CRM. Pay monthly, or yearly at 10 times the monthly price.</>}
-          >
-            One Plan for Every <span className="text-[#F97316]">Stage</span>
-          </SectionHeading>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {PLAN_KEYS.map((key) => (
-              <div key={key} className="mk-card p-6 flex flex-col" data-testid={`card-plan-${key}`}>
-                <h3 className="font-display font-semibold uppercase tracking-[0.12em] text-base">{PLANS[key].name}</h3>
-                <div className="mt-3 flex items-baseline gap-1.5">
-                  <span className="mk-display text-5xl">{formatUsd(PLANS[key].monthlyCents)}</span>
-                  <span className="text-sm mk-muted">/month</span>
+      <section id="plans" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8" data-testid="section-plans">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-12 lg:mb-14">
+            <div className="lg:col-span-7">
+              <Kicker n="03">Plans</Kicker>
+              <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
+                One Plan for Every <em className="text-mkt-orange-ink">Stage</em>
+              </h2>
+            </div>
+            <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
+              Every plan starts with a {TRIAL_LABEL} and includes the CRM. Pay monthly, or yearly at 10 times the monthly price.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {PLAN_KEYS.map((key, i) => (
+              <div key={key} className="bg-mkt-card border border-mkt-rule rounded-2xl p-7 flex flex-col hover:border-mkt-ink transition-colors" data-testid={`card-plan-${key}`}>
+                <div className="flex items-baseline justify-between">
+                  <h3 className="font-display font-semibold text-[1.4rem] text-mkt-ink">{PLANS[key].name}</h3>
+                  <span className="font-display italic text-mkt-muted text-lg leading-none">{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <p className="mt-3 text-[15px] leading-relaxed mk-muted">{PLANS[key].tagline}</p>
+                <div className="mt-5 font-display font-semibold text-[2.6rem] leading-none text-mkt-ink">
+                  {formatUsd(PLANS[key].monthlyCents)}<span className="font-sans text-sm font-medium text-mkt-muted ml-1">/month</span>
+                </div>
+                <p className="text-[15px] text-mkt-ink-soft mt-4 leading-relaxed">{PLANS[key].tagline}</p>
                 {key === "agency" && (
-                  <p className="mt-3 text-xs mk-muted border-t pt-3 mk-rule" data-testid="text-agency-locations">
+                  <p className="text-[13px] text-mkt-muted mt-3 leading-relaxed" data-testid="text-agency-locations">
                     {PLANS.agency.limits.locations} locations included, then per-location pricing.
                   </p>
                 )}
               </div>
             ))}
           </div>
-          <p className="mt-6 text-sm mk-muted" data-testid="text-agency-modules">
+          <p className="mt-6 text-center text-[15px] text-mkt-ink-soft" data-testid="text-agency-modules">
             Only the {PLANS.agency.name} plan includes the {joinNames(AGENCY_ONLY_MODULES)}.
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-            <Link href="/pricing" className="mk-btn mk-btn-primary" data-testid="link-plans-pricing">
+          <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+            <Link href="/pricing" data-testid="link-plans-pricing" className={`${BTN_PRIMARY} ${BTN_LG}`}>
               See Plans &amp; Pricing <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href={SALES_HREF} className="mk-btn mk-btn-outline" data-testid="link-plans-sales">
+            <Link href={SALES_HREF} data-testid="link-plans-sales" className={`${BTN_OUTLINE} ${BTN_LG}`}>
               {SALES_REP_LABEL}
             </Link>
           </div>
@@ -465,74 +468,65 @@ export default function LandingPage() {
       </section>
 
       {/* Coverage */}
-      <section id="coverage" className="pb-20 lg:pb-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            number="04"
-            eyebrow="Coverage"
-            lede={
-              <span data-testid="text-coverage-summary">
-                {counts ? `${formatCount(counts.total)} county and city jurisdictions` : "County and city jurisdictions"} listed
-                across all 50 states and DC{hasVerified ? `, ${formatCount(counts!.verifiedPortals!)} with a verified permit portal link` : ""}.
-                Every portal link we show is checked, and links we could not confirm are labeled.
-              </span>
-            }
-          >
-            Nationwide <span className="text-[#F97316]">Coverage</span>
-          </SectionHeading>
-          {/* Dotted-rule list, four columns across: a checklist, not chips. */}
-          <ul className="grid grid-cols-2 md:grid-cols-4 gap-x-8 border-t border-dotted border-[color:var(--mk-line-strong)]">
+      <section id="coverage" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-y border-mkt-rule">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center">
+            <Kicker n="04" className="justify-center">Coverage</Kicker>
+            <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
+              Nationwide <em className="text-mkt-orange-ink">Coverage</em>
+            </h2>
+            <p className="mt-5 text-[17px] text-mkt-ink-soft leading-relaxed max-w-2xl mx-auto" data-testid="text-coverage-summary">
+              {counts ? `${formatCount(counts.total)} county and city jurisdictions` : "County and city jurisdictions"} listed
+              across all 50 states and DC{hasVerified ? `, ${formatCount(counts!.verifiedPortals!)} with a verified permit portal link` : ""}.
+              Every portal link we show is checked, and links we could not confirm are labeled.
+            </p>
+          </div>
+          <ul className="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-8 border-t border-mkt-rule">
             {COVERAGE_STATES.map((state) => (
-              <li key={state} className="flex items-center gap-2.5 py-3 text-[15px] font-medium border-b border-dotted border-[color:var(--mk-line-strong)]">
-                <CheckCircle2 className="h-4 w-4 text-[#F97316] shrink-0" /> {state}
+              <li key={state} className="flex items-center gap-2.5 py-3 border-b border-dotted border-mkt-rule text-[15px] text-mkt-ink">
+                <CheckCircle2 className="h-4 w-4 text-mkt-orange-ink shrink-0" /> {state}
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-xs mk-muted">All 50 states + DC listed &mdash; portal links shown only once checked</p>
+          <p className="mt-5 text-center text-[13px] text-mkt-muted">All 50 states + DC listed &mdash; portal links shown only once checked</p>
         </div>
       </section>
 
-      {/* Final CTA: a split block — the pitch on navy, the two paths on orange. */}
-      <section className="pb-20 lg:pb-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] rounded-[6px] overflow-hidden border border-transparent dark:border-white/10">
-            <div className="mk-blueprint p-7 sm:p-10 lg:p-14">
-              <CHLogo height={72} className="mb-6" />
-              <h2 className="mk-display text-5xl sm:text-6xl lg:text-7xl">
-                Ready to Build Your Business?
-              </h2>
-              <p className="mt-5 text-white/70 max-w-xl text-base lg:text-lg leading-relaxed">
-                Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
-              </p>
-            </div>
-            <div className="bg-[#F97316] text-[#141b2d] p-7 sm:p-10 lg:p-14 flex flex-col justify-center">
-              <p className="font-display font-semibold uppercase tracking-[0.16em] text-sm">Pick your path</p>
-              <div className="mt-5 flex flex-col items-stretch gap-3 sm:gap-4">
-                <Link href="/auth?mode=signup" className="mk-btn mk-btn-navy" data-testid="link-cta-signup">
-                  Create Your Account <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link href={SALES_HREF} className="mk-btn mk-btn-navy-outline" data-testid="link-cta-consulting">
-                  {SALES_REP_LABEL}
-                </Link>
-              </div>
-            </div>
+      {/* Final CTA */}
+      <section className="relative bg-mkt-navy text-mkt-navy-ink py-24 lg:py-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="absolute inset-0 mkt-grid-paper-panel [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_70%)] opacity-70 dark:opacity-40" aria-hidden />
+        <div className="relative max-w-3xl mx-auto text-center">
+          <CHLogo height={80} className="mx-auto mb-8" />
+          <h2 className="font-display font-semibold text-[2.4rem] sm:text-[3rem] lg:text-[3.5rem] leading-[1.05] tracking-[-0.02em]">
+            Ready to Build Your Business?
+          </h2>
+          <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
+            Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
+          </p>
+          <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+            <Link href="/auth?mode=signup" data-testid="link-cta-signup" className={`${BTN_PRIMARY} ${BTN_LG} px-8`}>
+              Create Your Account <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link href={SALES_HREF} data-testid="link-cta-consulting" className={`${BTN_OUTLINE_ON_NAVY} ${BTN_LG}`}>
+              {SALES_REP_LABEL}
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="mk-navy border-t border-white/10 py-10 px-4 sm:px-6 lg:px-8">
+      <footer className="relative border-t border-mkt-navy-rule py-10 px-4 sm:px-6 lg:px-8 bg-mkt-navy text-mkt-navy-ink">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <CHLogo height={30} className="opacity-70" />
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-white/55">
-              <a href="mailto:support@constructhub.us" className="hover:text-white transition-colors" data-testid="link-footer-email">support@constructhub.us</a>
-              <span className="text-white/25">|</span>
-              <a href="/terms" className="hover:text-white transition-colors" data-testid="link-footer-terms">Terms of Use</a>
-              <span className="text-white/25">|</span>
-              <a href="/privacy" className="hover:text-white transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-mkt-navy-muted">
+              <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-email">support@constructhub.us</a>
+              <span aria-hidden className="opacity-40">·</span>
+              <a href="/terms" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-terms">Terms of Use</a>
+              <span aria-hidden className="opacity-40">·</span>
+              <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
             </div>
-            <p className="text-xs text-white/35">{copyrightNotice()}</p>
+            <p className="text-[13px] text-mkt-navy-muted">{copyrightNotice()}</p>
           </div>
         </div>
       </footer>

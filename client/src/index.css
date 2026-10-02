@@ -918,3 +918,155 @@
   left: 35%;
   animation-delay: -16s;
 }
+
+/*
+ * ── Marketing "editorial" theme ─────────────────────────────────────────────
+ * Scoped to the landing page and the public page chrome (header/footer) by
+ * the `mkt-editorial` class. It swaps the type to Fraunces (display) and
+ * Plus Jakarta Sans (body) and sets a warm paper / navy / orange palette.
+ *
+ * --font-sans is re-declared HERE, on the scope root, and re-applied with
+ * font-family — descendants inherit <body>'s computed font, not the variable,
+ * so declaring the variable alone would change nothing. The app-wide
+ * --font-sans (Inter, used by the CRM and dashboard) is untouched.
+ *
+ * The --mkt-* colours are plain hex/rgba (no opacity modifiers); every one
+ * flips under .dark below, so the page needs no dark: twins for them.
+ */
+.mkt-editorial {
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --mkt-paper: #FBF7F0;
+  --mkt-paper-2: #F3EDE1;
+  --mkt-card: #FFFDF9;
+  --mkt-ink: #1B2541;
+  --mkt-ink-soft: #46506B;
+  --mkt-muted: #6B7390;
+  --mkt-rule: rgba(27, 37, 65, 0.16);
+  --mkt-rule-soft: rgba(27, 37, 65, 0.09);
+  --mkt-grid: rgba(27, 37, 65, 0.075);
+  --mkt-orange: #F97316;
+  --mkt-orange-hover: #E4640A;
+  --mkt-orange-ink: #C2410C;
+  --mkt-orange-soft: rgba(249, 115, 22, 0.22);
+  --mkt-navy: #1E2A4A;
+  --mkt-navy-ink: #F4EFE6;
+  --mkt-navy-muted: rgba(244, 239, 230, 0.64);
+  --mkt-navy-rule: rgba(244, 239, 230, 0.14);
+  --mkt-panel: #1E2A4A;
+  --mkt-panel-ink: #F4EFE6;
+  --mkt-panel-grid: rgba(244, 239, 230, 0.08);
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+.dark .mkt-editorial {
+  --mkt-paper: #121A2D;
+  --mkt-paper-2: #182137;
+  --mkt-card: #1B2540;
+  --mkt-ink: #F2EDE4;
+  --mkt-ink-soft: #C9CDD9;
+  --mkt-muted: #9BA3B8;
+  --mkt-rule: rgba(242, 237, 228, 0.17);
+  --mkt-rule-soft: rgba(242, 237, 228, 0.09);
+  --mkt-grid: rgba(242, 237, 228, 0.06);
+  --mkt-orange: #F97316;
+  --mkt-orange-hover: #FB8A3C;
+  --mkt-orange-ink: #FB923C;
+  --mkt-orange-soft: rgba(249, 115, 22, 0.32);
+  --mkt-navy: #0D1324;
+  --mkt-navy-ink: #F4EFE6;
+  --mkt-navy-muted: rgba(244, 239, 230, 0.64);
+  --mkt-navy-rule: rgba(244, 239, 230, 0.14);
+  --mkt-panel: #F3EDE1;
+  --mkt-panel-ink: #1B2541;
+  --mkt-panel-grid: rgba(27, 37, 65, 0.09);
+}
+
+/* Display type: Fraunces. The global h1–h6 rule turns on Inter's ss01/ss02
+   and tightens tracking; Fraunces wants neither. Optical sizing follows the
+   font-size automatically (font-optical-sizing: auto is the default). */
+.mkt-editorial .font-display {
+  font-family: var(--font-display);
+  font-feature-settings: normal;
+  letter-spacing: -0.012em;
+}
+
+/* Grid paper — faint drafting lines, masked out by the section that uses it. */
+.mkt-grid-paper {
+  background-image:
+    linear-gradient(var(--mkt-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mkt-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.mkt-grid-paper-panel {
+  background-image:
+    linear-gradient(var(--mkt-panel-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mkt-panel-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* A tape-measure edge: baseline rule with a tick every 12px and a taller one
+   every 60px. The hero's gator stands on it. */
+.mkt-ruler {
+  height: 14px;
+  border-bottom: 2px solid var(--mkt-ink);
+  background-image:
+    repeating-linear-gradient(90deg, var(--mkt-ink) 0 1px, transparent 1px 12px),
+    repeating-linear-gradient(90deg, var(--mkt-ink) 0 1px, transparent 1px 60px);
+  background-size: 100% 5px, 100% 12px;
+  background-position: left bottom, left bottom;
+  background-repeat: no-repeat;
+}
+
+/* Hazard stripe — one thin band on the done-for-you bundle. */
+.mkt-hazard {
+  background-image: repeating-linear-gradient(135deg, var(--mkt-orange) 0 12px, var(--mkt-panel-ink) 12px 24px);
+}
+.dark .mkt-hazard {
+  background-image: repeating-linear-gradient(135deg, var(--mkt-orange) 0 12px, var(--mkt-navy) 12px 24px);
+}
+
+/* Marker highlight: a hand-drawn orange swipe behind one key phrase. Drawn as
+   a background so it sits behind the glyphs and, with box-decoration-break:
+   clone, repeats on every line the phrase wraps onto. */
+.mkt-marker {
+  padding: 0 0.08em;
+  margin: 0 -0.08em;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 40' preserveAspectRatio='none'%3E%3Cpath d='M8 23 C 60 12, 118 30, 176 19 S 258 13, 292 21' fill='none' stroke='%23F97316' stroke-width='19' stroke-linecap='round' opacity='0.42'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 100% 0.62em;
+  background-position: 0 78%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* On navy a translucent orange goes brown, so the dark swipe is nearly solid
+   and the cream glyphs sit on top of it. */
+.dark .mkt-marker {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 40' preserveAspectRatio='none'%3E%3Cpath d='M8 23 C 60 12, 118 30, 176 19 S 258 13, 292 21' fill='none' stroke='%23F97316' stroke-width='19' stroke-linecap='round' opacity='0.82'/%3E%3C/svg%3E");
+}
+
+/* The gator's speech bubble. */
+.mkt-bubble {
+  position: relative;
+  background: var(--mkt-card);
+  color: var(--mkt-ink);
+  border: 2px solid var(--mkt-ink);
+  border-radius: 18px 18px 18px 4px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-feature-settings: normal;
+  letter-spacing: -0.005em;
+}
+.mkt-bubble::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  right: 26px;
+  bottom: -9px;
+  background: var(--mkt-card);
+  border-right: 2px solid var(--mkt-ink);
+  border-bottom: 2px solid var(--mkt-ink);
+  transform: rotate(45deg);
+}
