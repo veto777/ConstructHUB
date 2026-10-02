@@ -6,6 +6,7 @@
  * (server/admin.ts) and NEVER on org membership. Everything is read-only
  * except issuing beta invites.
  */
+import { RECENT_AUTH_MS } from "../account-security";
 import type { Express } from "express";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -103,8 +104,8 @@ export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUs
   }
   // Second factor for the cross-org console: the admin passphrase, once per
   // session. Only enforced where the credentials are configured (prod).
-  if (adminGateConfigured() && req.session?.platformAdminGate !== true) {
-    res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+  if (!platformGatePassed(req)) {
+    res.status(403).json(ADMIN_REAUTH_BODY);
     return null;
   }
   return account;
@@ -115,9 +116,22 @@ export async function requirePlatformAdmin(req: any, res: any, getDevUser: GetUs
  * (the LSA console + test-email routes in routes.ts). No-op unless the gate
  * credentials are configured, so dev keeps its current behavior.
  */
-export function platformGatePassed(req: any): boolean {
-  return !adminGateConfigured() || req.session?.platformAdminGate === true;
+/** A recent identity check (Google or password re-verification, server/account-security.ts) for this user. */
+function recentAuthPassed(req: any): boolean {
+  const v = req.session?.recentAuth, id = req.user?.id;
+  return !!v && !!id && v.userId === id && v.at <= Date.now() && Date.now() - v.at < RECENT_AUTH_MS;
 }
+
+/**
+ * The admin second factor: the admin passphrase OR a recent identity check (owner, 2026-10-02 — signed in as
+ * the admin, the trial card dead-ended on "Admin sign-in required" with nowhere to enter a passphrase).
+ */
+export function platformGatePassed(req: any): boolean {
+  return !adminGateConfigured() || req.session?.platformAdminGate === true || recentAuthPassed(req);
+}
+
+/** The refusal when the second factor is missing: the client's verify-identity dialog opens and the request is retried. */
+export const ADMIN_REAUTH_BODY = { reauth: true, gateRequired: true, message: "Please verify your identity to continue." } as const;
 
 /** Per-owner subscription plan, keyed by user id (one subscriptions row each). */
 async function plansByUserId() {

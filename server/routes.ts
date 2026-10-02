@@ -40,7 +40,7 @@ import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sen
 import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { isPlatformAdmin as isAdmin } from "./admin";
-import { platformGatePassed } from "./crm/admin";
+import { platformGatePassed, ADMIN_REAUTH_BODY } from "./crm/admin";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -3243,7 +3243,7 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Admin only" });
     }
     if (!platformGatePassed(req)) {
-      return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+      return res.status(403).json(ADMIN_REAUTH_BODY);
     }
     const { useBackup } = req.body;
     const label = useBackup ? "BACKUP" : "PRIMARY";
@@ -5536,7 +5536,7 @@ function main() {
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
       // Same second-factor wall as requirePlatformAdmin (see adminGuard).
       if (!platformGatePassed(req)) {
-        return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+        return res.status(403).json(ADMIN_REAUTH_BODY);
       }
 
       const { trialDays, recipientEmail, recipientName } = req.body || {};
@@ -5580,7 +5580,7 @@ function main() {
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
       // Same second-factor wall as requirePlatformAdmin (see adminGuard).
       if (!platformGatePassed(req)) {
-        return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+        return res.status(403).json(ADMIN_REAUTH_BODY);
       }
 
       const codes = await storage.getAllBetaAccessCodes();
@@ -5610,7 +5610,7 @@ function main() {
       if (!isAdmin(user)) return res.status(403).json({ message: "Admin access required" });
       // Same second-factor wall as requirePlatformAdmin (see adminGuard).
       if (!platformGatePassed(req)) {
-        return res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+        return res.status(403).json(ADMIN_REAUTH_BODY);
       }
 
       const id = parseInt(req.params.id);
@@ -6028,7 +6028,7 @@ function main() {
     // Same second-factor wall as requirePlatformAdmin — the LSA console must
     // not be reachable on a session that never passed the admin gate.
     if (!platformGatePassed(req)) {
-      res.status(403).json({ message: "Admin sign-in required", gateRequired: true });
+      res.status(403).json(ADMIN_REAUTH_BODY);
       return false;
     }
     return true;
