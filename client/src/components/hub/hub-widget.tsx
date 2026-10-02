@@ -9,7 +9,8 @@ import { isClientPortal, isPortal } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 /**
- * Hub — the ConstructHUB corner assistant (a cartoon crew member in a hard hat).
+ * Gabe — the ConstructHUB corner assistant: a gator in a headset, always on the
+ * radio for the crew (the Hub widget; artwork via HubMascot / GabeAvatar).
  *
  * Signed out: preset question chips only (answers come from the server's cache
  * or price-book templates; there is no text box). Signed in: the chips plus
@@ -48,10 +49,10 @@ const WELCOME_FLAG = "hub.welcomeSeen";
 const HISTORY_MAX_MESSAGES = 10;
 const HISTORY_MAX_CHARS = 3800;
 
-// Homeowner-facing token pages, the auth flow and the admin console never show Hub.
+// Homeowner-facing token pages, the auth flow and the admin console never show Gabe.
 const TOKEN_PAGES = ["/e/", "/i/", "/co/", "/lead-form/", "/portal/", "/review/", "/contract/sign/", "/site-scan/report/"];
 const NEVER = ["/admin", "/crm/admin", "/auth", "/crm/join", "/crm-terms", "/crm-privacy", "/privacy", "/terms", "/free-site-scan"];
-// Signed-out visitors see Hub on the marketing pages.
+// Signed-out visitors see Gabe on the marketing pages.
 const MARKETING = ["/", "/landing", "/pricing", "/reinstatement", "/google-ad-fraud", "/lsa-guide", "/google-ads-guide",
   "/master-class", "/crm-app", "/google-business", "/databases", "/property"];
 
@@ -226,7 +227,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     const userMsgId = push({ role: "user", content: text });
     setInput("");
     setBusy(true);
-    // The Send button goes inactive while Hub answers; never leave focus on it.
+    // The Send button goes inactive while Gabe answers; never leave focus on it.
     if (document.activeElement !== inputRef.current) inputRef.current?.focus();
     try {
       const res = await fetch("/api/hub/chat", {
@@ -287,10 +288,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
 
   const portalMobile = surface === "portal";
   const greeting = welcome
-    ? "Welcome aboard! I'm Hub. I can walk you through setting up ConstructHUB, one step at a time. Where do you want to start?"
+    ? "Welcome aboard! I'm Gabe. I can walk you through setting up ConstructHUB, one step at a time. Where do you want to start?"
     : builder
-      ? "Hi, I'm Hub! Ask me how any ConstructHUB feature works or how to set it up. I can't see your account or anyone's data, so I'll point you to the right page."
-      : "Hi, I'm Hub! I know ConstructHUB inside out: plans, features and how to set things up. Tap a question below.";
+      ? "Hi, I'm Gabe! Ask me how any ConstructHUB feature works or how to set it up. I can't see your account or anyone's data, so I'll point you to the right page."
+      : "Hi, I'm Gabe! I know ConstructHUB inside out: plans, features and how to set things up. Tap a question below.";
 
   return (
     <>
@@ -304,11 +305,11 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           data-testid="hub-welcome-bubble"
         >
           <button type="button" onClick={dismissWelcome}
-            className="absolute right-1.5 top-1.5 rounded p-1 text-muted-foreground hover:text-foreground" aria-label="Dismiss Hub welcome">
+            className="absolute right-1.5 top-1.5 rounded p-1 text-muted-foreground hover:text-foreground" aria-label="Dismiss Gabe's welcome">
             <X className="h-3.5 w-3.5" />
           </button>
           <p className="pr-5 font-semibold">Welcome aboard!</p>
-          <p className="mt-1 text-muted-foreground">I'm Hub. Want a hand setting things up?</p>
+          <p className="mt-1 text-muted-foreground">I'm Gabe. Want a hand setting things up?</p>
           <button type="button" onClick={() => openPanel(true)} className="mt-2 rounded-full bg-orange-700 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-800" data-testid="hub-welcome-open">
             Show me around
           </button>
@@ -320,11 +321,11 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           ref={launcherRef}
           type="button"
           onClick={() => openPanel(welcomePending)}
-          aria-label="Ask Hub, your ConstructHUB guide"
+          aria-label="Ask Gabe, your ConstructHUB guide"
           aria-haspopup="dialog"
           aria-expanded={false}
           aria-controls={panelId}
-          title="Ask Hub"
+          title="Ask Gabe"
           className={cn(
             "fixed right-4 z-40 h-14 w-14 rounded-full shadow-lg shadow-orange-900/25 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-400/60",
             portalMobile ? "bottom-[calc(68px+env(safe-area-inset-bottom))] md:bottom-5" : "bottom-4 sm:bottom-5",
@@ -358,10 +359,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
         >
           <div className="flex items-center gap-3 bg-gradient-to-r from-[#C2410C] to-[#9A3412] px-3 py-2.5 text-white">
             <div className="shrink-0 rounded-full bg-white/10 p-0.5" data-testid="hub-header-mascot" data-state={mascotState}>
-              <HubMascot size={48} state={mascotState} label={busy ? "Hub is thinking" : "Hub"} />
+              <HubMascot size={48} state={mascotState} label={busy ? "Gabe is thinking" : "Gabe"} />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-[15px] font-bold leading-tight">Hub — your ConstructHUB guide</h2>
+              <h2 id={titleId} className="text-[15px] font-bold leading-tight">Gabe — your ConstructHUB guide</h2>
               <p id={descId} className="text-xs text-white/85">
                 {busy ? "Thinking it over…" : builder ? "Ask about any feature or setup step" : "Quick answers about ConstructHUB"}
               </p>
@@ -372,7 +373,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                 <RotateCcw className="h-4 w-4" />
               </button>
             )}
-            <button type="button" onClick={close} className="rounded-md p-1.5 text-white/85 hover:bg-white/10 hover:text-white" aria-label="Close Hub" data-testid="hub-close">
+            <button type="button" onClick={close} className="rounded-md p-1.5 text-white/85 hover:bg-white/10 hover:text-white" aria-label="Close Gabe" data-testid="hub-close">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -403,7 +404,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
             {busy && (
               <div className="flex justify-start" data-testid="hub-thinking">
                 <div className="rounded-2xl rounded-tl-sm border bg-muted/50 px-3 py-2 text-muted-foreground">
-                  <span className="sr-only">Hub is thinking</span>
+                  <span className="sr-only">Gabe is thinking</span>
                   <span aria-hidden="true" className="inline-flex gap-1">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
@@ -436,7 +437,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           <div className="border-t bg-background/60 p-3">
             {canChat ? (
               <form onSubmit={(e) => { e.preventDefault(); void sendChat(); }} className="flex items-end gap-2">
-                <label htmlFor={`${panelId}-input`} className="sr-only">Ask Hub a question</label>
+                <label htmlFor={`${panelId}-input`} className="sr-only">Ask Gabe a question</label>
                 <textarea
                   id={`${panelId}-input`}
                   ref={inputRef}
@@ -456,10 +457,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                 </button>
               </form>
             ) : builder ? (
-              <p className="text-xs text-muted-foreground" data-testid="hub-chat-off">Chat with Hub is off right now. The quick questions still work.</p>
+              <p className="text-xs text-muted-foreground" data-testid="hub-chat-off">Chat with Gabe is off right now. The quick questions still work.</p>
             ) : (
               <div className="flex items-center justify-between gap-3" data-testid="hub-signup-cta">
-                <p className="text-xs text-muted-foreground">Create a free account to ask Hub anything.</p>
+                <p className="text-xs text-muted-foreground">Create a free account to ask Gabe anything.</p>
                 <Link href="/auth" onClick={() => setOpen(false)}
                   className="shrink-0 rounded-full bg-orange-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-800"
                   data-testid="hub-signup-link">
