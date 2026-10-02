@@ -439,6 +439,10 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     for (const t of CALL_ASSISTANT_TIERS) await expect(page.getByTestId(`row-overview-tier-${t.tier}`)).toContainText(t.name);
     await expect(page.getByTestId("row-overview-tier-solo")).toContainText("Current");
     await expect(page.getByTestId("row-overview-tier-fleet")).toContainText("Upgrade");
+    // Four tiers (owner, 2026-10-02): Lite is below Solo; Crew and Fleet pay 5¢ a minute over, Lite and Solo 10¢.
+    await expect(page.locator('[data-testid^="row-overview-tier-"]')).toHaveCount(4);
+    await expect(page.getByTestId("row-overview-tier-lite")).toContainText("Downgrade");
+    for (const t of CALL_ASSISTANT_TIERS) await expect(page.getByTestId(`row-overview-tier-${t.tier}`)).toContainText(`${t.overageCentsPerMinute}¢/min over`);
     await expect(page.getByTestId("link-overview-change-tier")).toHaveAttribute("href", "/settings?tab=billing");
     await expect(page.getByTestId("metric-overview-spam")).toContainText("37");
     await expect(page.getByTestId("metric-overview-spam")).toContainText("30 of 500 free spam calls used");

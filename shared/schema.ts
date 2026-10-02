@@ -2720,6 +2720,14 @@ export const voiceUsage = pgTable("voice_usage", {
   includedMinutes: integer("included_minutes"),
   overageMinutes: integer("overage_minutes").notNull().default(0),
   overageReportedMinutes: integer("overage_reported_minutes").notNull().default(0),
+  /**
+   * Overage minutes per rate (cents per minute → minutes), each call in the
+   * bucket of its tier's rate when recorded; and how many of each were billed.
+   */
+  overageRateMinutes: jsonb("overage_rate_minutes").$type<Record<string, number>>().notNull().default({}),
+  overageReportedRateMinutes: jsonb("overage_reported_rate_minutes").$type<Record<string, number>>().notNull().default({}),
+  /** The overage rate in force at the month's latest call. */
+  overageCentsPerMinute: integer("overage_cents_per_minute"),
   overageReportedAt: timestamp("overage_reported_at"),
   stripeUsageRecordId: text("stripe_usage_record_id"),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -31,7 +31,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
-import { callAssistantIntroShort, callAssistantYearlyNote } from "@shared/plan-copy";
+import { callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote } from "@shared/plan-copy";
 import { CallAssistantTierCards } from "@/components/call-assistant-tiers";
 import { StandingGator } from "@/components/mascot";
 import { H2, Kicker, LEAD, TEXT_LINK } from "@/components/feature-landing/primitives";
@@ -596,7 +596,7 @@ export default function PricingPage() {
           >
             <h2 id="addons-heading" className={H2} data-testid="text-addons-heading">Add-ons: <em className="text-mkt-orange-ink">pay per feature</em></h2>
           </SectionHead>
-          {/* The AI Call Assistant: three tiers, one per subscription (shared/plans.ts CALL_ASSISTANT_TIERS). */}
+          {/* The AI Call Assistant: four tiers, one per subscription (shared/plans.ts CALL_ASSISTANT_TIERS). */}
           <div className="mt-10 max-w-5xl mx-auto space-y-3" id="call-assistant-tiers" data-testid="block-addon-call-assistant">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="font-display font-semibold text-[1.4rem] leading-tight text-mkt-ink">{CALL_ASSISTANT_NAME}: pick a tier</h3>
@@ -604,7 +604,7 @@ export default function PricingPage() {
             </div>
             <p className="text-[14px] font-semibold text-mkt-orange-ink" data-testid="text-addon-intro-call_assistant">
               {/* The intro is Solo, monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
-              {interval === "year" ? callAssistantYearlyNote() : `Solo launch price: ${callAssistantIntroShort()}`}
+              {interval === "year" ? callAssistantYearlyNote() : `Regular prices from ${callAssistantPricing().from}/mo (${callAssistantPricing().fromTier}). Solo launch price: ${callAssistantIntroShort()}`}
             </p>
             <CallAssistantTierCards interval={interval} />
           </div>

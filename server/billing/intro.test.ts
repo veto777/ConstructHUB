@@ -18,7 +18,7 @@ import { CALL_ASSISTANT_INTRO, callAssistantIntroLine, callAssistantIntroShort }
 const pool = new pg.Pool({ connectionString: process.env.CRM_TEST_DATABASE_URL || process.env.DATABASE_URL });
 // Account ids far above any real users row (the table has no FK; rows are removed after).
 const USER = 900_000_000 + Math.floor(Math.random() * 1_000_000);
-const users = [USER, USER + 1, USER + 2, USER + 3, USER + 4, USER + 5, USER + 6];
+const users = [USER, USER + 1, USER + 2, USER + 3, USER + 4, USER + 5, USER + 6, USER + 7, USER + 8];
 
 function fakeStripe() {
   const coupons = new Map<string, any>();
@@ -214,5 +214,17 @@ describe("the coupon lands on the item that first adds the add-on", () => {
     await markIntrosUsedByHeldAddons(USER + 6, { call_assistant_fleet: 1 }, "active", "sub_fleet2", pool);
     expect(await row(USER + 6)).toEqual({ coupon_id: INTRO_USED_BY_SIBLING, ref: "sub_fleet2" });
     expect(await introEligible(f.stripe, USER + 6, "call_assistant", pool)).toBe(false);
+  });
+
+  it("Lite follows the same rules: no intro of its own, Lite → Solo is a switch, and holding Lite uses the Solo intro up", async () => {
+    const f = fakeStripe();
+    expect(addonIntro("call_assistant_lite")).toBeNull();
+    expect(introCouponSpec("call_assistant_lite", "month")).toBeNull();
+    expect(await introsForOrder(f.stripe, USER + 7, {}, { call_assistant_lite: 1 }, "month", pool)).toEqual([]);
+    expect(await introsForOrder(f.stripe, USER + 7, { call_assistant_lite: 1 }, { call_assistant: 1 }, "month", pool)).toEqual([]);
+    expect(f.stripe.coupons.create).not.toHaveBeenCalled();
+    expect(await markIntrosUsedByHeldAddons(USER + 8, { call_assistant_lite: 1 }, "active", "sub_lite", pool)).toEqual(["call_assistant"]);
+    expect(await introEligible(f.stripe, USER + 8, "call_assistant", pool)).toBe(false);
+    expect(await introsForOrder(f.stripe, USER + 8, {}, { call_assistant: 1 }, "month", pool)).toEqual([]);
   });
 });

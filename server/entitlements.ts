@@ -126,20 +126,22 @@ export function moduleEnabled(ent: Pick<Entitlements, "modules" | "addonModules"
 /**
  * The Call Assistant allowance the subscription buys: numbers = the held
  * tier's numbers (shared/plans.ts CALL_ASSISTANT_TIERS) plus every call_number
- * unit; minutes per month = the tier's included minutes. Platform admins get
- * unlimited minutes (-1: never overage) and up to ADMIN_CALL_ASSISTANT_NUMBERS
- * numbers (or what their tier holds, if more) — a ceiling, because every number
- * is a real carrier number.
+ * unit; minutes per month = the tier's included minutes; overageCentsPerMinute
+ * = the tier's own overage rate (0 with no allowance: the meter then keeps the
+ * month's snapshot). Platform admins get unlimited minutes (-1: never overage)
+ * and up to ADMIN_CALL_ASSISTANT_NUMBERS numbers (or what their tier holds, if
+ * more) — a ceiling, because every number is a real carrier number; their rate
+ * is their tier's, or Solo's with none (moot while minutes are unlimited).
  */
-export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number } {
+export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number; overageCentsPerMinute: number } {
   // A paused add-on (payment needed) still shows what it bought: its numbers are held, not released.
   const paused = !ent.addonModules.callAssistant && ent.addonModulesPaused?.callAssistant === true;
-  if (!ent.addonModules.callAssistant && !paused) return { numbers: 0, minutes: 0 };
+  if (!ent.addonModules.callAssistant && !paused) return { numbers: 0, minutes: 0, overageCentsPerMinute: 0 };
   const addons = paused ? ent.storedAddons ?? {} : ent.addons;
   const included = callAssistantIncluded(addons);
   const bought = included.numbers + (addons.call_number ?? 0);
-  if (ent.isPlatformAdmin) return { numbers: Math.max(ADMIN_CALL_ASSISTANT_NUMBERS, bought), minutes: UNLIMITED };
-  return { numbers: bought, minutes: included.minutes };
+  if (ent.isPlatformAdmin) return { numbers: Math.max(ADMIN_CALL_ASSISTANT_NUMBERS, bought), minutes: UNLIMITED, overageCentsPerMinute: included.overageCentsPerMinute };
+  return { numbers: bought, minutes: included.minutes, overageCentsPerMinute: included.overageCentsPerMinute };
 }
 
 /**

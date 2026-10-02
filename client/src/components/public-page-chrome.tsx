@@ -12,9 +12,8 @@
  * Inter everywhere else in the app).
  */
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
-import { CHLogo } from "@/components/ch-logo";
-import { CartSheet } from "@/components/cart-sheet";
+import { Link } from "wouter";
+import { SiteNavBar } from "@/components/site-nav";
 import { copyrightNotice } from "@/lib/marketing";
 
 function useSignedOut(): boolean {
@@ -35,34 +34,12 @@ const startAtTop = () => window.scrollTo(0, 0);
  * outside the page's own `overflow-y-auto` wrapper, or it cannot stick.
  */
 export function PublicPageHeader({ next, cart = false }: { next: string; cart?: boolean }) {
-  const [location] = useLocation();
   if (!useSignedOut()) return null;
+  // The same ribbon as the home page (components/site-nav.tsx): Features ▾, the
+  // home page's sections, sign in / get started. Pinned to the top on every page.
   return (
-    <header
-      className={`mkt-editorial bg-mkt-navy border-b-[3px] border-mkt-orange${cart ? " sticky top-0 z-40" : ""}`}
-      data-testid="header-public-page"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
-        <Link href="/" onClick={startAtTop} aria-label="ConstructHUB home" data-testid="link-public-home">
-          <CHLogo height={32} />
-        </Link>
-        <div className="flex items-center gap-2 text-sm">
-          {location !== "/features" && (
-            <Link href="/features" onClick={startAtTop} className="hidden sm:inline px-3 py-1.5 rounded-md font-medium text-white/75 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-public-features">
-              Features
-            </Link>
-          )}
-          {location !== "/pricing" && (
-            <Link href="/pricing" onClick={startAtTop} className="hidden sm:inline px-3 py-1.5 rounded-md font-medium text-white/75 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-public-pricing">
-              Pricing
-            </Link>
-          )}
-          {cart && <div className="text-white"><CartSheet /></div>}
-          <Link href={`/auth?next=${encodeURIComponent(next)}`} onClick={startAtTop} className="inline-flex items-center h-9 px-4 rounded-lg bg-mkt-orange hover:bg-mkt-orange-hover text-white font-semibold transition-colors" data-testid="link-public-signin">
-            Sign in
-          </Link>
-        </div>
-      </div>
+    <header className="mkt-editorial sticky top-0 z-40 bg-mkt-navy border-b-[3px] border-mkt-orange" data-testid="header-public-page">
+      <SiteNavBar signedIn={false} next={next} cart={cart} />
     </header>
   );
 }

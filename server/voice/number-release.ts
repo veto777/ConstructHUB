@@ -8,7 +8,7 @@
  * So when the subscription ENDS (Stripe deleted it, or its status is canceled /
  * unpaid / incomplete_expired, or a trial grant ran out) or the Call Assistant
  * tier is removed, every number the org holds is released on SignalWire; when
- * a smaller tier (Fleet → Crew → Solo) or a lower call_number add-on quantity
+ * a smaller tier (Fleet → Crew → Solo → Lite) or a lower call_number add-on quantity
  * pays for fewer numbers than the org holds, the NEWEST
  * extra numbers go the same way (the oldest — normally the included one — is
  * kept). A failed payment (past_due) never releases anything: the assistant is
@@ -116,7 +116,7 @@ type SubscriptionLike = {
  *     retrying a failed payment) → keep 0, "payment_failed", which a fixed
  *     card can still undo;
  *   - active / trialing / past_due → keep what the add-ons pay for (the
- *     held tier's numbers — Solo 1, Crew 3, Fleet 5 — + every call_number
+ *     held tier's numbers — Lite 1, Solo 1, Crew 5, Fleet 20 — + every call_number
  *     unit, so a downgrade releases the newest extras); no tier → "addon_removed";
  *   - anything else (incomplete, paused, a row we can't read) → null: hold,
  *     never guess a release.
@@ -131,7 +131,7 @@ export function numbersKeptFor(row: SubscriptionLike | null | undefined, admin: 
   const plan = activePlanKey(row, now);
   if (!plan) return null;
   const addons = parseAddons(row.addons);
-  // The held tier (Solo 1, Crew 3, Fleet 5 numbers) plus every extra number; a tier the plan doesn't sell counts as none.
+  // The held tier (Lite 1, Solo 1, Crew 5, Fleet 20 numbers) plus every extra number; a tier the plan doesn't sell counts as none.
   const { tier, numbers } = callAssistantIncluded(addons);
   if (!tier || !ADDONS[tier.addon].availableOn.includes(plan)) return { keep: 0, reason: "addon_removed" };
   return { keep: numbers + (addons.call_number ?? 0), reason: "over_allowance" };
