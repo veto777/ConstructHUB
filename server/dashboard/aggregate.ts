@@ -97,7 +97,7 @@ export async function buildDashboard(userId: number, opts: BuildDashboardOptions
   }
 
   const ctx = makeContext(userId, ent, crm, now);
-  const access = { accessPlan: ent.accessPlan, allowances: ent.allowances, modules: ent.modules, hasCrmOrg: crmFailed || !!crm };
+  const access = { accessPlan: ent.accessPlan, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, hasCrmOrg: crmFailed || !!crm };
 
   const tilesP = Promise.all(DASHBOARD_TILES.map((def) => computeTile(def, ctx, access, {
     budget, crmFailed, sources: opts.sources, workspace: opts.workspace ?? null, onError: (e) => fail(`tile ${def.key}`)(e),

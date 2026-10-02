@@ -37,8 +37,10 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
 
   const numbers = (status.numbers as NumberRow[]).filter((n) => n && n.status !== "released");
   const used = status.usage?.minutes ?? 0;
+  // -1 = unlimited minutes (platform admins): no ceiling to measure against, never overage.
+  const unlimitedMinutes = status.allowance.minutes < 0;
   const included = status.allowance.minutes || status.pricing.includedMinutes;
-  const pct = included > 0 ? Math.min(100, Math.round((used / included) * 100)) : 0;
+  const pct = !unlimitedMinutes && included > 0 ? Math.min(100, Math.round((used / included) * 100)) : 0;
   const overage = status.usage?.overageMinutes ?? 0;
   const profileStatus = status.profile?.status ?? "draft";
   // The server probes the engine's /health (cached ~30 s); "configured" alone says nothing about whether calls get answered.
@@ -71,7 +73,7 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
         <MetricCard icon={Hash} label="Numbers" value={numbers.length} testid="metric-overview-numbers"
           context={`${status.allowance.numbers} included with your add-on`} href="/crm/call-assistant?tab=numbers" />
         <MetricCard icon={Timer} label="Minutes this month" value={used.toLocaleString("en-US")} testid="metric-overview-minutes"
-          context={`of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over at ${formatUsd(status.pricing.overageCentsPerMinute ?? CALL_MINUTE_OVERAGE_CENTS)}/min` : ""}`} />
+          context={unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over at ${formatUsd(status.pricing.overageCentsPerMinute ?? CALL_MINUTE_OVERAGE_CENTS)}/min` : ""}`} />
         <MetricCard icon={PhoneCall} label="Calls this month" value={status.usage?.calls ?? 0} testid="metric-overview-calls" href="/crm/call-assistant?tab=calls" />
         <MetricCard icon={ShieldBan} label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
           context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/crm/call-assistant?tab=calls&view=spam" />
@@ -116,9 +118,9 @@ export function OverviewPanel({ status, loading }: { status: VoiceStatus | null;
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Minutes used</h3>
-              <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-overview-minutes-pct">{pct}%</span>
+              <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-overview-minutes-pct">{unlimitedMinutes ? "Unlimited" : `${pct}%`}</span>
             </div>
-            <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />
+            {!unlimitedMinutes && <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />}
             <p className="text-xs text-muted-foreground">
               {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. The first {freeSpamLimit.toLocaleString("en-US")} spam calls each month never count toward your minutes; blocked numbers are rejected before answering and cost nothing.
               {status.addon.preview ? " Pricing is being finalized." : ""}

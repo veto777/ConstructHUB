@@ -51,6 +51,8 @@ async function visibleAppointments(crm: OrgContext, from: Date, to: Date, ownOnl
 const openCrm = { label: "Open the CRM", href: "/crm", surface: "portal" as const };
 
 export const runTiles: TileSources = {
+  /** Only reached when the add-on module is on (tileAccess): a link into the CRM's Call Assistant. */
+  callAssistant: async () => ok([], { label: "Open Call Assistant", href: "/crm/call-assistant", surface: "portal" }),
   async crm(ctx) {
     const crm = ctx.crm;
     if (!crm) return NO_ORG;

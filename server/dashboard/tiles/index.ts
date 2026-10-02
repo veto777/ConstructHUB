@@ -8,7 +8,7 @@ import type { TileSource, TileSources } from "./types";
 
 export * from "./types";
 
-/** One source per data tile. callAssistant has none: it is "coming_soon" by its gate. */
+/** One source per data tile. callAssistant is "coming_soon" by its gate unless its add-on module is on (run.ts). */
 export const TILE_SOURCES: TileSources = { ...growTiles, ...protectTiles, ...winTiles, ...runTiles, ...learnTiles };
 
 export const tileSource = (key: DashboardTileKey, overrides?: TileSources): TileSource | undefined =>

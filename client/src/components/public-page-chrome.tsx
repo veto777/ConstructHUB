@@ -1,7 +1,7 @@
 /**
  * Minimal header + footer for marketing-site pages a signed-out visitor can
  * land on directly (/reinstatement, /crm-app, /pricing, /master-class,
- * /call-assistant). Signed
+ * /call-assistant, /features and every /features/<slug>). Signed
  * in, those pages render inside the dashboard frame, which already has
  * navigation and the cart — so this renders nothing unless the visitor is
  * signed out.
@@ -47,6 +47,11 @@ export function PublicPageHeader({ next, cart = false }: { next: string; cart?: 
           <CHLogo height={32} />
         </Link>
         <div className="flex items-center gap-2 text-sm">
+          {location !== "/features" && (
+            <Link href="/features" onClick={startAtTop} className="hidden sm:inline px-3 py-1.5 rounded-md font-medium text-white/75 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-public-features">
+              Features
+            </Link>
+          )}
           {location !== "/pricing" && (
             <Link href="/pricing" onClick={startAtTop} className="hidden sm:inline px-3 py-1.5 rounded-md font-medium text-white/75 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-public-pricing">
               Pricing
@@ -68,6 +73,8 @@ export function PublicPageFooter() {
     <footer className="mkt-editorial bg-mkt-navy text-mkt-navy-muted border-t border-mkt-navy-rule py-8 px-4 text-center text-[13px]" data-testid="footer-public-page">
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         <Link href="/" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors">Home</Link>
+        <span aria-hidden className="opacity-40">·</span>
+        <Link href="/features" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-features">Features</Link>
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/call-assistant" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-call-assistant">AI Call Assistant</Link>
         <span aria-hidden className="opacity-40">·</span>

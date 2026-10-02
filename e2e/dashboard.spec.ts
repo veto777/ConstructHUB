@@ -257,10 +257,12 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     await expect(cf).toHaveAttribute("data-status", "locked");
     await expect(cf.getByTestId("status-cloudflare")).toContainText("Agency");
     await expect(cf).toHaveAttribute("title", /Cloudflare \+ Search Console is included with the Agency plan/);
-    // No numbers, and no per-tile prompt box: one "See plans" per group.
+    // No numbers, and no per-tile prompt box: one "See plans" per group; each chip opens its feature page.
     await expect(row.locator('[data-testid^="metric-"]')).toHaveCount(0);
     await expect(row.locator('[data-testid^="locked-cloudflare"]')).toHaveCount(0);
-    await expect(row.getByRole("link")).toHaveCount(1);
+    await expect(row.getByTestId("link-locked-protect-plans")).toHaveCount(1);
+    await expect(cf.getByTestId("link-tile-cloudflare-intro")).toHaveAttribute("href", "/features/cloudflare");
+    await expect(row.getByRole("link")).toHaveCount((await row.locator('[data-status="locked"]').count()) + 1);
     await row.getByTestId("link-locked-protect-plans").click();
     await expect(page).toHaveURL(/\/pricing$/);
   });

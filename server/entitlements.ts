@@ -8,8 +8,12 @@
  *   sendPlanRequired(res, ...)    -> the one 402 body the client understands
  *   sendLimitReached(res, ...)    -> the one 403 body for "you've used what your plan includes"
  *
- * Platform admins get every module and the top plan's limits (so the owner can
- * run the product); they do not get unlimited quotas beyond the top plan.
+ * Platform admins (server/admin.ts ADMIN_EMAILS — the Alpine account) are
+ * all-access, owner 2026-10-02: every module and every add-on module, and every
+ * numeric usage limit unlimited (-1, the price book's convention —
+ * platformAdminAllowances). The AI Call Assistant keeps a ceiling on numbers
+ * (ADMIN_CALL_ASSISTANT_NUMBERS: each one is a real carrier number) with
+ * unlimited minutes. Nothing here changes for any other account.
  *
  * A subscription row without a Stripe subscription is a grant (a trial code, or
  * a manual grant). It stops counting once its current_period_end has passed; a
@@ -32,7 +36,7 @@ import { forgetDashboard } from "./dashboard/cache";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
   ADDON_MODULES, isAddonModule, moduleName, ADDON_MODULE_UNLOCKED_BY, callAssistantIncluded,
-  ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, storedPlanKey,
+  ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, storedPlanKey, UNLIMITED,
   type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
   type AddonModuleKey, type AnyModuleKey,
 } from "@shared/plans";
@@ -46,7 +50,10 @@ export type Entitlements = {
   accessPlan: PlanKey | null;
   /** accessPlan's limits as published. */
   limits: PlanLimits | null;
-  /** limits plus purchased add-ons sold on that plan: what every gate checks. */
+  /**
+   * limits plus purchased add-ons sold on that plan: what every gate checks.
+   * For platform admins, platformAdminAllowances() (every usage limit -1).
+   */
   allowances: PlanLimits | null;
   modules: PlanModules;
   /**
@@ -120,24 +127,61 @@ export function moduleEnabled(ent: Pick<Entitlements, "modules" | "addonModules"
  * The Call Assistant allowance the subscription buys: numbers = the held
  * tier's numbers (shared/plans.ts CALL_ASSISTANT_TIERS) plus every call_number
  * unit; minutes per month = the tier's included minutes. Platform admins get
- * one unit's worth (they run the product, they do not get unlimited carrier numbers).
+ * unlimited minutes (-1: never overage) and up to ADMIN_CALL_ASSISTANT_NUMBERS
+ * numbers (or what their tier holds, if more) — a ceiling, because every number
+ * is a real carrier number.
  */
 export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number } {
   // A paused add-on (payment needed) still shows what it bought: its numbers are held, not released.
   const paused = !ent.addonModules.callAssistant && ent.addonModulesPaused?.callAssistant === true;
   if (!ent.addonModules.callAssistant && !paused) return { numbers: 0, minutes: 0 };
   const addons = paused ? ent.storedAddons ?? {} : ent.addons;
-  const included = callAssistantIncluded(ent.isPlatformAdmin && !callAssistantIncluded(addons).tier ? { call_assistant: 1 } : addons);
-  return {
-    numbers: included.numbers + (addons.call_number ?? 0),
-    minutes: included.minutes,
-  };
+  const included = callAssistantIncluded(addons);
+  const bought = included.numbers + (addons.call_number ?? 0);
+  if (ent.isPlatformAdmin) return { numbers: Math.max(ADMIN_CALL_ASSISTANT_NUMBERS, bought), minutes: UNLIMITED };
+  return { numbers: bought, minutes: included.minutes };
 }
+
+/**
+ * Call Assistant numbers a platform admin may hold: an engineering safeguard (each one is a
+ * real carrier number that costs money), not an owner rule. Confirm the number with the owner.
+ */
+export const ADMIN_CALL_ASSISTANT_NUMBERS = 5;
 
 /** The most complete plan: what platform admins run with. */
 export const TOP_PLAN: PlanKey = PLAN_KEYS[PLAN_KEYS.length - 1];
 /** The plan billed per location through AGENCY_LOCATION_BANDS, self-serve up to AGENCY_SELF_SERVE_MAX_LOCATIONS. */
 export const PER_LOCATION_PLAN: PlanKey = "agency";
+
+/**
+ * Numeric PlanLimits that are not usage caps, so they are not made unlimited
+ * for platform admins: Profile Guard's check cadence (admins get the fastest any
+ * plan buys), the public API's requests per minute per key (a rate, kept from
+ * the top plan), and the per-location multipliers (moot once the monthly base
+ * is unlimited, so 0).
+ */
+export const ADMIN_NON_CAP_LIMITS = ["guardCadenceMinutes", "apiRatePerMinute", "gridCreditsPerLocation", "siteScansPerLocation"] as const satisfies readonly CountLimitKey[];
+
+/**
+ * What a platform admin runs with: the top plan's limits with every numeric
+ * usage limit unlimited (-1) — monthly quotas (searches, grid credits, Site
+ * Scans, Competitor scans, texts, API units) and counts (locations, protected
+ * sites, seats, review templates) — automatic AI reply publishing, and the
+ * fastest Profile Guard cadence. Built from PlanLimits' own keys, so a limit
+ * added to the price book later is unlimited for admins by default.
+ */
+export function platformAdminAllowances(): PlanLimits {
+  const out: PlanLimits = { ...PLANS[TOP_PLAN].limits };
+  const skip = new Set<string>(ADMIN_NON_CAP_LIMITS);
+  for (const key of Object.keys(out) as (keyof PlanLimits)[]) {
+    if (typeof out[key] === "number" && !skip.has(key)) (out as Record<string, unknown>)[key] = UNLIMITED;
+  }
+  out.gridCreditsPerLocation = 0;
+  out.siteScansPerLocation = 0;
+  out.guardCadenceMinutes = Math.min(...PLAN_KEYS.map((k) => PLANS[k].limits.guardCadenceMinutes));
+  out.autoPublishAiReplies = true;
+  return out;
+}
 
 /** Numeric limits an add-on can raise. */
 export type CountLimit = CountLimitKey;
@@ -233,7 +277,7 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
     storedPlan: row?.plan ?? null,
     accessPlan,
     limits: accessPlan ? PLANS[accessPlan].limits : null,
-    allowances: accessPlan ? allowancesFor(accessPlan, admin ? {} : addons) : null,
+    allowances: admin ? platformAdminAllowances() : accessPlan ? allowancesFor(accessPlan, addons) : null,
     modules: admin ? ALL_MODULES : plan ? PLANS[plan].modules : NO_MODULES,
     addonModules: addonModulesFor(plan, addons, status, admin),
     addonModulesPaused: addonModulesPausedFor(grantExpired(row, now) ? null : row?.plan, storedAddons, status, admin),

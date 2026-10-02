@@ -76,12 +76,13 @@ test.describe("signed out", () => {
   });
 
   test("never on homeowner token pages or the sign-in page; shown on marketing pages", async ({ page }) => {
-    for (const path of ["/e/not-a-real-token", "/portal/not-a-real-token", "/auth", "/terms"]) {
+    // The feature pages (and the retired landing URLs that redirect to them) match /call-assistant: no launcher.
+    for (const path of ["/e/not-a-real-token", "/portal/not-a-real-token", "/auth", "/terms", "/features", "/features/master-class", "/master-class-landing"]) {
       await page.goto(`${SIGNED_OUT}${path}`);
       await page.waitForLoadState("networkidle");
       await expect(page.getByTestId("hub-launcher"), path).toHaveCount(0);
     }
-    for (const path of ["/pricing", "/reinstatement", "/master-class-landing"]) {
+    for (const path of ["/pricing", "/reinstatement"]) {
       await page.goto(`${SIGNED_OUT}${path}`);
       await expect(page.getByTestId("hub-launcher"), path).toBeVisible();
     }

@@ -708,7 +708,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="flex items-center gap-1.5 p-1.5 rounded border border-border/30">
           <Camera className="w-3 h-3 text-blue-400 shrink-0" />
-          <span className="text-muted-foreground">Photos: <strong className="text-foreground">{photoPct}%</strong></span>
+          <span className="text-muted-foreground">Reviewer photos: <strong className="text-foreground">{photoPct}%</strong></span>
         </div>
         <div className="flex items-center gap-1.5 p-1.5 rounded border border-border/30">
           <UserCheck className="w-3 h-3 text-emerald-400 shrink-0" />

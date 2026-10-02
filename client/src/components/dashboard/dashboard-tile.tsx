@@ -1,5 +1,6 @@
 import { ArrowRight, Clock3, LayoutGrid, Lock, Star, TriangleAlert } from "lucide-react";
 import type { DashboardMetric, DashboardTile } from "@shared/dashboard";
+import { featureIntroPath } from "@shared/feature-pages";
 import { PLANS } from "@shared/plans";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +105,7 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
   const [hero, ...rest] = tile.metrics;
   const titleId = `tile-title-${tile.key}`;
   const cta = tile.cta ?? { label: `Open ${tile.title}`, href: tile.href, surface: tile.surface };
+  const intro = featureIntroPath(tile.key);
 
   return (
     <Card
@@ -166,6 +168,17 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
               aria-label={cta.label === "Open" ? `Open ${tile.title}` : undefined}
             >
               {cta.label} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </DashLink>
+          )}
+          {/* Not for sale yet: its intro page says what it will do. */}
+          {tile.status === "coming_soon" && intro && intro !== cta.href && (
+            <DashLink
+              href={intro}
+              surface="app"
+              className={`inline-flex min-h-10 sm:min-h-8 items-center rounded-md text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4 ${FOCUS_RING}`}
+              data-testid={`link-tile-${tile.key}-intro`}
+            >
+              See what it does
             </DashLink>
           )}
           {tile.links?.map((l, i) => (

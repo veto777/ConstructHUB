@@ -15,7 +15,7 @@ vi.mock("../db", () => ({
   db: {},
 }));
 import {
-  getEntitlements, addonModulesFor, moduleEnabled, modulePaused, callAssistantAllowance, sendModuleRequired, requireModule, allowancesFor,
+  getEntitlements, addonModulesFor, moduleEnabled, modulePaused, callAssistantAllowance, ADMIN_CALL_ASSISTANT_NUMBERS, sendModuleRequired, requireModule, allowancesFor,
 } from "../entitlements";
 import {
   ADDONS, ADDON_MODULES, ADDON_MODULE_UNLOCKED_BY, PLANS, PLAN_KEYS, MODULE_NAMES, planForModule, moduleName, isAddonModule,
@@ -93,16 +93,18 @@ describe("entitlements: the callAssistant add-on module", () => {
     expect(allowancesFor("pro", { call_assistant: 2, call_number: 3 })).toEqual(PLANS.pro.limits);
   });
 
-  it("buys the held tier's numbers and minutes plus extra numbers; platform admins get Solo's worth", () => {
+  it("buys the held tier's numbers and minutes plus extra numbers; platform admins get unlimited minutes and up to 5 numbers", () => {
     const allowance = (addons: Record<string, number>, isPlatformAdmin = false) =>
       callAssistantAllowance({ addonModules: { callAssistant: true }, addons, isPlatformAdmin });
     expect(allowance({ call_assistant: 1, call_number: 3 })).toEqual({ numbers: 1 + 3, minutes: 2000 });
     expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 5, minutes: 5000 });
     expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 21, minutes: 12_000 });
     expect(callAssistantAllowance({ addonModules: { callAssistant: false }, addons: { call_assistant: 2 }, isPlatformAdmin: false })).toEqual({ numbers: 0, minutes: 0 });
-    expect(allowance({}, true)).toEqual({ numbers: 1, minutes: 2000 });
-    // An admin who holds a tier gets that tier.
-    expect(allowance({ call_assistant_fleet: 1 }, true)).toEqual({ numbers: 20, minutes: 12_000 });
+    expect(allowance({}, true)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1 });
+    expect(ADMIN_CALL_ASSISTANT_NUMBERS).toBe(5);
+    // An admin who holds a bigger tier keeps it: the admin ceiling is a floor, never a cut.
+    expect(allowance({ call_assistant_fleet: 1 }, true)).toEqual({ numbers: 20, minutes: -1 });
+    expect(allowance({ call_assistant: 1, call_number: 6 }, true)).toEqual({ numbers: 7, minutes: -1 });
   });
 
   it("getEntitlements reports addonModules beside modules, and legacy Platinum has no add-on", async () => {

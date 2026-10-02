@@ -21,7 +21,7 @@ let server: ReturnType<express.Express["listen"]>, base: string;
 beforeAll(async () => {
   const app = express();
   app.use((req: any, _res, next) => {
-    req.publicApi = { userId: 123, key: { id: String(req.query.key || "CODEX-key"), monthlyUnitLimit: Number(req.query.cap || 100) }, plan: { unitsPerMonth: Number(req.query.plan || 100), key: "pro", requiredPlan: "pro" } };
+    req.publicApi = { userId: 123, key: { id: String(req.query.key || "CODEX-key"), monthlyUnitLimit: req.query.cap === "none" ? null : Number(req.query.cap || 100) }, plan: { unitsPerMonth: Number(req.query.plan || 100), key: "pro", requiredPlan: "pro" } };
     next();
   });
   app.use(quota);
@@ -34,6 +34,25 @@ beforeAll(async () => {
 afterAll(async () => { await new Promise<void>(r => server.close(() => r())); });
 beforeEach(() => { state.usage.clear(); state.failMeter = false; });
 const get = async (path: string) => { const r = await fetch(base + path); return { status: r.status, remaining: r.headers.get("X-Units-Remaining"), body: await r.json() }; };
+
+describe("unlimited API units (platform admins: unitsPerMonth -1)", () => {
+  it("never refuses for the plan, still meters every call, and says 'unlimited'", async () => {
+    state.usage.set("CODEX-other", 1_000_000);
+    const results = await Promise.all(Array.from({ length: 12 }, () => get("/?plan=-1&cap=none&rows=250")));
+    expect(results.every(r => r.status === 200)).toBe(true);
+    expect(results.every(r => r.remaining === "unlimited")).toBe(true);
+    expect(state.usage.get("CODEX-key")).toBe(12 * 3);
+  });
+  it("a per-key cap the admin set still applies", async () => {
+    const results = await Promise.all(Array.from({ length: 4 }, () => get("/?plan=-1&cap=2")));
+    expect(results.filter(r => r.status === 200)).toHaveLength(2);
+    expect(results.filter(r => r.status === 429).every(r => r.body.error.details?.scope === "key" || r.body.error.scope === "key" || /this key/.test(r.body.error.message))).toBe(true);
+  });
+  it("a plan without the API (0) is still refused", async () => {
+    const r = await get("/?plan=0");
+    expect(r.status).toBe(402);
+  });
+});
 
 describe("monthly API quota under concurrent requests", () => {
   it("allows only one concurrent read against a one-unit key cap", async () => {

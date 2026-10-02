@@ -49,6 +49,22 @@ describe("usage meters", () => {
     expect(usagePercent({ used: 5, limit: 20 })).toBe(25);
     expect(usagePercent({ used: 30, limit: 20 })).toBe(100);
     expect(usagePercent({ used: 3, limit: -1 })).toBeNull();
+    // A platform admin's -1 reads as unlimited, never "12 of -1" or a full bar.
+    expect(usageLine({ used: 12, limit: -1 }, true)).toBe("12 used · unlimited");
+    expect(usageLine({ used: 12, limit: 10 }, true)).toBe("12 of 10 used");
+  });
+
+  it("Limits & usage and Billing say 'Unlimited' for a platform admin, with nothing to buy", () => {
+    const limits = read("client/src/pages/settings/limits-usage.tsx");
+    expect(limits).toContain('export const ADMIN_UNLIMITED = "Unlimited";');
+    expect(limits).toContain("const admin = entitlements.isPlatformAdmin === true;");
+    // No add-on rows on an all-access account, and Agency's per-location wording is not the admin's.
+    expect(limits).toContain("const addon = !admin && row.addon");
+    expect(limits).toContain('const isAgency = plan === "agency" && !admin;');
+    const billing = read("client/src/pages/settings/plan-billing.tsx");
+    expect(billing).toContain("usageLine(meter, admin)");
+    const overview = read("client/src/pages/crm-call-assistant/overview.tsx");
+    expect(overview).toContain('unlimitedMinutes ? "Unlimited minutes"');
   });
 
   it("cover every monthly meter the server reports", () => {

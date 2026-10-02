@@ -10,7 +10,7 @@
  * authenticates nothing outside this router.
  */
 import type { RequestHandler } from "express";
-import type { PlanKey } from "@shared/plans";
+import { isUnlimited, UNLIMITED, type PlanKey } from "@shared/plans";
 import { looksLikeApiKey, verifyApiKey, type ApiKeyRow, type ApiScope } from "../account/api-keys";
 import { cheapestPlanWhere, getEntitlements, TOP_PLAN } from "../entitlements";
 import { CRM_RESERVED } from "./registry";
@@ -23,7 +23,7 @@ export type PublicApiContext = {
   scopes: ApiScope[];
   plan: {
     key: PlanKey | null;
-    /** 0 = the API is not part of the plan. */
+    /** 0 = the API is not part of the plan; -1 = unlimited (platform admins). */
     unitsPerMonth: number;
     ratePerMinute: number;
     /** The cheapest plan that includes the API, for 402s. */
@@ -70,7 +70,7 @@ export const authenticate: RequestHandler = async (req, res, next) => {
       scopes: key.scopes,
       plan: {
         key: ent.accessPlan,
-        unitsPerMonth: Math.max(0, ent.allowances?.apiUnitsPerMonth ?? 0),
+        unitsPerMonth: isUnlimited(ent.allowances?.apiUnitsPerMonth) ? UNLIMITED : Math.max(0, ent.allowances?.apiUnitsPerMonth ?? 0),
         ratePerMinute: ent.allowances?.apiRatePerMinute || DEFAULT_RATE_PER_MINUTE,
         requiredPlan: apiRequiredPlan(),
       },
