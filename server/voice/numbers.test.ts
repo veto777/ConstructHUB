@@ -26,14 +26,14 @@ process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATA
 // ── The stub carrier ────────────────────────────────────────────────────────
 
 type Hit = { method: string; path: string; query: URLSearchParams; form: URLSearchParams; auth: string | null };
-type Stub = { server: http.Server; base: string; hits: Hit[]; nextStatus: number | null; nextBody: unknown; close: () => Promise<void> };
+type Stub = { server: http.Server; base: string; hits: Hit[]; nextStatus: number | null; nextBody: unknown; exchange: string; close: () => Promise<void> };
 
-function canned(hit: Hit) {
+function canned(hit: Hit, ex = "555") {
   if (hit.method === "GET" && hit.path.endsWith("/AvailablePhoneNumbers/US/Local.json")) {
     const region = hit.query.get("InRegion") ?? "WA";
     const code = hit.query.get("AreaCode") ?? "360";
     const n = Number(hit.query.get("PageSize") ?? 10);
-    return { available_phone_numbers: Array.from({ length: n }, (_, i) => ({ phone_number: `+1${code}555${String(100 + i).padStart(4, "0")}`, friendly_name: `(${code}) 555-0${100 + i}`, locality: hit.query.get("InLocality") ?? "Bellingham", region, capabilities: { voice: true, SMS: true, MMS: false } })) };
+    return { available_phone_numbers: Array.from({ length: n }, (_, i) => ({ phone_number: `+1${code}${ex}${String(100 + i).padStart(4, "0")}`, friendly_name: `(${code}) ${ex}-0${100 + i}`, locality: hit.query.get("InLocality") ?? "Bellingham", region, capabilities: { voice: true, SMS: true, MMS: false } })) };
   }
   if (hit.method === "POST" && hit.path.endsWith("/IncomingPhoneNumbers.json")) {
     return { sid: `PN${hit.form.get("PhoneNumber")!.slice(2)}`, phone_number: hit.form.get("PhoneNumber"), friendly_name: hit.form.get("FriendlyName"), voice_url: hit.form.get("VoiceUrl"), status_callback: hit.form.get("StatusCallback"), date_created: "Thu, 02 Oct 2026 00:00:00 +0000" };
@@ -44,7 +44,7 @@ function canned(hit: Hit) {
 }
 
 async function startStub(): Promise<Stub> {
-  const stub: Stub = { server: null as any, base: "", hits: [], nextStatus: null, nextBody: undefined, close: async () => {} };
+  const stub: Stub = { server: null as any, base: "", hits: [], nextStatus: null, nextBody: undefined, exchange: "555", close: async () => {} };
   stub.server = http.createServer((req, res) => {
     let raw = "";
     req.on("data", (c) => (raw += c));
@@ -53,7 +53,7 @@ async function startStub(): Promise<Stub> {
       const hit: Hit = { method: req.method!, path: u.pathname, query: u.searchParams, form: new URLSearchParams(raw), auth: req.headers.authorization ?? null };
       stub.hits.push(hit);
       const status = stub.nextStatus ?? (hit.method === "DELETE" ? 204 : hit.method === "POST" ? 201 : 200);
-      const body = stub.nextStatus !== null ? stub.nextBody : canned(hit);
+      const body = stub.nextStatus !== null ? stub.nextBody : canned(hit, stub.exchange);
       stub.nextStatus = null; stub.nextBody = undefined;
       if (status === 204 || body === null) { res.writeHead(204); return res.end(); }
       res.writeHead(status, { "content-type": "application/json" });
@@ -221,6 +221,9 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   const testIp = `198.18.${randomInt(256)}.${randomInt(1, 255)}`;
   let child: ChildProcess, stub: Stub, base = "";
   let noAddon: Account, pro: Account;
+  // A per-run exchange: the lane DB is shared with other lanes' suites, and phone_number is unique table-wide.
+  const EX = String(randomInt(200, 999)).replace(/^555$/, "556");
+  const num = (last: string) => `+1360${EX}${last}`;
 
   async function api(path: string, who: Account | null, method = "GET", body?: any) {
     const r = await fetch(base + path, { method, headers: { cookie: who?.cookie ?? "", "content-type": "application/json", "x-forwarded-for": testIp }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -247,6 +250,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   beforeAll(async () => {
     if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
     stub = await startStub();
+    stub.exchange = EX;
     const port = await freePort();
     base = `http://127.0.0.1:${port}`;
     child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
@@ -288,7 +292,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   beforeEach(() => { stub.hits.length = 0; });
 
   it("every numbers route answers the standard 402 with the add-on named until the owner buys it; status still answers", async () => {
-    for (const [method, path, body] of [["GET", "/api/crm/voice/numbers"], ["GET", "/api/crm/voice/numbers/search?state=WA"], ["POST", "/api/crm/voice/numbers", { phoneNumber: "+13605550100" }], ["DELETE", "/api/crm/voice/numbers/x"], ["GET", "/api/crm/voice/usage"]] as const) {
+    for (const [method, path, body] of [["GET", "/api/crm/voice/numbers"], ["GET", "/api/crm/voice/numbers/search?state=WA"], ["POST", "/api/crm/voice/numbers", { phoneNumber: num("0100") }], ["DELETE", "/api/crm/voice/numbers/x"], ["GET", "/api/crm/voice/usage"]] as const) {
       const r = await api(path, noAddon, method, body);
       expect(r.status, `${method} ${path}`).toBe(402);
       expect(r.body).toMatchObject({ code: "plan_required", requiredPlan: "pro", addon: "call_assistant" });
@@ -318,7 +322,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     const r = await api("/api/crm/voice/numbers/search?state=wa&areaCode=360&city=Bellingham&limit=5", pro);
     expect(r.status).toBe(200);
     expect(r.body.numbers).toHaveLength(5);
-    expect(r.body.numbers[0]).toMatchObject({ phoneNumber: "+13605550100", locality: "Bellingham", region: "WA", areaCode: "360" });
+    expect(r.body.numbers[0]).toMatchObject({ phoneNumber: num("0100"), locality: "Bellingham", region: "WA", areaCode: "360" });
     expect(r.body).toMatchObject({ monthlyCents: 0, mock: false, allowance: { numbers: 1, used: 0 } });
     expect(stub.hits).toHaveLength(1);
     expect(Object.fromEntries(stub.hits[0].query)).toEqual({ InRegion: "WA", AreaCode: "360", InLocality: "Bellingham", PageSize: "5" });
@@ -327,20 +331,20 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   it("buys a number with the webhooks + org name, then refuses a second above the allowance naming call_number", async () => {
     const bad = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "555-0100" });
     expect(bad.status).toBe(400);
-    const r = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "(360) 555-0100", label: "Main office", location: "Bellingham, WA", state: "wa", forwardingFrom: "360-555-0199" });
+    const r = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: `(360) ${EX}-0100`, label: "Main office", location: "Bellingham, WA", state: "wa", forwardingFrom: `360-${EX}-0199` });
     expect(r.status).toBe(201);
     expect(r.body.mock).toBe(false);
     expect(r.body.number).toMatchObject({
-      phoneNumber: "+13605550100", label: "Main office", location: "Bellingham, WA", state: "WA", areaCode: "360", provider: "signalwire", providerSid: "PN3605550100",
-      status: "active", isTest: false, forwardingFrom: "+13605550199", monthlyCents: 0, releasable: false,
+      phoneNumber: num("0100"), label: "Main office", location: "Bellingham, WA", state: "WA", areaCode: "360", provider: "signalwire", providerSid: `PN360${EX}0100`,
+      status: "active", isTest: false, forwardingFrom: num("0199"), monthlyCents: 0, releasable: false,
       voiceUrl: "https://constructhub.us/voice/signalwire/voice", statusCallbackUrl: "https://constructhub.us/voice/signalwire/status",
     });
     expect(new Date(r.body.number.releaseEligibleAt).getTime() - new Date(r.body.number.purchasedAt).getTime()).toBe(CALL_NUMBER_MIN_DAYS * 86_400_000);
     const orgName = (await db.query("select name from crm_orgs where id=$1", [pro.org])).rows[0].name;
     expect(stub.hits).toHaveLength(1);
-    expect(Object.fromEntries(stub.hits[0].form)).toMatchObject({ PhoneNumber: "+13605550100", FriendlyName: orgName, VoiceUrl: "https://constructhub.us/voice/signalwire/voice", VoiceMethod: "POST", StatusCallback: "https://constructhub.us/voice/signalwire/status" });
+    expect(Object.fromEntries(stub.hits[0].form)).toMatchObject({ PhoneNumber: num("0100"), FriendlyName: orgName, VoiceUrl: "https://constructhub.us/voice/signalwire/voice", VoiceMethod: "POST", StatusCallback: "https://constructhub.us/voice/signalwire/status" });
 
-    const second = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "+13605550101" });
+    const second = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: num("0101") });
     expect(second.status).toBe(403);
     expect(second.body).toMatchObject({ code: "limit_reached", feature: "voiceNumbers", limit: 1, used: 1, addon: "call_number", upgradePlan: null });
     expect(second.body.message).toContain(ADDONS.call_number.name);
@@ -348,10 +352,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     expect((await db.query("select count(*)::int n from voice_numbers where org_id=$1", [pro.org])).rows[0].n).toBe(1);
 
     // The same number can't be bought twice by anyone.
-    const dup = await api("/api/crm/voice/numbers", noAddon, "POST", { phoneNumber: "+13605550100" });
+    const dup = await api("/api/crm/voice/numbers", noAddon, "POST", { phoneNumber: num("0100") });
     expect(dup.status).toBe(402);
     await setAddons(pro, { call_assistant: 1, call_number: 1 });
-    const dup2 = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "+13605550100" });
+    const dup2 = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: num("0100") });
     expect(dup2.status).toBe(409);
     expect(dup2.body.code).toBe("number_taken");
   });
@@ -360,15 +364,15 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     const search = await api("/api/crm/voice/numbers/search?state=WA", pro);
     expect(search.body).toMatchObject({ monthlyCents: ADDONS.call_number.monthlyCents, allowance: { numbers: 2, used: 1, remaining: 1 } });
     stub.nextStatus = 400; stub.nextBody = { message: "Phone number is not available", code: 21422 };
-    const refused = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "+13605550102", label: "Second line" });
+    const refused = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: num("0102"), label: "Second line" });
     expect(refused.status).toBe(400);
     expect(refused.body).toMatchObject({ code: "signalwire_error", message: "Phone number is not available" });
     expect((await db.query("select count(*)::int n from voice_numbers where org_id=$1", [pro.org])).rows[0].n).toBe(1);
-    const ok = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "+13605550102", label: "Second line" });
+    const ok = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: num("0102"), label: "Second line" });
     expect(ok.status).toBe(201);
-    expect(ok.body.number).toMatchObject({ phoneNumber: "+13605550102", label: "Second line", monthlyCents: ADDONS.call_number.monthlyCents });
+    expect(ok.body.number).toMatchObject({ phoneNumber: num("0102"), label: "Second line", monthlyCents: ADDONS.call_number.monthlyCents });
     const list = await api("/api/crm/voice/numbers", pro);
-    expect(list.body.numbers.map((n: any) => n.phoneNumber)).toEqual(["+13605550100", "+13605550102"]);
+    expect(list.body.numbers.map((n: any) => n.phoneNumber)).toEqual([num("0100"), num("0102")]);
     expect(list.body.allowance).toEqual({ numbers: 2, used: 2, remaining: 0, includedNumbers: 1, extraNumberMonthlyCents: ADDONS.call_number.monthlyCents });
   });
 
@@ -404,7 +408,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     const r = await api(`/api/crm/voice/numbers/${second.id}`, pro, "DELETE");
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ released: true, number: { id: second.id, status: "released" } });
-    expect(stub.hits.at(-1)).toMatchObject({ method: "DELETE", path: `/api/laml/2010-04-01/Accounts/${CFG.SIGNALWIRE_PROJECT_ID}/IncomingPhoneNumbers/PN3605550102.json` });
+    expect(stub.hits.at(-1)).toMatchObject({ method: "DELETE", path: `/api/laml/2010-04-01/Accounts/${CFG.SIGNALWIRE_PROJECT_ID}/IncomingPhoneNumbers/PN360${EX}0102.json` });
     expect((await api(`/api/crm/voice/numbers/${second.id}`, pro, "DELETE")).body).toMatchObject({ released: true });
     const list = await api("/api/crm/voice/numbers", pro);
     expect(list.body.allowance).toMatchObject({ numbers: 2, used: 1, remaining: 1 });
@@ -413,10 +417,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
 
   it("a purchase SignalWire never confirmed is kept as failed (slot freed, reason shown) and can be dismissed without the carrier", async () => {
     stub.nextStatus = 503; stub.nextBody = { message: "upstream timeout" };
-    const r = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "+13605550103", label: "Flaky", state: "WA" });
+    const r = await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: num("0103"), label: "Flaky", state: "WA" });
     expect(r.status).toBe(502);
     expect(r.body).toMatchObject({ code: "signalwire_error" });
-    const row = (await db.query("select id,status,last_error,state from voice_numbers where phone_number='+13605550103'")).rows[0];
+    const row = (await db.query("select id,status,last_error,state from voice_numbers where phone_number=$1", [num("0103")])).rows[0];
     expect(row).toMatchObject({ status: "failed", state: "WA" });
     expect(row.last_error).toMatch(/not confirmed/);
     const list = await api("/api/crm/voice/numbers", pro);
@@ -427,7 +431,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     expect(gone.body).toMatchObject({ released: false, dismissed: true });
     expect(stub.hits).toHaveLength(0);
     expect((await db.query("select count(*)::int n from voice_numbers where id=$1", [row.id])).rows[0].n).toBe(0);
-    expect((await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: "+13605550104", state: "Washington" })).status).toBe(400);
+    expect((await api("/api/crm/voice/numbers", pro, "POST", { phoneNumber: num("0104"), state: "Washington" })).status).toBe(400);
   });
 
   it("the Overview status and the usage route carry the numbers and this month's minutes", async () => {
