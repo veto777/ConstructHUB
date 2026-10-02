@@ -1,0 +1,10 @@
+#! id: blocked_second_call
+#! title: Third call from a number flagged near-certain spam twice — rejected before answering
+#! tags: spam webhook
+#! mode: webhook
+#! caller: +14155550122
+#! prelude: spam_google_listing x2
+#! expect.outcome: blocked
+#! expect.twiml: Reject
+#! expect.notify: none
+#! expect.lead: false

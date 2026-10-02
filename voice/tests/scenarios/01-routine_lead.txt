@@ -1,0 +1,33 @@
+#! id: routine_lead
+#! title: Routine lead — whole-house siding, full intake, email read back once
+#! tags: lead core
+#! caller: +13605550101
+#! clock: 2026-10-06T10:30:00
+#! expect.outcome: lead_submitted
+#! expect.actions: submit_lead
+#! expect.never: alert flag_spam
+#! expect.slot: need ~ siding
+#! expect.slot: address ~ 55 Oak Lane
+#! expect.slot: first_name = Robert
+#! expect.slot: email = robert.hale@example.com
+#! expect.say_never: /\b\d{3}[ .-]?\d{3}[ .-]?\d{4}\b/
+#! expect.say_once: /robert\.hale@example\.com|robert dot hale at example dot com/
+#! expect.ended: true
+#! expect.lead: true
+#! expect.max_turns: 9
+Hi, I'm looking to get the siding on my whole house replaced.
+=> {"say": "I can help with that. What's the street address and city for the property?", "action": "continue", "slots": {"need": "whole-house siding replacement"}}
+It's 55 Oak Lane in Bellingham.
+=> {"say": "Got it. And who am I speaking with? A first name is fine.", "action": "continue", "slots": {"need": "whole-house siding replacement", "address": "55 Oak Lane, Bellingham"}}
+Robert.
+=> {"say": "Thanks, Robert. Is the number you're calling from the best one to reach you?", "action": "continue", "slots": {"first_name": "Robert"}}
+Yes, that works.
+=> {"say": "Great. What's a good email for the estimate?", "action": "continue", "slots": {"phone": "+13605550101"}}
+robert dot hale at example dot com
+=> {"say": "I have robert.hale@example.com, is that right?", "action": "continue", "slots": {"email": "robert.hale@example.com"}}
+Yes.
+=> {"say": "Perfect. When is the best time for someone to call you back?", "action": "continue", "slots": {}}
+Mornings are best.
+=> {"say": "I've sent your request to our team, and someone will call you in the morning to set up your free estimate. Is there anything else I can help with?", "action": "submit_lead", "slots": {"best_time": "mornings"}}
+No, that's everything. Thanks, bye.
+=> {"say": "Thank you for calling Cascade Exteriors, Robert. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

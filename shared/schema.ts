@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { primaryKey, pgTable, text, varchar, integer, bigserial, boolean, timestamp, jsonb, real, numeric, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, serial, bigserial, boolean, timestamp, jsonb, real, numeric, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -316,6 +316,20 @@ export const subscriptions = pgTable("subscriptions", {
   /** Agency only: locations billed (the 10 included + the band item's quantity). */
   agencyLocations: integer("agency_locations"),
 });
+
+/**
+ * Add-on intro prices (server/billing/intro.ts): one row per account + add-on
+ * whose intro coupon was attached. DDL: server/billing/schema.ts BILLING_INTRO_DDL.
+ */
+export const billingAddonIntros = pgTable("billing_addon_intros", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  addon: text("addon").notNull(),
+  couponId: text("coupon_id").notNull(),
+  /** cs_… (a Checkout Session; used once it completed) or sub_… (used at once). */
+  ref: text("ref").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("billing_addon_intros_user_id_addon_key").on(t.userId, t.addon)]);
 
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ createdAt: true });
 export type Subscription = typeof subscriptions.$inferSelect;

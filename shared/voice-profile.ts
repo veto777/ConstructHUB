@@ -371,6 +371,24 @@ export function defaultVoiceProfile(org: {
   });
 }
 
+/**
+ * All-party ("two-party") consent states for recording a phone call. A profile
+ * whose company or service area touches one of these always says the
+ * recording notice: the compiler forces it on, whatever the Studio switch says
+ * (the engine records every call).
+ */
+export const TWO_PARTY_CONSENT_STATES = ["CA", "CT", "DE", "FL", "IL", "MD", "MA", "MI", "MT", "NV", "NH", "OR", "PA", "WA"] as const;
+
+/** The states a profile operates in: the service-area counties plus the default state. */
+export function profileStates(p: Pick<VoiceProfile, "serviceArea">): string[] {
+  return [...new Set([...p.serviceArea.counties.map((c) => c.stateCode), p.serviceArea.defaultStateCode].filter(Boolean))];
+}
+
+/** The two-party-consent states this profile touches (non-empty → the recording notice is required). */
+export function recordingNoticeStates(p: Pick<VoiceProfile, "serviceArea">): string[] {
+  return profileStates(p).filter((s) => (TWO_PARTY_CONSENT_STATES as readonly string[]).includes(s));
+}
+
 /** Strict parse with every default applied; throws ZodError (the API maps it to 400 with the issues). */
 export function parseVoiceProfile(input: unknown): VoiceProfile {
   return voiceProfileSchema.parse(input);
@@ -429,4 +447,10 @@ export type CompiledProfile = {
   spam: { flagAt: number; strikeAt: number };
   vocabulary: string[];
   appointments: { enabled: boolean };
+  /**
+   * The profile's own decline lines, so the engine can tell deterministically
+   * that a call was declined / out of area when the assistant says one (no
+   * forced lead or alert for it). Optional: versions compiled before it existed lack it.
+   */
+  declineLines?: { outOfArea: string[]; declined: string[] };
 };

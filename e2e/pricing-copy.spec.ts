@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PLANS, PLAN_KEYS } from "../shared/plans";
-import { SALES_REP_LABEL, callAssistantIntroLine, callAssistantPricing, planPriceLine } from "../shared/plan-copy";
+import { SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, planPriceLine } from "../shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 
 /**
@@ -65,7 +65,7 @@ test("landing: plans from the price book, services go to a sales rep", async ({ 
 
 test("AI Call Assistant: the launch price from the price book on every surface, and the ways in", async ({ page }) => {
   const p = callAssistantPricing();
-  const short = `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo`;
+  const short = callAssistantIntroShort();
 
   await page.goto("/call-assistant");
   await expect(page.getByTestId("text-call-assistant-price")).toHaveText(
@@ -88,7 +88,7 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await expect(page.getByTestId("link-footer-call-assistant")).toHaveAttribute("href", "/call-assistant");
 
   await page.goto("/pricing");
-  await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(callAssistantIntroLine());
+  await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(callAssistantIntroShort());
   await expect(page.getByTestId("link-addon-call-assistant")).toHaveAttribute("href", "/call-assistant");
 
   // Signed in (dev bypass): the main sidebar has the entry, with the NEW badge.

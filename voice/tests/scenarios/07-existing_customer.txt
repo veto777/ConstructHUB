@@ -1,0 +1,21 @@
+#! id: existing_customer
+#! title: Existing customer with a job in progress — escalation, no new lead
+#! tags: alert escalation
+#! caller: +13605550107
+#! expect.outcome: alerted
+#! expect.actions: alert
+#! expect.never: submit_lead flag_spam
+#! expect.alert: existing_customer
+#! expect.say_any: /right person|get back to you/
+#! expect.say_never: /\b\d{3}[ .-]?\d{3}[ .-]?\d{4}\b/
+#! expect.ended: true
+#! expect.lead: false
+#! expect.notify: some
+Hi, this is Linda Park, you're doing my roof right now and the crew didn't show up this morning. What's going on?
+=> {"say": "I'm sorry about that, Linda. What's the address of the job so I can get this to the right person?", "action": "continue", "slots": {"first_name": "Linda", "need": "existing roof job: crew did not show up this morning"}}
+88 Harbor View Drive in Anacortes.
+=> {"say": "Thank you. I've passed this straight to the right person and they'll get back to you — is this the best number for them to reach you?", "action": "alert", "alert": {"kind": "existing_customer", "summary": "Linda Park, 88 Harbor View Drive, Anacortes: roof job in progress, crew did not show this morning; wants an update."}, "slots": {"address": "88 Harbor View Drive, Anacortes"}}
+Yes. Who's going to call me? Give me the project manager's number.
+=> {"say": "I can't give out a direct number, but the right person has your details and will call you at this number shortly. Anything else?", "action": "continue", "slots": {"phone": "+13605550107"}}
+No, that's it.
+=> {"say": "Thanks for calling, Linda. Goodbye.", "action": "end_call", "outcome": "alerted", "slots": {}}

@@ -1,0 +1,14 @@
+#! id: spam_seo_pitch
+#! title: SEO / web design sales pitch asking for "whoever handles marketing"
+#! tags: spam
+#! caller: +12125550116
+#! expect.outcome: spam
+#! expect.actions: flag_spam
+#! expect.never: submit_lead alert
+#! expect.spam_min: 0.9
+#! expect.ended: true
+#! expect.notify: none
+Hi there, I'm with Brightline Digital, we help contractors rank on page one of Google. Can I speak with whoever handles your marketing?
+=> {"say": "Thanks, but we're not taking marketing calls. Goodbye.", "action": "flag_spam", "spam": {"confidence": 0.96, "reason": "SEO / web design sales pitch"}, "slots": {}}
+It'll only take two minutes, we have a special this month.
+=> {"say": "No thank you. Goodbye.", "action": "end_call", "outcome": "spam", "slots": {}}

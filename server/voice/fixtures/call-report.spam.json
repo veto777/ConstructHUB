@@ -1,0 +1,109 @@
+{
+  "scenario": "spam_google_listing",
+  "callSid": "CAtestspamgooglelisting",
+  "start": {
+    "callSid": "CAtestspamgooglelisting",
+    "to": "+13605550199",
+    "from": "+14155550115",
+    "startedAt": "2026-10-06T17:30:00Z",
+    "engine": "constructhub-voice",
+    "model": "truthcode-api",
+    "persona": "janice",
+    "profileVersion": 1
+  },
+  "events": [],
+  "report": {
+    "endedAt": "2026-10-06T17:30:56Z",
+    "durationSeconds": 56,
+    "outcome": "spam",
+    "summary": "Spam call: Google listing verification scam. No lead taken.",
+    "transcript": [
+      {
+        "role": "assistant",
+        "text": "Thank you for calling Cascade Exteriors, this is Janice. Calls may be recorded. What can we help you with today?",
+        "t": "2026-10-06T17:30:00Z"
+      },
+      {
+        "role": "caller",
+        "text": "Hi, I'm calling about your Google Business listing — it's showing as unverified and could be removed. I just need the owner to confirm a few details.",
+        "t": "2026-10-06T17:30:08Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Can I ask what company you're calling from, and what this is regarding exactly?",
+        "t": "2026-10-06T17:30:16Z"
+      },
+      {
+        "role": "caller",
+        "text": "I'm with the Google listing department. Is the owner available?",
+        "t": "2026-10-06T17:30:24Z"
+      },
+      {
+        "role": "assistant",
+        "text": "We're not interested in listing services, thank you. Goodbye.",
+        "t": "2026-10-06T17:30:32Z"
+      },
+      {
+        "role": "caller",
+        "text": "It's about your business listing, this is important for your ranking.",
+        "t": "2026-10-06T17:30:40Z"
+      },
+      {
+        "role": "assistant",
+        "text": "Goodbye.",
+        "t": "2026-10-06T17:30:48Z"
+      }
+    ],
+    "slots": {},
+    "events": [
+      {
+        "t": "2026-10-06T17:30:08Z",
+        "type": "decision",
+        "decision": {
+          "say": "Can I ask what company you're calling from, and what this is regarding exactly?",
+          "action": "continue",
+          "slots": {}
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:16Z",
+        "type": "decision",
+        "decision": {
+          "say": "We're not interested in listing services, thank you. Goodbye.",
+          "action": "flag_spam",
+          "slots": {},
+          "spam": {
+            "confidence": 0.97,
+            "reason": "Google listing verification scam"
+          }
+        }
+      },
+      {
+        "t": "2026-10-06T17:30:24Z",
+        "type": "spam",
+        "detail": "Google listing verification scam"
+      },
+      {
+        "t": "2026-10-06T17:30:32Z",
+        "type": "decision",
+        "decision": {
+          "say": "Goodbye.",
+          "action": "end_call",
+          "slots": {},
+          "outcome": "spam"
+        }
+      }
+    ],
+    "caller": {
+      "name": "",
+      "email": "",
+      "address": "",
+      "city": ""
+    },
+    "serviceNeeded": "",
+    "spam": {
+      "confidence": 0.97,
+      "reason": "Google listing verification scam"
+    }
+  }
+}

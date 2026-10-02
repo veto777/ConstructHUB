@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
 import { planRequiredFrom } from "@/components/plan-required";
 import { ADDONS, PLANS, CALL_ASSISTANT_INCLUDED_MINUTES } from "@shared/plans";
-import { formatUsd, joinNames } from "@shared/plan-copy";
+import { callAssistantIntroShort, joinNames } from "@shared/plan-copy";
 import { OverviewPanel } from "./overview";
 import { NumbersPanel } from "./numbers";
 import { StudioPanel } from "./studio";
@@ -40,7 +40,7 @@ export type VoiceStatus = {
   plan: string | null;
   allowance: { numbers: number; minutes: number };
   pricing: { includedMinutes: number; overageCentsPerMinute: number };
-  engine: { configured: boolean; url: string; publicBase: string };
+  engine: { configured: boolean; reachable: boolean; models: boolean; checkedAt: string };
   numbers: unknown[];
   profile: { status: string; publishedVersion: number | null } | null;
   usage: { month: string; minutes: number; calls: number; overageMinutes: number } | null;
@@ -77,12 +77,17 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
           <li>Every call logged with a summary, transcript and recording.</li>
         </ul>
         <p className="text-sm">
-          {formatUsd(addon.monthlyCents)} a month with 1 local number and {CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US")} minutes included, on the {plans} plans.
+          <span className="font-semibold" data-testid="text-plan-required-intro">{callAssistantIntroShort()}</span>, with 1 local number and {CALL_ASSISTANT_INCLUDED_MINUTES.toLocaleString("en-US")} minutes included, on the {plans} plans.
           {preview ? " Pricing is being finalized; it cannot be added yet." : ""}
         </p>
-        <Button asChild disabled={preview}>
-          <a href="/settings?tab=billing" data-testid="link-call-assistant-billing">{preview ? "Not available yet" : "Add it in Billing"}</a>
-        </Button>
+        {/* a disabled <a> still navigates: while the add-on is in preview there is no link at all */}
+        {preview ? (
+          <Button disabled data-testid="button-call-assistant-unavailable">Not available yet</Button>
+        ) : (
+          <Button asChild>
+            <a href="/settings?tab=billing" data-testid="link-call-assistant-billing">Add it in Billing</a>
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

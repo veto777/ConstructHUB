@@ -14,7 +14,7 @@
 import pg from "pg";
 import { STATE_GUIDES_LINK_STATUS_DDL } from "../server/state-guides-schema";
 import { ensureDocNumberUniqueIndexes } from "../server/crm/doc-number";
-import { BILLING_SUBSCRIPTION_DDL, FULFILMENT_DDL } from "../server/billing/schema";
+import { BILLING_SUBSCRIPTION_DDL, FULFILMENT_DDL, BILLING_INTRO_DDL } from "../server/billing/schema";
 import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
 import { VOICE_SCHEMA_DDL } from "../server/voice/schema";
 
@@ -36,6 +36,9 @@ const STATEMENTS = [
   // One-time purchase fulfilment: one course_purchases / service_purchases row
   // per Checkout Session and item (server/billing/schema.ts also runs these at boot).
   ...FULFILMENT_DDL,
+  // Add-on introductory prices: one row per account + add-on that got its intro
+  // coupon (server/billing/intro.ts; server/billing/schema.ts also runs it at boot).
+  ...BILLING_INTRO_DDL,
   // Account: billing_events / billing_invoices / billing_purchases / email_log
   // (+ its outbox columns) / account_api_keys / account_api_usage
   // (server/account/schema.ts also runs these at boot).

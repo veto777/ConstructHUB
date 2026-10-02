@@ -1,0 +1,268 @@
+{
+  "_about": "Decision-protocol parser cases (SPEC.md \u00a74) shared by server/voice/break-test.test.ts (TypeScript reference parser, and server/voice/brain.ts parseDecision once studio-backend merges) and voice/tests/test_decision.py (the engine's voice/decision.py). expect.ok is binding for every parser; action/say/slots/alertKind/outcome/spamConfidence/sayMaxLen are checked when present (slots: exact match of the parsed slots).",
+  "cases": [
+    {
+      "id": "plain",
+      "raw": "{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}",
+      "expect": {
+        "ok": true,
+        "action": "continue",
+        "say": "What's the street address and city for the property?",
+        "slots": {
+          "need": "siding"
+        }
+      }
+    },
+    {
+      "id": "fenced_whole",
+      "raw": "```json\n{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}\n```",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "fenced_with_prose",
+      "raw": "Here you go:\n```json\n{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}\n```\nThanks!",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "prose_around",
+      "raw": "Sure! {\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}} Let me know.",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "think_closed",
+      "raw": "<think>The caller wants siding. Ask for the address.</think>\n{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "think_orphan_close",
+      "raw": "the caller wants siding {not json} so ask address</think>{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "think_unclosed",
+      "raw": "<think>I should ask for the address and {\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "tool_call_before",
+      "raw": "<tool_call><function=web_research>{\"q\":\"hardie siding\"}</function></tool_call>\n{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}",
+      "expect": {
+        "ok": true,
+        "action": "continue",
+        "say": "What's the street address and city for the property?"
+      }
+    },
+    {
+      "id": "function_tag_args_only",
+      "raw": "<function=web_search>{\"query\":\"siding cost\"}</function>",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "tool_call_object",
+      "raw": "{\"name\": \"submit_lead\", \"arguments\": {\"need\": \"siding\"}}",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "no_json",
+      "raw": "What's the street address and city for the property?",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "empty",
+      "raw": "",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "whitespace",
+      "raw": "   \n ",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "bad_json",
+      "raw": "{\"say\": \"Hi\", \"action\": continue}",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "trailing_comma",
+      "raw": "{\"say\": \"Got it.\", \"action\": \"continue\", \"slots\": {\"need\": \"roof\",},}",
+      "expect": {
+        "ok": true,
+        "action": "continue",
+        "slots": {
+          "need": "roof"
+        }
+      }
+    },
+    {
+      "id": "unknown_action",
+      "raw": "{\"say\": \"Transferring you now.\", \"action\": \"transfer\"}",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "missing_action_defaults",
+      "raw": "{\"say\": \"Sure, what's the address?\"}",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "alert_ok",
+      "raw": "{\"say\": \"I'm paging the team now.\", \"action\": \"alert\", \"alert\": {\"kind\": \"urgent\", \"summary\": \"active leak\"}}",
+      "expect": {
+        "ok": true,
+        "action": "alert",
+        "alertKind": "urgent"
+      }
+    },
+    {
+      "id": "alert_missing_object",
+      "raw": "{\"say\": \"I'll let them know.\", \"action\": \"alert\"}",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "alert_unknown_kind_becomes_other",
+      "raw": "{\"say\": \"I'll pass that on.\", \"action\": \"alert\", \"alert\": {\"kind\": \"manager\", \"summary\": \"wants the manager\"}}",
+      "expect": {
+        "ok": true,
+        "action": "alert",
+        "alertKind": "other"
+      }
+    },
+    {
+      "id": "flag_spam_ok",
+      "raw": "{\"say\": \"We're not interested, goodbye.\", \"action\": \"flag_spam\", \"spam\": {\"confidence\": 0.97, \"reason\": \"SEO pitch\"}}",
+      "expect": {
+        "ok": true,
+        "action": "flag_spam",
+        "spamConfidence": 0.97
+      }
+    },
+    {
+      "id": "flag_spam_missing_object",
+      "raw": "{\"say\": \"Goodbye.\", \"action\": \"flag_spam\"}",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "spam_confidence_clamped",
+      "raw": "{\"say\": \"Goodbye.\", \"action\": \"flag_spam\", \"spam\": {\"confidence\": 1.7, \"reason\": \"robocall\"}}",
+      "expect": {
+        "ok": true,
+        "action": "flag_spam",
+        "spamConfidence": 1.0
+      }
+    },
+    {
+      "id": "end_call_empty_say",
+      "raw": "{\"say\": \"\", \"action\": \"end_call\", \"outcome\": \"lead_submitted\"}",
+      "expect": {
+        "ok": true,
+        "action": "end_call",
+        "outcome": "lead_submitted"
+      }
+    },
+    {
+      "id": "continue_empty_say",
+      "raw": "{\"say\": \"\", \"action\": \"continue\"}",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "id": "unknown_outcome_dropped",
+      "raw": "{\"say\": \"Goodbye.\", \"action\": \"end_call\", \"outcome\": \"great_call\"}",
+      "expect": {
+        "ok": true,
+        "action": "end_call",
+        "outcome": null
+      }
+    },
+    {
+      "id": "slot_number_to_string",
+      "raw": "{\"say\": \"Thanks.\", \"action\": \"continue\", \"slots\": {\"windows\": 12, \"email\": \"\", \"x\": null}}",
+      "expect": {
+        "ok": true,
+        "action": "continue",
+        "slots": {
+          "windows": "12"
+        }
+      }
+    },
+    {
+      "id": "say_too_long_is_cut",
+      "raw": "{\"say\": \"This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding. This is a very long sentence about siding.\", \"action\": \"continue\"}",
+      "expect": {
+        "ok": true,
+        "action": "continue",
+        "sayMaxLen": 400
+      }
+    },
+    {
+      "id": "two_objects_first_wins",
+      "raw": "{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}\n{\"say\": \"Goodbye.\", \"action\": \"end_call\"}",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "braces_inside_string",
+      "raw": "{\"say\": \"Say {this} literally? Sure.\", \"action\": \"continue\"}",
+      "expect": {
+        "ok": true,
+        "action": "continue",
+        "say": "Say {this} literally? Sure."
+      }
+    },
+    {
+      "id": "unbalanced_then_good",
+      "raw": "Note: { unbalanced\n{\"say\": \"What's the street address and city for the property?\", \"action\": \"continue\", \"slots\": {\"need\": \"siding\"}}",
+      "expect": {
+        "ok": true,
+        "action": "continue"
+      }
+    },
+    {
+      "id": "slots_not_object",
+      "raw": "{\"say\": \"Okay.\", \"action\": \"continue\", \"slots\": [\"need\", \"siding\"]}",
+      "expect": {
+        "ok": false
+      }
+    }
+  ]
+}

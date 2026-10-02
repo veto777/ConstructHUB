@@ -1,0 +1,14 @@
+#! id: spanish_speaker
+#! title: Spanish speaker on an English-only profile — stays polite, never flags spam
+#! tags: language edge
+#! caller: +13605550111
+#! expect.never: flag_spam alert end_call
+#! expect.say_never: /spam|telemarket/
+#! expect.ended: false
+#! expect.max_turns: 4
+Hola, buenos días, necesito cambiar el siding de mi casa.
+=> {"say": "Thank you for calling — I can only help in English right now, but I'll keep it simple: do you need new siding?", "action": "continue", "slots": {}}
+Sí, yes, new siding, all the house.
+=> {"say": "Great. What is the street address and city for the house?", "action": "continue", "slots": {"need": "whole-house siding replacement"}}
+Calle, uh, 77 Pine Street, Mount Vernon.
+=> {"say": "Thank you. And your first name?", "action": "continue", "slots": {"address": "77 Pine Street, Mount Vernon"}}

@@ -21,6 +21,7 @@ import { registerVoiceBillingRoutes } from "./billing";
 import { registerVoiceProfileRoutes } from "./profile";
 import { registerVoiceSimulatorRoutes } from "./simulator";
 import { registerVoiceCallRoutes } from "./calls";
+import { startVoiceOverageWorker } from "./billing-usage";
 
 export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   // engine → app
@@ -31,5 +32,7 @@ export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   registerVoiceNumberRoutes(app, getDevUser);
   registerVoiceProfileRoutes(app, getDevUser);
   registerVoiceSimulatorRoutes(app, getDevUser);
-  registerVoiceCallRoutes(app, getDevUser);
+  registerVoiceCallRoutes(app, getDevUser); // also starts the escalation reminder worker (off unless VOICE_ESCALATION_WORKER_ENABLED=true)
+  // Overage minutes → Stripe (off unless production + STRIPE_SECRET_KEY + VOICE_OVERAGE_WORKER_ENABLED=true).
+  startVoiceOverageWorker();
 }

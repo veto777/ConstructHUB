@@ -1,0 +1,16 @@
+#! id: multiple_services
+#! title: Siding, roof and gutters together — one lead, gutters allowed alongside a primary job
+#! tags: lead intake
+#! caller: +13605550121
+#! expect.outcome: lead_submitted
+#! expect.actions: submit_lead
+#! expect.slot: need ~ siding
+#! expect.slot: need ~ roof
+#! expect.say_never: /handyman|we don't do gutters/
+#! expect.ended: true
+I'm redoing the outside of the house — siding, the roof, and I want new gutters while you're at it.
+=> {"say": "We can take all of that on together. What's the street address and city for the property?", "action": "continue", "slots": {"need": "siding replacement + roof replacement + gutters"}}
+2 Shoreline Way, Oak Harbor. I'm Henry, this number's fine, no email, evenings.
+=> {"say": "Thanks, Henry. I've sent your request to our team, and someone will call you in the evening to set up your free estimate. Anything else?", "action": "submit_lead", "slots": {"address": "2 Shoreline Way, Oak Harbor", "first_name": "Henry", "phone": "+13605550121", "best_time": "evenings"}}
+No, that's all, bye.
+=> {"say": "Thanks for calling, Henry. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

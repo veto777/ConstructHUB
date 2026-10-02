@@ -26,7 +26,7 @@ process.env.DATABASE_URL =
 
 let sendSms: any, resolveSmsSender: any, orgCanTextClients: any, smsStatus: any,
   recordSmsOptout: any, clearSmsOptout: any, isSmsOptedOut: any,
-  smsLamlReply: any, signalwireSignatureOk: any, CLIENT_TEXT_NEEDS_OWN_NUMBER: string,
+  smsLamlReply: any, signalwireSignatureOk: any, signalwireSignatureVerified: any, CLIENT_TEXT_NEEDS_OWN_NUMBER: string,
   SMS_NEEDS_PLAN: string, clearSmsEntitlementCache: any, orgSmsEntitled: any, smsPlanRequired: any;
 let placeEmailNudgeCall: any, voiceNudgeOnEstimate: any, emailNudgeTwiml: any;
 
@@ -34,7 +34,7 @@ beforeAll(async () => {
   ({
     sendSms, resolveSmsSender, orgCanTextClients, smsStatus,
     recordSmsOptout, clearSmsOptout, isSmsOptedOut,
-    smsLamlReply, signalwireSignatureOk, CLIENT_TEXT_NEEDS_OWN_NUMBER,
+    smsLamlReply, signalwireSignatureOk, signalwireSignatureVerified, CLIENT_TEXT_NEEDS_OWN_NUMBER,
     SMS_NEEDS_PLAN, clearSmsEntitlementCache, orgSmsEntitled, smsPlanRequired,
   } = await import("./sms"));
   ({ placeEmailNudgeCall, voiceNudgeOnEstimate, emailNudgeTwiml } = await import("./voice"));
@@ -306,6 +306,23 @@ describe("inbound webhook helpers (pure)", () => {
       expect(signalwireSignatureOk(req)).toBe(true);
       req.headers["x-signalwire-signature"] = createHmac("sha1", "some-other-key").update(signed).digest("base64");
       expect(signalwireSignatureOk(req)).toBe(false);
+    });
+  });
+
+  it("signalwireSignatureVerified never fails open: no signature, no key or a mismatch is unverified", async () => {
+    const { createHmac } = await import("crypto");
+    const { getBaseUrl } = await import("../auth");
+    const req: any = { headers: { host: "portal.constructhub.us" }, body: { Body: "OK", From: "+15551234567", To: "+15550100000" }, originalUrl: "/api/crm/sms/inbound" };
+    const signed = `${getBaseUrl(req)}${req.originalUrl}BodyOKFrom+15551234567To+15550100000`;
+    await withSwEnv({ ...SW_ENV, SIGNALWIRE_API_TOKEN: "" }, () => {
+      expect(signalwireSignatureOk(req)).toBe(true);           // the route stays open for STOP…
+      expect(signalwireSignatureVerified(req)).toBe(false);    // …but nothing is verified
+      req.headers["x-signalwire-signature"] = "forged";
+      expect(signalwireSignatureVerified(req)).toBe(false);
+    });
+    await withSwEnv({ ...SW_ENV, SIGNALWIRE_SIGNING_KEY: "signing-key-1" }, () => {
+      req.headers["x-signalwire-signature"] = createHmac("sha1", "signing-key-1").update(signed).digest("base64");
+      expect(signalwireSignatureVerified(req)).toBe(true);
     });
   });
 });

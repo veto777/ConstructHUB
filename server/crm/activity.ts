@@ -124,6 +124,15 @@ export function activityText(row: {
       case "payment.recorded":
         return `recorded payment ${money(m.amountCents)}${m.method ? ` via ${m.method}` : ""}${m.number ? ` on invoice ${m.number}` : ""}`;
       case "data.exported": return `exported the client list${m.rows != null ? ` (${m.rows} rows)` : ""}`;
+      // ── lane: calls+crm — Call Assistant rows (docs/call-assistant/LANES.md) ──
+      case "call.answered": return `answered a call${m.outcome ? ` (${String(m.outcome).replace(/_/g, " ")})` : ""}${m.summary ? `: ${String(m.summary).slice(0, 140)}` : ""}`;
+      case "call.lead": return `took a phone lead${m.need ? ` — ${String(m.need).slice(0, 100)}` : ""}${m.created ? " and created this client" : ""}`;
+      case "call.alert": return `paged ${m.recipient ? String(m.recipient) : "the office"}: ${m.label ?? m.kind ?? "escalation"}${m.summary ? ` — ${String(m.summary).slice(0, 120)}` : ""}`;
+      case "call.spam": return `screened a spam call${m.reason ? ` (${String(m.reason).slice(0, 100)})` : ""}${m.blocked ? " — number blocked" : ""}`;
+      case "call.blocked": return `blocked ${m.phone ?? "a number"} from the Call Assistant`;
+      case "call.unblocked": return `unblocked ${m.phone ?? "a number"} on the Call Assistant`;
+      case "call.escalation_closed": return `closed a ${m.kind ? String(m.kind).replace(/_/g, " ") : ""} escalation${m.recipient ? ` to ${m.recipient}` : ""}`.replace(/\s+/g, " ");
+      // ── end lane: calls+crm ──
       default: return row.action;
     }
   })();

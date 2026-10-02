@@ -5,6 +5,7 @@ this module is its only way to read a profile or write a call. All methods are s
 media loop — short timeouts, no exceptions leak out except from `health()` (used at startup)."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -85,19 +86,26 @@ class AppClient:
 
     async def call_finished(self, call_sid: str, payload: dict[str, Any]) -> dict[str, Any]:
         """PUT /calls/:sid — the end-of-call report; the app runs lead delivery, escalations, spam, usage."""
-        try:
-            r = await self._c.put(f"{BASE}/calls/{call_sid}", json=payload, timeout=30.0)
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:  # noqa: BLE001
-            log.warning("call_finished failed: %s", e)
-            return {"error": str(e)[:200]}
+        # 409 call_in_progress = another report for this call is still being processed by the app (a retry
+        # of ours that overlapped): wait and ask again — the app then answers with the stored result.
+        for attempt in range(4):
+            try:
+                r = await self._c.put(f"{BASE}/calls/{call_sid}", json=payload, timeout=30.0)
+                if r.status_code == 409 and attempt < 3:
+                    await asyncio.sleep(5.0)
+                    continue
+                r.raise_for_status()
+                return r.json()
+            except Exception as e:  # noqa: BLE001
+                log.warning("call_finished failed: %s", e)
+                return {"error": str(e)[:200]}
+        return {"error": "call_in_progress"}
 
     async def upload_recording(self, call_sid: str, wav_path: Path) -> dict[str, Any]:
         """POST /recordings/:sid with the WAV body; the app stores it in R2."""
         try:
-            with open(wav_path, "rb") as f:
-                r = await self._c.post(f"{BASE}/recordings/{call_sid}", content=f, headers={"Content-Type": "audio/wav"}, timeout=120.0)
+            body = wav_path.read_bytes()   # ≤ 40 MB by contract; an AsyncClient cannot stream a sync file object
+            r = await self._c.post(f"{BASE}/recordings/{call_sid}", content=body, headers={"Content-Type": "audio/wav"}, timeout=120.0)
             r.raise_for_status()
             return r.json()
         except Exception as e:  # noqa: BLE001

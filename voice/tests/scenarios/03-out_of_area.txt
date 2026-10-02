@@ -1,0 +1,17 @@
+#! id: out_of_area
+#! title: Out of area — Spokane address on a Western Washington line
+#! tags: decline core
+#! caller: +15095550103
+#! expect.outcome: out_of_area
+#! expect.never: submit_lead alert flag_spam
+#! expect.say_any: /outside the area|out of (?:our|the) (?:service )?area|don't (?:serve|cover) that area/
+#! expect.say_never: /other office|our (?:florida|texas) (?:team|office)/
+#! expect.ended: true
+#! expect.lead: false
+#! expect.max_turns: 4
+I need a new roof on my house.
+=> {"say": "I can help with that. What's the street address and city for the property?", "action": "continue", "slots": {"need": "roof replacement"}}
+1200 West Boone Avenue in Spokane.
+=> {"say": "I'm sorry, that's outside the area we serve — we're local to Western Washington. Is there anything else I can help with?", "action": "continue", "outcome": "out_of_area", "slots": {"address": "1200 West Boone Avenue, Spokane"}}
+No, that's it.
+=> {"say": "Thanks for calling Cascade Exteriors. Goodbye.", "action": "end_call", "outcome": "out_of_area", "slots": {}}

@@ -6,7 +6,7 @@ import {
   agencyLocationTiers, tieredAmountCents, planPriceSpec, addonPriceSpec, addonSetupPriceSpec, agencyLocationsPriceSpec,
   resolvePriceId, resetPriceCache, describeSubscription, roleOfPrice,
 } from "./prices";
-import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS, BILLING_LEDGER_DDL, BILLING_LEDGER_TABLES, FULFILMENT_DDL, FULFILMENT_INDEXES } from "./schema";
+import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS, BILLING_LEDGER_DDL, BILLING_LEDGER_TABLES, FULFILMENT_DDL, FULFILMENT_INDEXES, BILLING_INTRO_DDL } from "./schema";
 import { PLANS, ADDONS, ANNUAL_MONTHS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
 
 describe("Agency location bands in Stripe", () => {
@@ -116,14 +116,15 @@ describe("describeSubscription", () => {
 
 describe("ensureBillingSchema", () => {
   it("only reads the catalog when the columns exist, and adds them idempotently when not", async () => {
-    // Columns, ledger tables and fulfilment indexes all present: three catalog reads, no DDL.
+    // Columns, ledger tables, fulfilment indexes and the intro table all present: four catalog reads, no DDL.
     const present = { query: vi.fn(async (sql: string) => ({
-      rows: /information_schema\.tables/.test(sql) ? BILLING_LEDGER_TABLES.map(() => ({}))
+      rows: /billing_addon_intros/.test(sql) ? [{}]
+        : /information_schema\.tables/.test(sql) ? BILLING_LEDGER_TABLES.map(() => ({}))
         : /pg_indexes/.test(sql) ? FULFILMENT_INDEXES.map(() => ({}))
         : BILLING_COLUMNS.map(() => ({})),
     })) };
     await ensureBillingSchema(present);
-    expect(present.query).toHaveBeenCalledTimes(3);
+    expect(present.query).toHaveBeenCalledTimes(4);
     expect(present.query.mock.calls.every((c) => /information_schema|pg_indexes/.test(c[0]))).toBe(true);
 
     const missing = { query: vi.fn(async (_sql: string) => ({ rows: [{}] })) };
@@ -137,7 +138,12 @@ describe("ensureBillingSchema", () => {
     // Then the purchase-fulfilment indexes: one catalog read, then CREATE UNIQUE INDEX ... IF NOT EXISTS (one per session + item).
     const fulfilmentAt = ledgerAt + 1 + BILLING_LEDGER_DDL.length;
     expect(statements[fulfilmentAt]).toMatch(/pg_indexes/);
-    expect(statements.slice(fulfilmentAt + 1)).toEqual([...FULFILMENT_DDL]);
+    expect(statements.slice(fulfilmentAt + 1, fulfilmentAt + 1 + FULFILMENT_DDL.length)).toEqual([...FULFILMENT_DDL]);
+    // Then the add-on intro ledger (server/billing/intro.ts): its catalog read, then CREATE TABLE IF NOT EXISTS.
+    // (The fake answers every read with one row, so it reads as present and nothing is created.)
+    const introAt = fulfilmentAt + 1 + FULFILMENT_DDL.length;
+    expect(statements[introAt]).toMatch(/billing_addon_intros/);
+    for (const ddl of BILLING_INTRO_DDL) expect(ddl).toMatch(/^CREATE TABLE IF NOT EXISTS billing_addon_intros/);
     for (const ddl of FULFILMENT_DDL) expect(ddl).toMatch(/^CREATE UNIQUE INDEX IF NOT EXISTS \w+_session_item_idx\s+ON (course|service)_purchases/);
     // The ledger DDL is the account schema's (one definition): CREATE … IF NOT EXISTS, plus the removal of the
     // duplicate indexes earlier builds created under other names (DROP INDEX IF EXISTS, idempotent).

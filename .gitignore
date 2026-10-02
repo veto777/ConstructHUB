@@ -40,9 +40,9 @@ private/
 
 # Call Assistant engine (voice/): its own env + venv + models + recordings
 voice/.env
-voice/.venv/
+voice/.venv
 voice/recordings/
 voice/models/
 voice/__pycache__/
 voice/**/__pycache__/
-client/public/voice/samples/*.wav
+client/public/persona-samples/*.wav

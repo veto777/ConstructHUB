@@ -1,0 +1,34 @@
+# ConstructHUB AI Call Assistant engine — systemd USER unit for the tower (infra lane).
+#   install:  bash voice/deploy/install.sh            (copies this file to ~/.config/systemd/user/)
+#   restart:  bash voice/deploy/restart-when-idle.sh   (NEVER `systemctl --user restart` by hand: it
+#                                                       would cut a live call — the stop timeout below
+#                                                       only helps when the restart waits for idle)
+#   logs:     journalctl --user -u constructhub-voice -f
+# Runbook: docs/call-assistant/RUNBOOK.md. The engine reads ONLY voice/.env (config.py, python-dotenv);
+# nothing from another project's env is read, and alpine-voice* on the same GPU is a separate unit with
+# its own port (8150/8151), venv and env — the two never share anything.
+[Unit]
+Description=constructhub-voice: ConstructHUB AI Call Assistant engine (GPU STT/TTS, :8152 local + tailnet)
+After=network-online.target
+Wants=network-online.target
+# docs: the vb11 app proxies https://constructhub.us/voice/* here over the tailnet (100.90.145.13:8152).
+# Never let a crash loop hammer the GPU: 5 restarts per 10 minutes at most.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/veto/ConstructHUB/voice
+# Refuse to start without the engine's own env (VOICE_INTERNAL_SECRET etc.); it is gitignored on purpose.
+ExecStartPre=/usr/bin/test -f .env
+ExecStart=/home/veto/ConstructHUB/voice/.venv/bin/python server.py
+Restart=on-failure
+RestartSec=5
+# server.py runs aiohttp with shutdown_timeout=600: on SIGTERM it stops accepting and keeps serving the
+# calls in progress for up to 10 minutes. Give systemd a little more than that before SIGKILL.
+TimeoutStopSec=620
+KillMode=mixed
+Environment=PYTHONUNBUFFERED=1
+SyslogIdentifier=constructhub-voice
+[Install]
+WantedBy=default.target

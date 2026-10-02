@@ -1,0 +1,6 @@
+# Price question (must defer), "are you a bot?" (must say yes), then a lead.
+How much do you charge per square foot for Hardie siding?
+Wait, are you a real person or a robot?
+Okay. I want a quote on siding for my house at 88 Birch Bay Drive, Blaine.
+It's Dan. Yes this number works. No email, just call me.
+That's it, thanks, bye.

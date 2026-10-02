@@ -1,0 +1,14 @@
+#! id: vinyl_siding_request
+#! title: Asks for vinyl siding — recommends Hardie instead, still takes the lead
+#! tags: lead policy materials
+#! caller: +13605550130
+#! expect.outcome: lead_submitted
+#! expect.actions: submit_lead
+#! expect.say_any: /hardie/
+#! expect.ended: true
+I want vinyl siding on my house, do you install vinyl?
+=> {"say": "We install James Hardie fiber cement rather than vinyl, and we'd recommend it — the estimator can walk you through it. Would you like a free estimate?", "action": "continue", "slots": {"need": "siding replacement (asked for vinyl; Hardie recommended)"}}
+Sure. 90 Orchard Avenue, Lynden. Pete, this number is fine, no email.
+=> {"say": "Thanks, Pete. I've sent your request to our team, and someone will call you to set up your free estimate. Anything else?", "action": "submit_lead", "slots": {"address": "90 Orchard Avenue, Lynden", "first_name": "Pete", "phone": "+13605550130"}}
+No, bye.
+=> {"say": "Thanks for calling, Pete. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

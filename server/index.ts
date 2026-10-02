@@ -76,7 +76,9 @@ app.use((req, res, next) => {
       // API's responses (account data handed to third-party tools) and the API-key endpoints (one-time
       // secrets) never reach logs.
       if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")
-        && !path.startsWith("/api/v1") && !path.startsWith("/api/account/api-keys")) {
+        && !path.startsWith("/api/v1") && !path.startsWith("/api/account/api-keys")
+        // Call Assistant: transcripts, summaries and caller details never reach the request log
+        && !path.startsWith("/api/crm/voice") && !path.startsWith("/api/voice-internal")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

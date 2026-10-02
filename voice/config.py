@@ -48,18 +48,21 @@ class Settings:
     ai_model: str = _env("AI_MODEL", "truthcode-api")
     ai_timeout_s: float = _int("AI_TIMEOUT_MS", 12000) / 1000.0
     anthropic_api_key: str = _env("VOICE_ANTHROPIC_API_KEY")
-    anthropic_model: str = _env("VOICE_ANTHROPIC_MODEL", "claude-haiku-4-5")
+    anthropic_model: str = _env("VOICE_ANTHROPIC_MODEL", "claude-opus-5-5")
     # signalwire (verification only)
     sw_space_url: str = _env("SIGNALWIRE_SPACE_URL")
     sw_project_id: str = _env("SIGNALWIRE_PROJECT_ID")
     sw_api_token: str = _env("SIGNALWIRE_API_TOKEN")
     sw_signing_key: str = _env("SIGNALWIRE_SIGNING_KEY")
-    skip_signature: bool = _env("VOICE_SKIP_SIGNATURE") == "1"
+    skip_signature: bool = _env("VOICE_SKIP_SIGNATURE") == "1"    # dev only, and only on loopback binds (startup_problems)
+    # limits / privacy
+    max_active_calls: int = _int("VOICE_MAX_ACTIVE_CALLS", 6)     # GPU + AI + minutes: concurrent live calls this engine takes
+    log_transcripts: bool = _env("VOICE_LOG_TRANSCRIPTS") == "1"   # dev flag: what callers say stays out of the journal by default
     # speech
     whisper_model: str = _env("VOICE_WHISPER_MODEL", "large-v3-turbo")
     tts_device: str = _env("VOICE_TTS_DEVICE", "cuda")
     stt_device: str = _env("VOICE_STT_DEVICE", "cuda")
-    models_dir: Path = Path(_env("VOICE_MODELS_DIR", str(HERE / "models")))
+    models_dir: str = _env("VOICE_MODELS_DIR")       # Whisper download root; empty = the Hugging Face cache (shared)
     recordings_dir: Path = Path(_env("VOICE_RECORDINGS_DIR", str(HERE / "recordings")))
     # tuning (Alpine's proven defaults; the compiled profile can override timings per org)
     greeting_delay_s: float = _float("VOICE_GREETING_DELAY_S", 3.0)
@@ -79,6 +82,16 @@ class Settings:
         base = self.public_base
         return ("wss://" + base[len("https://"):] if base.startswith("https://") else "ws://" + base[len("http://"):]) + "/media"
 
+    def startup_problems(self) -> list[str]:
+        """Reasons to refuse to start. Signature checks off on a non-loopback interface (the tailnet address the app
+        proxies to) would let any peer forge SignalWire webhooks into the app."""
+        out = []
+        if self.skip_signature:
+            exposed = [h for h in self.bind if h not in ("127.0.0.1", "::1", "localhost")]
+            if exposed:
+                out.append(f"VOICE_SKIP_SIGNATURE=1 is only allowed on loopback binds; VOICE_BIND has {', '.join(exposed)}")
+        return out
+
     def describe(self) -> dict:
         """Safe to log: no secret values, only whether they are set."""
         return {
@@ -87,6 +100,7 @@ class Settings:
             "internal_secret": bool(self.internal_secret), "openai_api_key": bool(self.openai_api_key),
             "anthropic_api_key": bool(self.anthropic_api_key), "signalwire": bool(self.sw_project_id and self.sw_api_token),
             "signing_key": bool(self.sw_signing_key), "whisper_model": self.whisper_model, "tts_device": self.tts_device,
+            "skip_signature": self.skip_signature, "max_active_calls": self.max_active_calls, "log_transcripts": self.log_transcripts,
         }
 
 

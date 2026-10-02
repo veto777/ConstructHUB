@@ -471,3 +471,26 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
       table list and the `DATABASE_URL` blocker. The Replit app + DB were left untouched.
 - [ ] Ranking-grid per-user ownership (`user_id` column migration) — deferred from the review.
 - [ ] Optional: keep expanding permit-portal coverage past 632 (pipeline is built for it).
+
+## Call Assistant (AI phone receptionist) — infra, 2026-10-02
+
+Spec `docs/call-assistant/SPEC.md`, runbook `docs/call-assistant/RUNBOOK.md`, lane notes `LANE-NOTES-*.md`.
+Built in lanes on `voice/*` branches; not deployed to production by any lane.
+
+- **Where it runs:** the Python engine (`voice/`) on the **tower GPU** as the user unit
+  `constructhub-voice.service` (`127.0.0.1:8152` + tailnet `100.90.145.13:8152`). The vb11 app proxies
+  `https://constructhub.us/voice/*` to it (`server/voice/proxy.ts`: raw HTTP + the media WebSocket; 503
+  JSON when the engine is down). No new DNS/tunnel entries.
+- **Units/ports on the tower:** `constructhub-voice` :8152. `alpine-voice*` (:8150/:8151) are another
+  project's — never restarted, never read.
+- **Secrets (names only):** `VOICE_INTERNAL_SECRET` — same value in the app `.env` (vb11) and in the tower's
+  `voice/.env` (gitignored). App: `VOICE_ENGINE_URL`, `VOICE_PUBLIC_BASE`, `VOICE_PROXY_TIMEOUT_MS`. Engine:
+  see `voice/.env.example`. Rotation steps in RUNBOOK §7.
+- **The restart-when-idle rule:** never `systemctl --user restart constructhub-voice` by hand; use
+  `bash voice/deploy/restart-when-idle.sh` (waits for `activeCalls == 0`; unit `TimeoutStopSec=620`).
+- **Install/update on the tower:** `bash voice/deploy/install.sh` (venv, requirements, `.env` from example,
+  model warm-up, unit). Health: `bash voice/deploy/healthcheck.sh https://constructhub.us`.
+- **Owner-pending:** pricing confirmation (SPEC §14), the single `constructhub-test` number (numbers lane),
+  and the Alpine cut-over of +1 360-585-8200 (RUNBOOK §10 — owner decision only).
+- **Dev stage currently on the tower:** engine from `~/ConstructHUB-voice-infra/voice` via a systemd drop-in +
+  a dev app on :8201 (RUNBOOK §11, teardown steps there).

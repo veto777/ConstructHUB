@@ -117,6 +117,16 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  "call-assistant": {
+    title: "Call Assistant",
+    body: [
+      "An AI receptionist that answers your business line when you can't: it takes the caller's request, address, name and best number, and files it in your CRM as a lead.",
+      "You set what it knows in Agent Studio — your services, the areas you cover, what you don't do, who to text for emergencies — and try it in the Simulator before a real call reaches it.",
+      "Telemarketers are screened out, and calls that need a person (an emergency, an existing job, a payment) are texted or emailed to whoever you choose.",
+      "Example: you're up a ladder when a homeowner calls about new siding; the assistant takes the details, and the lead is waiting in Clients when you climb down.",
+    ],
+  },
+
   pipeline: {
     title: "Pipeline",
     body: [

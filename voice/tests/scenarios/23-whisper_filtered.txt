@@ -1,0 +1,14 @@
+#! id: whisper_filtered
+#! title: CallRail whisper announcement in the first seconds is not the caller
+#! tags: audio media
+#! mode: audio
+#! caller: +13605550123
+#! expect.outcome: lead_submitted
+#! expect.caller_never: /landing pages|call from cascade/
+#! expect.slot: need !~ landing
+#! expect.ended: true
+<whisper> Call from Cascade Bellingham Landing Pages.
+Hi, I need my siding replaced. 12 Elm Court in Ferndale, I'm Jo, this number is fine, no email.
+=> {"say": "Thanks, Jo. I've sent your request to our team, and someone will call you to set up your free estimate. Anything else?", "action": "submit_lead", "slots": {"need": "siding replacement", "address": "12 Elm Court, Ferndale", "first_name": "Jo", "phone": "+13605550123"}}
+No, bye.
+=> {"say": "Thanks for calling, Jo. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

@@ -1,0 +1,4 @@
+# Caller leaves before the intake finishes: submit what we have (caller-id + address + request), one closing line.
+Hey, I'm looking at getting new windows, like eight of them.
+It's 500 Grand Ave in Mount Vernon.
+Sorry I have to go, bye.

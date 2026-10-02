@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST, type VoicePersona } from "@shared/voice-personas";
-import { callAssistantPricing } from "@shared/plan-copy";
+import { callAssistantPricing, callAssistantIntroShort } from "@shared/plan-copy";
 
 export const CALL_ASSISTANT_PATH = "/call-assistant";
 
@@ -217,8 +217,7 @@ export function personaNames(gender: VoicePersona["gender"]): string {
 
 /** "<intro>/mo for your first <N> months, then <regular>/mo" — the owner's launch price, from the price book. */
 export function introPriceShort(): string {
-  const p = callAssistantPricing();
-  return `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo`;
+  return callAssistantIntroShort();
 }
 
 /** "Coming soon" while the add-on is `preview` in the price book; nothing once it's for sale. */
