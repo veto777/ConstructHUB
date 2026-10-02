@@ -54,15 +54,17 @@ export type VoiceStatus = {
   canManage?: boolean;
   /** The held tier (absent on an older server; null without one). */
   tier?: { key: string; addon: string; name: string } | null;
-  tiers?: { key: string; addon: string; name: string; monthlyCents: number; annualCents: number; includedMinutes: number; includedNumbers: number; preview: boolean }[];
+  tiers?: { key: string; addon: string; name: string; monthlyCents: number; annualCents: number; includedMinutes: number; includedNumbers: number; overageCentsPerMinute?: number; preview: boolean }[];
   plan: string | null;
-  allowance: { numbers: number; minutes: number };
+  allowance: { numbers: number; minutes: number; overageCentsPerMinute?: number };
   pricing: { includedMinutes: number; overageCentsPerMinute: number; freeSpamCalls?: number };
   engine: { configured: boolean; reachable: boolean; models: boolean; checkedAt: string };
   numbers: unknown[];
   profile: { status: string; publishedVersion: number | null } | null;
   usage: {
     month: string; minutes: number; calls: number; overageMinutes: number;
+    /** What the overage costs so far: each call's minutes at its own tier's rate. */
+    overageCents?: number; overageCentsPerMinute?: number;
     spamCallsThisMonth?: number; freeSpamCalls?: number; freeSpamMinutes?: number; freeSpamCallsLimit?: number;
   } | null;
 };
@@ -99,11 +101,11 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
           <li>Screens out spam on every call forwarded to it, so you stop answering telemarketers and robocalls; a number caught twice as near-certain spam is blocked before it's answered.</li>
           <li>Every call logged with a summary, transcript and recording.</li>
         </ul>
-        <ul className="grid gap-2 sm:grid-cols-3 text-sm" data-testid="list-plan-required-tiers">
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm" data-testid="list-plan-required-tiers">
           {tiers.map((t) => (
             <li key={t.tier} className="rounded-md border p-2.5" data-testid={`text-plan-required-tier-${t.tier}`}>
               <span className="font-semibold">{t.name}</span> · {t.monthly}/mo
-              <span className="block text-xs text-muted-foreground">{t.minutes} minutes / month · {t.numbersLabel}</span>
+              <span className="block text-xs text-muted-foreground">{t.minutes} minutes / month · {t.numbersLabel} · {t.overageShort}/min over</span>
             </li>
           ))}
         </ul>

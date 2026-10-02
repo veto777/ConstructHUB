@@ -1,9 +1,9 @@
 import { defineConfig } from "@playwright/test";
 // Pricing p5 (copy): runs against an already-started dev server on the lane's port
-// (8255, or a child server from a worktree on 8260–8280 or 8390–8399).
+// (8255, or a child server from a worktree on 8260–8280 or 8390–8409).
 const port = Number(process.env.E2E_PORT);
-if (!(port === 8255 || (port >= 8260 && port <= 8280) || (port >= 8390 && port <= 8399)) || process.env.E2E_DB !== "constructhub_dev_a6")
-  throw new Error("Pricing copy tests require port 8255 (or 8260–8280, 8390–8399) and constructhub_dev_a6");
+if (!(port === 8255 || (port >= 8260 && port <= 8280) || (port >= 8390 && port <= 8409)) || process.env.E2E_DB !== "constructhub_dev_a6")
+  throw new Error("Pricing copy tests require port 8255 (or 8260–8280, 8390–8409) and constructhub_dev_a6");
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "pricing-copy.spec.ts",

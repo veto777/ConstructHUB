@@ -445,7 +445,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     const status = await api("/api/crm/voice/status", pro);
     expect(status.status).toBe(200);
     expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 2000 }, units: { callAssistant: 1, tier: "solo", callNumber: 1 }, tier: { key: "solo", addon: "call_assistant", name: "Solo" }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
-    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers])).toEqual([["solo", 2000, 1], ["crew", 5000, 5], ["fleet", 12000, 20]]);
+    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([["lite", 1000, 1, 10], ["solo", 2000, 1, 10], ["crew", 5000, 5, 5], ["fleet", 12000, 20, 5]]);
     expect(status.body.pricing).toMatchObject({ includedMinutes: 2000, overageCentsPerMinute: 10, freeSpamCalls: 500 });
     // The engine is probed, not assumed; its internal address never reaches the browser.
     expect(status.body.engine).toMatchObject({ reachable: false, models: false });
@@ -459,6 +459,9 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     expect(usage.status).toBe(200);
     expect(usage.body).toMatchObject({ month, calls: 4, minutes: 2020, includedMinutes: 2000, remainingMinutes: 0, overageMinutes: 20, overageCents: 200, allowance: { minutes: 2000 }, spamCallsThisMonth: 3, freeSpamCalls: 2, freeSpamMinutes: 3 });
     expect(usage.body.history).toHaveLength(1);
+    // A month that switched tiers: each rate bucket at its own rate (10 min at 10¢ + 10 min at 5¢), not 20 × the current rate.
+    await db.query(`update voice_usage set overage_rate_minutes = '{"10": 10, "5": 10}'::jsonb where org_id = $1 and month = $2`, [pro.org, month]);
+    expect((await api("/api/crm/voice/usage", pro)).body).toMatchObject({ overageMinutes: 20, overageCents: 150, overageByRate: [{ centsPerMinute: 10, minutes: 10 }, { centsPerMinute: 5, minutes: 10 }] });
     expect((await api("/api/crm/voice/usage?month=2026-13", pro)).status).toBe(400);
     expect((await api("/api/crm/voice/usage?month=2025-01", pro)).body).toMatchObject({ month: "2025-01", minutes: 0 });
   });
