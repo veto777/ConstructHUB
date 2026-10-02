@@ -639,7 +639,7 @@ class Call:
         while self.speaking and not self.closing and time.time() < end:
             await asyncio.sleep(0.05)
 
-    async def _respond(self, text: str, silence: bool) -> None:
+    async def _respond(self, text: str, silence: bool, retracted: bool = False) -> None:
         t_brain = time.time()
         d = await self.brain.respond(text, silence=silence)
         log.info("ai %s: %s [%s] (stt %.1fs, brain %.1fs)", self.call_sid, d.say if settings.log_transcripts else f"{len(d.say)} chars", d.action,
@@ -649,7 +649,9 @@ class Call:
             # first fragment while they were already on the next sentence is what made the assistant talk over
             # people). Let them finish; if they added something, take the unspoken reply back and answer it all.
             await self.wait_caller_quiet(4.0)
-            if self.pending and d.action == "continue" and not self.closing:
+            # At most ONE retract per turn: a caller saying "hello?" every few seconds must not keep the
+            # assistant silent forever (Alpine 2026-10-02, 833-line calls) — after one merge, speak.
+            if self.pending and d.action == "continue" and not self.closing and not retracted:
                 audio_in = np.concatenate(self.pending)
                 self.pending = []
                 more = await self._hear(audio_in, False)
@@ -657,7 +659,7 @@ class Call:
                     prev = self.brain.retract_last_reply()
                     if prev is not None:
                         log.info("caller kept talking (%d chars more): answering the whole turn", len(more))
-                        return await self._respond(f"{prev} {more}".strip(), silence=False)
+                        return await self._respond(f"{prev} {more}".strip(), silence=False, retracted=True)
                     self.pending = [audio_in]   # not retractable: say this reply, then answer the rest
                     self.last_caller_norm = ""   # ...and let the duplicate guard hear it again
         if d.say:
