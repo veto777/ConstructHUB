@@ -19,6 +19,26 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🐊 2026-10-01 — Gabe (Hub assistant) + the standing-gator mascot (deployed 2026-10-02 03:56 UTC)
+- **Mascots** are the owner's artwork in client/public/mascot/ (checkerboard/noisy alpha cut out in-session;
+  sources kept in the session scratchpad). `client/src/components/mascot.tsx`: `StandingGator` (hard hat + vest,
+  arms crossed) stands to the right of the logo in the site sidebar (`app-sidebar.tsx`, 64px) and the CRM sidebar
+  (`crm-sidebar.tsx`, 56px, hidden on the icon rail); `GabeAvatar` is the Hub assistant's face.
+- **Hub assistant = "Gabe"** (branch hub/agent-rev merged, then hub/gabe): corner widget on every page; signed-out
+  visitors get cached preset answers (pricing, features, setup); signed-in users get free chat through TruthCoder
+  (`server/hub/*`: own client with maxRetries 0 + hard timeout, deterministic prefilter + output filter, per-visitor
+  and global limits, never any client/user data, no tools). The old `/api/site-assistant/chat` and
+  server/site-assistant.ts are gone; the public-API no-AI lists name server/hub/ai.ts and /api/hub/chat.
+- **Fixes the verifiers forced before merge:** the Hub's provider pin now accepts `truthcode-api` (the live
+  `AI_MODEL`) as well as `truthcode:38` — without it Gabe would have been "offline" on deploy; the output filter
+  strips TruthCoder tool-call/reasoning markup and blocks prompt-dump n-grams beyond HARD RULES; the pre-filter
+  knows the persona is Gabe; the launcher renders even when /api/hub/presets fails (panel says Gabe is offline).
+- **Cloudflare gotcha (cost one redeploy):** a verifier fetched `/mascot/gabe-160.webp` on the live domain BEFORE
+  the deploy; the SPA answered 200 text/html and Cloudflare cached that HTML under the image URL for 4 h (it caches
+  by extension). The project has no valid Cloudflare API token to purge (`secrets/cf_dns_token.txt` is rejected), so
+  the files are named `*.v1.webp` — a changed image gets a new version, never the same name. Never probe a new
+  static path on the live domain before it is deployed.
+
 ## 🛠 2026-10-01 — audit-4 follow-ups: the four open items (deployed 15:49 UTC)
 - **Texting allowance metered (Kimi A1-3)** — every outbound text with an org (manual client texts, reminders,
   estimate texts, invites, consent, re-engagement and owner alerts, the Settings test send) reserves its segments
@@ -119,7 +139,7 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   Verify: the new `/assets/index-*.js` contains `hub-launcher`, and `curl -I https://constructhub.us/mascot/gabe-160.webp`
   returns `image/webp`, not `text/html`. The widget now shows its launcher even when `/api/hub/presets` is missing
   (panel says Gabe is offline, with a retry), so a server/client mismatch is visible instead of silent.
-- Replaces the old site assistant (`server/site-assistant.ts`, `site-assistant-chat.tsx` — both removed). A cartoon
+- Replaces the old site assistant (`server/site-assistant.ts`, `site-assistant-chat.tsx` — both removed). Now fronted by Gabe (see the 10-02 entry above); originally a cartoon
   crew member in the bottom-right corner (`client/src/components/hub/`). **Signed out** (marketing pages): 14 preset
   question chips only, no text box; answers come from `hub_preset_answers` (generated in the background through
   TruthCoder, cached per question + knowledge hash) or from price-book templates — a tap never calls the model.
