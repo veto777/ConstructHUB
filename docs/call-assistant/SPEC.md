@@ -2,8 +2,8 @@
 
 *Architect's spec, 2026-10-02. Seven lanes build on this (ownership in `LANES.md`). Fixed decisions from the
 owner are marked **FIXED**; anything marked **PLACEHOLDER** needs the owner. The reference implementation is
-Alpine's "Janice" (`~/alpine/voice`, read-only; nothing from its `.env` is ever copied) and the owner's
-product spec in `~/alpine/seo-hub/docs/AI-RECEPTIONIST-PLAN-2026-10-01.md` → PRODUCT SPEC / ALPINE RULES /
+Alpine's "Janice" receptionist (the owner-directed reference design; read-only — nothing from its environment is ever copied) and the owner's
+product spec (the owner's AI-receptionist plan of 2026-10-01, kept with the Alpine project) → PRODUCT SPEC / ALPINE RULES /
 LAUNCH / TEXT ESCALATIONS.*
 
 ## 0. What it is
@@ -333,7 +333,7 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
 - Webhooks: signature (`SIGNALWIRE_SIGNING_KEY`) or CallSid lookup; `VOICE_SKIP_SIGNATURE=1` only on a dev
   box with no public webhook.
 - The engine reads only `voice/.env`; the operator copies ConstructHUB's own AI and SignalWire values in.
-  Nothing from `~/alpine/voice/.env` or any other project is ever read or copied. Never restart/stop
+  Nothing from the Alpine receptionist's environment or any other project is ever read or copied. Never restart/stop
   `alpine-voice*` or touch +1 360-585-8200.
 - No PII in logs beyond what the CRM already logs; recordings only through the org-scoped route.
 - Two-party-consent states: `recordingNotice` on by default; the Studio warns when turning it off.
