@@ -134,6 +134,37 @@ const page: FeaturePage = {
       a: "No. It prepares the files. To publish photos to your Business Profile on a schedule, use Posts & Photos.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the filename parts are
+  // server/photo-processor.ts generateFileName; the photo details (title, description, keywords, author, copyright,
+  // GPS) are photo-processor.ts processPhoto (EXIF) fed by server/routes.ts /api/photos/process; the area lookup
+  // (radius 5–50 miles, Google's geocoding data) is /api/photos/nearby-cities; areas and keywords rotating per photo
+  // are /api/photos/process (rotatedArea, selectedKeywords[i % n]); upright, 4096 px, filters, watermark opacity and
+  // JPEG output are processPhoto; AI descriptions without the image are /api/photos/generate-description;
+  // "Google strips EXIF" is photos.tsx and media-library.tsx copy.
+  inDepth: {
+    heading: { title: "Job Photo SEO for Contractors, ", em: "Explained" },
+    paragraphs: [
+      "Photos straight off a phone come out with names like a camera number and nothing inside that says who took " +
+        "them or where. The Photo Optimizer turns a batch of job photos into files that carry your business with them: " +
+        "a clear filename built from your company, the service, the area and a keyword, and photo details (the EXIF " +
+        "data stored inside the image file) with a title, a description, keywords, your company as author, a " +
+        "copyright line and GPS coordinates from your business location.",
+      "Service areas are what make a batch more than a rename. Give it your business location and a radius, from 5 " +
+        "to 50 miles, and it looks up the nearby cities, towns, neighborhoods, townships or counties from Google's map " +
+        "data. You keep the ones you serve, and the batch rotates through them in the filenames, so each photo names " +
+        "the next area on your list instead of the same town on every file. Your chosen keywords rotate the same way, " +
+        "and your list of areas also goes into each photo's description and keywords.",
+      "Each photo is turned upright, scaled down if its long side is over 4096 pixels, touched up if you ask " +
+        "(brightness, contrast, saturation or one-click auto-enhance), stamped with your text or logo watermark at the " +
+        "opacity you choose, and saved as a high-quality JPEG. Descriptions come from ready-made templates instantly, " +
+        "or from AI written from the business details you enter; the AI is never sent the photo itself.",
+      "Be clear about what this does on Google. When you upload a photo to a Google Business Profile, Google strips " +
+        "the photo details, GPS tags included, so geotagging photos for Google Business Profile isn't a ranking lever " +
+        "there. The details travel with the file to your own records, your website and other sites that keep them. To " +
+        "publish the photos to your Business Profile, use Posts & Photos; to keep them by job, save them to a Media " +
+        "Library folder with the client's address.",
+    ],
+  },
   related: ["gbpContent", "gbp", "social"],
   app: { href: "/photos", surface: "app" },
   headings: {
@@ -144,7 +175,7 @@ const page: FeaturePage = {
   seo: {
     title: "SEO Photo Optimizer for Contractor Job Photos | ConstructHUB",
     description:
-      "Watermark job photos, give them keyword filenames, write descriptions, author and GPS details in one batch, and keep them in Media Library folders.",
+      "Watermark job photos, give them keyword filenames and write descriptions, keywords and GPS details in one batch, then keep them in Media Library folders.",
   },
   sources: [
     "client/src/pages/photos.tsx",

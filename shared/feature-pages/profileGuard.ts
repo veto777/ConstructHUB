@@ -166,6 +166,37 @@ const page: FeaturePage = {
       a: "A simpler checker for any public listing, with no Google connection needed. It compares the listing with Google's public data when you click Check now or Check all and keeps the history. It runs no automatic checks and sends no alerts.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the snapshot and the eleven fields are
+  // server/gbp/guard.ts previewSnapshot/configureGuard + GUARD_FIELDS; the two reads per check (live + getGoogleUpdated),
+  // the order-insensitive comparison and the source label are guard.ts checkGuard, canonical()/same() and differences();
+  // one alert per pending change is the observed/pending check in checkGuard; restore-one-field-then-confirm is
+  // guard.ts resolveLocked (PATCH ?updateMask=<field>, "Google did not confirm the restored value"); the cadence, and
+  // no checks without an active plan with settings kept, are guard.ts runGuardWorker + shared/plans.ts guardCadenceMinutes.
+  inDepth: {
+    heading: { title: "Google Business Profile Edit Alerts, ", em: "Explained" },
+    paragraphs: [
+      "Anyone can suggest an edit to a Google Business Profile, and Google can change a listing itself. A different " +
+        "phone number, new hours or another website on your listing can go unnoticed until a customer can't reach you. " +
+        "Profile Guard is the edit alert that watches for it, and in Lockdown it puts your own values back.",
+      "It starts from a snapshot you approve. Profile Guard reads the values Google has now, you choose which of the " +
+        "eleven fields to watch, and those values become your baseline. At every check it reads your listing twice: " +
+        "the live version, and Google's own record of what it has changed. Each watched field is compared with your " +
+        "baseline in a way that ignores harmless differences, such as the order your categories are listed in, so an " +
+        "alert means a value really changed.",
+      "When a field differs, Profile Guard records the change with your approved value, the new value, when it was " +
+        "found and what Google reported about it, and alerts you in the app and by email. If the change shows up in " +
+        "Google's record, the alert says it came from Google; otherwise it says the edit was made outside " +
+        "ConstructHUB. Google doesn't say who made an edit, so neither does the alert. A change still waiting for your " +
+        "decision isn't announced again at every check.",
+      "In Notify mode you decide: approve the new value into your snapshot, or reject it and your approved value is " +
+        "written back to Google. Lockdown does that on its own after each check. Either way, only the changed field is " +
+        "sent, and Profile Guard then confirms that Google's answer matches your value; if Google doesn't confirm it, " +
+        "the change keeps an error instead of being marked restored. Lockdown can't stop an edit from happening, and a " +
+        "restored value can take a while to show on Google Maps.",
+      `Checks run on your plan's schedule, as often as every ${FASTEST} minutes, and only while the plan is active. ` +
+        "If a plan lapses, your Guard settings stay and checks start again when a plan is back.",
+    ],
+  },
   related: ["gbp", "reinstatement", "reviews"],
   app: { href: "/locations", surface: "app", label: "Open Locations" },
   headings: {
@@ -174,9 +205,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Turn It On" },
   },
   seo: {
-    title: "Profile Guard — Google Business Profile Edit Alerts | ConstructHUB",
+    title: "Google Business Profile Edit Alerts | ConstructHUB",
     description:
-      "Get alerts when your Google Business Profile's name, phone, website, hours or address change, and restore your approved values with Lockdown.",
+      "Get an alert when your Google Business Profile's name, phone, website, hours or address changes, and restore your approved values with Lockdown.",
   },
   sources: [
     "client/src/components/profile-guard.tsx",
