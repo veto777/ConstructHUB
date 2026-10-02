@@ -492,3 +492,33 @@ def test_placeholder_and_spoken_email_slots():
         await b.respond("actually no email")
         assert b.slots["email"] == "mike.torres@gmail.com"   # a placeholder never overwrites a value
     run(go())
+
+
+# ── retract an unspoken reply (Alpine 2026-10-02: answering stale fragments made the assistant talk over callers) ──
+
+def test_retract_last_reply_undoes_a_plain_continue_and_returns_its_caller_text():
+    async def go():
+        b, p = mk([say("What's the address?", slots={"need": "siding"}), say("Got it — siding and gutters. What's the address?")])
+        await b.greet()
+        before_msgs, before_transcript = len(b.messages), len(b.transcript)
+        await b.respond("I need siding")
+        assert b.slots.get("need") == "siding"
+        prev = b.retract_last_reply()
+        assert prev == "I need siding"
+        assert len(b.messages) == before_msgs and len(b.transcript) == before_transcript
+        assert "need" not in b.slots or b.slots["need"] != "siding"
+        assert b.retract_last_reply() is None            # one retract per reply
+        d = await b.respond(f"{prev} and new gutters")    # the merged turn is answered once
+        assert d.say.startswith("Got it")
+        assert [m for m in b.messages if m["role"] == "user"][-1]["content"] == "I need siding and new gutters"
+    run(go())
+
+
+def test_retract_refuses_anything_with_side_effects():
+    async def go():
+        slots = {"need": "siding", "address": "1 Main St, Bellingham", "first_name": "Dana", "phone": CALLER}
+        b, _ = mk([say("I've sent your request.", "submit_lead", slots=slots)])
+        await b.greet()
+        await b.respond("Dana, 1 Main St Bellingham, siding")
+        assert b.retract_last_reply() is None             # a submitted lead is never taken back
+    run(go())
