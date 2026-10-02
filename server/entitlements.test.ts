@@ -13,8 +13,9 @@ vi.mock("./db", () => ({
 import {
   getEntitlements, activePlanKey, grantExpired, allowancesFor, parseAddons, ADDON_GRANTS, requirePlan,
   sendLocationLimit, raiseHint, cheapestPlanWhere, TOP_PLAN, hasModule, usersWithModule, planPausedMessage,
+  platformAdminAllowances, ADMIN_NON_CAP_LIMITS, ADMIN_CALL_ASSISTANT_NUMBERS, callAssistantAllowance,
 } from "./entitlements";
-import { ADDONS, PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP } from "@shared/plans";
+import { ADDONS, PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, fitsLimit } from "@shared/plans";
 
 const res = () => { const r: any = { status: vi.fn(() => r), json: vi.fn(() => r) }; return r; };
 const customer = (plan: string | null, extra: Record<string, unknown> = {}) =>
@@ -75,19 +76,75 @@ describe("plan resolution", () => {
     expect(activePlanKey({ ...trial, status: "active", stripe_subscription_id: "sub_1" }, now)).toBe("agency");
   });
 
-  it("gives platform admins every module and the top plan's limits, never beyond it", async () => {
+  it("gives platform admins every module and every usage limit unlimited, whatever plan they hold", async () => {
     mocks.row = { email: "support@constructhub.us", plan: null };
     const ent = await getEntitlements(1);
     expect(ent.isPlatformAdmin).toBe(true);
     expect(ent.plan).toBeNull();
     expect(ent.accessPlan).toBe(TOP_PLAN);
-    expect(ent.allowances).toEqual(allowancesFor(TOP_PLAN));
+    expect(ent.limits).toEqual(PLANS[TOP_PLAN].limits);
+    expect(ent.allowances).toEqual(platformAdminAllowances());
     expect(Object.values(ent.modules).every(Boolean)).toBe(true);
-    // An admin on a small plan still runs with the top plan's limits.
-    mocks.row = customer("starter", { email: "support@constructhub.us" });
-    const starterAdmin = await getEntitlements(1);
-    expect(starterAdmin.plan).toBe("starter");
-    expect(starterAdmin.allowances?.competitorScans).toBe(PLANS[TOP_PLAN].limits.competitorScans);
+    expect(Object.values(ent.addonModules).every(Boolean)).toBe(true);
+    // An admin on a small plan (or the Alpine account's legacy Platinum grant) is just as unlimited.
+    for (const row of [customer("starter", { email: "support@constructhub.us" }), customer("platinum", { email: "alpinesidingcompany@gmail.com", stripe_subscription_id: null })]) {
+      mocks.row = row;
+      const admin = await getEntitlements(1);
+      expect(admin.allowances).toEqual(platformAdminAllowances());
+      expect(admin.allowances?.competitorScans).toBe(-1);
+      expect(admin.allowances?.locations).toBe(-1);
+    }
+  });
+});
+
+describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
+  const NUMERIC = (Object.keys(PLANS.agency.limits) as (keyof typeof PLANS.agency.limits)[])
+    .filter((k) => typeof PLANS.agency.limits[k] === "number");
+  const USAGE_CAPS = NUMERIC.filter((k) => !(ADMIN_NON_CAP_LIMITS as readonly string[]).includes(k));
+
+  it("covers every usage cap the owner named", () => {
+    expect(USAGE_CAPS).toEqual(expect.arrayContaining([
+      "locations", "gridCredits", "competitorScans", "protectedSites", "siteScans", "permitSearches",
+      "crmSeats", "teamTextSegments", "reviewTemplates", "apiUnitsPerMonth",
+    ]));
+  });
+
+  it("admin: every usage cap is -1, the rest are sane, every module and add-on module is on", async () => {
+    mocks.row = { email: "alpinesidingcompany@gmail.com", plan: "platinum", status: "active", stripe_subscription_id: null, current_period_end: null };
+    const ent = await getEntitlements(1);
+    for (const k of USAGE_CAPS) expect(ent.allowances![k], k).toBe(-1);
+    expect(ent.allowances!.guardCadenceMinutes).toBe(Math.min(...Object.values(PLANS).map((p) => p.limits.guardCadenceMinutes)));
+    expect(ent.allowances!.apiRatePerMinute).toBe(PLANS[TOP_PLAN].limits.apiRatePerMinute);
+    expect(ent.allowances!.gridCreditsPerLocation).toBe(0);
+    expect(ent.allowances!.siteScansPerLocation).toBe(0);
+    expect(ent.allowances!.autoPublishAiReplies).toBe(true);
+    expect(Object.values(ent.modules).every(Boolean)).toBe(true);
+    expect(ent.addonModules.callAssistant).toBe(true);
+    expect(callAssistantAllowance(ent)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 10 });
+    // The gates: a location at any count fits; the agency workspace is on.
+    expect(fitsLimit(ent.allowances!.locations, 10_000, 50)).toBe(true);
+    expect(ent.modules.agencyWorkspace).toBe(true);
+  });
+
+  it("agency and pro customers are exactly the price book (unchanged)", async () => {
+    mocks.row = customer("agency");
+    const agency = await getEntitlements(7);
+    expect(agency.isPlatformAdmin).toBe(false);
+    expect(agency.allowances).toEqual(allowancesFor("agency"));
+    expect(agency.allowances).toEqual({ ...PLANS.agency.limits, locations: AGENCY_SELF_SERVE_MAX_LOCATIONS });
+    expect(agency.modules).toEqual(PLANS.agency.modules);
+    expect(agency.addonModules.callAssistant).toBe(false);
+    expect(callAssistantAllowance(agency)).toEqual({ numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
+
+    mocks.row = customer("pro", { addons: { call_assistant: 1 } });
+    const pro = await getEntitlements(7);
+    expect(pro.isPlatformAdmin).toBe(false);
+    expect(pro.allowances).toEqual(PLANS.pro.limits);
+    for (const k of USAGE_CAPS) expect(pro.allowances![k], k).not.toBe(-1);
+    expect(Object.values(pro.modules).some(Boolean)).toBe(false);
+    expect(callAssistantAllowance(pro)).toEqual({ numbers: 1, minutes: 2000, overageCentsPerMinute: 10 }); // Solo: the price book's tier
+    // A full pro location count is still refused.
+    expect(fitsLimit(pro.allowances!.locations, 1)).toBe(false);
   });
 });
 

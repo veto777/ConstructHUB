@@ -3,7 +3,7 @@ import type { Response } from 'express';
 import { pool } from '../db';
 import { GoogleError } from '../gbp/client';
 import { getEntitlements, sendLocationLimit, sendPlanRequired } from '../entitlements';
-import { MODULE_NAMES, PLANS, PLAN_KEYS, planForModule } from '@shared/plans';
+import { MODULE_NAMES, PLANS, PLAN_KEYS, planForModule, fitsLimit } from '@shared/plans';
 export const positiveId = z.coerce.number().int().positive().max(2147483647);
 export type AgencyAccess = { owner: number; actor: number; role: 'owner'|'admin'|'manager'|'viewer'; allClients: boolean };
 export const missing = () => new GoogleError('invalid','Record not found',404);
@@ -21,7 +21,7 @@ export async function workspaceEntitled(owner: number, actor = owner) {
 export async function locationLimitRefusal(owner: number, used: number): Promise<string|null> {
   const ent = await getEntitlements(owner);
   if (!ent.allowances) return agencyPlanPaused;
-  if (used < ent.allowances.locations) return null;
+  if (fitsLimit(ent.allowances.locations, used)) return null;
   let body: { message?: string } = {};
   const capture = { status() { return capture; }, json(b: { message?: string }) { body = b; return capture; } };
   sendLocationLimit(capture as unknown as Response, ent, used);

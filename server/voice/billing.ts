@@ -87,7 +87,7 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       subscriptionStatus: v.ent.subscriptionStatus,
       // `addon` is the held tier's add-on (Solo when none is held: the one a prompt offers).
       addon: { key: entry.key, name: CALL_ASSISTANT_NAME, preview: entry.preview === true, availableOn: entry.availableOn, monthlyCents: entry.monthlyCents, annualCents: entry.annualCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
-      /** The held tier (null without one — a platform admin runs on Solo's allowance without holding it). */
+      /** The held tier (null without one — a platform admin has the add-on, unlimited minutes, without holding a tier). */
       tier: tier ? { key: tier.tier, addon: tier.addon, name: tier.name } : null,
       tiers: CALL_ASSISTANT_TIERS.map((t) => ({
         key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents,
@@ -97,7 +97,7 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       allowance: v.allowance,
       units: { callAssistant: tier ? 1 : 0, tier: tier?.tier ?? null, callNumber: heldAddons.call_number ?? 0 },
       pricing: {
-        // Without a held tier: Solo's (the tier a prompt offers and a platform admin runs on).
+        // Without a held tier: Solo's (the tier a prompt offers; an admin's own minutes are unlimited — `allowance`).
         includedMinutes: (tier ?? callAssistantTier("solo")).includedMinutes, overageCentsPerMinute: (tier ?? callAssistantTier("solo")).overageCentsPerMinute,
         numberMinDays: CALL_NUMBER_MIN_DAYS, freeSpamCalls: CALL_ASSISTANT_FREE_SPAM_CALLS,
       },

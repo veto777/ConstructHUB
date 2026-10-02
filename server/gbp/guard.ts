@@ -171,8 +171,9 @@ export async function runGuardWorker(check=checkGuard,onlyUser?:number) {
     const {rows:owners}=await pool.query(`SELECT DISTINCT p.user_id ${due} AND (p.last_attempt IS NULL OR p.last_attempt<now()-make_interval(mins=>$2::int))`,[onlyUser??null,FASTEST_GUARD_MINUTES]);
     const ids:number[]=[],minutes:number[]=[];
     for(const o of owners){
-      const plan=(await getEntitlements(o.user_id)).accessPlan;
-      if(plan){ids.push(o.user_id);minutes.push(PLANS[plan].limits.guardCadenceMinutes);}
+      // allowances = the plan's own cadence (no add-on changes it); a platform admin's is the fastest any plan buys.
+      const a=(await getEntitlements(o.user_id)).allowances;
+      if(a){ids.push(o.user_id);minutes.push(a.guardCadenceMinutes);}
     }
     if(!ids.length)return;
     const {rows}=await pool.query(`SELECT p.user_id,p.location_id ${due} AND p.user_id=ANY($2::int[])

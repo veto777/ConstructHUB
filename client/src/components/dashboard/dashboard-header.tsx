@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { CreditCard, RefreshCw } from "lucide-react";
+import { CreditCard, LayoutGrid, RefreshCw } from "lucide-react";
+import { ADMIN_FEATURE_PAGES_PATH } from "@shared/feature-pages";
 import type { DashboardAccount } from "@shared/dashboard";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,14 @@ export function DashboardHeader({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PlanChip account={account} />
+          {/* Platform admins: every feature's intro page, in one list. */}
+          {account.isPlatformAdmin && (
+            <Button asChild variant="outline" size="sm" className="min-h-10 sm:min-h-8">
+              <Link href={ADMIN_FEATURE_PAGES_PATH} data-testid="link-dashboard-feature-pages">
+                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Feature pages
+              </Link>
+            </Button>
+          )}
           {account.status !== "none" && (
             <Button asChild variant="outline" size="sm" className="min-h-10 sm:min-h-8">
               <Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">

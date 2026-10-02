@@ -5,7 +5,7 @@
  * own gates (requirePlan / requireModule / the allowance tests in
  * server/routes.ts); it never grants what those routes would refuse.
  */
-import { PLANS, PLAN_KEYS, planForModule, type ModuleKey, type PlanKey, type PlanLimits, type PlanModules, type AddonKey } from "@shared/plans";
+import { ADDON_MODULES, PLANS, PLAN_KEYS, planForModule, type ModuleKey, type PlanKey, type PlanLimits, type PlanModules, type AddonKey, type AddonModuleKey } from "@shared/plans";
 import type { DashboardTileDef } from "@shared/dashboard";
 
 /** The slice of server/entitlements.ts Entitlements a tile gate reads. */
@@ -15,6 +15,8 @@ export type TileAccessInput = {
   modules: PlanModules;
   /** The user is an active member of a CRM org (read-only lookup — never creates one). */
   hasCrmOrg: boolean;
+  /** Add-on modules that are on (Entitlements.addonModules: every one for platform admins). */
+  addonModules?: Partial<Record<AddonModuleKey, boolean>>;
 };
 
 export type TileAccess = {
@@ -56,7 +58,12 @@ export function tileAccess(def: DashboardTileDef, ent: TileAccessInput): TileAcc
       // The CRM is included with every plan; a member of someone else's org
       // (a crew seat) has no plan of their own and still uses it.
       return ent.hasCrmOrg || ent.accessPlan ? { entitled: true } : { entitled: false, requiredPlan: PLAN_KEYS[0] };
-    case "addon":
+    case "addon": {
+      // The add-on module is on (a platform admin, or the add-on bought and running): the
+      // tile opens it, as requireModule would let the account in. Otherwise "coming soon".
+      const module = (Object.keys(ADDON_MODULES) as AddonModuleKey[]).find((k) => ADDON_MODULES[k] === gate.addon);
+      if (module && ent.addonModules?.[module]) return { entitled: true, addon: gate.addon };
       return { entitled: false, requiredPlan: gate.requiredPlan, addon: gate.addon, comingSoon: true };
+    }
   }
 }

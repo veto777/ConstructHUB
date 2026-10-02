@@ -66,7 +66,7 @@ export const accountResource = resource("account", {
       addons: { type: "object", additionalProperties: { type: "integer" } },
       api: { type: "object", properties: {
         enabled: { type: "boolean" }, unitsPerMonth: { type: "integer" }, ratePerMinute: { type: "integer" },
-        usedThisMonth: { type: "integer" }, requestsThisMonth: { type: "integer" }, remaining: { type: "integer" }, resetsAt: dateTime,
+        usedThisMonth: { type: "integer" }, requestsThisMonth: { type: "integer" }, remaining: { type: "integer", description: "Units left this month; -1 = unlimited." }, resetsAt: dateTime,
         key: { type: "object", nullable: true, properties: {
           id: { type: "string" }, name: nullableString, prefix: nullableString, suffix: nullableString, scopes: { type: "array", items: { type: "string" } },
           monthlyUnitLimit: nullableInt, unitsThisMonth: { type: "integer" }, requestsThisMonth: { type: "integer" }, expiresAt: dateTime, lastUsedAt: dateTime, createdAt: dateTime } },
@@ -97,7 +97,10 @@ export const accountResource = resource("account", {
     ]);
     const { unitsPerMonth, ratePerMinute } = apiAllowances(ent);
     const keyLimit = usage.keyRow?.monthly_unit_limit ?? null;
-    const remaining = Math.max(0, Math.min(unitsPerMonth - usage.account.units, keyLimit == null ? Infinity : keyLimit - usage.key.units));
+    // -1 = unlimited (platform admins): only a per-key cap limits what is left.
+    const unlimited = unitsPerMonth === -1;
+    const planLeft = unlimited ? Infinity : unitsPerMonth - usage.account.units;
+    const remaining = Math.max(0, Math.min(planLeft, keyLimit == null ? Infinity : keyLimit - usage.key.units));
     sendItem(res, {
       account: user ? { id: user.id, email: user.email, displayName: user.display_name, companyName: user.company_name, createdAt: user.created_at } : null,
       plan: {
@@ -108,9 +111,9 @@ export const accountResource = resource("account", {
       modules: ent.modules,
       addons: ent.addons,
       api: {
-        enabled: unitsPerMonth > 0, unitsPerMonth, ratePerMinute,
+        enabled: unlimited || unitsPerMonth > 0, unitsPerMonth, ratePerMinute,
         usedThisMonth: usage.account.units, requestsThisMonth: usage.account.requests,
-        remaining: Number.isFinite(remaining) ? remaining : Math.max(0, unitsPerMonth - usage.account.units),
+        remaining: Number.isFinite(remaining) ? remaining : -1,
         resetsAt: monthResetsAt(),
         key: usage.keyRow ? {
           id: usage.keyRow.id, name: usage.keyRow.name, prefix: usage.keyRow.prefix, suffix: usage.keyRow.suffix,

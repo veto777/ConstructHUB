@@ -53,6 +53,12 @@ export type PlanLimits = {
 /** The numeric limits (the ones an add-on can raise). */
 export type CountLimitKey = { [K in keyof PlanLimits]: PlanLimits[K] extends number ? K : never }[keyof PlanLimits];
 
+/** A count or monthly limit with no ceiling (PlanLimits: "-1 means unlimited"). Platform admins run on it. */
+export const UNLIMITED = -1;
+export const isUnlimited = (limit: number | null | undefined) => limit === UNLIMITED;
+/** Does `used + adding` fit under a count limit? An unlimited limit always fits. */
+export const fitsLimit = (limit: number, used: number, adding = 1) => limit === UNLIMITED || used + adding <= limit;
+
 export type PlanModules = {
   agencyWorkspace: boolean;
   adsManager: boolean;
@@ -132,7 +138,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "15 Site Scans / month",
       "5,000 permit searches / month",
       "CRM — 10 seats, team text alerts (1,500 / month)",
-      "1 client-texting number included (500 texts / month)",
+      "1 client-texting number included",
       "Priority support + onboarding call",
     ],
     limits: {
@@ -285,8 +291,9 @@ export const CALL_ASSISTANT_TIER_ADDONS: readonly AddonKey[] = CALL_ASSISTANT_TI
 export const CALL_ASSISTANT_NAME = "AI Call Assistant";
 /**
  * The overage rate for a call when no tier is held at that moment (a platform
- * admin runs on Solo's allowance; a call that ends just after a cancellation
- * keeps the month's snapshot): Solo's, the tier the admin allowance is.
+ * admin without a tier — whose minutes are unlimited, so it never applies; a
+ * call that ends just after a cancellation keeps the month's snapshot): Solo's,
+ * the entry tier a prompt offers.
  */
 export const CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS = CALL_ASSISTANT_TIERS.find((t) => t.tier === "solo")!.overageCentsPerMinute;
 /** Every distinct overage rate, highest first (for copy and the Stripe price lookup). */
@@ -325,7 +332,7 @@ export const ADDONS: Record<AddonKey, Addon> = {
   extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location (10+ locations: Agency).", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "pro", "growth"], grants: { locations: 1 } },
   extra_seat: { key: "extra_seat", name: "Extra seat", description: "One more CRM or agency team seat.", monthlyCents: 1500, annualCents: 15000, availableOn: ["starter", "pro", "growth", "agency"], grants: { crmSeats: 1 } },
   protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["pro", "growth", "agency"], grants: { protectedSites: 1 } },
-  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier: 500 texts / month, then $0.02 each.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
+  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"], grants: { competitorScans: 10 } },
   // ── Call Assistant (docs/call-assistant/SPEC.md) ─────────────────────────
   // Four tiers (owner, 2026-10-02: "We should offer 3 different tiers for the

@@ -14,32 +14,24 @@
 import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { CHLogo } from "@/components/ch-logo";
-import { CartSheet } from "@/components/cart-sheet";
-import { Settings } from "lucide-react";
 import {
   ArrowRight, Search, Camera, Users,
   MapPin, CheckCircle2,
-  Eye, Globe, LayoutDashboard, GraduationCap,
+  Eye, Globe, GraduationCap,
   Grid3X3, ShieldAlert, Crosshair, Briefcase,
   Megaphone, Package, Phone,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
 import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
-import { LandingMobileMenu } from "@/components/landing-mobile-menu";
+import { SiteNavBar } from "@/components/site-nav";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
 import { callAssistantPricing } from "@shared/plan-copy";
+import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
 
-const SECTION_LINKS = [
-  { href: "#services", label: "Services" },
-  { href: "#plans", label: "Plans" },
-  { href: "#stats", label: "Results" },
-  { href: "#coverage", label: "Coverage" },
-] as const;
 
 /** Button recipes — anchors styled as buttons (no <button> nested in <a>). */
 const BTN = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange focus-visible:ring-offset-2 focus-visible:ring-offset-mkt-paper";
@@ -144,46 +136,55 @@ const services = [
   {
     icon: Search,
     title: "Nationwide Permit Search",
+    href: featureIntroPath("permits"),
     description: "Find the permit office for any county or city we list in all 50 states and DC, and search the government portals we support by address, contractor, or company name.",
   },
   {
     icon: Camera,
     title: "SEO Photo Optimizer",
+    href: featureIntroPath("media"),
     description: "Watermark, rename, geotag and describe your job photos in one batch. Google strips EXIF on upload, so geotags don't promise a ranking benefit.",
   },
   {
     icon: Eye,
     title: "GMB Monitor",
+    href: featureIntroPath("profileGuard"),
     description: "Check your Google Business listings against Google on demand and keep a history of every change a check finds. Includes AI Review Response Generator.",
   },
   {
     icon: Grid3X3,
     title: "GMB Ranking Grid",
+    href: featureIntroPath("rankingGrid"),
     description: "Visualize exactly where you rank on Google Maps across your service area. Monitor local keyword performance with a geographic heatmap grid.",
   },
   {
     icon: MapPin,
     title: "GMB Locations Manager",
+    href: featureIntroPath("gbp"),
     description: "Manage all your business locations with Semrush-style GBP analytics — search/maps views, interactions, phone calls, and citation campaign tracking.",
   },
   {
     icon: ShieldAlert,
     title: "GBP Reinstatement",
+    href: featureIntroPath("reinstatement"),
     description: "Suspended Google Business Profile? Our reinstatement service handles soft and hard suspensions with a proven 4-step recovery process.",
   },
   {
     icon: Crosshair,
     title: "Competitor Intelligence",
+    href: featureIntroPath("competitors"),
     description: "Analyze competitors in your market. Track their permit activity, ranking positions, and business moves so you always stay one step ahead.",
   },
   {
     icon: GraduationCap,
     title: "Master Class",
+    href: featureIntroPath("masterClass"),
     description: "Complete state-by-state guide to starting a construction business — LLC formation, licensing, bonding, insurance, plus website & SEO training.",
   },
   {
     icon: Users,
     title: "Contractor CRM",
+    href: featureIntroPath("crm"),
     description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — included with every plan.",
   },
   {
@@ -256,40 +257,7 @@ export default function LandingPage() {
 
       {/* Nav — a navy masthead with an orange rule under it. */}
       <nav className={`sticky top-0 z-50 transition-transform duration-300 bg-mkt-navy border-b-[3px] border-mkt-orange ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <CHLogo height={40} />
-          <div className="hidden md:flex items-center gap-5 lg:gap-7 text-[14px] lg:text-[15px] font-medium text-white/75">
-            {SECTION_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-white transition-colors" data-testid={`link-nav-${link.href.slice(1)}`}>{link.label}</a>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 lg:gap-3">
-            {user && (
-              <Link href="/settings">
-                <button className="hidden sm:inline-flex items-center justify-center rounded-md h-9 w-9 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
-                  <Settings className="h-4 w-4" />
-                </button>
-              </Link>
-            )}
-            <div className="text-white"><CartSheet /></div>
-            <div className="text-white hidden sm:block"><ThemeToggle /></div>
-            {user ? (
-              <Link href="/" data-testid="link-nav-dashboard" className={`${BTN_PRIMARY} h-9 px-4 text-sm`}>
-                <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link href="/auth" className="hidden sm:inline-flex items-center whitespace-nowrap h-9 px-3 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-nav-signin">
-                  Sign In
-                </Link>
-                <Link href="/auth?mode=signup" data-testid="link-nav-getstarted" className={`${BTN_PRIMARY} h-9 px-4 text-sm`}>
-                  Get Started <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </>
-            )}
-            <LandingMobileMenu signInHref={user ? undefined : "/auth"} links={[...SECTION_LINKS]} />
-          </div>
-        </div>
+        <SiteNavBar signedIn={!!user} next="/" />
       </nav>
 
       {/* Hero — the gator is the cover star, standing on a tape-measure rule.
@@ -413,7 +381,7 @@ export default function LandingPage() {
             ))}
             {Array.from({ length: fillerCells }, (_, i) => (
               i === 0 ? (
-                <Link key="filler-cta" href="/pricing" className="hidden lg:flex bg-mkt-paper-2 p-8 flex-col justify-end hover:bg-mkt-card transition-colors">
+                <Link key="filler-cta" href="/features" className="hidden lg:flex bg-mkt-paper-2 p-8 flex-col justify-end hover:bg-mkt-card transition-colors" data-testid="link-services-all-features">
                   <span className="font-display italic text-xl text-mkt-ink">Every plan includes the CRM.</span>
                   <span className="mt-2 inline-flex items-center gap-2 text-[15px] font-semibold text-mkt-orange-ink">See every tool <ArrowRight className="h-4 w-4" /></span>
                 </Link>
@@ -586,6 +554,8 @@ export default function LandingPage() {
             <CHLogo height={30} className="opacity-70" />
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-mkt-navy-muted">
               <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-email">support@constructhub.us</a>
+              <span aria-hidden className="opacity-40">·</span>
+              <Link href="/features" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-features">Features</Link>
               <span aria-hidden className="opacity-40">·</span>
               <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">AI Call Assistant</Link>
               <span aria-hidden className="opacity-40">·</span>

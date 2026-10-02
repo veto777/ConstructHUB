@@ -124,12 +124,33 @@ function limitBody(ent: Entitlements, feature: MeteredFeature, limit: number, us
   };
 }
 
+/** Add `amount` to an unlimited meter's month (the same growth_budgets row a capped meter uses); false when the write failed. */
+async function countUnlimited(key: string, amount: number): Promise<boolean> {
+  if (!Number.isInteger(amount) || amount < 1) return false;
+  try {
+    await pool.query(
+      `INSERT INTO growth_budgets(key,period,used) VALUES($1,'0',$2)
+       ON CONFLICT(key,period) DO UPDATE SET used=growth_budgets.used+EXCLUDED.used`, [key, amount]);
+    return true;
+  } catch (e: any) {
+    console.error(`[quota] counting unlimited use failed for ${key}:`, e?.message || e);
+    return false;
+  }
+}
+
 /** Reserve `amount` of a monthly quota for an account (no request needed: workers use this too). */
 export async function reserveQuotaFor(userId: number, feature: MeteredFeature, amount = 1): Promise<QuotaResult> {
   const { ent, limit } = await allowanceFor(userId, feature);
   if (!ent.accessPlan || limit === 0) return { ok: false, status: 402, body: planRequiredBody(feature) };
   const key = quotaKey(userId, feature);
-  if (limit === -1) return { ok: true, reservation: { key, remaining: 0 }, ent, limit };
+  if (limit === -1) {
+    // Unlimited (platform admins): never refused. A counted meter still records
+    // the use, so Limits & usage shows "12 used · Unlimited" rather than 0; a
+    // failed count never blocks the work. Fair-use meters (photos) stay uncounted.
+    if (!METERS[feature].limit) return { ok: true, reservation: { key, remaining: 0 }, ent, limit };
+    const counted = await countUnlimited(key, amount);
+    return { ok: true, reservation: { key, remaining: counted ? amount : 0 }, ent, limit };
+  }
   const allowed = await takeBudget(key, limit, amount, Number.MAX_SAFE_INTEGER);
   if (!allowed) {
     const { rows: [row] } = await pool.query("SELECT used FROM growth_budgets WHERE key=$1 AND period='0'", [key]);

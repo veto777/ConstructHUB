@@ -7,7 +7,7 @@
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
   MODULE_NAMES, agencyMonthlyCents, effectivePlanKey, showsPrice,
-  type Addon, type AddonKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
+  type Addon, type AddonKey, type AddonModuleKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "@shared/plans";
 
 // ── Money ───────────────────────────────────────────────────────────────────
@@ -137,6 +137,8 @@ export type EntitlementsInfo = {
   grantEndsAt: string | null;
   allowances: PlanLimits | null;
   modules: Record<ModuleKey, boolean>;
+  /** Add-on modules that are on (every one for platform admins). */
+  addonModules?: Partial<Record<AddonModuleKey, boolean>>;
   addons: Partial<Record<AddonKey, number>>;
   locations: UsageMeter;
   usage: Partial<Record<UsageKey, UsageMeter>>;
@@ -152,11 +154,11 @@ export const USAGE_METERS: readonly { key: UsageKey; label: string }[] = [
   { key: "texts", label: "Text segments" },
 ];
 
-/** "12 of 100 used", "3 used · fair use", or null when the plan doesn't include it. */
-export function usageLine(meter: UsageMeter | undefined): string | null {
+/** "12 of 100 used", "3 used · fair use" ("3 used · unlimited" for a platform admin), or null when the plan doesn't include it. */
+export function usageLine(meter: UsageMeter | undefined, admin = false): string | null {
   if (!meter || meter.limit === 0) return null;
   const used = Math.max(0, meter.used).toLocaleString("en-US");
-  return meter.limit < 0 ? `${used} used · fair use` : `${used} of ${meter.limit.toLocaleString("en-US")} used`;
+  return meter.limit < 0 ? `${used} used · ${admin ? "unlimited" : "fair use"}` : `${used} of ${meter.limit.toLocaleString("en-US")} used`;
 }
 
 /** Share of a finite meter used, 0–100 (null when unlimited or not included). */

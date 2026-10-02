@@ -387,7 +387,9 @@ export function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) 
     .map((m) => ({ ...m, meter: entitlements.usage?.[m.key] }))
     .filter((m) => usageLine(m.meter) !== null);
   const resets = entitlements.resetsAt ? new Date(entitlements.resetsAt) : null;
-  const perLocation = entitlements.accessPlan === "agency";
+  // Platform admins are all-access (every usage limit -1), not on Agency's per-location pricing.
+  const admin = entitlements.isPlatformAdmin === true;
+  const perLocation = entitlements.accessPlan === "agency" && !admin;
   const locations = entitlements.locations;
   return (
     <Card data-testid="card-usage">
@@ -395,9 +397,9 @@ export function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) 
         <CardTitle className="text-lg">Usage this month</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {entitlements.isPlatformAdmin && entitlements.accessPlan !== entitlements.plan && (
+        {admin && (
           <p className="text-xs text-muted-foreground" data-testid="text-usage-admin">
-            Platform admin: the {entitlements.planName} plan's limits apply to this account, whatever plan it holds.
+            Platform admin: every feature is on and every plan limit is unlimited on this account, whatever plan it holds. Per-day safety caps (for example 5 Site Scans a day) still apply.
           </p>
         )}
         {locations && (
@@ -406,6 +408,8 @@ export function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) 
             <span className="text-muted-foreground tabular-nums">
               {perLocation
                 ? `${locations.used.toLocaleString("en-US")} linked`
+                : locations.limit < 0
+                ? `${locations.used.toLocaleString("en-US")} · ${admin ? "unlimited" : "fair use"}`
                 : `${locations.used.toLocaleString("en-US")} of ${locations.limit.toLocaleString("en-US")}`}
             </span>
           </div>
@@ -416,7 +420,7 @@ export function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) 
             <div key={key} className="space-y-1.5" data-testid={`usage-${key}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
                 <span className="font-medium">{label}</span>
-                <span className={`tabular-nums ${pct !== null && pct >= 100 ? "text-destructive" : "text-muted-foreground"}`}>{usageLine(meter)}</span>
+                <span className={`tabular-nums ${pct !== null && pct >= 100 ? "text-destructive" : "text-muted-foreground"}`}>{usageLine(meter, admin)}</span>
               </div>
               {pct !== null && (
                 <div
