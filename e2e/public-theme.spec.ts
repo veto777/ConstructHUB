@@ -55,6 +55,25 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       }
     });
 
+    test("picking a Contents entry lands its heading at the top of the screen, and the site footer follows", async ({ page }) => {
+      const phone = viewport.width < 1024;
+      for (const [path, id] of [["/privacy", "ccpa"], ["/terms", "refund-policy"], ["/terms", "introduction"]] as const) {
+        await page.goto(`${BASE}${path}`);
+        const heading = page.locator(`section#${id} h2`);
+        await expect(heading).toHaveCount(1);
+        if (phone) await page.getByTestId("toc-legal-mobile").locator("summary").click();
+        await page.getByTestId(phone ? "toc-legal-mobile" : "toc-legal").getByTestId(`link-toc-${id}`).click();
+        if (phone) await expect(page.getByTestId("toc-legal-mobile")).not.toHaveAttribute("open", "");
+        // The smooth scroll settles: the heading sits in the top band of the viewport.
+        await expect.poll(async () => {
+          const top = await heading.evaluate((el) => Math.round(el.getBoundingClientRect().top));
+          return top >= 0 && top < 200 ? "in view" : `top=${top}`;
+        }, { message: `${path} #${id}`, timeout: 5_000 }).toBe("in view");
+        await expect(page).toHaveURL(new RegExp(`#${id}$`));
+        await expect(page.getByTestId("footer-public-page")).toHaveCount(1);
+      }
+    });
+
     test("an unknown URL is the 404 with the gator", async ({ page }) => {
       await page.goto(`${BASE}/this-page-does-not-exist`);
       await expect(page.getByText("Page Not Found")).toBeVisible();

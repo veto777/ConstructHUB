@@ -3,7 +3,8 @@
  * site's editorial look (design B): the public header when signed out, a
  * grid-paper masthead with the title and date, then the text in readable
  * editorial type (the `mkt-legal` scope in client/src/index.css) beside a
- * sticky table of contents on desktop (a "Contents" drop-down on phones).
+ * sticky table of contents on desktop (a "Contents" drop-down on phones), and
+ * the public site footer when signed out.
  *
  * The pages keep their own wording and markup; the contents list is read from
  * their <section> headings after mount, so a section added to a page appears
@@ -12,7 +13,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ChevronDown } from "lucide-react";
-import { PublicPageHeader } from "@/components/public-page-chrome";
+import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { Kicker } from "@/components/feature-landing/primitives";
 
 type TocEntry = { id: string; label: string };
@@ -63,12 +64,21 @@ export function LegalPage({
     return () => observer.disconnect();
   }, []);
 
-  /** Jump within whatever scrolls the page (the window signed out, the app pane signed in). */
-  const jump = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+  /**
+   * Jump within whatever scrolls the page (the window signed out, the app pane signed in).
+   * `beforeScroll` runs first (the phone list closes itself there): closing it collapses the
+   * list above the text, so the scroll waits a frame for that layout before aiming at the heading.
+   */
+  const jump = (e: React.MouseEvent<HTMLAnchorElement>, id: string, beforeScroll?: () => void) => {
     const el = document.getElementById(id);
     if (!el) return;
     e.preventDefault();
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (beforeScroll) {
+      beforeScroll();
+      requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" }));
+    } else {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     try { window.history.replaceState(window.history.state, "", `#${id}`); } catch { /* cosmetic */ }
     setActive(id);
   };
@@ -79,7 +89,7 @@ export function LegalPage({
         <li key={entry.id}>
           <a
             href={`#${entry.id}`}
-            onClick={(e) => { jump(e, entry.id); onPick?.(); }}
+            onClick={(e) => jump(e, entry.id, onPick)}
             className={`block border-l-2 py-1.5 pl-3 transition-colors ${active === entry.id ? "border-mkt-orange font-semibold text-mkt-ink" : "border-transparent text-mkt-ink-soft hover:text-mkt-ink hover:border-mkt-rule"}`}
             data-testid={`link-toc-${entry.id}`}
           >
@@ -138,6 +148,7 @@ export function LegalPage({
           </article>
         </div>
       </div>
+      <PublicPageFooter />
     </div>
   );
 }
