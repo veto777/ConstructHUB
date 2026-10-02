@@ -1,0 +1,15 @@
+#! id: callback_other_number
+#! title: Caller gives a different callback number — stored, never read back as digits
+#! tags: lead intake privacy
+#! caller: +13605550127
+#! expect.outcome: lead_submitted
+#! expect.slot: phone ~ 0199
+#! expect.say_never: /\b\d{3}[ .-]?\d{3}[ .-]?\d{4}\b|five five five/
+#! expect.ended: true
+Hi, I'd like an estimate on a new roof. 48 Hilltop Road, Everett. I'm Walt.
+=> {"say": "Thanks, Walt. Is the number you're calling from the best one to reach you?", "action": "continue", "slots": {"need": "roof replacement", "address": "48 Hilltop Road, Everett", "first_name": "Walt"}}
+No, this is my work line, use my cell: 360-555-0199.
+=> {"say": "Got it, I'll use your cell. What's a good email for the estimate?", "action": "continue", "slots": {"phone": "+13605550199"}}
+No email. Any time. That's all, bye.
+=> {"say": "I've sent your request to our team, and someone will call you on your cell to set up your free estimate. Goodbye, Walt.", "action": "submit_lead", "slots": {"best_time": "any time"}}
+<hangup>

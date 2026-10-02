@@ -1,0 +1,13 @@
+#! id: roof_repair
+#! title: Roof repair (a few shingles) — declined with the small-roofer referral
+#! tags: decline
+#! caller: +13605550125
+#! expect.outcome: declined
+#! expect.never: submit_lead alert flag_spam
+#! expect.say_any: /smaller local roofing company|handyman/
+#! expect.ended: true
+#! expect.lead: false
+The wind took some shingles off last night, can you patch it?
+=> {"say": "I'm sorry, we only do full roof replacements; a smaller local roofing company or a handyman would be the best fit for a repair. Anything else I can help with?", "action": "continue", "outcome": "declined", "slots": {"need": "roof repair: missing shingles"}}
+No, that's it, bye.
+=> {"say": "Thanks for calling Cascade Exteriors. Goodbye.", "action": "end_call", "outcome": "declined", "slots": {}}

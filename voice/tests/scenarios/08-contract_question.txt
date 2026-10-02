@@ -1,0 +1,15 @@
+#! id: contract_question
+#! title: Signed contract question — contract escalation, no new lead
+#! tags: alert escalation
+#! caller: +13605550108
+#! expect.outcome: alerted
+#! expect.alert: contract
+#! expect.never: submit_lead flag_spam
+#! expect.ended: true
+#! expect.lead: false
+I signed a contract with you guys last week for siding and I need to change the color we picked.
+=> {"say": "I can get that to the right person. What's the address on the contract, and who am I speaking with?", "action": "continue", "slots": {"need": "signed siding contract: wants to change the color"}}
+It's 19 Birch Court in Ferndale, I'm Sam.
+=> {"say": "Thanks, Sam. I've passed this straight to the right person and they'll get back to you at this number. Anything else?", "action": "alert", "alert": {"kind": "contract", "summary": "Sam, 19 Birch Court, Ferndale: signed siding contract last week, wants to change the chosen color."}, "slots": {"address": "19 Birch Court, Ferndale", "first_name": "Sam", "phone": "+13605550108"}}
+Nope, thanks, bye.
+=> {"say": "Thanks for calling, Sam. Goodbye.", "action": "end_call", "outcome": "alerted", "slots": {}}

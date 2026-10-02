@@ -1,0 +1,13 @@
+#! id: gutters_only
+#! title: Gutters only — a secondary service on its own is declined
+#! tags: decline
+#! caller: +13605550124
+#! expect.outcome: declined
+#! expect.never: submit_lead alert flag_spam
+#! expect.say_any: /handyman/
+#! expect.ended: true
+#! expect.lead: false
+Do you guys do gutters? I just need new gutters on the front of the house.
+=> {"say": "We only do gutters alongside a siding, roofing, window or deck project, so a local handyman company would be the best fit for that. Anything else I can help with?", "action": "continue", "outcome": "declined", "slots": {"need": "gutters only"}}
+No, okay, thanks anyway.
+=> {"say": "Thanks for calling Cascade Exteriors. Goodbye.", "action": "end_call", "outcome": "declined", "slots": {}}

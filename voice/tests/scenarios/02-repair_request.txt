@@ -1,0 +1,18 @@
+#! id: repair_request
+#! title: Repair request — must decline with the handyman referral, no lead
+#! tags: decline core
+#! caller: +13605550102
+#! expect.outcome: declined
+#! expect.never: submit_lead alert flag_spam
+#! expect.say_any: /handyman/
+#! expect.say_never: /\bwe can (?:do|fix|repair)\b/
+#! expect.ended: true
+#! expect.lead: false
+#! expect.notify: none
+#! expect.max_turns: 4
+Hi, a couple of siding panels came loose on the side of my house, can someone come fix them?
+=> {"say": "I'm sorry, we only do full replacements, so a local handyman company would be the best fit for that. Is there anything else I can help with?", "action": "continue", "outcome": "declined", "slots": {"need": "siding repair (two loose panels)"}}
+It's only two panels.
+=> {"say": "I understand, but we don't take repair jobs at any size; a handyman would get that done quickly. Anything else today?", "action": "continue", "outcome": "declined", "slots": {}}
+Okay, no, thanks.
+=> {"say": "Thanks for calling Cascade Exteriors. Goodbye.", "action": "end_call", "outcome": "declined", "slots": {}}

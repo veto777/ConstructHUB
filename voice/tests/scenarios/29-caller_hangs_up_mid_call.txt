@@ -1,0 +1,14 @@
+#! id: caller_hangs_up_mid_call
+#! title: Caller hangs up after giving address and need — the engine forces a submit from the transcript
+#! tags: lead hangup policy
+#! caller: +13605550129
+#! expect.outcome: lead_submitted
+#! expect.never: alert flag_spam
+#! expect.slot: address ~ 15 Juniper
+#! expect.ended: true
+#! expect.lead: true
+I need the siding done on my whole house.
+=> {"say": "I can help with that. What's the street address and city for the property?", "action": "continue", "slots": {"need": "whole-house siding replacement"}}
+15 Juniper Way, Anacortes.
+=> {"say": "Got it. And who am I speaking with? A first name is fine.", "action": "continue", "slots": {"address": "15 Juniper Way, Anacortes"}}
+<hangup>

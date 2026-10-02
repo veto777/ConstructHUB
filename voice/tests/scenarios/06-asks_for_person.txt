@@ -1,0 +1,20 @@
+#! id: asks_for_person
+#! title: Caller insists on a person — alert (no transfer), still take the request
+#! tags: alert core
+#! caller: +13605550106
+#! expect.outcome: lead_submitted|alerted
+#! expect.actions: alert submit_lead
+#! expect.never: flag_spam
+#! expect.alert: human
+#! expect.say_never: /transferring you|hold while I transfer|let me transfer|one moment while I connect/
+#! expect.say_any: /someone (?:will|can) call you back|alert(?:ed|ing) the team|let the team know/
+#! expect.ended: true
+#! expect.notify: some
+I don't want to talk to a machine. Put a real person on the phone.
+=> {"say": "I can't transfer you right now, but I'm alerting the team so someone calls you back — what's it regarding?", "action": "alert", "alert": {"kind": "human", "summary": "Caller insists on speaking to a person; callback requested."}, "slots": {}}
+Fine. It's for siding on my mother's house, 55 Oak Lane in Bellingham. I'm Robert.
+=> {"say": "Thank you, Robert. Is the number you're calling from the best one to reach you?", "action": "continue", "slots": {"need": "siding replacement, mother's house", "address": "55 Oak Lane, Bellingham", "first_name": "Robert"}}
+Use this number. Mornings.
+=> {"say": "I've sent your request to our team and flagged that you'd like a call from a person; someone will call you in the morning. Anything else?", "action": "submit_lead", "slots": {"phone": "+13605550106", "best_time": "mornings"}}
+No. Goodbye.
+=> {"say": "Thanks for calling, Robert. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

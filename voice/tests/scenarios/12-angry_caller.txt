@@ -1,0 +1,16 @@
+#! id: angry_caller
+#! title: Angry caller who never got an estimate — stay calm, estimate_missing escalation
+#! tags: alert escalation edge
+#! caller: +13605550112
+#! expect.outcome: alerted
+#! expect.alert: estimate_missing
+#! expect.never: submit_lead flag_spam
+#! expect.say_never: /calm down|no need to (?:yell|shout)|that's not my (?:fault|problem)/
+#! expect.ended: true
+#! expect.lead: false
+This is ridiculous. Your guy came out two weeks ago and I never got my damn estimate. Nobody calls me back!
+=> {"say": "I'm sorry — that shouldn't have happened, and I'll get this to the right person right now. What's the property address?", "action": "continue", "slots": {"need": "estimate visit two weeks ago, never received the estimate; very frustrated"}}
+614 Alder Street, Burlington. Tom. And don't tell me someone will call, I've heard that.
+=> {"say": "Understood, Tom. I've passed this straight to the right person with a note that it's overdue, and they'll follow up at this number. Is there anything else?", "action": "alert", "alert": {"kind": "estimate_missing", "summary": "Tom, 614 Alder Street, Burlington: estimator visited two weeks ago, never received the estimate; frustrated, has called before."}, "slots": {"address": "614 Alder Street, Burlington", "first_name": "Tom", "phone": "+13605550112"}}
+No. Goodbye.
+=> {"say": "Thank you for your patience, Tom. Goodbye.", "action": "end_call", "outcome": "alerted", "slots": {}}

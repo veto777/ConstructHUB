@@ -1,0 +1,21 @@
+#! id: price_per_sqft
+#! title: Asks price per square foot — defer to the estimator, keep collecting
+#! tags: lead policy
+#! caller: +13605550105
+#! expect.outcome: lead_submitted
+#! expect.actions: submit_lead
+#! expect.never: flag_spam alert
+#! expect.say_never: /\$\s?\d|\d+ dollars|per square foot is|a square foot is/
+#! expect.say_any: /estimat/
+#! expect.ended: true
+#! expect.lead: true
+Hi, what do you charge per square foot for Hardie siding?
+=> {"say": "That's a great question for the estimator — the estimate is free and the written price comes from them on site. Are you looking at replacing the siding on your home?", "action": "continue", "slots": {}}
+Yes, the whole house. Ballpark, is it like ten dollars a foot?
+=> {"say": "I really can't quote numbers, but the estimator will give you an exact written price. What's the street address and city for the property?", "action": "continue", "slots": {"need": "whole-house Hardie siding replacement"}}
+410 Cedar Street, Lynden. I'm Dana, this number is fine.
+=> {"say": "Thanks, Dana. What's a good email for the estimate?", "action": "continue", "slots": {"address": "410 Cedar Street, Lynden", "first_name": "Dana", "phone": "+13605550105"}}
+I'd rather not give an email.
+=> {"say": "No problem. I've sent your request to our team, and someone will call you to set up your free estimate. Anything else I can help with?", "action": "submit_lead", "slots": {}}
+No, that's all, thank you.
+=> {"say": "Thanks for calling Cascade Exteriors, Dana. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

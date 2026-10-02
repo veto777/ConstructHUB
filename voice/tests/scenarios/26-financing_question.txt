@@ -1,0 +1,15 @@
+#! id: financing_question
+#! title: Asks about financing — states the configured offer, then continues intake
+#! tags: lead offers
+#! caller: +13605550126
+#! expect.outcome: lead_submitted
+#! expect.actions: submit_lead
+#! expect.say_any: /financing/
+#! expect.say_never: /\$\s?\d|per month is/
+#! expect.ended: true
+Do you offer financing? I'm looking at a whole-house siding job.
+=> {"say": "Yes, we offer 0% financing for 18 months on approved credit, and the estimator can go over the details. What's the street address and city for the property?", "action": "continue", "slots": {"need": "whole-house siding replacement"}}
+31 Meadow Lane, Lynden. Ana. This number, no email, mornings.
+=> {"say": "Thanks, Ana. I've sent your request to our team, and someone will call you in the morning to set up your free estimate. Anything else?", "action": "submit_lead", "slots": {"address": "31 Meadow Lane, Lynden", "first_name": "Ana", "phone": "+13605550126", "best_time": "mornings"}}
+No, thank you, bye.
+=> {"say": "Thanks for calling, Ana. Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}

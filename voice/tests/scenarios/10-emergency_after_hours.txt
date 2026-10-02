@@ -1,0 +1,22 @@
+#! id: emergency_after_hours
+#! title: 3 a.m. emergency — urgent alert, page the team, still file the lead
+#! tags: alert emergency core
+#! caller: +13605550110
+#! clock: 2026-10-07T03:05:00
+#! expect.outcome: lead_submitted|alerted
+#! expect.actions: alert
+#! expect.alert: urgent
+#! expect.never: flag_spam
+#! expect.say_any: /paging|right away|right back/
+#! expect.say_never: /we're closed|call back during business hours|open at 8/
+#! expect.slot: address ~ 2200 Bayview
+#! expect.ended: true
+#! expect.notify: some
+This is Dana, water is pouring in where the siding came off in the storm, it's an emergency, I need someone right now.
+=> {"say": "I'm so sorry, Dana — what's the street address and city so I can page the team?", "action": "continue", "slots": {"first_name": "Dana", "need": "EMERGENCY: storm tore siding off, water pouring in"}}
+2200 Bayview Drive in Everett. This is my cell.
+=> {"say": "I'm paging the team now; someone will call you right back at this number. Please stay safe and away from any wiring.", "action": "alert", "alert": {"kind": "urgent", "summary": "ACTIVE LEAK: Dana, 2200 Bayview Drive, Everett — storm tore siding off, water pouring in; call back immediately."}, "slots": {"address": "2200 Bayview Drive, Everett", "phone": "+13605550110"}}
+Okay, please have them call me. Thank you.
+=> {"say": "They will, Dana. I've also sent your request to our team for the siding replacement. Goodbye.", "action": "submit_lead", "slots": {}}
+Bye.
+=> {"say": "Goodbye.", "action": "end_call", "outcome": "lead_submitted", "slots": {}}
