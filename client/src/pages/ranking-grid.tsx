@@ -611,7 +611,7 @@ export default function RankingGridPage() {
   });
   // This month's ranking-grid credits, as the server counts them.
   const { data: entitlements } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
-  const creditsUsage = usageLine(entitlements?.usage?.rankings);
+  const creditsUsage = usageLine(entitlements?.usage?.rankings, entitlements?.isPlatformAdmin === true);
 
   const searchBusinessMutation = useMutation({
     mutationFn: async (query: string) => {

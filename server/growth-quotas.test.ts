@@ -148,10 +148,64 @@ describe("reserving quota", () => {
     expect(mocks.refunds).toHaveLength(0);
   });
 
-  it("gives platform admins the top plan's quotas", async () => {
+  it("never refuses a platform admin, on any meter, at any amount, and still counts the use", async () => {
+    // A customer would be refused here: takeBudget says the month is spent.
+    mocks.take.mockResolvedValue(false);
+    mocks.used = 1_000_000;
+    for (const row of [{ email: "alpinesidingcompany@gmail.com", plan: null }, plan("platinum", { email: "alpinesidingcompany@gmail.com", stripe_subscription_id: null }), plan("starter", { email: "support@constructhub.us" })]) {
+      mocks.row = row;
+      const ent = await getEntitlements(1);
+      for (const feature of ["searches", "rankings", "siteScans", "competitorScans", "photos", "texts"] as const) {
+        expect(monthlyLimit(ent, feature, 50), feature).toBe(-1);
+        const r = await reserveQuotaFor(1, feature, 9_999);
+        expect(r.ok, feature).toBe(true);
+        const http = res();
+        expect(await reserveMonthlyQuota(req(1), http, feature, 25), feature).toBe(true);
+        expect(http.status).not.toHaveBeenCalled();
+      }
+    }
+    // The capped path (takeBudget) is never consulted for an admin.
+    expect(mocks.take).not.toHaveBeenCalled();
+    const { pool } = await import("./db");
+    const counted = (pool.query as any).mock.calls.filter(([sql]: [string]) => /INSERT INTO growth_budgets/.test(sql));
+    // Counted meters (not the fair-use photo optimizer) record the use for Limits & usage.
+    expect(counted.some(([, v]: [string, any[]]) => v[0] === quotaKey(1, "competitorScans") && v[1] === 9_999)).toBe(true);
+    expect(counted.some(([, v]: [string, any[]]) => v[0] === quotaKey(1, "photos"))).toBe(false);
+  });
+
+  it("an admin's counted use is refundable like any reservation", async () => {
     mocks.row = { email: "alpinesidingcompany@gmail.com", plan: null };
-    mocks.take.mockResolvedValue(true);
-    expect((await reserveQuotaFor(1, "competitorScans")).ok).toBe(true);
+    const r = res();
+    expect(await reserveMonthlyQuota(req(1), r, "siteScans", 3)).toBe(true);
+    expect(r.locals.growthQuota).toMatchObject({ key: quotaKey(1, "siteScans"), remaining: 3 });
+    await refundQuota(r, 2);
+    expect(mocks.refunds.at(-1)).toEqual([quotaKey(1, "siteScans"), 2]);
+  });
+
+  it("a failed count never blocks an admin", async () => {
+    mocks.row = { email: "alpinesidingcompany@gmail.com", plan: null };
+    const { pool } = await import("./db");
+    const base = (pool.query as any).getMockImplementation();
+    (pool.query as any).mockImplementation(async (text: string, values: any[]) => {
+      if (/INSERT INTO growth_budgets/.test(text)) throw new Error("db down");
+      return base(text, values);
+    });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const r = await reserveQuotaFor(1, "searches", 1);
+      expect(r).toMatchObject({ ok: true, limit: -1, reservation: { remaining: 0 } });
+    } finally {
+      (pool.query as any).mockImplementation(base);
+      spy.mockRestore();
+    }
+  });
+
+  it("customers are unchanged: a spent month is still refused", async () => {
+    mocks.row = plan("agency");
+    mocks.take.mockResolvedValue(false);
+    mocks.used = 20;
+    const r = await reserveQuotaFor(7, "competitorScans");
+    expect(r).toMatchObject({ ok: false, status: 403 });
     expect(mocks.take.mock.calls[0][1]).toBe(20);
   });
 });

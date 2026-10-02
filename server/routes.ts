@@ -2,7 +2,7 @@ import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmen
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
 import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
 import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
-import { PLANS } from "@shared/plans";
+import { PLANS, fitsLimit } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
@@ -200,7 +200,7 @@ export async function registerRoutes(
               AND NOT EXISTS (SELECT 1 FROM agency_discovery d JOIN business_locations l ON l.user_id=d.user_id AND l.gbp_location_name IS NULL AND l.place_id=d.data->>'placeId'
                                WHERE d.user_id=$1 AND d.location=n.name)`, [user.id, names]);
         const used = await locationCount(user.id);
-        if (r.adding > 0 && used + r.adding > ent.allowances!.locations) return void sendLocationLimit(res, ent, used, r.adding);
+        if (r.adding > 0 && !fitsLimit(ent.allowances!.locations, used, r.adding)) return void sendLocationLimit(res, ent, used, r.adding);
         next();
       } catch (err) { planCheckFailed(res, err); }
     });
@@ -215,7 +215,7 @@ export async function registerRoutes(
         const id = Number(req.params.id);
         const { rows: [r] } = await pool.query("SELECT count(*)::int n FROM gbp_guard WHERE user_id=$1 AND mode<>'off' AND location_id<>$2", [user.id, Number.isSafeInteger(id) ? id : 0]);
         const limit = ent.allowances!.locations;
-        if (r.n >= limit) {
+        if (!fitsLimit(limit, r.n)) {
           const raise = raiseHint(ent, "locations", ["location"], "extra_location");
           return void sendLimitReached(res, {
             feature: "guardedLocations", limit, used: r.n, upgradePlan: raise.upgradePlan, addon: raise.addon,
@@ -2186,7 +2186,8 @@ export async function registerRoutes(
 
         // The self-serve card trial (a Stripe subscription still trialing) runs one grid. A trial
         // code is an admin grant of the full Agency plan, so its monthly credits apply as they are.
-        const trialLive = !!sub && sub.status === "trialing" && !!sub.stripeSubscriptionId;
+        // Platform admins are all-access whatever their own subscription says.
+        const trialLive = !!sub && sub.status === "trialing" && !!sub.stripeSubscriptionId && !isAdmin(user);
         if (trialLive) {
           const existingScans = await storage.getRankingGridScans({ id: user.id, admin: false });
           if (existingScans.length >= 1) {
@@ -2678,7 +2679,7 @@ export async function registerRoutes(
       // Every location counts toward the plan's Google Business Profile locations (plus Extra location add-ons).
       const outcome = await withAccountLock(user.id, async (tx) => {
         const [{ n: used }] = await tx.select({ n: count() }).from(businessLocations).where(eq(businessLocations.userId, user.id));
-        if (used >= ent.allowances!.locations) return { used, location: null };
+        if (!fitsLimit(ent.allowances!.locations, used)) return { used, location: null };
         const [location] = await tx.insert(businessLocations).values(parsed).returning();
         return { used, location };
       });

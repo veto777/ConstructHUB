@@ -26,7 +26,7 @@ import { pool } from "../db";
 import { getEntitlements, callAssistantAllowance } from "../entitlements";
 import { stripe as stripeClient, stripeConfigured } from "../billing/client";
 import { hasLiveStripeSubscription } from "../billing/sync";
-import { ACCESS_STATUSES, ADDONS, CALL_MINUTE_OVERAGE_CENTS } from "@shared/plans";
+import { ACCESS_STATUSES, ADDONS, CALL_MINUTE_OVERAGE_CENTS, UNLIMITED } from "@shared/plans";
 import type { VoiceUsageRow } from "@shared/schema";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
@@ -62,8 +62,10 @@ export type VoiceUsageSummary = {
 /** The summary the Overview and Limits & usage show; `includedMinutes` falls back to the live allowance for a month with no row. */
 export function summarizeVoiceUsage(row: Partial<VoiceUsageRow> | null | undefined, month: string, includedNow: number): VoiceUsageSummary {
   const minutes = Number(row?.minutes ?? 0);
-  const included = Math.max(Number(row?.includedMinutes ?? includedNow), includedNow);
-  const overage = Math.max(0, minutes - included);
+  // -1 = unlimited minutes (platform admins): never any overage, nothing "remaining" to count down.
+  const unlimited = includedNow === UNLIMITED || row?.includedMinutes === UNLIMITED;
+  const included = unlimited ? UNLIMITED : Math.max(Number(row?.includedMinutes ?? includedNow), includedNow);
+  const overage = unlimited ? 0 : Math.max(0, minutes - included);
   return {
     month,
     calls: Number(row?.calls ?? 0),
@@ -71,7 +73,7 @@ export function summarizeVoiceUsage(row: Partial<VoiceUsageRow> | null | undefin
     spamCalls: Number(row?.spamCalls ?? 0),
     blockedCalls: Number(row?.blockedCalls ?? 0),
     includedMinutes: included,
-    remainingMinutes: Math.max(0, included - minutes),
+    remainingMinutes: unlimited ? UNLIMITED : Math.max(0, included - minutes),
     overageMinutes: overage,
     overageCents: overage * CALL_MINUTE_OVERAGE_CENTS,
     overageCentsPerMinute: CALL_MINUTE_OVERAGE_CENTS,
@@ -107,7 +109,9 @@ export type RecordUsageInput = {
  * Count one finished call on the account's month (atomic upsert). The
  * included-minutes snapshot only ever grows within a month (a second
  * call_assistant unit bought mid-month raises it; a cancellation never
- * lowers what was already granted). Returns the month's row after the call.
+ * lowers what was already granted). -1 is unlimited (platform admins): a month
+ * that was ever unlimited stays unlimited and records no overage, so nothing
+ * reaches Stripe. Returns the month's row after the call.
  */
 export async function recordVoiceCallUsage(input: RecordUsageInput, q: Queryable = pool): Promise<VoiceUsageRow> {
   const month = voiceMonthKey(input.at ?? new Date());
@@ -116,15 +120,17 @@ export async function recordVoiceCallUsage(input: RecordUsageInput, q: Queryable
   const included = callAssistantAllowance(await getEntitlements(input.accountUserId)).minutes;
   const { rows: [r] } = await q.query(
     `INSERT INTO voice_usage (org_id, account_user_id, month, calls, minutes, spam_calls, blocked_calls, included_minutes, overage_minutes, updated_at)
-     VALUES ($1, $2, $3, 1, $4::int, $5::int, $6::int, $7::int, GREATEST(0, $4::int - $7::int), now())
+     VALUES ($1, $2, $3, 1, $4::int, $5::int, $6::int, $7::int, CASE WHEN $7::int = -1 THEN 0 ELSE GREATEST(0, $4::int - $7::int) END, now())
      ON CONFLICT (org_id, month) DO UPDATE SET
        account_user_id = EXCLUDED.account_user_id,
        calls = voice_usage.calls + 1,
        minutes = voice_usage.minutes + EXCLUDED.minutes,
        spam_calls = voice_usage.spam_calls + EXCLUDED.spam_calls,
        blocked_calls = voice_usage.blocked_calls + EXCLUDED.blocked_calls,
-       included_minutes = GREATEST(COALESCE(voice_usage.included_minutes, 0), EXCLUDED.included_minutes),
-       overage_minutes = GREATEST(0, voice_usage.minutes + EXCLUDED.minutes - GREATEST(COALESCE(voice_usage.included_minutes, 0), EXCLUDED.included_minutes)),
+       included_minutes = CASE WHEN voice_usage.included_minutes = -1 OR EXCLUDED.included_minutes = -1 THEN -1
+         ELSE GREATEST(COALESCE(voice_usage.included_minutes, 0), EXCLUDED.included_minutes) END,
+       overage_minutes = CASE WHEN voice_usage.included_minutes = -1 OR EXCLUDED.included_minutes = -1 THEN 0
+         ELSE GREATEST(0, voice_usage.minutes + EXCLUDED.minutes - GREATEST(COALESCE(voice_usage.included_minutes, 0), EXCLUDED.included_minutes)) END,
        updated_at = now()
      RETURNING *`,
     [input.orgId, input.accountUserId, month, minutes, isSpamOutcome(input.outcome) ? 1 : 0, blocked ? 1 : 0, included],

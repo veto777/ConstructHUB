@@ -60,15 +60,18 @@ type VoiceStatusLite = {
   usage: { minutes: number; overageMinutes: number; overageCents: number } | null;
 };
 
-const countText = (v: number) => (v < 0 ? "Unlimited (fair use)" : v === 0 ? "Not included" : formatCount(v));
-const perMonth = (v: number) => (v < 0 ? "Unlimited (fair use)" : v === 0 ? "Not included" : `${formatCount(v)} / mo`);
+/** How a -1 limit reads: platform admins are simply unlimited; a plan's -1 is fair use. */
+const FAIR_USE = "Unlimited (fair use)";
+export const ADMIN_UNLIMITED = "Unlimited";
+const countText = (v: number, unlimited = FAIR_USE) => (v < 0 ? unlimited : v === 0 ? "Not included" : formatCount(v));
+const perMonth = (v: number, unlimited = FAIR_USE) => (v < 0 ? unlimited : v === 0 ? "Not included" : `${formatCount(v)} / mo`);
 
 /** Monthly meters as the server reports them: the effective limit already accounts for per-location plans. */
-function meterRow(key: string, label: string, meter: UsageMeter | undefined, fallbackLimit: number, extra: Partial<LimitRow> = {}): LimitRow {
+function meterRow(key: string, label: string, meter: UsageMeter | undefined, fallbackLimit: number, extra: Partial<LimitRow> = {}, unlimited = FAIR_USE): LimitRow {
   const limit = meter ? meter.limit : fallbackLimit;
   return {
     key, label,
-    included: perMonth(limit),
+    included: perMonth(limit, unlimited),
     excluded: limit === 0,
     used: limit === 0 ? null : meter ? Math.max(0, meter.used) : undefined,
     ceiling: limit > 0 ? limit : undefined,
@@ -131,7 +134,11 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   }
 
   const usage = entitlements.usage ?? {};
-  const isAgency = plan === "agency";
+  // Platform admins (the Alpine account) are all-access: every usage limit is -1, no add-on raises anything.
+  const admin = entitlements.isPlatformAdmin === true;
+  const unl = admin ? ADMIN_UNLIMITED : FAIR_USE;
+  // Agency's per-location pricing, which an admin's unlimited locations don't follow.
+  const isAgency = plan === "agency" && !admin;
   const interval: BillingInterval = view.interval ?? "month";
   // Add-ons change a Stripe subscription on a current plan; a legacy plan keeps its old price until it switches in Pricing.
   const editable = view.changesInPlace && !view.isLegacy;
@@ -145,7 +152,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "locations",
           label: "Google Business Profile locations",
-          included: isAgency ? `${formatCount(AGENCY_INCLUDED_LOCATIONS)} included, then per location` : countText(allowances.locations),
+          included: isAgency ? `${formatCount(AGENCY_INCLUDED_LOCATIONS)} included, then per location` : countText(allowances.locations, unl),
           used: entitlements.locations?.used ?? undefined,
           ceiling: isAgency ? undefined : allowances.locations > 0 ? allowances.locations : undefined,
           hint: isAgency && view.locations ? `Billed for ${formatCount(view.locations)} locations.` : undefined,
@@ -163,11 +170,11 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         },
         meterRow("gridCredits", "Ranking-grid credits", usage.rankings, allowances.gridCredits, {
           hint: isAgency ? `${formatCount(allowances.gridCreditsPerLocation)} per location each month.` : "One credit per 25 grid points.",
-        }),
+        }, unl),
         {
           key: "reviewTemplates",
           label: "Review request templates",
-          included: countText(allowances.reviewTemplates),
+          included: countText(allowances.reviewTemplates, unl),
           excluded: allowances.reviewTemplates === 0,
           used: allowances.reviewTemplates === 0 ? null : templates.data ? templates.data.length : undefined,
           ceiling: allowances.reviewTemplates > 0 ? allowances.reviewTemplates : undefined,
@@ -188,7 +195,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "protectedSites",
           label: "Protected websites (Click Guard + IP Tracker + VPN Shield)",
-          included: countText(allowances.protectedSites),
+          included: countText(allowances.protectedSites, unl),
           excluded: allowances.protectedSites === 0,
           used: allowances.protectedSites === 0 ? null : domains.data ? domains.data.length : undefined,
           ceiling: allowances.protectedSites > 0 ? allowances.protectedSites : undefined,
@@ -196,18 +203,18 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         },
         meterRow("siteScans", "Site Scans", usage.siteScans, allowances.siteScans, {
           hint: isAgency ? `${formatCount(allowances.siteScansPerLocation)} per location each month.` : undefined,
-        }),
-        meterRow("competitorScans", "Competitor Intel scans", usage.competitorScans, allowances.competitorScans, { addon: "competitor_pack" }),
+        }, unl),
+        meterRow("competitorScans", "Competitor Intel scans", usage.competitorScans, allowances.competitorScans, { addon: "competitor_pack" }, unl),
       ],
     },
     {
       title: "Permits & CRM",
       rows: [
-        meterRow("permitSearches", "Permit searches", usage.searches, allowances.permitSearches),
+        meterRow("permitSearches", "Permit searches", usage.searches, allowances.permitSearches, {}, unl),
         {
           key: "crmSeats",
           label: "CRM seats (estimates, invoices, payments)",
-          included: countText(allowances.crmSeats),
+          included: countText(allowances.crmSeats, unl),
           used: crmMe.data?.seats ? crmMe.data.seats.used : undefined,
           ceiling: allowances.crmSeats > 0 ? allowances.crmSeats : undefined,
           hint: isAgency ? "One pool for the CRM and the agency team." : undefined,
@@ -215,7 +222,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         },
         meterRow("teamTextSegments", "Team text alerts", usage.texts, allowances.teamTextSegments, {
           hint: allowances.teamTextSegments === 0 ? undefined : "Every text the workspace sends counts, by segment: 160 characters, or 70 with emoji or special characters.",
-        }),
+        }, unl),
         {
           key: "clientTexting",
           label: "Two-way client texting",
@@ -243,12 +250,14 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "callAssistantMinutes",
           label: "Call Assistant minutes",
-          included: on ? perMonth(minutes) : paused ? "Paused" : "Add-on",
+          included: on ? perMonth(minutes, unl) : paused ? "Paused" : "Add-on",
           excluded: !on,
           used: !on ? null : vs!.usage ? vs!.usage.minutes : 0,
           ceiling: on && minutes > 0 ? minutes : undefined,
           monthly: true,
-          hint: paused
+          hint: admin && on
+            ? "Unlimited for platform admins: every started minute is counted here and none is billed as overage."
+            : paused
             ? "Paused: the subscription's payment didn't go through. Update your payment method in Billing and the assistant answers again; your number is held meanwhile."
             : overage
             ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} at ${formatUsd(vs!.pricing.overageCentsPerMinute)}/min, on your next invoice.`
@@ -258,11 +267,13 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "callAssistantNumbers",
           label: "Call Assistant phone numbers",
-          included: on ? countText(numbers) : "Add-on",
+          included: on ? countText(numbers, unl) : "Add-on",
           excluded: !on,
           used: !on ? null : vs!.numberAllowance ? vs!.numberAllowance.used : undefined,
           ceiling: on && numbers > 0 ? numbers : undefined,
-          hint: "One local number comes with each AI Call Assistant; buy and release them in CRM → Call Assistant → Numbers.",
+          hint: admin
+            ? `Platform admins can hold up to ${formatCount(numbers)} numbers: each one is a real carrier number. Buy and release them in CRM → Call Assistant → Numbers.`
+            : "One local number comes with each AI Call Assistant; buy and release them in CRM → Call Assistant → Numbers.",
           addon: on ? "call_number" : undefined,
         },
       ],
@@ -276,7 +287,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "apiUnitsPerMonth",
           label: "API units",
-          included: perMonth(api.apiUnitsPerMonth ?? 0),
+          included: perMonth(api.apiUnitsPerMonth ?? 0, unl),
           excluded: (api.apiUnitsPerMonth ?? 0) === 0,
           used: (api.apiUnitsPerMonth ?? 0) === 0 ? null : apiPlan && typeof apiPlan.usedThisMonth === "number" ? apiPlan.usedThisMonth : undefined,
           ceiling: (api.apiUnitsPerMonth ?? 0) > 0 ? api.apiUnitsPerMonth : undefined,
@@ -303,16 +314,16 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <div className="font-semibold flex flex-wrap items-center gap-2" data-testid="text-limits-plan">
-                {entitlements.planName ?? PLANS[plan].name} plan limits
-                {entitlements.isPlatformAdmin && entitlements.accessPlan !== entitlements.plan && (
+                {admin ? "All features, unlimited" : `${entitlements.planName ?? PLANS[plan].name} plan limits`}
+                {admin && (
                   <Badge variant="outline" className="text-[10px]" data-testid="badge-limits-admin">Platform admin</Badge>
                 )}
               </div>
               <p className="text-xs text-muted-foreground" data-testid="text-limits-resets">
                 {resets ? `Monthly counts reset ${resets.toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone: "UTC" })}.` : ""}
                 {isAgency ? " Agency allowances grow with the locations you're billed for." : ""}
-                {entitlements.isPlatformAdmin && entitlements.accessPlan !== entitlements.plan
-                  ? ` The ${entitlements.planName} plan's limits apply to this account, whatever plan it holds.` : ""}
+                {admin
+                  ? " This is a platform admin account: every feature and add-on is on, and every usage limit is unlimited, whatever plan it holds. The Call Assistant keeps a ceiling on phone numbers." : ""}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -335,7 +346,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
               <span className="text-right">Used</span>
             </div>
             {group.rows.map((row) => {
-              const addon = row.addon && ADDONS[row.addon].availableOn.includes(plan) ? ADDONS[row.addon] : null;
+              // Nothing to buy on an all-access admin account.
+              const addon = !admin && row.addon && ADDONS[row.addon].availableOn.includes(plan) ? ADDONS[row.addon] : null;
               const qty = addon ? Math.max(0, Number(subscription?.addons?.[addon.key] ?? 0) || 0) : 0;
               const pct = row.ceiling && typeof row.used === "number" ? Math.min(100, Math.round((row.used / row.ceiling) * 100)) : null;
               const usedText = row.used === null ? "—"

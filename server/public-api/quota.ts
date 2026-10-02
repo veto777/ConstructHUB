@@ -16,6 +16,7 @@ import type { Request, RequestHandler, Response } from "express";
 import { apiMonthResetsAt, monthlyUsage, recordUnits } from "../account/api-keys";
 import type { PublicApiContext } from "./auth";
 import { apiError } from "./errors";
+import { UNLIMITED } from "@shared/plans";
 
 export const READ_UNITS = 1;
 export const ROWS_PER_UNIT = 100;
@@ -28,6 +29,9 @@ export function unitsFor(method: string, rows = 0): number {
   if (isWriteMethod(method)) return WRITE_UNITS;
   return READ_UNITS + Math.floor(Math.max(0, Math.floor(rows)) / ROWS_PER_UNIT);
 }
+
+/** X-Units-Remaining: whole units left, or "unlimited" for an account with no monthly cap (platform admins) and no key cap. */
+export const unitsRemaining = (left: number) => (Number.isFinite(left) ? String(Math.max(0, Math.floor(left))) : "unlimited");
 
 export function inferRows(body: unknown): number {
   if (Array.isArray(body)) return body.length;
@@ -65,7 +69,8 @@ export const quota: RequestHandler = async (req, res, next) => {
   if (!ctx) return apiError(res, 401, "unauthorized", "Authenticate with an API key first.");
   let release: (() => void) | undefined;
   try {
-    if (ctx.plan.unitsPerMonth <= 0) {
+    const unlimited = ctx.plan.unitsPerMonth === UNLIMITED;
+    if (!unlimited && ctx.plan.unitsPerMonth <= 0) {
       res.setHeader("X-Units-Remaining", "0");
       return apiError(res, 402, "plan_required", ctx.plan.key
         ? `API access is included with the ${ctx.plan.requiredPlan[0].toUpperCase()}${ctx.plan.requiredPlan.slice(1)} plan and above. Upgrade in Pricing to use it.`
@@ -75,7 +80,7 @@ export const quota: RequestHandler = async (req, res, next) => {
     if (res.destroyed) { release(); return; }
     const used = await monthlyUsage(ctx.key.id, ctx.userId);
     const cost = unitsFor(req.method);
-    const planLeft = ctx.plan.unitsPerMonth - used.user;
+    const planLeft = unlimited ? Number.POSITIVE_INFINITY : ctx.plan.unitsPerMonth - used.user;
     const keyLeft = ctx.key.monthlyUnitLimit == null ? Number.POSITIVE_INFINITY : ctx.key.monthlyUnitLimit - used.key;
     const left = Math.min(planLeft, keyLeft);
     const refuse = () => {
@@ -93,7 +98,7 @@ export const quota: RequestHandler = async (req, res, next) => {
       });
     };
     if (left < cost) { release(); return refuse(); }
-    res.setHeader("X-Units-Remaining", String(Math.max(0, Math.floor(left - cost))));
+    res.setHeader("X-Units-Remaining", unitsRemaining(left - cost));
     installMetering(req, res, ctx, left, refuse, release);
     next();
   } catch (e) {
@@ -122,9 +127,9 @@ function installMetering(req: Request, res: Response, ctx: PublicApiContext, lef
           }
           await recordUnits(ctx.key.id, ctx.userId, units);
           res.locals.apiUnits = units;
-          if (!res.headersSent) res.setHeader("X-Units-Remaining", String(Math.max(0, Math.floor(left - units))));
+          if (!res.headersSent) res.setHeader("X-Units-Remaining", unitsRemaining(left - units));
         } else if (!res.headersSent) {
-          res.setHeader("X-Units-Remaining", String(Math.max(0, Math.floor(left))));
+          res.setHeader("X-Units-Remaining", unitsRemaining(left));
         }
         if (sendJson && !res.destroyed) json(body);
       } catch (e: any) {
