@@ -1,6 +1,6 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
-import { ADDONS, PLANS } from "../plans";
+import { ADDONS, PLANS, planForModule } from "../plans";
 import { joinNames, plansWhere } from "../plan-copy";
 
 /**
@@ -27,6 +27,7 @@ const SITES: FeatureAllowance = { limit: "protectedSites", unit: "websites", per
 const FIRST_PLAN = PLANS[plansWhere((plan) => plan.limits.protectedSites !== 0)[0] ?? "agency"].name;
 const EXTRA_SITE = ADDONS.protected_site;
 const EXTRA_SITE_PLANS = joinNames(EXTRA_SITE.availableOn.map((key) => PLANS[key].name));
+const ADS_MANAGER_PLAN = PLANS[planForModule("adsManager")].name;
 
 const page: FeaturePage = {
   key: "clickGuard",
@@ -151,6 +152,43 @@ const page: FeaturePage = {
       a: "It loads asynchronously, so your page doesn't wait for it, and it sends one small message per page view.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): what the code reports is
+  // server/tracking-script.ts (fp(), send()); the flags and the automatic block are server/routes.ts
+  // POST /api/click-guard/track (BOT_PATTERNS, the hour/day counts, the fingerprint query); manual blocks and the
+  // refused wide ranges are server/route-guards.ts normalizeBlockedIp; the list order, whitelist and 50–500 length
+  // are server/click-guard-exclusions.ts buildExclusionList/exclusionListCap; the script (enabled campaigns, skips
+  // existing, stops at 500, only adds) is server/routes.ts GET …/google-ads-script; the Agency preview is
+  // server/ads/worker.ts (job.kind === "preview", input.kind === "ip").
+  inDepth: {
+    heading: { title: "Google Ads Click Fraud Protection, ", em: "Explained" },
+    paragraphs: [
+      "Click Guard is click fraud protection for contractors who pay for Google Ads. It starts with a short tracking " +
+        "code on the pages your ads point to. Each time one of those pages loads, the code reports the visit: the IP " +
+        "address it came from, the device type, browser, operating system, screen size, language and time zone, the " +
+        "page landed on and the site that sent the visitor. It also takes a browser fingerprint, a short code made from " +
+        "how that browser draws a small test image, so the same device can be recognized when it comes back from a " +
+        "different IP address.",
+      "Every visit is checked as it arrives. It is flagged when the user agent (the name a browser sends with each " +
+        "request) belongs to a bot, a crawler, a headless browser or a scripting tool, or is missing; when one IP " +
+        "makes more than 5 visits in an hour or more than 15 in a day; or when the same fingerprint was seen from " +
+        "another IP within the day. Each flag keeps its reason. A flagged IP that passes 10 visits in an hour is " +
+        "added to your blocked list automatically. The rest is your call: block a single IPv4 or IPv6 address, a CIDR " +
+        "range (a block of neighbouring addresses) or a wildcard like 203.0.113.*, and unblock any of them. Very wide " +
+        "ranges are refused.",
+      "Google Ads lets each campaign exclude up to 500 IP addresses. Click Guard turns your blocked list into that IP " +
+        "exclusion list: your manual exclusions first, then blocked IPs from newest to oldest, with your whitelisted " +
+        "office and crew addresses taken out, cut off at the length you set between 50 and 500. It then writes a " +
+        "Google Ads script for you to paste into your account and schedule hourly. On each run the script fetches the " +
+        "list through a private link, skips addresses a campaign already excludes and adds the rest to every enabled " +
+        "campaign until that campaign is full. It runs inside your own Google Ads account, so there is no Google " +
+        "sign-in to share, and it only adds exclusions. It never removes one.",
+      "A flag is a pattern, not proof. Several real customers behind one office or phone network can share an IP and " +
+        "trip the visit limits, so check the blocked list and whitelist the addresses you trust. Click Guard only " +
+        "sees visits where the tracking code runs, it doesn't file refund claims with Google, and an exclusion only " +
+        `applies to campaigns that accept IP exclusions. On the ${ADS_MANAGER_PLAN} plan, the Google Ads manager can ` +
+        "preview a mapped client's Click Guard list as exclusions in that client's ad account before applying it.",
+    ],
+  },
   related: ["ipTracker", "vpnShield", "masterClass"],
   app: { href: "/google-ads", surface: "app" },
   headings: {
@@ -159,9 +197,9 @@ const page: FeaturePage = {
     faq: { title: "Before You ", em: "Install It" },
   },
   seo: {
-    title: "Click Guard — Flag Ad Clicks, Exclude IPs | ConstructHUB",
+    title: "Click Fraud Protection for Google Ads | ConstructHUB",
     description:
-      "Flag repeat and automated visits from your Google Ads, block suspicious IPs and sync an IP exclusion list to your campaigns with a script you schedule.",
+      "Flag bot, repeat and same-device clicks on your Google Ads, block suspicious IPs and sync an IP exclusion list to your campaigns with a script.",
   },
   legacyPath: "/google-ads-landing",
   sources: [

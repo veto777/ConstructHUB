@@ -144,15 +144,52 @@ const page: FeaturePage = {
       a: "No. Syncs run in the background and each one covers the last day. Some Cloudflare datasets are sampled, and data your Cloudflare plan doesn't provide shows as unavailable.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the custom-rule phase and the three packs
+  // (ads door: exact path, gclid/gbraid/wbraid, empty UA, GET/HEAD, non-Google verified bots, 10 per 10 s; bad-ua:
+  // empty/sqlmap/masscan, 120 per 10 s; ips: 1–100; office exemptions; verified bots left out) are
+  // server/cloudflare/service.ts rulePack; the key exchange and the three permissions are service.ts exchangeKey +
+  // client.ts ZONE_PERMISSIONS; analytics (last day, 100 events, 20 paths, bot scores, sampled) is cloudflareAnalytics;
+  // zones → locations is discoverZones + common.ts mapLocations; preview/confirm (recent sign-in, one hour)/undo and
+  // disconnect are server/cloudflare/routes.ts; undo removing only its own rules is service.ts applyAction (ref prefix);
+  // Click Guard IPs per zone are server/cloudflare/hooks.ts flaggedIpsForZone.
+  inDepth: {
+    heading: { title: "Cloudflare Firewall Rules for Client Sites, ", em: "Explained" },
+    paragraphs: [
+      "Cloudflare sits in front of many contractor websites and answers requests before they reach the web host, so " +
+        "it can stop unwanted traffic at that edge with firewall rules (Cloudflare calls them custom rules). This tool " +
+        "connects your Cloudflare accounts so you can read each zone's traffic and roll out a few prepared rules " +
+        "without writing rule expressions by hand. A zone is one website's domain in Cloudflare; zones are found " +
+        "automatically and linked to the location whose website matches.",
+      "There are two ways to connect. Give your Cloudflare login email and Global API key once, and ConstructHUB uses " +
+        "them in that one request to create a new API token limited to Zone Read, Analytics Read and Zone WAF Edit on " +
+        "the zones you pick; the Global API key is never stored. Or create a scoped token in Cloudflare yourself and " +
+        "paste it in. Each sync reads the last day of the zone's analytics: requests, unique visitors, page views and " +
+        "threats by day and country, the latest 100 firewall events and the 20 most requested paths, plus bot scores " +
+        "where your Cloudflare plan provides them. Cloudflare samples some of these numbers.",
+      "There are three rule packs. The ads door guards the exact path your Google Ads land on. It blocks requests " +
+        "without a Google click ID (the gclid, gbraid or wbraid tag Google adds to an ad click), requests with an " +
+        "empty user agent or that aren't ordinary page loads, verified bots that aren't Google's, and an IP sending " +
+        "more than 10 requests in 10 seconds, so use a landing path only your ads link to. The bad user agents pack " +
+        "works site-wide: it blocks empty and known scanner user agents and briefly blocks any IP sending more than " +
+        "120 requests in 10 seconds. The flagged IPs pack turns up to 100 addresses into one block rule, and each zone " +
+        "lists the IPs Click Guard blocked for its domain so you can pick from them.",
+      "Nothing goes live on its own. The preview shows each rule's description and exact expression for every zone, " +
+        "office IP addresses you list are exempted from every rule in the pack, and confirming needs a recent sign-in " +
+        "within an hour of the preview. Every applied pack stays in the edge audit, and undo removes only the rules " +
+        "ConstructHUB added. Rate limits depend on what your Cloudflare plan allows. Disconnecting deletes " +
+        "ConstructHUB's copy of the data and the token it created, but rules already applied stay until you undo or " +
+        "remove them.",
+    ],
+  },
   related: ["searchConsole", "domains", "clickGuard"],
   app: { href: "/cloudflare", surface: "app" },
   headings: {
     cards: { title: "What You Can Do ", em: "From Here" },
   },
   seo: {
-    title: "Cloudflare — Zones, Traffic and Firewall Rules | ConstructHUB",
+    title: "Cloudflare Firewall Rules and Analytics | ConstructHUB",
     description:
-      "Connect Cloudflare zones with a limited key, see traffic and firewall events, and apply previewed rule packs for ads pages, bad bots and flagged IPs, with undo.",
+      "Connect Cloudflare with a limited token, read each zone's traffic and firewall events, and apply previewed rules for ads pages, bad bots and flagged IPs.",
   },
   sources: [
     "client/src/pages/site-connections.tsx",

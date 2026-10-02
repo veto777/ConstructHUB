@@ -143,15 +143,52 @@ const page: FeaturePage = {
       a: "Encrypted. Connecting a key and confirming a change both ask you to have signed in recently, and you can remove a saved key at any time, even after leaving the plan.",
     },
   ],
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the daily monitor (DNS snapshot vs. the
+  // last one, nameserver change named, 60/30/7-day expiry, auto-renew off, HTTPS failure, SSL within 30 days, each
+  // alert once per state via domain_alert_dedup, next_check +1 day) is server/domains/service.ts monitor/alert; the
+  // snapshot over a public DNS-over-HTTPS resolver is server/domains/dns.ts dnsSnapshot/doh; the HTTPS and certificate
+  // check is server/domains/health.ts websiteHealth; imports and manual domains are service.ts saveConnection +
+  // routes.ts POST /manual; record kinds, the email acknowledgement and the Cloudflare-hosted refusal are
+  // server/domains/types.ts changeInput/emailWarning/desired; the 15-minute preview, "changed since preview", recent
+  // sign-in, 5-minute verification and rollback preview are service.ts + routes.ts; the Cloudflare nameserver pair is
+  // server/domains/cloudflare-link.ts; guides are server/domains/guides.ts.
+  inDepth: {
+    heading: { title: "Domain Expiry and DNS Monitoring, ", em: "Explained" },
+    paragraphs: [
+      "A lapsed domain takes the website and the business email down with it, and a DNS change nobody meant to make " +
+        "can do the same. Domains is domain monitoring for agencies and companies that hold more than a few: one list, " +
+        "checked once a day, with a notification when something needs attention. Connect a Porkbun or Name.com API key " +
+        "and your domains are imported with their expiry date, auto-renew setting, records and nameservers. Or type in " +
+        "a domain from any other registrar to monitor it without that registrar data.",
+      "The daily check covers four things. It takes a snapshot of the domain's DNS answers (A, AAAA, CNAME, MX, TXT, " +
+        "CAA and nameserver records) from a public DNS resolver and compares it with the last one, so a change that " +
+        "wasn't made through ConstructHUB raises an alert, and a nameserver change is named as one. On connected " +
+        "registrars it warns at 60, 30 and 7 days before expiry and when auto-renew is off. It opens the website over " +
+        "HTTPS and alerts when the site doesn't answer or returns a server error. And it reads the SSL certificate (what " +
+        "puts the padlock in the browser) and warns when it expires within 30 days. Each alert is sent once for the " +
+        "state that caused it, not every day.",
+      "On a connected registrar you can also change DNS: create, update or delete A, AAAA, CNAME, TXT, MX and CAA " +
+        "records, or switch nameservers. Every change starts as a preview of the before and after. Changes that can " +
+        "interrupt email, like MX, TXT and CNAME records or nameservers, need an extra acknowledgement, and confirming " +
+        "asks for a recent sign-in. If the domain changed after the preview, or the preview is more than 15 minutes old, " +
+        "you're asked for a new one. Once a change is applied, public DNS is checked every 5 minutes until the new " +
+        "values show, and a rollback preview puts the old values back. With Cloudflare connected, one previewed change " +
+        "points a domain's nameservers at the pair Cloudflare assigned to its zone.",
+      "When a domain's DNS is hosted on Cloudflare, the records are managed there and Domains won't edit them; it still " +
+        "monitors the domain. It doesn't renew, transfer or bill domains, which stay with your registrar. Registrars " +
+        "without an API connection here get step-by-step guides instead, including how to change nameservers by hand. " +
+        "Registrar keys are stored encrypted, and a saved key can be removed at any time.",
+    ],
+  },
   related: ["mailAlerts", "cloudflare", "agency"],
   app: { href: "/domains", surface: "app" },
   headings: {
     cards: { title: "What Domains ", em: "Watches For" },
   },
   seo: {
-    title: "Domains — Expiry, DNS and SSL Monitoring | ConstructHUB",
+    title: "Domain Expiry, DNS and SSL Monitoring | ConstructHUB",
     description:
-      "Check your and your clients' domains daily for expiry, auto-renew, DNS changes, HTTPS and SSL, and change DNS at Porkbun or Name.com after a preview.",
+      "Check every client domain daily for expiry, auto-renew, DNS changes, HTTPS and SSL, and change DNS at Porkbun or Name.com after a preview.",
   },
   sources: [
     "client/src/pages/domains.tsx",
