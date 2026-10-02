@@ -5,7 +5,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
@@ -495,6 +495,18 @@ export function AppSidebar() {
                     <Link href="/lsa-account-manager" data-testid="link-nav-lsa-account-manager" className="flex items-center gap-2 w-full">
                       <Users className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-[#4285F4]" />
                       <span>Account Manager</span>
+                      <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Every feature's intro page, with its status — the admins' way to review them all. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/feature-pages"}>
+                    <Link href="/admin/feature-pages" data-testid="link-nav-admin-feature-pages" className="flex items-center gap-2 w-full">
+                      <LayoutGrid className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Feature pages</span>
                       <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
                     </Link>
                   </SidebarMenuButton>

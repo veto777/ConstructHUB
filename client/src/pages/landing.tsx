@@ -413,7 +413,7 @@ export default function LandingPage() {
             ))}
             {Array.from({ length: fillerCells }, (_, i) => (
               i === 0 ? (
-                <Link key="filler-cta" href="/pricing" className="hidden lg:flex bg-mkt-paper-2 p-8 flex-col justify-end hover:bg-mkt-card transition-colors">
+                <Link key="filler-cta" href="/features" className="hidden lg:flex bg-mkt-paper-2 p-8 flex-col justify-end hover:bg-mkt-card transition-colors" data-testid="link-services-all-features">
                   <span className="font-display italic text-xl text-mkt-ink">Every plan includes the CRM.</span>
                   <span className="mt-2 inline-flex items-center gap-2 text-[15px] font-semibold text-mkt-orange-ink">See every tool <ArrowRight className="h-4 w-4" /></span>
                 </Link>
@@ -586,6 +586,8 @@ export default function LandingPage() {
             <CHLogo height={30} className="opacity-70" />
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-mkt-navy-muted">
               <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-email">support@constructhub.us</a>
+              <span aria-hidden className="opacity-40">·</span>
+              <Link href="/features" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-features">Features</Link>
               <span aria-hidden className="opacity-40">·</span>
               <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">AI Call Assistant</Link>
               <span aria-hidden className="opacity-40">·</span>

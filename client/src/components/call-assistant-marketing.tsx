@@ -23,29 +23,12 @@ import {
 } from "lucide-react";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST, type VoicePersona } from "@shared/voice-personas";
 import { callAssistantPricing, callAssistantIntroShort } from "@shared/plan-copy";
+// The editorial primitives (buttons, panel hairlines, the section kicker) live
+// in feature-landing/primitives.tsx, shared with every /features page.
+import { BTN_LG, BTN_PRIMARY, Kicker, PANEL_RULE, PANEL_RULE_STRONG } from "@/components/feature-landing/primitives";
+export { BTN_LG, BTN_OUTLINE, BTN_OUTLINE_ON_NAVY, BTN_PRIMARY, Kicker } from "@/components/feature-landing/primitives";
 
 export const CALL_ASSISTANT_PATH = "/call-assistant";
-
-/** Button recipes — anchors styled as buttons (same as landing.tsx). */
-const BTN = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange focus-visible:ring-offset-2 focus-visible:ring-offset-mkt-paper";
-export const BTN_PRIMARY = `${BTN} bg-mkt-orange text-white hover:bg-mkt-orange-hover`;
-export const BTN_OUTLINE = `${BTN} border-2 border-mkt-ink text-mkt-ink hover:bg-mkt-ink hover:text-mkt-paper`;
-export const BTN_OUTLINE_ON_NAVY = `${BTN} border-2 border-mkt-navy-ink text-mkt-navy-ink hover:bg-mkt-navy-ink hover:text-mkt-navy`;
-export const BTN_LG = "h-12 px-6 text-base";
-/** Hairlines on the navy panel. The --mkt-* colours take no Tailwind opacity modifier, so mix them. */
-const PANEL_RULE = "border-[color:color-mix(in_srgb,var(--mkt-panel-ink)_16%,transparent)]";
-const PANEL_RULE_STRONG = "border-[color:color-mix(in_srgb,var(--mkt-panel-ink)_42%,transparent)]";
-
-/** Section kicker: a short orange rule, an index (or a word) and small caps — as on the landing page. */
-export function Kicker({ n, children, className = "" }: { n: string; children: React.ReactNode; className?: string }) {
-  return (
-    <p className={`flex items-center gap-3 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.18em] text-mkt-orange-ink [text-wrap:balance] ${className}`}>
-      <span className="hidden sm:block h-px w-8 bg-mkt-orange shrink-0" aria-hidden />
-      {n && <span className="font-display italic normal-case tracking-normal text-[15px] text-mkt-muted">{n}</span>}
-      <span>{children}</span>
-    </p>
-  );
-}
 
 /** The headline facts, in one list (landing section and the dedicated page). */
 export const CA_HIGHLIGHTS: { icon: LucideIcon; title: string; body: string }[] = [

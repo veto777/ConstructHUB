@@ -9,16 +9,20 @@ import {
   requestHost,
 } from "./site-context";
 import { ROUTE_META } from "@shared/route-meta";
+import { FEATURES_PATH, READY_FEATURE_PAGES, featurePagePath } from "@shared/feature-pages";
 
 const CANONICAL_HOST = PRIMARY_DOMAIN;
 const BASE = `https://${CANONICAL_HOST}`;
 
 // Public, indexable routes (marketing + legal). App/dashboard routes are
 // deliberately excluded — they render behind auth and shouldn't be indexed.
+// Feature intro pages join once written: a stub (status "stub") is not listed.
 export const PUBLIC_ROUTES = [
   "/",
   "/pricing",
   "/call-assistant",
+  FEATURES_PATH,
+  ...READY_FEATURE_PAGES.map(featurePagePath),
   "/google-ads-landing",
   "/google-ads-guide",
   "/google-ad-fraud",

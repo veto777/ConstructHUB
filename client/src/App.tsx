@@ -54,6 +54,8 @@ import PermitsLandingPage from "@/pages/permits-landing";
 import CompetitorsLandingPage from "@/pages/competitors-landing";
 import MasterClassLandingPage from "@/pages/master-class-landing";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
+import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
+import AdminFeaturePagesPage from "@/pages/admin-feature-pages";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
 import CrmTeamPage from "@/pages/crm-team";
@@ -102,6 +104,16 @@ import MediaLibraryPage from "@/pages/media-library";
 import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
+
+/**
+ * The old one-off landing pages, retired into /features/<slug>: each keeps
+ * rendering until its feature page is written ("ready"), then redirects there
+ * (LegacyLanding in pages/features.tsx).
+ */
+const PermitsLanding = () => <LegacyLanding featureKey="permits" fallback={PermitsLandingPage} />;
+const GoogleAdsLanding = () => <LegacyLanding featureKey="clickGuard" fallback={GoogleAdsLandingPage} />;
+const CompetitorsLanding = () => <LegacyLanding featureKey="competitors" fallback={CompetitorsLandingPage} />;
+const MasterClassLanding = () => <LegacyLanding featureKey="masterClass" fallback={MasterClassLandingPage} />;
 
 /** The old à-la-carte tools page: single features are add-ons on /pricing now. */
 function IndividualPricingRedirect() {
@@ -161,7 +173,7 @@ function DashboardRouter() {
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
       <Route path="/ads-manager" component={AdsManagerPage} />
-      <Route path="/google-ads-landing" component={GoogleAdsLandingPage} />
+      <Route path="/google-ads-landing" component={GoogleAdsLanding} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
       <Route path="/google-ads-guide/:section" component={GoogleAdsGuideSectionPage} />
       <Route path="/google-ad-fraud" component={GoogleAdFraudPage} />
@@ -171,10 +183,15 @@ function DashboardRouter() {
       <Route path="/crm-app" component={CrmGatewayPage} />
       {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
+      {/* Every feature's intro page (shared/feature-pages), inside the app frame when signed in. */}
+      <Route path="/features" component={FeaturesCataloguePage} />
+      <Route path="/features/:slug" component={FeaturePageRoute} />
+      {/* Platform admins: every feature page, its status and links (the API answers 403 to anyone else). */}
+      <Route path="/admin/feature-pages" component={AdminFeaturePagesPage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
-      {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
-      <Route path="/master-class-landing" component={MasterClassLandingPage} />
+      {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLanding} />}
+      <Route path="/master-class-landing" component={MasterClassLanding} />
       {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews" component={GoogleReviewsPage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
@@ -218,7 +235,7 @@ function PublicRouter() {
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
       <Route path="/ads-manager" component={AdsManagerPage} />
-      <Route path="/google-ads-landing" component={GoogleAdsLandingPage} />
+      <Route path="/google-ads-landing" component={GoogleAdsLanding} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
       <Route path="/google-ads-guide/:section" component={GoogleAdsGuideSectionPage} />
       <Route path="/google-ad-fraud" component={GoogleAdFraudPage} />
@@ -226,12 +243,14 @@ function PublicRouter() {
       <Route path="/ip-tracker" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
+      <Route path="/features" component={FeaturesCataloguePage} />
+      <Route path="/features/:slug" component={FeaturePageRoute} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/developers" component={DevelopersPage} />
-      <Route path="/permits-landing" component={PermitsLandingPage} />
-      {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLandingPage} />}
-      <Route path="/master-class-landing" component={MasterClassLandingPage} />
+      <Route path="/permits-landing" component={PermitsLanding} />
+      {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLanding} />}
+      <Route path="/master-class-landing" component={MasterClassLanding} />
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
       <Route path="/contract/sign/:token" component={ContractSignPage} />
@@ -251,7 +270,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/guides", "/cloudflare", "/search-console", "/lsa-leads", "/lsa-account-manager", "/settings",
-  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content",
+  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/admin/feature-pages",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -270,7 +289,9 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy"];
+const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/admin/feature-pages"];
+/** Feature intro pages title themselves from their content (seo.title). */
+const isSelfTitled = (location: string) => SELF_TITLED.includes(location) || location.startsWith("/features/");
 const PAGE_TITLES: Record<string, string> = {
   "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
   "/schedules": "Scrape Schedules", "/history": "Search History", "/photos": "Photo Optimizer",
@@ -414,7 +435,7 @@ function AppContent() {
   // Each growth-app page gets its own tab title (runs after the page's own
   // effects, so self-titled pages are skipped rather than overwritten).
   useEffect(() => {
-    if (portal || clientPortal || SELF_TITLED.includes(location)) return;
+    if (portal || clientPortal || isSelfTitled(location)) return;
     const key = Object.keys(PAGE_TITLES).find(p => location === p || location.startsWith(`${p}/`));
     document.title = key ? `${PAGE_TITLES[key]} | ConstructHUB` : DEFAULT_TITLE;
   }, [location, portal, clientPortal]);
@@ -550,20 +571,21 @@ function AppContent() {
     );
   }
 
+  // Retired landing pages: full-bleed until their feature page is ready, then a redirect into the app frame.
   if (location === "/google-ads-landing") {
-    return <><GoogleAdsLandingPage /><HubWidget surface="marketing" signedIn /></>;
+    return <><GoogleAdsLanding /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location === "/permits-landing") {
-    return <><PermitsLandingPage /><HubWidget surface="marketing" signedIn /></>;
+    return <><PermitsLanding /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location === "/competitors-landing" && SHOW_COMPETITOR_INTEL) {
-    return <><CompetitorsLandingPage /><HubWidget surface="marketing" signedIn /></>;
+    return <><CompetitorsLanding /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location === "/master-class-landing") {
-    return <><MasterClassLandingPage /><HubWidget surface="marketing" signedIn /></>;
+    return <><MasterClassLanding /><HubWidget surface="marketing" signedIn /></>;
   }
 
   if (location.startsWith("/contract/sign/")) {

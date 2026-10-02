@@ -276,6 +276,9 @@ export async function registerRoutes(
   // Signed-in home dashboard (docs/dashboard/SPEC.md): one per-user aggregate.
   const { registerDashboardRoutes } = await import("./dashboard");
   registerDashboardRoutes(app, getDevUser);
+  // The admins' index of the feature intro pages (/admin/feature-pages).
+  const { registerFeaturePageRoutes } = await import("./feature-pages");
+  registerFeaturePageRoutes(app);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
   const { ensureAgencySchema } = await import("./agency/schema");
