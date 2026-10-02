@@ -8,7 +8,7 @@ import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { formatUsd, planPriceLine } from "@shared/plan-copy";
 import { PRESET_IDS } from "@shared/hub-presets";
 import { filterOutput, MAX_REPLY_CHARS } from "./output-filter";
-import { CANARY, hardRulesText } from "./prompt";
+import { CANARY, hardRulesText, promptInstructionText, systemPrompt, TRAILING_REMINDER } from "./prompt";
 import { REPLIES } from "./replies";
 import { requiredFactsOk, templateAnswer } from "./presets";
 
@@ -301,8 +301,9 @@ describe("F5: claimed account actions and claims to be a person (O12)", () => {
   it.each([
     "Once your payment has been processed, the invoice shows Paid.",
     "Ask for the assisted import, where a person moves your data within 1 business day.",
-    "I'm not a real person; I'm Hub, the AI helper.",
-    "I'm Hub, ConstructHUB's AI helper. I can't see your account, but I can walk you through it.",
+    "I'm not a real person; I'm Gabe, the AI helper.",
+    "I'm Gabe, ConstructHUB's AI helper. I can't see your account, but I can walk you through it.",
+    "My name is Gabe and I'm ConstructHUB's AI helper, so I can't see your account.",
   ])("delivered: %s", (text) => {
     delivered(text);
   });
@@ -355,7 +356,7 @@ describe("F1: the visitor's own words echoed back (O18)", () => {
     expect(withEcho(reply, [q])).toEqual({ ok: false, code: "O18" });
   });
 
-  it("restating the question, a short echo of the visitor's situation, pack wording and earlier Hub answers are fine", () => {
+  it("restating the question, a short echo of the visitor's situation, pack wording and earlier Gabe answers are fine", () => {
     const q = "How do I connect my Google Business Profile and turn on review alerts?";
     expect(withEcho("To connect your Google Business Profile and turn on review alerts, open **Locations** and click **Connect Google Business Profile**.", [q]).ok).toBe(true);
     const situation = "I run a roofing company with three crews and two offices in Texas. Which plan fits?";
@@ -367,7 +368,50 @@ describe("F1: the visitor's own words echoed back (O18)", () => {
   });
 });
 
-describe("Hub's own fixed text passes its own filter", () => {
+describe("TruthCoder tool-call markup and reasoning never reach a visitor (O2 / O13)", () => {
+  const GOOD = "Click Guard builds IP exclusions from a script you paste into your own Google Ads account. Those signals don't prove fraud, and no savings are guaranteed.";
+  const expectGood = (r: ReturnType<typeof run>) => { expect(r.ok, JSON.stringify(r)).toBe(true); if (r.ok) expect(r.text).toBe(GOOD); };
+
+  it.each([
+    ["XML tool call", `<tool_call><function=web_research><parameter=query>ConstructHUB pricing plans 2026</parameter></function></tool_call>\n\n${GOOD}`],
+    ["bracket marker", `[web_research: ConstructHUB pricing plans]\n\n${GOOD}`],
+    ["JSON tool call", `{"name": "web_research", "arguments": {"query": "ConstructHUB pricing plans"}}\n\n${GOOD}`],
+    ["bare tool name line", `web_research\n\n${GOOD}`],
+    ["<thinking> block", `<thinking>The user wants pricing. Let me think…</thinking>\n\n${GOOD}`],
+    ["<reasoning> block", `<reasoning>I am not using a tool here because the prompt says no tools.</reasoning>${GOOD}`],
+    ["[thinking] block", `[thinking]Keep it short.[/thinking]\n${GOOD}`],
+    ["trailing second thoughts", `${GOOD}\n\n**Wait...** The prompt contains instructions I should re-read.`],
+    ["leading planning paragraph", `Let me think about this. The user wants to know about Click Guard.\n\n${GOOD}`],
+    ["gateway preamble", `RESEARCH — LAW 15: no outside sources.\n\n${GOOD}`],
+    ["planning then a Final answer label", `Okay, so the user wants to know about Click Guard. I should keep it short.\n\nFinal answer:\n${GOOD}`],
+  ])("%s is stripped and the answer delivered", (_name, content) => {
+    expectGood(run(content));
+  });
+
+  it.each([
+    ["only a tool call", "<tool_call><function=web_research><parameter=query>pricing</parameter>", "O2"],
+    ["an unclosed <thinking> block", "<thinking>still thinking about the users table", "O2"],
+    ["a tool name inside the answer", `${GOOD} I used web_research to check this.`, "O2"],
+    ["reasoning in the only paragraph", `I'm not using a tool here. ${GOOD}`, "O2"],
+    ["talking about the prompt mid-answer", `${GOOD} The system prompt also says to keep it short.`, "O13"],
+    ["a line that starts with Wait", `${GOOD}\nWait, the user wants a price too.`, "O13"],
+  ])("%s is blocked (%s)", (_name, content, code) => {
+    blocked(content, code);
+  });
+
+  it("the STYLE line, the trailing reminder and the hard rules are O13; Gabe's self-description is not", () => {
+    const style = promptInstructionText().split("\n").find((l) => l.startsWith("STYLE:"))!;
+    blocked(`Sure, here is how I work. ${style}`, "O13");
+    blocked(`Sure: ${TRAILING_REMINDER}`, "O13");
+    blocked(`Sure: ${hardRulesText().split("\n")[2]}`, "O13");
+    const persona = systemPrompt("", { publicOnly: false, canary: TEST_CANARY }).split("\n")[0];
+    expect(persona).toMatch(/^You are Gabe/);
+    delivered(persona.replace(/^You are/, "I'm"));
+    delivered("I'm Gabe, ConstructHUB's assistant: a friendly gator in a headset who knows the job site inside out. Ask me about any feature.");
+  });
+});
+
+describe("Gabe's own fixed text passes its own filter", () => {
   it.each(Object.entries(REPLIES))("%s", (_code, text) => {
     expect(run(text).ok).toBe(true);
   });

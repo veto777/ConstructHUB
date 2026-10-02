@@ -103,13 +103,22 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   **owner must set Stripe → Billing → Subscriptions → Manage failed payments to cancel/mark unpaid**. Agency
   extra-location quantity syncs daily (production only; yearly subs invoice immediately).
 - **AI = TruthCoder** (owner's decision): live `.env` has `AI_INTEGRATIONS_OPENAI_BASE_URL=http://127.0.0.1:8250/api`
-  (truthcoder-webui on the same host, bypasses Cloudflare's 100 s cap), `AI_MODEL=truthcode:38`,
+  (truthcoder-webui on the same host, bypasses Cloudflare's 100 s cap), `AI_MODEL=truthcode-api` (the key's API model
+  name; verified in the vb11 `.env` 2026-10-01 — it is not `truthcode:38`, which is the preset the key is scoped to),
   `AI_VISION_MODEL=huihui_ai/qwen3-vl-abliterated:8b`, `AI_TIMEOUT_MS=180000`, and the named TruthCoder key **"ConstructHUB"**
   (scoped to truthcode:38 + the vision model; issued by the owner 2026-10-01; rotating his personal key no longer affects it).
   Keys are managed at https://truthcoder.com/api-keys (named, revocable; built by Kimi in the TruthCoder project).
   This is an owner-approved cross-project coupling — record it in `~/HUB/registry.json → known_tower_couplings`.
 
-## 👷 2026-09-30 — Hub, the corner assistant (branch `hub/agent`, not deployed)
+## 👷 2026-09-30 — Gabe, the corner assistant (merged to main 2026-10-01 as `abaea7a`; **NOT deployed**)
+- **Why the widget is not on the live site (2026-10-01):** constructhub.us still serves the bundle built at 11:49
+  (commit `30356cc`, before the Hub merge at 23:17): it has no `hub-launcher`, `/api/hub/presets` falls through to the
+  SPA catch-all, and `/mascot/*.webp` are missing. **A Cloudflare purge changes nothing** — `index.html` is
+  `cf-cache-status: DYNAMIC` (never cached) and the JS bundle is content-hashed. To ship: merge `hub/gabe` (the Gabe
+  persona + review fixes), `npm run build` on the tower (Node 20), then `bash script/deploy-vb11.sh` (pg_dump first).
+  Verify: the new `/assets/index-*.js` contains `hub-launcher`, and `curl -I https://constructhub.us/mascot/gabe-160.webp`
+  returns `image/webp`, not `text/html`. The widget now shows its launcher even when `/api/hub/presets` is missing
+  (panel says Gabe is offline, with a retry), so a server/client mismatch is visible instead of silent.
 - Replaces the old site assistant (`server/site-assistant.ts`, `site-assistant-chat.tsx` — both removed). A cartoon
   crew member in the bottom-right corner (`client/src/components/hub/`). **Signed out** (marketing pages): 14 preset
   question chips only, no text box; answers come from `hub_preset_answers` (generated in the background through
@@ -123,8 +132,9 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
 - Endpoints: `GET /api/hub/presets`, `POST /api/hub/preset {presetId}`, `POST /api/hub/chat` (JSON + same-origin
   `Origin` required), `GET /api/admin/hub-stats` (platform admin; also a card on /admin). Logs: one line
   `hub: <outcome> <reason> <ms>`; `/api/hub` bodies are excluded from the request logger; `hub_stats` holds counts only.
-- Env (all optional): `HUB_AI_HOSTS` (default `127.0.0.1:8250`) + `HUB_EXPECTED_MODEL` (default `truthcode:38`) —
-  production refuses chat on any other provider; `HUB_AI_TIMEOUT_MS` (45 s cap), `HUB_GLOBAL_DAILY_CAP` (1500),
+- Env (all optional): `HUB_AI_HOSTS` (default `127.0.0.1:8250`) + `HUB_EXPECTED_MODEL` (comma-separated; default
+  `truthcode-api,truthcode:38` — the live `AI_MODEL` is `truthcode-api`, and a pin of only `truthcode:38` would have
+  booted Gabe with chat offline) — production refuses chat on any other provider; `HUB_AI_TIMEOUT_MS` (45 s cap), `HUB_GLOBAL_DAILY_CAP` (1500),
   `HUB_MAX_CONCURRENCY` (3), `HUB_TURN_KEY` (else derived from SESSION_SECRET), `HUB_WARM_PRESETS=false` to skip warming.
 - Tests: `npx vitest run server/hub/` (unit + in-process routes with a stub model), Playwright
   `-c playwright.hub.config.ts` (needs a bypass-on and a bypass-off dev server), live eval `scripts/hub-redteam.ts`.

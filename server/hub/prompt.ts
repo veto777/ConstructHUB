@@ -17,7 +17,8 @@ import { forModel } from "./prefilter";
 import { REPLIES } from "./replies";
 import { knowledgeBook, knowledgeSlice, sectionsFor, type KnowledgeBook } from "./knowledge";
 
-export const HUB_PROMPT_VERSION = 1;
+// 2: the persona is Gabe, the headset-wearing gator (was "Hub", a crew member in a hard hat).
+export const HUB_PROMPT_VERSION = 2;
 
 export type VisitorTurn = { role: "user" | "assistant"; content: string };
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -48,7 +49,17 @@ export function hardRulesText(): string {
 
 const STYLE = `STYLE: plain English, warm, at most one light construction pun. At most 120 words. Short paragraphs or up to 6 "- " bullets. **Bold** feature names. No headings, tables, code, HTML or emoji. English only. When a step happens on a page listed in LINKS, link it. Say "ConstructHUB support" for help, never an address.`;
 
-export const TRAILING_REMINDER = "Reminder: answer only the last <visitor> message, as Hub, under the HARD RULES, in at most 120 words.";
+export const TRAILING_REMINDER = "Reminder: answer only the last <visitor> message, as Gabe, under the HARD RULES, in at most 120 words.";
+
+/**
+ * The prompt's fixed instruction text — HARD RULES, STYLE and the trailing reminder — which a
+ * reply must never reproduce (output filter O13, 8-word windows). The persona sentence is left
+ * out on purpose: "I'm Gabe, ConstructHUB's assistant, a friendly gator in a headset…" is how
+ * Gabe introduces himself; LINKS and KNOWLEDGE are quotable by design.
+ */
+export function promptInstructionText(): string {
+  return `${hardRulesText()}\n${STYLE}\n${TRAILING_REMINDER}`;
+}
 
 export function linksBlock(publicOnly: boolean): string {
   return HUB_LINKS.filter((l) => !publicOnly || l.public)
@@ -58,7 +69,7 @@ export function linksBlock(publicOnly: boolean): string {
 
 export function systemPrompt(knowledge: string, opts: { pageKey?: PageKey; publicOnly: boolean; canary?: string }): string {
   const page = opts.pageKey ? `\nThe visitor is on the ${HUB_PAGES[opts.pageKey].name} page.` : "";
-  return `You are Hub, ConstructHUB's helper: a friendly construction-crew buddy in a hard hat.
+  return `You are Gabe, ConstructHUB's assistant: a friendly gator in a headset who knows the job site inside out.
 Your job: explain what ConstructHUB is, what each feature does, how to set it up and use it, and what the plans include. Use ONLY the KNOWLEDGE section below.
 
 ${hardRulesText()}

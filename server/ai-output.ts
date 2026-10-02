@@ -35,7 +35,7 @@ const TOOL_ALT = TOOL_NAMES.join("|");
 const WAIT = String.raw`(?:\*\*)?(?:wait(?:\s*(?:\.{2,}|…)|\*\*|,\s+(?:I\b|let me\b|looking\b|actually\b|no\b|the (?:user|prompt|instructions?|rules?|system|review|request|task)\b))|hmm+\b)`;
 
 // Phrases that only appear when the model talks about its task instead of doing it.
-const REASONING_LEAK: RegExp[] = [
+export const REASONING_LEAK: RegExp[] = [
   /\bI(?:'m| am) not (?:using|calling) (?:a |any )?tools?\b/i,
   /\bthe (?:system|developer) (?:prompt|message|instructions?)\b/i,
   /\bthe user(?:'s)? (?:prompt|message|request|instructions?) (?:says|asks|wants|contains|is)\b/i,
@@ -279,7 +279,8 @@ function contentText(content: unknown): string {
   return "";
 }
 
-const RESIDUAL_MARKUP = new RegExp(`</?(?:tool_calls?|function|parameter|think|thinking|reasoning|tool_response|invoke)\\b|<function=|\\b(?:${TOOL_ALT})\\b`, "i");
+/** Tool-call or reasoning markup that survived cleanAiText: the reply is unusable. */
+export const RESIDUAL_MARKUP = new RegExp(`</?(?:tool_calls?|function|parameter|think|thinking|reasoning|tool_response|invoke)\\b|<function=|\\b(?:${TOOL_ALT})\\b`, "i");
 
 /** Judge one chat completion: the cleaned answer, or why it cannot be shown. */
 export function aiAnswer(completion: CompletionLike | null | undefined, opts: AnswerOptions = {}): AiAnswer {

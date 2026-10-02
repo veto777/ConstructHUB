@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 /**
- * Hub — the corner assistant. Run with playwright.hub.config.ts (two servers:
+ * Gabe — the corner assistant (the Hub widget). Run with playwright.hub.config.ts (two servers:
  * signed in on HUB_SIGNED_IN_URL, signed out on HUB_SIGNED_OUT_URL).
  */
 test.skip(!process.env.HUB_E2E, "run with -c playwright.hub.config.ts");
@@ -16,7 +16,7 @@ async function shot(page: Page, name: string) {
 
 async function openHub(page: Page) {
   await page.getByTestId("hub-launcher").click();
-  const panel = page.getByRole("dialog", { name: "Hub — your ConstructHUB guide" });
+  const panel = page.getByRole("dialog", { name: "Gabe — your ConstructHUB guide" });
   await expect(panel).toBeVisible();
   return panel;
 }
@@ -26,13 +26,13 @@ test.describe("signed out", () => {
     await page.goto(`${SIGNED_OUT}/`);
     const launcher = page.getByTestId("hub-launcher");
     await expect(launcher).toBeVisible();
-    await expect(launcher).toHaveAccessibleName("Ask Hub, your ConstructHUB guide");
+    await expect(launcher).toHaveAccessibleName("Ask Gabe, your ConstructHUB guide");
     const panel = await openHub(page);
     await expect(panel.locator("[data-hub-chip]")).toHaveCount(8);
     await panel.getByTestId("hub-more").click();
     await expect(panel.locator("[data-hub-chip]")).toHaveCount(14);
     await expect(panel.getByTestId("hub-input")).toHaveCount(0);
-    await expect(panel.getByTestId("hub-signup-cta")).toContainText("Create a free account to ask Hub anything");
+    await expect(panel.getByTestId("hub-signup-cta")).toContainText("Create a free account to ask Gabe anything");
     await expect(panel.getByTestId("hub-signup-link")).toHaveAttribute("href", "/auth");
 
     await panel.getByTestId("hub-chip-trial").click();
@@ -61,7 +61,7 @@ test.describe("signed out", () => {
     await page.goto(`${SIGNED_OUT}/`);
     await page.getByTestId("hub-launcher").focus();
     await page.keyboard.press("Enter");
-    const panel = page.getByRole("dialog", { name: "Hub — your ConstructHUB guide" });
+    const panel = page.getByRole("dialog", { name: "Gabe — your ConstructHUB guide" });
     await expect(panel).toBeVisible();
     await panel.getByTestId("hub-chip-pricing").focus();
     await page.keyboard.press("Enter");
@@ -146,7 +146,9 @@ test.describe("signed in", () => {
     await input.fill("And which plans include it?");
     await panel.getByTestId("hub-send").click();
     await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("<img src=x onerror=alert(1)> stays text.");
-    await expect(panel.locator("img")).toHaveCount(0);
+    // The transcript never renders an injected image; the only <img> in the dialog is Gabe in the header.
+    await expect(panel.getByTestId("hub-messages").locator("img")).toHaveCount(0);
+    await expect(panel.locator("img")).toHaveCount(1);
     expect(bodies[1].conversationId).toBe(convo);
     expect(bodies[1].messages).toEqual([
       { role: "user", content: "How do I set up Click Guard on my website?" },
@@ -204,12 +206,12 @@ test.describe("signed in", () => {
     expect(fit.bubbleRight).toBeLessThanOrEqual(fit.panelRight);
   });
 
-  test("first visit after sign-up: a welcome bubble that opens Hub with setup questions", async ({ page }) => {
+  test("first visit after sign-up: a welcome bubble that opens Gabe with setup questions", async ({ page }) => {
     await page.goto(`${SIGNED_IN}/locations`);
     const bubble = page.getByTestId("hub-welcome-bubble");
     await expect(bubble).toBeVisible();
     await page.getByTestId("hub-welcome-open").click();
-    const panel = page.getByRole("dialog", { name: "Hub — your ConstructHUB guide" });
+    const panel = page.getByRole("dialog", { name: "Gabe — your ConstructHUB guide" });
     await expect(panel.getByTestId("hub-greeting")).toContainText("Welcome aboard");
     await expect(panel.getByTestId("hub-chip-get-started")).toBeVisible();
     await page.keyboard.press("Escape");
@@ -250,7 +252,7 @@ test.describe("signed in", () => {
     await shot(page, "hub-portal-390");
   });
 
-  test("the Google Ads pages keep their own consultant chat (no Hub there)", async ({ page }) => {
+  test("the Google Ads pages keep their own consultant chat (no Gabe there)", async ({ page }) => {
     await page.goto(`${SIGNED_IN}/google-ads-guide`);
     await page.waitForLoadState("networkidle");
     await expect(page.getByTestId("hub-launcher")).toHaveCount(0);

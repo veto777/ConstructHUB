@@ -14,14 +14,15 @@ import {
   cleanText, HOST_SOURCE, OWN_HOST_RE, BRACKET_DOT_RE, SPELLED_DOMAIN_RE, EMAIL_OBFUSCATED_RE, EMAIL_SPACED_RE,
   PHONE_RE, SPELLED_DIGITS_RE, VANITY_PHONE_RE, ADDRESS_CASED_RE,
 } from "./prefilter";
-import { hardRulesText, NOT_SURE_LINE, REDIRECT_LINE, CANARY } from "./prompt";
+import { promptInstructionText, NOT_SURE_LINE, REDIRECT_LINE, CANARY } from "./prompt";
 import { knowledgeBook, dollarAmounts, type KnowledgeBook } from "./knowledge";
+import { cleanAiText, REASONING_LEAK, RESIDUAL_MARKUP } from "../ai-output";
 
 export type OCode = "O1" | "O2" | "O4" | "O6" | "O7" | "O8" | "O9" | "O10" | "O11" | "O12" | "O13" | "O14" | "O15" | "O16" | "O17" | "O18";
 export type ModelOutput = { content?: string | null; finishReason?: string | null; toolCalls?: unknown; functionCall?: unknown };
 /**
  * `echo`: the request's own turns. A reply may not repeat a run of the visitor's words (O18);
- * text that is in an earlier (signed, already filtered) Hub answer or in the knowledge pack is fine.
+ * text that is in an earlier (signed, already filtered) Gabe answer or in the knowledge pack is fine.
  */
 export type FilterOptions = { publicOnly: boolean; canary?: string; book?: KnowledgeBook; echo?: { user: readonly string[]; assistant?: readonly string[] } };
 export type FilterResult = { ok: true; text: string } | { ok: false; code: OCode };
@@ -146,9 +147,9 @@ const NOT_A_BOT = /\bnot an? (bot|ai|robot|machine|chatbot|computer|program)\b/i
 const REAL_PERSON = /\breal (person|human|rep|representative|agent|employee|staff member|team member|people)\b/gi;
 /** "I'm Mike from the ConstructHUB team", "Mike, ConstructHUB billing team", "my name is Mike". */
 const STAFF_SIGNOFF: RegExp[] = [
-  /\b(I'?m|I am|this is|it'?s|my name is)\s+(?!Hub\b)[A-Z][a-z]+\b[^.]{0,30}\b(from|with|on|at|of) (the )?ConstructHUB\b/,
-  /\b(?!Hub\b)[A-Z][a-z]{1,15}, (the |your )?ConstructHUB('s)? (\w+ )?(team|billing|support|sales|staff|rep|representative|agent|office)\b/,
-  /\bmy name is (?!Hub\b)[A-Z]/,
+  /\b(I'?m|I am|this is|it'?s|my name is)\s+(?!Gabe\b)[A-Z][a-z]+\b[^.]{0,30}\b(from|with|on|at|of) (the )?ConstructHUB\b/,
+  /\b(?!Gabe\b)[A-Z][a-z]{1,15}, (the |your )?ConstructHUB('s)? (\w+ )?(team|billing|support|sales|staff|rep|representative|agent|office)\b/,
+  /\bmy name is (?!Gabe\b)[A-Z]/,
 ];
 /** A real ConstructHUB button label ("I submitted the form — mark reported"), not a claim. */
 const UI_LABELS = /\bI submitted the form\s*[—–-]\s*mark reported\b/gi;
@@ -159,13 +160,17 @@ const LEAKS: RegExp[] = [
   /\bknowledge (pack|base) (says|states)\b/i, /\bhard rules\b/i, /\binternal reference\b/i, /\bas an ai language model\b/i,
   /\btruthcoder?\b/i, /\bopenai\b/i, /gpt/i, /qwen/i, /llama/i, /abliterat/i, /ollama/i, /\blocalhost\b/i,
   /127\.0\.0\.1/, /\bvb\d/i, /ai_integrations/i, /\bapi[_ ]?key\s*(is|=|:)\s*\S/i, /\b(sk|pk|rk)[-_][A-Za-z0-9_-]{12,}/,
+  // The provider's agent tools, which the model sometimes "calls" as text (cleanAiText strips them; none may remain).
+  /\b(web_research|web_search|tool_calls?)\b/i, /\bfunction=/i,
+  // The model talking about its task instead of doing it ("the system prompt", "let me re-read the rules", "**Wait...**").
+  ...REASONING_LEAK,
 ];
 
 // O14
 const CODE: RegExp[] = [/\bdef \w+\(/, /\bfunction\s*\(/, /\bconsole\./, /\bimport\s+[\w{*].*\bfrom\s+['"]/, /#include/, /\bSELECT\b.+\bFROM\b/];
 const PROFANITY = /\b(fuck\w*|shit\w*|bitch\w*|asshole\w*|bastard\w*|cunt\w*|motherf\w*|slut\w*|whore\w*|retard\w*|f[a@]gg?ot\w*|n[i1]gg(er|a)\w*|dickhead\w*|piss off)\b/i;
 /**
- * Other companies Hub never names, as letters only: a name matches however it is cased, spaced or
+ * Other companies Gabe never names, as letters only: a name matches however it is cased, spaced or
  * hyphenated ("House Call Pro", "Job-ber", "ANGI"), but never inside a longer word ("changing").
  * Google, Stripe, Cloudflare, SignalWire, Gmail, Blotato, HOVER, NETR Online and the citation and
  * social sites the pack lists (Yelp, BBB, Apple Maps, Bing Places, Facebook…) are named in the pack.
@@ -204,10 +209,14 @@ export const MAX_REPLY_CHARS = 1200;
 
 const normWords = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
 let rulesGrams: Set<string> | null = null;
-/** 8-word windows of the HARD RULES, minus the reply lines the rules tell the model to say. */
+/**
+ * 8-word windows of the prompt's instruction text (HARD RULES, STYLE, the trailing reminder),
+ * minus the reply lines the rules tell the model to say. The persona sentence, LINKS and
+ * KNOWLEDGE are not in it: Gabe may say who he is and quote the pack.
+ */
 function rulesNgrams(): Set<string> {
   if (rulesGrams) return rulesGrams;
-  const text = hardRulesText().split(REDIRECT_LINE).join(" ").split(NOT_SURE_LINE).join(" ");
+  const text = promptInstructionText().split(REDIRECT_LINE).join(" ").split(NOT_SURE_LINE).join(" ");
   const words = normWords(text);
   rulesGrams = new Set<string>();
   for (let i = 0; i + 8 <= words.length; i++) rulesGrams.add(words.slice(i, i + 8).join(" "));
@@ -403,7 +412,7 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
 
   // O7 — contact details and identifiers, and a named business said to be a ConstructHUB customer
   for (const re of CONTACT) if (re.test(linkless)) block("O7");
-  for (const s of sentences) if (BUSINESS.test(s) && TENANT_CLAIM.test(s) && /\b(constructhub|hub)\b/i.test(s)) block("O7");
+  for (const s of sentences) if (BUSINESS.test(s) && TENANT_CLAIM.test(s) && /\b(constructhub|hub|gabe)\b/i.test(s)) block("O7");
 
   // O6 (continued) — link text is read too: "[constructhub-refund.site/claim](/pricing)" names a host as
   // much as bare text does; so do "acme[.]com" and "constructhub dot help".
@@ -522,11 +531,13 @@ function run(out: ModelOutput, opts: FilterOptions): string {
   let t = typeof out.content === "string" ? out.content : "";
   if (!t.trim()) block("O1");
 
-  // O2 — reasoning blocks (strip; an unclosed one blocks)
-  t = t.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  const closer = t.toLowerCase().lastIndexOf("</think>");
-  if (closer !== -1) t = t.slice(closer + "</think>".length);
-  if (/<think>/i.test(t)) block("O2");
+  // O2 — reasoning blocks and tool-call markup (strip; what survives, or a reply that was only that, blocks).
+  // cleanAiText is the TruthCoder cleaner every AI path uses: <think>/<thinking>/<reasoning>… blocks (an
+  // unclosed one takes everything after it), XML / bracket / JSON tool calls and "web_research" lines,
+  // the gateway's "RESEARCH — LAW n" preamble, leading planning paragraphs ("Let me think…", "Okay, so
+  // the user wants…"), a trailing "**Wait...** the prompt…" and "Final answer:" labels.
+  t = cleanAiText(t);
+  if (!t.trim() || RESIDUAL_MARKUP.test(t)) block("O2");
 
   // O3 — normalise (strip). Combining marks NFKC could not compose ("$̲" + "5") only hide characters
   // from the checks in an English answer, so they go too.
@@ -538,7 +549,7 @@ function run(out: ModelOutput, opts: FilterOptions): string {
   if (/<\/?visitor>/i.test(t)) block("O13");
 
   // O5 + O17 + style (strip), before any content check. Formatting that only settles over several
-  // passes ("$<i>_</i>5_") is not something Hub writes: block it rather than guess what it shows.
+  // passes ("$<i>_</i>5_") is not something Gabe writes: block it rather than guess what it shows.
   t = tidy(t);
   if (tidy(t) !== t) block("O17");
   if (ACTIVE.test(t)) block("O4");

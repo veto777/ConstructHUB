@@ -738,10 +738,10 @@ export default function CrmAdminPage() {
         </div>
       </div>
 
-      {/* ── Hub assistant (counts only; Hub never stores what anyone asked) ── */}
+      {/* ── Hub assistant, Gabe (counts only; Gabe never stores what anyone asked) ── */}
       <div className="space-y-3" data-testid="section-admin-hub">
         <SectionTitle icon={MessageCircle} title="Hub assistant"
-          description="Outcome counts for the corner assistant over the last 30 days. Hub keeps no messages, replies or identities." />
+          description="Outcome counts for Gabe, the corner assistant, over the last 30 days. Gabe keeps no messages, replies or identities." />
         <div className={crmTable.wrapper}>
           <table className={crmTable.table}>
             <thead className={crmTable.thead}>

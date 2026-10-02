@@ -447,7 +447,7 @@ function AppContent() {
     return (
       <>
         <PublicRouter />
-        {/* Hub, the corner assistant: preset questions only for signed-out visitors (marketing pages). */}
+        {/* Gabe, the corner assistant (Hub widget): preset questions only for signed-out visitors (marketing pages). */}
         <HubWidget surface="marketing" signedIn={false} />
       </>
     );
@@ -606,7 +606,7 @@ function AppContent() {
           </main>
         </div>
       </div>
-      {/* The Google Ads pages keep their own consultant chat; everywhere else Hub helps. */}
+      {/* The Google Ads pages keep their own consultant chat; everywhere else Gabe helps. */}
       {showAdsChat ? <AdsConsultantChat /> : <HubWidget surface="growth" signedIn />}
     </SidebarProvider>
   );
