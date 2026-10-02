@@ -5,8 +5,10 @@
  * navigation and the cart — so this renders nothing unless the visitor is
  * signed out.
  *
- * Styled to match the landing page ("Bold trades": navy band, orange accent,
- * Barlow Condensed labels, DM Sans body) via the `mk` root class in index.css.
+ * Styled to match the landing page's editorial chrome: a navy masthead with
+ * an orange rule, the orange sign-in button, and the marketing type (the
+ * `mkt-editorial` scope in client/src/index.css — Plus Jakarta Sans here,
+ * Inter everywhere else in the app).
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
@@ -36,21 +38,21 @@ export function PublicPageHeader({ next, cart = false }: { next: string; cart?: 
   if (!useSignedOut()) return null;
   return (
     <header
-      className={`mk mk-navy border-b border-white/10${cart ? " sticky top-0 z-40" : ""}`}
+      className={`mkt-editorial bg-mkt-navy border-b-[3px] border-mkt-orange${cart ? " sticky top-0 z-40" : ""}`}
       data-testid="header-public-page"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
         <Link href="/" onClick={startAtTop} aria-label="ConstructHUB home" data-testid="link-public-home">
-          <CHLogo height={36} />
+          <CHLogo height={32} />
         </Link>
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-2 text-sm">
           {location !== "/pricing" && (
-            <Link href="/pricing" onClick={startAtTop} className="hidden sm:inline-flex mk-navlink px-3 py-2 text-white/80 hover:text-white transition-colors" data-testid="link-public-pricing">
+            <Link href="/pricing" onClick={startAtTop} className="hidden sm:inline px-3 py-1.5 rounded-md font-medium text-white/75 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-public-pricing">
               Pricing
             </Link>
           )}
           {cart && <div className="text-white"><CartSheet /></div>}
-          <Link href={`/auth?next=${encodeURIComponent(next)}`} onClick={startAtTop} className="mk-btn mk-btn-primary mk-btn-sm" data-testid="link-public-signin">
+          <Link href={`/auth?next=${encodeURIComponent(next)}`} onClick={startAtTop} className="inline-flex items-center h-9 px-4 rounded-lg bg-mkt-orange hover:bg-mkt-orange-hover text-white font-semibold transition-colors" data-testid="link-public-signin">
             Sign in
           </Link>
         </div>
@@ -62,17 +64,17 @@ export function PublicPageHeader({ next, cart = false }: { next: string; cart?: 
 export function PublicPageFooter() {
   if (!useSignedOut()) return null;
   return (
-    <footer className="mk !bg-transparent border-t mk-rule py-8 px-4 text-center text-xs mk-muted" data-testid="footer-public-page">
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-display font-semibold uppercase tracking-[0.12em] text-[13px]">
-        <Link href="/" onClick={startAtTop} className="hover:text-[#F97316] transition-colors">Home</Link>
-        <span aria-hidden className="text-[#F97316]">&middot;</span>
-        <a href="mailto:support@constructhub.us" className="hover:text-[#F97316] transition-colors normal-case tracking-normal font-sans font-medium">support@constructhub.us</a>
-        <span aria-hidden className="text-[#F97316]">&middot;</span>
-        <a href="/terms" className="hover:text-[#F97316] transition-colors">Terms</a>
-        <span aria-hidden className="text-[#F97316]">&middot;</span>
-        <a href="/privacy" className="hover:text-[#F97316] transition-colors">Privacy</a>
+    <footer className="mkt-editorial bg-mkt-navy text-mkt-navy-muted border-t border-mkt-navy-rule py-8 px-4 text-center text-[13px]" data-testid="footer-public-page">
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <Link href="/" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors">Home</Link>
+        <span aria-hidden className="opacity-40">·</span>
+        <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors">support@constructhub.us</a>
+        <span aria-hidden className="opacity-40">·</span>
+        <a href="/terms" className="hover:text-mkt-navy-ink transition-colors">Terms</a>
+        <span aria-hidden className="opacity-40">·</span>
+        <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors">Privacy</a>
       </div>
-      <p className="mt-3">{copyrightNotice()}</p>
+      <p className="mt-2">{copyrightNotice()}</p>
     </footer>
   );
 }
