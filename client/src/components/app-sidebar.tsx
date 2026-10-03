@@ -527,7 +527,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         {user?.isPlatformAdmin === true && <SidebarGroup>
-          <details open={location.startsWith("/admin/") || location === "/lsa-account-manager"}>
+          {/* Open by default: the owner uses these daily (Access grants, Issues, Feature pages); folding it stays possible. */}
+          <details open>
             <summary className="cursor-pointer rounded-md px-2 py-3 text-sm font-medium">Admin</summary>
             <SidebarMenu>              {/* The server decides who is a platform admin (/api/auth/me). */}
               {user?.isPlatformAdmin === true && (

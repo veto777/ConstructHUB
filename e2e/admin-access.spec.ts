@@ -71,7 +71,7 @@ test("grant 30 days, see it active, revoke it, see it ended (1440)", async ({ pa
   const nav = page.getByTestId("link-nav-admin-access");
   await expect(nav).toHaveAttribute("href", "/admin/access");
   await expect(nav).toContainText("Access grants");
-  await expect(nav).toContainText("ADMIN");
+  // Admin items live under one "Admin" group in the sidebar (no per-item ADMIN badge since the 2026-10-03 redesign).
 
   await findAccount(page, account);
   await page.getByTestId(`button-open-grant-${account.id}`).click();

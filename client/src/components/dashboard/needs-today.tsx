@@ -221,21 +221,34 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
                 <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </DashLink>
               <span className="flex shrink-0 items-center">
+                {/* Clearing a task is one tap (owner, 2026-10-02: "lets make a way to clear these tasks"); snoozing sits in ⋯. */}
+                {!dashboardItemSnoozeOnly(item.key) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={ICON_BTN}
+                    title="Done"
+                    aria-label={`Done: ${name}`}
+                    onClick={() => clear([item], null)}
+                    data-testid={`button-needs-done-${item.key}`}
+                  >
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
                       className={ICON_BTN}
-                      title="More actions"
-                      aria-label={`More actions: ${name}`}
+                      title="Snooze"
+                      aria-label={`Snooze: ${name}`}
                       data-testid={`button-needs-snooze-${item.key}`}
                     >
                       <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="[&_[role=menuitem]]:min-h-10">
-                    {!dashboardItemSnoozeOnly(item.key) && <DropdownMenuItem onSelect={() => clear([item], null)} data-testid={`button-needs-done-${item.key}`} aria-label={`Done: ${name}`}>Done</DropdownMenuItem>}
                     <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Snooze “{item.label}”</DropdownMenuLabel>
                     <DropdownMenuItem onSelect={() => clear([item], snoozeUntil("tomorrow"))} data-testid={`menu-needs-snooze-tomorrow-${item.key}`}>
                       Until tomorrow

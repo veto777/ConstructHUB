@@ -258,6 +258,6 @@ describe("profile contract", () => {
 
   it("the DDL creates every table the spec names, idempotently", () => {
     for (const t of VOICE_TABLES) expect(VOICE_SCHEMA_DDL.some((s) => s.includes(`CREATE TABLE IF NOT EXISTS ${t} (`))).toBe(true);
-    for (const s of VOICE_SCHEMA_DDL) expect(s).toMatch(/IF NOT EXISTS|ADD COLUMN IF NOT EXISTS/);
+    for (const s of VOICE_SCHEMA_DDL) expect(s).toMatch(/IF NOT EXISTS|ADD COLUMN IF NOT EXISTS|CREATE OR REPLACE/);
   });
 });

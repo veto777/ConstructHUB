@@ -91,7 +91,16 @@ export function DashboardHeader({
   return (
     <PageHeader
       title={<span data-testid="text-dashboard-greeting">{account.firstName ? greeting : "Welcome back"}</span>}
-      description="Here's your business today."
+      description={
+        <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pt-1">
+          <PlanChip account={account} />
+          <span className="text-xs text-muted-foreground" data-testid="text-dashboard-meta">{meta.join(" · ")}</span>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={onRefresh} disabled={refreshing}
+            title={refreshing ? "Refreshing…" : "Refresh"} aria-label={refreshing ? "Refreshing" : "Refresh"} data-testid="button-dashboard-refresh">
+            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} aria-hidden="true" />
+          </Button>
+        </span>
+      }
       meta={fixture ? <Badge variant="secondary" data-testid="badge-dashboard-fixture">Sample data</Badge> : undefined}
       actions={<>
         <Button asChild><Link href="/crm-app">Open CRM</Link></Button>
@@ -99,8 +108,6 @@ export function DashboardHeader({
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline">More</Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)] [&_[role=menuitem]]:min-h-10">
-            <div className="px-2 py-2"><PlanChip account={account} /><p className="mt-2 text-xs text-muted-foreground" data-testid="text-dashboard-meta">{meta.join(" · ")}</p></div>
-            <DropdownMenuItem onSelect={onRefresh} disabled={refreshing} data-testid="button-dashboard-refresh">{refreshing ? "Refreshing…" : "Refresh"}</DropdownMenuItem>
             {account.status !== "none" && <DropdownMenuItem asChild><Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">Manage plan</Link></DropdownMenuItem>}
             {account.isPlatformAdmin && <DropdownMenuItem asChild><Link href={ADMIN_FEATURE_PAGES_PATH} data-testid="link-dashboard-feature-pages">Feature pages</Link></DropdownMenuItem>}
           </DropdownMenuContent>
