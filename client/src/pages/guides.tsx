@@ -1,5 +1,6 @@
 import { SiteConnectionGuide } from "./site-connection-guide";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { AppPage, PageHeader, Section } from "@/components/app-ui";
+import { Button } from "@/components/ui/button";
 import { Redirect } from "wouter";
 const guides = [
   {
@@ -107,27 +108,26 @@ const guides = [
 /** The walkthroughs, shown as the Guides tab of Social Media. */
 export function GuidesContent() {
   return (
-    <section aria-label="Guides walkthroughs" className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Guides</h2>
-        <p className="text-muted-foreground">Step-by-step help for the business tools available in ConstructHUB.</p>
-      </div>
-      <SiteConnectionGuide />
-      {guides.map((g) => (
-        <Card key={g.title}>
-          <CardHeader>
-            <CardTitle>{g.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <a className="inline-block underline text-primary mb-3" href={g.href}>Open {g.title === "Security" ? "Security & activity" : g.title === "Profile Guard" ? "Locations" : g.title === "AI review replies" ? "Google Reviews" : g.title.startsWith("Posts & Photos") ? "Posts & Photos" : g.title === "Site Scan" ? "Site Scan" : "Social Media"}</a>
-            <ol className="list-decimal pl-5 space-y-3">
-              {g.steps.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
+    <section aria-label="Guides walkthroughs">
+      <AppPage width="narrow" className="!px-0 !pt-0">
+        <PageHeader title="Guides" description="Choose a tool and follow the steps at your own pace."
+          actions={<Button asChild><a href="#guide-0">Get started</a></Button>} />
+        <Section title="Find a guide">
+          <nav aria-label="Guide topics" className="grid gap-1 sm:grid-cols-2">
+            <a href="#guide-connection" className="flex min-h-10 items-center rounded-lg px-2 text-sm hover:bg-muted">Connect your website</a>
+            {guides.map((g, i) => <a key={g.title} href={`#guide-${i}`} className="flex min-h-10 items-center rounded-lg px-2 text-sm hover:bg-muted">{g.title}</a>)}
+          </nav>
+        </Section>
+        <div id="guide-connection" className="scroll-mt-6"><SiteConnectionGuide /></div>
+        {guides.map((g, i) => (
+          <Section key={g.title} id={`guide-${i}`} title={g.title} className="scroll-mt-6"
+            actions={<Button asChild variant="outline" size="sm"><a href={g.href}>Open {g.title === "Security" ? "Security & activity" : g.title === "Profile Guard" ? "Locations" : g.title === "AI review replies" ? "Google Reviews" : g.title.startsWith("Posts & Photos") ? "Posts & Photos" : g.title === "Site Scan" ? "Site Scan" : "Social Media"}</a></Button>}>
+            <ol className="list-decimal space-y-5 pl-5 text-sm leading-7 marker:text-muted-foreground">
+              {g.steps.map((step) => <li key={step} className="pl-1">{step}</li>)}
             </ol>
-          </CardContent>
-        </Card>
-      ))}
+          </Section>
+        ))}
+      </AppPage>
     </section>
   );
 }
