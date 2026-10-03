@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section } from "@/components/app-ui";
 /**
  * /invite/:code — the link in a trial invite email (owner, 2026-10-02: "you aren't emailing someone else a code.
  * You are emailing them an invite or the system creates a code that can be redeemed").
@@ -34,11 +35,11 @@ export default function InvitePage() {
   });
 
   const card = (body: React.ReactNode) => (
-    <main className="flex min-h-[60vh] items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md space-y-4 rounded-2xl border bg-card p-6 text-card-foreground shadow-sm sm:p-8" data-testid="card-invite">
+    <AppPage width="narrow">
+      <Section contentClassName="space-y-4" testId="card-invite">
         {body}
-      </div>
-    </main>
+      </Section>
+    </AppPage>
   );
 
   if (isLoading) return card(<p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading your invite…</p>);
@@ -60,7 +61,7 @@ export default function InvitePage() {
       <>
         <PublicPageHeader next={here} />
         {card(<>
-          <Gift className="h-8 w-8 text-orange-500" aria-hidden="true" />
+          
           <h1 className="text-2xl font-semibold" data-testid="text-invite-title">You're invited to ConstructHUB</h1>
           <p className="text-sm text-muted-foreground">
             Someone gave you a free trial. Create your account or sign in, and the trial starts as soon as you're back on this page.
@@ -82,17 +83,17 @@ export default function InvitePage() {
   if (done) {
     return card(<>
       <CheckCircle2 className="h-8 w-8 text-emerald-600" aria-hidden="true" />
-      <h1 className="text-2xl font-semibold" data-testid="text-invite-done">Your trial is active</h1>
+      <PageHeader title={<span data-testid="text-invite-done">Your trial is active</span>} />
       <p className="text-sm text-muted-foreground">{done}</p>
       <Button asChild size="lg" className="w-full" data-testid="button-invite-dashboard"><Link href="/">Open your dashboard</Link></Button>
     </>);
   }
 
   return card(<>
-    <Gift className="h-8 w-8 text-orange-500" aria-hidden="true" />
-    <h1 className="text-2xl font-semibold" data-testid="text-invite-title">Accept your free trial</h1>
+    
+    <PageHeader title={<span data-testid="text-invite-title">Accept your free trial</span>} description="Activate your invite on the account below." />
     <p className="text-sm text-muted-foreground">
-      The trial goes on the account you're signed in to: <strong className="text-foreground" data-testid="text-invite-account">{user.email}</strong>.
+      The trial goes on the account you're signed in to: <strong className="text-foreground break-all" data-testid="text-invite-account">{user.email}</strong>.
     </p>
     <Button size="lg" className="w-full" onClick={() => redeem.mutate()} disabled={redeem.isPending} data-testid="button-invite-accept">
       {redeem.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Activating…</> : "Start my trial"}
