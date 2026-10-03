@@ -1,4 +1,4 @@
-import { AppPage, PageHeader, Section } from "@/components/app-ui";
+import { AppPage, PageHeader } from "@/components/app-ui";
 /**
  * /invite/:code — the link in a trial invite email (owner, 2026-10-02: "you aren't emailing someone else a code.
  * You are emailing them an invite or the system creates a code that can be redeemed").
@@ -10,7 +10,7 @@ import { AppPage, PageHeader, Section } from "@/components/app-ui";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
-import { CheckCircle2, Gift, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
@@ -61,7 +61,7 @@ export default function InvitePage() {
       <>
         <PublicPageHeader next={here} />
         {card(<>
-          
+
           <h1 className="text-2xl font-semibold" data-testid="text-invite-title">You're invited to ConstructHUB</h1>
           <p className="text-sm text-muted-foreground">
             Someone gave you a free trial. Create your account or sign in, and the trial starts as soon as you're back on this page.
@@ -90,7 +90,7 @@ export default function InvitePage() {
   }
 
   return card(<>
-    
+
     <PageHeader title={<span data-testid="text-invite-title">Accept your free trial</span>} description="Activate your invite on the account below." />
     <p className="text-sm text-muted-foreground">
       The trial goes on the account you're signed in to: <strong className="text-foreground break-all" data-testid="text-invite-account">{user.email}</strong>.
