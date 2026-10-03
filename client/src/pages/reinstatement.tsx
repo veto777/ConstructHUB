@@ -169,6 +169,7 @@ export default function ReinstatementPage() {
                   </div>
                   <Button
                     type="submit"
+                    variant={user ? "outline" : "default"}
                     className="w-full h-12 rounded-lg text-base font-semibold"
                     disabled={!canSubmit || submitMutation.isPending}
                     data-testid="button-submit-reinstatement"
@@ -178,7 +179,7 @@ export default function ReinstatementPage() {
                   </Button>
                 </form>);
   if (user) return <AppPage width="narrow" testId="page-reinstatement">
-    <PageHeader title={<span data-testid="text-reinstatement-title">Profile reinstatement</span>} description="Request help with a suspended Google Business Profile." actions={<Button asChild variant="outline"><a href="#request" data-testid="button-get-reinstated">Review request form</a></Button>}/>
+    <PageHeader title={<span data-testid="text-reinstatement-title">Profile reinstatement</span>} description="Request help with a suspended Google Business Profile." actions={<Button asChild><a href="#request" data-testid="button-get-reinstated">Review request form</a></Button>}/>
     <div data-testid="reinstatement-facts"><StatGrid cols={2}><Stat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><Stat label="Initial review" value="1–2 days" hint="Business days"/></StatGrid></div>
     <Section id="request" title={<span data-testid="text-form-title">Tell us about your suspension</span>} testId="card-reinstatement-form" description="We’ll review your case before taking it on.">
       {requestForm}
