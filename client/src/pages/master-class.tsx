@@ -1,7 +1,9 @@
+import { AppPage, PageHeader, AppTabsList, Section, appTable, appTableCards } from "@/components/app-ui";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -48,40 +50,10 @@ const TAB_MODULE_MAP: Record<string, number> = {
 
 function PaywallOverlay({ tabName, onGoToPricing }: { tabName: string; onGoToPricing: () => void }) {
   return (
-    <div className="relative mt-4 sm:mt-6">
-      <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
-        <div className="text-center max-w-md px-4 py-6 sm:p-8">
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#4A6CF7]/10 flex items-center justify-center mx-auto mb-3 sm:mb-4">
-            <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-[#4A6CF7]" />
-          </div>
-          <h3 className="text-lg sm:text-xl font-bold mb-2" data-testid="text-paywall-title">Enrolled Students Only</h3>
-          <p className="text-muted-foreground mb-4 sm:mb-6 text-sm">
-            This {tabName} content is available to enrolled students. Purchase the course to unlock the full detailed guide, step-by-step instructions, and expert tips.
-          </p>
-          <Button
-            className="bg-[#4A6CF7] hover:bg-[#3B5CE5] text-white"
-            size="lg"
-            onClick={onGoToPricing}
-            data-testid="button-paywall-unlock"
-          >
-            <Lock className="h-4 w-4 mr-2" />
-            How to enroll
-          </Button>
-        </div>
-      </div>
-      <div className="pointer-events-none select-none" aria-hidden="true">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="mb-4 opacity-40 blur-[2px]">
-            <CardContent className="p-3 sm:p-5">
-              <div className="h-4 bg-muted rounded w-3/4 mb-3" />
-              <div className="h-3 bg-muted rounded w-full mb-2" />
-              <div className="h-3 bg-muted rounded w-5/6 mb-2" />
-              <div className="h-3 bg-muted rounded w-2/3" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+    <Section title={<span data-testid="text-paywall-title">Enrolled Students Only</span>} className="mt-4">
+      <p className="text-sm text-muted-foreground mb-4">Enroll to read the full {tabName} guide.</p>
+      <Button className="w-full sm:w-auto" onClick={onGoToPricing} data-testid="button-paywall-unlock">How to enroll</Button>
+    </Section>
   );
 }
 
@@ -106,11 +78,11 @@ const US_STATES = [
 ];
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
-  formation: { label: "Business Formation", icon: Building2, color: "bg-blue-500" },
-  licensing: { label: "Licensing", icon: Shield, color: "bg-purple-500" },
-  insurance: { label: "Insurance", icon: Heart, color: "bg-red-500" },
-  tax: { label: "Tax & Revenue", icon: Calculator, color: "bg-green-500" },
-  payroll: { label: "Payroll & Reporting", icon: Users, color: "bg-orange-500" },
+  formation: { label: "Business Formation", icon: Building2, color: "bg-muted" },
+  licensing: { label: "Licensing", icon: Shield, color: "bg-muted" },
+  insurance: { label: "Insurance", icon: Heart, color: "bg-muted" },
+  tax: { label: "Tax & Revenue", icon: Calculator, color: "bg-muted" },
+  payroll: { label: "Payroll & Reporting", icon: Users, color: "bg-muted" },
 };
 
 type StateGuide = {
@@ -179,7 +151,7 @@ function AgencyTile({ icon: Icon, iconClass, name, caption, agency, url, status,
     : `We don't have a checked link for ${agency} — searches the web instead.`;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" title={title}
-      className={`${className} hover:border-[#4A6CF7]/50 hover:bg-muted/60 transition-colors`} data-testid={testid}>
+      className={`${className} border-border hover:bg-muted/60 transition-colors`} data-testid={testid}>
       {body(sub, usable
         ? <ExternalLink className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
         : <Search className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />)}
@@ -223,12 +195,6 @@ const MODULE_ICONS: Record<string, any> = {
   seo: TrendingUp,
 };
 
-const MODULE_COLORS: Record<string, string> = {
-  licensing: "from-blue-600 to-blue-800",
-  gmb: "from-purple-600 to-purple-800",
-  website: "from-emerald-600 to-emerald-800",
-  seo: "from-orange-600 to-orange-800",
-};
 
 export default function MasterClassPage() {
   const [selectedState, setSelectedState] = useState<string>("");
@@ -344,87 +310,68 @@ export default function MasterClassPage() {
   return (
     <>
     {/* Signed out, this page has no app frame: the header brings the way home,
-        sign-in and the cart the Add to Cart buttons below fill. */}
+        sign-in and the cart the Add to cart buttons below fill. */}
     <PublicPageHeader next="/master-class" cart />
     <div className="h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        <div className="flex flex-col gap-3">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <GraduationCap className="h-7 w-7 sm:h-8 sm:w-8 text-[#4A6CF7]" />
-              <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-master-class-title">Master Class</h1>
-            </div>
-            <p className="text-muted-foreground text-sm max-w-2xl" data-testid="text-master-class-subtitle">
-              Your complete step-by-step guide to starting a construction business. Select your state to see exactly what you need — from forming your LLC to getting licensed, insured, and ready to work.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="outline" className="gap-1 text-xs" data-testid="badge-states-count">
-              <MapPin className="h-3 w-3" /> 50 States
-            </Badge>
-            <Badge variant="outline" className="gap-1 text-xs" data-testid="badge-licensing-count">
-              <Shield className="h-3 w-3" /> {statesWithLicensing} Require Licensing
-            </Badge>
-          </div>
-        </div>
+      <AppPage width="narrow" className="[&_p]:leading-relaxed [&_button]:min-h-10 [&_input]:min-h-10">
+        <PageHeader title={<span data-testid="text-master-class-title">Master Class</span>}
+          description={<span data-testid="text-master-class-subtitle">Build your construction business, one lesson at a time.</span>}
+          meta={<><Badge variant="outline" data-testid="badge-states-count">50 states</Badge><Badge variant="outline" data-testid="badge-licensing-count">{statesWithLicensing} require licensing</Badge></>}
+          actions={activeTab === "overview" ? <><Button className="!basis-full sm:!basis-auto" onClick={() => setActiveTab("state-guide")}>Choose your state</Button><Button variant="outline" onClick={() => setActiveTab("pricing")} data-testid="button-overview-enroll">How to enroll</Button></> : undefined} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full flex-wrap h-auto gap-1 p-1" data-testid="tabs-master-class">
+          <AppTabsList data-testid="tabs-master-class">
             <TabsTrigger value="overview" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3" data-testid="tab-overview">
-              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden xs:inline">Overview</span><span className="xs:hidden">Info</span>
+              Overview
             </TabsTrigger>
             <TabsTrigger value="state-guide" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3" data-testid="tab-state-guide">
-              <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">State Guide</span><span className="sm:hidden">States</span>
-              {!isTabUnlocked("state-guide") && <Lock className="h-3 w-3 text-amber-500" />}
+              State guide
+              {!isTabUnlocked("state-guide") && <Lock className="h-3 w-3 text-muted-foreground" />}
             </TabsTrigger>
             <TabsTrigger value="website-seo" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3" data-testid="tab-website-seo">
-              <Monitor className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Website & SEO</span><span className="sm:hidden">SEO</span>
-              {!isTabUnlocked("website-seo") && <Lock className="h-3 w-3 text-amber-500" />}
+              Website & SEO
+              {!isTabUnlocked("website-seo") && <Lock className="h-3 w-3 text-muted-foreground" />}
             </TabsTrigger>
             <TabsTrigger value="vetting" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3" data-testid="tab-vetting">
-              <ShieldAlert className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Vetting Contractors</span><span className="sm:hidden">Vetting</span>
-              {!isTabUnlocked("vetting") && <Lock className="h-3 w-3 text-amber-500" />}
+              Vetting contractors
+              {!isTabUnlocked("vetting") && <Lock className="h-3 w-3 text-muted-foreground" />}
             </TabsTrigger>
             <TabsTrigger value="pricing" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3" data-testid="tab-pricing">
-              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span>Enroll</span>
+              Enroll
             </TabsTrigger>
-          </TabsList>
+          </AppTabsList>
 
           <TabsContent value="overview" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
-            <Card className="border-[#F97316]/30 bg-gradient-to-br from-[#F97316]/5 via-transparent to-[#4A6CF7]/5 overflow-hidden">
+            <Section flush className="border-border     overflow-hidden">
               <CardContent className="p-4 sm:p-6 relative">
                 {bundleSavingsPct !== null && (
                   <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
-                    <Badge className="bg-red-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-1" data-testid="badge-sale">Bundle saves {bundleSavingsPct}%</Badge>
+                    <Badge className="bg-muted text-foreground text-xs sm:text-sm px-2 sm:px-3 py-1" data-testid="badge-sale">Bundle saves {bundleSavingsPct}%</Badge>
                   </div>
                 )}
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-[#F97316]" />
-                  <Badge variant="outline" className="text-xs border-[#F97316] text-[#F97316]">Master Class</Badge>
-                </div>
-                <h2 className="text-lg sm:text-2xl font-bold mb-2 sm:mb-3 max-w-lg">The Complete Blueprint to Building a Profitable Construction Business</h2>
+                <h2 className="text-base font-semibold mb-2 sm:mb-3 max-w-lg">Start with the essentials</h2>
                 <p className="text-muted-foreground text-sm mb-4 max-w-2xl">
-                  This isn't a generic business course. This is a battle-tested, step-by-step system built specifically for contractors, trades professionals, and construction entrepreneurs. Every module is packed with real-world knowledge from people who've actually built and scaled construction companies — not theory from someone who read a book about it.
+                  Learn business formation, licensing, your online presence and local marketing.
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                  <div className="text-center p-3 rounded-lg bg-background/60 border">
-                    <p className="text-xl sm:text-2xl font-bold text-[#4A6CF7]">4</p>
+                  <div className="text-center p-3 py-3">
+                    <p className="text-xl font-semibold text-muted-foreground">4</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">In-Depth Modules</p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-background/60 border">
-                    <p className="text-xl sm:text-2xl font-bold text-[#4A6CF7]">50</p>
+                  <div className="text-center p-3 py-3">
+                    <p className="text-xl font-semibold text-muted-foreground">50</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">State Guides</p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-background/60 border">
-                    <p className="text-xl sm:text-2xl font-bold text-[#4A6CF7]" data-testid="stat-licensing-states">{guides ? statesWithLicensing : "—"}</p>
+                  <div className="text-center p-3 py-3">
+                    <p className="text-xl font-semibold text-muted-foreground" data-testid="stat-licensing-states">{guides ? statesWithLicensing : "—"}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">States Require a License</p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-background/60 border">
+                  <div className="text-center p-3 py-3">
                     {/* At or above the sales threshold the bundle has no price here either. */}
                     {bundlePriceShown ? (
-                      <p className="text-xl sm:text-2xl font-bold text-[#F97316]" data-testid="text-overview-bundle-price">{usd(BUNDLE_PRICE_CENTS)}</p>
+                      <p className="text-xl font-semibold text-muted-foreground" data-testid="text-overview-bundle-price">{usd(BUNDLE_PRICE_CENTS)}</p>
                     ) : (
-                      <Link href={SALES_HREF} className="block text-sm sm:text-base font-bold leading-tight text-[#F97316] hover:underline" data-testid="link-overview-bundle-sales">{SALES_REP_LABEL}</Link>
+                      <Link href={SALES_HREF} className="block text-sm sm:text-base font-semibold leading-tight text-muted-foreground hover:underline" data-testid="link-overview-bundle-sales">{SALES_REP_LABEL}</Link>
                     )}
                     <p className="text-[10px] sm:text-xs text-muted-foreground" data-testid="text-bundle-reference">
                       {modulesTotalCents !== null ? <><span className="line-through">{usd(modulesTotalCents)}</span> separately</> : "All four modules"}
@@ -432,40 +379,19 @@ export default function MasterClassPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button className="bg-[#F97316] hover:bg-[#E86C0A] text-white" onClick={() => setActiveTab("pricing")} data-testid="button-overview-enroll">
-                    How to enroll <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
+
                   <Button variant="outline" onClick={() => setActiveTab("state-guide")} data-testid="button-overview-preview">
-                    Preview State Guide
+                    Preview state guide
                   </Button>
                 </div>
               </CardContent>
-            </Card>
+            </Section>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {[
-                { icon: Building2, color: "text-blue-500", bg: "bg-blue-500/10", title: "Business Formation", desc: "Everything you need to legally establish your construction company — entity type, state filings, and compliance" },
-                { icon: Shield, color: "text-purple-500", bg: "bg-purple-500/10", title: "Licensing & Bonding", desc: "Navigate your state's contractor licensing requirements and get properly bonded" },
-                { icon: Heart, color: "text-red-500", bg: "bg-red-500/10", title: "Insurance & Workers Comp", desc: "The right insurance coverage for your trade — what you actually need and what's optional" },
-                { icon: Calculator, color: "text-green-500", bg: "bg-green-500/10", title: "Tax & Payroll Setup", desc: "Tax registration, payroll compliance, and reporting — set up right from day one" },
-              ].map((item, i) => (
-                <Card key={i} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center mb-3`}>
-                      <item.icon className={`h-5 w-5 ${item.color}`} />
-                    </div>
-                    <p className="font-semibold text-sm mb-1">{item.title}</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <Card>
+            <Section flush>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <Layers className="h-5 w-5 text-[#4A6CF7]" />
-                  Full Curriculum Breakdown
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-muted-foreground" />
+                  Course modules
                 </CardTitle>
                 <CardDescription>Everything you get across all four modules</CardDescription>
               </CardHeader>
@@ -473,28 +399,28 @@ export default function MasterClassPage() {
                 {[
                   {
                     module: "Module 1: Business Formation & Licensing",
-                    color: "border-l-blue-500",
+                    color: "border-border",
                     category: "licensing",
                     desc: "The complete legal blueprint for getting your construction business up and running in any state — entity formation, licensing, bonding, insurance, and compliance.",
                     highlights: ["All 50 states covered with direct agency links", "Entity selection, licensing & bonding guides", "Insurance, workers comp & tax setup", "Subcontractor management & sales strategy"]
                   },
                   {
                     module: "Module 2: GMB Setup & Optimization",
-                    color: "border-l-purple-500",
+                    color: "border-border",
                     category: "gmb",
                     desc: "Build a Google Business Profile that dominates local search, generates leads consistently, and withstands competitor attacks.",
                     highlights: ["Full GMB setup & verification system", "Review strategy & fake review defense", "Photo optimization & posting calendar", "Suspension prevention & recovery"]
                   },
                   {
                     module: "Module 3: Website & Online Presence",
-                    color: "border-l-emerald-500",
+                    color: "border-border",
                     category: "website",
                     desc: "Build a contractor website that actually converts visitors into booked jobs — the same framework used by 7-figure contractors.",
                     highlights: ["High-converting website blueprint", "Service & location page strategy", "Lead capture & speed optimization", "Portfolio showcases & trust signals"]
                   },
                   {
                     module: "Module 4: SEO & Directory Domination",
-                    color: "border-l-orange-500",
+                    color: "border-border",
                     category: "seo",
                     desc: "Get found everywhere your customers search — the complete local SEO, citation, content, and advertising playbook.",
                     highlights: ["Local SEO strategy for contractors", "Citation & link building systems", "Google Ads & LSA campaign setup", "Tracking, analytics & monthly maintenance"]
@@ -506,14 +432,14 @@ export default function MasterClassPage() {
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <h4 className="font-semibold text-sm">{section.module}</h4>
                       {priceCents !== undefined && (
-                        <span className="text-xs font-bold text-[#4A6CF7] shrink-0" data-testid={`text-curriculum-price-${section.category}`}>{priceOrSalesRep(priceCents)}</span>
+                        <span className="text-xs font-semibold text-muted-foreground shrink-0" data-testid={`text-curriculum-price-${section.category}`}>{priceOrSalesRep(priceCents)}</span>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">{section.desc}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                       {section.highlights.map((item, j) => (
                         <div key={j} className="flex items-start gap-2 text-xs text-muted-foreground">
-                          <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
+                          <CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
                           <span>{item}</span>
                         </div>
                       ))}
@@ -522,12 +448,13 @@ export default function MasterClassPage() {
                   );
                 })}
               </CardContent>
-            </Card>
+            </Section>
 
-            <Card className="border-[#4A6CF7]/20 bg-[#4A6CF7]/5">
+            <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer min-h-10 text-sm font-medium">About the course and licensing</summary><div className="mt-3 space-y-4">
+            <Section flush>
               <CardContent className="p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-bold mb-3 flex items-center gap-2">
-                  <Target className="h-5 w-5 text-[#4A6CF7]" />
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+                  <Target className="h-5 w-5 text-muted-foreground" />
                   Who This Course Is For
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -540,7 +467,7 @@ export default function MasterClassPage() {
                     { title: "Franchise Owners", desc: "Running a franchise location and need to understand local compliance, GMB optimization, and local SEO strategy" },
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-background/60">
-                      <CheckCircle2 className="h-4 w-4 text-[#4A6CF7] shrink-0 mt-0.5" />
+                      <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                       <div>
                         <p className="font-medium text-sm">{item.title}</p>
                         <p className="text-xs text-muted-foreground">{item.desc}</p>
@@ -549,12 +476,12 @@ export default function MasterClassPage() {
                   ))}
                 </div>
               </CardContent>
-            </Card>
+            </Section>
 
-            <Card className="border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-transparent">
+            <Section flush className="border-border   ">
               <CardContent className="p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-bold mb-3 flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-500" />
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-muted-foreground" />
                   What Makes This Different
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -572,13 +499,13 @@ export default function MasterClassPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <Card>
+            <div className="space-y-4">
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-muted-foreground shrink-0" />
                     States Requiring Contractor License ({statesWithLicensing})
                   </CardTitle>
                 </CardHeader>
@@ -597,11 +524,11 @@ export default function MasterClassPage() {
                     ))}
                   </div>
                 </CardContent>
-              </Card>
-              <Card>
+              </Section>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+                    <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0" />
                     No State Contractor License Required ({statesNoLicensing})
                   </CardTitle>
                 </CardHeader>
@@ -623,12 +550,14 @@ export default function MasterClassPage() {
                     These states may still require local licenses or trade-specific licenses (electrical, plumbing, etc.)
                   </p>
                 </CardContent>
-              </Card>
+              </Section>
             </div>
 
-            <Card>
+            </div></details>
+            <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer min-h-10 text-sm font-medium">Compare all 50 states</summary>
+            <div>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Quick State Comparison</CardTitle>
+                <CardTitle className="text-base">Compare states</CardTitle>
                 <CardDescription>Key facts for each state at a glance</CardDescription>
               </CardHeader>
               <CardContent>
@@ -642,9 +571,9 @@ export default function MasterClassPage() {
                     data-testid="input-search-states"
                   />
                 </div>
-                <div className="overflow-x-auto -mx-2 sm:mx-0">
-                  <table className="w-full text-xs sm:text-sm min-w-[600px]">
-                    <thead>
+                <div className={appTable.wrapper}>
+                  <table className={appTable.table}>
+                    <thead className={appTableCards.thead}>
                       <tr className="border-b text-left">
                         <th className="pb-2 pr-3 sm:pr-4 font-medium">State</th>
                         <th className="pb-2 pr-3 sm:pr-4 font-medium">License</th>
@@ -662,51 +591,51 @@ export default function MasterClassPage() {
                         return (
                           <tr
                             key={state.code}
-                            className="border-b last:border-0 hover:bg-muted/50 cursor-pointer transition-colors"
+                            className={cn(appTable.tr, appTableCards.tr, "cursor-pointer")}
                             onClick={() => { setSelectedState(state.code); setActiveTab("state-guide"); }}
                             data-testid={`row-state-${state.code}`}
                           >
-                            <td className="py-2 pr-3 sm:pr-4 font-medium whitespace-nowrap">{state.name}</td>
-                            <td className="py-2 pr-3 sm:pr-4">
+                            <td className={cn(appTableCards.td, "py-2 pr-3 sm:pr-4 font-medium whitespace-nowrap")}><span className="mr-2 text-muted-foreground sm:hidden">State</span>{state.name}</td>
+                            <td className={cn(appTableCards.td, "py-2 pr-3 sm:pr-4")}><span className="mr-2 text-muted-foreground sm:hidden">License</span>
                               {guide.licensingRequired ? (
-                                <Badge variant="default" className="bg-green-600 text-xs">Yes</Badge>
+                                <Badge variant="default" className="bg-muted text-xs">Yes</Badge>
                               ) : (
                                 <Badge variant="outline" className="text-xs">No</Badge>
                               )}
                             </td>
-                            <td className="py-2 pr-3 sm:pr-4 text-xs text-muted-foreground whitespace-nowrap">
+                            <td className={cn(appTableCards.td, "py-2 pr-3 sm:pr-4 text-xs text-muted-foreground whitespace-nowrap")}><span className="mr-2 text-muted-foreground sm:hidden">Workers comp</span>
                               {guide.workersCompType === "state_fund" ? "State Fund" :
                                guide.workersCompType === "state_fund_or_private" ? "State/Private" :
                                guide.workersCompType === "private_or_state" ? "Private/State" : "Private"}
                             </td>
-                            <td className="py-2 pr-3 sm:pr-4">
+                            <td className={cn(appTableCards.td, "py-2 pr-3 sm:pr-4")}><span className="mr-2 text-muted-foreground sm:hidden">Sales tax</span>
                               {guide.salesTaxOnLabor ? (
                                 <Badge variant="destructive" className="text-xs">Yes</Badge>
                               ) : (
-                                <Badge variant="outline" className="text-green-600 text-xs">No</Badge>
+                                <Badge variant="outline" className="text-muted-foreground text-xs">No</Badge>
                               )}
                             </td>
-                            <td className="py-2 pr-3 sm:pr-4">
+                            <td className={cn(appTableCards.td, "py-2 pr-3 sm:pr-4")}><span className="mr-2 text-muted-foreground sm:hidden">B&O tax</span>
                               {guide.bAndOTax ? (
                                 <Badge variant="destructive" className="text-xs">Yes</Badge>
                               ) : (
                                 <Badge variant="outline" className="text-xs">No</Badge>
                               )}
                             </td>
-                            <td className="py-2 pr-3 sm:pr-4">
+                            <td className={cn(appTableCards.td, "py-2 pr-3 sm:pr-4")}><span className="mr-2 text-muted-foreground sm:hidden">Bond</span>
                               {guide.bondRequired ? (
                                 <Badge variant="secondary" className="text-xs">Yes</Badge>
                               ) : (
                                 <Badge variant="outline" className="text-xs">No</Badge>
                               )}
                             </td>
-                            <td className="py-2">
+                            <td className={cn(appTableCards.td, "py-2")}><span className="mr-2 text-muted-foreground sm:hidden">Secretary of state</span>
                               {guide.sosUrl && guide.sosUrlStatus !== "dead" ? (
                                 <a
                                   href={guide.sosUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[#4A6CF7] hover:underline inline-flex items-center gap-1"
+                                  className="text-muted-foreground hover:underline inline-flex items-center gap-1"
                                   onClick={(e) => e.stopPropagation()}
                                   aria-label={`${guide.stateName} ${guide.sosName} (opens in a new tab)`}
                                   title={guide.sosUrlStatus === "unconfirmed" ? "Our automated check couldn't confirm this page" : undefined}
@@ -735,7 +664,8 @@ export default function MasterClassPage() {
                   </table>
                 </div>
               </CardContent>
-            </Card>
+            </div>
+            </details>
           </TabsContent>
 
           <TabsContent value="state-guide" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
@@ -758,7 +688,7 @@ export default function MasterClassPage() {
             </div>
 
             {!selectedState && (
-              <Card className="border-dashed">
+              <Section flush className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                   <MapPin className="h-12 w-12 text-muted-foreground/30 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Select Your State</h3>
@@ -766,7 +696,7 @@ export default function MasterClassPage() {
                     Choose a state from the dropdown above to see the complete step-by-step process for starting a construction business there.
                   </p>
                 </CardContent>
-              </Card>
+              </Section>
             )}
 
             {selectedState && loadingGuide && (
@@ -777,12 +707,12 @@ export default function MasterClassPage() {
 
             {stateGuide && (
               <>
-                <Card className="border-[#4A6CF7]/20">
+                <Section flush className="border-border">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col gap-3 mb-4">
                       <div>
-                        <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2" data-testid="text-state-name">
-                          <MapPin className="h-5 w-5 text-[#4A6CF7] shrink-0" />
+                        <h2 className="text-base font-semibold flex items-center gap-2" data-testid="text-state-name">
+                          <MapPin className="h-5 w-5 text-muted-foreground shrink-0" />
                           {stateGuide.stateName}
                         </h2>
                         <p className="text-muted-foreground mt-1 text-sm max-w-2xl">
@@ -791,7 +721,7 @@ export default function MasterClassPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0">
                         {stateGuide.licensingRequired ? (
-                          <Badge className="bg-green-600 gap-1"><Shield className="h-3 w-3" /> License Required</Badge>
+                          <Badge className="bg-muted gap-1"><Shield className="h-3 w-3" /> License Required</Badge>
                         ) : (
                           <Badge variant="outline" className="gap-1"><AlertCircle className="h-3 w-3" /> No State License</Badge>
                         )}
@@ -802,120 +732,120 @@ export default function MasterClassPage() {
                           <Badge variant="destructive" className="gap-1"><DollarSign className="h-3 w-3" /> Tax on Labor</Badge>
                         )}
                         {!isTabUnlocked("state-guide") && (
-                          <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600"><Lock className="h-3 w-3" /> Locked</Badge>
+                          <Badge variant="outline" className="gap-1 border-border text-muted-foreground"><Lock className="h-3 w-3" /> Locked</Badge>
                         )}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                      <AgencyTile icon={Building2} iconClass="text-blue-500" name={stateGuide.sosName} caption="Form Entity"
+                      <AgencyTile icon={Building2} iconClass="text-muted-foreground" name={stateGuide.sosName} caption="Form Entity"
                         agency={stateGuide.sosName} url={stateGuide.sosUrl} status={stateGuide.sosUrlStatus}
                         checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
                         unlocked={isTabUnlocked("state-guide")} testid="link-agency-sos" />
                       {stateGuide.licensingRequired === false && !stateGuide.licensingBoardUrl ? (
                         <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30" data-testid="link-agency-licensing">
-                          <Shield className="h-4 w-4 text-purple-500 shrink-0" />
+                          <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs font-medium truncate">Licensing Board</p>
                             <p className="text-[10px] text-muted-foreground">No state license</p>
                           </div>
                         </div>
                       ) : (
-                        <AgencyTile icon={Shield} iconClass="text-purple-500" name="Licensing Board" caption="Get Licensed"
+                        <AgencyTile icon={Shield} iconClass="text-muted-foreground" name="Licensing Board" caption="Get Licensed"
                           agency={stateGuide.licensingBoardName || "contractor licensing board"} url={stateGuide.licensingBoardUrl}
                           status={stateGuide.licensingBoardUrlStatus} checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
                           unlocked={isTabUnlocked("state-guide")} testid="link-agency-licensing" />
                       )}
-                      <AgencyTile icon={Heart} iconClass="text-red-500" name="Workers Comp" caption="Coverage Info"
+                      <AgencyTile icon={Heart} iconClass="text-muted-foreground" name="Workers Comp" caption="Coverage Info"
                         agency={stateGuide.workersCompAgency || "workers' compensation agency"} url={stateGuide.workersCompUrl}
                         status={stateGuide.workersCompUrlStatus} checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
                         unlocked={isTabUnlocked("state-guide")} testid="link-agency-workers-comp" />
-                      <AgencyTile icon={Calculator} iconClass="text-green-500" name="Tax Board" caption="Taxes"
+                      <AgencyTile icon={Calculator} iconClass="text-muted-foreground" name="Tax Board" caption="Taxes"
                         agency={stateGuide.taxBoardName || "department of revenue"} url={stateGuide.taxBoardUrl}
                         status={stateGuide.taxBoardUrlStatus} checkedAt={stateGuide.linksCheckedAt} stateName={stateGuide.stateName}
                         unlocked={isTabUnlocked("state-guide")} testid="link-agency-tax" />
                     </div>
                   </CardContent>
-                </Card>
+                </Section>
 
                 {isTabUnlocked("state-guide") ? (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                      <Card className="text-center">
+                      <Section flush className="text-center">
                         <CardContent className="p-4">
-                          <p className="text-lg font-bold">{stateGuide.entityTypes?.length || 0}</p>
+                          <p className="text-base font-semibold">{stateGuide.entityTypes?.length || 0}</p>
                           <p className="text-xs text-muted-foreground">Entity Types</p>
                         </CardContent>
-                      </Card>
-                      <Card className="text-center">
+                      </Section>
+                      <Section flush className="text-center">
                         <CardContent className="p-4">
-                          <p className="text-lg font-bold">{stateGuide.licensingRequired ? "Yes" : "No"}</p>
+                          <p className="text-base font-semibold">{stateGuide.licensingRequired ? "Yes" : "No"}</p>
                           <p className="text-xs text-muted-foreground">State License</p>
                         </CardContent>
-                      </Card>
-                      <Card className="text-center">
+                      </Section>
+                      <Section flush className="text-center">
                         <CardContent className="p-4">
-                          <p className="text-lg font-bold">{stateGuide.workersCompType === "state_fund" ? "State" : "Private"}</p>
+                          <p className="text-base font-semibold">{stateGuide.workersCompType === "state_fund" ? "State" : "Private"}</p>
                           <p className="text-xs text-muted-foreground">Workers Comp</p>
                         </CardContent>
-                      </Card>
-                      <Card className="text-center">
+                      </Section>
+                      <Section flush className="text-center">
                         <CardContent className="p-4">
-                          <p className="text-lg font-bold">{stateGuide.salesTaxOnLabor ? "Yes" : "No"}</p>
+                          <p className="text-base font-semibold">{stateGuide.salesTaxOnLabor ? "Yes" : "No"}</p>
                           <p className="text-xs text-muted-foreground">Tax on Labor</p>
                         </CardContent>
-                      </Card>
-                      <Card className="text-center">
+                      </Section>
+                      <Section flush className="text-center">
                         <CardContent className="p-4">
-                          <p className="text-lg font-bold">{stateGuide.gcBondAmount || "None"}</p>
+                          <p className="text-base font-semibold">{stateGuide.gcBondAmount || "None"}</p>
                           <p className="text-xs text-muted-foreground">GC Bond</p>
                         </CardContent>
-                      </Card>
+                      </Section>
                     </div>
 
                     {stateGuide.licensingNotes && (
-                      <Card>
+                      <Section flush>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <Shield className="h-4 w-4 text-purple-500" /> Licensing Details
+                            <Shield className="h-4 w-4 text-muted-foreground" /> Licensing Details
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground">{stateGuide.licensingNotes}</p>
                         </CardContent>
-                      </Card>
+                      </Section>
                     )}
 
                     {stateGuide.insuranceNotes && (
-                      <Card>
+                      <Section flush>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <Heart className="h-4 w-4 text-red-500" /> Insurance & Workers Comp
+                            <Heart className="h-4 w-4 text-muted-foreground" /> Insurance & Workers Comp
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground">{stateGuide.insuranceNotes}</p>
                         </CardContent>
-                      </Card>
+                      </Section>
                     )}
 
                     {stateGuide.payrollNotes && (
-                      <Card>
+                      <Section flush>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <Users className="h-4 w-4 text-orange-500" /> Payroll & Tax Reporting
+                            <Users className="h-4 w-4 text-muted-foreground" /> Payroll & Tax Reporting
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground">{stateGuide.payrollNotes}</p>
                         </CardContent>
-                      </Card>
+                      </Section>
                     )}
 
                     {stateGuide.steps && stateGuide.steps.length > 0 && (
                       <div className="space-y-4">
-                        <h3 className="text-lg font-bold flex items-center gap-2">
-                          <Briefcase className="h-5 w-5 text-[#4A6CF7]" />
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Briefcase className="h-5 w-5 text-muted-foreground" />
                           Step-by-Step Process for {stateGuide.stateName}
                         </h3>
                         <div className="space-y-3">
@@ -923,12 +853,12 @@ export default function MasterClassPage() {
                             const catConfig = CATEGORY_CONFIG[step.category] || CATEGORY_CONFIG.formation;
                             const CatIcon = catConfig.icon;
                             return (
-                              <Card key={step.id} className="overflow-hidden" data-testid={`card-step-${idx + 1}`}>
+                              <Section flush key={step.id} className="overflow-hidden" testId={`card-step-${idx + 1}`}>
                                 <div className="flex">
                                   <div className={`w-1.5 ${catConfig.color} shrink-0`} />
                                   <div className="flex-1 p-4">
                                     <div className="flex items-start gap-3">
-                                      <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[#4A6CF7] text-white text-sm font-bold shrink-0">
+                                      <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted text-foreground text-sm font-semibold shrink-0">
                                         {step.stepNumber}
                                       </div>
                                       <div className="flex-1 min-w-0">
@@ -938,15 +868,15 @@ export default function MasterClassPage() {
                                             <CatIcon className="h-2.5 w-2.5" /> {catConfig.label}
                                           </Badge>
                                           {step.isRequired ? (
-                                            <Badge className="bg-green-600/10 text-green-600 text-[10px]">Required</Badge>
+                                            <Badge className="bg-muted text-muted-foreground text-[10px]">Required</Badge>
                                           ) : (
                                             <Badge variant="outline" className="text-[10px]">Optional</Badge>
                                           )}
                                         </div>
                                         <p className="text-sm text-muted-foreground mb-2">{step.description}</p>
                                         {step.tips && (
-                                          <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/5 border border-amber-500/10 mb-2">
-                                            <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                          <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border mb-2">
+                                            <Lightbulb className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                                             <p className="text-xs text-muted-foreground">{step.tips}</p>
                                           </div>
                                         )}
@@ -955,7 +885,7 @@ export default function MasterClassPage() {
                                             href={step.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-xs text-[#4A6CF7] hover:underline font-medium"
+                                            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:underline font-medium"
                                             data-testid={`link-step-${idx + 1}`}
                                           >
                                             <ExternalLink className="h-3 w-3" />
@@ -966,7 +896,7 @@ export default function MasterClassPage() {
                                     </div>
                                   </div>
                                 </div>
-                              </Card>
+                              </Section>
                             );
                           })}
                         </div>
@@ -974,7 +904,7 @@ export default function MasterClassPage() {
                     )}
 
                     {(!stateGuide.steps || stateGuide.steps.length === 0) && (
-                      <Card className="border-dashed">
+                      <Section flush className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-10 text-center">
                           <Clock className="h-10 w-10 text-muted-foreground/30 mb-3" />
                           <h3 className="font-semibold mb-1">Detailed Steps Coming Soon</h3>
@@ -982,22 +912,22 @@ export default function MasterClassPage() {
                             We're building out the step-by-step guide for {stateGuide.stateName}. In the meantime, use the quick links above to access the key state agencies directly.
                           </p>
                         </CardContent>
-                      </Card>
+                      </Section>
                     )}
 
                     <div className="space-y-4 mt-6">
-                      <h3 className="text-lg font-bold flex items-center gap-2">
-                        <Building2 className="h-5 w-5 text-[#4A6CF7]" />
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-muted-foreground" />
                         Building & Running Your Business
                       </h3>
                       <p className="text-sm text-muted-foreground">
                         The way you structure your company — hiring, sales, branding, subcontractors — can make or break you, especially in the early stages. This section covers the real-world operations lessons that most courses skip entirely.
                       </p>
 
-                      <Card className="border-blue-500/20" data-testid="card-subs-section">
+                      <Section flush className="border-border" testId="card-subs-section">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <Handshake className="h-4 w-4 text-blue-500" /> Working with Subcontractors (1099)
+                            <Handshake className="h-4 w-4 text-muted-foreground" /> Working with Subcontractors (1099)
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -1005,20 +935,20 @@ export default function MasterClassPage() {
                             Using subs will always be easier than building a W-2 crew, but there are critical legal and operational realities you need to understand.
                           </p>
                           <div className="space-y-2">
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-red-500/5 border border-red-500/10">
-                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Insurance & Workers Comp:</strong> Every sub MUST carry their own insurance and workers comp. If they don't and one of their employees gets hurt on your jobsite, the liability falls back on YOU. Always verify their certificates of insurance (COIs) and make sure they're current.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/5 border border-amber-500/10">
-                              <FileText className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Subcontractor Agreement:</strong> Create a contract stating they are responsible for their own employees, taxes, fees, and liability. This is your legal protection. Without it, you're exposed.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-500/5 border border-blue-500/10">
-                              <Clock className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">1099 Rule — No Schedule Dictation:</strong> You cannot dictate a sub's schedule. This is a hard legal requirement for 1099 classification. If you control when and how they work, the IRS can reclassify them as W-2 employees, exposing you to back taxes, penalties, and fines.
                               </p>
@@ -1044,7 +974,7 @@ export default function MasterClassPage() {
                               "There are gray areas in this space — but consistent branding is key to client trust"
                             ].map((item, i) => (
                               <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                                <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" />
+                                <CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
                                 <span>{item}</span>
                               </div>
                             ))}
@@ -1055,12 +985,12 @@ export default function MasterClassPage() {
                             Non-compete agreements have been largely abolished due to freedom of rights rulings. You can no longer force a sub to sign one. However, you CAN have them sign an <strong>NDA (Non-Disclosure Agreement)</strong> which limits who they can talk to — restricting them from sharing your client lists, pricing structures, operational processes, or contacting your clients directly. This is your best legal protection for keeping your business intelligence private.
                           </p>
                         </CardContent>
-                      </Card>
+                      </Section>
 
-                      <Card className="border-green-500/20" data-testid="card-sales-section">
+                      <Section flush className="border-border" testId="card-sales-section">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <CircleDollarSign className="h-4 w-4 text-green-500" /> Sales — The Most Important Role
+                            <CircleDollarSign className="h-4 w-4 text-muted-foreground" /> Sales — The Most Important Role
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -1068,21 +998,21 @@ export default function MasterClassPage() {
                             The most important role in any construction business is <strong>SALES</strong>. Without sales, nothing else matters — not your crew, not your tools, not your license. Everything starts with closing jobs.
                           </p>
 
-                          <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
+                          <div className="p-3 rounded-lg border border-border bg-muted">
                             <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                              <Target className="h-4 w-4 text-green-500" /> Close Rate Benchmarks
+                              <Target className="h-4 w-4 text-muted-foreground" /> Close Rate Benchmarks
                             </h4>
                             <div className="grid grid-cols-3 gap-3 text-center">
                               <div>
-                                <p className="text-lg font-bold text-green-500">33%+</p>
+                                <p className="text-lg font-semibold text-muted-foreground">33%+</p>
                                 <p className="text-[10px] text-muted-foreground">Great Sales (1 of 3)</p>
                               </div>
                               <div>
-                                <p className="text-lg font-bold text-yellow-500">20%</p>
+                                <p className="text-lg font-semibold text-yellow-500">20%</p>
                                 <p className="text-[10px] text-muted-foreground">Average</p>
                               </div>
                               <div>
-                                <p className="text-lg font-bold text-red-500">&lt;15%</p>
+                                <p className="text-lg font-semibold text-muted-foreground">&lt;15%</p>
                                 <p className="text-[10px] text-muted-foreground">Dangerous</p>
                               </div>
                             </div>
@@ -1093,14 +1023,14 @@ export default function MasterClassPage() {
 
                           <h4 className="font-semibold text-sm mt-3">Hiring a Sales Rep</h4>
                           <div className="space-y-2">
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-green-500/5 border border-green-500/10">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Commission only — 8-10% of revenue minus sales tax.</strong> Do NOT put a sales rep on salary. This is a huge long-term exposure. Commission-only reps perform better because if they don't sell, they don't eat.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/5 border border-amber-500/10">
-                              <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Lightbulb className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Poaching from competitors:</strong> This is what Elon Musk does — he recruits top talent from Microsoft and Google. Hiring a proven sales rep from a competitor saves you training time and they already know the trade. However, this is risky: they could flip on you, and they may have an NDA with their previous employer that could expose you legally. Always ask about prior arrangements before bringing them on.
                               </p>
@@ -1112,20 +1042,20 @@ export default function MasterClassPage() {
 
                           <h4 className="font-semibold text-sm mt-3">Sales Tactics That Win Jobs</h4>
                           <div className="space-y-2">
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-500/5 border border-blue-500/10">
-                              <Clock className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Never say you're available same day — even if you are.</strong> Schedule estimates 1-2 days ahead. If you show up immediately, the client assumes you're not busy, which signals you don't have much work. A slight wait creates perceived demand and makes them value your time more.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-green-500/5 border border-green-500/10">
-                              <Phone className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Stay in constant contact while bidding.</strong> Out of sight, out of mind — and that's deadly during the bidding process. Follow up after the estimate, send a thank-you text or email, check in 2-3 days later. Most contractors give a bid and disappear. The one who stays top of mind wins the job.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-purple-500/5 border border-purple-500/10">
-                              <Award className="h-3.5 w-3.5 text-purple-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Award className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Differentiate yourself from the competition.</strong> Every homeowner is getting 3-5 bids. If your estimate looks like everyone else's — a number scribbled on a piece of paper — you blend in. Present a professional proposal with your branding, scope of work, timeline, warranty details, and photos of past work. Make it impossible for the client to compare you to the guy in a beat-up truck with a handwritten quote.
                               </p>
@@ -1137,12 +1067,12 @@ export default function MasterClassPage() {
                             Don't fall into the trap of sleazy one-call-close tactics — "sign today or lose the price" pressure selling. High-pressure sales is an art form that takes years to master, and if you don't know what you're doing, it will backfire badly. You'll lose the sale, damage your reputation, and potentially earn a bad review that costs you far more than the job was worth. Homeowners talk to each other, post in neighborhood groups, and share experiences online. One pushy encounter can label your company as "aggressive" or "scammy" in an entire community. Instead, focus on building trust through professionalism, clear communication, and honest timelines. Let the quality of your proposal and follow-up do the selling — the best closers in construction don't need to pressure anyone because they've already built enough confidence during the estimate.
                           </p>
                         </CardContent>
-                      </Card>
+                      </Section>
 
-                      <Card className="border-red-500/20" data-testid="card-reputation-section">
+                      <Section flush className="border-border" testId="card-reputation-section">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <Star className="h-4 w-4 text-red-500" /> Reputation & Review Management
+                            <Star className="h-4 w-4 text-muted-foreground" /> Reputation & Review Management
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -1150,17 +1080,17 @@ export default function MasterClassPage() {
                             Your online reputation is the single most valuable asset in your business — more important than your trucks, your tools, or even your crew. Every decision you make with a client should be filtered through this question: <strong>"Is this worth risking a bad review?"</strong>
                           </p>
 
-                          <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5">
+                          <div className="p-3 rounded-lg border border-border bg-muted">
                             <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                              <AlertTriangle className="h-4 w-4 text-red-500" /> The Real Cost of Bad Reviews
+                              <AlertTriangle className="h-4 w-4 text-muted-foreground" /> The Real Cost of Bad Reviews
                             </h4>
                             <div className="grid grid-cols-2 gap-3 text-center mb-3">
-                              <div className="p-2 rounded border border-red-500/10">
-                                <p className="text-lg font-bold text-red-500">10-15%</p>
+                              <div className="p-2 rounded border border-border">
+                                <p className="text-lg font-semibold text-muted-foreground">10-15%</p>
                                 <p className="text-[10px] text-muted-foreground">Business loss per year from a single bad review</p>
                               </div>
-                              <div className="p-2 rounded border border-red-500/10">
-                                <p className="text-lg font-bold text-red-500">20-50%</p>
+                              <div className="p-2 rounded border border-border">
+                                <p className="text-lg font-semibold text-muted-foreground">20-50%</p>
                                 <p className="text-[10px] text-muted-foreground">Business loss from damaging reviews (scam, abandoned job, etc.)</p>
                               </div>
                             </div>
@@ -1174,14 +1104,14 @@ export default function MasterClassPage() {
                             Resolve unfinished work and disputes according to the contract and the customer's concerns. Keep that process separate from review requests. Ask every client for honest feedback, with no reward or preferred rating.
                           </p>
                           <div className="space-y-2 mt-2">
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-green-500/5 border border-green-500/10">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Fix it first, then ask — with no strings attached.</strong> If a client has a remaining $500-1,000 complaint, resolve it because it's the right call, not as payment for a review. Afterward, ask for an honest review exactly as you would any client. Never make the fix, a discount, or any reward conditional on a review or its star rating — Google removes incentivized reviews, and the FTC's consumer-review rule (16 CFR Part 465) carries civil penalties for buying positive reviews. A client whose problem you solved often writes the best review you'll get anyway.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-red-500/5 border border-red-500/10">
-                              <Ban className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Ban className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Never get into a pissing contest with a client.</strong> You will always lose. Even if you're right, even if the client is being unreasonable — the public will side with the homeowner every time. A back-and-forth argument in Google Reviews makes you look petty and unprofessional. Responding to negative reviews should be calm, professional, and focused on resolution — never defensive or combative.
                               </p>
@@ -1191,15 +1121,15 @@ export default function MasterClassPage() {
                           <h4 className="font-semibold text-sm mt-3">What Clients Actually Look For in Reviews</h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                             {[
-                              { rank: "1", trait: "Trustworthiness", desc: "Did they do what they said? Did they show up? Did they finish? This is the #1 filter and the reason 'scam' reviews are devastating", weight: "text-red-500" },
-                              { rank: "2", trait: "Communication", desc: "Did they keep the client in the loop? Were they responsive? Did they return calls and texts promptly?", weight: "text-orange-500" },
+                              { rank: "1", trait: "Trustworthiness", desc: "Did they do what they said? Did they show up? Did they finish? This is the #1 filter and the reason 'scam' reviews are devastating", weight: "text-muted-foreground" },
+                              { rank: "2", trait: "Communication", desc: "Did they keep the client in the loop? Were they responsive? Did they return calls and texts promptly?", weight: "text-muted-foreground" },
                               { rank: "3", trait: "Quality of Work", desc: "Was the craftsmanship good? Did they pay attention to details? Were there callbacks or warranty issues?", weight: "text-yellow-500" },
-                              { rank: "4", trait: "Timeline & Reliability", desc: "Did they start and finish on time? Were there unexplained delays? Did they manage expectations?", weight: "text-blue-500" },
-                              { rank: "5", trait: "Cleanliness & Respect", desc: "Did they protect the property? Clean up daily? Treat the home and family with respect?", weight: "text-green-500" },
-                              { rank: "6", trait: "Price Fairness", desc: "Was pricing transparent? Were there surprise charges? Interestingly, price is one of the least-mentioned traits in positive reviews", weight: "text-purple-500" },
+                              { rank: "4", trait: "Timeline & Reliability", desc: "Did they start and finish on time? Were there unexplained delays? Did they manage expectations?", weight: "text-muted-foreground" },
+                              { rank: "5", trait: "Cleanliness & Respect", desc: "Did they protect the property? Clean up daily? Treat the home and family with respect?", weight: "text-muted-foreground" },
+                              { rank: "6", trait: "Price Fairness", desc: "Was pricing transparent? Were there surprise charges? Interestingly, price is one of the least-mentioned traits in positive reviews", weight: "text-muted-foreground" },
                             ].map((item, i) => (
                               <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-md border border-border/30">
-                                <div className={`w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold ${item.weight} shrink-0`}>{item.rank}</div>
+                                <div className={`w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-semibold ${item.weight} shrink-0`}>{item.rank}</div>
                                 <div>
                                   <p className="text-xs font-semibold">{item.trait}</p>
                                   <p className="text-[10px] text-muted-foreground leading-relaxed">{item.desc}</p>
@@ -1208,8 +1138,8 @@ export default function MasterClassPage() {
                             ))}
                           </div>
 
-                          <div className="flex items-start gap-2 p-3 rounded-md bg-[#4A6CF7]/5 border border-[#4A6CF7]/10 mt-2">
-                            <Lightbulb className="h-4 w-4 text-[#4A6CF7] shrink-0 mt-0.5" />
+                          <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border mt-2">
+                            <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                             <div>
                               <p className="text-sm font-medium mb-1">The Math That Should Change How You Handle Every Client</p>
                               <p className="text-xs text-muted-foreground">
@@ -1224,20 +1154,20 @@ export default function MasterClassPage() {
                           </p>
 
                           <div className="space-y-2 mt-2">
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-red-500/5 border border-red-500/10">
-                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">The goal is always the same: walk away without a lawsuit or a bad review.</strong> You won't win every client relationship, but you can control how it ends. A clean exit — where the client feels heard and you part on neutral terms — is worth more than being "right." Standing your ground with a difficult client is not a winning approach. Pride has no ROI in this business.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/5 border border-amber-500/10">
-                              <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Shield className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Never get personal — no politics, religion, personal views, or opinions.</strong> Keep every interaction 100% professional and focused on the work. Even casual small talk can turn dangerous. If a client brings up a topic you disagree with — don't engage, don't push back, don't even hint at your position. They may seem fine in the moment, but disagreements plant seeds of resentment that surface later as "difficult to work with" reviews or refusal to pay. You are there to build, not to debate.
                               </p>
                             </div>
-                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-500/5 border border-blue-500/10">
-                              <Handshake className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                              <Handshake className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
                                 <strong className="text-foreground">Always be agreeable — stay neutral, stay relevant, stay professional.</strong> Even when the client is wrong about a construction method, a timeline, or a material choice — correct them with facts, not attitude. "I totally understand why you'd think that, and here's what we've found works best..." will always land better than "That's not how it works." Agreeable doesn't mean pushover — it means you control the conversation without creating conflict. The contractors who build the biggest businesses are the ones who know how to manage people, not just projects.
                               </p>
@@ -1246,7 +1176,7 @@ export default function MasterClassPage() {
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
                             <div className="p-2.5 rounded-md border border-border/30">
-                              <p className="text-xs font-semibold text-red-500 mb-1">Red Flags of a Problem Client</p>
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">Red Flags of a Problem Client</p>
                               <div className="space-y-1">
                                 {[
                                   "Mentions lawsuits or attorneys early in the process",
@@ -1258,14 +1188,14 @@ export default function MasterClassPage() {
                                   "Becomes overly friendly too fast — could be setting you up for a favor later",
                                 ].map((flag, i) => (
                                   <div key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                                    <X className="h-2.5 w-2.5 text-red-400 shrink-0 mt-0.5" />
+                                    <X className="h-2.5 w-2.5 text-muted-foreground shrink-0 mt-0.5" />
                                     <span>{flag}</span>
                                   </div>
                                 ))}
                               </div>
                             </div>
                             <div className="p-2.5 rounded-md border border-border/30">
-                              <p className="text-xs font-semibold text-green-500 mb-1">How to De-Escalate & Exit Clean</p>
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">How to De-Escalate & Exit Clean</p>
                               <div className="space-y-1">
                                 {[
                                   "Document everything — texts, emails, photos of completed work",
@@ -1277,7 +1207,7 @@ export default function MasterClassPage() {
                                   "Consult your attorney before walking off any job mid-contract",
                                 ].map((tip, i) => (
                                   <div key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                                    <CheckCircle2 className="h-2.5 w-2.5 text-green-400 shrink-0 mt-0.5" />
+                                    <CheckCircle2 className="h-2.5 w-2.5 text-muted-foreground shrink-0 mt-0.5" />
                                     <span>{tip}</span>
                                   </div>
                                 ))}
@@ -1285,17 +1215,17 @@ export default function MasterClassPage() {
                             </div>
                           </div>
                         </CardContent>
-                      </Card>
+                      </Section>
 
-                      <Card className="border-purple-500/20" data-testid="card-pm-section">
+                      <Section flush className="border-border" testId="card-pm-section">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <Users className="h-4 w-4 text-purple-500" /> Hiring & Staffing Strategy
+                            <Users className="h-4 w-4 text-muted-foreground" /> Hiring & Staffing Strategy
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                          <div className="flex items-start gap-2 p-2.5 rounded-md bg-red-500/5 border border-red-500/10">
-                            <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                          <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
+                            <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                             <p className="text-xs text-muted-foreground">
                               <strong className="text-foreground">Avoid hiring too fast.</strong> In the early stages, do NOT hire a ton of help like PMs or secretaries. The majority of the work will fall back on you regardless. Every salary you add is overhead that eats into margins before you have consistent revenue to support it.
                             </p>
@@ -1309,11 +1239,11 @@ export default function MasterClassPage() {
                             <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <p className="text-xs text-muted-foreground">Typical PM Salary</p>
-                                <p className="text-sm font-bold">$45,000 – $75,000/yr</p>
+                                <p className="text-sm font-semibold">$45,000 – $75,000/yr</p>
                               </div>
                               <div>
                                 <p className="text-xs text-muted-foreground">Depends On</p>
-                                <p className="text-sm font-bold">Experience & Scope</p>
+                                <p className="text-sm font-semibold">Experience & Scope</p>
                               </div>
                             </div>
                           </div>
@@ -1321,12 +1251,12 @@ export default function MasterClassPage() {
                             Incentivize PMs with performance bonuses, paid time off, and potentially a company vehicle. But don't buy assets you can't afford — if you're not closing enough work to support it, a company truck becomes a liability, not a perk.
                           </p>
                         </CardContent>
-                      </Card>
+                      </Section>
 
-                      <Card className="border-amber-500/20" data-testid="card-branding-section">
+                      <Section flush className="border-border" testId="card-branding-section">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <Award className="h-4 w-4 text-amber-500" /> Branding & Professional Image
+                            <Award className="h-4 w-4 text-muted-foreground" /> Branding & Professional Image
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -1341,14 +1271,14 @@ export default function MasterClassPage() {
                               { icon: Building2, text: "If you're owner-operator, never tell the client you're the owner — say you're a PM or sales rep" },
                             ].map((item, i) => (
                               <div key={i} className="flex items-start gap-2 p-2.5 rounded-md border border-border/30">
-                                <item.icon className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                <item.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                                 <p className="text-xs text-muted-foreground">{item.text}</p>
                               </div>
                             ))}
                           </div>
 
-                          <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/5 border border-amber-500/10 mt-2">
-                            <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border mt-2">
+                            <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                             <div>
                               <p className="text-sm font-medium mb-1">Why Separation Between You and the Brand Matters</p>
                               <p className="text-xs text-muted-foreground">
@@ -1357,26 +1287,26 @@ export default function MasterClassPage() {
                             </div>
                           </div>
                         </CardContent>
-                      </Card>
+                      </Section>
 
-                      <Card className="border-[#4A6CF7]/20 bg-[#4A6CF7]/5" data-testid="card-business-structure-summary">
+                      <Section flush className="border-border bg-muted" testId="card-business-structure-summary">
                         <CardContent className="p-4">
                           <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                            <Lightbulb className="h-4 w-4 text-[#4A6CF7]" /> The Bottom Line on Business Structure
+                            <Lightbulb className="h-4 w-4 text-muted-foreground" /> The Bottom Line on Business Structure
                           </h4>
                           <p className="text-sm text-muted-foreground">
                             How your company is structured can make you or break you, especially in the early stages. Keep overhead low, use subs strategically with proper contracts, hire sales commission-only, don't rush into salaried positions, and always project a professional image. The companies that survive year one are the ones that sell well and spend smart — not the ones that hire fastest.
                           </p>
                         </CardContent>
-                      </Card>
+                      </Section>
                     </div>
                   </>
                 ) : (
                   <>
-                    <Card className="border-dashed border-amber-500/30 bg-amber-500/5">
+                    <Section flush className="border-dashed border-border bg-muted">
                       <CardContent className="p-4">
                         <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-[#4A6CF7]" />
+                          <BookOpen className="h-4 w-4 text-muted-foreground" />
                           What's Included in the {stateGuide.stateName} Guide
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
@@ -1391,7 +1321,7 @@ export default function MasterClassPage() {
                             "Payroll Setup & Reporting",
                           ].map((item, i) => (
                             <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+                              <CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0" />
                               {item}
                             </div>
                           ))}
@@ -1402,7 +1332,7 @@ export default function MasterClassPage() {
                           </p>
                         )}
                       </CardContent>
-                    </Card>
+                    </Section>
                     <PaywallOverlay tabName="State Guide" onGoToPricing={() => setActiveTab("pricing")} />
                   </>
                 )}
@@ -1411,18 +1341,18 @@ export default function MasterClassPage() {
           </TabsContent>
 
           <TabsContent value="website-seo" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6" data-testid="tab-content-website-seo">
-            <Card className="border-[#4A6CF7]/20 bg-gradient-to-r from-[#4A6CF7]/5 to-transparent">
+            <Section flush className="border-border   ">
               <CardContent className="p-4 sm:p-6">
-                <h2 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 flex items-center gap-2">
-                  <Monitor className="h-5 w-5 sm:h-6 sm:w-6 text-[#4A6CF7] shrink-0" />
+                <h2 className="text-base font-semibold mb-2 sm:mb-3 flex items-center gap-2">
+                  <Monitor className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground shrink-0" />
                   Building a Strong Website That Ranks
-                  {!isTabUnlocked("website-seo") && <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600 ml-2"><Lock className="h-3 w-3" /> Locked</Badge>}
+                  {!isTabUnlocked("website-seo") && <Badge variant="outline" className="gap-1 border-border text-muted-foreground ml-2"><Lock className="h-3 w-3" /> Locked</Badge>}
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  Your website is the foundation of your online presence. This module covers everything from location pages and unique content strategy to Google Search Console, page speed optimization, tracking analytics, and advanced backlink building.
+                  Learn how to build, measure and improve your business website.
                 </p>
                 {!isTabUnlocked("website-seo") && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-4">
+                  <details><summary className="cursor-pointer py-2 text-sm">Browse lesson topics</summary><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-4">
                     {[
                       { icon: Globe, text: "Location Pages & Slug Pages" },
                       { icon: FileSearch, text: "Google Search Console Setup" },
@@ -1432,23 +1362,23 @@ export default function MasterClassPage() {
                       { icon: Send, text: "SEO Services & Consultation" },
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground p-2 rounded border bg-muted/30">
-                        <item.icon className="h-3.5 w-3.5 text-[#4A6CF7] shrink-0" />
+                        <item.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         {item.text}
                       </div>
                     ))}
-                  </div>
+                  </div></details>
                 )}
               </CardContent>
-            </Card>
+            </Section>
 
             {!isTabUnlocked("website-seo") ? (
               <PaywallOverlay tabName="Website & SEO" onGoToPricing={() => setActiveTab("pricing")} />
             ) : (
             <div className="space-y-6">
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Globe className="h-5 w-5 text-blue-500" />
+                    <Globe className="h-5 w-5 text-muted-foreground" />
                     Location Pages & Slug Pages
                   </CardTitle>
                 </CardHeader>
@@ -1456,19 +1386,19 @@ export default function MasterClassPage() {
                   <p className="text-sm text-muted-foreground">
                     Your homepage matters, but your location pages and slug pages (service pages, city pages) are just as important — sometimes more. These are the pages that actually rank for local and service-specific searches. Every city and service you cover should have its own dedicated landing page with unique content.
                   </p>
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/5 border border-amber-500/10">
-                    <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground">
                       Each landing page must have unique content. Do not duplicate content across pages or copy from competitors. Use AI tools minimally — if you lean on AI too heavily, your content will read the same as everyone else's. Google grades your content on uniqueness. If it detects duplicate or thin content, your pages will not rank and can actually hurt your entire site.
                     </p>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <FileSearch className="h-5 w-5 text-green-500" />
+                    <FileSearch className="h-5 w-5 text-muted-foreground" />
                     Google Search Console (GSC)
                   </CardTitle>
                 </CardHeader>
@@ -1480,31 +1410,31 @@ export default function MasterClassPage() {
                     <div className="p-3 rounded-lg border bg-muted/30">
                       <p className="text-xs font-medium mb-1">GSC Verification Methods</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" /> Website HTML tag or file upload</li>
-                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" /> Server access (root level)</li>
-                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" /> Email access to that domain account</li>
-                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" /> Cloudflare DNS</li>
-                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" /> DNS TXT record</li>
+                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0" /> Website HTML tag or file upload</li>
+                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0" /> Server access (root level)</li>
+                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0" /> Email access to that domain account</li>
+                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0" /> Cloudflare DNS</li>
+                        <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0" /> DNS TXT record</li>
                       </ul>
                     </div>
                     <div className="p-3 rounded-lg border bg-muted/30">
                       <p className="text-xs font-medium mb-1">What to Monitor</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-blue-500 shrink-0" /> Index coverage & errors</li>
-                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-blue-500 shrink-0" /> Sitemap submission status</li>
-                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-blue-500 shrink-0" /> Manual actions or penalties</li>
-                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-blue-500 shrink-0" /> Core Web Vitals</li>
-                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-blue-500 shrink-0" /> Page experience signals</li>
+                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-muted-foreground shrink-0" /> Index coverage & errors</li>
+                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-muted-foreground shrink-0" /> Sitemap submission status</li>
+                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-muted-foreground shrink-0" /> Manual actions or penalties</li>
+                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-muted-foreground shrink-0" /> Core Web Vitals</li>
+                        <li className="flex items-center gap-1.5"><Eye className="h-3 w-3 text-muted-foreground shrink-0" /> Page experience signals</li>
                       </ul>
                     </div>
                   </div>
 
-                  <Card className="border-red-500/30 bg-red-500/5">
+                  <Section flush>
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <ShieldAlert className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                        <ShieldAlert className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">Critical Warning: Protect Your GSC Access</p>
+                          <p className="text-sm font-semibold text-muted-foreground text-muted-foreground mb-2">Critical Warning: Protect Your GSC Access</p>
                           <p className="text-xs text-muted-foreground mb-2">
                             Never give Google Search Console access to someone you don't fully trust. There is a feature called <strong>Disavow</strong> that allows someone to reject all of your site's backlinks. A disgruntled employee, fired contractor, or untrustworthy agency can pull your backlink profile from tools like Ahrefs or Semrush, then disavow every single backlink your site has built. This will destroy your rankings entirely — and it is extremely difficult to recover from.
                           </p>
@@ -1514,14 +1444,14 @@ export default function MasterClassPage() {
                         </div>
                       </div>
                     </CardContent>
-                  </Card>
+                  </Section>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Gauge className="h-5 w-5 text-orange-500" />
+                    <Gauge className="h-5 w-5 text-muted-foreground" />
                     Page Speed & Performance
                   </CardTitle>
                 </CardHeader>
@@ -1532,7 +1462,7 @@ export default function MasterClassPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <a href="https://pagespeed.web.dev/" target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors" data-testid="link-pagespeed">
-                      <Gauge className="h-5 w-5 text-orange-500 shrink-0" />
+                      <Gauge className="h-5 w-5 text-muted-foreground shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">Google PageSpeed Insights</p>
                         <p className="text-xs text-muted-foreground">Check your speed score, SEO issues, and Core Web Vitals. This is the tool Google uses to grade your site.</p>
@@ -1548,12 +1478,12 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-purple-500" />
+                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     Tracking & Analytics
                   </CardTitle>
                 </CardHeader>
@@ -1563,7 +1493,7 @@ export default function MasterClassPage() {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
-                      <BarChart3 className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                      <BarChart3 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium">Google Analytics</p>
                         <p className="text-xs text-muted-foreground">Track visitor behavior, traffic sources, conversions, and user demographics. Essential for understanding how people find and use your site.</p>
@@ -1571,7 +1501,7 @@ export default function MasterClassPage() {
                     </div>
                     <a href="https://www.tracemyip.org/" target="_blank" rel="noopener noreferrer"
                       className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors" data-testid="link-tracemyip">
-                      <Eye className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <Eye className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium">IP Tracker Tools</p>
                         <p className="text-xs text-muted-foreground">Tools like TraceMyIP.org let you track individual visitor behavior, see exactly where traffic is coming from, and monitor user activity on your site in real-time.</p>
@@ -1579,19 +1509,19 @@ export default function MasterClassPage() {
                       <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                     </a>
                   </div>
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-blue-500/5 border border-blue-500/10">
-                    <Lightbulb className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground">
                       Tools like <strong>Ahrefs</strong> and <strong>Semrush</strong> are highly recommended for tracking your organic keywords, monitoring your backlink profile, analyzing competitors, and finding ranking opportunities. These are industry-standard tools used by serious SEO professionals.
                     </p>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Link2 className="h-5 w-5 text-teal-500" />
+                    <Link2 className="h-5 w-5 text-muted-foreground" />
                     Backlinks & Link Building
                   </CardTitle>
                 </CardHeader>
@@ -1601,10 +1531,10 @@ export default function MasterClassPage() {
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3 rounded-lg border bg-green-500/5 border-green-500/20">
+                    <div className="p-3 rounded-lg border bg-muted border-border">
                       <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <p className="text-xs font-semibold text-green-700 dark:text-green-400">Good Backlinks</p>
+                        <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs font-semibold text-muted-foreground text-muted-foreground">Good Backlinks</p>
                       </div>
                       <ul className="text-xs text-muted-foreground space-y-1">
                         <li>DR/DA of 30 or higher</li>
@@ -1614,10 +1544,10 @@ export default function MasterClassPage() {
                         <li>Press releases (PBNs)</li>
                       </ul>
                     </div>
-                    <div className="p-3 rounded-lg border bg-red-500/5 border-red-500/20">
+                    <div className="p-3 rounded-lg border bg-muted border-border">
                       <div className="flex items-center gap-2 mb-2">
-                        <Ban className="h-4 w-4 text-red-500" />
-                        <p className="text-xs font-semibold text-red-700 dark:text-red-400">Bad Backlinks</p>
+                        <Ban className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs font-semibold text-muted-foreground text-muted-foreground">Bad Backlinks</p>
                       </div>
                       <ul className="text-xs text-muted-foreground space-y-1">
                         <li>Fiverr spam packages</li>
@@ -1627,10 +1557,10 @@ export default function MasterClassPage() {
                         <li>Same anchor text repeatedly</li>
                       </ul>
                     </div>
-                    <div className="p-3 rounded-lg border bg-blue-500/5 border-blue-500/20">
+                    <div className="p-3 rounded-lg border bg-muted border-border">
                       <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="h-4 w-4 text-blue-500" />
-                        <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Best Practices</p>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs font-semibold text-muted-foreground text-muted-foreground">Best Practices</p>
                       </div>
                       <ul className="text-xs text-muted-foreground space-y-1">
                         <li>Aim for 75% quality / 25% other</li>
@@ -1642,34 +1572,34 @@ export default function MasterClassPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/5 border border-amber-500/10">
-                    <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <div className="text-xs text-muted-foreground space-y-1">
                       <p><strong>Guest Posts:</strong> Writing guest posts on relevant industry blogs is a great way to build quality backlinks. But avoid using the same keywords across all your guest posts — Google will notice the pattern and it can look manipulative.</p>
                       <p><strong>PBNs / Press Releases:</strong> Press release networks and news announcements can generate powerful, high-authority backlinks. These can be very effective but also expensive. Think of them as a big news push for launches, milestones, or major projects.</p>
                     </div>
                   </div>
 
-                  <Card className="border-red-500/30 bg-red-500/5">
+                  <Section flush>
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <Ban className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                        <Ban className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">Avoid Buying Backlinks on Fiverr</p>
+                          <p className="text-sm font-semibold text-muted-foreground text-muted-foreground mb-1">Avoid Buying Backlinks on Fiverr</p>
                           <p className="text-xs text-muted-foreground">
                             Cheap backlink packages on platforms like Fiverr are almost always spam. These sellers blast your URL across low-quality sites, link farms, and irrelevant directories. Google's algorithm detects this and your site will get de-ranked. If your backlink profile is mostly spam, you will lose your rankings — and recovering from a penalty is extremely difficult.
                           </p>
                         </div>
                       </div>
                     </CardContent>
-                  </Card>
+                  </Section>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <PenTool className="h-5 w-5 text-indigo-500" />
+                    <PenTool className="h-5 w-5 text-muted-foreground" />
                     Content Strategy That Actually Ranks
                   </CardTitle>
                 </CardHeader>
@@ -1679,51 +1609,51 @@ export default function MasterClassPage() {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="p-3 rounded-lg border bg-muted/30">
-                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-indigo-500" /> Service Pages</p>
+                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-muted-foreground" /> Service Pages</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> One dedicated page per service (roofing, siding, windows, etc.)</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Include process details, materials used, and expected timelines</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Add before/after photos with proper alt text</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Include FAQ sections targeting "how much does X cost" queries</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> One dedicated page per service (roofing, siding, windows, etc.)</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Include process details, materials used, and expected timelines</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Add before/after photos with proper alt text</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Include FAQ sections targeting "how much does X cost" queries</li>
                       </ul>
                     </div>
                     <div className="p-3 rounded-lg border bg-muted/30">
-                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-indigo-500" /> Location Pages</p>
+                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> Location Pages</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Create unique pages for every city and neighborhood you serve</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Reference local landmarks, neighborhoods, and community details</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Include photos from actual projects in that area</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Never copy-paste the same content across location pages</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Create unique pages for every city and neighborhood you serve</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Reference local landmarks, neighborhoods, and community details</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Include photos from actual projects in that area</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Never copy-paste the same content across location pages</li>
                       </ul>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="p-3 rounded-lg border bg-muted/30">
-                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-indigo-500" /> Blog & Guide Content</p>
+                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-muted-foreground" /> Blog & Guide Content</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Write guides answering real customer questions: "How long does a roof last?"</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Comparison posts: "Standing seam vs architectural shingles"</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Case studies from real projects with cost breakdowns</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Post consistently — at least 2-4 articles per month</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Write guides answering real customer questions: "How long does a roof last?"</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Comparison posts: "Standing seam vs architectural shingles"</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Case studies from real projects with cost breakdowns</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Post consistently — at least 2-4 articles per month</li>
                       </ul>
                     </div>
-                    <div className="p-3 rounded-lg border bg-red-500/5 border-red-500/20">
-                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-red-600 dark:text-red-400"><Ban className="h-3.5 w-3.5" /> Content Mistakes That Kill Rankings</p>
+                    <div className="p-3 rounded-lg border bg-muted border-border">
+                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-muted-foreground text-muted-foreground"><Ban className="h-3.5 w-3.5" /> Content Mistakes That Kill Rankings</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" /> Using AI to generate all your content — Google detects it</li>
-                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" /> Copy-pasting competitor content or spinning articles</li>
-                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" /> Publishing thin pages with less than 300 words</li>
-                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" /> Keyword stuffing — repeating the same phrase 20 times</li>
+                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Using AI to generate all your content — Google detects it</li>
+                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Copy-pasting competitor content or spinning articles</li>
+                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Publishing thin pages with less than 300 words</li>
+                        <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Keyword stuffing — repeating the same phrase 20 times</li>
                       </ul>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Code className="h-5 w-5 text-cyan-500" />
+                    <Code className="h-5 w-5 text-muted-foreground" />
                     Schema Markup & Structured Data
                   </CardTitle>
                 </CardHeader>
@@ -1732,32 +1662,32 @@ export default function MasterClassPage() {
                     Schema markup is code you add to your website that tells Google exactly what your business is, what services you offer, and where you're located. It's how you get rich results in search — star ratings, service lists, business hours, and more showing up directly in Google.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3 rounded-lg border bg-cyan-500/5 border-cyan-500/20">
-                      <p className="text-xs font-semibold mb-1 text-cyan-700 dark:text-cyan-400">LocalBusiness Schema</p>
+                    <div className="p-3 rounded-lg border bg-muted border-border">
+                      <p className="text-xs font-semibold mb-1 text-muted-foreground text-muted-foreground">LocalBusiness Schema</p>
                       <p className="text-xs text-muted-foreground">Business name, address, phone, hours, service area, and geo coordinates. This is the foundation — every contractor site needs it.</p>
                     </div>
-                    <div className="p-3 rounded-lg border bg-cyan-500/5 border-cyan-500/20">
-                      <p className="text-xs font-semibold mb-1 text-cyan-700 dark:text-cyan-400">Service Schema</p>
+                    <div className="p-3 rounded-lg border bg-muted border-border">
+                      <p className="text-xs font-semibold mb-1 text-muted-foreground text-muted-foreground">Service Schema</p>
                       <p className="text-xs text-muted-foreground">Define each service with descriptions, price ranges, and service areas. Helps Google match your pages to specific service queries.</p>
                     </div>
-                    <div className="p-3 rounded-lg border bg-cyan-500/5 border-cyan-500/20">
-                      <p className="text-xs font-semibold mb-1 text-cyan-700 dark:text-cyan-400">Review & FAQ Schema</p>
+                    <div className="p-3 rounded-lg border bg-muted border-border">
+                      <p className="text-xs font-semibold mb-1 text-muted-foreground text-muted-foreground">Review & FAQ Schema</p>
                       <p className="text-xs text-muted-foreground">Embed review data and FAQ answers directly in search results. This takes up more space in Google and increases click-through rates.</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/5 border border-amber-500/10">
-                    <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground">
                       Use Google's <strong>Rich Results Test</strong> tool to validate your schema markup. If your schema has errors, Google will ignore it entirely. Most WordPress SEO plugins like Yoast or RankMath can generate basic schema automatically, but you'll want to customize it for contractor-specific services.
                     </p>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Smartphone className="h-5 w-5 text-pink-500" />
+                    <Smartphone className="h-5 w-5 text-muted-foreground" />
                     Mobile-First Design & User Experience
                   </CardTitle>
                 </CardHeader>
@@ -1769,31 +1699,31 @@ export default function MasterClassPage() {
                     <div className="p-3 rounded-lg border bg-muted/30">
                       <p className="text-xs font-semibold mb-2">Mobile Must-Haves</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Click-to-call button visible on every page</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Fast load time — under 3 seconds on mobile networks</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Large tap targets — buttons at least 48px tall</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Readable text without zooming — 16px minimum font size</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Sticky header or floating CTA button for easy contact</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Click-to-call button visible on every page</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Fast load time — under 3 seconds on mobile networks</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Large tap targets — buttons at least 48px tall</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Readable text without zooming — 16px minimum font size</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Sticky header or floating CTA button for easy contact</li>
                       </ul>
                     </div>
                     <div className="p-3 rounded-lg border bg-muted/30">
                       <p className="text-xs font-semibold mb-2">Conversion Optimization</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" /> Contact form above the fold on every service page</li>
-                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" /> Social proof near CTAs — review count, star rating, years in business</li>
-                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" /> Simple forms — name, phone, zip code, service needed (4 fields max)</li>
-                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" /> Urgency elements — "Free estimates this week" or "Limited availability"</li>
-                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" /> Trust badges — BBB, manufacturer certifications, insurance logos</li>
+                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Contact form above the fold on every service page</li>
+                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Social proof near CTAs — review count, star rating, years in business</li>
+                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Simple forms — name, phone, zip code, service needed (4 fields max)</li>
+                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Urgency elements — "Free estimates this week" or "Limited availability"</li>
+                        <li className="flex items-start gap-1.5"><MousePointer className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Trust badges — BBB, manufacturer certifications, insurance logos</li>
                       </ul>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Share2 className="h-5 w-5 text-blue-600" />
+                    <Share2 className="h-5 w-5 text-muted-foreground" />
                     Social Media & Reputation Building
                   </CardTitle>
                 </CardHeader>
@@ -1814,19 +1744,19 @@ export default function MasterClassPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-blue-500/5 border border-blue-500/10">
-                    <Lightbulb className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground">
                       <strong>Pro Tip:</strong> Don't spread yourself thin across every platform. Pick 2 and do them well. Facebook + Google Business Profile posting is the minimum. Add Instagram or YouTube if you have the bandwidth.
                     </p>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Mail className="h-5 w-5 text-emerald-500" />
+                    <Mail className="h-5 w-5 text-muted-foreground" />
                     Email Marketing & Follow-Up Systems
                   </CardTitle>
                 </CardHeader>
@@ -1835,23 +1765,23 @@ export default function MasterClassPage() {
                     Most contractors completely ignore email marketing, which means it's a huge opportunity. Not every lead is ready to buy today — a follow-up system keeps you top of mind when they're ready. This is especially powerful for seasonal services.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
-                      <p className="text-xs font-semibold mb-1 text-emerald-700 dark:text-emerald-400">Lead Follow-Up Sequence</p>
+                    <div className="p-3 rounded-lg border bg-muted border-border">
+                      <p className="text-xs font-semibold mb-1 text-muted-foreground text-muted-foreground">Lead Follow-Up Sequence</p>
                       <p className="text-xs text-muted-foreground">Set up automated emails after someone fills out your contact form. Day 1: confirmation. Day 3: case study. Day 7: special offer. Day 14: check-in.</p>
                     </div>
-                    <div className="p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
-                      <p className="text-xs font-semibold mb-1 text-emerald-700 dark:text-emerald-400">Seasonal Campaigns</p>
+                    <div className="p-3 rounded-lg border bg-muted border-border">
+                      <p className="text-xs font-semibold mb-1 text-muted-foreground text-muted-foreground">Seasonal Campaigns</p>
                       <p className="text-xs text-muted-foreground">Send seasonal reminders: spring gutter cleaning, fall roof inspections, winter prep, etc. These are high-conversion emails because they're timely and relevant.</p>
                     </div>
-                    <div className="p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
-                      <p className="text-xs font-semibold mb-1 text-emerald-700 dark:text-emerald-400">Past Customer Nurture</p>
+                    <div className="p-3 rounded-lg border bg-muted border-border">
+                      <p className="text-xs font-semibold mb-1 text-muted-foreground text-muted-foreground">Past Customer Nurture</p>
                       <p className="text-xs text-muted-foreground">Stay in touch with completed customers. They're your best source of referrals and repeat business. Quarterly newsletters with maintenance tips work great.</p>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card>
+              <Section flush>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Megaphone className="h-5 w-5 text-rose-500" />
@@ -1864,37 +1794,37 @@ export default function MasterClassPage() {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="p-3 rounded-lg border bg-muted/30">
-                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Target className="h-3.5 w-3.5 text-blue-500" /> Google Search Ads</p>
+                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Target className="h-3.5 w-3.5 text-muted-foreground" /> Google Search Ads</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Target specific keywords: "roof repair near me," "siding contractor [city]"</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Set geographic targeting to your exact service radius</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Use negative keywords to filter out DIY and job-seeker clicks</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Start with $500-$1,500/month and scale based on ROI</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Target specific keywords: "roof repair near me," "siding contractor [city]"</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Set geographic targeting to your exact service radius</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Use negative keywords to filter out DIY and job-seeker clicks</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Start with $500-$1,500/month and scale based on ROI</li>
                       </ul>
                     </div>
                     <div className="p-3 rounded-lg border bg-muted/30">
-                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><BadgeCheck className="h-3.5 w-3.5 text-green-500" /> Local Service Ads (Google Guaranteed)</p>
+                      <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><BadgeCheck className="h-3.5 w-3.5 text-muted-foreground" /> Local Service Ads (Google Guaranteed)</p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Pay per lead, not per click — only charged for actual phone calls/messages</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Google Guaranteed badge builds instant trust with consumers</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Shows above regular ads — top of search results</li>
-                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Requires background check and license/insurance verification</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Pay per lead, not per click — only charged for actual phone calls/messages</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Google Guaranteed badge builds instant trust with consumers</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Shows above regular ads — top of search results</li>
+                        <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Requires background check and license/insurance verification</li>
                       </ul>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/5 border border-amber-500/10">
-                    <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border">
+                    <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground">
                       <strong>Budget Strategy:</strong> Run LSA as your primary paid channel (it's cheaper per lead for most trades). Layer in Google Search Ads for keywords that LSA doesn't cover. Track every lead source so you know your actual cost per customer acquisition — not just cost per click.
                     </p>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card className="border-[#F97316]/20 bg-gradient-to-r from-[#F97316]/5 to-transparent">
+              <Section flush className="border-border   ">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Send className="h-5 w-5 text-[#F97316]" />
+                    <Send className="h-5 w-5 text-muted-foreground" />
                     Need Help With Any of These Services?
                   </CardTitle>
                   <CardDescription>
@@ -1933,7 +1863,7 @@ export default function MasterClassPage() {
                         <Badge
                           key={service}
                           variant={seoServices.includes(service) ? "default" : "outline"}
-                          className={`cursor-pointer transition-colors ${seoServices.includes(service) ? "bg-[#4A6CF7]" : "hover:bg-muted"}`}
+                          className={`cursor-pointer transition-colors ${seoServices.includes(service) ? "bg-muted" : "hover:bg-muted"}`}
                           onClick={() => toggleSeoService(service)}
                           data-testid={`badge-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
                         >
@@ -1957,40 +1887,40 @@ export default function MasterClassPage() {
 
                   <Button
                     type="submit"
-                    className="bg-[#F97316] hover:bg-[#E86C0A] text-white"
+                    className="w-full sm:w-auto"
                     data-testid="button-submit-seo-inquiry"
                     disabled={seoInquiryMutation.isPending || !seoName.trim() || !seoEmail.trim()}
                   >
                     {seoInquiryMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-                    Submit Inquiry
+                    Submit inquiry
                   </Button>
                   </form>
                 </CardContent>
-              </Card>
+              </Section>
             </div>
             )}
           </TabsContent>
 
           <TabsContent value="vetting" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
-            <Card className="border-red-500/20 bg-gradient-to-r from-red-500/5 to-transparent">
+            <Section flush className="border-border   ">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-start gap-3 mb-3">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
-                    <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                    <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base sm:text-xl font-bold flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2 flex-wrap">
                       19 Essential Tips for Vetting a Contractor
-                      {!isTabUnlocked("vetting") && <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600"><Lock className="h-3 w-3" /> Locked</Badge>}
+                      {!isTabUnlocked("vetting") && <Badge variant="outline" className="gap-1 border-border text-muted-foreground"><Lock className="h-3 w-3" /> Locked</Badge>}
                     </h2>
                     <p className="text-sm text-muted-foreground">Don't fake it till you make it — build a legit brand the right way</p>
                   </div>
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  The construction industry has been flooded with new companies across every sector. This guide helps homeowners identify red flags and helps legitimate contractors understand what NOT to do when building their brand. These tips apply industry-wide — roofing, siding, general contracting, plumbing, electrical, and more.
+                  Check credentials, reviews and business practices before choosing a contractor.
                 </p>
                 {!isTabUnlocked("vetting") && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-4">
+                  <details><summary className="cursor-pointer py-2 text-sm">Browse lesson topics</summary><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-4">
                     {[
                       { num: 1, icon: UserX, text: "False Claims of Affiliation" },
                       { num: 2, icon: Clock, text: "Experience Can't Be Faked" },
@@ -2013,28 +1943,28 @@ export default function MasterClassPage() {
                       { num: 19, icon: AlertTriangle, text: "Too-Good-To-Be-True Pricing" },
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground p-2 rounded border bg-muted/30">
-                        <div className="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center text-[10px] font-bold text-red-500 shrink-0">{item.num}</div>
-                        <item.icon className="h-3 w-3 text-red-400 shrink-0" />
+                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground shrink-0">{item.num}</div>
+                        <item.icon className="h-3 w-3 text-muted-foreground shrink-0" />
                         {item.text}
                       </div>
                     ))}
-                  </div>
+                  </div></details>
                 )}
               </CardContent>
-            </Card>
+            </Section>
 
             {!isTabUnlocked("vetting") ? (
               <PaywallOverlay tabName="Vetting Contractors" onGoToPricing={() => setActiveTab("pricing")} />
             ) : (
             <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <Card data-testid="card-vetting-tip-1">
+            <div className="space-y-4">
+              <Section flush testId="card-vetting-tip-1">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">1</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">1</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <UserX className="h-4 w-4 text-red-500" /> False Claims of Affiliation
+                        <UserX className="h-4 w-4 text-muted-foreground" /> False Claims of Affiliation
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Some companies falsely claim to have worked for or been affiliated with established brands to gain credibility they haven't earned. They use misleading language like "partnered with" or "worked alongside" when no real connection exists.
@@ -2042,23 +1972,23 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">How to Protect Yourself:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Ask for proof of any claimed affiliations — documentation, references</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Verify directly with the company they claim to be affiliated with</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Be aware that AI can fabricate photos, documents, and endorsements</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Ask for proof of any claimed affiliations — documentation, references</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Verify directly with the company they claim to be affiliated with</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Be aware that AI can fabricate photos, documents, and endorsements</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-2">
+              <Section flush testId="card-vetting-tip-2">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">2</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">2</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-red-500" /> Experience Can't Be Faked
+                        <Clock className="h-4 w-4 text-muted-foreground" /> Experience Can't Be Faked
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         How long a company has been in business is one of the strongest indicators of reliability. Watch out for the "combined experience" trick — adding up individual employee years to inflate the company's track record.
@@ -2066,23 +1996,23 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">Red Flags:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> "Combined years of experience" claims (e.g., "Joe 3yr + Phil 4yr = 7 years!")</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Taking credit for a hired employee's prior experience</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Cross-reference their claims with BBB and state licensing records</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> "Combined years of experience" claims (e.g., "Joe 3yr + Phil 4yr = 7 years!")</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Taking credit for a hired employee's prior experience</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Cross-reference their claims with BBB and state licensing records</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-3">
+              <Section flush testId="card-vetting-tip-3">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">3</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">3</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-red-500" /> The Permitting Loophole
+                        <FileText className="h-4 w-4 text-muted-foreground" /> The Permitting Loophole
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Many counties have no permitting requirements for certain work (siding, windows, doors). This creates a massive loophole allowing unqualified contractors to operate without oversight. No inspection means no accountability.
@@ -2090,29 +2020,29 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">Protect Yourself:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Ask for active jobs in the area — established companies always have them</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Demand industry-standard installation practices regardless of permit requirements</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Consider hiring a third-party inspector if permits aren't required</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Ask for active jobs in the area — established companies always have them</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Demand industry-standard installation practices regardless of permit requirements</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Consider hiring a third-party inspector if permits aren't required</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-4">
+              <Section flush testId="card-vetting-tip-4">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">4</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">4</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Award className="h-4 w-4 text-red-500" /> Manufacturer Programs (Diluted Standards)
+                        <Award className="h-4 w-4 text-muted-foreground" /> Manufacturer Programs (Diluted Standards)
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Programs like James Hardie Elite used to require 36 full re-siding projects per year. Now it's just 10, and partial jobs as small as 150 sq ft qualify. Verification has been minimized. Don't rely on these badges alone.
                       </p>
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                      <div className="bg-muted border border-border rounded-md p-3">
+                        <p className="text-xs text-muted-foreground text-muted-foreground flex items-start gap-1.5">
                           <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
                           Manufacturer certifications that once meant something may now be easily obtained. Always verify a company's actual project history — not just their badges.
                         </p>
@@ -2120,15 +2050,15 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-5">
+              <Section flush testId="card-vetting-tip-5">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">5</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">5</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Receipt className="h-4 w-4 text-red-500" /> Vanishing Estimates
+                        <Receipt className="h-4 w-4 text-muted-foreground" /> Vanishing Estimates
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Some contractors send estimates via links that later disappear. If they can delete an estimate, they can alter a contract. This is a massive red flag for accountability.
@@ -2136,29 +2066,29 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">Always:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Request a downloadable PDF or printed copy of every estimate</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> If a company only provides a disappearing link, walk away</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Keep copies of all signed contracts independently</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Request a downloadable PDF or printed copy of every estimate</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> If a company only provides a disappearing link, walk away</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Keep copies of all signed contracts independently</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-6">
+              <Section flush testId="card-vetting-tip-6">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">6</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">6</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Truck className="h-4 w-4 text-red-500" /> The Illusion of Size
+                        <Truck className="h-4 w-4 text-muted-foreground" /> The Illusion of Size
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Some companies use branded trucks, slick websites, and multiple Google listings to look like large operations. In reality, they may be a single-person company using virtual addresses and PO boxes. They hide behind titles like "project manager" or "estimator" when they're the sole operator.
                       </p>
-                      <div className="bg-red-500/10 border border-red-500/20 rounded-md p-3">
-                        <p className="text-xs text-red-600 dark:text-red-400 flex items-start gap-1.5">
+                      <div className="bg-muted border border-border rounded-md p-3">
+                        <p className="text-xs text-muted-foreground text-muted-foreground flex items-start gap-1.5">
                           <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
                           If something goes wrong, these companies often vanish with your money or fail to fix their mistakes, leaving you with zero accountability.
                         </p>
@@ -2166,15 +2096,15 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-7">
+              <Section flush testId="card-vetting-tip-7">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">7</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">7</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <CircleDollarSign className="h-4 w-4 text-red-500" /> Lower Price ≠ Equal Service
+                        <CircleDollarSign className="h-4 w-4 text-muted-foreground" /> Lower Price ≠ Equal Service
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Comparing a 20-year company with staff and offices to a 1-year company working from a pickup truck is not "apples to apples." Established companies anticipate structural issues. New companies discover them mid-project — costing you more.
@@ -2182,51 +2112,51 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">Real Risks of Cheap Bids:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> No workers' comp — if an employee is injured on your property, YOU could be sued</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Insurance may not cover defective work or wrong materials</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> A $6K contractor bond won't cover your legal fees</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> No workers' comp — if an employee is injured on your property, YOU could be sued</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Insurance may not cover defective work or wrong materials</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> A $6K contractor bond won't cover your legal fees</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-8">
+              <Section flush testId="card-vetting-tip-8">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">8</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">8</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <ThumbsDown className="h-4 w-4 text-red-500" /> New Companies Badmouthing Veterans
+                        <ThumbsDown className="h-4 w-4 text-muted-foreground" /> New Companies Badmouthing Veterans
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         It's a major red flag when a company tears down competitors instead of building its own reputation. Claims like "I used to work for them and they're terrible" are often manipulation tactics. Companies that succeed on merit don't need to badmouth others.
                       </p>
                       <div className="bg-muted/50 rounded-md p-3">
                         <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                          <Lightbulb className="h-3 w-3 text-[#4A6CF7] shrink-0 mt-0.5" />
+                          <Lightbulb className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
                           A company that actively works to tear down others rather than build up their own reputation likely doesn't have the skills or track record to succeed on merit alone.
                         </p>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-9">
+              <Section flush testId="card-vetting-tip-9">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">9</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">9</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-red-500" /> Licensed ≠ Legitimate
+                        <Shield className="h-4 w-4 text-muted-foreground" /> Licensed ≠ Legitimate
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         In many states (like Washington), getting a contractor's license just means paying $65, getting a $300/year bond, and $100/month insurance. No experience required. No testing. States like California require 4 years experience + exams. Know your state's requirements.
                       </p>
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                      <div className="bg-muted border border-border rounded-md p-3">
+                        <p className="text-xs text-muted-foreground text-muted-foreground flex items-start gap-1.5">
                           <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
                           A license is just a minimum legal requirement — not proof of skill, experience, or quality workmanship. Use the State Guide tab to check your state's licensing requirements.
                         </p>
@@ -2234,37 +2164,37 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-10">
+              <Section flush testId="card-vetting-tip-10">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">10</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">10</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Globe className="h-4 w-4 text-red-500" /> Web Presence ≠ Legitimacy
+                        <Globe className="h-4 w-4 text-muted-foreground" /> Web Presence ≠ Legitimacy
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         High Google rankings can be bought through marketing firms. A polished website with customer reviews, ads, and "10 years in business" claims means nothing without verification. Many companies pay to manipulate their online positions.
                       </p>
                       <div className="bg-muted/50 rounded-md p-3">
                         <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                          <Lightbulb className="h-3 w-3 text-[#4A6CF7] shrink-0 mt-0.5" />
+                          <Lightbulb className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
                           When vetting a contractor, read their Google reviews critically — repeated phrasing and clustered review dates can be signals worth a closer look, but do not establish authorship or authenticity.
                         </p>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-11">
+              <Section flush testId="card-vetting-tip-11">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">11</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">11</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-red-500" /> Unsolicited Calls = Lead Gen
+                        <Phone className="h-4 w-4 text-muted-foreground" /> Unsolicited Calls = Lead Gen
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         If a company calls you out of the blue, your information was likely sold through a lead generation form. These companies buy leads in bulk and often lack the experience to deliver quality work. Only engage with companies you've researched yourself.
@@ -2272,37 +2202,37 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-12">
+              <Section flush testId="card-vetting-tip-12">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">12</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">12</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <BadgeCheck className="h-4 w-4 text-red-500" /> Warranty Is Key
+                        <BadgeCheck className="h-4 w-4 text-muted-foreground" /> Warranty Is Key
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Companies offering 1-2 year warranties don't want to be held accountable. But beware the opposite too — a company in business for 2 years offering a 10-year warranty is a red flag. Always ask how long they've been operating before trusting a warranty promise.
                       </p>
                       <div className="bg-muted/50 rounded-md p-3">
                         <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                          <Lightbulb className="h-3 w-3 text-[#4A6CF7] shrink-0 mt-0.5" />
+                          <Lightbulb className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
                           The warranty is the best indicator of a company's commitment to their work and customers. A company can't honor a 15-year warranty if they've only existed for 3.
                         </p>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-13">
+              <Section flush testId="card-vetting-tip-13">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">13</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">13</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Building className="h-4 w-4 text-red-500" /> Physical Office Verification
+                        <Building className="h-4 w-4 text-muted-foreground" /> Physical Office Verification
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Schedule a meeting at their office. A legitimate company will have a physical space, showroom, or office. Ask how many employees they have. Verify the address on Google Maps — many scam companies use PO boxes, storage units, or random warehouses as false addresses.
@@ -2310,23 +2240,23 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">Check for:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Real office or showroom (not a PO box, Suite #, or storage unit)</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Actual staff — customer service, project managers</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Drive by the address if you're unsure</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Real office or showroom (not a PO box, Suite #, or storage unit)</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Actual staff — customer service, project managers</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Drive by the address if you're unsure</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-14">
+              <Section flush testId="card-vetting-tip-14">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">14</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">14</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Search className="h-4 w-4 text-red-500" /> BBB & Online Credibility
+                        <Search className="h-4 w-4 text-muted-foreground" /> BBB & Online Credibility
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Check the Better Business Bureau (BBB). It reveals the owner's name, complaints history, and accreditation status. If a company doesn't have an A+ and isn't accredited, they're either very new or have unresolved complaints.
@@ -2338,15 +2268,15 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-15">
+              <Section flush testId="card-vetting-tip-15">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">15</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">15</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Handshake className="h-4 w-4 text-red-500" /> Fabricated Accomplishments
+                        <Handshake className="h-4 w-4 text-muted-foreground" /> Fabricated Accomplishments
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Some companies subcontract work and present it as their own. They leverage established brand names by falsely claiming affiliation or insider knowledge. When encountering such claims, question the integrity of the source.
@@ -2354,24 +2284,24 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">Common Fabrication Tactics:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Displaying project photos from other companies as their own work</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Claiming "trained by" or "formerly with" established companies without proof</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Listing subcontracted projects as direct company accomplishments</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Ask for job site addresses you can drive by and verify in person</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Displaying project photos from other companies as their own work</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Claiming "trained by" or "formerly with" established companies without proof</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Listing subcontracted projects as direct company accomplishments</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Ask for job site addresses you can drive by and verify in person</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-16">
+              <Section flush testId="card-vetting-tip-16">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">16</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">16</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Star className="h-4 w-4 text-red-500" /> Referrals & Fake Reviews
+                        <Star className="h-4 w-4 text-muted-foreground" /> Referrals & Fake Reviews
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Don't just trust online reviews — ask for 5-10 verified addresses as references. Many new companies have 80-90% of reviews from family or friends. Watch for reviews duplicated across 3-4 platforms (real customers rarely post on multiple sites). Check suspicious usernames.
@@ -2387,15 +2317,15 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-17">
+              <Section flush testId="card-vetting-tip-17">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">17</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">17</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Eye className="h-4 w-4 text-red-500" /> Fabrication of Credibility
+                        <Eye className="h-4 w-4 text-muted-foreground" /> Fabrication of Credibility
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Companies create dozens of online profiles across Houzz, Thumbtack, YouTube, Facebook, and more. They duplicate competitor content, steal branding colors and logos, and display vendor logos they have no real partnership with. They acquire credentials to emulate successful local companies.
@@ -2403,30 +2333,30 @@ export default function MasterClassPage() {
                       <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
                         <p className="text-xs font-medium">Signs of Fabricated Credibility:</p>
                         <ul className="text-xs text-muted-foreground space-y-1">
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Website design, colors, or layout that closely mimics a well-known local competitor</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Displaying manufacturer logos without being an actual certified installer</li>
-                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> Having profiles on 15+ platforms but only 6 months in business</li>
-                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> Verify certifications directly with the manufacturer's installer lookup tool</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Website design, colors, or layout that closely mimics a well-known local competitor</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Displaying manufacturer logos without being an actual certified installer</li>
+                          <li className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Having profiles on 15+ platforms but only 6 months in business</li>
+                          <li className="flex items-start gap-1.5"><CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" /> Verify certifications directly with the manufacturer's installer lookup tool</li>
                         </ul>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-18">
+              <Section flush testId="card-vetting-tip-18">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">18</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">18</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <CircleDollarSign className="h-4 w-4 text-red-500" /> Real Financing vs. 3rd Party Referrals
+                        <CircleDollarSign className="h-4 w-4 text-muted-foreground" /> Real Financing vs. 3rd Party Referrals
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Legitimate in-house financing requires years of established operations, solid financial stability, and significant revenue (millions). Many new companies claim to offer financing but actually just partner with obscure third-party vendors for referral commissions.
                       </p>
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                      <div className="bg-muted border border-border rounded-md p-3">
+                        <p className="text-xs text-muted-foreground text-muted-foreground flex items-start gap-1.5">
                           <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
                           If a company offers financing but has been in business less than 5 years, chances are it's a third-party referral program — not real in-house financing.
                         </p>
@@ -2434,36 +2364,36 @@ export default function MasterClassPage() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
 
-              <Card data-testid="card-vetting-tip-19">
+              <Section flush testId="card-vetting-tip-19">
                 <CardContent className="p-3 sm:p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-sm font-bold text-red-500 shrink-0">19</div>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">19</div>
                     <div>
                       <h3 className="font-semibold mb-1.5 flex items-center gap-2">
-                        <Home className="h-4 w-4 text-red-500" /> Too-Good-to-Be-True Prices
+                        <Home className="h-4 w-4 text-muted-foreground" /> Too-Good-to-Be-True Prices
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
                         Low bids mean the company is cutting costs — unskilled labor, no insurance, no overhead. When you pay a higher price, you're investing in experience and a company that has already overcome the hurdles of running a business. Lack of experience often results in redoing the job entirely.
                       </p>
                       <div className="bg-muted/50 rounded-md p-3">
                         <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                          <Lightbulb className="h-3 w-3 text-[#4A6CF7] shrink-0 mt-0.5" />
+                          <Lightbulb className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
                           Find the middle ground. The cheapest option often leads to the most expensive outcome — incorrect products, project delays, and lawsuits with insurance that doesn't cover the work.
                         </p>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Section>
             </div>
 
-            <Card className="border-[#4A6CF7]/20 bg-[#4A6CF7]/5">
+            <Section flush>
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-start gap-3 mb-3 sm:mb-4">
-                  <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-[#4A6CF7] shrink-0 mt-0.5" />
-                  <h3 className="text-base sm:text-lg font-bold">Building a Legit Brand — The Right Way</h3>
+                  <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground shrink-0 mt-0.5" />
+                  <h3 className="text-base font-semibold">Building a Legit Brand — The Right Way</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">
                   For contractors building their own business: don't try to fake it till you make it. It usually never ends well. The construction industry rewards authenticity and punishes shortcuts. Here's the honest path to a credible brand that lasts:
@@ -2480,26 +2410,26 @@ export default function MasterClassPage() {
                     { icon: Scale, text: "Be transparent about your company's actual age and experience. Honesty about where you are in your journey builds more trust than inflated claims." },
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm">
-                      <item.icon className="h-4 w-4 text-[#4A6CF7] shrink-0 mt-0.5" />
+                      <item.icon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                       <span className="text-muted-foreground">{item.text}</span>
                     </div>
                   ))}
                 </div>
                 <div className="p-3 rounded-lg border bg-background/60">
                   <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                    <Lightbulb className="h-3.5 w-3.5 text-[#4A6CF7]" /> The Bottom Line
+                    <Lightbulb className="h-3.5 w-3.5 text-muted-foreground" /> The Bottom Line
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Every established company in your market started exactly where you are. The difference between the ones that made it and the ones that didn't is simple: the successful ones built their reputation on real work, real customers, and real results. They didn't cut corners on insurance, they didn't fake reviews, and they didn't pretend to be bigger than they were. They earned every star, every referral, and every repeat customer. That's the path — and it works.
                   </p>
                 </div>
               </CardContent>
-            </Card>
+            </Section>
 
-            <Card className="border-green-500/20 bg-green-500/5">
+            <Section flush>
               <CardContent className="p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-bold mb-3 flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
                   Homeowner's Quick Vetting Checklist
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
@@ -2523,13 +2453,13 @@ export default function MasterClassPage() {
                     "Check if financing is in-house or a third-party referral",
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground p-2 rounded border bg-background/60">
-                      <div className="w-4 h-4 rounded border-2 border-green-500/40 shrink-0 mt-0.5" />
+                      <div className="w-4 h-4 rounded border-2 border-border shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </div>
                   ))}
                 </div>
               </CardContent>
-            </Card>
+            </Section>
             </>
             )}
           </TabsContent>
@@ -2537,35 +2467,110 @@ export default function MasterClassPage() {
           <TabsContent value="pricing" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
             <div className="text-center max-w-2xl mx-auto mb-4 sm:mb-8">
               {bundleSavingsPct !== null && (
-                <Badge className="bg-red-600 text-white text-xs sm:text-sm px-3 py-1 mb-3" data-testid="badge-pricing-savings">
+                <Badge className="bg-muted text-foreground text-xs sm:text-sm px-3 py-1 mb-3" data-testid="badge-pricing-savings">
                   Bundle saves {bundleSavingsPct}% vs. buying modules separately
                 </Badge>
               )}
-              <h2 className="text-xl sm:text-2xl font-bold mb-2">Master Class Courses</h2>
+              <h2 className="text-xl font-semibold mb-2">Courses</h2>
               <p className="text-muted-foreground">
                 Go from zero to a fully operational, online-dominant construction business. Each module walks you through every detail with step-by-step instructions, direct links to every resource, and real-world strategies that actually work.
               </p>
             </div>
 
+            <Section flush className={`border-border     overflow-hidden relative ${hasBundle ? "ring-2 ring-border" : ""}`}>
+              {/* "Best value" only when the page can show the saving that backs it. */}
+              {bundleSavingsCents !== null && (
+                <div className="absolute top-3 right-3">
+                  <Badge className="bg-muted text-foreground text-xs px-2 py-0.5" data-testid="badge-bundle-best-value">Best value</Badge>
+                </div>
+              )}
+              <CardContent className="p-4 sm:p-6 text-center">
+                <Star className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <h3 className="text-base font-semibold mb-2">Complete course bundle</h3>
+                <p className="text-muted-foreground text-sm mb-4 max-w-lg mx-auto">
+                  All four modules, from forming your business to growing your online presence.
+                </p>
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  {modulesTotalCents !== null && modulesTotalCents > BUNDLE_PRICE_CENTS && (
+                    <span className="text-xl font-semibold text-muted-foreground line-through" data-testid="text-bundle-was">{usd(modulesTotalCents)}</span>
+                  )}
+                  {/* Quoted bundles skip the price slot: the button below says "Talk to a sales rep". */}
+                  {bundlePriceShown && <span className="text-2xl font-semibold text-muted-foreground" data-testid="text-bundle-price">{usd(BUNDLE_PRICE_CENTS)}</span>}
+                </div>
+                {bundleSavingsCents !== null && (
+                  <p className="text-xs text-muted-foreground mb-4" data-testid="text-bundle-savings">
+                    Save {usd(bundleSavingsCents)} — the four modules total {usd(modulesTotalCents!)} purchased separately
+                  </p>
+                )}
+                {hasBundle ? (
+                  <Button size="lg" className="w-full sm:w-auto" disabled data-testid="button-enrolled-bundle">
+                    <CheckCircle2 className="h-4 w-4 mr-2" /> Bundle purchased
+                  </Button>
+                ) : !bundlePriceShown ? (
+                  <TalkToSalesButton
+                    topic="Master Class — Complete Bundle"
+                    size="lg"
+                    className="w-full sm:w-auto"
+                    data-testid="button-bundle-sales"
+                  />
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+                    <Button
+                      size="lg"
+                      className={`w-full sm:w-auto ${isInCart("course_bundle") ? "bg-muted bg-muted text-foreground" : ""}`}
+                      variant="outline"
+                      disabled={isInCart("course_bundle")}
+                      onClick={() => {
+                        addItem({
+                          id: "course_bundle",
+                          type: "course_bundle",
+                          name: "Master Class — Complete Bundle",
+                          price: BUNDLE_PRICE_CENTS,
+                          description: "All four modules — licensing, GMB, website & SEO",
+                        });
+                        toast({ title: "Added to cart", description: "Master Class Bundle has been added to your cart." });
+                      }}
+                      data-testid="button-add-cart-bundle"
+                    >
+                      {isInCart("course_bundle") ? (
+                        <><CheckCircle2 className="h-4 w-4 mr-2" /> In cart</>
+                      ) : (
+                        <><ShoppingCart className="h-4 w-4 mr-2" /> Add to cart</>
+                      )}
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="w-full sm:w-auto"
+                      data-testid="button-enroll-bundle"
+                      onClick={() => enrollMutation.mutate({ bundle: true })}
+                      disabled={enrollMutation.isPending}
+                    >
+                      {enrollMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                      Buy now — {usd(BUNDLE_PRICE_CENTS)}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Section>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {modules?.map((mod) => {
                 const ModIcon = MODULE_ICONS[mod.category] || BookOpen;
-                const gradientClass = MODULE_COLORS[mod.category] || "from-gray-600 to-gray-800";
                 const isPurchased = hasBundle || purchasedModuleIds.has(mod.id);
                 const priceShown = showsPrice(mod.price);
                 return (
-                  <Card key={mod.id} className={`overflow-hidden ${isPurchased ? "ring-2 ring-green-500/50" : ""}`} data-testid={`card-module-${mod.category}`}>
-                    <div className={`bg-gradient-to-r ${gradientClass} p-4 sm:p-6 text-white relative`}>
+                  <Section flush key={mod.id} className={`overflow-hidden ${isPurchased ? "ring-2 ring-border" : ""}`} testId={`card-module-${mod.category}`}>
+                    <div className={`  p-4 sm:p-6 text-foreground relative`}>
                       {isPurchased && (
-                        <Badge className="absolute top-3 right-3 bg-green-600 text-white gap-1" data-testid={`badge-purchased-${mod.category}`}>
+                        <Badge className="absolute top-3 right-3 bg-muted text-foreground gap-1" data-testid={`badge-purchased-${mod.category}`}>
                           <CheckCircle2 className="h-3 w-3" /> Purchased
                         </Badge>
                       )}
                       <ModIcon className="h-8 w-8 mb-3 opacity-80" />
-                      <h3 className="text-lg font-bold">{mod.title}</h3>
+                      <h3 className="text-base font-semibold">{mod.title}</h3>
                       {priceShown ? (
                         <div className="flex items-baseline gap-1 mt-2">
-                          <span className="text-2xl sm:text-3xl font-bold">{usd(mod.price)}</span>
+                          <span className="text-2xl font-semibold">{usd(mod.price)}</span>
                           <span className="text-xs sm:text-sm opacity-70">one-time</span>
                         </div>
                       ) : (
@@ -2578,15 +2583,15 @@ export default function MasterClassPage() {
                         <ul className="space-y-2">
                           {mod.features.map((feat, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm">
-                              <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                              <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                               <span>{feat}</span>
                             </li>
                           ))}
                         </ul>
                       )}
                       {isPurchased ? (
-                        <Button
-                          className="w-full mt-5 bg-green-600 hover:bg-green-700"
+                        <Button variant="outline"
+                          className="w-full mt-5  "
                           disabled
                           data-testid={`button-enrolled-${mod.category}`}
                         >
@@ -2596,14 +2601,14 @@ export default function MasterClassPage() {
                         // No price and no checkout at or above the sales threshold: the inquiry form names the module.
                         <TalkToSalesButton
                           topic={`Master Class — ${mod.title}`}
-                          className="w-full mt-5 bg-[#4A6CF7] hover:bg-[#3B5CE5]"
-                          data-testid={`button-module-sales-${mod.category}`}
+                          className="w-full mt-5  "
+                          variant="outline" data-testid={`button-module-sales-${mod.category}`}
                         />
                       ) : (
                         <div className="flex gap-2 mt-5">
-                          <Button
-                            className={`flex-1 ${isInCart(`course_module_${mod.id}`) ? "bg-green-600 hover:bg-green-600" : ""}`}
-                            variant={isInCart(`course_module_${mod.id}`) ? "default" : "outline"}
+                          <Button variant="outline"
+                            className={`flex-1 ${isInCart(`course_module_${mod.id}`) ? "bg-muted bg-muted" : ""}`}
+
                             disabled={isInCart(`course_module_${mod.id}`)}
                             onClick={() => {
                               addItem({
@@ -2619,107 +2624,33 @@ export default function MasterClassPage() {
                             data-testid={`button-add-cart-${mod.category}`}
                           >
                             {isInCart(`course_module_${mod.id}`) ? (
-                              <><CheckCircle2 className="h-4 w-4 mr-1" /> In Cart</>
+                              <><CheckCircle2 className="h-4 w-4 mr-1" /> In cart</>
                             ) : (
-                              <><ShoppingCart className="h-4 w-4 mr-1" /> Add to Cart</>
+                              <><ShoppingCart className="h-4 w-4 mr-1" /> Add to cart</>
                             )}
                           </Button>
-                          <Button
-                            className="bg-[#4A6CF7] hover:bg-[#3B5CE5]"
+                          <Button variant="outline"
+                            className=" "
                             data-testid={`button-enroll-${mod.category}`}
                             onClick={() => enrollMutation.mutate({ moduleId: mod.id })}
                             disabled={enrollMutation.isPending}
                           >
                             {enrollMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                            Buy Now
+                            Buy now
                           </Button>
                         </div>
                       )}
                     </CardContent>
-                  </Card>
+                  </Section>
                 );
               })}
             </div>
 
-            <Card className={`border-[#F97316]/30 bg-gradient-to-br from-[#F97316]/10 via-[#F97316]/5 to-transparent overflow-hidden relative ${hasBundle ? "ring-2 ring-green-500/50" : ""}`}>
-              {/* "Best value" only when the page can show the saving that backs it. */}
-              {bundleSavingsCents !== null && (
-                <div className="absolute top-3 right-3">
-                  <Badge className="bg-red-600 text-white text-xs px-2 py-0.5" data-testid="badge-bundle-best-value">BEST VALUE</Badge>
-                </div>
-              )}
-              <CardContent className="p-4 sm:p-6 text-center">
-                <Star className="h-8 w-8 text-[#F97316] mx-auto mb-3" />
-                <h3 className="text-lg sm:text-xl font-bold mb-2">Complete Master Class Bundle</h3>
-                <p className="text-muted-foreground text-sm mb-4 max-w-lg mx-auto">
-                  Get all four modules for one price. The complete system — from forming your business to dominating local search. Built by owners who scaled from solo operators to hundreds of employees.
-                </p>
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  {modulesTotalCents !== null && modulesTotalCents > BUNDLE_PRICE_CENTS && (
-                    <span className="text-xl sm:text-2xl font-bold text-muted-foreground line-through" data-testid="text-bundle-was">{usd(modulesTotalCents)}</span>
-                  )}
-                  {/* Quoted bundles skip the price slot: the button below says "Talk to a sales rep". */}
-                  {bundlePriceShown && <span className="text-2xl sm:text-3xl font-bold text-[#F97316]" data-testid="text-bundle-price">{usd(BUNDLE_PRICE_CENTS)}</span>}
-                </div>
-                {bundleSavingsCents !== null && (
-                  <p className="text-xs text-muted-foreground mb-4" data-testid="text-bundle-savings">
-                    Save {usd(bundleSavingsCents)} — the four modules total {usd(modulesTotalCents!)} purchased separately
-                  </p>
-                )}
-                {hasBundle ? (
-                  <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" disabled data-testid="button-enrolled-bundle">
-                    <CheckCircle2 className="h-4 w-4 mr-2" /> Bundle Purchased
-                  </Button>
-                ) : !bundlePriceShown ? (
-                  <TalkToSalesButton
-                    topic="Master Class — Complete Bundle"
-                    size="lg"
-                    className="w-full sm:w-auto bg-[#F97316] hover:bg-[#E86C0A] text-white"
-                    data-testid="button-bundle-sales"
-                  />
-                ) : (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-                    <Button
-                      size="lg"
-                      className={`w-full sm:w-auto ${isInCart("course_bundle") ? "bg-green-600 hover:bg-green-600 text-white" : ""}`}
-                      variant={isInCart("course_bundle") ? "default" : "outline"}
-                      disabled={isInCart("course_bundle")}
-                      onClick={() => {
-                        addItem({
-                          id: "course_bundle",
-                          type: "course_bundle",
-                          name: "Master Class — Complete Bundle",
-                          price: BUNDLE_PRICE_CENTS,
-                          description: "All four modules — licensing, GMB, website & SEO",
-                        });
-                        toast({ title: "Added to cart", description: "Master Class Bundle has been added to your cart." });
-                      }}
-                      data-testid="button-add-cart-bundle"
-                    >
-                      {isInCart("course_bundle") ? (
-                        <><CheckCircle2 className="h-4 w-4 mr-2" /> In Cart</>
-                      ) : (
-                        <><ShoppingCart className="h-4 w-4 mr-2" /> Add to Cart</>
-                      )}
-                    </Button>
-                    <Button
-                      size="lg"
-                      className="w-full sm:w-auto bg-[#F97316] hover:bg-[#E86C0A] text-white"
-                      data-testid="button-enroll-bundle"
-                      onClick={() => enrollMutation.mutate({ bundle: true })}
-                      disabled={enrollMutation.isPending}
-                    >
-                      {enrollMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                      Buy Now — {usd(BUNDLE_PRICE_CENTS)}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            <Card className="border-dashed">
+
+            <Section flush className="border-dashed">
               <CardContent className="p-4 sm:p-6">
-                <h3 className="text-base font-bold mb-3 text-center">What's in the Complete Bundle</h3>
+                <h3 className="text-base font-semibold mb-3 text-center">What’s included</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {[
                     { label: "Business Formation & Licensing", desc: "All 50 states covered" },
@@ -2731,7 +2662,7 @@ export default function MasterClassPage() {
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-bold text-green-500">Included</p>
+                        <p className="text-sm font-semibold text-muted-foreground">Included</p>
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">{item.label}</p>
@@ -2742,15 +2673,15 @@ export default function MasterClassPage() {
                 </div>
                 <div className="text-center mt-4 pt-4 border-t">
                   {modulesTotalCents !== null && (
-                    <p className="text-sm text-muted-foreground">Modules bought separately: <span className="font-bold line-through">{usd(modulesTotalCents)}</span></p>
+                    <p className="text-sm text-muted-foreground">Modules bought separately: <span className="font-semibold line-through">{usd(modulesTotalCents)}</span></p>
                   )}
                   {bundlePriceShown ? (
-                    <p className="text-lg font-bold text-[#F97316]">Bundle price: {usd(BUNDLE_PRICE_CENTS)}</p>
+                    <p className="text-lg font-semibold text-muted-foreground">Bundle price: {usd(BUNDLE_PRICE_CENTS)}</p>
                   ) : (
                     <TalkToSalesButton
                       topic="Master Class — Complete Bundle"
                       variant="link"
-                      className="text-lg font-bold text-[#F97316] h-auto p-0 whitespace-normal"
+                      className="text-lg font-semibold text-muted-foreground h-auto p-0 whitespace-normal"
                       data-testid="button-bundle-summary-sales"
                     >
                       {SALES_REP_LABEL} about the complete bundle
@@ -2758,12 +2689,12 @@ export default function MasterClassPage() {
                   )}
                 </div>
               </CardContent>
-            </Card>
+            </Section>
 
-            <Card className="bg-muted/30">
+            <Section flush className="bg-muted/30">
               <CardContent className="p-4 sm:p-6">
-                <h3 className="text-base font-bold mb-3 flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-[#4A6CF7]" />
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-muted-foreground" />
                   Frequently Asked Questions
                 </h3>
                 <div className="space-y-3">
@@ -2786,10 +2717,10 @@ export default function MasterClassPage() {
                   ))}
                 </div>
               </CardContent>
-            </Card>
+            </Section>
           </TabsContent>
         </Tabs>
-      </div>
+      </AppPage>
       <PublicPageFooter />
     </div>
     </>

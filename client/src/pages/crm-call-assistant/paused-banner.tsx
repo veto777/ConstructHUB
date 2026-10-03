@@ -1,5 +1,6 @@
+import { Notice } from "@/components/app-ui";
 import { PauseCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CALL_ASSISTANT_NUMBER_RULES } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
@@ -7,11 +8,12 @@ import type { VoiceStatus } from "./index";
 /** "Paused — update your payment method": the one banner for a bought add-on whose payment failed. */
 export function CallAssistantPausedBanner({ status }: { status: VoiceStatus }) {
   return (
-    <Card role="alert" className="border-amber-500/50 bg-amber-50/60 dark:bg-amber-950/20" data-testid="banner-call-assistant-paused">
-      <CardContent className="flex flex-wrap items-start gap-3 p-4">
-        <PauseCircle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="font-semibold" data-testid="text-call-assistant-paused">Paused — update your payment method</p>
+    <Notice tone="warning" testId="banner-call-assistant-paused"
+      title={<span data-testid="text-call-assistant-paused">Paused — update your payment method</span>}>
+      <div className="mt-2">        <Button asChild variant="outline" size="sm">
+          <a href={status.billingHref ?? "/settings?tab=billing"} data-testid="link-call-assistant-paused-billing">Update payment method</a>
+        </Button></div>
+      <details className="mt-2"><summary className="cursor-pointer py-1">What happens to calls and numbers?</summary>
           <p className="text-sm text-muted-foreground">
             The subscription's last payment didn't go through, so the assistant isn't answering calls. Callers hear a short
             "taking a break" message.{" "}
@@ -24,11 +26,7 @@ export function CallAssistantPausedBanner({ status }: { status: VoiceStatus }) {
                   : "The payment is no longer being retried. Update your payment method to restart the assistant."}
             {" "}You can still read your settings and call log.
           </p>
-        </div>
-        <Button asChild size="sm">
-          <a href={status.billingHref ?? "/settings?tab=billing"} data-testid="link-call-assistant-paused-billing">Update payment method</a>
-        </Button>
-      </CardContent>
-    </Card>
+      </details>
+    </Notice>
   );
 }

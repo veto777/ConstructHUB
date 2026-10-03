@@ -1,8 +1,9 @@
+import { Section } from "@/components/app-ui";
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatPhone, type ForwardingCarrier, type VoiceNumber } from "./numbers-shared";
 
@@ -37,11 +38,11 @@ export function ForwardingInstructions({ numbers, carriers, advice, initialId }:
   };
 
   return (
-    <Card data-testid="card-voice-forwarding">
+    <Section flush testId="card-voice-forwarding">
       <CardHeader className="space-y-1">
         <CardTitle className="text-lg">Forward your existing line</CardTitle>
         <CardDescription>
-          Keep the number on your trucks, site and ads. Point it at the assistant and every call it can't reach you on goes to the assistant.
+          Send calls from your existing line to the assistant.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -51,7 +52,7 @@ export function ForwardingInstructions({ numbers, carriers, advice, initialId }:
           <div className="flex flex-wrap items-center gap-3">
             {usable.length > 1 ? (
               <Select value={current.id} onValueChange={setId}>
-                <SelectTrigger className="w-auto min-w-[16rem]" aria-label="Number to forward to" data-testid="select-voice-forwarding-number"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-auto sm:min-w-[16rem]" aria-label="Number to forward to" data-testid="select-voice-forwarding-number"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {usable.map((n) => <SelectItem key={n.id} value={n.id}>{formatPhone(n.phoneNumber)}{n.label ? ` — ${n.label}` : ""}</SelectItem>)}
                 </SelectContent>
@@ -66,9 +67,9 @@ export function ForwardingInstructions({ numbers, carriers, advice, initialId }:
           </div>
         )}
 
-        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+        <details><summary className="cursor-pointer py-2 text-sm">Before you forward</summary><ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           {advice.map((a) => <li key={a}>{a}</li>)}
-        </ul>
+        </ul></details>
 
         <Accordion type="single" collapsible className="w-full" data-testid="accordion-voice-forwarding">
           {carriers.map((c) => (
@@ -88,6 +89,6 @@ export function ForwardingInstructions({ numbers, carriers, advice, initialId }:
           Star codes differ by line type and plan; if a code doesn't confirm, your carrier's app or support line can set forwarding for you.
         </p>
       </CardContent>
-    </Card>
+    </Section>
   );
 }

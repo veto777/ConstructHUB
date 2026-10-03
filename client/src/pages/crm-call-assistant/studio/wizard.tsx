@@ -1,8 +1,9 @@
+import { Section } from "@/components/app-ui";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Loader2, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -61,23 +62,23 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
     <div className="pt-4 space-y-4" data-testid="studio-wizard">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">Set up your assistant</h2>
-          <p className="text-sm text-muted-foreground">Ten short steps. The more you tell it, the better it answers — everything can be changed later.</p>
+          <h2 className="text-base font-semibold">Set up your assistant</h2>
+          <p className="text-sm text-muted-foreground">Set up once, then update any detail later.</p>
         </div>
         {onSkip && <Button variant="ghost" size="sm" onClick={onSkip} data-testid="button-wizard-skip">Skip to the editor</Button>}
       </div>
 
-      <ol className="flex flex-wrap gap-1.5" aria-label="Setup steps" data-testid="wizard-steps">
+      <ol className="flex gap-1.5 overflow-x-auto pb-2" aria-label="Setup steps" data-testid="wizard-steps">
         {WIZARD_STEPS.map((s, i) => {
           const done = i < stepIdx;
           const bad = saveFailed.has(s.id) || (issuesFor(issues, s.sections as readonly StudioSectionId[]).length > 0 && i < stepIdx);
           return (
-            <li key={s.id}>
+            <li key={s.id} className="shrink-0">
               <button type="button" data-testid={`wizard-step-${s.id}`} aria-current={i === stepIdx ? "step" : undefined}
                 onClick={() => (i <= stepIdx ? setStepIdx(i) : void go(i))}
                 data-save-failed={saveFailed.has(s.id) ? "true" : undefined}
-                className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
-                  i === stepIdx ? "border-primary bg-primary text-primary-foreground" : done ? "bg-muted" : "text-muted-foreground",
+                className={cn("flex items-center gap-1.5 min-h-10 rounded-lg border px-3 py-2 text-xs",
+                  i === stepIdx ? "border-foreground bg-muted text-foreground" : done ? "bg-muted" : "text-muted-foreground",
                   saveFailed.has(s.id) && "border-destructive")}>
                 {bad ? <CircleAlert className="h-3 w-3 text-destructive" /> : done ? <Check className="h-3 w-3" /> : <span className="tabular-nums">{i + 1}</span>}
                 {s.label}
@@ -87,7 +88,7 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
         })}
       </ol>
 
-      <Card>
+      <Section flush>
         <CardContent className="p-4 sm:p-6 space-y-6">
           {step.id === "review" ? (
             <ReviewStep draft={draft} issues={issues} noticeForced={recordingNoticeStates(draft).length > 0} onJump={(id) => setStepIdx(WIZARD_STEPS.findIndex((s) => (s.sections as readonly string[]).includes(id)))} />
@@ -100,9 +101,9 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
             </ul>
           )}
         </CardContent>
-      </Card>
+      </Section>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 [&>div]:flex-1 sm:[&>div]:flex-none [&>div>button]:w-full">
         <Button variant="outline" onClick={() => void go(stepIdx - 1)} disabled={stepIdx === 0} data-testid="button-wizard-back"><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button>
         <div className="flex items-center gap-2">
           {save.isPending && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Saving…</span>}

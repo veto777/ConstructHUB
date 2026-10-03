@@ -1,3 +1,4 @@
+import { Toolbar } from "@/components/app-ui";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -83,7 +84,7 @@ export function CallsPanel({ canManage }: { canManage: boolean }) {
         setOutcome(p);
         writeParams({ outcome: p });
       }} />
-      <div role="tablist" aria-label="Calls views" className="inline-flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+      <div role="tablist" aria-label="Calls views" className="flex overflow-x-auto gap-1 rounded-xl bg-muted p-1">
         <ViewButton active={view === "log"} onClick={() => pick("log")} testId="button-calls-view-log" icon={PhoneIncoming}>Calls</ViewButton>
         <ViewButton active={view === "spam"} onClick={() => pick("spam")} testId="button-calls-view-spam" icon={ShieldBan}>
           Spam blocked
@@ -119,7 +120,7 @@ function ViewButton({ active, onClick, testId, icon: Icon, children }: {
       onClick={onClick}
       data-testid={testId}
       className={cn(
-        "inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex shrink-0 min-h-10 items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
       )}
     >
@@ -160,21 +161,7 @@ function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) => void
   return (
     <section className="space-y-3" aria-labelledby="calls-log-title">
       <h2 id="calls-log-title" className="sr-only">Call log</h2>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="relative flex-1">
-          <Label htmlFor="calls-search" className="sr-only">Search calls</Label>
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <Input
-            id="calls-search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search call #, name, number, city or what they needed"
-            className="pl-8"
-            data-testid="input-calls-search"
-          />
-        </div>
-        <div className="sm:w-48">
-          <Label htmlFor="calls-outcome" className="sr-only">Outcome</Label>
+      <Toolbar search={{ value: search, onChange: setSearch, placeholder: "Search calls", testId: "input-calls-search" }} activeFilters={outcome === "all" ? 0 : 1} filters={(
           <Select value={outcome} onValueChange={setOutcome}>
             <SelectTrigger id="calls-outcome" data-testid="select-calls-outcome"><SelectValue placeholder="All outcomes" /></SelectTrigger>
             <SelectContent>
@@ -184,8 +171,7 @@ function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) => void
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </div>
+      )} />
 
       {list.isLoading ? (
         <TableSkeleton />
@@ -332,28 +318,28 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 sm:p-5 space-y-3" aria-labelledby="spam-summary-title" data-testid="card-spam-summary">
+      <section className="rounded-xl border bg-card p-4 sm:p-5 space-y-3" aria-labelledby="spam-summary-title" data-testid="card-spam-summary">
         <div className="flex flex-wrap items-start gap-3">
           <ShieldBan className="h-6 w-6 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <h2 id="spam-summary-title" className="text-lg font-semibold">{CALL_ASSISTANT_SPAM.headline}</h2>
-            <p className="text-sm text-muted-foreground">{CALL_ASSISTANT_SPAM.lead} {CALL_ASSISTANT_SPAM.screen} {CALL_ASSISTANT_SPAM.forwarding}</p>
+            <h2 id="spam-summary-title" className="text-base font-semibold">{CALL_ASSISTANT_SPAM.headline}</h2>
+            <p className="text-sm text-muted-foreground">{CALL_ASSISTANT_SPAM.lead}</p>
           </div>
         </div>
         <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <div className="rounded-lg bg-background/70 border p-3">
+          <div className="p-3">
             <dt className="text-xs text-muted-foreground">Spam stopped this month</dt>
             <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-this-month">{(month?.spamCalls ?? 0).toLocaleString("en-US")}</dd>
           </div>
-          <div className="rounded-lg bg-background/70 border p-3">
+          <div className="p-3">
             <dt className="text-xs text-muted-foreground">Rejected before answering</dt>
             <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-rejected">{(month?.rejected ?? 0).toLocaleString("en-US")}</dd>
           </div>
-          <div className="rounded-lg bg-background/70 border p-3">
+          <div className="p-3">
             <dt className="text-xs text-muted-foreground">Numbers blocked</dt>
             <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-numbers-blocked">{(ledger.data?.blocked ?? 0).toLocaleString("en-US")}</dd>
           </div>
-          <div className="rounded-lg bg-background/70 border p-3">
+          <div className="p-3">
             <dt className="text-xs text-muted-foreground">Free spam calls used</dt>
             <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-free-used">
               {(month?.freeSpamCalls ?? 0).toLocaleString("en-US")}<span className="text-sm font-medium text-muted-foreground"> / {(month?.freeSpamCallsLimit ?? CALL_ASSISTANT_FREE_SPAM_CALLS).toLocaleString("en-US")}</span>
@@ -367,9 +353,7 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
         <div>
           <h2 id="spam-ledger-title" className="text-base font-semibold">Screened numbers</h2>
           <p className="text-sm text-muted-foreground">
-            The assistant asks every caller what the call is about. A near-certain sales pitch or scam is a strike;
-            two strikes and the number is rejected before it rings through. Spam calls never notify anyone or create a lead.
-            Got one wrong? Unblock it and its next calls are answered again.
+            Unblock a number to let its calls through again.
           </p>
         </div>
 

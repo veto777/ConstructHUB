@@ -30,7 +30,7 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
   const call = q.data;
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto" data-testid="sheet-call-detail">
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto break-words" data-testid="sheet-call-detail">
         <SheetHeader>
           <SheetTitle className="flex flex-wrap items-center gap-2" data-testid="text-call-detail-title">
             {call?.callNo != null && <span className="font-mono text-base text-muted-foreground" data-testid="text-call-detail-no">Call #{call.callNo}</span>}
@@ -105,7 +105,7 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
             {call.slots && Object.keys(call.slots).length > 0 && (
               <section>
                 <h3 className="mb-2 font-medium">What was collected</h3>
-                <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-3 gap-y-1" data-testid="list-call-slots">
+                <dl className="grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="list-call-slots">
                   {orderedSlots(call.slots).map(([k, v]) => (
                     <div key={k} className="contents">
                       <dt className="text-muted-foreground">{k.replace(/_/g, " ")}</dt>
@@ -134,10 +134,10 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
                 <ol className="space-y-2" data-testid="list-call-transcript">
                   {call.transcript.map((t, i) => (
                     <li key={i} className={`flex gap-2 ${t.role === "system" ? "text-xs text-muted-foreground italic" : ""}`}>
-                      <span className={`w-16 shrink-0 text-xs font-medium uppercase tracking-wide ${t.role === "assistant" ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"}`}>
+                      <span className={`w-16 shrink-0 text-xs font-medium  ${t.role === "assistant" ? "text-foreground" : "text-muted-foreground"}`}>
                         {t.role === "assistant" ? (call.persona ? personaName(call.persona) : "assistant") : t.role}
                       </span>
-                      <span className="whitespace-pre-wrap">{t.text}</span>
+                      <span className="min-w-0 whitespace-pre-wrap break-words">{t.text}</span>
                     </li>
                   ))}
                 </ol>

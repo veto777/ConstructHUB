@@ -1,8 +1,9 @@
+import { Section } from "@/components/app-ui";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, Search, ArrowLeft, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -71,9 +72,9 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
   });
 
   return (
-    <Card data-testid="card-voice-number-buy">
+    <Section flush testId="card-voice-number-buy">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-lg flex flex-wrap items-center gap-2">
+        <CardTitle className="text-base flex flex-wrap items-center gap-2">
           <PhoneCall className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           Get a local number
           {mock && <Badge variant="outline" data-testid="badge-voice-numbers-mock">Mock carrier</Badge>}
@@ -110,7 +111,7 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
             <p className="text-xs text-muted-foreground">
               A number in your callers' area code looks local on their phone. A city narrows the list; if nothing comes back, try just the state.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <Button type="submit" disabled={!state || !areaCodeOk} data-testid="button-voice-number-search">
                 <Search className="h-4 w-4 mr-1.5" aria-hidden="true" />Find numbers
               </Button>
@@ -151,7 +152,7 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
                 </RadioGroup>
               </>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <Button variant="outline" onClick={() => setStep("where")} data-testid="button-voice-number-back"><ArrowLeft className="h-4 w-4 mr-1.5" aria-hidden="true" />Change area</Button>
               <Button disabled={!picked} onClick={() => { setLocation((l) => l || [chosen?.locality, state].filter(Boolean).join(", ")); setStep("details"); }} data-testid="button-voice-number-next">Use this number</Button>
             </div>
@@ -183,7 +184,7 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
               The carrier keeps a number for at least {minDays} days, so it can be released {minDays} days after you buy it.
               {mock ? " Mock carrier: nothing is bought and the number won't ring." : ""}
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <Button type="button" variant="outline" onClick={() => setStep("pick")} disabled={buy.isPending} data-testid="button-voice-number-back-pick"><ArrowLeft className="h-4 w-4 mr-1.5" aria-hidden="true" />Back</Button>
               <Button type="submit" disabled={buy.isPending} data-testid="button-voice-number-buy">
                 {buy.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden="true" /> : null}
@@ -193,6 +194,6 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
           </form>
         )}
       </CardContent>
-    </Card>
+    </Section>
   );
 }
