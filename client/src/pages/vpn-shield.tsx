@@ -1,19 +1,25 @@
 import { useAppOrigin } from "@/lib/app-origin";
 import { useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  ShieldOff, BarChart3, Eye, Bot, Building, Search,
-  ChevronRight, Copy, Globe, Monitor, Smartphone, Tablet,
-  MapPin, Fingerprint, Clock, AlertTriangle, Shield,
-  Code2, Settings2, Info, CheckCircle,
+  AppPage,
+  PageHeader,
+  Section,
+  Notice,
+  Stat,
+  StatGrid,
+} from "@/components/app-ui";
+import {
+  AlertTriangle,
+  ChevronRight, Copy, Monitor, Smartphone, Tablet,
+  MapPin, Fingerprint, Clock, Shield,
+  Search,
 } from "lucide-react";
 
 type VpnDomain = {
@@ -61,10 +67,10 @@ type VpnStats = {
 };
 
 const tabs = [
-  { id: "overview", label: "Overview", icon: BarChart3 },
-  { id: "blocked", label: "Flagged Visits", icon: ShieldOff },
-  { id: "install", label: "Install Script", icon: Code2 },
-  { id: "settings", label: "Settings", icon: Settings2 },
+  { id: "overview", label: "Overview" },
+  { id: "blocked", label: "Flagged visits" },
+  { id: "install", label: "Install script" },
+  { id: "settings", label: "Settings" },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
@@ -89,17 +95,19 @@ const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;
 
 function NoSiteCard() {
   return (
-    <Card className="p-6 sm:p-8 text-center mb-6" data-testid="card-vpn-no-site">
-      <AlertTriangle className="h-8 w-8 text-orange-400 mx-auto mb-2" />
-      <p className="text-sm font-semibold text-foreground">No site yet</p>
-      <p className="text-muted-foreground text-sm mt-1" data-testid="text-no-domain-selected">
+    <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center" data-testid="card-vpn-no-site">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <AlertTriangle className="h-5 w-5" strokeWidth={1.6} />
+      </div>
+      <div className="mt-3 text-sm font-medium">No site yet</div>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground" data-testid="text-no-domain-selected">
         VPN Shield uses the sites you track. Add one in{" "}
         <Link href="/ip-tracker" className="text-primary underline underline-offset-2" data-testid="link-vpn-add-site-ip-tracker">IP Tracker</Link>
         {" "}or{" "}
         <Link href="/google-ads" className="text-primary underline underline-offset-2" data-testid="link-vpn-add-site-click-guard">Google Click Guard</Link>
         , then come back here to install VPN Shield and choose its settings.
       </p>
-    </Card>
+    </div>
   );
 }
 
@@ -127,21 +135,6 @@ function DeviceIcon({ type }: { type: string | null }) {
   return <Monitor className="h-3.5 w-3.5" />;
 }
 
-function StatCard({ label, value, icon: Icon, sub }: { label: string; value: string | number; icon: any; sub?: string }) {
-  return (
-    <Card className="border-orange-500/10" data-testid={`card-stat-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between gap-1 mb-2">
-          <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">{label}</span>
-          <Icon className="h-4 w-4 text-orange-500/60" />
-        </div>
-        <div className="text-xl sm:text-2xl font-bold text-foreground tabular-nums truncate">{value}</div>
-        {sub && <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>}
-      </CardContent>
-    </Card>
-  );
-}
-
 function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnStats | undefined }) {
   // The stats endpoint counts every detection; split them by the action that was taken.
   const { data: visits } = useQuery<VpnVisit[]>({
@@ -151,107 +144,52 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
   const blockedCount = visits ? visits.filter(v => v.action === "block").length : null;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-yellow-500/5">
-        <CardContent className="p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1" data-testid="text-hero-title">
-            Review Possible Proxy Traffic
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
-            VPN Shield flags possible VPN or proxy signals using IP ranges and browser reports. Its optional browser overlay or redirect runs after page load and can be bypassed; it is not network access control.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-md bg-orange-500/10 flex items-center justify-center shrink-0">
-                <BarChart3 className="h-5 w-5 text-orange-500" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-analytics">Review Traffic Signals</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">VPN usage can be legitimate. Review patterns in context before acting.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-md bg-yellow-500/10 flex items-center justify-center shrink-0">
-                <Eye className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-snooping">Filter Anonymous Traffic</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Browser and IP signals may suggest proxy use, but can produce false positives.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-md bg-orange-500/10 flex items-center justify-center shrink-0">
-                <Bot className="h-5 w-5 text-orange-500" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-bots">Flag Possible Proxy Traffic</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Proxy networks are used for scraping, click fraud, and fake leads.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-md bg-yellow-500/10 flex items-center justify-center shrink-0">
-                <Building className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground" data-testid="text-feature-enterprise">Browser-Based Controls</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Optional overlays and redirects affect only visitors who execute the script.</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4 sm:space-y-5">
+      <Notice>
+        <span data-testid="text-crawler-notice">
+          <span className="font-semibold">Search engine crawlers</span>{" "}
+          (Google, Bing, Yahoo) are exempted by user-agent matching, which can
+          be spoofed. VPN detection is heuristic.
+        </span>
+      </Notice>
 
-      <Card className="border-orange-500/20">
-        <CardContent className="p-3 sm:p-4 flex items-start sm:items-center gap-3">
-          <CheckCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5 sm:mt-0" />
-          <p className="text-xs sm:text-sm text-foreground" data-testid="text-crawler-notice">
-            <span className="font-semibold">Search engine crawlers</span> (Google, Bing, Yahoo) are exempted by user-agent matching, which can be spoofed. VPN detection is heuristic.
-          </p>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
-        <StatCard label="Detections" value={stats?.total ?? 0} icon={Eye} sub="All time, any action" />
-        <StatCard label="Detections Today" value={stats?.today ?? 0} icon={Clock} />
-        <StatCard label="Blocked" value={domainId ? (blockedCount ?? "…") : 0} icon={ShieldOff} sub="Overlay shown" />
-        <StatCard label="Unique VPN IPs" value={stats?.uniqueIps ?? 0} icon={Fingerprint} sub="All time" />
-        <StatCard label="Top Provider" value={stats?.topProviders?.[0]?.name ?? "None"} icon={Globe} sub={stats?.topProviders?.[0] ? `${stats.topProviders[0].count} detection${stats.topProviders[0].count !== 1 ? "s" : ""}` : undefined} />
-      </div>
+      <StatGrid cols={4}>
+        <Stat label="Detections" testId="card-stat-detections"
+          value={stats?.total ?? 0}
+          hint="All time, any action" />
+        <Stat label="Detections today" testId="card-stat-detections-today"
+          value={stats?.today ?? 0} />
+        <Stat label="Blocked" testId="card-stat-blocked"
+          value={domainId ? (blockedCount ?? "…") : 0}
+          hint="Overlay shown" />
+        <Stat label="Unique VPN IPs" testId="card-stat-unique-vpn-ips"
+          value={stats?.uniqueIps ?? 0}
+          hint="All time" />
+      </StatGrid>
 
       {stats && stats.topProviders.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Top VPN Providers</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="space-y-2">
-                {stats.topProviders.slice(0, 8).map(p => (
-                  <div key={p.name} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-foreground truncate">{p.name}</span>
-                    <Badge variant="outline" className="text-muted-foreground tabular-nums shrink-0">{p.count}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Top Countries</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <p className="text-xs text-muted-foreground mb-2" data-testid="text-countries-source-note">Country/city come from Cloudflare on visits recorded after this update; older visits show Unknown.</p>
-              <div className="space-y-2">
-                {stats.topCountries.slice(0, 8).map(c => (
-                  <div key={c.name} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-foreground truncate">{c.name}</span>
-                    <Badge variant="outline" className="text-muted-foreground tabular-nums shrink-0">{c.count}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
+          <Section title="Top VPN providers">
+            <div className="space-y-2">
+              {stats.topProviders.slice(0, 8).map(p => (
+                <div key={p.name} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate">{p.name}</span>
+                  <span className="tabular-nums text-muted-foreground">{p.count}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+          <Section title="Top countries">
+            <p className="mb-2 text-xs text-muted-foreground" data-testid="text-countries-source-note">Country/city come from Cloudflare on visits recorded after this update; older visits show Unknown.</p>
+            <div className="space-y-2">
+              {stats.topCountries.slice(0, 8).map(c => (
+                <div key={c.name} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate">{c.name}</span>
+                  <span className="tabular-nums text-muted-foreground">{c.count}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
         </div>
       )}
     </div>
@@ -275,21 +213,21 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-0 flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by IP address..."
+            placeholder="Search by IP address…"
             value={ipSearch}
             onChange={e => { setIpSearch(e.target.value); setPage(1); }}
             className="pl-9"
             data-testid="input-vpn-ip-search"
           />
         </div>
-        <Badge variant="outline" className="text-muted-foreground" data-testid="badge-vpn-visit-count">
+        <span className="text-sm tabular-nums text-muted-foreground" data-testid="badge-vpn-visit-count">
           {filtered.length} flagged visit{filtered.length !== 1 ? "s" : ""}
           {" · "}{filtered.filter(v => v.action === "block").length} blocked
-        </Badge>
+        </span>
       </div>
 
       {isLoading ? (
@@ -297,49 +235,52 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
           <div className="animate-spin h-6 w-6 border-2 border-foreground border-t-transparent rounded-full" />
         </div>
       ) : paginated.length === 0 ? (
-        <Card className="p-8 text-center">
-          <ShieldOff className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-muted-foreground text-sm" data-testid="text-no-vpn-visits">No flagged VPN visits found</p>
-        </Card>
+        <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
+          <Shield className="h-5 w-5 text-muted-foreground" strokeWidth={1.6} />
+          <p className="mt-3 text-sm text-muted-foreground" data-testid="text-no-vpn-visits">No flagged VPN visits found</p>
+        </div>
       ) : (
         <div className="space-y-2">
           {paginated.map(v => (
-            <Card
+            <div
               key={v.id}
-              className={`transition-all ${expandedId === v.id ? "ring-1 ring-border" : ""}`}
+              className={`rounded-xl border bg-card transition-all ${expandedId === v.id ? "ring-1 ring-border" : ""}`}
               data-testid={`card-vpn-visit-${v.id}`}
             >
               <div
-                className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                className="cursor-pointer p-4 hover:bg-muted/30 transition-colors"
                 onClick={() => setExpandedId(expandedId === v.id ? null : v.id)}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-sm font-medium text-foreground" data-testid={`text-vpn-ip-${v.id}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-medium" data-testid={`text-vpn-ip-${v.id}`}>
                           {v.ipAddress}
                         </span>
                         {v.vpnProvider && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          <span className="rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
                             {v.vpnProvider}
-                          </Badge>
+                          </span>
                         )}
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        <span className="rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
                           {v.detectionMethod}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] px-1.5 py-0 ${v.action === "block" ? "border-orange-500/40 text-orange-600 dark:text-orange-400" : "text-muted-foreground"}`}
+                        </span>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                            v.action === "block"
+                              ? "border-amber-500/40 text-amber-700 dark:text-amber-400"
+                              : "text-muted-foreground"
+                          }`}
                           data-testid={`badge-vpn-action-${v.id}`}
                         >
                           {actionLabel(v.action)}
-                        </Badge>
+                        </span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         {v.fingerprint && (
                           <span className="flex items-center gap-1">
-                            <Fingerprint className="h-3 w-3" /> {v.fingerprint.slice(0, 12)}...
+                            <Fingerprint className="h-3 w-3" /> {v.fingerprint.slice(0, 12)}…
                           </span>
                         )}
                         {(v.city || v.country) && (
@@ -353,41 +294,39 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
                       </div>
                     </div>
                   </div>
-                  <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-                    <div className="flex items-center gap-1.5">
-                      <DeviceIcon type={v.deviceType} />
-                      <span>{v.browser || "Unknown"}</span>
-                    </div>
+                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+                    <DeviceIcon type={v.deviceType} />
+                    <span>{v.browser || "Unknown"}</span>
                   </div>
                   <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expandedId === v.id ? "rotate-90" : ""}`} />
                 </div>
               </div>
 
               {expandedId === v.id && (
-                <div className="border-t border-border p-4 bg-muted/20">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border-t bg-muted/20 p-4">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2 text-sm">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Detection Details</h4>
-                      <div className="flex justify-between"><span className="text-muted-foreground">IP Address</span><span className="font-mono font-medium text-foreground">{v.ipAddress}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">VPN Provider</span><span className="font-medium text-foreground">{v.vpnProvider || "Unknown"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Detection Method</span><span className="font-medium text-foreground">{v.detectionMethod}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Action</span><span className="font-medium text-foreground">{actionLabel(v.action)}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Fingerprint</span><span className="font-mono text-xs text-foreground truncate max-w-[200px]">{v.fingerprint || "N/A"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="text-foreground">{formatDate(v.visitedAt)}</span></div>
+                      <h4 className="mb-3 text-xs font-semibold text-muted-foreground">Detection details</h4>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">IP address</span><span className="font-mono font-medium">{v.ipAddress}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">VPN provider</span><span className="font-medium">{v.vpnProvider || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Detection method</span><span className="font-medium">{v.detectionMethod}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Action</span><span className="font-medium">{actionLabel(v.action)}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Fingerprint</span><span className="max-w-[200px] truncate font-mono text-xs">{v.fingerprint || "N/A"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Time</span><span>{formatDate(v.visitedAt)}</span></div>
                     </div>
                     <div className="space-y-2 text-sm">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Visitor Details</h4>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Browser</span><span className="font-medium text-foreground">{v.browser || "Unknown"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">OS</span><span className="font-medium text-foreground">{v.os || "Unknown"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Device</span><span className="font-medium text-foreground">{v.deviceType || "Unknown"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Country</span><span className="font-medium text-foreground">{v.country || "Unknown"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">City</span><span className="font-medium text-foreground">{v.city || "Unknown"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Landing Page</span><span className="text-foreground truncate max-w-[200px]">{v.landingPage || "Unknown"}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Referrer</span><span className="text-foreground truncate max-w-[200px]">{v.referrer || "Direct"}</span></div>
+                      <h4 className="mb-3 text-xs font-semibold text-muted-foreground">Visitor details</h4>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Browser</span><span className="font-medium">{v.browser || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">OS</span><span className="font-medium">{v.os || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Device</span><span className="font-medium">{v.deviceType || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span className="font-medium">{v.country || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">City</span><span className="font-medium">{v.city || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Landing page</span><span className="max-w-[200px] truncate">{v.landingPage || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Referrer</span><span className="max-w-[200px] truncate">{v.referrer || "Direct"}</span></div>
                       {v.userAgent && (
                         <>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-4">User Agent</h4>
-                          <p className="text-[11px] text-muted-foreground font-mono break-all bg-muted rounded-md p-2">
+                          <h4 className="mb-2 mt-4 text-xs font-semibold text-muted-foreground">User agent</h4>
+                          <p className="rounded-md bg-muted p-2 font-mono text-[11px] text-muted-foreground break-all">
                             {v.userAgent}
                           </p>
                         </>
@@ -396,13 +335,13 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
                   </div>
                 </div>
               )}
-            </Card>
+            </div>
           ))}
         </div>
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
           <span className="text-xs text-muted-foreground">
             Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
           </span>
@@ -440,32 +379,31 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
   };
 
   return (
-    <div className="space-y-6">
-      {domains.length > 0 && <div className="flex items-center gap-3 flex-wrap">
-        <label className="text-sm font-medium text-foreground">Select Domain:</label>
-        <select
-          className="bg-card border border-border text-foreground text-sm rounded-md px-3 py-2 outline-none"
-          value={selectedDomainId || ""}
-          onChange={(e) => setSelectedDomainId(Number(e.target.value))}
-          data-testid="select-vpn-domain"
-        >
-          {domains.map(d => (
-            <option key={d.id} value={d.id}>{d.name || d.domain}</option>
-          ))}
-        </select>
-      </div>}
+    <div className="space-y-4 sm:space-y-5">
+      {domains.length > 0 && (
+        <label className="block max-w-sm space-y-1.5 text-sm">
+          <span className="text-muted-foreground">Site</span>
+          <select
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            value={selectedDomainId || ""}
+            onChange={(e) => setSelectedDomainId(Number(e.target.value))}
+            data-testid="select-vpn-domain"
+          >
+            {domains.map(d => (
+              <option key={d.id} value={d.id}>{d.name || d.domain}</option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {selectedDomain && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Installation Code</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Add this script tag to the <code className="bg-muted px-1 py-0.5 rounded text-foreground">&lt;head&gt;</code> or before the closing <code className="bg-muted px-1 py-0.5 rounded text-foreground">&lt;/body&gt;</code> tag of your website.
+        <Section title="Installation code">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Add this script tag to the <code className="rounded bg-muted px-1 py-0.5">&lt;head&gt;</code> or before the closing <code className="rounded bg-muted px-1 py-0.5">&lt;/body&gt;</code> tag of your website.
             </p>
             <div className="relative">
-              <pre className="bg-muted rounded-md p-4 text-xs font-mono text-foreground overflow-x-auto" data-testid="text-vpn-script-code">
+              <pre className="overflow-x-auto rounded-md bg-muted p-4 font-mono text-xs" data-testid="text-vpn-script-code">
                 {scriptSnippet}
               </pre>
               <Button
@@ -478,55 +416,30 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
       )}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">How Detection Works</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          <div className="space-y-4">
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-md bg-orange-500/10 flex items-center justify-center shrink-0">
-                <Globe className="h-4 w-4 text-orange-500" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-webrtc">WebRTC IP Leak Detection</h4>
-                <p className="text-xs text-muted-foreground">Uses browser-reported WebRTC differences as one possible signal. Network configuration can also cause differences.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-md bg-yellow-500/10 flex items-center justify-center shrink-0">
-                <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-timezone">Timezone / Geo Mismatch</h4>
-                <p className="text-xs text-muted-foreground">Uses browser-reported timezone differences as a heuristic; travel and device settings can also cause mismatches.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-md bg-orange-500/10 flex items-center justify-center shrink-0">
-                <Shield className="h-4 w-4 text-orange-500" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-datacenter">Datacenter IP Range Detection</h4>
-                <p className="text-xs text-muted-foreground">Checks a limited built-in set of IP prefixes. This list may be incomplete or outdated and cannot establish VPN usage.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-md bg-yellow-500/10 flex items-center justify-center shrink-0">
-                <Fingerprint className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground" data-testid="text-detection-extensions">VPN Extension Detection</h4>
-                <p className="text-xs text-muted-foreground">Uses browser-reported extension indicators when available; it cannot reliably identify installed VPN tools.</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Section title="How detection works">
+        <ul className="space-y-3 text-sm">
+          <li>
+            <p className="font-medium" data-testid="text-detection-webrtc">WebRTC IP leak detection</p>
+            <p className="text-muted-foreground">Uses browser-reported WebRTC differences as one possible signal. Network configuration can also cause differences.</p>
+          </li>
+          <li>
+            <p className="font-medium" data-testid="text-detection-timezone">Timezone / geo mismatch</p>
+            <p className="text-muted-foreground">Uses browser-reported timezone differences as a heuristic; travel and device settings can also cause mismatches.</p>
+          </li>
+          <li>
+            <p className="font-medium" data-testid="text-detection-datacenter">Datacenter IP range detection</p>
+            <p className="text-muted-foreground">Checks a limited built-in set of IP prefixes. This list may be incomplete or outdated and cannot establish VPN usage.</p>
+          </li>
+          <li>
+            <p className="font-medium" data-testid="text-detection-extensions">VPN extension detection</p>
+            <p className="text-muted-foreground">Uses browser-reported extension indicators when available; it cannot reliably identify installed VPN tools.</p>
+          </li>
+        </ul>
+      </Section>
     </div>
   );
 }
@@ -573,102 +486,87 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
   });
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Block Mode</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 space-y-3">
-          <p className="text-xs text-muted-foreground">Choose how the browser script responds to possible proxy signals after page load.</p>
-          <div className="space-y-2">
-            {[
-              { value: "block", label: "Block", desc: "Show an overlay to flagged browsers" },
-              { value: "log", label: "Log Only", desc: "Record VPN visits but don't block them" },
-              { value: "redirect", label: "Redirect", desc: "Redirect VPN visitors to a custom URL" },
-            ].map(opt => (
-              <label
-                key={opt.value}
-                className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
-                  blockMode === opt.value ? "border-foreground/30 bg-muted/50" : "border-border"
-                }`}
-                data-testid={`option-mode-${opt.value}`}
-              >
-                <input
-                  type="radio"
-                  name="blockMode"
-                  value={opt.value}
-                  checked={blockMode === opt.value}
-                  onChange={() => setBlockMode(opt.value)}
-                  className="mt-0.5"
-                />
-                <div>
-                  <span className="text-sm font-medium text-foreground">{opt.label}</span>
-                  <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                </div>
-              </label>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="max-w-2xl space-y-4 sm:space-y-5">
+      <Section
+        title="Block mode"
+        description="Choose how the browser script responds to possible proxy signals after page load."
+      >
+        <div className="space-y-2">
+          {[
+            { value: "block", label: "Block", desc: "Show an overlay to flagged browsers" },
+            { value: "log", label: "Log only", desc: "Record VPN visits but don't block them" },
+            { value: "redirect", label: "Redirect", desc: "Redirect VPN visitors to a custom URL" },
+          ].map(opt => (
+            <label
+              key={opt.value}
+              className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
+                blockMode === opt.value ? "border-primary/60 bg-primary/5" : ""
+              }`}
+              data-testid={`option-mode-${opt.value}`}
+            >
+              <input
+                type="radio"
+                name="blockMode"
+                value={opt.value}
+                checked={blockMode === opt.value}
+                onChange={() => setBlockMode(opt.value)}
+                className="mt-0.5"
+              />
+              <div>
+                <span className="text-sm font-medium">{opt.label}</span>
+                <p className="text-xs text-muted-foreground">{opt.desc}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </Section>
 
       {blockMode === "redirect" && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Redirect URL</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <Input
-              type="url"
-              inputMode="url"
-              placeholder="https://example.com/blocked"
-              value={redirectUrl}
-              onChange={e => setRedirectUrl(e.target.value)}
-              aria-invalid={!!redirectError}
-              data-testid="input-redirect-url"
-            />
-            {redirectError && <p className="mt-2 text-xs text-destructive" data-testid="text-redirect-url-error">{redirectError}</p>}
-          </CardContent>
-        </Card>
+        <Section title="Redirect URL">
+          <Input
+            type="url"
+            inputMode="url"
+            placeholder="https://example.com/blocked"
+            value={redirectUrl}
+            onChange={e => setRedirectUrl(e.target.value)}
+            aria-invalid={!!redirectError}
+            data-testid="input-redirect-url"
+          />
+          {redirectError && <p className="mt-2 text-xs text-destructive" data-testid="text-redirect-url-error">{redirectError}</p>}
+        </Section>
       )}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Whitelisted IPs</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Enter IP addresses that should never be blocked, one per line. Useful for your office VPN or testing.
-          </p>
-          <Textarea
-            placeholder={"192.168.1.1\n10.0.0.1"}
-            value={whitelistedIps}
-            onChange={e => setWhitelistedIps(e.target.value)}
-            className="font-mono text-sm resize-none"
-            rows={5}
-            aria-invalid={!!whitelistError}
-            data-testid="textarea-whitelisted-ips"
-          />
-          {whitelistError && <p className="text-xs text-destructive" data-testid="text-whitelist-error">{whitelistError}</p>}
-        </CardContent>
-      </Card>
+      <Section
+        title="Whitelisted IPs"
+        description="IP addresses that should never be blocked, one per line. Useful for your office VPN or testing."
+      >
+        <Textarea
+          placeholder={"192.168.1.1\n10.0.0.1"}
+          value={whitelistedIps}
+          onChange={e => setWhitelistedIps(e.target.value)}
+          className="resize-none font-mono text-sm"
+          rows={5}
+          aria-invalid={!!whitelistError}
+          data-testid="textarea-whitelisted-ips"
+        />
+        {whitelistError && <p className="mt-2 text-xs text-destructive" data-testid="text-whitelist-error">{whitelistError}</p>}
+      </Section>
 
-      <Card className="border-border/60">
-        <CardContent className="p-4 flex items-center gap-3">
-          <Info className="h-5 w-5 text-muted-foreground shrink-0" />
-          <p className="text-sm text-foreground" data-testid="text-settings-crawler-whitelist">
-            <span className="font-semibold">Crawler Whitelist:</span> Googlebot, Bingbot, Yahoo Slurp, DuckDuckBot, Baiduspider, and other crawler user-agent strings are exempted. User-agent strings can be spoofed.
-          </p>
-        </CardContent>
-      </Card>
+      <Notice>
+        <span data-testid="text-settings-crawler-whitelist">
+          <span className="font-semibold">Crawler whitelist:</span> Googlebot,
+          Bingbot, Yahoo Slurp, DuckDuckBot, Baiduspider, and other crawler
+          user-agent strings are exempted. User-agent strings can be spoofed.
+        </span>
+      </Notice>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
-          className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:from-orange-600 hover:to-yellow-600"
           onClick={() => saveMutation.mutate()}
           disabled={!domainId || saveMutation.isPending || !!redirectError || !!whitelistError}
           data-testid="button-save-vpn-settings"
         >
-          {saveMutation.isPending ? "Saving..." : "Save Settings"}
+          {saveMutation.isPending ? "Saving…" : "Save settings"}
         </Button>
         {redirectError && blockMode !== "redirect" && (
           <span className="text-xs text-destructive" data-testid="text-redirect-url-error-hidden">{redirectError} Switch to Redirect to fix or clear it.</span>
@@ -704,102 +602,79 @@ export default function VpnShieldPage() {
   });
 
   return (
-    <div className="h-full overflow-y-auto bg-background text-foreground overflow-x-hidden">
-      <section className="relative z-10 pt-6 sm:pt-8 pb-8 sm:pb-12 px-3 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center shrink-0">
-                  <ShieldOff className="h-5 w-5 text-white" />
-                </div>
-                <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 px-3 py-1 text-sm" data-testid="badge-vpn-shield">
-                  <Shield className="h-3.5 w-3.5 mr-1.5" /> VPN Shield
-                </Badge>
-              </div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight" data-testid="text-vpn-page-title">
-                <span className="text-foreground">VPN </span>
-                <span className="bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent">Shield</span>
-              </h1>
-              <p className="mt-2 text-muted-foreground max-w-xl text-sm" data-testid="text-vpn-subtitle">
-                Review possible proxy traffic signals. Optional browser overlays and redirects are bypassable and may affect legitimate visitors.
-              </p>
-            </div>
+    <AppPage testId="page-vpn-shield">
+      <PageHeader
+        title="VPN Shield"
+        description="Review possible VPN or proxy traffic and choose how flagged visitors are handled. Browser overlays can be bypassed and may affect legitimate visitors."
+        actions={
+          domains.length > 0 ? (
+            <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-56 sm:flex-none">
+              <span className="text-muted-foreground sm:hidden">Site</span>
+              <select
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                value={domainId || ""}
+                onChange={(e) => setSelectedDomainId(Number(e.target.value))}
+                aria-label="Site"
+                data-testid="select-vpn-shield-domain"
+              >
+                {domains.map(d => (
+                  <option key={d.id} value={d.id}>{d.name || d.domain}</option>
+                ))}
+              </select>
+            </label>
+          ) : undefined
+        }
+      />
 
-            {domains.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className="bg-card border border-border text-foreground text-sm rounded-md px-3 py-2 outline-none min-w-0 max-w-[200px]"
-                  value={domainId || ""}
-                  onChange={(e) => setSelectedDomainId(Number(e.target.value))}
-                  aria-label="Site"
-                  data-testid="select-vpn-shield-domain"
-                >
-                  {domains.map(d => (
-                    <option key={d.id} value={d.id}>{d.name || d.domain}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* Wraps instead of scrolling so every tab stays visible at phone width. */}
-          <div className="flex flex-wrap items-center gap-1 mb-6 bg-card border border-border rounded-md p-1 sm:w-fit" role="tablist">
-            {tabs.map(tab => {
-              const TabIcon = tab.icon;
-              return (
-                <Button
-                  key={tab.id}
-                  size="sm"
-                  variant={activeTab === tab.id ? "default" : "ghost"}
-                  className={`shrink-0 text-xs sm:text-sm ${activeTab === tab.id
-                    ? "bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:from-orange-600 hover:to-yellow-600 border-0"
-                    : "text-muted-foreground"
-                  }`}
-                  onClick={() => setActiveTab(tab.id)}
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  data-testid={`tab-vpn-${tab.id}`}
-                >
-                  <TabIcon className="h-3.5 w-3.5 mr-1.5" />
-                  {tab.label}
-                </Button>
-              );
-            })}
-          </div>
-
-          {domainsLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin h-8 w-8 border-2 border-orange-500 border-t-transparent rounded-full" />
-            </div>
-          ) : (
-            <>
-              {domains.length === 0 && <NoSiteCard />}
-
-              {activeTab === "overview" && (
-                <OverviewTab domainId={domainId} stats={stats} />
-              )}
-
-              {activeTab === "blocked" && (
-                <BlockedVisitorsTab domainId={domainId} />
-              )}
-
-              {activeTab === "install" && (
-                <InstallScriptTab
-                  domains={domains}
-                  selectedDomainId={domainId}
-                  setSelectedDomainId={setSelectedDomainId}
-                />
-              )}
-
-              {activeTab === "settings" && (
-                // Keyed by site: the form seeds its state once, so each site needs a fresh form.
-                <SettingsTab key={domainId ?? "none"} domainId={domainId} domains={domains} />
-              )}
-            </>
-          )}
+      {/* Scrolls sideways on phones instead of wrapping. */}
+      <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+        <div className="inline-flex h-10 w-max min-w-full gap-1 rounded-xl bg-muted p-1 sm:min-w-0" role="tablist">
+          {tabs.map(tab => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? "default" : "ghost"}
+              className="shrink-0 rounded-lg px-3.5"
+              onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              data-testid={`tab-vpn-${tab.id}`}
+            >
+              {tab.label}
+            </Button>
+          ))}
         </div>
-      </section>
-    </div>
+      </div>
+
+      {domainsLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+      ) : (
+        <>
+          {domains.length === 0 && <NoSiteCard />}
+
+          {activeTab === "overview" && (
+            <OverviewTab domainId={domainId} stats={stats} />
+          )}
+
+          {activeTab === "blocked" && (
+            <BlockedVisitorsTab domainId={domainId} />
+          )}
+
+          {activeTab === "install" && (
+            <InstallScriptTab
+              domains={domains}
+              selectedDomainId={domainId}
+              setSelectedDomainId={setSelectedDomainId}
+            />
+          )}
+
+          {activeTab === "settings" && (
+            // Keyed by site: the form seeds its state once, so each site needs a fresh form.
+            <SettingsTab key={domainId ?? "none"} domainId={domainId} domains={domains} />
+          )}
+        </>
+      )}
+    </AppPage>
   );
 }
