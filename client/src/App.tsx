@@ -507,6 +507,13 @@ function AppContent() {
     return () => document.documentElement.classList.remove("crm-theme");
   }, [portal, clientPortal]);
 
+  // The platform's signed-in pages wear the one brand too (`.app-theme`: orange, Plus Jakarta Sans, warm page).
+  const appTheme = !!user && !portal && !clientPortal;
+  useEffect(() => {
+    document.documentElement.classList.toggle("app-theme", appTheme);
+    return () => document.documentElement.classList.remove("app-theme");
+  }, [appTheme]);
+
   // Each growth-app page gets its own tab title (runs after the page's own
   // effects, so self-titled pages are skipped rather than overwritten).
   useEffect(() => {

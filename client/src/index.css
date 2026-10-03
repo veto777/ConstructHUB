@@ -182,6 +182,83 @@
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/*
+ * The platform's signed-in pages (constructhub.us, the growth tools): one brand with the marketing site and the
+ * CRM — the orange #F97316, Plus Jakarta Sans (owner's pick for the site, 2026-10-01), a warm off-white page and
+ * white cards with quiet hairlines (owner, 2026-10-03: "cleaner, simpler and better! Less is more"). Toggled on
+ * <html> by App.tsx for signed-in platform pages only (Radix portals inherit it); the CRM keeps `.crm-theme`,
+ * marketing keeps `.mk` / `.mkt-editorial`. Layout primitives: client/src/components/app-ui.tsx;
+ * rules: docs/design/APP-UI.md.
+ */
+.app-theme {
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --background: 36 22% 97.5%;
+  --foreground: 222 38% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 38% 14%;
+  --card-border: 32 14% 90%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 38% 14%;
+  --popover-border: 32 14% 88%;
+  --border: 32 14% 90%;
+  --input: 32 12% 86%;
+  --muted: 36 18% 94.5%;
+  --muted-foreground: 222 10% 42%;
+  --accent: 36 20% 93.5%;
+  --accent-foreground: 222 38% 14%;
+  --secondary: 36 18% 94%;
+  --secondary-foreground: 222 38% 14%;
+  --primary: 25 95% 53%; /* #F97316 */
+  --primary-foreground: 0 0% 100%;
+  --ring: 25 95% 53%;
+  --sidebar-primary: 25 95% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-ring: 25 95% 53%;
+  --chart-1: 25 95% 53%;
+  --chart-2: 222 45% 30%;
+  --chart-3: 38 92% 50%;
+  --chart-4: 199 70% 45%;
+  --chart-5: 152 55% 40%;
+  --radius: .75rem;
+
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+}
+.app-theme body { letter-spacing: 0; word-spacing: 0.03em; font-feature-settings: "cv11", "ss01"; }
+
+.dark.app-theme {
+  --background: 222 28% 11%;
+  --foreground: 36 20% 94%;
+  --card: 222 26% 14%;
+  --card-foreground: 36 20% 94%;
+  --card-border: 222 20% 21%;
+  --popover: 222 26% 14%;
+  --popover-foreground: 36 20% 94%;
+  --popover-border: 222 20% 23%;
+  --border: 222 20% 21%;
+  --input: 222 18% 26%;
+  --muted: 222 22% 17%;
+  --muted-foreground: 220 12% 66%;
+  --accent: 222 22% 19%;
+  --accent-foreground: 36 20% 94%;
+  --secondary: 222 22% 18%;
+  --secondary-foreground: 36 20% 94%;
+  --primary: 27 96% 61%;
+  --primary-foreground: 24 80% 10%;
+  --ring: 27 96% 61%;
+  --sidebar-primary: 27 96% 61%;
+  --sidebar-primary-foreground: 24 80% 10%;
+  --sidebar-ring: 27 96% 61%;
+  --chart-1: 27 96% 61%;
+
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+}
+
 .dark.crm-theme {
   --primary: 27 96% 61%; /* orange-400 — keeps contrast on dark surfaces */
   --primary-foreground: 24 80% 10%;

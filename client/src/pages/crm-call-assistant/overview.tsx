@@ -12,6 +12,7 @@ import { callAssistantIntroShort, callAssistantTiers, formatUsd } from "@shared/
 import type { VoiceStatus } from "./index";
 import { CallAssistantPausedBanner } from "./paused-banner";
 import { CallResults, type ResultsPick } from "./results";
+import { Stat, StatGrid } from "@/components/app-ui";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
@@ -67,20 +68,19 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
   return (
     <div data-testid="panel-call-assistant-overview" className="pt-4 space-y-4">
       {paymentPaused && <CallAssistantPausedBanner status={status} />}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <MetricCard icon={Sparkles} label="Assistant" testid="metric-overview-assistant"
-          value={paymentPaused
-            ? <StatusPill tone="warning" className="text-sm">paused</StatusPill>
-            : <StatusPill tone={profileStatus === "live" ? "success" : profileStatus === "paused" ? "warning" : "neutral"} className="text-sm">{profileStatus}</StatusPill>}
-          context={paymentPaused ? "Waiting for a payment" : status.profile?.publishedVersion != null ? `Published version ${status.profile.publishedVersion}` : "Nothing published yet"} href="/call-assistant?tab=studio" />
-        <MetricCard icon={Hash} label="Numbers" value={numbers.length} testid="metric-overview-numbers"
-          context={`${status.allowance.numbers} included with your add-on`} href="/call-assistant?tab=numbers" />
-        <MetricCard icon={Timer} label="Minutes this month" value={used.toLocaleString("en-US")} testid="metric-overview-minutes"
-          context={unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} included${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
-        <MetricCard icon={PhoneCall} label="Calls this month" value={status.usage?.calls ?? 0} testid="metric-overview-calls" href="/call-assistant?tab=calls" />
-        <MetricCard icon={ShieldBan} label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testid="metric-overview-spam"
-          context={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} href="/call-assistant?tab=calls&view=spam" />
-      </div>
+      <StatGrid cols={4}>
+        <Stat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=studio"
+          value={paymentPaused ? <span className="text-amber-600 dark:text-amber-400">Paused</span> : <span className="capitalize">{profileStatus}</span>}
+          hint={paymentPaused ? "Waiting for a payment" : status.profile?.publishedVersion != null ? `Version ${status.profile.publishedVersion} is live` : "Not published yet"} />
+        <Stat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant?tab=numbers"
+          hint={`${status.allowance.numbers} included`} />
+        <Stat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
+          hint={unlimitedMinutes ? `${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls · unlimited` : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
+        <Stat label="Spam stopped" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
+          hint={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} />
+      </StatGrid>
+      {/* "Calls this month" folded into the minutes tile (less is more); the testid stays for links/tests. */}
+      <span className="sr-only" data-testid="metric-overview-calls">{status.usage?.calls ?? 0} calls this month</span>
 
       <CallResults onPick={(p) => {
         if (onPickResult) onPickResult(p);

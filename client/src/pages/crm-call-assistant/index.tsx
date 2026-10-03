@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Phone, Lock } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { AppPage, AppTabsList, PageHeader, StatusPill } from "@/components/app-ui";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -148,15 +149,14 @@ export default function CrmCallAssistantPage() {
   const canManage = me?.permissions?.manageSettings === true;
 
   return (
-    <CrmPage>
-      <CrmPageHeader
-        icon={Phone}
+    <AppPage testId="page-call-assistant">
+      <PageHeader
         title={<span data-testid="text-call-assistant-title">Call Assistant</span>}
-        subtitle="An AI receptionist on your own local number: answers, qualifies, files the lead, pages the right person."
-        actions={status.data?.profile?.status ? (
-          <Badge variant={status.data.profile.status === "live" ? "default" : "secondary"} data-testid="badge-call-assistant-status">
+        description="Your AI receptionist answers every call, files the lead and alerts the right person."
+        meta={status.data?.profile?.status ? (
+          <StatusPill tone={status.data.profile.status === "live" ? "success" : status.data.profile.status === "paused" ? "warning" : "neutral"} data-testid="badge-call-assistant-status">
             {status.data.profile.status}
-          </Badge>
+          </StatusPill>
         ) : null}
       />
 
@@ -168,11 +168,11 @@ export default function CrmCallAssistantPage() {
         <Tabs value={tab} onValueChange={goToTab} data-testid="tabs-call-assistant">
           {/* The Overview shows the banner itself; every other tab gets it above the tab strip. */}
           {paused && status.data && tab !== "overview" && <div className="mb-3"><CallAssistantPausedBanner status={status.data} /></div>}
-          <TabsList className="flex flex-wrap h-auto">
+          <AppTabsList>
             {CALL_ASSISTANT_TABS.map((t) => (
-              <TabsTrigger key={t} value={t} data-testid={`tab-call-assistant-${t}`}>{TAB_LABELS[t]}</TabsTrigger>
+              <TabsTrigger key={t} value={t} className="rounded-lg px-3.5" data-testid={`tab-call-assistant-${t}`}>{TAB_LABELS[t]}</TabsTrigger>
             ))}
-          </TabsList>
+          </AppTabsList>
           <TabsContent value="overview"><OverviewPanel status={status.data ?? null} loading={status.isLoading} onPickResult={(p) => {
             // Open the Calls tab already filtered: the Calls panel reads ?outcome= / ?view= when it mounts.
             setTab("calls");
@@ -184,6 +184,6 @@ export default function CrmCallAssistantPage() {
           <TabsContent value="calls"><CallsPanel canManage={canManage} /></TabsContent>
         </Tabs>
       )}
-    </CrmPage>
+    </AppPage>
   );
 }
