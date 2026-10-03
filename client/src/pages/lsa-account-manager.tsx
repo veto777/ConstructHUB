@@ -1,3 +1,5 @@
+import { Tabs } from "@/components/ui/tabs";
+import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -135,13 +137,13 @@ export default function LsaAccountManagerPage() {
   if (isAdmin && (gateCheckFailed || !gate)) {
     return (
       <div className="h-full flex items-center justify-center p-8">
-        <Card className="max-w-md w-full">
+        <Section flush className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-lg font-semibold mb-2" data-testid="text-access-check-failed">Couldn't check access</h2>
+            <h2 className="text-base font-semibold mb-2" data-testid="text-access-check-failed">Couldn't check access</h2>
             <p className="text-sm text-muted-foreground">Refresh the page to try again.</p>
           </CardContent>
-        </Card>
+        </Section>
       </div>
     );
   }
@@ -149,53 +151,38 @@ export default function LsaAccountManagerPage() {
   if (!isAdmin) {
     return (
       <div className="h-full flex items-center justify-center p-8">
-        <Card className="max-w-md w-full">
+        <Section flush className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-lg font-semibold mb-2" data-testid="text-access-denied">Access Denied</h2>
+            <h2 className="text-base font-semibold mb-2" data-testid="text-access-denied">Access denied</h2>
             <p className="text-sm text-muted-foreground">This section is restricted to ConstructHUB administrators only.</p>
           </CardContent>
-        </Card>
+        </Section>
       </div>
     );
   }
 
   if (selectedAccountId) {
-    return <AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} />;
+    return <AppPage><PageHeader title="LSA account details" description="Review campaigns, budgets and leads for this account." actions={<Button onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/accounts", selectedAccountId]})}>Refresh account</Button>} /><AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} /></AppPage>;
   }
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: "manager", label: "Manager Connection", icon: Wifi },
-    { id: "accounts", label: "All Accounts", icon: Users },
+    { id: "manager", label: "Manager connection", icon: Wifi },
+    { id: "accounts", label: "Accounts", icon: Users },
     { id: "invitations", label: "Invitations", icon: Send },
-    { id: "audit", label: "Audit Log", icon: History },
+    { id: "audit", label: "Audit log", icon: History },
   ];
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="mb-8 flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Shield className="h-5 w-5 text-[#4285F4]" />
-              <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-xs" data-testid="badge-admin-only">
-                Admin Only
-              </Badge>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">LSA Account Manager</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage all Google Ads / LSA client accounts from one place via the central MCC connection.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1 mb-6 bg-card border border-border rounded-lg p-1 w-fit">
+    <AppPage className="[&_button]:min-h-10">
+      <PageHeader title={<span data-testid="text-page-title">LSA account manager</span>} description="Manage client accounts through your Google Ads manager connection." meta={<Badge variant="outline" data-testid="badge-admin-only">Admin only</Badge>} actions={activeTab === "audit" ? <Button onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/audit-log"]})}>Refresh audit</Button> : undefined} />
+        <Tabs value={activeTab}><AppTabsList>
           {tabs.map(tab => (
             <Button
               key={tab.id}
               size="sm"
-              variant={activeTab === tab.id ? "default" : "ghost"}
-              className={`text-sm ${activeTab === tab.id ? "bg-[#4285F4] text-white" : "text-muted-foreground"}`}
+              variant={activeTab === tab.id ? "secondary" : "ghost"}
+              className={`shrink-0 text-sm ${activeTab === tab.id ? "bg-muted text-foreground" : "text-muted-foreground"}`}
               onClick={() => setActiveTab(tab.id)}
               data-testid={`tab-${tab.id}`}
             >
@@ -203,14 +190,13 @@ export default function LsaAccountManagerPage() {
               {tab.label}
             </Button>
           ))}
-        </div>
+        </AppTabsList></Tabs>
 
         {activeTab === "manager" && <ManagerConnectionTab />}
         {activeTab === "accounts" && <AccountsTab onSelectAccount={setSelectedAccountId} />}
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "audit" && <AuditLogTab />}
-      </div>
-    </div>
+    </AppPage>
   );
 }
 
@@ -232,10 +218,10 @@ function AdminGateCard() {
 
   return (
     <div className="h-full flex items-center justify-center p-8">
-      <Card className="max-w-sm w-full" data-testid="card-admin-gate">
+      <Section flush className="max-w-sm w-full" testId="card-admin-gate">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <ShieldCheck className="h-5 w-5 text-primary" /> Platform Admin sign-in
+            <ShieldCheck className="h-5 w-5 text-primary" /> Platform admin sign-in
           </CardTitle>
           <p className="text-sm text-muted-foreground">The LSA Account Manager needs the admin console credentials.</p>
         </CardHeader>
@@ -263,7 +249,7 @@ function AdminGateCard() {
             </Button>
           </form>
         </CardContent>
-      </Card>
+      </Section>
     </div>
   );
 }
@@ -319,11 +305,11 @@ function ManagerConnectionTab() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <Card data-testid="card-manager-status">
+      <Section flush testId="card-manager-status">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Wifi className="h-4 w-4 text-[#4285F4]" />
-            Central MCC Manager Connection
+            <Wifi className="h-4 w-4 text-muted-foreground" />
+            Manager connection
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -340,7 +326,7 @@ function ManagerConnectionTab() {
                   <p className="text-sm text-muted-foreground">Manager ID: <span className="font-mono" data-testid="text-manager-id">{status.managerId}</span></p>
                 </div>
                 <Badge className={status.hasDeveloperToken ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}>
-                  {status.hasDeveloperToken ? "Dev Token ✓" : "No Dev Token"}
+                  {status.hasDeveloperToken ? "API access" : "API access needed"}
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
@@ -353,10 +339,10 @@ function ManagerConnectionTab() {
                   <p className="font-medium">{status.lastRefreshedAt ? new Date(status.lastRefreshedAt).toLocaleDateString() : "Never"}</p>
                 </div>
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-wrap gap-2 pt-2">
                 <Button size="sm" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} data-testid="button-sync-accounts">
                   <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-                  {syncMutation.isPending ? "Syncing..." : "Sync Child Accounts"}
+                  {syncMutation.isPending ? "Syncing..." : "Sync accounts"}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowConnect(true)} data-testid="button-reconfigure">
                   <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Reconfigure
@@ -368,24 +354,19 @@ function ManagerConnectionTab() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
-                <div>
-                  <p className="font-medium text-amber-600 dark:text-amber-400" data-testid="text-manager-not-connected">Not Connected</p>
-                  <p className="text-sm text-muted-foreground">No central Google Ads Manager (MCC) account is connected.</p>
-                </div>
-              </div>
-              <Button onClick={() => setShowConnect(true)} className="bg-[#4285F4] text-white" data-testid="button-connect-manager">
-                <Link2 className="h-4 w-4 mr-2" /> Connect Manager Account
+              <Notice tone="warning"><span data-testid="text-manager-not-connected">Not connected</span> · Connect a Google Ads manager account.</Notice>
+              <Button onClick={() => setShowConnect(true)} className="w-full sm:w-auto" data-testid="button-connect-manager">
+                <Link2 className="h-4 w-4 mr-2" /> Connect manager
               </Button>
             </div>
           )}
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card>
+      <details><summary className="cursor-pointer py-3 text-sm font-medium">Advanced · Setup requirements</summary>
+      <Section flush>
         <CardHeader>
-          <CardTitle className="text-sm text-muted-foreground">External Prerequisites</CardTitle>
+          <CardTitle className="text-sm text-muted-foreground">Setup requirements</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {[
@@ -401,16 +382,17 @@ function ManagerConnectionTab() {
             </div>
           ))}
         </CardContent>
-      </Card>
+      </Section>
 
+      </details>
       <Dialog open={showConnect} onOpenChange={open => { setShowConnect(open); if (!open) connectMutation.reset(); }}>
         <DialogContent data-testid="dialog-connect-manager">
           <DialogHeader>
-            <DialogTitle>Connect Central Manager Account</DialogTitle>
+            <DialogTitle>Connect manager account</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="managerId">Manager Customer ID</Label>
+              <Label htmlFor="managerId">Manager customer ID</Label>
               <Input
                 id="managerId"
                 placeholder="1234567890 (digits only, no dashes)"
@@ -421,7 +403,7 @@ function ManagerConnectionTab() {
               <p className="text-xs text-muted-foreground">Your Google Ads MCC customer ID — digits only.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refreshToken">Refresh Token</Label>
+              <Label htmlFor="refreshToken">Refresh token</Label>
               <Input
                 id="refreshToken"
                 type="password"
@@ -433,7 +415,7 @@ function ManagerConnectionTab() {
               <p className="text-xs text-muted-foreground">Obtained via OAuth with access_type=offline + prompt=consent. Checked with Google before anything is saved.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="developerToken">Developer Token <span className="text-muted-foreground">(optional)</span></Label>
+              <Label htmlFor="developerToken">Developer token <span className="text-muted-foreground">(optional)</span></Label>
               <Input
                 id="developerToken"
                 type="password"
@@ -453,7 +435,7 @@ function ManagerConnectionTab() {
             <Button
               onClick={() => connectMutation.mutate()}
               disabled={!managerId || !refreshToken || connectMutation.isPending}
-              className="bg-[#4285F4] text-white"
+              className="w-full sm:w-auto"
               data-testid="button-save-connect"
             >
               {connectMutation.isPending ? "Connecting..." : "Connect"}
@@ -508,8 +490,8 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative w-full flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search by customer ID or name..."
@@ -519,13 +501,13 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
             data-testid="input-search-accounts"
           />
         </div>
-        <Button size="sm" onClick={() => setShowAdd(true)} className="bg-[#4285F4] text-white" data-testid="button-add-account">
-          <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Account
+        <Button variant={showAdd ? "outline" : "default"} size="sm" onClick={() => setShowAdd(true)} className="w-full sm:w-auto" data-testid="button-add-account">
+          <Plus className="h-3.5 w-3.5 mr-1.5" /> Add account
         </Button>
       </div>
 
       {showAdd && (
-        <Card data-testid="card-add-account">
+        <Section flush testId="card-add-account">
           <CardContent className="p-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -533,18 +515,18 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
                 <Input placeholder="1234567890" value={newCustomerId} onChange={e => setNewCustomerId(e.target.value)} data-testid="input-new-customer-id" />
               </div>
               <div className="space-y-1">
-                <Label>Account Name (optional)</Label>
+                <Label>Account name (optional)</Label>
                 <Input placeholder="Client name" value={newAccountName} onChange={e => setNewAccountName(e.target.value)} data-testid="input-new-account-name" />
               </div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => addAccountMutation.mutate()} disabled={!newCustomerId || addAccountMutation.isPending} className="bg-[#4285F4] text-white" data-testid="button-save-account">
-                {addAccountMutation.isPending ? "Adding..." : "Add Account"}
+              <Button size="sm" onClick={() => addAccountMutation.mutate()} disabled={!newCustomerId || addAccountMutation.isPending} className="w-full sm:w-auto" data-testid="button-save-account">
+                {addAccountMutation.isPending ? "Adding..." : "Add account"}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
             </div>
           </CardContent>
-        </Card>
+        </Section>
       )}
 
       {isLoading ? (
@@ -552,22 +534,22 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
+        <Section flush>
           <CardContent className="p-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="font-medium" data-testid="text-no-accounts">No accounts yet</p>
             <p className="text-sm text-muted-foreground mt-1">Add accounts manually or sync from the connected MCC.</p>
           </CardContent>
-        </Card>
+        </Section>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm" data-testid="table-accounts">
-            <thead>
-              <tr className="bg-muted/50 border-b border-border">
+          <table className={appTable.table} data-testid="table-accounts">
+            <thead className={appTableCards.thead}>
+              <tr className={appTableCards.tr + " bg-muted/50 border-b border-border"}>
                 <th className="text-left p-3 font-medium">Account</th>
                 <th className="text-left p-3 font-medium">Customer ID</th>
                 <th className="text-left p-3 font-medium">Owner</th>
-                <th className="text-left p-3 font-medium">Link Type</th>
+                <th className="text-left p-3 font-medium">Link type</th>
                 <th className="text-left p-3 font-medium">Status</th>
                 <th className="text-left p-3 font-medium">Leads</th>
                 <th className="text-left p-3 font-medium">Charged</th>
@@ -579,50 +561,50 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
             </thead>
             <tbody>
               {filtered.map(account => (
-                <tr key={account.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors" data-testid={`row-account-${account.id}`}>
-                  <td className="p-3 font-medium">{account.accountName || "—"}</td>
-                  <td className="p-3 font-mono text-xs text-muted-foreground" data-testid={`text-customer-id-${account.id}`}>{account.customerId}</td>
-                  <td className="p-3 text-xs text-muted-foreground" data-testid={`text-owner-${account.id}`}>
+                <tr key={account.id} className={appTableCards.tr + " border-b border-border last:border-0 hover:bg-muted/30 transition-colors"} data-testid={`row-account-${account.id}`}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Account: </span>{account.accountName || "—"}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-customer-id-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Customer ID: </span>{account.customerId}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-owner-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Owner: </span>
                     {account.ownerEmail ? (
                       <span className="truncate max-w-[140px] block" title={account.ownerEmail}>{account.ownerEmail}</span>
                     ) : <span className="text-muted-foreground/50">—</span>}
                   </td>
-                  <td className="p-3">
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Link Type: </span>
                     <Badge className={
-                      account.linkType === "central" ? "bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/20" :
+                      account.linkType === "central" ? "bg-primary/10 text-muted-foreground border-[#4285F4]/20" :
                       account.linkType === "both" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
                       "bg-muted text-muted-foreground"
                     }>
                       {account.linkType}
                     </Badge>
                   </td>
-                  <td className="p-3">
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span>
                     <Badge className={account.linkStatus === "active" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}>
                       {account.linkStatus}
                     </Badge>
                   </td>
-                  <td className="p-3 text-muted-foreground" data-testid={`text-lead-count-${account.id}`}>{account.leadCount}</td>
-                  <td className="p-3">
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-lead-count-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Leads: </span>{account.leadCount}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Charged: </span>
                     {(account.chargedLeads ?? 0) > 0 ? (
                       <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-xs" data-testid={`text-charged-leads-${account.id}`}>{account.chargedLeads}</Badge>
                     ) : <span className="text-muted-foreground text-xs">0</span>}
                   </td>
-                  <td className="p-3">
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Disputed: </span>
                     {(account.disputedLeads ?? 0) > 0 ? (
                       <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-xs" data-testid={`text-disputed-leads-${account.id}`}>{account.disputedLeads}</Badge>
                     ) : <span className="text-muted-foreground text-xs">0</span>}
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground" data-testid={`text-total-spend-${account.id}`}>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-total-spend-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Spend: </span>
                     {account.totalSpend ? account.totalSpend : <span className="opacity-40">—</span>}
                   </td>
-                  <td className="p-3">
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">LSA: </span>
                     {account.isLsaEnrolled ? (
                       <Badge className="bg-[#34A853]/10 text-[#34A853] border-[#34A853]/20 text-xs">LSA ✓</Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </td>
-                  <td className="p-3">
+                  <td className={appTableCards.td + " min-w-0 break-words"}>
                     <Button size="sm" variant="ghost" onClick={() => onSelectAccount(account.id)} data-testid={`button-view-account-${account.id}`}>
                       <Eye className="h-3.5 w-3.5 mr-1" /> View
                     </Button>
@@ -706,19 +688,19 @@ function InvitationsTab() {
 
   return (
     <div className="space-y-4 max-w-4xl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           Invite client Google Ads accounts to link under the central manager. Clients must accept the invitation in their own Google Ads account.
         </p>
-        <Button size="sm" onClick={() => setShowForm(true)} className="bg-[#4285F4] text-white shrink-0" data-testid="button-new-invitation">
-          <Plus className="h-3.5 w-3.5 mr-1.5" /> New Invitation
+        <Button variant={showForm ? "outline" : "default"} size="sm" onClick={() => setShowForm(true)} className="bg-primary text-white shrink-0" data-testid="button-new-invitation">
+          <Plus className="h-3.5 w-3.5 mr-1.5" /> New invitation
         </Button>
       </div>
 
       {showForm && (
-        <Card data-testid="card-invitation-form">
+        <Section flush testId="card-invitation-form">
           <CardHeader>
-            <CardTitle className="text-sm">Link a Client Account</CardTitle>
+            <CardTitle className="text-sm">Link a client account</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-700 dark:text-amber-300">
@@ -727,11 +709,11 @@ function InvitationsTab() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Client Customer ID</Label>
+                <Label>Client customer ID</Label>
                 <Input placeholder="1234567890 (digits only)" value={targetCustomerId} onChange={e => setTargetCustomerId(e.target.value)} data-testid="input-target-customer-id" />
               </div>
               <div className="space-y-1">
-                <Label>Client Name (optional)</Label>
+                <Label>Client name (optional)</Label>
                 <Input placeholder="ABC Roofing LLC" value={accountName} onChange={e => setAccountName(e.target.value)} data-testid="input-invitation-account-name" />
               </div>
               <div className="space-y-1 sm:col-span-2">
@@ -740,14 +722,14 @@ function InvitationsTab() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => createMutation.mutate()} disabled={!targetCustomerId || createMutation.isPending} className="bg-[#4285F4] text-white" data-testid="button-send-invitation">
+              <Button size="sm" onClick={() => createMutation.mutate()} disabled={!targetCustomerId || createMutation.isPending} className="w-full sm:w-auto" data-testid="button-send-invitation">
                 <Send className="h-3.5 w-3.5 mr-1.5" />
-                {createMutation.isPending ? "Sending..." : "Send Invitation"}
+                {createMutation.isPending ? "Sending..." : "Send invitation"}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
             </div>
           </CardContent>
-        </Card>
+        </Section>
       )}
 
       {isLoading ? (
@@ -755,18 +737,18 @@ function InvitationsTab() {
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
       ) : invitations.length === 0 ? (
-        <Card>
+        <Section flush>
           <CardContent className="p-12 text-center">
             <Send className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="font-medium" data-testid="text-no-invitations">No invitations yet</p>
           </CardContent>
-        </Card>
+        </Section>
       ) : (
         <div className="space-y-3">
           {invitations.map(inv => (
-            <Card key={inv.id} data-testid={`card-invitation-${inv.id}`}>
+            <Section flush key={inv.id} testId={`card-invitation-${inv.id}`}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-medium" data-testid={`text-inv-name-${inv.id}`}>{inv.accountName || "Unnamed Account"}</span>
@@ -781,7 +763,7 @@ function InvitationsTab() {
                     <p className="text-xs text-muted-foreground mt-1">Invited {new Date(inv.invitedAt).toLocaleDateString()}</p>
                   </div>
                   {inv.status === "pending" && (
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-wrap gap-2 sm:shrink-0">
                       <Button
                         size="sm"
                         className="bg-emerald-600 text-white text-xs"
@@ -789,7 +771,7 @@ function InvitationsTab() {
                         disabled={updateStatusMutation.isPending}
                         data-testid={`button-accept-invitation-${inv.id}`}
                       >
-                        <CheckCircle className="h-3 w-3 mr-1" /> Mark Accepted
+                        <CheckCircle className="h-3 w-3 mr-1" /> Mark accepted
                       </Button>
                       <Button
                         size="sm"
@@ -805,7 +787,7 @@ function InvitationsTab() {
                   )}
                 </div>
               </CardContent>
-            </Card>
+            </Section>
           ))}
         </div>
       )}
@@ -920,14 +902,14 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="button-back">
           <ChevronRight className="h-4 w-4 rotate-180 mr-1" /> Back
         </Button>
         {account && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <h2 className="font-semibold" data-testid="text-account-name">{account.accountName || "Unnamed Account"}</h2>
-            <Badge className={account.linkType === "central" ? "bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/20" : "bg-muted text-muted-foreground"}>
+            <Badge className={account.linkType === "central" ? "bg-primary/10 text-muted-foreground border-[#4285F4]/20" : "bg-muted text-muted-foreground"}>
               {account.linkType}
             </Badge>
             <span className="text-sm text-muted-foreground font-mono">{account.customerId}</span>
@@ -935,11 +917,11 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
         )}
       </div>
 
-      <div className="flex gap-1 bg-card border border-border rounded-lg p-1 w-fit">
-        <Button size="sm" variant={activeTab === "campaigns" ? "default" : "ghost"} className={activeTab === "campaigns" ? "bg-[#4285F4] text-white" : "text-muted-foreground"} onClick={() => setActiveTab("campaigns")} data-testid="tab-campaigns">
+      <div className="flex gap-1 overflow-x-auto bg-muted rounded-xl p-1 w-full sm:w-fit">
+        <Button size="sm" variant={activeTab === "campaigns" ? "secondary" : "ghost"} className={activeTab === "campaigns" ? "bg-muted text-foreground" : "text-muted-foreground"} onClick={() => setActiveTab("campaigns")} data-testid="tab-campaigns">
           <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Campaigns
         </Button>
-        <Button size="sm" variant={activeTab === "leads" ? "default" : "ghost"} className={activeTab === "leads" ? "bg-[#4285F4] text-white" : "text-muted-foreground"} onClick={() => setActiveTab("leads")} data-testid="tab-leads">
+        <Button size="sm" variant={activeTab === "leads" ? "secondary" : "ghost"} className={activeTab === "leads" ? "bg-muted text-foreground" : "text-muted-foreground"} onClick={() => setActiveTab("leads")} data-testid="tab-leads">
           <FileText className="h-3.5 w-3.5 mr-1.5" /> Leads
         </Button>
       </div>
@@ -951,26 +933,26 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
               <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
             </div>
           ) : campaignsError ? (
-            <Card>
+            <Section flush>
               <CardContent className="p-8 text-center">
                 <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
                 <p className="font-medium" data-testid="text-campaigns-error">Failed to load campaigns</p>
                 <p className="text-sm text-muted-foreground mt-1">{(campaignsError as any)?.message || "Google Ads API error. Ensure the manager connection is active and the developer token is configured."}</p>
               </CardContent>
-            </Card>
+            </Section>
           ) : campaigns.length === 0 ? (
-            <Card>
+            <Section flush>
               <CardContent className="p-12 text-center">
                 <BarChart3 className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="font-medium" data-testid="text-no-campaigns">No campaigns found</p>
               </CardContent>
-            </Card>
+            </Section>
           ) : (
             <div className="space-y-3" data-testid="list-campaigns">
               {campaigns.map(campaign => (
-                <Card key={campaign.id} data-testid={`card-campaign-${campaign.id}`}>
+                <Section flush key={campaign.id} testId={`card-campaign-${campaign.id}`}>
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-medium truncate" data-testid={`text-campaign-name-${campaign.id}`}>{campaign.name}</span>
@@ -984,7 +966,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
                           <span className="text-xs">{campaign.channelType}</span>
                         </div>
                       </div>
-                      <div className="flex gap-2 shrink-0">
+                      <div className="flex flex-wrap gap-2 sm:shrink-0">
                         <Button
                           size="sm"
                           variant="outline"
@@ -1035,7 +1017,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </Section>
               ))}
             </div>
           )}
@@ -1056,18 +1038,18 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
               <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
             </div>
           ) : leads.length === 0 ? (
-            <Card>
+            <Section flush>
               <CardContent className="p-12 text-center">
                 <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="font-medium" data-testid="text-no-leads">No leads yet</p>
                 <p className="text-sm text-muted-foreground mt-1">Leads will appear here once synced from Google Ads.</p>
               </CardContent>
-            </Card>
+            </Section>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border" data-testid="table-leads">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/50 border-b border-border">
+              <table className={appTable.table}>
+                <thead className={appTableCards.thead}>
+                  <tr className={appTableCards.tr + " bg-muted/50 border-b border-border"}>
                     <th className="text-left p-3 font-medium">Customer</th>
                     <th className="text-left p-3 font-medium">Service</th>
                     <th className="text-left p-3 font-medium">Status</th>
@@ -1078,13 +1060,13 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
                 </thead>
                 <tbody>
                   {leads.map(lead => (
-                    <tr key={lead.id} className="border-b border-border last:border-0" data-testid={`row-lead-${lead.id}`}>
-                      <td className="p-3">{lead.customerName || "—"}</td>
-                      <td className="p-3 text-muted-foreground">{lead.serviceRequested || "—"}</td>
-                      <td className="p-3"><Badge>{lead.status}</Badge></td>
-                      <td className="p-3">{lead.charged ? <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Charged {lead.chargeAmount || ""}</Badge> : <span className="text-muted-foreground">No</span>}</td>
-                      <td className="p-3">{lead.disputed ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Disputed</Badge> : <span className="text-muted-foreground">No</span>}</td>
-                      <td className="p-3">
+                    <tr key={lead.id} className={appTableCards.tr + " border-b border-border last:border-0"} data-testid={`row-lead-${lead.id}`}>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Customer: </span>{lead.customerName || "—"}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Service: </span>{lead.serviceRequested || "—"}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span><Badge>{lead.status}</Badge></td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Charged: </span>{lead.charged ? <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Charged {lead.chargeAmount || ""}</Badge> : <span className="text-muted-foreground">No</span>}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Disputed: </span>{lead.disputed ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Disputed</Badge> : <span className="text-muted-foreground">No</span>}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}>
                         {lead.charged && !lead.disputed && (
                           <Button size="sm" variant="outline" className="text-xs" onClick={() => { setDisputeDialog({ lead }); setDisputeReason(""); }} data-testid={`button-dispute-lead-${lead.id}`}>
                             Dispute
@@ -1111,7 +1093,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
             <Button
               onClick={() => { confirmDialog?.onConfirm(); }}
               disabled={statusMutation.isPending}
-              className="bg-[#4285F4] text-white"
+              className="w-full sm:w-auto"
               data-testid="button-confirm-action"
             >
               {statusMutation.isPending ? "Updating..." : "Confirm"}
@@ -1123,12 +1105,12 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
       <Dialog open={!!budgetDialog} onOpenChange={() => setBudgetDialog(null)}>
         <DialogContent data-testid="dialog-budget">
           <DialogHeader>
-            <DialogTitle>Change Daily Budget</DialogTitle>
+            <DialogTitle>Change daily budget</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">Campaign: <strong>{budgetDialog?.campaign.name}</strong></p>
             <div className="space-y-1">
-              <Label htmlFor="newBudget">New Daily Budget (USD)</Label>
+              <Label htmlFor="newBudget">New daily budget (USD)</Label>
               <Input id="newBudget" type="number" min="1" step="0.01" value={newBudget} onChange={e => setNewBudget(e.target.value)} data-testid="input-new-budget" />
             </div>
           </div>
@@ -1137,7 +1119,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
             <Button
               onClick={() => budgetDialog && budgetMutation.mutate({ campaign: budgetDialog.campaign, budget: Number(newBudget) })}
               disabled={!newBudget || Number(newBudget) <= 0 || budgetMutation.isPending}
-              className="bg-[#4285F4] text-white"
+              className="w-full sm:w-auto"
               data-testid="button-confirm-budget"
             >
               {budgetMutation.isPending ? "Updating..." : "Update Budget"}
@@ -1149,11 +1131,11 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
       <Dialog open={!!renameDialog} onOpenChange={() => setRenameDialog(null)}>
         <DialogContent data-testid="dialog-rename">
           <DialogHeader>
-            <DialogTitle>Rename Campaign</DialogTitle>
+            <DialogTitle>Rename campaign</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <Label htmlFor="newName">New Campaign Name</Label>
+              <Label htmlFor="newName">New campaign name</Label>
               <Input id="newName" value={newName} onChange={e => setNewName(e.target.value)} data-testid="input-new-name" placeholder="Campaign name" />
             </div>
           </div>
@@ -1162,7 +1144,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
             <Button
               onClick={() => renameDialog && renameMutation.mutate({ campaign: renameDialog.campaign, name: newName })}
               disabled={!newName.trim() || newName === renameDialog?.campaign.name || renameMutation.isPending}
-              className="bg-[#4285F4] text-white"
+              className="w-full sm:w-auto"
               data-testid="button-confirm-rename"
             >
               {renameMutation.isPending ? "Renaming..." : "Save Name"}
@@ -1174,14 +1156,14 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
       <Dialog open={!!disputeDialog} onOpenChange={() => setDisputeDialog(null)}>
         <DialogContent data-testid="dialog-dispute">
           <DialogHeader>
-            <DialogTitle>Dispute Lead</DialogTitle>
+            <DialogTitle>Dispute lead</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-700 dark:text-amber-300">
               Only charged leads can be disputed. Each lead can only be disputed once. Google does not like excessive disputes — use sparingly for genuine invalid leads.
             </div>
             <div className="space-y-1">
-              <Label>Dispute Reason</Label>
+              <Label>Dispute reason</Label>
               <Select value={disputeReason} onValueChange={setDisputeReason}>
                 <SelectTrigger data-testid="select-dispute-reason">
                   <SelectValue placeholder="Select a reason..." />
@@ -1242,7 +1224,7 @@ function AuditLogTab() {
     if (action === "campaign_enable") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
     if (action === "dispute_lead" || action === "access_grant_revoke") return "bg-red-500/10 text-red-500 border-red-500/20";
     if (action === "access_grant") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
-    return "bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/20";
+    return "bg-primary/10 text-muted-foreground border-[#4285F4]/20";
   };
 
   return (
@@ -1253,17 +1235,17 @@ function AuditLogTab() {
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
       ) : logs.length === 0 ? (
-        <Card>
+        <Section flush>
           <CardContent className="p-12 text-center">
             <History className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="font-medium" data-testid="text-no-audit-logs">No audit entries yet</p>
           </CardContent>
-        </Card>
+        </Section>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border" data-testid="table-audit-log">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/50 border-b border-border">
+          <table className={appTable.table}>
+            <thead className={appTableCards.thead}>
+              <tr className={appTableCards.tr + " bg-muted/50 border-b border-border"}>
                 <th className="text-left p-3 font-medium">When</th>
                 <th className="text-left p-3 font-medium">Admin</th>
                 <th className="text-left p-3 font-medium">Action</th>
@@ -1274,21 +1256,21 @@ function AuditLogTab() {
             </thead>
             <tbody>
               {logs.map(log => (
-                <tr key={log.id} className="border-b border-border last:border-0 hover:bg-muted/20" data-testid={`row-audit-${log.id}`}>
-                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
-                  <td className="p-3 text-xs" data-testid={`text-audit-actor-${log.id}`}>{log.actorEmail}</td>
-                  <td className="p-3">
+                <tr key={log.id} className={appTableCards.tr + " border-b border-border last:border-0 hover:bg-muted/20"} data-testid={`row-audit-${log.id}`}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">When: </span>{new Date(log.createdAt).toLocaleString()}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-audit-actor-${log.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Admin: </span>{log.actorEmail}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Action: </span>
                     <Badge className={`text-xs ${actionColor(log.action)}`} data-testid={`badge-audit-action-${log.id}`}>
                       {actionLabel(log.action)}
                     </Badge>
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground">{log.targetAccountName || log.targetCustomerId || "—"}</td>
-                  <td className="p-3">
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Account: </span>{log.targetAccountName || log.targetCustomerId || "—"}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Result: </span>
                     <Badge className={log.result === "success" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-xs" : "bg-red-500/10 text-red-500 border-red-500/20 text-xs"} data-testid={`badge-audit-result-${log.id}`}>
                       {log.result}
                     </Badge>
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground max-w-[200px] truncate">
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Details: </span>
                     {log.errorMessage || (log.parameters ? JSON.stringify(log.parameters) : "—")}
                   </td>
                 </tr>

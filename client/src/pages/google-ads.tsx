@@ -1,3 +1,5 @@
+import { Tabs, TabsTrigger } from "@/components/ui/tabs";
+import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { useAppOrigin } from "@/lib/app-origin";
 import { useState } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -251,8 +253,8 @@ export default function ClickGuardPage() {
     else toast({ title: "Couldn't copy", description: COPY_BLOCKED, variant: "destructive" });
   };
 
-  const threatColor = analytics?.threatLevel === "critical" ? "text-red-400" : analytics?.threatLevel === "substantial" ? "text-blue-500" : "text-emerald-400";
-  const threatBg = analytics?.threatLevel === "critical" ? "bg-red-500/20" : analytics?.threatLevel === "substantial" ? "bg-blue-500/20" : "bg-emerald-500/20";
+  const threatColor = analytics?.threatLevel === "critical" ? "text-red-400" : analytics?.threatLevel === "substantial" ? "text-muted-foreground" : "text-emerald-400";
+  const threatBg = analytics?.threatLevel === "critical" ? "bg-red-500/20" : analytics?.threatLevel === "substantial" ? "bg-muted" : "bg-emerald-500/20";
 
   const filteredVisits = ipSearch ? visits.filter(v => v.ipAddress.includes(ipSearch)) : visits;
 
@@ -260,52 +262,15 @@ export default function ClickGuardPage() {
   const maxDailyVisits = Math.max(...dailyEntries.map(([, v]) => v), 1);
 
   return (
-    <div className="h-full overflow-y-auto bg-background text-foreground overflow-x-hidden">
-      <section className="relative z-10 pt-6 sm:pt-8 pb-8 sm:pb-12 px-3 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <img src={googleAdsLogo} alt="Google Ads" className="h-8 w-8 rounded object-contain shrink-0" />
-                <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 px-3 py-1 text-sm" data-testid="badge-click-guard">
-                  <Shield className="h-3.5 w-3.5 mr-1.5" /> Google Click Guard
-                </Badge>
-              </div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight" data-testid="text-page-title">
-                <span className="text-foreground">Click Fraud </span>
-                <span className="bg-gradient-to-r from-[#4285F4] to-[#34A853] bg-clip-text text-transparent">Protection</span>
-              </h1>
-              <p className="mt-2 text-muted-foreground max-w-xl text-sm" data-testid="text-subtitle">
-                Track visits that run your script, flag unusual patterns, and build an IP exclusion list. Signals do not prove fraud; Google Ads exclusions require the separate Ads script.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedDomain && (
-                <select
-                  className="bg-card border border-border text-foreground text-sm rounded-md px-3 py-2 outline-none min-w-0 max-w-[200px]"
-                  value={domainId || ""}
-                  onChange={(e) => setSelectedDomainId(Number(e.target.value))}
-                  data-testid="select-domain"
-                >
-                  {domains.map(d => (
-                    <option key={d.id} value={d.id} >{d.name || d.domain}</option>
-                  ))}
-                </select>
-              )}
-              <Button
-                size="sm"
-                className="bg-[#4285F4] hover:bg-[#3367D6] text-white"
-                onClick={() => setShowAddDomain(true)}
-                data-testid="button-add-domain"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add Domain
-              </Button>
-            </div>
-          </div>
-
+    <AppPage className="[&_button]:min-h-10">
+      <PageHeader title={<span data-testid="text-page-title">Click fraud protection</span>}
+        description={<span data-testid="text-subtitle">Track website visits and review unusual traffic.</span>}
+        meta={<Badge variant="outline" data-testid="badge-click-guard">Google Click Guard</Badge>}
+        actions={<Button variant={showAddDomain ? "outline" : "default"} onClick={() => setShowAddDomain(true)} data-testid="button-add-domain"><Plus className="mr-2 h-4 w-4" />Add domain</Button>} />
+      {selectedDomain && <select aria-label="Website domain" className="h-10 w-full sm:w-72 rounded-md border bg-card px-3 text-sm" value={domainId || ""} onChange={e => setSelectedDomainId(Number(e.target.value))} data-testid="select-domain">{domains.map(d => <option key={d.id} value={d.id}>{d.name || d.domain}</option>)}</select>}
+      <details className="text-sm text-muted-foreground"><summary className="cursor-pointer py-2">How protection works</summary><p>Signals do not prove fraud. Apply IP exclusions using the separate Google Ads script.</p></details>
           {showAddDomain && (
-            <Card className="bg-card border-border mb-6" data-testid="card-add-domain">
+            <Section flush className="bg-card border-border mb-6" testId="card-add-domain">
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Input
@@ -325,7 +290,7 @@ export default function ClickGuardPage() {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      className="bg-[#4285F4] text-white"
+                      className=""
                       onClick={() => addDomainMutation.mutate()}
                       disabled={!newDomain.trim() || addDomainMutation.isPending}
                       data-testid="button-save-domain"
@@ -344,18 +309,18 @@ export default function ClickGuardPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Section>
           )}
 
-          <div className="flex items-center gap-1 mb-6 bg-card border border-border rounded-lg p-1 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 sm:w-fit scrollbar-none">
+<Tabs value={activeTab}><AppTabsList>
             {PAGE_TABS.map(tab => {
               const labels: Record<string, string> = {
                 dashboard: "Dashboard",
-                traffic: "Traffic Sources",
-                fraud: "Traffic Signals",
+                traffic: "Traffic sources",
+                fraud: "Traffic signals",
                 tools: "Tools",
-                settings: "Domain Settings",
-                "link-ads": "Google Ads Script",
+                settings: "Domain settings",
+                "link-ads": "Google Ads script",
               };
               const shortLabels: Record<string, string> = {
                 dashboard: "Dashboard",
@@ -363,19 +328,17 @@ export default function ClickGuardPage() {
                 fraud: "Signals",
                 tools: "Tools",
                 settings: "Settings",
-                "link-ads": "Ads Script",
+                "link-ads": "Ads script",
               };
               const tabIcons: Record<string, typeof Shield> = {
                 "link-ads": Link2,
               };
               const TabIcon = tabIcons[tab];
               return (
-                <Button
+                <TabsTrigger value={tab}
                   key={tab}
-                  size="sm"
-                  variant={activeTab === tab ? "default" : "ghost"}
                   className={`shrink-0 text-xs sm:text-sm ${activeTab === tab
-                    ? "bg-[#4285F4] text-white"
+                    ? "bg-muted text-foreground"
                     : "text-muted-foreground"
                   }`}
                   onClick={() => setActiveTab(tab)}
@@ -384,10 +347,10 @@ export default function ClickGuardPage() {
                   {TabIcon && <TabIcon className="h-3.5 w-3.5 mr-1" />}
                   <span className="hidden sm:inline">{labels[tab]}</span>
                   <span className="sm:hidden">{shortLabels[tab]}</span>
-                </Button>
+                </TabsTrigger>
               );
             })}
-          </div>
+          </AppTabsList></Tabs>
 
           {activeTab === "link-ads" && <LinkGoogleAdsView domainId={domainId} trackingId={selectedDomain?.trackingId} />}
 
@@ -395,35 +358,25 @@ export default function ClickGuardPage() {
             <>
               {domainsLoading ? (
                 <div className="flex items-center justify-center py-20">
-                  <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full" />
+                  <div className="animate-spin h-8 w-8 border-2 border-border border-t-transparent rounded-full" />
                 </div>
               ) : !selectedDomain ? (
-                <Card className="bg-card border-border">
+                <Section flush className="bg-card border-border">
                   <CardContent className="p-12 text-center">
-                    <Shield className="h-16 w-16 text-blue-500/40 mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-foreground mb-2" data-testid="text-no-domains">No Domains Added Yet</h2>
+                    <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <h2 className="text-base font-semibold text-foreground mb-2" data-testid="text-no-domains">No domains yet</h2>
                     <p className="text-muted-foreground mb-6">Add your first website domain to start tracking visitors and reviewing unusual traffic patterns.</p>
                     <Button
-                      className="bg-[#4285F4] text-white"
+                      variant="outline"
                       onClick={() => setShowAddDomain(true)}
                       data-testid="button-add-first-domain"
                     >
-                      <Plus className="h-4 w-4 mr-2" /> Add Your First Domain
+                      <Plus className="h-4 w-4 mr-2" /> Add your first domain
                     </Button>
                   </CardContent>
-                </Card>
+                </Section>
               ) : (
                 <>
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="flex items-center gap-2 bg-card border border-border rounded-lg p-1">
-                      <Globe className="h-4 w-4 text-blue-500 ml-2" />
-                      <span className="text-foreground font-medium text-sm">{selectedDomain.domain}</span>
-                      <Badge className={`${selectedDomain.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-card text-muted-foreground border-border"} text-xs ml-1`}>
-                        {selectedDomain.isActive ? "TRACKING" : "INACTIVE"}
-                      </Badge>
-                    </div>
-                  </div>
-
                   {activeTab === "dashboard" && (
                     <DashboardView
                       analytics={analytics}
@@ -484,9 +437,7 @@ export default function ClickGuardPage() {
               )}
             </>
           )}
-        </div>
-      </section>
-    </div>
+    </AppPage>
   );
 }
 
@@ -535,7 +486,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
       return;
     }
     setScriptCopied(true);
-    toast({ title: "Script copied!", description: "Paste this into Google Ads Scripts." });
+    toast({ title: "Script copied!", description: "Paste this into Google Ads scripts." });
     setTimeout(() => setScriptCopied(false), 3000);
   };
 
@@ -552,7 +503,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
   const copyIpList = async () => {
     const ipList = blockedIps.filter(b => b.isActive).map(b => b.ipAddress).join("\n");
     if (await copyToClipboard(ipList)) toast({ title: "IP list copied!", description: `${activeBlockedCount} IPs copied to clipboard.` });
-    else toast({ title: "Couldn't copy the IP list", description: "Your browser blocked clipboard access. The same IPs are listed under Traffic Signals → Blocked IPs.", variant: "destructive" });
+    else toast({ title: "Couldn't copy the IP list", description: "Your browser blocked clipboard access. The same IPs are listed under Traffic signals → Blocked IPs.", variant: "destructive" });
   };
 
   const copyExclusionUrl = async () => {
@@ -564,96 +515,40 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
   return (
     <div className="space-y-8" data-testid="view-link-google-ads">
       <div className="text-center max-w-3xl mx-auto mb-8">
-        <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5 mb-4">
-          <Link2 className="h-4 w-4 text-blue-400" />
-          <span className="text-sm text-blue-400 font-medium">Google Ads Script</span>
+        <div className="inline-flex items-center gap-2 bg-muted border border-border rounded-full px-4 py-1.5 mb-4">
+          <Link2 className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground font-medium">Google Ads script</span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3" data-testid="text-link-title">
-          Apply Your IP List in Google Ads
+        <h2 className="text-base font-semibold text-foreground mb-3" data-testid="text-link-title">
+          Apply your IP list in Google Ads
         </h2>
-        <p className="text-muted-foreground text-sm leading-relaxed">
+        <details className="text-left"><summary className="cursor-pointer py-2 text-sm">How to apply exclusions</summary>        <p className="text-muted-foreground text-sm leading-relaxed">
           Click Guard records script-observed visits and flags unusual patterns. To apply its IP exclusion list, you paste a script into your own Google Ads account (Tools &rarr; Bulk actions &rarr; Scripts) and schedule it. This tab has no Google sign-in; the script runs inside your own Google Ads account. Agencies with a Google Ads manager (MCC) account can instead connect it with Google under Agency Ads &amp; LSA and apply Click Guard exclusions to mapped client accounts from there.
-        </p>
-      </div>
-
-      <div className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-0 items-center mb-10">
-          <div className="flex flex-col items-center text-center p-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-2">
-              <Globe className="h-7 w-7 text-white" />
-            </div>
-            <p className="text-xs font-semibold text-foreground">Your Website</p>
-            <p className="text-[10px] text-muted-foreground">Tracking script installed</p>
-          </div>
-          <div className="flex items-center justify-center">
-            <ArrowRight className="h-5 w-5 text-blue-500 hidden md:block" />
-            <div className="h-5 w-px bg-blue-500/30 md:hidden" />
-          </div>
-          <div className="flex flex-col items-center text-center p-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#4285F4] to-[#3367D6] flex items-center justify-center mb-2">
-              <Shield className="h-7 w-7 text-white" />
-            </div>
-            <p className="text-xs font-semibold text-foreground">ConstructHUB</p>
-            <p className="text-[10px] text-muted-foreground">Flags unusual visits, lists IPs</p>
-          </div>
-          <div className="flex items-center justify-center">
-            <ArrowRight className="h-5 w-5 text-blue-500 hidden md:block" />
-            <div className="h-5 w-px bg-blue-500/30 md:hidden" />
-          </div>
-          <div className="flex flex-col items-center text-center p-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center mb-2">
-              <ShieldBan className="h-7 w-7 text-white" />
-            </div>
-            <p className="text-xs font-semibold text-foreground">Google Ads</p>
-            <p className="text-[10px] text-muted-foreground">Your pasted script applies the list</p>
-          </div>
-        </div>
+        </p></details>
       </div>
 
       {!domainId ? (
-        <Card className="max-w-4xl mx-auto bg-yellow-500/5 border-yellow-500/20">
+        <Section flush className="max-w-4xl mx-auto bg-muted border-border">
           <CardContent className="p-8 text-center">
-            <AlertTriangle className="h-10 w-10 text-yellow-400 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">Add a Domain First</h3>
+            <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <h3 className="text-base font-semibold text-foreground mb-2">Add a domain first</h3>
             <p className="text-sm text-muted-foreground">Select the Dashboard tab and add your website domain to get started with Click Guard protection.</p>
           </CardContent>
-        </Card>
+        </Section>
       ) : (
         <>
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className=" bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-blocked-count">
-              <CardContent className="p-5">
-                <Ban className="h-6 w-6 text-blue-500 mb-2" />
-                <div className="text-2xl font-bold text-foreground">{activeBlockedCount}</div>
-                <div className="text-xs text-muted-foreground">Blocked IPs Ready to Sync</div>
-              </CardContent>
-            </Card>
-            <Card className=" bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-api-status">
-              <CardContent className="p-5">
-                <Activity className="h-6 w-6 text-blue-400 mb-2" />
-                <div className="text-2xl font-bold text-foreground" data-testid="text-api-status">
-                  {scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {exclusionCheck ? `Exclusion list URL · serving ${exclusionCheck.count} IP${exclusionCheck.count === 1 ? "" : "s"}` : "Exclusion list URL"}
-                </div>
-              </CardContent>
-            </Card>
-            <Card className=" bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-google-limit">
-              <CardContent className="p-5">
-                <ShieldCheck className="h-6 w-6 text-emerald-400 mb-2" />
-                <div className="text-2xl font-bold text-foreground">{Math.min(activeBlockedCount, 500)}/500</div>
-                <div className="text-xs text-muted-foreground">Your list vs. Google's 500-IP campaign limit</div>
-              </CardContent>
-            </Card>
-          </div>
+          <StatGrid cols={3} className="max-w-4xl mx-auto">
+            <Stat label="IPs ready to sync" value={activeBlockedCount} testId="card-blocked-count" />
+            <Stat label="Exclusion list" testId="card-api-status" value={<span data-testid="text-api-status">{scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}</span>} hint={exclusionCheck ? `Serving ${exclusionCheck.count} IPs` : "Exclusion list URL"} />
+            <Stat label="Campaign IP limit" value={`${Math.min(activeBlockedCount, 500)}/500`} testId="card-google-limit" />
+          </StatGrid>
 
-          <Card className="max-w-4xl mx-auto border-blue-500/20" data-testid="card-step1-tracking">
+          <Section flush className="max-w-4xl mx-auto border-border" testId="card-step1-tracking">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">1</div>
+                <div className="w-10 h-10 rounded-lg    flex items-center justify-center text-white font-bold text-sm">1</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Install Tracking Code on Your Website</CardTitle>
+                  <CardTitle className="text-foreground text-base">Install tracking code on your website</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">Add this snippet to the header or footer of every page your Google Ads point to</p>
                 </div>
               </div>
@@ -665,7 +560,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-7 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                    className="h-7 text-xs text-muted-foreground text-muted-foreground"
                     onClick={copyTrackingSnippet}
                     data-testid="button-copy-tracking"
                   >
@@ -677,9 +572,9 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                   {trackingSnippet}
                 </pre>
               </div>
-              <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3">
+              <div className="bg-muted border border-border rounded-lg p-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="text-blue-400 font-semibold">What this does:</span> When someone clicks your Google Ad and lands on your website, this script captures their IP address, device fingerprint, browser info, and behavior. That data is sent to ConstructHUB's Click Guard for fraud analysis.
+                  <span className="text-muted-foreground font-semibold">What this does:</span> When someone clicks your Google Ad and lands on your website, this script captures their IP address, device fingerprint, browser info, and behavior. That data is sent to ConstructHUB's Click Guard for fraud analysis.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -697,14 +592,14 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Section>
 
-          <Card className="max-w-4xl mx-auto border-blue-500/20" data-testid="card-step2-detection">
+          <Section flush className="max-w-4xl mx-auto border-border" testId="card-step2-detection">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#4285F4] to-[#3367D6] flex items-center justify-center text-white font-bold text-sm">2</div>
+                <div className="w-10 h-10 rounded-lg    flex items-center justify-center text-white font-bold text-sm">2</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Click Guard Flags Unusual Traffic Automatically</CardTitle>
+                  <CardTitle className="text-foreground text-base">Click Guard flags unusual traffic automatically</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">No action needed — this happens on ConstructHUB's servers</p>
                 </div>
               </div>
@@ -718,7 +613,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                   { icon: Ban, label: "Auto-blocking", desc: "A flagged IP with more than 10 visits in an hour is added to your Blocked IPs list" },
                 ].map((item, i) => (
                   <div key={i} className="flex items-start gap-3 bg-card rounded-lg p-3">
-                    <item.icon className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <item.icon className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-foreground">{item.label}</p>
                       <p className="text-xs text-muted-foreground">{item.desc}</p>
@@ -727,14 +622,14 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 ))}
               </div>
             </CardContent>
-          </Card>
+          </Section>
 
-          <Card className="max-w-4xl mx-auto border-emerald-500/20" data-testid="card-step3-google-ads">
+          <Section flush className="max-w-4xl mx-auto border-emerald-500/20" testId="card-step3-google-ads">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">3</div>
+                <div className="w-10 h-10 rounded-lg    flex items-center justify-center text-white font-bold text-sm">3</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Paste the Script into Google Ads</CardTitle>
+                  <CardTitle className="text-foreground text-base">Paste the script into Google Ads</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-step3-subtitle">Paste this script into Google Ads &rarr; Tools &rarr; Bulk actions &rarr; Scripts and schedule it. No Google sign-in is needed here; the script runs inside your own Google Ads account.</p>
                 </div>
               </div>
@@ -752,7 +647,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 data-testid="button-toggle-gads-script"
               >
                 <div className="flex items-center gap-3">
-                  <Zap className="h-5 w-5 text-blue-500" />
+                  <Zap className="h-5 w-5 text-muted-foreground" />
                   <div className="text-left">
                     <p className="text-sm font-semibold text-foreground">Google Ads IP Exclusion Script</p>
                     <p className="text-xs text-muted-foreground">Click to view the script you paste into Google Ads</p>
@@ -772,7 +667,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 text-xs text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
+                        className="h-7 text-xs text-muted-foreground text-muted-foreground"
                         onClick={copyScript}
                         disabled={scriptLoading || !scriptData}
                         data-testid="button-copy-script"
@@ -787,19 +682,19 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                   </div>
                   <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="text-script-key-note">{PRIVATE_KEY_NOTE}</p>
 
-                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
-                    <h4 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                  <div className="bg-muted border border-border rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                       <BookOpen className="h-4 w-4" />
-                      Install in Google Ads (3 Steps)
+                      Install in Google Ads (3 steps)
                     </h4>
                     <div className="space-y-3">
                       {[
-                        { step: 1, title: "Open Google Ads Scripts", desc: "Go to ads.google.com → Tools & Settings → Bulk Actions → Scripts" },
+                        { step: 1, title: "Open Google Ads scripts", desc: "Go to ads.google.com → Tools & Settings → Bulk Actions → Scripts" },
                         { step: 2, title: "Create New Script", desc: "Click the + button, name it \"Click Guard IP Blocker\", paste the script above, and click Save" },
                         { step: 3, title: "Schedule It", desc: "Set the script to run Hourly. Click \"Run\" once to test it. Check the Logs tab to see which IPs were excluded." },
                       ].map(s => (
                         <div key={s.step} className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-400 flex-shrink-0 mt-0.5">
+                          <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground flex-shrink-0 mt-0.5">
                             {s.step}
                           </div>
                           <div>
@@ -816,7 +711,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="border-t border-border pt-4">
                 <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Code2 className="h-4 w-4 text-muted-foreground" />
-                  IP Exclusion List URL
+                  IP exclusion list URL
                 </h4>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-muted rounded-lg border border-border px-4 py-2.5">
@@ -836,13 +731,13 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 </div>
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-2" data-testid="text-exclusion-key-note">{PRIVATE_KEY_NOTE}</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  When you schedule it hourly, the Google Ads Script calls this URL on each run. It returns your exclusion list in JSON format, up to the length set under Domain Settings (500 at most). You can also use this with Microsoft Ads or any other platform.
+                  When you schedule it hourly, the Google Ads script calls this URL on each run. It returns your exclusion list in JSON format, up to the length set under Domain settings (500 at most). You can also use this with Microsoft Ads or any other platform.
                 </p>
               </div>
             </CardContent>
-          </Card>
+          </Section>
 
-          <Card className="max-w-4xl mx-auto bg-card border-border" data-testid="card-manual-method">
+          <Section flush className="max-w-4xl mx-auto bg-card border-border" testId="card-manual-method">
             <CardHeader className="pb-3">
               <button
                 className="w-full flex items-center justify-between cursor-pointer"
@@ -854,7 +749,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                     <FileText className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <div className="text-left">
-                    <CardTitle className="text-foreground text-base">Manual Fallback — Copy & Paste IPs</CardTitle>
+                    <CardTitle className="text-foreground text-base">Manual fallback — copy & paste IPs</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5">If you prefer to manually add IPs to Google Ads</p>
                   </div>
                 </div>
@@ -864,14 +759,14 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             {showManualSteps && (
               <CardContent className="space-y-4 pt-0">
                 <div className="flex items-center gap-3 bg-card rounded-lg p-3">
-                  <Ban className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                  <Ban className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm text-foreground">{activeBlockedCount} blocked IPs ready to copy</p>
                     <p className="text-xs text-muted-foreground">One IP per line, formatted for Google Ads</p>
                   </div>
                   <Button
                     size="sm"
-                    className="bg-[#4285F4] hover:bg-[#3367D6] text-white h-8"
+                    variant="outline" className="min-h-10"
                     onClick={copyIpList}
                     disabled={activeBlockedCount === 0}
                     data-testid="button-copy-ips"
@@ -900,45 +795,47 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                 </div>
               </CardContent>
             )}
-          </Card>
+          </Section>
 
+          <details className="max-w-4xl mx-auto space-y-4"><summary className="cursor-pointer py-3 text-sm font-medium">More about exclusions and limits</summary>
           <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className=" bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-tip-budget">
+            <Section flush className="    border-emerald-500/20" testId="card-tip-budget">
               <CardContent className="p-5">
                 <DollarSign className="h-8 w-8 text-emerald-400 mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Review IP Exclusions</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-1">Review IP exclusions</h4>
                 <p className="text-xs text-muted-foreground">IP exclusions can reduce repeated traffic from specified addresses on supported campaigns, but do not identify a person or guarantee savings.</p>
               </CardContent>
-            </Card>
-            <Card className=" bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-tip-auto">
+            </Section>
+            <Section flush className="    border-border" testId="card-tip-auto">
               <CardContent className="p-5">
-                <RefreshCw className="h-8 w-8 text-blue-400 mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Runs When You Schedule It</h4>
+                <RefreshCw className="h-8 w-8 text-muted-foreground mb-3" />
+                <h4 className="text-sm font-semibold text-foreground mb-1">Runs when you schedule it</h4>
                 <p className="text-xs text-muted-foreground">Once you schedule the pasted script to run hourly in Google Ads, each run adds newly listed IPs to your enabled campaigns. Check its Logs tab to confirm it ran.</p>
               </CardContent>
-            </Card>
-            <Card className=" bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20" data-testid="card-tip-fingerprint">
+            </Section>
+            <Section flush className="    border-border" testId="card-tip-fingerprint">
               <CardContent className="p-5">
-                <Fingerprint className="h-8 w-8 text-purple-400 mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Smarter Than IP Alone</h4>
+                <Fingerprint className="h-8 w-8 text-muted-foreground mb-3" />
+                <h4 className="text-sm font-semibold text-foreground mb-1">Smarter than IP alone</h4>
                 <p className="text-xs text-muted-foreground">Click Guard compares reported fingerprints and visit patterns. These signals can flag legitimate visitors and do not establish identity or fraud.</p>
               </CardContent>
-            </Card>
+            </Section>
           </div>
 
-          <Card className="max-w-4xl mx-auto bg-blue-500/5 border-blue-500/20" data-testid="card-pro-tip">
+          <Section flush className="max-w-4xl mx-auto bg-muted border-border" testId="card-pro-tip">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-semibold text-blue-500 mb-1">Pro Tip: Google Ads Has a 500 IP Limit</h4>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-1">Pro tip: Google Ads has a 500 IP limit</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Google Ads allows 500 IP exclusions per campaign. The script stops adding IPs once a campaign reaches that limit, so review and remove old exclusions in Google Ads when the list fills up.
                   </p>
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Section>
+          </details>
         </>
       )}
     </div>
@@ -957,50 +854,36 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
   domain: DomainWithStats;
 }) {
   const stats = [
-    { label: "Visits", value: analytics?.totalVisits ?? 0, icon: Eye, color: "text-blue-400", bg: "from-blue-500/20 to-indigo-500/20" },
-    { label: "Blocked IPs", value: analytics?.blockedIps ?? 0, icon: Ban, color: "text-red-400", bg: "from-red-500/20 to-rose-500/20" },
-    { label: "Unique Visitors", value: analytics?.uniqueVisitors ?? 0, icon: Users, color: "text-emerald-400", bg: "from-emerald-500/20 to-teal-500/20" },
-    { label: "Avg Visits/User", value: analytics?.avgVisitsPerUser ?? 0, icon: BarChart3, color: "text-purple-400", bg: "from-purple-500/20 to-violet-500/20" },
+    { label: "Visits", value: analytics?.totalVisits ?? 0, icon: Eye, color: "text-muted-foreground", bg: " " },
+    { label: "Blocked IPs", value: analytics?.blockedIps ?? 0, icon: Ban, color: "text-red-400", bg: " " },
+    { label: "Unique Visitors", value: analytics?.uniqueVisitors ?? 0, icon: Users, color: "text-emerald-400", bg: " " },
+    { label: "Avg Visits/User", value: analytics?.avgVisitsPerUser ?? 0, icon: BarChart3, color: "text-muted-foreground", bg: " " },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 flex-wrap">
+      <Toolbar filters={<>
         {["1d", "7d", "30d"].map(r => (
           <Button
             key={r}
             size="sm"
-            variant={dateRange === r ? "default" : "ghost"}
-            className={dateRange === r ? "bg-[#4285F4] text-white" : "text-muted-foreground border border-border"}
+            variant={dateRange === r ? "secondary" : "ghost"}
+            className={dateRange === r ? "bg-muted text-foreground" : "text-muted-foreground border border-border"}
             onClick={() => setDateRange(r)}
             data-testid={`button-range-${r}`}
           >
-            {r === "1d" ? "Daily" : r === "7d" ? "Last 7 Days" : "Last 30 Days"}
+            {r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
           </Button>
         ))}
-      </div>
+      </>} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {stats.map(s => (
-          <Card key={s.label} className="bg-card border-border" data-testid={`card-stat-${s.label.toLowerCase().replace(/[\s\/]/g, "-")}`}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`h-8 w-8 rounded-md bg-gradient-to-br ${s.bg} flex items-center justify-center`}>
-                  <s.icon className={`h-4 w-4 ${s.color}`} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{typeof s.value === "number" ? s.value.toLocaleString() : s.value}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <StatGrid>{stats.map(s => <Stat key={s.label} label={s.label === "Unique Visitors" ? "Unique visitors" : s.label === "Avg Visits/User" ? "Visits per visitor" : s.label} value={typeof s.value === "number" ? s.value.toLocaleString() : s.value} testId={`card-stat-${s.label.toLowerCase().replace(/[\s\/]/g, "-")}`} />)}</StatGrid>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 bg-card border-border" data-testid="card-threat-level">
+        <Section flush className="lg:col-span-2 bg-card border-border" testId="card-threat-level">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-blue-500" /> Threat Level
+            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-muted-foreground" /> Threat level
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
@@ -1023,35 +906,35 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
               })}
             </div>
           </CardContent>
-        </Card>
+        </Section>
 
-        <Card className="bg-card border-border" data-testid="card-savings">
+        <Section flush className="bg-card border-border" testId="card-savings">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-400" /> Illustrative Cost Estimate
+            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-400" /> Cost illustration
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="text-center py-4">
               {(analytics?.blockedIps ?? 0) > 0 ? (
                 <>
-                  <p className="text-3xl font-bold text-emerald-400">${((analytics?.blockedIps ?? 0) * 4.5).toFixed(0)}</p>
+                  <p className="text-2xl font-semibold text-emerald-400">${((analytics?.blockedIps ?? 0) * 4.5).toFixed(0)}</p>
                   <p className="text-xs text-muted-foreground mt-1">Illustration based on listed IPs; not measured savings</p>
                   <p className="text-xs text-muted-foreground mt-1">Assumes $4.50 per click; no actual ad-cost data is connected</p>
                 </>
               ) : (
-                <p className="text-blue-500 text-sm">No listed IPs in this range</p>
+                <p className="text-muted-foreground text-sm">No listed IPs in this range</p>
               )}
             </div>
           </CardContent>
-        </Card>
+        </Section>
       </div>
 
       {dailyEntries.length > 0 && (
-        <Card className="bg-card border-border" data-testid="card-chart">
+        <Section flush className="bg-card border-border" testId="card-chart">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-[#4285F4]" /> Visit Trend
+            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-muted-foreground" /> Visit trend
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-2">
@@ -1060,7 +943,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                 <div key={date} className="flex-1 flex flex-col items-center gap-1">
                   <div className="w-full flex flex-col items-center justify-end flex-1">
                     <div
-                      className="w-full max-w-[32px] bg-gradient-to-t from-[#4285F4] to-[#34A853] rounded-t-sm opacity-80"
+                      className="w-full max-w-[32px]    rounded-t-sm opacity-80"
                       style={{ height: `${(count / maxDailyVisits) * 100}%`, minHeight: "4px" }}
                       title={`${count} visits on ${date}`}
                       data-testid={`bar-${date}`}
@@ -1071,15 +954,15 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
               ))}
             </div>
           </CardContent>
-        </Card>
+        </Section>
       )}
 
       {analytics && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="bg-card border-border" data-testid="card-device-breakdown">
+          <Section flush className="bg-card border-border" testId="card-device-breakdown">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Monitor className="h-4 w-4 text-blue-400" /> Visits by Device
+                <Monitor className="h-4 w-4 text-muted-foreground" /> Visits by device
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -1093,7 +976,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                         <Icon className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground capitalize w-20">{device}</span>
                         <div className="flex-1 h-2 bg-card rounded-full">
-                          <div className="h-full bg-gradient-to-r from-[#4285F4] to-[#34A853] rounded-full" style={{ width: `${pct}%` }} />
+                          <div className="h-full    rounded-full" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground w-16 text-right">{count} ({pct}%)</span>
                       </div>
@@ -1101,15 +984,15 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-blue-500 text-center py-4">No device data yet</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No device data yet</p>
               )}
             </CardContent>
-          </Card>
+          </Section>
 
-          <Card className="bg-card border-border" data-testid="card-browser-breakdown">
+          <Section flush className="bg-card border-border" testId="card-browser-breakdown">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Globe className="h-4 w-4 text-purple-400" /> Browser Breakdown
+                <Globe className="h-4 w-4 text-muted-foreground" /> Browser breakdown
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -1121,7 +1004,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                       <div key={browser} className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground w-20 truncate">{browser}</span>
                         <div className="flex-1 h-2 bg-card rounded-full">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-violet-400 rounded-full" style={{ width: `${pct}%` }} />
+                          <div className="h-full    rounded-full" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground w-16 text-right">{count} ({pct}%)</span>
                       </div>
@@ -1129,10 +1012,10 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-blue-500 text-center py-4">No browser data yet</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No browser data yet</p>
               )}
             </CardContent>
-          </Card>
+          </Section>
         </div>
       )}
     </div>
@@ -1151,85 +1034,70 @@ function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-lg font-bold text-foreground flex items-center gap-2" data-testid="text-traffic-title">
-          <Globe className="h-5 w-5 text-[#4285F4]" /> Traffic Sources by Domain / Vendor
+        <h3 className="text-base font-semibold text-foreground flex items-center gap-2" data-testid="text-traffic-title">
+          <Globe className="h-5 w-5 text-muted-foreground" /> Traffic sources by domain / vendor
         </h3>
-        <div className="flex items-center gap-2">
+        <Toolbar filters={<>
           {["1d", "7d", "30d"].map(r => (
             <Button
               key={r}
               size="sm"
-              variant={dateRange === r ? "default" : "ghost"}
-              className={dateRange === r ? "bg-[#4285F4] text-white" : "text-muted-foreground border border-border"}
+              variant={dateRange === r ? "secondary" : "ghost"}
+              className={dateRange === r ? "bg-muted text-foreground" : "text-muted-foreground border border-border"}
               onClick={() => setDateRange(r)}
               data-testid={`button-traffic-range-${r}`}
             >
-              {r === "1d" ? "Daily" : r === "7d" ? "Last 7 Days" : "Last 30 Days"}
+              {r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
             </Button>
           ))}
-        </div>
+        </>} />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-card border-border" data-testid="card-total-sources">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#4285F4]">{sources.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Traffic Sources</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border" data-testid="card-total-pageloads">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#34A853]">{totalPageLoads.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">Page Loads</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border" data-testid="card-total-visitors">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#FBBC05]">{totalVisitors.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">Unique Visitors</p>
-          </CardContent>
-        </Card>
-      </div>
+      <StatGrid cols={3}>
+        <Stat label="Traffic sources" value={sources.length} testId="card-total-sources" />
+        <Stat label="Page loads" value={totalPageLoads.toLocaleString()} testId="card-total-pageloads" />
+        <Stat label="Visitors" value={totalVisitors.toLocaleString()} testId="card-total-visitors" />
+      </StatGrid>
 
-      <Card className="bg-card border-border" data-testid="card-traffic-table">
+      <Section flush className="bg-card border-border" testId="card-traffic-table">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Percentage</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Page Loads</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Visitors</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Traffic Sources by Domain / Vendor</th>
+            <table className={appTable.table}>
+              <thead className={appTableCards.thead}>
+                <tr className={appTableCards.tr + " border-b border-border bg-muted/50"}>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Percentage</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Page loads</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Visitors</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Traffic sources by domain / vendor</th>
                 </tr>
               </thead>
               <tbody>
                 {sources.length > 0 ? sources.map((source, i) => (
-                  <tr key={source.domain} className="border-b border-border last:border-0 hover:bg-card transition-colors" data-testid={`row-traffic-${i}`}>
-                    <td className="px-4 py-3">
+                  <tr key={source.domain} className={appTableCards.tr + " border-b border-border last:border-0 hover:bg-card transition-colors"} data-testid={`row-traffic-${i}`}>
+                    <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Percentage: </span>
                       <div className="flex items-center gap-2">
                         <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-gradient-to-r from-[#4285F4] to-[#34A853] rounded-full"
+                            className="h-full    rounded-full"
                             style={{ width: `${Math.max(source.percentage, 1)}%` }}
                           />
                         </div>
                         <span className="text-foreground font-medium">{source.percentage.toFixed(2)} %</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-foreground font-medium">{source.pageLoads.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-foreground font-medium">{source.visitors.toLocaleString()}</td>
-                    <td className="px-4 py-3">
+                    <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Page Loads: </span>{source.pageLoads.toLocaleString()}</td>
+                    <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Visitors: </span>{source.visitors.toLocaleString()}</td>
+                    <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Traffic sources by Domain / Vendor: </span>
                       {source.domain === "NO REFERRER DATA" ? (
                         <span className="text-muted-foreground italic">{source.domain}</span>
                       ) : (
-                        <span className="text-[#4285F4] font-medium">{source.domain}</span>
+                        <span className="text-muted-foreground font-medium">{source.domain}</span>
                       )}
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={4} className={appTableCards.td + " min-w-0 break-words"}>
                       No traffic data yet. Add the tracking script to your website to start collecting traffic source data.
                     </td>
                   </tr>
@@ -1244,21 +1112,21 @@ function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-blue-500/5 border-blue-500/20" data-testid="card-traffic-tip">
+      <Section flush className="bg-muted border-border" testId="card-traffic-tip">
         <CardContent className="p-5">
           <div className="flex items-start gap-3">
-            <Activity className="h-5 w-5 text-[#4285F4] flex-shrink-0 mt-0.5" />
+            <Activity className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-semibold text-[#4285F4] mb-1">Understanding Traffic Sources</h4>
+              <h4 className="text-sm font-semibold text-muted-foreground mb-1">Understanding traffic sources</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Traffic sources show where your website visitors are coming from. "NO REFERRER DATA" means the visitor typed your URL directly or the referrer was stripped. Look for entries like "google.com =&gt; (Campaign: Google AdWords)" to see your paid ad traffic vs organic search traffic.
               </p>
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Section>
     </div>
   );
 }
@@ -1278,9 +1146,9 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
 }) {
   return (
     <div className="space-y-6">
-      <Card className="bg-card border-border">
+      <Section flush className="bg-card border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-bold text-foreground" data-testid="text-signals-title">Traffic Signals</CardTitle>
+          <CardTitle className="text-base font-semibold text-foreground" data-testid="text-signals-title">Traffic signals</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="flex items-center gap-1 px-4 pt-2 pb-4 overflow-x-auto">
@@ -1289,7 +1157,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                 key={tab}
                 size="sm"
                 variant="ghost"
-                className={fraudTab === tab ? "text-blue-500 border-b-2 border-blue-500 rounded-none" : "text-muted-foreground rounded-none"}
+                className={fraudTab === tab ? "text-muted-foreground border-b-2 border-border rounded-none" : "text-muted-foreground rounded-none"}
                 onClick={() => setFraudTab(tab)}
                 data-testid={`fraud-tab-${tab.toLowerCase().replace(/\s+/g, "-")}`}
               >
@@ -1309,9 +1177,9 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                     className="bg-card border-border text-foreground max-w-xs"
                     data-testid="input-block-ip"
                   />
-                  <Button
+                  <Button variant="outline"
                     size="sm"
-                    className="bg-red-500/20 text-red-400 border border-red-500/20"
+                    className="text-red-400 border border-red-500/20"
                     onClick={() => blockIpMutation.mutate(blockIpInput)}
                     disabled={!blockIpInput || blockIpMutation.isPending}
                     data-testid="button-block-ip"
@@ -1321,28 +1189,28 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                 </div>
                 {blockedIps.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm" data-testid="table-blocked-ips">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left text-muted-foreground font-medium py-2 px-3">IP Address</th>
+                    <table className={appTable.table} data-testid="table-blocked-ips">
+                      <thead className={appTableCards.thead}>
+                        <tr className={appTableCards.tr + " border-b border-border"}>
+                          <th className="text-left text-muted-foreground font-medium py-2 px-3">IP address</th>
                           <th className="text-left text-muted-foreground font-medium py-2 px-3">Reason</th>
                           <th className="text-left text-muted-foreground font-medium py-2 px-3">Source</th>
-                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Blocked At</th>
+                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Blocked at</th>
                           <th className="text-right text-muted-foreground font-medium py-2 px-3">Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {blockedIps.map(ip => (
-                          <tr key={ip.id} className="border-b border-border" data-testid={`row-blocked-${ip.id}`}>
-                            <td className="py-2 px-3 text-foreground font-mono text-xs">{ip.ipAddress}</td>
-                            <td className="py-2 px-3 text-muted-foreground text-xs max-w-[200px] truncate">{ip.reason}</td>
-                            <td className="py-2 px-3">
-                              <Badge className={ip.source === "auto" ? "bg-blue-500/10 text-blue-500 border-blue-500/20 text-[10px]" : "bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px]"}>
+                          <tr key={ip.id} className={appTableCards.tr + " border-b border-border"} data-testid={`row-blocked-${ip.id}`}>
+                            <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">IP Address: </span>{ip.ipAddress}</td>
+                            <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Reason: </span>{ip.reason}</td>
+                            <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Source: </span>
+                              <Badge className={ip.source === "auto" ? "bg-muted text-muted-foreground border-border text-[10px]" : "bg-muted text-muted-foreground border-border text-[10px]"}>
                                 {ip.source}
                               </Badge>
                             </td>
-                            <td className="py-2 px-3 text-muted-foreground text-xs">{new Date(ip.blockedAt).toLocaleDateString()}</td>
-                            <td className="py-2 px-3 text-right">
+                            <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Blocked At: </span>{new Date(ip.blockedAt).toLocaleDateString()}</td>
+                            <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Action: </span>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -1375,7 +1243,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                       <div key={country} className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground w-24">{country}</span>
                         <div className="flex-1 h-2 bg-card rounded-full">
-                          <div className="h-full bg-gradient-to-r from-[#4285F4] to-[#34A853] rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
+                          <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground">{cnt}</span>
                       </div>
@@ -1383,7 +1251,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Globe className="h-12 w-12 text-blue-500/30 mx-auto mb-2" />
+                    <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                     <p className="text-muted-foreground text-sm" data-testid="text-countries-empty">Country comes from Cloudflare on new visits; earlier visits show as Unknown.</p>
                   </div>
                 )}
@@ -1394,10 +1262,10 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
               <div>
                 {analytics && Object.keys(analytics.multiClickBreakdown).length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Number of Clicks</th>
+                    <table className={appTable.table}>
+                      <thead className={appTableCards.thead}>
+                        <tr className={appTableCards.tr + " border-b border-border"}>
+                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Number of clicks</th>
                           <th className="text-right text-muted-foreground font-medium py-2 px-3">Users</th>
                           <th className="text-right text-muted-foreground font-medium py-2 px-3">Percentage</th>
                         </tr>
@@ -1411,10 +1279,10 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                           const totalUsers = Object.values(analytics.multiClickBreakdown).reduce((a, b) => a + b, 0);
                           const pct = totalUsers > 0 ? ((users / totalUsers) * 100).toFixed(1) : "0";
                           return (
-                            <tr key={clicks} className="border-b border-border">
-                              <td className="py-2 px-3 text-foreground">{clicks} Click{clicks !== "1" ? "s" : ""}</td>
-                              <td className="py-2 px-3 text-right text-muted-foreground">{users}</td>
-                              <td className="py-2 px-3 text-right text-muted-foreground">{pct}%</td>
+                            <tr key={clicks} className={appTableCards.tr + " border-b border-border"}>
+                              <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Number of Clicks: </span>{clicks} Click{clicks !== "1" ? "s" : ""}</td>
+                              <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Users: </span>{users}</td>
+                              <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Percentage: </span>{pct}%</td>
                             </tr>
                           );
                         })}
@@ -1423,7 +1291,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-blue-500 text-sm">No multi-click data yet</p>
+                    <p className="text-muted-foreground text-sm">No multi-click data yet</p>
                   </div>
                 )}
               </div>
@@ -1440,7 +1308,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                           <Icon className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm text-muted-foreground capitalize w-20">{device}</span>
                           <div className="flex-1 h-2 bg-card rounded-full">
-                            <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
+                            <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                           </div>
                           <span className="text-xs text-muted-foreground">{cnt}</span>
                         </div>
@@ -1463,7 +1331,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                       <div key={browser} className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground w-24">{browser}</span>
                         <div className="flex-1 h-2 bg-card rounded-full">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-pink-400 rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
+                          <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground">{cnt}</span>
                       </div>
@@ -1485,7 +1353,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                       <div key={os} className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground w-24">{os}</span>
                         <div className="flex-1 h-2 bg-card rounded-full">
-                          <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
+                          <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground">{cnt}</span>
                       </div>
@@ -1500,12 +1368,12 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
             )}
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-clicks-report">
+      <Section flush className="bg-card border-border" testId="card-clicks-report">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-            Clicks Report
+          <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+            Clicks report
             <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] ml-1">LIVE</Badge>
           </CardTitle>
         </CardHeader>
@@ -1524,7 +1392,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
             <Button
               size="sm"
               variant="outline"
-              className="border-blue-500/30 text-blue-500"
+              className="border-border text-muted-foreground"
               onClick={() => {
                 const csv = ["IP,Device,Browser,OS,Suspicious,Time"]
                   .concat(visits.map(v => `${v.ipAddress},${v.deviceType},${v.browser},${v.os},${v.isSuspicious},${v.visitedAt}`))
@@ -1544,10 +1412,10 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
 
           {visits.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm" data-testid="table-clicks-report">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left text-muted-foreground font-medium py-2 px-3">IP Address</th>
+              <table className={appTable.table} data-testid="table-clicks-report">
+                <thead className={appTableCards.thead}>
+                  <tr className={appTableCards.tr + " border-b border-border"}>
+                    <th className="text-left text-muted-foreground font-medium py-2 px-3">IP address</th>
                     <th className="text-left text-muted-foreground font-medium py-2 px-3">Device</th>
                     <th className="text-left text-muted-foreground font-medium py-2 px-3">Browser</th>
                     <th className="text-left text-muted-foreground font-medium py-2 px-3">OS</th>
@@ -1562,13 +1430,13 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                     let pagePath = "-";
                     try { pagePath = v.landingPage ? new URL(v.landingPage).pathname : "-"; } catch { pagePath = v.landingPage || "-"; }
                     return (
-                      <tr key={v.id} className="border-b border-border" data-testid={`row-visit-${v.id}`}>
-                        <td className="py-2 px-3 text-foreground font-mono text-xs">{v.ipAddress}</td>
-                        <td className="py-2 px-3 text-muted-foreground text-xs capitalize">{v.deviceType || "-"}</td>
-                        <td className="py-2 px-3 text-muted-foreground text-xs">{v.browser || "-"}</td>
-                        <td className="py-2 px-3 text-muted-foreground text-xs">{v.os || "-"}</td>
-                        <td className="py-2 px-3 text-muted-foreground text-xs max-w-[150px] truncate">{pagePath}</td>
-                        <td className="py-2 px-3 text-center">
+                      <tr key={v.id} className={appTableCards.tr + " border-b border-border"} data-testid={`row-visit-${v.id}`}>
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">IP Address: </span>{v.ipAddress}</td>
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Device: </span>{v.deviceType || "-"}</td>
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Browser: </span>{v.browser || "-"}</td>
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">OS: </span>{v.os || "-"}</td>
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Page: </span>{pagePath}</td>
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span>
                           {v.isSuspicious ? (
                             <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[10px]">
                               <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> Flagged
@@ -1579,8 +1447,8 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                             </Badge>
                           )}
                         </td>
-                        <td className="py-2 px-3 text-muted-foreground text-xs">{new Date(v.visitedAt).toLocaleString()}</td>
-                        <td className="py-2 px-3 text-right">
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Time: </span>{new Date(v.visitedAt).toLocaleString()}</td>
+                        <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Action: </span>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1605,7 +1473,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
             </div>
           )}
         </CardContent>
-      </Card>
+      </Section>
     </div>
   );
 }
@@ -1617,15 +1485,15 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
 }) {
   return (
     <div className="space-y-6">
-      <Card className="bg-card border-border" data-testid="card-tracking-script">
+      <Section flush className="bg-card border-border" testId="card-tracking-script">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-blue-500" /> Tracking Script
+          <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-muted-foreground" /> Tracking script
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0">
           <p className="text-sm text-muted-foreground mb-3">
-            Add this script to the <code className="text-blue-500">&lt;head&gt;</code> of every page on <strong className="text-foreground">{domain.domain}</strong> to start tracking visitors and reviewing unusual traffic patterns.
+            Add this script to the <code className="text-muted-foreground">&lt;head&gt;</code> of every page on <strong className="text-foreground">{domain.domain}</strong> to start tracking visitors and reviewing unusual traffic patterns.
           </p>
           <div className="relative">
             <pre className="bg-muted border border-border rounded-lg p-4 text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre-wrap break-all">
@@ -1641,20 +1509,20 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
               <Copy className="h-3 w-3 mr-1" /> Copy
             </Button>
           </div>
-          <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg">
-            <p className="text-xs text-blue-400">
+          <div className="mt-4 p-3 bg-muted border border-border rounded-lg">
+            <p className="text-xs text-muted-foreground">
               <strong>How it works:</strong> The script runs on page load, captures the visitor's device fingerprint, IP (server-side), browser, screen size, and sends it to Click Guard. Repeated visits and matching device signals are flagged. Repeatedly flagged IPs can enter a local exclusion list; applying it in Google Ads requires the separate Ads script.
             </p>
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
       {/* Conversion tracking is not built: the tracker records page visits only
           (no conversion value is sent or stored), so no snippet is offered. */}
-      <Card className="bg-card border-border" data-testid="card-conversion-tracking">
+      <Section flush className="bg-card border-border" testId="card-conversion-tracking">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-            <Target className="h-5 w-5 text-muted-foreground" /> Conversion Tracking
+          <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Target className="h-5 w-5 text-muted-foreground" /> Conversion tracking
             <Badge className="bg-card text-muted-foreground border-border text-[10px] ml-1">Not available yet</Badge>
           </CardTitle>
         </CardHeader>
@@ -1663,7 +1531,7 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
             Conversion tracking is not available yet. Click Guard records page visits only; it does not record form submissions, calls or conversion values. Use Google Ads conversion tracking to measure leads.
           </p>
         </CardContent>
-      </Card>
+      </Section>
     </div>
   );
 }
@@ -1734,18 +1602,18 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
 
   return (
     <div className="space-y-6">
-      <p className="rounded-md border p-4 text-sm text-muted-foreground" data-testid="text-settings-note">Detection preferences below are saved but do not yet change automatic detection. The exclusion list your Google Ads script downloads is built from Manually Exclude IPs and the Blocked IPs tab (Traffic Signals), minus Whitelist IPs, up to the Exclusion List Refresh Rate length. The script only adds exclusions in Google Ads; it never removes them. VPN Shield has separate browser controls.</p>
+      <p className="rounded-md border p-4 text-sm text-muted-foreground" data-testid="text-settings-note">Detection preferences below are saved but do not yet change automatic detection. The exclusion list your Google Ads script downloads is built from Manually Exclude IPs and the Blocked IPs tab (Traffic signals), minus Whitelist IPs, up to the Exclusion List Refresh Rate length. The script only adds exclusions in Google Ads; it never removes them. VPN Shield has separate browser controls.</p>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <Globe className="h-5 w-5 text-blue-500" /> Your Domains
+        <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+          <Globe className="h-5 w-5 text-muted-foreground" /> Your domains
         </h2>
         <Button
           size="sm"
-          className="bg-[#4285F4] hover:bg-[#3367D6] text-white"
+          variant="outline"
           onClick={() => setShowAddDomain(true)}
           data-testid="button-add-domain-settings"
         >
-          <Plus className="h-4 w-4 mr-1" /> Add Domain
+          <Plus className="h-4 w-4 mr-1" /> Add domain
         </Button>
       </div>
 
@@ -1757,7 +1625,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           return (
             <Card
               key={d.id}
-              className={`border transition-all cursor-pointer ${isSelected ? "bg-card border-blue-500/30 ring-1 ring-blue-500/20" : "bg-card border-border hover:border-border"}`}
+              className={`border transition-all cursor-pointer ${isSelected ? "bg-card border-border ring-1 ring-blue-500/20" : "bg-card border-border hover:border-border"}`}
               onClick={() => setSelectedDomainId(d.id)}
               data-testid={`card-domain-${d.id}`}
             >
@@ -1774,8 +1642,8 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                           {d.isActive ? "ACTIVE" : "INACTIVE"}
                         </Badge>
                         {isSelected && (
-                          <Badge className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-500 border-blue-500/20">
-                            SELECTED
+                          <Badge className="text-[10px] px-1.5 py-0 bg-muted text-muted-foreground border-border">
+                            Selected
                           </Badge>
                         )}
                       </div>
@@ -1793,7 +1661,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                       <p className="text-[10px] text-muted-foreground">Unique</p>
                     </div>
                     <div className="text-center px-3">
-                      <p className="text-sm font-bold text-blue-500" data-testid={`stat-blocked-${d.id}`}>{d.stats.blockedIps.toLocaleString()}</p>
+                      <p className="text-sm font-bold text-muted-foreground" data-testid={`stat-blocked-${d.id}`}>{d.stats.blockedIps.toLocaleString()}</p>
                       <p className="text-[10px] text-muted-foreground">Blocked</p>
                     </div>
                     <div className="text-center px-3">
@@ -1807,7 +1675,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-red-400"
                         onClick={(e) => {
                           e.stopPropagation();
                           setConfirmDeleteId(d.id);
@@ -1818,9 +1686,9 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                       </Button>
                     ) : (
                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                        <Button
+                        <Button variant="outline"
                           size="sm"
-                          className="h-7 text-xs bg-red-500 hover:bg-red-600 text-white px-2"
+                          className="h-7 text-xs px-2"
                           onClick={() => handleDeleteDomain(d.id)}
                           disabled={deleteDomainMutation.isPending}
                           data-testid={`button-confirm-delete-${d.id}`}
@@ -1851,7 +1719,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                     <p className="text-[10px] text-muted-foreground">Unique</p>
                   </div>
                   <div className="text-center flex-1">
-                    <p className="text-sm font-bold text-blue-500">{d.stats.blockedIps.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-muted-foreground">{d.stats.blockedIps.toLocaleString()}</p>
                     <p className="text-[10px] text-muted-foreground">Blocked</p>
                   </div>
                   <div className="text-center flex-1">
@@ -1875,27 +1743,27 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
       </div>
 
       {domains.length === 0 && (
-        <Card className="bg-card border-border">
+        <Section flush className="bg-card border-border">
           <CardContent className="p-8 text-center">
             <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground text-sm">No domains added yet. Add your first domain to start tracking.</p>
           </CardContent>
-        </Card>
+        </Section>
       )}
 
       <div className="border-t border-border pt-6 mt-8" />
 
-      <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-        <Settings2 className="h-5 w-5 text-blue-500" /> Detection Rules
+      <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+        <Settings2 className="h-5 w-5 text-muted-foreground" /> Detection rules
         <span className="text-xs font-normal text-muted-foreground ml-2">for {domain.domain}</span>
       </h2>
 
-      <Card className="bg-card border-border" data-testid="card-click-threshold">
+      <Section flush className="bg-card border-border" testId="card-click-threshold">
         <CardContent className="p-5">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Crosshair className="h-4 w-4 text-blue-500" /> Click Fraud Threshold
+                <Crosshair className="h-4 w-4 text-muted-foreground" /> Click fraud threshold
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; automatic flagging currently uses fixed rules: bot-like user agents, more than 5 visits from one IP in an hour or more than 15 in a day, and one device fingerprint seen from different IPs.
@@ -1919,25 +1787,26 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                 <Button
                   size="sm"
                   variant="outline"
-                  className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+                  className="border-border text-muted-foreground"
                   onClick={() => updateSetting.mutate({ clickThreshold: Number(clickThreshold.trim()) })}
                   disabled={!!thresholdError || updateSetting.isPending}
                   data-testid="button-update-threshold"
                 >
-                  Update Threshold Rules
+                  Update threshold rules
                 </Button>
               </div>
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-detect-device-id">
+      <details className="space-y-4"><summary className="cursor-pointer py-3 text-sm font-medium">Advanced · Detection and exclusions</summary>
+      <Section flush className="bg-card border-border" testId="card-detect-device-id">
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Fingerprint className="h-4 w-4 text-blue-500" /> Detect IPs Based on Device IDs
+                <Fingerprint className="h-4 w-4 text-muted-foreground" /> Detect IPs based on device IDs
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; Click Guard already flags a device fingerprint seen from different IPs, and this toggle does not turn that off. Requires the tracking code to be installed.
@@ -1950,14 +1819,14 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             />
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-block-country">
+      <Section flush className="bg-card border-border" testId="card-block-country">
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-blue-500" /> Block IPs By Country
+                <MapPin className="h-4 w-4 text-muted-foreground" /> Block IPs by country
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only: country-based enforcement is not implemented in this tracker.
@@ -1987,14 +1856,14 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             />
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-block-js-disabled">
+      <Section flush className="bg-card border-border" testId="card-block-js-disabled">
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Bot className="h-4 w-4 text-blue-500" /> Block JavaScript Disabled Browsers
+                <Bot className="h-4 w-4 text-muted-foreground" /> Block JavaScript disabled browsers
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Not enforced: the tracking script cannot observe browsers that do not execute JavaScript.
@@ -2007,14 +1876,14 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             />
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-vpn-blocking">
+      <Section flush className="bg-card border-border" testId="card-vpn-blocking">
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <ShieldBan className="h-4 w-4 text-blue-500" /> VPN Blocking
+                <ShieldBan className="h-4 w-4 text-muted-foreground" /> VPN blocking
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only: this toggle does not enforce VPN blocking. VPN Shield offers separate, heuristic browser controls.
@@ -2028,14 +1897,14 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             />
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-behavior-analysis">
+      <Section flush className="bg-card border-border" testId="card-behavior-analysis">
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-500" /> Behavior Analysis
+                <Activity className="h-4 w-4 text-muted-foreground" /> Behavior analysis
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 The installed tracking script records page visits and device signals. These cannot reliably distinguish a person from a bot; this saved preference does not change collection.
@@ -2049,17 +1918,17 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             />
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <h2 className="text-xl font-bold text-foreground flex items-center gap-2 pt-4">
-        <ShieldBan className="h-5 w-5 text-blue-500" /> Manage Auto IP Blocking
+      <h2 className="text-base font-semibold text-foreground flex items-center gap-2 pt-4">
+        <ShieldBan className="h-5 w-5 text-muted-foreground" /> Manage auto IP blocking
       </h2>
 
-      <Card className="bg-card border-border" data-testid="card-block-period">
+      <Section flush className="bg-card border-border" testId="card-block-period">
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">Block IPs for a Certain Period</h3>
+              <h3 className="text-base font-semibold text-foreground">Block IPs for a certain period</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; not applied yet. Blocked IPs stay on the list until you remove them.
               </p>
@@ -2079,7 +1948,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
               <Button
                 size="sm"
                 variant="outline"
-                className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+                className="border-border text-muted-foreground"
                 onClick={() => updateSetting.mutate({ blockDays: Number(blockDays.trim()) })}
                 disabled={!!blockDaysError || updateSetting.isPending}
                 data-testid="button-update-block-days"
@@ -2089,13 +1958,13 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-exclusion-rate">
+      <Section flush className="bg-card border-border" testId="card-exclusion-rate">
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">Exclusion List Refresh Rate</h3>
+              <h3 className="text-base font-semibold text-foreground">Exclusion list refresh rate</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 The exclusion list URL serves at most this many IPs (50&ndash;500). Manually excluded IPs come first, then the newest blocked IPs.
               </p>
@@ -2115,7 +1984,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
               <Button
                 size="sm"
                 variant="outline"
-                className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+                className="border-border text-muted-foreground"
                 onClick={() => updateSetting.mutate({ exclusionListRate: Number(exclusionListRate.trim()) })}
                 disabled={!!exclusionRateError || updateSetting.isPending}
                 data-testid="button-update-exclusion"
@@ -2125,13 +1994,13 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-ip-range">
+      <Section flush className="bg-card border-border" testId="card-ip-range">
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">IP Range Exclusion</h3>
+              <h3 className="text-base font-semibold text-foreground">IP range exclusion</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; this switch does not change the exclusion list. Automatic blocking lists single IPs; to exclude a range, add it under Manually Exclude IPs.
               </p>
@@ -2143,11 +2012,11 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             />
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-manual-exclude">
+      <Section flush className="bg-card border-border" testId="card-manual-exclude">
         <CardContent className="p-5">
-          <h3 className="text-base font-semibold text-foreground">Manually Exclude IPs</h3>
+          <h3 className="text-base font-semibold text-foreground">Manually exclude IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
             Added first to the exclusion list your Google Ads script downloads. One IP, CIDR range or 1.2.3.* per line. Every line must be valid: if one isn&rsquo;t, nothing is saved and that line is named here.
           </p>
@@ -2166,7 +2035,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <Button
             size="sm"
             variant="outline"
-            className="mt-3 border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+            className="mt-3 border-border text-muted-foreground"
             onClick={() => saveIpList("manualExcludeIps", manualExcludeIps)}
             disabled={updateSetting.isPending}
             data-testid="button-update-exclude"
@@ -2174,9 +2043,9 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             Update
           </Button>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-whitelist">
+      <Section flush className="bg-card border-border" testId="card-whitelist">
         <CardContent className="p-5">
           <h3 className="text-base font-semibold text-foreground">Whitelist IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
@@ -2197,7 +2066,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <Button
             size="sm"
             variant="outline"
-            className="mt-3 border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+            className="mt-3 border-border text-muted-foreground"
             onClick={() => saveIpList("whitelistIps", whitelistIps)}
             disabled={updateSetting.isPending}
             data-testid="button-update-whitelist"
@@ -2205,13 +2074,13 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             Update
           </Button>
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="bg-card border-border" data-testid="card-aggressive">
+      <Section flush className="bg-card border-border" testId="card-aggressive">
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">Aggressive Blocking</h3>
+              <h3 className="text-base font-semibold text-foreground">Aggressive blocking</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only: this mode does not change the current automatic traffic rules.
               </p>
@@ -2223,7 +2092,8 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
             />
           </div>
         </CardContent>
-      </Card>
+      </Section>
+      </details>
     </div>
   );
 }
