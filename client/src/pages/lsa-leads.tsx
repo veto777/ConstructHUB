@@ -216,17 +216,17 @@ export default function LsaLeadsPage() {
   const connect = () => { window.location.href = "/api/lsa/oauth/start"; };
 
   return (
-    <AppPage testId="page-lsa-leads">
+    <AppPage testId="page-lsa-leads" className="[&_button]:min-h-10 [&_select]:min-h-10">
       <PageHeader title="LSA leads" description="Review your Local Services Ads leads and manage billing disputes." actions={<>
               {status?.connected ? (
                 <>
-                  <Button variant={selectedAccount ? "outline" : "default"} onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="flex items-center gap-2" data-testid="button-sync">
+                  <Button variant="default" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="flex items-center gap-2" data-testid="button-sync">
                     <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
                     {syncMutation.isPending ? "Syncing…" : "Sync now"}
                   </Button>
-                  <Button variant="ghost" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending} className="flex items-center gap-2" data-testid="button-disconnect">
+                  <details className="relative"><summary className="cursor-pointer rounded-md border px-3 py-2 text-sm">More</summary><div className="absolute right-0 z-20 mt-2 rounded-xl border bg-card p-2 shadow-sm">                  <Button variant="ghost" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending} className="flex items-center gap-2" data-testid="button-disconnect">
                     <Unplug className="w-4 h-4" /> Disconnect
-                  </Button>
+                  </Button></div></details>
                 </>
               ) : status?.configured ? (
                 <Button onClick={connect} className="flex items-center gap-2" data-testid="button-connect">
@@ -589,7 +589,7 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
                 <Button size="sm" variant="outline" onClick={() => setScheduleOpen((v) => !v)} disabled={selected.size === 0} className="flex items-center gap-1" data-testid="button-toggle-schedule">
                   <Clock className="w-4 h-4" /> Schedule for later
                 </Button>
-                <Button size="sm" onClick={submitBatch} disabled={selected.size === 0 || batchDispute.isPending} className="flex items-center gap-1" data-testid="button-report-now">
+                <Button variant="outline" size="sm" onClick={submitBatch} disabled={selected.size === 0 || batchDispute.isPending} className="flex items-center gap-1" data-testid="button-report-now">
                   <ThumbsDown className="w-4 h-4" /> {batchDispute.isPending ? "Queuing…" : `Report ${selected.size || ""} now`}
                 </Button>
                 {selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection} data-testid="button-clear-selection">Clear</Button>}
