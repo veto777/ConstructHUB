@@ -1,3 +1,5 @@
+import { AppPage, PageHeader, Section, Stat, StatGrid } from "@/components/app-ui";
+import { Button } from "@/components/ui/button";
 /**
  * /admin/feature-pages — platform admins' map of every feature intro page:
  * its group, whether it is written yet (stub / ready), the public page and the
@@ -68,33 +70,21 @@ export default function AdminFeaturePagesPage() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6" data-testid="page-admin-feature-pages">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Feature pages</h1>
-            <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground" data-testid="text-feature-pages-counts">
-            {data.counts.ready} of {data.counts.ready + data.counts.stub} feature pages written{data.counts.stub > 0 ? " · the rest are stubs until their copy lands." : " · no stubs left."}
-            {data.serviceCounts && ` · ${data.serviceCounts.ready} of ${data.serviceCounts.ready + data.serviceCounts.stub} service pages written.`}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col gap-1 sm:items-end">
-          <Link href={data.catalogue} className={linkClass} data-testid="link-admin-features-catalogue">
-            <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Open the public catalogue ({data.catalogue})
-          </Link>
-          {data.services && (
-            <Link href={data.services} className={linkClass} data-testid="link-admin-dfy-catalogue">
-              <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Open the services catalogue ({data.services})
-            </Link>
-          )}
-        </div>
+    <AppPage testId="page-admin-feature-pages">
+      <PageHeader title="Feature pages" description="Review public pages and open their tools." actions={<>
+        <Button asChild><Link href={data.catalogue} data-testid="link-admin-features-catalogue">Open public catalogue</Link></Button>
+        {data.services && <Button asChild variant="outline"><Link href={data.services} data-testid="link-admin-dfy-catalogue">Services catalogue</Link></Button>}
+      </>} />
+      <div data-testid="text-feature-pages-counts">
+        <StatGrid cols={3}>
+          <Stat label="Features written" value={data.counts.ready} hint={`of ${data.counts.ready + data.counts.stub} feature pages`} />
+          <Stat label="Feature stubs" value={data.counts.stub} />
+          <Stat label="Services written" value={data.serviceCounts?.ready ?? 0} hint={`of ${(data.serviceCounts?.ready ?? 0) + (data.serviceCounts?.stub ?? 0)} service pages`} />
+        </StatGrid>
       </div>
-
       <div className="mt-6 space-y-6">
         {groups.map((group) => (
-          <Card key={group.key} className="overflow-hidden" data-testid={`card-admin-feature-group-${group.key}`}>
+          <Section flush key={group.key} className="overflow-hidden" testId={`card-admin-feature-group-${group.key}`}>
             <div className="grid border-b bg-muted/40 px-4 py-2.5 text-sm md:grid-cols-12">
               <h2 className="font-semibold md:col-span-4">{group.label}</h2>
               <span className="hidden text-xs font-medium text-muted-foreground md:col-span-4 md:block">Public page</span>
@@ -135,9 +125,9 @@ export default function AdminFeaturePagesPage() {
                 );
               })}
             </ul>
-          </Card>
+          </Section>
         ))}
       </div>
-    </div>
+    </AppPage>
   );
 }

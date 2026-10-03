@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section, Toolbar } from "@/components/app-ui";
 /**
  * /admin/access — platform admins give an account one of the plans for 1–1000
  * days (no card), extend it by granting again, and revoke it. Owner,
@@ -86,7 +87,7 @@ function AccessSummary({ account }: { account: AccessGrantAccount }) {
       {a.planName && <span className="font-medium">{a.planName}</span>}
       {!a.planName && a.paidStripe && a.status && <span className="text-muted-foreground">({a.status.replace(/_/g, " ")})</span>}
       {end && <span className="text-muted-foreground">· {end}</span>}
-      {account.isPlatformAdmin && <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>}
+      {account.isPlatformAdmin && <span className="text-xs text-muted-foreground">Admin</span>}
     </div>
   );
 }
@@ -332,7 +333,7 @@ function ActiveGrants({ grants }: { grants: AccessGrantRow[] }) {
   return (
     <Card className="overflow-hidden" data-testid="card-active-grants">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Active grants <span className="font-normal text-muted-foreground">({grants.length})</span></CardTitle>
+        <CardTitle className="text-base">Active grants <span className="font-normal text-muted-foreground">({grants.length})</span></CardTitle>
       </CardHeader>
       {grants.length === 0 ? (
         <CardContent><p className="text-sm text-muted-foreground" data-testid="text-no-active-grants">No account has granted access right now.</p></CardContent>
@@ -418,7 +419,7 @@ function EndedGrants({ grants }: { grants: AccessGrantRow[] }) {
   return (
     <Card className="overflow-hidden" data-testid="card-ended-grants">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Recently ended</CardTitle>
+        <CardTitle className="text-base">Recently ended</CardTitle>
       </CardHeader>
       {grants.length === 0 ? (
         <CardContent><p className="text-sm text-muted-foreground" data-testid="text-no-ended-grants">No grant has ended yet.</p></CardContent>
@@ -499,21 +500,12 @@ export default function AdminAccessPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6" data-testid="page-admin-access">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Access grants</h1>
-          <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
-        </div>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Give an account a plan for {ACCESS_GRANT_MIN_DAYS}–{ACCESS_GRANT_MAX_DAYS.toLocaleString("en-US")} days with no card. Access stops on its own at
-          the end date, or the moment you revoke it. Accounts that pay through Stripe keep their plan and can't be granted over.
-        </p>
-      </div>
+    <AppPage testId="page-admin-access">
+      <PageHeader title="Access grants" description="Give an account temporary access to a plan." />
 
       <Card className="overflow-hidden" data-testid="card-find-account">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Find an account</CardTitle>
+          <CardTitle className="text-base">Find an account</CardTitle>
           <div className="relative mt-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -547,6 +539,6 @@ export default function AdminAccessPage() {
 
       <ActiveGrants grants={data.active} />
       <EndedGrants grants={data.ended} />
-    </div>
+    </AppPage>
   );
 }

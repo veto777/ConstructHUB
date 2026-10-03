@@ -61,7 +61,7 @@ export function ChecklistCard({ items }: { items: DashboardChecklistItem[] }) {
                   <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
                 )}
                 <span className="min-w-0 flex-1">
-                  {next && <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-primary" data-testid="badge-checklist-next">Next step</span>}
+                  {next && <span className="mb-1 block text-xs font-semibold text-primary" data-testid="badge-checklist-next">Next step</span>}
                   <span className={`block text-sm font-medium ${item.done ? "text-muted-foreground line-through decoration-muted-foreground/50" : ""}`}>
                     {item.label}
                     <span className="sr-only">{item.done ? " (done)" : next ? " (next step)" : " (to do)"}</span>
@@ -70,7 +70,7 @@ export function ChecklistCard({ items }: { items: DashboardChecklistItem[] }) {
                   {!item.done && <span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span>}
                   {/* Looks like the page's primary button; the whole row is the link. */}
                   {next && (
-                    <span className={`${buttonVariants({ size: "sm" })} mt-3 min-h-9 pointer-events-none`} aria-hidden="true">
+                    <span className={`${buttonVariants({ size: "sm", variant: "outline" })} mt-3 min-h-9 pointer-events-none`} aria-hidden="true">
                       Start <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </span>
                   )}

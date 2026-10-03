@@ -1,3 +1,5 @@
+import { PageHeader, Section } from "@/components/app-ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { CreditCard, LayoutGrid, RefreshCw, SlidersHorizontal } from "lucide-react";
@@ -87,66 +89,24 @@ export function DashboardHeader({
   meta.push(`Updated ${relativeTime(generatedAt, updatedNow)}`);
 
   return (
-    <div>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="text-dashboard-greeting">
-              {account.firstName ? greeting : "Welcome back"}
-            </h1>
-            {fixture && (
-              <Badge variant="secondary" className="font-medium" data-testid="badge-dashboard-fixture" title="These numbers are a sample, not your account's.">
-                Sample data
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">Here's your business today.</p>
-          <p className="mt-0.5 text-xs text-muted-foreground" data-testid="text-dashboard-meta">{meta.join(" · ")}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <PlanChip account={account} />
-          {/* Platform admins: every feature's intro page, in one list. */}
-          {account.isPlatformAdmin && (
-            <Button asChild variant="outline" size="sm" className="min-h-10 sm:min-h-8">
-              <Link href={ADMIN_FEATURE_PAGES_PATH} data-testid="link-dashboard-feature-pages">
-                <LayoutGrid className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Feature pages
-              </Link>
-            </Button>
-          )}
-          {account.status !== "none" && (
-            <Button asChild variant="outline" size="sm" className="min-h-10 sm:min-h-8">
-              <Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">
-                <CreditCard className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Manage plan
-              </Link>
-            </Button>
-          )}
-          {onCustomize && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-10 sm:min-h-8"
-              onClick={onCustomize}
-              aria-haspopup="dialog"
-              data-testid="button-dashboard-customize"
-            >
-              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Customize
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-10 min-w-10 px-2.5 sm:min-h-8 sm:px-3"
-            onClick={onRefresh}
-            disabled={refreshing}
-            aria-busy={refreshing}
-            data-testid="button-dashboard-refresh"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 sm:mr-1.5 ${refreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
-            <span className="sr-only sm:not-sr-only">{refreshing ? "Refreshing…" : "Refresh"}</span>
-          </Button>
-        </div>
-      </div>
-    </div>
+    <PageHeader
+      title={<span data-testid="text-dashboard-greeting">{account.firstName ? greeting : "Welcome back"}</span>}
+      description="Here's your business today."
+      meta={fixture ? <Badge variant="secondary" data-testid="badge-dashboard-fixture">Sample data</Badge> : undefined}
+      actions={<>
+        <Button asChild><Link href="/crm-app">Open CRM</Link></Button>
+        {onCustomize && <Button variant="outline" onClick={onCustomize} aria-haspopup="dialog" data-testid="button-dashboard-customize">Customize</Button>}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button variant="outline">More</Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)] [&_[role=menuitem]]:min-h-10">
+            <div className="px-2 py-2"><PlanChip account={account} /><p className="mt-2 text-xs text-muted-foreground" data-testid="text-dashboard-meta">{meta.join(" · ")}</p></div>
+            <DropdownMenuItem onSelect={onRefresh} disabled={refreshing} data-testid="button-dashboard-refresh">{refreshing ? "Refreshing…" : "Refresh"}</DropdownMenuItem>
+            {account.status !== "none" && <DropdownMenuItem asChild><Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">Manage plan</Link></DropdownMenuItem>}
+            {account.isPlatformAdmin && <DropdownMenuItem asChild><Link href={ADMIN_FEATURE_PAGES_PATH} data-testid="link-dashboard-feature-pages">Feature pages</Link></DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </>}
+    />
   );
 }
 

@@ -68,7 +68,7 @@ export function IntegrationsSection(_props: SettingsSectionProps) {
     return (
       <Card data-testid="card-integrations-unavailable">
         <CardHeader>
-          <CardTitle className="text-lg">Connection status isn't available on this server yet</CardTitle>
+          <CardTitle className="text-base">Connection status isn't available on this server yet</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">

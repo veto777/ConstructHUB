@@ -57,6 +57,7 @@ const csvCell = (v: unknown) => {
 };
 
 export function AuditLogSection(_props: SettingsSectionProps) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { data, error, isLoading } = useQuery<{ activity: ActivityRow[] }>({ queryKey: ["/api/account-activity"] });
   const [area, setArea] = useState("");
   const [kind, setKind] = useState("");
@@ -105,6 +106,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
     <div className="space-y-4" data-testid="section-audit-log">
       <Card>
         <CardContent className="pt-6 space-y-4">
+          <div><Button variant="outline" className="w-full sm:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(v => !v)}>Filters</Button><div className={filtersOpen ? "mt-3 sm:mt-0" : "hidden sm:block"}>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_10rem_minmax(0,1.4fr)]">
             <label className="text-xs text-muted-foreground space-y-1">
               <span>Area</span>
@@ -144,6 +146,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
               </div>
             </label>
           </div>
+          </div></div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground" data-testid="text-audit-count">
               {rows.length === 0
@@ -161,7 +164,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
       <Card>
         <CardContent className="p-0">
           {/* The four-column table needs ~34rem; below xl (app sidebar + this page's padding) a row stacks its fields instead. */}
-          <div className="hidden xl:grid grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] gap-3 px-4 py-2 border-b text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="hidden xl:grid grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] gap-3 px-4 py-2 border-b text-[11px] font-semibold  text-muted-foreground">
             <span>Time</span><span>Event</span><span>IP</span><span>Device</span>
           </div>
           {rows.length > 0 && shown.length === 0 && (

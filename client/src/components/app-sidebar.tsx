@@ -195,25 +195,7 @@ type NavGroup = {
 };
 
 function FeatureBadge({ type, label }: { type: BadgeType; label: string }) {
-  if (type === "hot") {
-    return (
-      <span className="ml-auto shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 text-white shadow-sm shadow-red-500/30 animate-pulse" data-testid={`badge-hot-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-        HOT
-      </span>
-    );
-  }
-  if (type === "best") {
-    return (
-      <span className="ml-auto shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-amber-900 shadow-sm shadow-amber-400/30" data-testid={`badge-best-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-        BEST
-      </span>
-    );
-  }
-  return (
-    <span className="ml-auto shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-400 text-white shadow-sm shadow-blue-500/30" data-testid={`badge-new-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-      NEW
-    </span>
-  );
+  return <span className="sr-only" data-testid={`badge-${type}-${label.toLowerCase().replace(/\s+/g, "-")}`}>{type === "new" ? "New" : type === "hot" ? "Popular" : "Recommended"}</span>;
 }
 
 const permitsGroup: NavGroup = {
@@ -435,20 +417,21 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-5 pb-6">
+      <SidebarHeader className="p-4 pb-3">
         <Link href="/" className="flex items-center justify-between gap-3 cursor-pointer" data-testid="link-logo-home">
           <span className="flex flex-col min-w-0">
             <CHLogo height={36} />
-            <p className="text-[10px] font-medium text-sidebar-foreground/40 tracking-wide mt-1 leading-tight" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
+            <p className="sr-only" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
           </span>
           {/* The mascot stands beside the mark on every ConstructHUB sidebar. */}
-          <StandingGator height={64} className="shrink-0 -my-2" />
+
         </Link>
       </SidebarHeader>
       <SidebarContent>
         {/* ConstructHub CRM — included in every paid plan, on its own portal.
             Prominent pathway in through the /crm-app gateway (member → portal, else plans). */}
         <SidebarGroup>
+          <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Workspace</div>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -456,8 +439,8 @@ export function AppSidebar() {
                   <Link href="/crm-app" data-testid="link-nav-crm" className="flex items-center gap-2 w-full">
                     <KanbanSquare className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                     <span className="font-semibold">CRM</span>
-                    <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-primary/80">
-                      Included <ArrowRight className="h-3 w-3" />
+                    <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs text-sidebar-foreground/60">
+                      <ArrowRight className="h-3 w-3" />
                     </span>
                   </Link>
                 </SidebarMenuButton>
@@ -480,6 +463,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupContent>
+            <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Growth</div>
             <SidebarMenu>
               {googleGroups.map(group => (
                 <CollapsibleNavGroup key={group.label} group={group} planBadgeFor={planBadgeFor} />
@@ -498,62 +482,6 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-              {/* The server decides who is a platform admin (/api/auth/me). */}
-              {user?.isPlatformAdmin === true && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild data-active={location === "/lsa-account-manager"}>
-                    <Link href="/lsa-account-manager" data-testid="link-nav-lsa-account-manager" className="flex items-center gap-2 w-full">
-                      <Users className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-[#4285F4]" />
-                      <span>Account Manager</span>
-                      <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {/* Every feature's intro page, with its status — the admins' way to review them all. */}
-              {user?.isPlatformAdmin === true && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild data-active={location === "/admin/feature-pages"}>
-                    <Link href="/admin/feature-pages" data-testid="link-nav-admin-feature-pages" className="flex items-center gap-2 w-full">
-                      <LayoutGrid className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
-                      <span>Feature pages</span>
-                      <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {/* Give an account a plan for 1–1000 days, and revoke it. */}
-              {user?.isPlatformAdmin === true && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild data-active={location === "/admin/access"}>
-                    <Link href="/admin/access" data-testid="link-nav-admin-access" className="flex items-center gap-2 w-full">
-                      <KeyRound className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
-                      <span>Access grants</span>
-                      <span className="ml-auto text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {/* The issue desk: captured failures and Claude's reports on them; the count is issues still new. */}
-              {user?.isPlatformAdmin === true && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild data-active={location === "/admin/issues"}>
-                    <Link href="/admin/issues" data-testid="link-nav-admin-issues" className="flex items-center gap-2 w-full">
-                      <Bug className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-red-500" />
-                      <span>Issues</span>
-                      <span className="ml-auto flex shrink-0 items-center gap-1">
-                        {newIssues > 0 && (
-                          <span className="min-w-[1.25rem] rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums text-primary-foreground"
-                            aria-label={`${newIssues} new`} data-testid="badge-nav-issues-new">
-                            {newIssues > 99 ? "99+" : newIssues}
-                          </span>
-                        )}
-                        <span className="text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>
-                      </span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -562,6 +490,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupContent>
+            <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Tools</div>
             <SidebarMenu>
               {standaloneItems.map(item => (
                 <SidebarMenuItem key={item.url}>
@@ -597,9 +526,72 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {user?.isPlatformAdmin === true && <SidebarGroup>
+          <details open={location.startsWith("/admin/") || location === "/lsa-account-manager"}>
+            <summary className="cursor-pointer rounded-md px-2 py-3 text-sm font-medium">Admin</summary>
+            <SidebarMenu>              {/* The server decides who is a platform admin (/api/auth/me). */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/lsa-account-manager"}>
+                    <Link href="/lsa-account-manager" data-testid="link-nav-lsa-account-manager" className="flex items-center gap-2 w-full">
+                      <Users className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-muted-foreground" />
+                      <span>Account Manager</span>
+
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Every feature's intro page, with its status — the admins' way to review them all. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/feature-pages"}>
+                    <Link href="/admin/feature-pages" data-testid="link-nav-admin-feature-pages" className="flex items-center gap-2 w-full">
+                      <LayoutGrid className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Feature pages</span>
+
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Give an account a plan for 1–1000 days, and revoke it. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/access"}>
+                    <Link href="/admin/access" data-testid="link-nav-admin-access" className="flex items-center gap-2 w-full">
+                      <KeyRound className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Access grants</span>
+
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* The issue desk: captured failures and Claude's reports on them; the count is issues still new. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/issues"}>
+                    <Link href="/admin/issues" data-testid="link-nav-admin-issues" className="flex items-center gap-2 w-full">
+                      <Bug className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-muted-foreground" />
+                      <span>Issues</span>
+                      <span className="ml-auto flex shrink-0 items-center gap-1">
+                        {newIssues > 0 && (
+                          <span className="min-w-[1.25rem] rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums text-primary-foreground"
+                            aria-label={`${newIssues} new`} data-testid="badge-nav-issues-new">
+                            {newIssues > 99 ? "99+" : newIssues}
+                          </span>
+                        )}
+
+                      </span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+</SidebarMenu>
+          </details>
+        </SidebarGroup>}
       </SidebarContent>
       <SidebarFooter className="p-5 pt-3">
         <div className="space-y-3">
+          <details className="text-xs text-muted-foreground"><summary className="cursor-pointer py-2">Directory totals</summary>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Counties</span>
             <span className="font-semibold tabular-nums">{countyCount}</span>
@@ -608,6 +600,7 @@ export function AppSidebar() {
             <span className="text-muted-foreground">Directory entries</span>
             <span className="font-semibold tabular-nums">{activeCount}</span>
           </div>
+          </details>
           <div className="border-t border-sidebar-border pt-3 mt-2">
             {user ? (
               <div className="flex items-center justify-between gap-2">
@@ -626,7 +619,7 @@ export function AppSidebar() {
                   </span>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
-                  <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <Button asChild variant="ghost" size="sm" className="h-10 w-10 p-0">
                     <Link href="/settings" aria-label="Settings" data-testid="button-settings">
                       <Settings className="h-3.5 w-3.5" />
                     </Link>
@@ -634,7 +627,7 @@ export function AppSidebar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0"
+                    className="h-10 w-10 p-0"
                     onClick={handleLogout}
                     aria-label="Sign out"
                     data-testid="button-logout"

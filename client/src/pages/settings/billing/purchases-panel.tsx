@@ -20,7 +20,7 @@ export function PurchasesPanel() {
   return (
     <Card data-testid="card-purchases">
       <CardHeader>
-        <CardTitle className="text-lg">Purchases</CardTitle>
+        <CardTitle className="text-base">Purchases</CardTitle>
         <CardDescription>One-time payments: courses, services and reinstatement. A receipt is emailed for each one.</CardDescription>
       </CardHeader>
       <CardContent>
