@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -215,28 +216,11 @@ export default function LsaLeadsPage() {
   const connect = () => { window.location.href = "/api/lsa/oauth/start"; };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto" data-testid="page-lsa-leads">
-      {/* Connection header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <PhoneCall className="w-5 h-5 text-green-600" />
-                Google Local Services Ads (LSA)
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                {!status?.configured
-                  ? "Google Ads isn't configured on the server yet — add the app credentials to enable LSA."
-                  : status.connected
-                    ? "Your leads pull in automatically. Connect Telegram to get a DM the moment a new lead arrives, and manually report bad leads to Google for a billing credit."
-                    : "Connect your own Google account to pull in your LSA phone-call & message leads (with phone numbers)."}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+    <AppPage testId="page-lsa-leads">
+      <PageHeader title="LSA leads" description="Review your Local Services Ads leads and manage billing disputes." actions={<>
               {status?.connected ? (
                 <>
-                  <Button variant="outline" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="flex items-center gap-2" data-testid="button-sync">
+                  <Button variant={selectedAccount ? "outline" : "default"} onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="flex items-center gap-2" data-testid="button-sync">
                     <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
                     {syncMutation.isPending ? "Syncing…" : "Sync now"}
                   </Button>
@@ -248,15 +232,14 @@ export default function LsaLeadsPage() {
                 <Button onClick={connect} className="flex items-center gap-2" data-testid="button-connect">
                   <Link2 className="w-4 h-4" /> Connect Google Ads
                 </Button>
-              ) : null}
-            </div>
-          </div>
+              ) : <Button disabled>Connect Google Ads</Button>}</>} />
+      {!status?.configured && <Notice tone="warning">Google Ads setup is required before you can connect.</Notice>}
+      {status?.configured && <Section title="Connection" contentClassName="space-y-3">
           {status?.configured && !status.connected && status.redirectUri && (
             <RedirectUriHelp redirectUri={status.redirectUri} />
           )}
-        </CardHeader>
         {status?.connected && status.connection && (
-          <CardContent className="space-y-3">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
               {status.connection.lastSyncAt && <span data-testid="text-last-sync">Last synced {new Date(status.connection.lastSyncAt).toLocaleString()}</span>}
               {status.connection.lastDiscoveryAt && <span>Accounts discovered {new Date(status.connection.lastDiscoveryAt).toLocaleString()}</span>}
@@ -267,10 +250,10 @@ export default function LsaLeadsPage() {
                 <span className="break-all">Last sync issue: {status.connection.lastSyncError}</span>
               </div>
             )}
-            <TelegramPanel status={status} />
-          </CardContent>
+<details><summary className="cursor-pointer py-2 text-sm font-medium">Telegram notifications</summary><TelegramPanel status={status} /></details>
+          </div>
         )}
-      </Card>
+      </Section>}
 
       {status?.connected && !selectedAccount && (
         <AccountsOverview onOpen={setSelectedAccount} />
@@ -278,7 +261,7 @@ export default function LsaLeadsPage() {
       {status?.connected && selectedAccount && (
         <AccountDetail account={selectedAccount} onBack={() => setSelectedAccount(null)} />
       )}
-    </div>
+    </AppPage>
   );
 }
 
@@ -370,7 +353,7 @@ function TelegramPanel({ status }: { status: LsaStatus }) {
             <span className="block mb-1">Your Telegram @username (optional)</span>
             <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@yourname" className="w-48 h-9" data-testid="input-telegram-username" />
           </label>
-          <Button size="sm" onClick={() => linkMutation.mutate()} disabled={linkMutation.isPending} className="flex items-center gap-1" data-testid="button-telegram-link">
+          <Button variant="outline" size="sm" onClick={() => linkMutation.mutate()} disabled={linkMutation.isPending} className="flex items-center gap-1" data-testid="button-telegram-link">
             <Send className="w-4 h-4" /> {linkMutation.isPending ? "Starting…" : "Link Telegram"}
           </Button>
           {deepLink && <a href={deepLink} target="_blank" rel="noreferrer" className="text-xs text-sky-600 underline">Open Telegram</a>}
@@ -402,13 +385,13 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <Card>
+    <Section flush>
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <CardTitle className="text-lg flex items-center gap-2"><Building2 className="w-5 h-5" /> Your Google Ads accounts</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2"><Building2 className="w-5 h-5" /> Your Google Ads accounts</CardTitle>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search accounts…" className="pl-8 w-64 h-9" data-testid="input-search-accounts" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search accounts…" className="pl-8 w-full sm:w-64 h-10" data-testid="input-search-accounts" />
           </div>
         </div>
       </CardHeader>
@@ -464,7 +447,7 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
           </>
         )}
       </CardContent>
-    </Card>
+    </Section>
   );
 }
 
@@ -570,29 +553,28 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
   const totalSpend = account.costTotal != null ? Number(account.costTotal) : 0;
 
   return (
-    <Card>
+    <Section flush>
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="ghost" onClick={onBack} data-testid="button-back-accounts"><ArrowLeft className="w-4 h-4" /> Accounts</Button>
-            <CardTitle className="text-lg">{account.descriptiveName || `Account ${account.customerId}`}</CardTitle>
+            <CardTitle className="text-base">{account.descriptiveName || `Account ${account.customerId}`}</CardTitle>
             <span className="text-xs text-muted-foreground">{account.customerId}</span>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-          <Stat label="Total leads" value={String(account.leadCount ?? 0)} testid="stat-leads" />
-          <Stat label="Charged leads" value={String(account.chargedCount ?? 0)} testid="stat-charged" />
-          <Stat label="Disputed" value={String(account.disputedCount ?? 0)} testid="stat-disputed" />
-          <Stat label="Total spend" value={`$${money(totalSpend)}`} red testid="stat-spend" />
-        </div>
+        <StatGrid className="mt-3">
+          <LeadStat label="Total leads" value={String(account.leadCount ?? 0)} testid="stat-leads" />
+          <LeadStat label="Charged leads" value={String(account.chargedCount ?? 0)} testid="stat-charged" />
+          <LeadStat label="Disputed" value={String(account.disputedCount ?? 0)} testid="stat-disputed" />
+          <LeadStat label="Total spend" value={`$${money(totalSpend)}`} red testid="stat-spend" />
+        </StatGrid>
       </CardHeader>
       <CardContent>
         {/* Filter bar */}
-        <div className="flex items-center gap-2 mb-4">
+        <Toolbar className="mb-4" filters={<>
           {([["all", "All"], ["charged", "Charged"], ["disputed", "Disputed"]] as const).map(([v, label]) => (
-            <Button key={v} size="sm" variant={filter === v ? "default" : "outline"} onClick={() => setFilter(v)} data-testid={`button-filter-${v}`}>{label}</Button>
-          ))}
-        </div>
+            <Button key={v} size="sm" variant={filter === v ? "secondary" : "outline"} onClick={() => setFilter(v)} data-testid={`button-filter-${v}`}>{label}</Button>
+          ))}</>} />
 
         {/* Bulk dispute toolbar */}
         {eligibleOnPage.length > 0 && (
@@ -607,14 +589,14 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
                 <Button size="sm" variant="outline" onClick={() => setScheduleOpen((v) => !v)} disabled={selected.size === 0} className="flex items-center gap-1" data-testid="button-toggle-schedule">
                   <Clock className="w-4 h-4" /> Schedule for later
                 </Button>
-                <Button size="sm" onClick={submitBatch} disabled={selected.size === 0 || batchDispute.isPending} className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-1" data-testid="button-report-now">
+                <Button size="sm" onClick={submitBatch} disabled={selected.size === 0 || batchDispute.isPending} className="flex items-center gap-1" data-testid="button-report-now">
                   <ThumbsDown className="w-4 h-4" /> {batchDispute.isPending ? "Queuing…" : `Report ${selected.size || ""} now`}
                 </Button>
                 {selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection} data-testid="button-clear-selection">Clear</Button>}
               </div>
             </div>
             {scheduleOpen && selected.size > 0 && (
-              <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20 dark:border-indigo-900 p-3">
+              <div className="mt-3 rounded-md border border-border bg-muted bg-muted border-border p-3">
                 <div className="text-sm font-medium flex items-center gap-1"><Clock className="w-4 h-4" /> Scatter {selected.size} dispute{selected.size > 1 ? "s" : ""} across a date range</div>
                 <div className="flex flex-wrap items-end gap-3 mt-2">
                   <label className="text-xs"><span className="block mb-1">From</span>
@@ -623,7 +605,7 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
                   <label className="text-xs"><span className="block mb-1">To</span>
                     <input type="date" value={scheduleEnd} min={scheduleStart} onChange={(e) => setScheduleEnd(e.target.value)} className="border rounded px-2 py-1 text-sm bg-background" data-testid="input-schedule-end" />
                   </label>
-                  <Button size="sm" onClick={submitSchedule} disabled={batchSchedule.isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1" data-testid="button-submit-schedule">
+                  <Button variant="outline" size="sm" onClick={submitSchedule} disabled={batchSchedule.isPending} className="flex items-center gap-1" data-testid="button-submit-schedule">
                     <Clock className="w-4 h-4" /> {batchSchedule.isPending ? "Scheduling…" : `Schedule ${selected.size}`}
                   </Button>
                 </div>
@@ -677,7 +659,7 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm">
                     {lead.contactPhone && (
-                      <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-muted-foreground" /><a href={`tel:${lead.contactPhone}`} className="text-blue-600 hover:underline">{lead.contactPhone}</a></div>
+                      <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-muted-foreground" /><a href={`tel:${lead.contactPhone}`} className="text-muted-foreground hover:underline">{lead.contactPhone}</a></div>
                     )}
                     {lead.contactEmail && (
                       <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-muted-foreground" /><span>{lead.contactEmail}</span></div>
@@ -727,17 +709,12 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
           </div>
         )}
       </CardContent>
-    </Card>
+    </Section>
   );
 }
 
-function Stat({ label, value, red, testid }: { label: string; value: string; red?: boolean; testid?: string }) {
-  return (
-    <div className="rounded-lg border bg-card p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`text-xl font-bold ${red ? "text-red-600" : "text-foreground"}`} data-testid={testid}>{value}</div>
-    </div>
-  );
+function LeadStat({ label, value, red, testid }: { label: string; value: string; red?: boolean; testid?: string }) {
+  return <Stat label={label} value={<span data-testid={testid}>{value}</span>} />;
 }
 
 function DetailRow({ label, value, icon, mono }: { label: string; value: string; icon?: ReactNode; mono?: boolean }) {
@@ -752,10 +729,10 @@ function DetailRow({ label, value, icon, mono }: { label: string; value: string;
 // Live sticker reflecting the local dispute pipeline so we never double-dispute.
 function DisputeSticker({ lead }: { lead: LsaLead }) {
   const s = lead.disputeStatus;
-  if (s === "scheduled") return <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 flex items-center gap-1"><Clock className="w-3 h-3" /> Scheduled</Badge>;
+  if (s === "scheduled") return <Badge className="bg-muted text-muted-foreground border-border flex items-center gap-1"><Clock className="w-3 h-3" /> Scheduled</Badge>;
   if (s === "queued") return <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1"><Clock className="w-3 h-3" /> Queued</Badge>;
   if (s === "sending") return <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Sending</Badge>;
-  if (s === "disputed") return <Badge className="bg-purple-100 text-purple-700 border-purple-200 flex items-center gap-1"><ThumbsDown className="w-3 h-3" /> Disputed</Badge>;
+  if (s === "disputed") return <Badge className="bg-muted text-muted-foreground border-border flex items-center gap-1"><ThumbsDown className="w-3 h-3" /> Disputed</Badge>;
   if (s === "failed") return <Badge className="bg-red-100 text-red-700 border-red-200 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Failed</Badge>;
   if (lead.feedbackSubmitted && lead.surveyAnswer === "SATISFIED") return <Badge className="bg-green-100 text-green-700 border-green-200 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Good</Badge>;
   return null;
@@ -785,7 +762,7 @@ function LeadRating({ lead, onDone }: { lead: LsaLead; onDone: () => void }) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
         <ReasonSelect value={reason} onChange={setReason} disabled={bad.isPending} testid={`select-single-reason-${lead.leadId}`} />
-        <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => bad.mutate()} disabled={bad.isPending} data-testid={`button-confirm-bad-${lead.leadId}`}>
+        <Button variant="outline" size="sm" className="" onClick={() => bad.mutate()} disabled={bad.isPending} data-testid={`button-confirm-bad-${lead.leadId}`}>
           {bad.isPending ? "Queuing…" : "Report"}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setPicking(false)} data-testid={`button-cancel-bad-${lead.leadId}`}>Cancel</Button>
@@ -798,7 +775,7 @@ function LeadRating({ lead, onDone }: { lead: LsaLead; onDone: () => void }) {
       <Button size="sm" variant="outline" className="flex items-center gap-1" onClick={() => good.mutate()} disabled={good.isPending} data-testid={`button-good-${lead.leadId}`}>
         <ThumbsUp className="w-3.5 h-3.5" /> Good
       </Button>
-      <Button size="sm" variant="outline" className="flex items-center gap-1 border-red-200 text-red-700 hover:bg-red-50" onClick={() => setPicking(true)} data-testid={`button-bad-${lead.leadId}`}>
+      <Button size="sm" variant="outline" className="flex items-center gap-1 border-red-200 text-red-700" onClick={() => setPicking(true)} data-testid={`button-bad-${lead.leadId}`}>
         <ThumbsDown className="w-3.5 h-3.5" /> Bad
       </Button>
     </div>
