@@ -4,7 +4,6 @@ import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -30,11 +29,10 @@ import {
   Search,
   Loader2,
   Download,
-  Building2,
-  Landmark,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { AppPage, PageHeader, StatGrid, Stat, Toolbar, EmptyState } from "@/components/app-ui";
 import { apiRequest } from "@/lib/queryClient";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { useToast } from "@/hooks/use-toast";
@@ -170,157 +168,158 @@ export default function DatabasesPage() {
     setCurrentPage(1);
   };
 
+  const resetAll = () => {
+    setSearchInput("");
+    setSearchQuery("");
+    setSelectedState("all");
+    setSelectedCountyId("all");
+    setJurisdictionFilter("all");
+    setCurrentPage(1);
+  };
+
+  const hasFilters = searchQuery !== "" || selectedState !== "all" || selectedCountyId !== "all";
+  const activeFilters = (selectedState !== "all" ? 1 : 0) + (selectedCountyId !== "all" ? 1 : 0);
+
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-        <div className="space-y-2 animate-in">
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
-            Database Directory
-          </h1>
-          <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
-          <p className="text-sm text-muted-foreground max-w-lg">
-            Browse US counties and cities for permit offices. Where an official permit portal is on record it is linked; otherwise use “Find permit portal” to search the web.
-          </p>
-          {counts && (
-            <p className="text-sm text-muted-foreground" data-testid="text-database-count">
-              {counts.total.toLocaleString()} jurisdictions listed — {counts.county.toLocaleString()} counties, {counts.city.toLocaleString()} cities
-              {typeof counts.withPortal === "number" && (
-                <span data-testid="text-portal-count"> · {counts.withPortal.toLocaleString()} with a permit portal on record</span>
+    <AppPage width="narrow" testId="page-databases">
+      <PageHeader
+        title={<span data-testid="text-page-title">Database directory</span>}
+        description="Browse US counties and cities for permit offices — official portals where they are on record."
+      />
+
+      {counts && (
+        <StatGrid cols={3}>
+          <Stat
+            label="Jurisdictions"
+            value={counts.total.toLocaleString()}
+            testId="text-database-count"
+            hint={typeof counts.withPortal === "number" ? (
+              <span data-testid="text-portal-count">{counts.withPortal.toLocaleString()} with a permit portal on record</span>
+            ) : undefined}
+          />
+          <Stat label="Counties" value={counts.county.toLocaleString()} />
+          <Stat label="Cities" value={counts.city.toLocaleString()} />
+        </StatGrid>
+      )}
+
+      <div className="flex flex-col gap-4">
+        <div className="flex w-fit max-w-full gap-1 rounded-xl bg-muted p-1" data-testid="filter-jurisdiction-type">
+          {([
+            { key: "all" as const, label: "All", count: counts?.total },
+            { key: "county" as const, label: "Counties", count: counts?.county },
+            { key: "city" as const, label: "Cities", count: counts?.city },
+          ]).map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => handleFilterChange(setJurisdictionFilter)(key)}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                jurisdictionFilter === key
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`button-filter-${key}`}
+            >
+              {label}
+              {count != null && (
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {count.toLocaleString()}
+                </span>
               )}
-            </p>
-          )}
+            </button>
+          ))}
         </div>
 
-        <div className="space-y-3 animate-in">
-          <div className="flex flex-wrap gap-1.5 p-1 bg-muted/50 rounded-lg w-fit max-w-full" data-testid="filter-jurisdiction-type">
-            {([
-              { key: "all" as const, label: "All", icon: Database, count: counts?.total },
-              { key: "county" as const, label: "Counties", icon: Landmark, count: counts?.county },
-              { key: "city" as const, label: "Cities", icon: Building2, count: counts?.city },
-            ]).map(({ key, label, icon: Icon, count }) => (
-              <button
-                key={key}
-                onClick={() => handleFilterChange(setJurisdictionFilter)(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  jurisdictionFilter === key
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid={`button-filter-${key}`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-                {count != null && (
-                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4 tabular-nums hidden sm:inline-flex">
-                    {count.toLocaleString()}
-                  </Badge>
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search by city, county, or state..."
-                className="pl-9"
-                data-testid="input-database-search"
-              />
-            </div>
-            <Select
-              value={selectedState}
-              onValueChange={(val) => {
-                handleFilterChange(setSelectedState)(val);
-                setSelectedCountyId("all");
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-state-filter">
-                <SelectValue placeholder="All States" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All States ({allStates.length})</SelectItem>
-                {allStates.map((state) => (
-                  <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedState !== "all" && stateCountiesForDropdown.length > 0 && (
+        <Toolbar
+          search={{ value: searchInput, onChange: setSearchInput, placeholder: "Search by city, county, or state…", testId: "input-database-search" }}
+          activeFilters={activeFilters}
+          actions={hasFilters ? (
+            <Button variant="ghost" size="sm" onClick={resetAll} data-testid="button-clear-filters">
+              Clear filters
+            </Button>
+          ) : undefined}
+          filters={(
+            <>
               <Select
-                value={selectedCountyId}
-                onValueChange={handleFilterChange(setSelectedCountyId)}
+                value={selectedState}
+                onValueChange={(val) => {
+                  handleFilterChange(setSelectedState)(val);
+                  setSelectedCountyId("all");
+                }}
               >
-                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-county-filter">
-                  <SelectValue placeholder="All Counties" />
+                <SelectTrigger className="h-10 w-full sm:w-[200px]" data-testid="select-state-filter">
+                  <SelectValue placeholder="All states" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Counties</SelectItem>
-                  {stateCountiesForDropdown.map((county) => (
-                    <SelectItem key={county.id} value={county.id.toString()}>
-                      {county.name}
-                    </SelectItem>
+                  <SelectItem value="all">All states ({allStates.length})</SelectItem>
+                  {allStates.map((state) => (
+                    <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-          </div>
-        </div>
+              {selectedState !== "all" && stateCountiesForDropdown.length > 0 && (
+                <Select
+                  value={selectedCountyId}
+                  onValueChange={handleFilterChange(setSelectedCountyId)}
+                >
+                  <SelectTrigger className="h-10 w-full sm:w-[200px]" data-testid="select-county-filter">
+                    <SelectValue placeholder="All counties" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All counties</SelectItem>
+                    {stateCountiesForDropdown.map((county) => (
+                      <SelectItem key={county.id} value={county.id.toString()}>
+                        {county.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
+          )}
+        />
+      </div>
 
-        {isLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-28 rounded-md" />
-            ))}
-          </div>
-        ) : databases.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground animate-in">
-            <Database className="h-6 w-6 opacity-30" />
-            <p className="text-sm">No databases match your search criteria.</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearchInput("");
-                setSearchQuery("");
-                setSelectedState("all");
-                setSelectedCountyId("all");
-                setJurisdictionFilter("all");
-                setCurrentPage(1);
-              }}
-              data-testid="button-clear-filters"
-            >
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+      ) : databases.length === 0 ? (
+        <EmptyState
+          icon={Database}
+          title="No databases match your search"
+          description="Try a different city, county or state."
+          action={
+            <Button variant="outline" size="sm" onClick={resetAll} data-testid="button-clear-filters-empty">
               Clear filters
             </Button>
+          }
+        />
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground tabular-nums" data-testid="text-result-count">
+            Showing {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(currentPage * PAGE_SIZE, totalResults).toLocaleString()} of {totalResults.toLocaleString()} results
+            {isFetching && <Loader2 className="inline h-3 w-3 ml-2 animate-spin" />}
+          </p>
+          <div className="space-y-3">
+            {databases.map((db) => {
+              const county = countyMap.get(db.countyId);
+              return (
+                <DatabaseCard key={db.id} database={db} countyName={county?.name} />
+              );
+            })}
           </div>
-        ) : (
-          <div className="space-y-3 animate-in-delay-1">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Showing {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(currentPage * PAGE_SIZE, totalResults).toLocaleString()} of {totalResults.toLocaleString()} results
-                {isFetching && <Loader2 className="inline h-3 w-3 ml-2 animate-spin" />}
-              </p>
-            </div>
-            <div className="space-y-2">
-              {databases.map((db, index) => {
-                const county = countyMap.get(db.countyId);
-                return (
-                  <DatabaseCard key={db.id} database={db} index={index} countyName={county?.name} />
-                );
-              })}
-            </div>
-            {totalPages > 1 && (
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+          {totalPages > 1 && (
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          )}
+        </>
+      )}
+    </AppPage>
   );
 }
 
@@ -391,7 +390,7 @@ function PaginationControls({
   );
 }
 
-function DatabaseCard({ database, index, countyName }: { database: PermitDatabase; index: number; countyName?: string }) {
+function DatabaseCard({ database, countyName }: { database: PermitDatabase; countyName?: string }) {
   const [scrapeOpen, setScrapeOpen] = useState(false);
   // "Active", searchable fields and notes describe a portal; a jurisdiction with no
   // usable portal on record gets none of them (never a templated placeholder).
@@ -405,26 +404,17 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
 
   return (
     <>
-      <Card
-        className="p-4 space-y-3 hover-elevate transition-all duration-200"
-        style={{
-          boxShadow: 'var(--shadow-2xs)',
-          animation: `fadeSlideIn 0.3s ease-out ${index * 0.04}s both`,
-        }}
+      <div
+        className="rounded-xl border bg-card p-4 space-y-3"
         data-testid={`card-database-${database.id}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              {database.jurisdictionType === "county" ? (
-                <Landmark className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-              ) : (
-                <Building2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              )}
               <h3 className="text-sm font-semibold">{title}</h3>
               {hasPortal ? (
-                <span className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400" data-testid={`status-portal-${database.id}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400"></span>
+                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" data-testid={`status-portal-${database.id}`}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
                   Active
                 </span>
               ) : (
@@ -465,7 +455,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
               href={database.portalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-blue-500 hover:text-blue-400 transition-colors font-medium"
+              className="flex items-center gap-1 font-medium text-foreground hover:underline transition-colors"
               data-testid={`link-portal-url-${database.id}`}
             >
               <ExternalLink className="h-3 w-3" />
@@ -491,7 +481,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
               href={`https://www.google.com/search?q=${encodeURIComponent(`${database.jurisdiction} building permit search portal`)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 italic text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 italic hover:text-foreground transition-colors"
               data-testid={`link-search-fallback-${database.id}`}
               title="No official portal on record — search the web for this jurisdiction's permit portal"
             >
@@ -532,7 +522,7 @@ function DatabaseCard({ database, index, countyName }: { database: PermitDatabas
         {notes && (
           <p className="text-xs text-muted-foreground border-t border-border/40 pt-3">{notes}</p>
         )}
-      </Card>
+      </div>
 
       <ScrapeDialog
         database={database}
@@ -691,10 +681,10 @@ function ScrapeDialog({
             <p className="text-[11px] text-muted-foreground pt-0.5">{getPlatformHint(database.platform)}</p>
           </div>
           {scrapeStatus && (
-            <Card className="p-3 space-y-2 animate-scale-in" style={{ boxShadow: 'none' }}>
+            <div className="rounded-xl border bg-card p-3 space-y-2">
               <div className="flex items-center gap-2">
                 {scrapeStatus.status === "running" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                {scrapeStatus.status === "completed" && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />}
+                {scrapeStatus.status === "completed" && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
                 {scrapeStatus.status === "error" && <XCircle className="h-3.5 w-3.5 text-destructive" />}
                 <span className="text-sm font-medium capitalize">{scrapeStatus.status}</span>
               </div>
@@ -705,7 +695,7 @@ function ScrapeDialog({
                   {scrapeStatus.totalPages > 1 && <span className="text-muted-foreground">Page {scrapeStatus.currentPage} of {scrapeStatus.totalPages}</span>}
                 </div>
               )}
-            </Card>
+            </div>
           )}
         </div>
       </DialogContent>
