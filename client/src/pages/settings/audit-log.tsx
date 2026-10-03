@@ -57,6 +57,7 @@ const csvCell = (v: unknown) => {
 };
 
 export function AuditLogSection(_props: SettingsSectionProps) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { data, error, isLoading } = useQuery<{ activity: ActivityRow[] }>({ queryKey: ["/api/account-activity"] });
   const [area, setArea] = useState("");
   const [kind, setKind] = useState("");
@@ -105,7 +106,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
     <div className="space-y-4" data-testid="section-audit-log">
       <Card>
         <CardContent className="pt-6 space-y-4">
-          <details className="group" open={undefined}><summary className="cursor-pointer rounded-md border px-3 py-2 text-sm font-medium sm:hidden">Filters</summary><div className="hidden group-open:block sm:block">
+          <div><Button variant="outline" className="w-full sm:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(v => !v)}>Filters</Button><div className={filtersOpen ? "mt-3 sm:mt-0" : "hidden sm:block"}>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_10rem_minmax(0,1.4fr)]">
             <label className="text-xs text-muted-foreground space-y-1">
               <span>Area</span>
@@ -145,7 +146,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
               </div>
             </label>
           </div>
-          </div></details>
+          </div></div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground" data-testid="text-audit-count">
               {rows.length === 0
