@@ -400,23 +400,9 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
 
   return (
     <div className="space-y-6 print:space-y-4" data-testid="scan-report">
-      <div className="flex items-center justify-between print:hidden">
-        <Button variant="ghost" size="sm" onClick={onBack} data-testid="button-back-to-scans">
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to Scans
-        </Button>
-        <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-report">
-          <Printer className="h-4 w-4 mr-1" />
-          Print / PDF
-        </Button>
-      </div>
-
-      <div className="text-center print:text-left">
-        <h2 className="text-xl font-bold" data-testid="text-report-title">
-          LOCAL RANKINGS SCAN REPORT | {scan.businessName.toUpperCase()}
-        </h2>
-      </div>
-
+      <PageHeader title={<span data-testid="text-report-title">Local rankings · {scan.businessName}</span>}
+        description="Your Google Maps visibility across the scanned area."
+        actions={<><Button onClick={handlePrint} data-testid="button-print-report"><Printer className="mr-2 h-4 w-4" />Print / PDF</Button><Button variant="ghost" onClick={onBack} data-testid="button-back-to-scans"><ArrowLeft className="mr-2 h-4 w-4" />Back to scans</Button></>} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
           <Section flush>
@@ -486,7 +472,7 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Trophy className="h-4 w-4" />
-            Top Competitors
+            Top competitors
           </CardTitle>
           <CardDescription>
             Competitors found across all grid locations, sorted by frequency
@@ -511,15 +497,15 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                     : 0;
                   return (
                     <tr key={idx} className={appTableCards.tr + " border-b last:border-0 hover:bg-muted/30 transition-colors"} data-testid={`row-competitor-${idx}`}>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>{idx + 1}</td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">#: </span>{idx + 1}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Name: </span>
                         <p className="font-medium truncate max-w-[300px]">{comp.name}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[300px]">
                           <MapPin className="h-3 w-3 shrink-0" />
                           {comp.address}
                         </p>
                       </td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Found At: </span>
                         <div className="flex flex-col items-center gap-0.5">
                           <span className="font-semibold">{comp.foundAt}</span>
                           <Badge
@@ -530,12 +516,12 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                           </Badge>
                         </div>
                       </td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">AR: </span>
                         <Badge variant={getRankBadgeVariant(Math.round(comp.avgRank))} className="text-sm font-bold px-2.5">
                           {comp.avgRank.toFixed(2)}
                         </Badge>
                       </td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Best: </span>
                         <Badge variant={getRankBadgeVariant(comp.bestRank)} className="text-sm font-bold px-2.5">
                           {comp.bestRank}
                         </Badge>
@@ -703,7 +689,7 @@ export default function RankingGridPage() {
   }
 
   return (
-    <AppPage>
+    <AppPage className="[&_button]:min-h-10">
       <PageHeader title={<span data-testid="text-page-title">GMB ranking grid</span>} description="See where your business ranks on Google Maps across your service area." actions={            <Button
               className="w-full"
               disabled={!selectedBusiness || !keyword.trim() || startScanMutation.isPending}
@@ -1024,25 +1010,25 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
 
                 {latestScan.status === "completed" && (
                   <>
-                    <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                      <StatBox label="Grid Points" value={String(latestScan.gridSize * latestScan.gridSize)} />
-                      <StatBox label="Avg Rank" value={latestScan.averageRank || "N/A"} />
+                    <StatGrid className="w-full mt-2">
+                      <StatBox label="Grid points" value={String(latestScan.gridSize * latestScan.gridSize)} />
+                      <StatBox label="Average rank" value={latestScan.averageRank || "N/A"} />
                       <StatBox label="Ranked" value={`${rankedCount} / ${results.length}`} />
                       <StatBox label="Top 3" value={String(results.filter(r => r.rank !== null && r.rank <= 3).length)} />
-                    </div>
+                    </StatGrid>
 
                     <div className="w-full">
                       <RankDistributionChart results={results} />
                     </div>
 
                     <Button
-                      variant="default"
+                      variant="outline"
                       className="w-full sm:w-auto"
                       onClick={onViewReport}
                       data-testid={`button-full-report-${scan.id}`}
                     >
                       <FileText className="h-4 w-4 mr-2" />
-                      View Full Report
+                      View full report
                     </Button>
                   </>
                 )}
@@ -1077,19 +1063,10 @@ function ReportView({ scanId, onBack }: { scanId: number; onBack: () => void }) 
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="max-w-6xl mx-auto p-4 sm:p-6">
-        <ScanReport scan={data.scan} results={data.results} onBack={onBack} />
-      </div>
-    </div>
+    <AppPage className="[&_button]:min-h-10"><ScanReport scan={data.scan} results={data.results} onBack={onBack} /></AppPage>
   );
 }
 
 function StatBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-muted/50 rounded-lg p-3 text-center">
-      <p className="text-base font-semibold">{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
-  );
+  return <Stat label={label} value={value} />;
 }
