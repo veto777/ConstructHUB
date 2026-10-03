@@ -1,23 +1,27 @@
 import { useState } from "react";
 import { useLocation, useSearch } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useAppOrigin } from "@/lib/app-origin";
 import {
+  AppPage, PageHeader, Section, Stat, StatGrid, StatusPill,
+} from "@/components/app-ui";
+import {
   Fingerprint, Globe, Eye, Users, Monitor, Smartphone, Tablet,
-  Search, ChevronRight, ChevronDown, Activity, MapPin,
-  FileText, BarChart3, Plus, Copy, Trash2, Ban,
-  Clock, ArrowRight, ExternalLink, Shield, AlertTriangle,
-  Laptop, Chrome, X,
+  Search, ChevronRight, MapPin,
+  FileText, Plus, Copy, Trash2,
+  Clock, Activity, AlertTriangle,
+  Laptop, Chrome, MoreHorizontal,
 } from "lucide-react";
 
 type DomainWithStats = {
@@ -127,12 +131,12 @@ type PlatformData = {
 };
 
 const tabs = [
-  { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-  { id: "visitors", label: "Visitor List", icon: Users },
-  { id: "traffic", label: "Traffic Sources", icon: Globe },
-  { id: "pages", label: "Pages", icon: FileText },
-  { id: "geo", label: "Geo", icon: MapPin },
-  { id: "platforms", label: "Platforms", icon: Monitor },
+  { id: "dashboard", label: "Dashboard" },
+  { id: "visitors", label: "Visitors" },
+  { id: "traffic", label: "Traffic" },
+  { id: "pages", label: "Pages" },
+  { id: "geo", label: "Geo" },
+  { id: "platforms", label: "Platforms" },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
@@ -208,26 +212,11 @@ function DeviceIcon({ type }: { type: string | null }) {
   return <Monitor className="h-3.5 w-3.5" />;
 }
 
-function PercentBar({ value, color = "bg-primary" }: { value: number; color?: string }) {
+function PercentBar({ value }: { value: number }) {
   return (
     <div className="w-full bg-muted rounded-full h-2">
-      <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${Math.min(value, 100)}%` }} />
+      <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.min(value, 100)}%` }} />
     </div>
-  );
-}
-
-function StatCard({ label, value, icon: Icon, sub }: { label: string; value: string | number; icon: any; sub?: string }) {
-  return (
-    <Card className="bg-card border-border" data-testid={`card-stat-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-muted-foreground">{label}</span>
-          <Icon className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="text-2xl font-bold text-foreground tabular-nums">{value}</div>
-        {sub && <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -236,7 +225,8 @@ function OnlineCell({ domainId }: { domainId: number }) {
     queryKey: ["/api/click-guard/domains", domainId, "online"],
   });
   return (
-    <td className="text-right p-3 tabular-nums" data-testid={`text-online-${domainId}`} title="Distinct IPs in the last 20 minutes">
+    <td className="px-3 py-2.5 sm:px-4 sm:py-3 align-middle text-right tabular-nums" data-testid={`text-online-${domainId}`} title="Distinct IPs in the last 20 minutes">
+      <span className="sm:hidden text-muted-foreground">Online: </span>
       {data ? data.count : isError ? "Unavailable" : "…"}
     </td>
   );
@@ -259,12 +249,12 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
   };
 
   return (
-    <Card className={`bg-card ${noVisits ? "border-blue-500/40" : "border-border"}`} data-testid="card-install-tracking">
-      <CardContent className="p-4 space-y-3">
+    <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-install-tracking">
+      <div className="space-y-3 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground">Tracking code for {domain.domain}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-install-status">
+            <h3 className="text-sm font-semibold">Tracking code for {domain.domain}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground" data-testid="text-install-status">
               {noVisits
                 ? "No visits recorded yet. Visits appear here only after this code runs on your site."
                 : `${countLabel(domain.stats.totalVisits, domain.stats.totalVisits >= VISIT_ROW_CAP)} visit${domain.stats.totalVisits !== 1 ? "s" : ""} recorded so far.`}
@@ -279,18 +269,18 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
         {open && (
           <>
             <p className="text-xs text-muted-foreground">
-              Add this tag to the <code className="bg-muted px-1 py-0.5 rounded text-foreground">&lt;head&gt;</code> or just before the closing <code className="bg-muted px-1 py-0.5 rounded text-foreground">&lt;/body&gt;</code> tag of every page you want to track.
+              Add this tag to the <code className="rounded bg-muted px-1 py-0.5">&lt;head&gt;</code> or just before the closing <code className="rounded bg-muted px-1 py-0.5">&lt;/body&gt;</code> tag of every page you want to track.
             </p>
             <div className="relative">
-              <pre className="bg-muted rounded-md p-3 pr-12 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap break-all" data-testid="text-tracking-snippet">{snippet}</pre>
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 pr-12 font-mono text-xs" data-testid="text-tracking-snippet">{snippet}</pre>
               <Button size="icon" variant="ghost" className="!absolute top-1.5 right-1.5" onClick={copy} aria-label="Copy tracking code" data-testid="button-copy-tracking-snippet">
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -321,92 +311,91 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
   const totalVisits = domain?.stats.totalVisits ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5">
       {domain && <InstallCard key={domain.id} domain={domain} />}
 
       {online && online.count > 0 && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex items-center gap-3" data-testid="banner-online">
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30" data-testid="banner-online">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
             {online.count} ongoing visit{online.count > 1 ? "s" : ""} right now
           </span>
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-        <StatCard label="Online Now" value={online?.count ?? 0} icon={Activity} sub="Last 20 minutes" />
-        <StatCard label="Today" value={countLabel(todayVisits, partialFrom(localDayKey(now)))} icon={Eye} />
-        <StatCard label="Yesterday" value={countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1))))} icon={Clock} />
-        <StatCard label="Last 7 Days" value={countLabel(last7, partialFrom(chartDays[7][0]))} icon={BarChart3} />
-        <StatCard label="This Month" value={countLabel(thisMonth, partialFrom(`${monthPrefix}-01`))} icon={Globe} />
-        <StatCard label="Total" value={countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP)} icon={Users} sub="All time" />
-      </div>
+      <StatGrid cols={3}>
+        <Stat label="Online now" value={online?.count ?? 0} testId="card-stat-online-now" hint="Last 20 minutes" />
+        <Stat label="Today" value={countLabel(todayVisits, partialFrom(localDayKey(now)))} testId="card-stat-today" />
+        <Stat label="Yesterday" value={countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1))))} testId="card-stat-yesterday" />
+        <Stat label="Last 7 days" value={countLabel(last7, partialFrom(chartDays[7][0]))} testId="card-stat-last-7-days" />
+        <Stat label="This month" value={countLabel(thisMonth, partialFrom(`${monthPrefix}-01`))} testId="card-stat-this-month" />
+        <Stat label="Total" value={countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP)} testId="card-stat-total" hint="All time" />
+      </StatGrid>
 
       {oldestLoaded && (
-        <p className="text-xs text-muted-foreground -mt-3" data-testid="text-visits-capped">
+        <p className="text-xs text-muted-foreground" data-testid="text-visits-capped">
           Only the latest {VISIT_ROW_CAP.toLocaleString()} visits in this period are loaded, so counts marked + are lower bounds and days before {new Date(`${oldestLoaded}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })} are not loaded.
         </p>
       )}
 
       {chartDays.some(([, v]) => v > 0) && (
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Daily Visits</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="flex items-end gap-1 h-32">
-              {chartDays.map(([date, count]) => (
-                <div key={date} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className={`w-full rounded-t transition-colors min-h-[2px] ${oldestLoaded && date < oldestLoaded ? "bg-muted" : "bg-primary/80 hover:bg-primary"}`}
-                    style={{ height: `${(count / maxDaily) * 100}%` }}
-                    title={oldestLoaded && date < oldestLoaded ? `${date}: not loaded` : date === oldestLoaded ? `${date}: at least ${count} visits` : `${date}: ${count} visits`}
-                  />
-                  <span className="text-[8px] text-muted-foreground truncate w-full text-center">
-                    {Number(date.slice(8, 10))}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <Section title="Daily visits">
+          <div className="flex items-end gap-1 h-32">
+            {chartDays.map(([date, count]) => (
+              <div key={date} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className={`w-full rounded-t transition-colors min-h-[2px] ${oldestLoaded && date < oldestLoaded ? "bg-muted" : "bg-primary/80 hover:bg-primary"}`}
+                  style={{ height: `${(count / maxDaily) * 100}%` }}
+                  title={oldestLoaded && date < oldestLoaded ? `${date}: not loaded` : date === oldestLoaded ? `${date}: at least ${count} visits` : `${date}: ${count} visits`}
+                />
+                <span className="text-[8px] text-muted-foreground truncate w-full text-center">
+                  {Number(date.slice(8, 10))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Section>
       )}
 
       {domains.length > 0 && (
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">All Projects</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Project</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Online</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Total</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Unique</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Blocked</th>
+        <Section title="All projects" flush>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr className="hidden sm:table-row">
+                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Project</th>
+                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Online</th>
+                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Total</th>
+                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Unique</th>
+                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Blocked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {domains.map(d => (
+                  <tr key={d.id} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-domain-${d.id}`}>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle">
+                      <div className="font-medium">{d.name || d.domain}</div>
+                      <div className="text-xs text-muted-foreground break-all">{d.domain}</div>
+                    </td>
+                    <OnlineCell domainId={d.id} />
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums sm:font-medium">
+                      <span className="sm:hidden text-muted-foreground">Total: </span>
+                      {countLabel(d.stats.totalVisits, d.stats.totalVisits >= VISIT_ROW_CAP)}
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
+                      <span className="sm:hidden text-muted-foreground">Unique: </span>
+                      {countLabel(d.stats.uniqueVisitors, d.stats.totalVisits >= VISIT_ROW_CAP)}
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
+                      <span className="sm:hidden text-muted-foreground">Blocked: </span>
+                      {d.stats.blockedIps}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {domains.map(d => (
-                    <tr key={d.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors" data-testid={`row-domain-${d.id}`}>
-                      <td className="p-3">
-                        <div className="font-medium text-foreground">{d.name || d.domain}</div>
-                        <div className="text-xs text-muted-foreground">{d.domain}</div>
-                      </td>
-                      <OnlineCell domainId={d.id} />
-                      <td className="text-right p-3 tabular-nums font-medium">{countLabel(d.stats.totalVisits, d.stats.totalVisits >= VISIT_ROW_CAP)}</td>
-                      <td className="text-right p-3 tabular-nums">{countLabel(d.stats.uniqueVisitors, d.stats.totalVisits >= VISIT_ROW_CAP)}</td>
-                      <td className="text-right p-3 tabular-nums">{d.stats.blockedIps}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
       )}
     </div>
   );
@@ -434,20 +423,20 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-0 flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by IP address..."
+            placeholder="Search by IP address…"
             value={ipSearch}
             onChange={e => { setIpSearch(e.target.value); setPage(1); }}
             className="pl-9"
             data-testid="input-ip-search"
           />
         </div>
-        <Badge variant="outline" className="text-muted-foreground" data-testid="badge-visitor-count">
+        <span className="text-sm tabular-nums text-muted-foreground" data-testid="badge-visitor-count">
           {filtered.length} visitor{filtered.length !== 1 ? "s" : ""}
-        </Badge>
+        </span>
       </div>
 
       {isLoading ? (
@@ -455,42 +444,42 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
         </div>
       ) : paginated.length === 0 ? (
-        <Card className="bg-card border-border p-8 text-center">
-          <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-muted-foreground text-sm">No visitors found</p>
-        </Card>
+        <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
+          <Users className="h-5 w-5 text-muted-foreground" strokeWidth={1.6} />
+          <p className="mt-3 text-sm text-muted-foreground">No visitors found</p>
+        </div>
       ) : (
         <div className="space-y-2">
           {paginated.map(v => (
-            <Card
+            <div
               key={v.ipAddress}
-              className={`bg-card border-border transition-all ${expandedIp === v.ipAddress ? "ring-1 ring-primary/30" : ""}`}
+              className={`rounded-xl border bg-card transition-all ${expandedIp === v.ipAddress ? "ring-1 ring-primary/30" : ""}`}
               data-testid={`card-visitor-${v.ipAddress}`}
             >
               <div
-                className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                className="cursor-pointer p-4 hover:bg-muted/30 transition-colors"
                 onClick={() => setExpandedIp(expandedIp === v.ipAddress ? null : v.ipAddress)}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"}`} />
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"}`} />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-medium text-foreground" data-testid={`text-ip-${v.ipAddress}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-medium" data-testid={`text-ip-${v.ipAddress}`}>
                           {v.ipAddress}
                         </span>
                         {v.isSuspicious && (
-                          <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[10px] px-1.5 py-0">
-                            <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> Suspicious
-                          </Badge>
+                          <span className="inline-flex items-center gap-0.5 rounded-full border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
+                            <AlertTriangle className="h-2.5 w-2.5" /> Suspicious
+                          </span>
                         )}
                         {v.isOnline && (
-                          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px] px-1.5 py-0">
+                          <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                             Online
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Eye className="h-3 w-3" /> {v.visits} visit{v.visits !== 1 ? "s" : ""}
                         </span>
@@ -505,11 +494,11 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                       </div>
                     </div>
                   </div>
-                  <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-                    <div className="flex items-center gap-1.5">
+                  <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                    <span className="flex items-center gap-1.5">
                       <DeviceIcon type={v.lastDevice} />
                       <span>{v.lastBrowser || "Unknown"}</span>
-                    </div>
+                    </span>
                     <span>{formatTimeAgo(v.lastVisit)}</span>
                   </div>
                   <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expandedIp === v.ipAddress ? "rotate-90" : ""}`} />
@@ -517,66 +506,66 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
               </div>
 
               {expandedIp === v.ipAddress && visitorDetail && (
-                <div className="border-t border-border p-4 bg-muted/20">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border-t bg-muted/20 p-4">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">System Specs</h4>
+                      <h4 className="mb-3 text-xs font-semibold text-muted-foreground">System specs</h4>
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span className="text-muted-foreground">Browser</span><span className="font-medium text-foreground">{visitorDetail.systemSpecs.browser || "Unknown"}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">OS</span><span className="font-medium text-foreground">{visitorDetail.systemSpecs.os || "Unknown"}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Device</span><span className="font-medium text-foreground">{visitorDetail.systemSpecs.deviceType || "Unknown"}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Resolution</span><span className="font-medium text-foreground">{visitorDetail.systemSpecs.screenResolution || "Unknown"}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Language</span><span className="font-medium text-foreground">{visitorDetail.systemSpecs.language || "Unknown"}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Timezone</span><span className="font-medium text-foreground">{visitorDetail.systemSpecs.timezone || "Unknown"}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Browser</span><span className="font-medium">{visitorDetail.systemSpecs.browser || "Unknown"}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">OS</span><span className="font-medium">{visitorDetail.systemSpecs.os || "Unknown"}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Device</span><span className="font-medium">{visitorDetail.systemSpecs.deviceType || "Unknown"}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Resolution</span><span className="font-medium">{visitorDetail.systemSpecs.screenResolution || "Unknown"}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Language</span><span className="font-medium">{visitorDetail.systemSpecs.language || "Unknown"}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Timezone</span><span className="font-medium">{visitorDetail.systemSpecs.timezone || "Unknown"}</span></div>
                       </div>
 
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 mt-6">Identity</h4>
+                      <h4 className="mb-3 mt-6 text-xs font-semibold text-muted-foreground">Identity</h4>
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span className="text-muted-foreground">IP Address</span><span className="font-mono font-medium text-foreground">{visitorDetail.ipAddress}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Computer ID</span><span className="font-mono text-xs text-foreground truncate max-w-[200px]">{visitorDetail.fingerprint || "N/A"}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">First Visit</span><span className="text-foreground">{formatDate(visitorDetail.firstVisit)}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Last Visit</span><span className="text-foreground">{formatDate(visitorDetail.lastVisit)}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Total Visits</span><span className="font-bold text-foreground">{visitorDetail.totalVisits}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">IP address</span><span className="font-mono font-medium">{visitorDetail.ipAddress}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Computer ID</span><span className="max-w-[200px] truncate font-mono text-xs">{visitorDetail.fingerprint || "N/A"}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">First visit</span><span>{formatDate(visitorDetail.firstVisit)}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Last visit</span><span>{formatDate(visitorDetail.lastVisit)}</span></div>
+                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Total visits</span><span className="font-semibold">{visitorDetail.totalVisits}</span></div>
                       </div>
 
                       {visitorDetail.geo.country && (
                         <>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 mt-6">Geolocation</h4>
+                          <h4 className="mb-3 mt-6 text-xs font-semibold text-muted-foreground">Geolocation</h4>
                           <div className="space-y-2 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">City</span><span className="text-foreground">{visitorDetail.geo.city || "Unknown"}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Country</span><span className="text-foreground">{visitorDetail.geo.country || "Unknown"}</span></div>
+                            <div className="flex justify-between gap-4"><span className="text-muted-foreground">City</span><span>{visitorDetail.geo.city || "Unknown"}</span></div>
+                            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span>{visitorDetail.geo.country || "Unknown"}</span></div>
                           </div>
                         </>
                       )}
                     </div>
 
                     <div>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent Activity</h4>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                      <h4 className="mb-3 text-xs font-semibold text-muted-foreground">Recent activity</h4>
+                      <div className="max-h-64 space-y-2 overflow-y-auto">
                         {visitorDetail.recentActivity.map(a => (
-                          <div key={a.id} className="border border-border rounded-lg p-3 text-xs bg-card" data-testid={`activity-${a.id}`}>
-                            <div className="flex items-center justify-between mb-1">
+                          <div key={a.id} className="rounded-lg border bg-card p-3 text-xs" data-testid={`activity-${a.id}`}>
+                            <div className="mb-1 flex items-center justify-between">
                               <span className="text-muted-foreground">{formatDate(a.visitedAt)}</span>
-                              {a.isSuspicious && <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[9px] px-1 py-0">Suspicious</Badge>}
+                              {a.isSuspicious && <span className="rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-0 text-[9px] font-medium text-red-700 dark:text-red-400">Suspicious</span>}
                             </div>
                             <div className="text-muted-foreground">
-                              <span className="font-medium text-foreground">From:</span> {a.referrer || "NO REFERRER DATA"}
+                              <span className="font-medium">From:</span> {a.referrer || "NO REFERRER DATA"}
                             </div>
-                            <div className="text-muted-foreground mt-0.5">
-                              <span className="font-medium text-foreground">Landed:</span>{" "}
-                              <span className="text-primary break-all">{a.landingPage || "Unknown"}</span>
+                            <div className="mt-0.5 text-muted-foreground">
+                              <span className="font-medium">Landed:</span>{" "}
+                              <span className="break-all text-primary">{a.landingPage || "Unknown"}</span>
                             </div>
                           </div>
                         ))}
                         {visitorDetail.recentActivity.length === 0 && (
-                          <p className="text-muted-foreground text-sm">No activity recorded</p>
+                          <p className="text-sm text-muted-foreground">No activity recorded</p>
                         )}
                       </div>
 
                       {visitorDetail.systemSpecs.userAgent && (
                         <>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-6">User Agent</h4>
-                          <p className="text-[11px] text-muted-foreground font-mono break-all bg-muted rounded p-2">
+                          <h4 className="mb-2 mt-6 text-xs font-semibold text-muted-foreground">User agent</h4>
+                          <p className="rounded bg-muted p-2 font-mono text-[11px] text-muted-foreground break-all">
                             {visitorDetail.systemSpecs.userAgent}
                           </p>
                         </>
@@ -585,13 +574,13 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                   </div>
                 </div>
               )}
-            </Card>
+            </div>
           ))}
         </div>
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
           <span className="text-xs text-muted-foreground">
             Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
           </span>
@@ -616,51 +605,56 @@ function TrafficSourcesView({ domainId, analytics, since }: { domainId: number |
       <p className="text-xs text-muted-foreground" data-testid="text-traffic-range">
         {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Total Sources" value={sources.length} icon={Globe} />
-        <StatCard label="Total Page Loads" value={totalLoads.toLocaleString()} icon={FileText} />
-        <StatCard label="Unique Visitors" value={totalVisitors.toLocaleString()} icon={Users} />
-      </div>
+      <StatGrid cols={3}>
+        <Stat label="Total sources" value={sources.length} testId="card-stat-total-sources" />
+        <Stat label="Total page loads" value={totalLoads.toLocaleString()} testId="card-stat-total-page-loads" />
+        <Stat label="Unique visitors" value={totalVisitors.toLocaleString()} testId="card-stat-unique-visitors" />
+      </StatGrid>
 
-      <Card className="bg-card border-border">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Percentage</th>
-                  <th className="text-right p-3 text-xs font-medium text-muted-foreground">Page Loads</th>
-                  <th className="text-right p-3 text-xs font-medium text-muted-foreground">Visitors</th>
-                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Traffic Sources by Domain / Vendor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sources.length === 0 ? (
-                  <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No traffic source data available</td></tr>
-                ) : (
-                  sources.map((s, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors" data-testid={`row-source-${i}`}>
-                      <td className="p-3 w-48">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs tabular-nums text-muted-foreground w-14">{s.percentage.toFixed(1)}%</span>
-                          <PercentBar value={s.percentage} />
-                        </div>
-                      </td>
-                      <td className="text-right p-3 tabular-nums font-medium">{s.pageLoads.toLocaleString()}</td>
-                      <td className="text-right p-3 tabular-nums">{s.visitors.toLocaleString()}</td>
-                      <td className="p-3">
-                        <span className={`${s.domain === "NO REFERRER DATA" ? "text-muted-foreground italic" : "text-primary"}`}>
-                          {s.domain}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <Section flush title="Traffic sources by domain">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr className="hidden sm:table-row">
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Source</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Page loads</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visitors</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-48">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.length === 0 ? (
+                <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No traffic source data available</td></tr>
+              ) : (
+                sources.map((s, i) => (
+                  <tr key={i} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-source-${i}`}>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle">
+                      <span className={`break-all ${s.domain === "NO REFERRER DATA" ? "italic text-muted-foreground" : "font-medium"}`}>
+                        {s.domain}
+                      </span>
+                      <span className="sm:hidden text-xs text-muted-foreground"> · {s.percentage.toFixed(1)}%</span>
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
+                      <span className="sm:hidden text-muted-foreground">Page loads: </span>
+                      {s.pageLoads.toLocaleString()}
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
+                      <span className="sm:hidden text-muted-foreground">Visitors: </span>
+                      {s.visitors.toLocaleString()}
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-48">
+                      <div className="flex items-center gap-2">
+                        <span className="w-14 text-xs tabular-nums text-muted-foreground">{s.percentage.toFixed(1)}%</span>
+                        <PercentBar value={s.percentage} />
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
     </div>
   );
 }
@@ -673,51 +667,55 @@ function PagesView({ domainId }: { domainId: number | null }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Total Pages" value={pages.length} icon={FileText} />
-        <StatCard label="Total Hits" value={pages.reduce((s, p) => s + p.hits, 0).toLocaleString()} icon={Eye} />
-      </div>
+      <StatGrid cols={2}>
+        <Stat label="Total pages" value={pages.length} testId="card-stat-total-pages" />
+        <Stat label="Total hits" value={pages.reduce((s, p) => s + p.hits, 0).toLocaleString()} testId="card-stat-total-hits" />
+      </StatGrid>
 
-      <Card className="bg-card border-border">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Page URL</th>
-                  <th className="text-right p-3 text-xs font-medium text-muted-foreground">Hits</th>
-                  <th className="text-right p-3 text-xs font-medium text-muted-foreground">Unique Visitors</th>
-                  <th className="text-left p-3 text-xs font-medium text-muted-foreground w-32">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
-                ) : pages.length === 0 ? (
-                  <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No page data available</td></tr>
-                ) : (
-                  pages.map((p, i) => {
-                    const totalHits = pages.reduce((s, x) => s + x.hits, 0);
-                    const pct = totalHits ? (p.hits / totalHits) * 100 : 0;
-                    return (
-                      <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors" data-testid={`row-page-${i}`}>
-                        <td className="p-3 max-w-xs">
-                          <span className="text-primary text-xs break-all">{p.url}</span>
-                        </td>
-                        <td className="text-right p-3 tabular-nums font-medium">{p.hits.toLocaleString()}</td>
-                        <td className="text-right p-3 tabular-nums">{p.uniqueVisitors.toLocaleString()}</td>
-                        <td className="p-3 w-32">
-                          <PercentBar value={pct} />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <Section flush title="Pages">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr className="hidden sm:table-row">
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Page URL</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Hits</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Unique visitors</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-32">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
+              ) : pages.length === 0 ? (
+                <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No page data available</td></tr>
+              ) : (
+                pages.map((p, i) => {
+                  const totalHits = pages.reduce((s, x) => s + x.hits, 0);
+                  const pct = totalHits ? (p.hits / totalHits) * 100 : 0;
+                  return (
+                    <tr key={i} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-page-${i}`}>
+                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:max-w-xs">
+                        <span className="break-all text-xs text-primary">{p.url}</span>
+                      </td>
+                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums sm:font-medium">
+                        <span className="sm:hidden text-muted-foreground">Hits: </span>
+                        {p.hits.toLocaleString()}
+                      </td>
+                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
+                        <span className="sm:hidden text-muted-foreground">Unique: </span>
+                        {p.uniqueVisitors.toLocaleString()}
+                      </td>
+                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-32">
+                        <PercentBar value={pct} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
     </div>
   );
 }
@@ -733,54 +731,58 @@ function GeoView({ domainId }: { domainId: number | null }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant={subTab === "countries" ? "default" : "outline"} onClick={() => setSubTab("countries")} data-testid="button-geo-countries">Countries</Button>
         <Button size="sm" variant={subTab === "cities" ? "default" : "outline"} onClick={() => setSubTab("cities")} data-testid="button-geo-cities">Cities</Button>
       </div>
       <p className="text-xs text-muted-foreground" data-testid="text-geo-source-note">Country/city come from Cloudflare on visits recorded after this update; older visits show Unknown.</p>
 
-      <Card className="bg-card border-border">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Location</th>
-                  <th className="text-right p-3 text-xs font-medium text-muted-foreground">Visits</th>
-                  <th className="text-right p-3 text-xs font-medium text-muted-foreground">Visitors</th>
-                  <th className="text-left p-3 text-xs font-medium text-muted-foreground w-32">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
-                ) : items.length === 0 ? (
-                  <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No geographic data available</td></tr>
-                ) : (
-                  items.map((item: any, i: number) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors" data-testid={`row-geo-${i}`}>
-                      <td className="p-3 font-medium text-foreground">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {item.name}
-                        </div>
-                      </td>
-                      <td className="text-right p-3 tabular-nums font-medium">{item.count.toLocaleString()}</td>
-                      <td className="text-right p-3 tabular-nums">{item.visitors.toLocaleString()}</td>
-                      <td className="p-3 w-32">
-                        <div className="flex items-center gap-2">
-                          <PercentBar value={parseFloat(item.percentage)} />
-                          <span className="text-xs text-muted-foreground tabular-nums w-10">{item.percentage}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <Section flush title={subTab === "countries" ? "Countries" : "Cities"}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr className="hidden sm:table-row">
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Location</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visits</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visitors</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-32">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No geographic data available</td></tr>
+              ) : (
+                items.map((item: any, i: number) => (
+                  <tr key={i} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-geo-${i}`}>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:font-medium">
+                      <span className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                        {item.name}
+                      </span>
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums sm:font-medium">
+                      <span className="sm:hidden text-muted-foreground">Visits: </span>
+                      {item.count.toLocaleString()}
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
+                      <span className="sm:hidden text-muted-foreground">Visitors: </span>
+                      {item.visitors.toLocaleString()}
+                    </td>
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-32">
+                      <div className="flex items-center gap-2">
+                        <PercentBar value={parseFloat(item.percentage)} />
+                        <span className="w-10 text-xs tabular-nums text-muted-foreground">{item.percentage}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
     </div>
   );
 }
@@ -797,31 +799,29 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
     const total = entries.reduce((s, [, v]) => s + v, 0);
     const Icon = icon;
     return (
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Icon className="h-4 w-4 text-muted-foreground" /> {title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 space-y-2">
+      <Section title={title}>
+        <div className="space-y-2">
           {entries.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No data</p>
+            <p className="text-sm text-muted-foreground">No data</p>
           ) : (
             entries.map(([name, count]) => {
               const pct = total ? (count / total) * 100 : 0;
               return (
                 <div key={name} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">{name}</span>
-                    <span className="text-muted-foreground tabular-nums">{count} ({pct.toFixed(1)}%)</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{name}</span>
+                    </span>
+                    <span className="tabular-nums text-muted-foreground">{count} ({pct.toFixed(1)}%)</span>
                   </div>
                   <PercentBar value={pct} />
                 </div>
               );
             })
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
     );
   };
 
@@ -830,11 +830,11 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
       {renderBreakdown("Browsers", Chrome, platforms?.browsers)}
-      {renderBreakdown("Operating Systems", Laptop, platforms?.oses)}
+      {renderBreakdown("Operating systems", Laptop, platforms?.oses)}
       {renderBreakdown("Devices", Monitor, platforms?.devices)}
-      {renderBreakdown("Screen Resolutions", Monitor, platforms?.resolutions)}
+      {renderBreakdown("Screen resolutions", Monitor, platforms?.resolutions)}
     </div>
   );
 }
@@ -902,176 +902,170 @@ export default function IpTrackerPage() {
   });
 
   return (
-    <div className="h-full overflow-y-auto bg-background text-foreground overflow-x-hidden">
-      <section className="relative z-10 pt-6 sm:pt-8 pb-8 sm:pb-12 px-3 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
-                  <Fingerprint className="h-5 w-5 text-white" />
-                </div>
-                <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 px-3 py-1 text-sm" data-testid="badge-ip-tracker">
-                  <Activity className="h-3.5 w-3.5 mr-1.5" /> IP Tracker
-                </Badge>
-              </div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight" data-testid="text-page-title">
-                <span className="text-foreground">Visitor </span>
-                <span className="bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">Tracker</span>
-              </h1>
-              <p className="mt-2 text-muted-foreground max-w-xl text-sm" data-testid="text-subtitle">
-                Real-time website visitor tracking. See who visits your site, where they come from, and what they do.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedDomain && domains.length > 0 && (
-                <>
-                  <select
-                    className="bg-card border border-border text-foreground text-sm rounded-md px-3 py-2 outline-none min-w-0 max-w-[200px]"
-                    value={domainId || ""}
-                    onChange={(e) => setSelectedDomainId(Number(e.target.value))}
-                    aria-label="Site"
-                    data-testid="select-domain"
-                  >
-                    {domains.map(d => (
-                      <option key={d.id} value={d.id}>{d.name || d.domain}</option>
-                    ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setConfirmRemove(true)}
-                    disabled={removeDomainMutation.isPending}
-                    aria-label="Remove site"
-                    data-testid="button-remove-domain"
-                  >
-                    <Trash2 className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Remove site</span>
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => setShowAddDomain(true)}
-                data-testid="button-add-domain"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add Site
-              </Button>
-            </div>
-          </div>
-
-          <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
-            <AlertDialogContent data-testid="dialog-remove-domain">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Remove {selectedDomain?.name || selectedDomain?.domain || "this site"}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This stops tracking {selectedDomain?.domain ?? "this site"} in IP Tracker, Click Guard and VPN Shield, and permanently deletes its recorded visits and blocked IPs. Remove the tracking code from your site as well. This cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-remove-domain">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={() => { if (domainId) removeDomainMutation.mutate(domainId); }}
-                  data-testid="button-confirm-remove-domain"
-                >
-                  Remove site
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {showAddDomain && (
-            <Card className="bg-card border-border mb-6" data-testid="card-add-domain">
-              <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Input
-                    placeholder="example.com"
-                    value={newDomain}
-                    onChange={(e) => setNewDomain(e.target.value)}
-                    className="bg-card border-border text-foreground"
-                    data-testid="input-domain"
-                  />
-                  <Input
-                    placeholder="Display name (optional)"
-                    value={newDomainName}
-                    onChange={(e) => setNewDomainName(e.target.value)}
-                    className="bg-card border-border text-foreground"
-                    data-testid="input-domain-name"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => addDomainMutation.mutate()}
-                      disabled={!newDomain.trim() || addDomainMutation.isPending}
-                      data-testid="button-save-domain"
-                    >
-                      {addDomainMutation.isPending ? "Adding..." : "Add"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-muted-foreground"
-                      onClick={() => setShowAddDomain(false)}
-                      data-testid="button-cancel-domain"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Wraps instead of scrolling so every tab stays visible at phone width. */}
-          <div className="flex flex-wrap items-center gap-1 mb-6 bg-card border border-border rounded-lg p-1 sm:w-fit" role="tablist">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
-                  activeTab === tab.id
-                    ? "bg-blue-600 text-white"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-                data-testid={`tab-${tab.id}`}
-              >
-                <tab.icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.split(" ")[0]}</span>
-              </button>
-            ))}
-          </div>
-
-          {domainsLoading ? (
-            <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
-          ) : !domainId && !showAddDomain ? (
-            <Card className="bg-card border-border p-12 text-center">
-              <Fingerprint className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-foreground mb-2">No Sites Being Tracked</h2>
-              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                Add your first website to start tracking visitors in real time. You'll get a tracking code to embed on your site.
-              </p>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowAddDomain(true)} data-testid="button-add-first-domain">
-                <Plus className="h-4 w-4 mr-2" /> Add Your First Site
-              </Button>
-            </Card>
-          ) : (
+    <AppPage width="wide" testId="page-ip-tracker">
+      <PageHeader
+        title={<span data-testid="text-page-title">IP Tracker</span>}
+        description={<span data-testid="text-subtitle">Real-time website visitor tracking. See who visits your site, where they come from, and what they do.</span>}
+        meta={selectedDomain ? (
+          <StatusPill tone="neutral" data-testid="badge-ip-tracker">
+            {selectedDomain.name || selectedDomain.domain}
+          </StatusPill>
+        ) : undefined}
+        actions={
+          domains.length > 0 ? (
             <>
-              {activeTab === "dashboard" && <DashboardView domainId={domainId} analytics={analytics} domains={domains} />}
-              {activeTab === "visitors" && <VisitorListView domainId={domainId} />}
-              {activeTab === "traffic" && <TrafficSourcesView domainId={domainId} analytics={analytics} since={since} />}
-              {activeTab === "pages" && <PagesView domainId={domainId} />}
-              {activeTab === "geo" && <GeoView domainId={domainId} />}
-              {activeTab === "platforms" && <PlatformsView domainId={domainId} />}
+              <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-52 sm:flex-none">
+                <span className="text-muted-foreground sm:hidden">Site</span>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={domainId || ""}
+                  onChange={(e) => setSelectedDomainId(Number(e.target.value))}
+                  aria-label="Site"
+                  data-testid="select-domain"
+                >
+                  {domains.map(d => (
+                    <option key={d.id} value={d.id}>{d.name || d.domain}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex flex-1 gap-2 sm:flex-none">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="outline" aria-label="Site actions" data-testid="button-site-actions">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={() => setConfirmRemove(true)}
+                      data-testid="button-remove-domain"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Remove site
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  className="flex-1 sm:flex-none"
+                  onClick={() => setShowAddDomain(o => !o)}
+                  data-testid="button-add-domain"
+                >
+                  <Plus className="mr-1 h-4 w-4" /> Add site
+                </Button>
+              </div>
             </>
-          )}
+          ) : undefined
+        }
+      />
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent data-testid="dialog-remove-domain">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {selectedDomain?.name || selectedDomain?.domain || "this site"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This stops tracking {selectedDomain?.domain ?? "this site"} in IP Tracker, Click Guard and VPN Shield, and permanently deletes its recorded visits and blocked IPs. Remove the tracking code from your site as well. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-remove-domain">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (domainId) removeDomainMutation.mutate(domainId); }}
+              data-testid="button-confirm-remove-domain"
+            >
+              Remove site
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {showAddDomain && (
+        <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-add-domain">
+          <div className="space-y-3 p-4 sm:p-5">
+            <h2 className="text-base font-semibold">Add a site</h2>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Input
+                placeholder="example.com"
+                value={newDomain}
+                onChange={(e) => setNewDomain(e.target.value)}
+                data-testid="input-domain"
+              />
+              <Input
+                placeholder="Display name (optional)"
+                value={newDomainName}
+                onChange={(e) => setNewDomainName(e.target.value)}
+                data-testid="input-domain-name"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => addDomainMutation.mutate()}
+                disabled={!newDomain.trim() || addDomainMutation.isPending}
+                data-testid="button-save-domain"
+              >
+                {addDomainMutation.isPending ? "Adding…" : "Add"}
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-muted-foreground"
+                onClick={() => setShowAddDomain(false)}
+                data-testid="button-cancel-domain"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
-      </section>
-    </div>
+      )}
+
+      {/* Scrolls sideways on phones instead of wrapping. */}
+      <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+        <div className="inline-flex h-10 w-max min-w-full gap-1 rounded-xl bg-muted p-1 sm:min-w-0" role="tablist">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              data-testid={`tab-${tab.id}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {domainsLoading ? (
+        <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
+      ) : !domainId && !showAddDomain ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <Fingerprint className="h-5 w-5" strokeWidth={1.6} />
+          </div>
+          <h2 className="mt-3 text-sm font-medium">No sites being tracked</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+            Add your first website to start tracking visitors in real time. You'll get a tracking code to embed on your site.
+          </p>
+          <Button className="mt-4" onClick={() => setShowAddDomain(true)} data-testid="button-add-first-domain">
+            <Plus className="mr-2 h-4 w-4" /> Add your first site
+          </Button>
+        </div>
+      ) : (
+        <>
+          {activeTab === "dashboard" && <DashboardView domainId={domainId} analytics={analytics} domains={domains} />}
+          {activeTab === "visitors" && <VisitorListView domainId={domainId} />}
+          {activeTab === "traffic" && <TrafficSourcesView domainId={domainId} analytics={analytics} since={since} />}
+          {activeTab === "pages" && <PagesView domainId={domainId} />}
+          {activeTab === "geo" && <GeoView domainId={domainId} />}
+          {activeTab === "platforms" && <PlatformsView domainId={domainId} />}
+        </>
+      )}
+    </AppPage>
   );
 }
