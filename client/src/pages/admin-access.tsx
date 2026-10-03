@@ -87,7 +87,7 @@ function AccessSummary({ account }: { account: AccessGrantAccount }) {
       {a.planName && <span className="font-medium">{a.planName}</span>}
       {!a.planName && a.paidStripe && a.status && <span className="text-muted-foreground">({a.status.replace(/_/g, " ")})</span>}
       {end && <span className="text-muted-foreground">· {end}</span>}
-      {account.isPlatformAdmin && <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">ADMIN</span>}
+      {account.isPlatformAdmin && <span className="text-xs text-muted-foreground">Admin</span>}
     </div>
   );
 }
