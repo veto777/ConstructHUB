@@ -154,7 +154,7 @@ export default function LsaAccountManagerPage() {
         <Section flush className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-base font-semibold mb-2" data-testid="text-access-denied">Access Denied</h2>
+            <h2 className="text-base font-semibold mb-2" data-testid="text-access-denied">Access denied</h2>
             <p className="text-sm text-muted-foreground">This section is restricted to ConstructHUB administrators only.</p>
           </CardContent>
         </Section>
@@ -221,7 +221,7 @@ function AdminGateCard() {
       <Section flush className="max-w-sm w-full" testId="card-admin-gate">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <ShieldCheck className="h-5 w-5 text-primary" /> Platform Admin sign-in
+            <ShieldCheck className="h-5 w-5 text-primary" /> Platform admin sign-in
           </CardTitle>
           <p className="text-sm text-muted-foreground">The LSA Account Manager needs the admin console credentials.</p>
         </CardHeader>
@@ -388,11 +388,11 @@ function ManagerConnectionTab() {
       <Dialog open={showConnect} onOpenChange={open => { setShowConnect(open); if (!open) connectMutation.reset(); }}>
         <DialogContent data-testid="dialog-connect-manager">
           <DialogHeader>
-            <DialogTitle>Connect manager Account</DialogTitle>
+            <DialogTitle>Connect manager account</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="managerId">Manager Customer ID</Label>
+              <Label htmlFor="managerId">Manager customer ID</Label>
               <Input
                 id="managerId"
                 placeholder="1234567890 (digits only, no dashes)"
@@ -403,7 +403,7 @@ function ManagerConnectionTab() {
               <p className="text-xs text-muted-foreground">Your Google Ads MCC customer ID — digits only.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refreshToken">Refresh Token</Label>
+              <Label htmlFor="refreshToken">Refresh token</Label>
               <Input
                 id="refreshToken"
                 type="password"
@@ -415,7 +415,7 @@ function ManagerConnectionTab() {
               <p className="text-xs text-muted-foreground">Obtained via OAuth with access_type=offline + prompt=consent. Checked with Google before anything is saved.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="developerToken">Developer Token <span className="text-muted-foreground">(optional)</span></Label>
+              <Label htmlFor="developerToken">Developer token <span className="text-muted-foreground">(optional)</span></Label>
               <Input
                 id="developerToken"
                 type="password"
@@ -515,7 +515,7 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
                 <Input placeholder="1234567890" value={newCustomerId} onChange={e => setNewCustomerId(e.target.value)} data-testid="input-new-customer-id" />
               </div>
               <div className="space-y-1">
-                <Label>Account Name (optional)</Label>
+                <Label>Account name (optional)</Label>
                 <Input placeholder="Client name" value={newAccountName} onChange={e => setNewAccountName(e.target.value)} data-testid="input-new-account-name" />
               </div>
             </div>
@@ -549,7 +549,7 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
                 <th className="text-left p-3 font-medium">Account</th>
                 <th className="text-left p-3 font-medium">Customer ID</th>
                 <th className="text-left p-3 font-medium">Owner</th>
-                <th className="text-left p-3 font-medium">Link Type</th>
+                <th className="text-left p-3 font-medium">Link type</th>
                 <th className="text-left p-3 font-medium">Status</th>
                 <th className="text-left p-3 font-medium">Leads</th>
                 <th className="text-left p-3 font-medium">Charged</th>
@@ -771,7 +771,7 @@ function InvitationsTab() {
                         disabled={updateStatusMutation.isPending}
                         data-testid={`button-accept-invitation-${inv.id}`}
                       >
-                        <CheckCircle className="h-3 w-3 mr-1" /> Mark Accepted
+                        <CheckCircle className="h-3 w-3 mr-1" /> Mark accepted
                       </Button>
                       <Button
                         size="sm"
@@ -1105,12 +1105,12 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
       <Dialog open={!!budgetDialog} onOpenChange={() => setBudgetDialog(null)}>
         <DialogContent data-testid="dialog-budget">
           <DialogHeader>
-            <DialogTitle>Change Daily Budget</DialogTitle>
+            <DialogTitle>Change daily budget</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">Campaign: <strong>{budgetDialog?.campaign.name}</strong></p>
             <div className="space-y-1">
-              <Label htmlFor="newBudget">New Daily Budget (USD)</Label>
+              <Label htmlFor="newBudget">New daily budget (USD)</Label>
               <Input id="newBudget" type="number" min="1" step="0.01" value={newBudget} onChange={e => setNewBudget(e.target.value)} data-testid="input-new-budget" />
             </div>
           </div>
@@ -1131,11 +1131,11 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
       <Dialog open={!!renameDialog} onOpenChange={() => setRenameDialog(null)}>
         <DialogContent data-testid="dialog-rename">
           <DialogHeader>
-            <DialogTitle>Rename Campaign</DialogTitle>
+            <DialogTitle>Rename campaign</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <Label htmlFor="newName">New Campaign Name</Label>
+              <Label htmlFor="newName">New campaign name</Label>
               <Input id="newName" value={newName} onChange={e => setNewName(e.target.value)} data-testid="input-new-name" placeholder="Campaign name" />
             </div>
           </div>
@@ -1156,14 +1156,14 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
       <Dialog open={!!disputeDialog} onOpenChange={() => setDisputeDialog(null)}>
         <DialogContent data-testid="dialog-dispute">
           <DialogHeader>
-            <DialogTitle>Dispute Lead</DialogTitle>
+            <DialogTitle>Dispute lead</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-700 dark:text-amber-300">
               Only charged leads can be disputed. Each lead can only be disputed once. Google does not like excessive disputes — use sparingly for genuine invalid leads.
             </div>
             <div className="space-y-1">
-              <Label>Dispute Reason</Label>
+              <Label>Dispute reason</Label>
               <Select value={disputeReason} onValueChange={setDisputeReason}>
                 <SelectTrigger data-testid="select-dispute-reason">
                   <SelectValue placeholder="Select a reason..." />
